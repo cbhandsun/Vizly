@@ -1,6 +1,7 @@
 import type { Edge } from '@xyflow/react';
 
 import { parseRoutingLineHops } from '../../routing/routingLineHops';
+import type { RoutingPatch } from '../../routing/routingPatch';
 import { edgeRoutingQualityIntentToken } from '../../strategies/shared/edgeRoutingQualityIntent';
 import {
   baseReactFlowDisplayOutputRouteSignatureMatches,
@@ -74,9 +75,9 @@ const applyRoutingValuePatch = (baseline: unknown, patch: unknown): unknown => {
 export const createBaseReactFlowDisplayEdgePatches = (
   sourceEdges: Edge[],
   routedEdges: Edge[],
-): Edge[] | null => {
+): RoutingPatch[] | null => {
   if (sourceEdges.length !== routedEdges.length) return null;
-  const patches: Edge[] = [];
+  const patches: RoutingPatch[] = [];
   for (let index = 0; index < routedEdges.length; index += 1) {
     const routedEdge = routedEdges[index];
     const sourceEdge = sourceEdges[index];
@@ -104,14 +105,14 @@ export const createBaseReactFlowDisplayEdgePatches = (
       source: routedEdge.source,
       target: routedEdge.target,
       ...patch,
-    } as Edge);
+    } as RoutingPatch);
   }
   return patches;
 };
 
 export const mergeBaseReactFlowDisplayEdgePatches = (
   sourceEdges: Edge[],
-  patches: Edge[],
+  patches: RoutingPatch[],
 ): Edge[] | null => {
   if (!Array.isArray(patches) || sourceEdges.length !== patches.length) return null;
   const merged: Edge[] = [];
@@ -171,14 +172,14 @@ type DisplayRoutingPatchSanitizerOptions = {
 
 const sanitizeBaseReactFlowRoutingPatches = (
   sourceEdges: Edge[],
-  patches: Edge[],
+  patches: RoutingPatch[],
   options: DisplayRoutingPatchSanitizerOptions,
-): Edge[] | null => {
+): RoutingPatch[] | null => {
   if (
     sourceEdges.length !== patches.length
     || sourceEdges.length > DISPLAY_WORKER_MAX_GRAPH_ITEMS
   ) return null;
-  const safePatches: Edge[] = [];
+  const safePatches: RoutingPatch[] = [];
   let totalPoints = 0;
   for (let index = 0; index < patches.length; index += 1) {
     const sourceEdge = sourceEdges[index];
@@ -320,7 +321,7 @@ const sanitizeBaseReactFlowRoutingPatches = (
       }
       if (Object.keys(safeData).length > 0) safePatch.data = safeData;
     }
-    safePatches.push(safePatch as unknown as Edge);
+    safePatches.push(safePatch as RoutingPatch);
   }
   return safePatches;
 };
@@ -332,8 +333,8 @@ const sanitizeBaseReactFlowRoutingPatches = (
  */
 export const sanitizeBaseReactFlowDisplayCachePatches = (
   sourceEdges: Edge[],
-  patches: Edge[],
-): Edge[] | null => sanitizeBaseReactFlowRoutingPatches(sourceEdges, patches, {
+  patches: RoutingPatch[],
+): RoutingPatch[] | null => sanitizeBaseReactFlowRoutingPatches(sourceEdges, patches, {
   allowRuntimeHandleChange: false,
   allowRouterIntent: false,
   allowNewTreeRouting: false,
@@ -347,8 +348,8 @@ export const sanitizeBaseReactFlowDisplayCachePatches = (
  */
 export const sanitizeBaseReactFlowTrustedDisplayPatches = (
   sourceEdges: Edge[],
-  patches: Edge[],
-): Edge[] | null => sanitizeBaseReactFlowRoutingPatches(sourceEdges, patches, {
+  patches: RoutingPatch[],
+): RoutingPatch[] | null => sanitizeBaseReactFlowRoutingPatches(sourceEdges, patches, {
   allowRuntimeHandleChange: true,
   allowRouterIntent: true,
   allowNewTreeRouting: true,
@@ -361,9 +362,13 @@ export const mergeBaseReactFlowDisplayRoutingTransactions = ({
   repairRoutingPatches,
 }: {
   latestSourceEdges: Edge[];
-  workerRoutingPatches: Edge[];
-  repairRoutingPatches?: Edge[];
-}): { edges: Edge[]; displayPatches: Edge[]; cachePatches: Edge[] | null } | null => {
+  workerRoutingPatches: RoutingPatch[];
+  repairRoutingPatches?: RoutingPatch[];
+}): {
+  edges: Edge[];
+  displayPatches: RoutingPatch[];
+  cachePatches: RoutingPatch[] | null;
+} | null => {
   const workerMergedEdges = mergeBaseReactFlowDisplayEdgePatches(
     latestSourceEdges,
     workerRoutingPatches,
@@ -400,7 +405,7 @@ export const resolveBaseReactFlowDisplayCacheReplaySignature = ({
 }: {
   sourceEdges: Edge[];
   finalEdges: Edge[];
-  cachePatches: Edge[];
+  cachePatches: RoutingPatch[];
   finalOutputRouteSignature: string | null;
 }): string | null => {
   if (finalOutputRouteSignature === null) return null;

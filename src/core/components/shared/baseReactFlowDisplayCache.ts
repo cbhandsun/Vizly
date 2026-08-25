@@ -1,5 +1,6 @@
 import type { Edge, Node, XYPosition } from '@xyflow/react';
 import { EDGE_ROUTING_CACHE_VERSION } from '../../routing/routingVersion';
+import type { RoutingPatch } from '../../routing/routingPatch';
 import { edgeRoutingQualityIntentToken } from '../../strategies/shared/edgeRoutingQualityIntent';
 import { visitBaseReactFlowDisplayInputIdentity } from './baseReactFlowDisplayInputIdentity';
 import {
@@ -23,7 +24,7 @@ const BASE_DISPLAY_ROUTE_MAX_TOTAL_POINTS = 200_000;
 const BASE_DISPLAY_ROUTE_SIGNATURE_VERSION = 'route-v2';
 
 export type BaseReactFlowDisplayEdgesCacheEntry = {
-  edges: Edge[];
+  edges: RoutingPatch[];
   hardClean: boolean;
   inputGeometryDigest?: string;
   /** Exact path/handle geometry to which hardClean applies. */

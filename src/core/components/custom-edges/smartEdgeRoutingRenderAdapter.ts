@@ -1,12 +1,15 @@
 import { createContext, useContext } from 'react';
 
-import { EDGE_ROUTING_CACHE_VERSION } from '../../routing/routingVersion';
+import {
+  EDGE_ROUTING_CACHE_VERSION,
+  EDGE_ROUTING_VISUAL_VERSION,
+} from '../../routing/routingVersion';
 
 export type SmartEdgeRoutingRenderAdapter = Readonly<{
   kind: 'standalone-fallback' | 'routing-session';
   acceptsCommittedGeometry: boolean;
   routingVersion: string | null;
-  qualityContract: 'none' | 'commercial-hard-gate-v1';
+  qualityContract: 'none' | typeof EDGE_ROUTING_VISUAL_VERSION;
 }>;
 
 export const STANDALONE_EDGE_RENDER_ADAPTER: SmartEdgeRoutingRenderAdapter = Object.freeze({
@@ -20,7 +23,7 @@ export const ROUTING_SESSION_EDGE_RENDER_ADAPTER: SmartEdgeRoutingRenderAdapter 
   kind: 'routing-session',
   acceptsCommittedGeometry: true,
   routingVersion: EDGE_ROUTING_CACHE_VERSION,
-  qualityContract: 'commercial-hard-gate-v1',
+  qualityContract: EDGE_ROUTING_VISUAL_VERSION,
 });
 
 /** Fail-closed authority for rendering routing-owned computedPath geometry. */
@@ -40,5 +43,5 @@ export const smartEdgeRenderAdapterAcceptsCommittedGeometry = (
   return adapter.kind === 'routing-session'
     && adapter.acceptsCommittedGeometry === true
     && adapter.routingVersion === EDGE_ROUTING_CACHE_VERSION
-    && adapter.qualityContract === 'commercial-hard-gate-v1';
+    && adapter.qualityContract === EDGE_ROUTING_VISUAL_VERSION;
 };

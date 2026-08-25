@@ -14,7 +14,11 @@ import {
   createBaseReactFlowRoutingAffectedClosure,
   createBaseReactFlowRoutingChangeSet,
 } from '../baseReactFlowDisplayRoutingChangeSet';
-import { createDisplayRoutingIdentity } from '../baseReactFlowDisplayRoutingSession';
+import {
+  createDisplayRoutingIdentity,
+  displayRoutingIdentitiesMatch,
+  isDisplayRoutingIdentity,
+} from '../baseReactFlowDisplayRoutingSession';
 import { createBaseReactFlowDisplayEdgePatches } from '../baseReactFlowDisplayWorkerClient';
 import { parseDisplayEdgesWorkerResponse } from '../baseReactFlowDisplayWorkerProtocol';
 import { completeDisplayWorkerResponse } from '../baseReactFlowDisplayWorkerSessionResponse';
@@ -52,6 +56,28 @@ const edges: Edge[] = [{
 afterEach(clearDisplayRoutingWorkerSessions);
 
 describe('display routing Worker-private session', () => {
+  it('binds session authority to both routing and visual contract versions', () => {
+    const identity = createDisplayRoutingIdentity(
+      '123',
+      `geometry-v1:${'a'.repeat(32)}`,
+    );
+
+    expect(isDisplayRoutingIdentity(identity)).toBe(true);
+    expect(isDisplayRoutingIdentity({
+      ...identity,
+      visualVersion: 'commercial-hard-gate-v0',
+    })).toBe(false);
+    expect(isDisplayRoutingIdentity({
+      routingVersion: identity.routingVersion,
+      inputSignature: identity.inputSignature,
+      inputGeometryDigest: identity.inputGeometryDigest,
+    })).toBe(false);
+    expect(displayRoutingIdentitiesMatch(identity, {
+      ...identity,
+      visualVersion: 'commercial-hard-gate-v0',
+    })).toBe(false);
+  });
+
   it('keeps a full phase trace within the response protocol budget during session commit', () => {
     const identity = computeBaseReactFlowDisplayInputIdentityBundle({
       nodes,

@@ -83,7 +83,7 @@ export type BaseReactFlowPrecompiledCommittedRouteCapture = Readonly<{
   inputGeometryDigest: string;
   outputRouteSignature: string;
   sourceEdges: Edge[];
-  displayPatches: Edge[];
+  displayPatches: RoutingPatch[];
 }>;
 
 type PrecompiledCaptureWindow = Window & {
@@ -115,3 +115,4 @@ export const publishBaseReactFlowPrecompiledCommittedRoute = (
   }
 };
 import type { Edge } from '@xyflow/react';
+import type { RoutingPatch } from '../../routing/routingPatch';

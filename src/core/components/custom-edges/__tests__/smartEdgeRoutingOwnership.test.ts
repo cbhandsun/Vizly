@@ -21,6 +21,7 @@ describe('smart edge routing render authority', () => {
     {},
     [],
     { ...ROUTING_SESSION_EDGE_RENDER_ADAPTER, routingVersion: 'stale' },
+    { ...ROUTING_SESSION_EDGE_RENDER_ADAPTER, qualityContract: 'commercial-hard-gate-v0' },
     { ...ROUTING_SESSION_EDGE_RENDER_ADAPTER, qualityContract: 'none' },
     { ...ROUTING_SESSION_EDGE_RENDER_ADAPTER, acceptsCommittedGeometry: false },
   ])('fails closed for malformed, stale, or downgraded authority: %j', value => {

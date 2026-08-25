@@ -73,5 +73,16 @@ describe('baseReactFlowDocumentRouteCandidate', () => {
       inputGeometryDigest: candidate.inputGeometryDigest,
       sourceEdges,
     })).toBeNull();
+
+    const forgedSnapshot = createRoutingOnlyDocumentSnapshot({
+      ...candidate,
+      outputRouteSignature: 'route-v2:1:2:0123456789abcdef',
+    });
+    expect(registerRoutingOnlyDocumentCandidate(forgedSnapshot)).toBe(true);
+    expect(loadBaseReactFlowDocumentRouteCandidate({
+      inputSignature: candidate.inputSignature,
+      inputGeometryDigest: candidate.inputGeometryDigest,
+      sourceEdges,
+    })).toBeNull();
   });
 });

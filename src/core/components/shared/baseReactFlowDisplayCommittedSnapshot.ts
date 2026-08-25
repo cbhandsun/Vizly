@@ -7,6 +7,7 @@ import {
 } from '../../routing/persistedRoutingCandidate';
 import { EDGE_ROUTING_CACHE_VERSION } from '../../routing/routingVersion';
 import { isDisplayRoutingCapabilityEnabled } from '../../routing/displayRoutingCapabilities';
+import type { RoutingPatch } from '../../routing/routingPatch';
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
 import {
   computeDisplayRoutingHardReportDigest,
@@ -47,7 +48,7 @@ export type RoutingCommittedSnapshot = Readonly<{
     nodes: Node[];
     edges: Edge[];
   }>;
-  routingPatches: Edge[];
+  routingPatches: RoutingPatch[];
   outputRouteSignature: string;
   hardReportDigest: DisplayRoutingHardReportDigest;
   workerSessionRef?: RoutingWorkerSessionRef;
@@ -59,7 +60,7 @@ export type BaseReactFlowDisplayCommittedSnapshotBaseline = RoutingCommittedSnap
   inputGeometryDigest: string;
   nodes: Node[];
   sourceEdges: Edge[];
-  displayPatches: Edge[];
+  displayPatches: RoutingPatch[];
   outputRouteSignature: string;
   workerSessionRef?: RoutingWorkerSessionRef;
 }>;
@@ -115,7 +116,7 @@ export const writeBaseReactFlowDisplayCommittedSnapshot = (options: {
   inputGeometryDigest: string;
   sourceEdges: Edge[];
   sourceNodes: Node[];
-  displayPatches: Edge[];
+  displayPatches: RoutingPatch[];
   outputRouteSignature: string | null;
   workerSessionRef?: RoutingWorkerSessionRef;
 } & CommittedHardReportIdentity): boolean => {
@@ -145,7 +146,7 @@ const createCommittedSnapshot = ({
   inputGeometryDigest: string;
   sourceEdges: Edge[];
   sourceNodes: Node[];
-  displayPatches: Edge[];
+  displayPatches: RoutingPatch[];
   outputRouteSignature: string | null;
   workerSessionRef?: RoutingWorkerSessionRef;
 } & CommittedHardReportIdentity): BaseReactFlowDisplayCommittedSnapshotBaseline | null => {
@@ -260,7 +261,7 @@ export const commitBaseReactFlowDisplaySnapshot = (options: {
   inputGeometryDigest: string;
   sourceEdges: Edge[];
   sourceNodes: Node[];
-  displayPatches: Edge[];
+  displayPatches: RoutingPatch[];
   outputRouteSignature: string | null;
   workerSessionRef?: RoutingWorkerSessionRef;
   precompiledCapturePresetId?: string | null;

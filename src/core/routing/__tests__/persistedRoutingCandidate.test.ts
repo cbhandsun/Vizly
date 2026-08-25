@@ -84,6 +84,47 @@ describe('routing-only document snapshot', () => {
     })).toBeNull();
   });
 
+  it('fails closed for oversized, overdeep, and signature-conflicting document input', () => {
+    const current = candidate();
+    if (!current) throw new Error('expected a valid candidate fixture');
+    const wrap = (candidateValue: unknown) => ({
+      schema: ROUTING_ONLY_DOCUMENT_SNAPSHOT_SCHEMA,
+      candidate: candidateValue,
+    });
+
+    expect(parseRoutingOnlyDocumentSnapshot(wrap({
+      ...current,
+      patches: Array.from({ length: 301 }, (_, index) => ({
+        ...current.patches[0],
+        id: `edge-${index}`,
+      })),
+    }))).toBeNull();
+    expect(parseRoutingOnlyDocumentSnapshot(wrap({
+      ...current,
+      patches: [{
+        ...current.patches[0],
+        data: {
+          computedPath: Array.from({ length: 2_001 }, (_, index) => ({ x: index, y: 0 })),
+        },
+      }],
+    }))).toBeNull();
+    expect(parseRoutingOnlyDocumentSnapshot(wrap({
+      ...current,
+      patches: [{
+        ...current.patches[0],
+        data: { treeRouting: { points: { nested: { nested: { nested: [] } } } } },
+      }],
+    }))).toBeNull();
+    expect(parseRoutingOnlyDocumentSnapshot(wrap({
+      ...current,
+      outputRouteSignature: 'route-v2:1:2:not-a-signature',
+    }))).toBeNull();
+    expect(parseRoutingOnlyDocumentSnapshot(wrap({
+      ...current,
+      patches: [{ ...current.patches[0], markerEnd: 'business-owned' }],
+    }))).toBeNull();
+  });
+
   it('strips routing geometry while preserving business and manual metadata', () => {
     const edge = {
       id: 'edge-1',

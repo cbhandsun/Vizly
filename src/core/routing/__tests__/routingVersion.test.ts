@@ -10,7 +10,10 @@ import {
   retainRenderedPathCacheEdges,
   setRenderedPathCacheValue,
 } from '../renderedPathCache';
-import { EDGE_ROUTING_CACHE_VERSION } from '../routingVersion';
+import {
+  EDGE_ROUTING_CACHE_VERSION,
+  EDGE_ROUTING_VISUAL_VERSION,
+} from '../routingVersion';
 
 describe('edge routing cache version', () => {
   beforeEach(() => {
@@ -21,6 +24,10 @@ describe('edge routing cache version', () => {
     expect(BASE_DISPLAY_ROUTING_VERSION).toBe(EDGE_ROUTING_CACHE_VERSION);
     expect(RENDERED_PATH_CACHE_VERSION).toBe(EDGE_ROUTING_CACHE_VERSION);
     expect(STANDARD_PRESET_CANVAS_CACHE_VERSION).toBe(EDGE_ROUTING_CACHE_VERSION);
+  });
+
+  it('declares an independent renderer-facing commercial contract version', () => {
+    expect(EDGE_ROUTING_VISUAL_VERSION).toBe('commercial-hard-gate-v1');
   });
 
   it('bounds rendered paths and prunes edges that no longer belong to the active graph', () => {

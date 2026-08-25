@@ -1,8 +1,7 @@
-import type { Edge } from '@xyflow/react';
-
 import { EDGE_ROUTING_CACHE_VERSION } from './routingVersion';
 import { parseRoutingLineHops } from './routingLineHops';
 import { ROUTING_IDENTIFIER_MAX_LENGTH } from './routingBoundaryLimits';
+import type { RoutingPatch } from './routingPatch';
 
 export const PERSISTED_ROUTING_CANDIDATE_SCHEMA = 'vizly-routing-only-candidate-v1';
 export const ROUTING_ONLY_DOCUMENT_SNAPSHOT_SCHEMA = 'vizly-routing-only-document-v1';
@@ -47,7 +46,7 @@ export type PersistedRoutingCandidate = Readonly<{
   writtenAt: number;
   hardClean: true;
   outputRouteSignature: string;
-  patches: Edge[];
+  patches: RoutingPatch[];
 }>;
 
 export type PersistedRoutingCandidateExpectation = Readonly<{
@@ -106,7 +105,7 @@ const parsePath = (value: unknown): Array<{ x: number; y: number }> | null => {
 const parsePatch = (
   value: unknown,
   pointBudget: { total: number },
-): Edge | null => {
+): RoutingPatch | null => {
   if (!isRecord(value) || !hasOnlyKeys(value, PATCH_KEYS)) return null;
   if (!isIdentifier(value.id) || !isIdentifier(value.source) || !isIdentifier(value.target)) {
     return null;
@@ -160,7 +159,7 @@ const parsePatch = (
     }
     patch.data = data;
   }
-  return patch as unknown as Edge;
+  return patch as RoutingPatch;
 };
 
 const parseStructurallyValidCandidate = (
@@ -195,7 +194,7 @@ const parseStructurallyValidCandidate = (
     writtenAt: value.writtenAt as number,
     hardClean: true,
     outputRouteSignature: value.outputRouteSignature,
-    patches: patches as Edge[],
+    patches: patches as RoutingPatch[],
   };
 };
 
@@ -227,7 +226,7 @@ export const createPersistedRoutingCandidate = ({
   inputSignature: string;
   inputGeometryDigest: string;
   outputRouteSignature: string;
-  patches: Edge[];
+  patches: RoutingPatch[];
   writtenAt?: number;
 }): PersistedRoutingCandidate | null => parsePersistedRoutingCandidate({
   schema: PERSISTED_ROUTING_CANDIDATE_SCHEMA,

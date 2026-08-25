@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import { ROUTING_IDENTIFIER_MAX_LENGTH } from '../../routing/routingBoundaryLimits';
+import type { RoutingPatch } from '../../routing/routingPatch';
 import { isDisplayWorkerBoundedCandidateReport } from './baseReactFlowDisplayWorkerQualityProtocol';
 import {
   isDisplayRoutingPhaseTrace,
@@ -95,7 +96,7 @@ export type DisplayEdgesWorkerValidateOrRouteRequest = Omit<
   /** Legacy full candidate. New clients send routing-only patches instead. */
   candidateEdges?: Edge[] | null;
   /** Null means the routing-only candidate failed protocol validation. */
-  candidatePatches?: Edge[] | null;
+  candidatePatches?: RoutingPatch[] | null;
   candidateSource: DisplayEdgesWorkerCandidateSource;
 };
 
@@ -122,7 +123,7 @@ export type DisplayEdgesWorkerIncrementalRouteRequest = Omit<
   baselineInputGeometryDigest: string;
   baselineNodes?: Node[];
   baselineSourceEdges?: Edge[];
-  baselinePatches?: Edge[];
+  baselinePatches?: RoutingPatch[];
   baselineOutputRouteSignature: string;
   nextInputSignature: string;
   nextInputGeometryDigest: string;
@@ -440,7 +441,7 @@ export const parseDisplayEdgesWorkerRequest = (
       ...(hasCompleteBootstrap ? {
         baselineNodes: value.baselineNodes as Node[],
         baselineSourceEdges: value.baselineSourceEdges as Edge[],
-        baselinePatches: value.baselinePatches as Edge[],
+        baselinePatches: value.baselinePatches as RoutingPatch[],
       } : {}),
       baselineOutputRouteSignature: value.baselineOutputRouteSignature as string,
       nextInputSignature: value.nextInputSignature as string,
@@ -599,7 +600,7 @@ export const parseDisplayEdgesWorkerResponse = (
   return {
     requestId: expectedRequestId,
     edges: hasEdges ? value.edges as Edge[] : undefined,
-    routingPatches: hasRoutingPatches ? value.routingPatches as Edge[] : undefined,
+    routingPatches: hasRoutingPatches ? value.routingPatches as RoutingPatch[] : undefined,
     hardClean: value.hardClean,
     hardReport,
     routeResolution: value.routeResolution,

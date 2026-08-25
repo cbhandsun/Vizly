@@ -1,4 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
+import type { RoutingPatch } from '../../routing/routingPatch';
 
 import type {
   RoutingIdentity,
@@ -25,7 +26,7 @@ export type DisplayRoutingWorkerSessionState = Readonly<{
   ref: RoutingWorkerSessionRef;
   nodes: Node[];
   sourceEdges: Edge[];
-  displayPatches: Edge[];
+  displayPatches: RoutingPatch[];
   topologyPlan: RoutingTopologyPlan;
   spatialSnapshot: DisplayRoutingWorkerSpatialSnapshot | null;
   hardReport?: BaseDisplayBoundedCandidateReport;
@@ -57,7 +58,7 @@ export const writeDisplayRoutingWorkerSession = ({
   outputRouteSignature: string;
   nodes: Node[];
   sourceEdges: Edge[];
-  displayPatches: Edge[];
+  displayPatches: RoutingPatch[];
   finalEdges: Edge[];
   hardReport?: BaseDisplayBoundedCandidateReport;
 }): RoutingWorkerSessionRef => {

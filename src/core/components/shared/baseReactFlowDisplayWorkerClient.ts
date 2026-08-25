@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 import type { MutableRefObject } from 'react';
+import type { RoutingPatch } from '../../routing/routingPatch';
 import {
   parseDisplayEdgesWorkerResponse,
   readDisplayEdgesWorkerRequestId,
@@ -55,13 +56,13 @@ export {
 export type DeferredDisplayEdges = {
   signature: string;
   geometryDigest: string;
-  displayPatches: Edge[];
+  displayPatches: RoutingPatch[];
   hardClean: boolean;
 };
 export type BaseReactFlowDisplayWorkerResult = {
   edges: Edge[];
   /** Sanitized routing-only transaction produced at the Worker trust boundary. */
-  routingPatches: Edge[];
+  routingPatches: RoutingPatch[];
   hardClean: boolean;
   hardReport?: DisplayEdgesWorkerResponse['hardReport'];
   routeResolution: DisplayEdgesWorkerRouteResolution;

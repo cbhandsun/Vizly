@@ -445,6 +445,7 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
     expect(committed?.displayPatches).not.toBe(displayPatches);
     expect(committed?.identity).toEqual({
       routingVersion: expect.any(String),
+      visualVersion: expect.any(String),
       inputSignature: '321',
       inputGeometryDigest: `geometry-v1:${'b'.repeat(32)}`,
     });

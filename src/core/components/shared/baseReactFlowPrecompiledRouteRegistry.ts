@@ -1,4 +1,5 @@
 import type { Edge } from '@xyflow/react';
+import type { RoutingPatch } from '../../routing/routingPatch';
 
 import {
   baseReactFlowDisplayOutputRouteSignatureMatches,
@@ -80,7 +81,7 @@ export const mergeTrustedBaseReactFlowPrecompiledRouteArtifact = (
  */
 export const mergeBaseReactFlowPrecompiledRoutePatches = (
   sourceEdges: Edge[],
-  patches: Edge[],
+  patches: RoutingPatch[],
 ): Edge[] | null => {
   const merged = mergeBaseReactFlowDisplayEdgePatches(sourceEdges, patches);
   if (!merged) return null;

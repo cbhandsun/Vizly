@@ -1,4 +1,5 @@
 import { BASE_DISPLAY_ROUTING_VERSION } from './baseReactFlowDisplayCache';
+import { EDGE_ROUTING_VISUAL_VERSION } from '../../routing/routingVersion';
 import { isBaseReactFlowDisplayGeometryDigest } from './baseReactFlowDisplayInputIdentity';
 import { isBaseReactFlowDisplayOutputRouteSignature } from './baseReactFlowDisplayCache';
 
@@ -7,6 +8,7 @@ const SESSION_ID_PATTERN = /^display-session-v1:[1-9]\d{0,9}$/;
 
 export type RoutingIdentity = Readonly<{
   routingVersion: string;
+  visualVersion: string;
   inputSignature: string;
   inputGeometryDigest: string;
 }>;
@@ -22,6 +24,7 @@ export const createDisplayRoutingIdentity = (
   inputGeometryDigest: string,
 ): RoutingIdentity => ({
   routingVersion: BASE_DISPLAY_ROUTING_VERSION,
+  visualVersion: EDGE_ROUTING_VISUAL_VERSION,
   inputSignature,
   inputGeometryDigest,
 });
@@ -29,8 +32,9 @@ export const createDisplayRoutingIdentity = (
 export const isDisplayRoutingIdentity = (value: unknown): value is RoutingIdentity => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const identity = value as Record<string, unknown>;
-  return Object.keys(identity).length === 3
+  return Object.keys(identity).length === 4
     && identity.routingVersion === BASE_DISPLAY_ROUTING_VERSION
+    && identity.visualVersion === EDGE_ROUTING_VISUAL_VERSION
     && typeof identity.inputSignature === 'string'
     && INPUT_SIGNATURE_PATTERN.test(identity.inputSignature)
     && isBaseReactFlowDisplayGeometryDigest(identity.inputGeometryDigest);
@@ -53,6 +57,7 @@ export const displayRoutingIdentitiesMatch = (
   second: RoutingIdentity,
 ): boolean => (
   first.routingVersion === second.routingVersion
+  && first.visualVersion === second.visualVersion
   && first.inputSignature === second.inputSignature
   && first.inputGeometryDigest === second.inputGeometryDigest
 );

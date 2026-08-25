@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 import type { MutableRefObject } from 'react';
+import type { RoutingPatch } from '../../routing/routingPatch';
 
 import { computeBaseReactFlowDisplayOutputRouteSignature } from './baseReactFlowDisplayCache';
 import {
@@ -201,7 +202,7 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
   const outputRouteSignature = computeBaseReactFlowDisplayOutputRouteSignature(routedEdges);
   const displayPatches = createBaseReactFlowDisplayEdgePatches(routedEdges, routedEdges);
   if (!outputRouteSignature || !displayPatches) return false;
-  const writeSnapshot = (edges: Edge[], patches: Edge[]): boolean => {
+  const writeSnapshot = (edges: Edge[], patches: RoutingPatch[]): boolean => {
     // Layout strategies keep child coordinates relative to their domain. The
     // display router identifies the same nodes by their projected absolute
     // geometry, so staged snapshots must use that canonical representation too.

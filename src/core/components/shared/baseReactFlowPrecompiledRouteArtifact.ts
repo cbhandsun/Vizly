@@ -1,6 +1,7 @@
 import type { Edge } from '@xyflow/react';
 
 import { parseRoutingLineHops } from '../../routing/routingLineHops';
+import type { RoutingPatch } from '../../routing/routingPatch';
 import {
   BASE_DISPLAY_ROUTING_VERSION,
   isBaseReactFlowDisplayOutputRouteSignature,
@@ -51,7 +52,7 @@ export type BaseReactFlowPrecompiledRouteArtifact = {
   inputGeometryDigest: string;
   outputRouteSignature: string;
   hardClean: true;
-  patches: Edge[];
+  patches: RoutingPatch[];
 };
 
 export type BaseReactFlowPrecompiledRouteArtifactExpectation = {
@@ -134,7 +135,10 @@ const isRoutingDataPatch = (value: unknown, pointBudget: { total: number }): boo
   return true;
 };
 
-const parseRoutingPatch = (value: unknown, pointBudget: { total: number }): Edge | null => {
+const parseRoutingPatch = (
+  value: unknown,
+  pointBudget: { total: number },
+): RoutingPatch | null => {
   if (!isRecord(value) || !Object.keys(value).every(key => PATCH_KEYS.has(key))) return null;
   if (
     !isBoundedIdentifier(value.id)
@@ -148,19 +152,19 @@ const parseRoutingPatch = (value: unknown, pointBudget: { total: number }): Edge
   if (typeof value.data !== 'undefined' && !isRoutingDataPatch(value.data, pointBudget)) {
     return null;
   }
-  return structuredClone(value) as unknown as Edge;
+  return structuredClone(value) as RoutingPatch;
 };
 
 export const parseBaseReactFlowPrecompiledRoutePatches = (
   value: unknown,
-): Edge[] | null => {
+): RoutingPatch[] | null => {
   if (
     !Array.isArray(value)
     || value.length === 0
     || value.length > MAX_PATCHES
   ) return null;
   const pointBudget = { total: 0 };
-  const patches: Edge[] = [];
+  const patches: RoutingPatch[] = [];
   for (let index = 0; index < value.length; index += 1) {
     const patch = parseRoutingPatch(value[index], pointBudget);
     if (!patch) return null;
@@ -172,7 +176,7 @@ export const parseBaseReactFlowPrecompiledRoutePatches = (
 export const sanitizeBaseReactFlowPrecompiledRoutePatches = (
   sourceEdges: Edge[],
   value: unknown,
-): Edge[] | null => {
+): RoutingPatch[] | null => {
   const patches = parseBaseReactFlowPrecompiledRoutePatches(value);
   if (!patches || patches.length !== sourceEdges.length) return null;
   for (let index = 0; index < patches.length; index += 1) {

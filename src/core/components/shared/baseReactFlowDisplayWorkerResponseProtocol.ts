@@ -1,4 +1,5 @@
 import type { Edge } from '@xyflow/react';
+import type { RoutingPatch } from '../../routing/routingPatch';
 
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
 import type { DisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
@@ -20,7 +21,7 @@ export type DisplayRoutingFallbackLevel = 'none' | 'full';
 export type DisplayEdgesWorkerResponse = {
   requestId: string;
   edges?: Edge[];
-  routingPatches?: Edge[];
+  routingPatches?: RoutingPatch[];
   hardClean?: boolean;
   hardReport?: BaseDisplayBoundedCandidateReport;
   routeResolution?: DisplayEdgesWorkerRouteResolution;
