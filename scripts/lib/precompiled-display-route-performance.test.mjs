@@ -178,7 +178,7 @@ describe('precompiled display route cold performance', () => {
     expect(Object.keys(focused.presets)).toEqual(['logistics-architecture-v1']);
     expect(assertPrecompiledDisplayRoutePerformanceBudget(focused)).toBe(true);
     const overBudget = summarizePrecompiledDisplayRoutePerformance(
-      Array.from({ length: 30 }, () => sample(751)),
+      Array.from({ length: 30 }, () => sample(1_101)),
       30,
     );
     expect(() => assertPrecompiledDisplayRoutePerformanceBudget(overBudget)).toThrow(/logistics/);

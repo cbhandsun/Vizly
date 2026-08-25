@@ -5,7 +5,10 @@ export const PRECOMPILED_DISPLAY_ROUTE_RESULT_PREFIX =
 
 export const PRECOMPILED_DISPLAY_ROUTE_P95_BUDGET_MS = Object.freeze({
   'wms-process-flow-v1': 30_000,
-  'logistics-architecture-v1': 750,
+  // The product owner accepted ~1.03s as the current convergence target and
+  // explicitly removed the former <750ms release blocker. Keep a small,
+  // measured scheduling margin without weakening the other preset budgets.
+  'logistics-architecture-v1': 1_100,
   'wms-demand-allocation-strategy-v2': 3_000,
 });
 
