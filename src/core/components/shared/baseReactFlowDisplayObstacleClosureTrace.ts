@@ -62,6 +62,7 @@ export const startBaseReactFlowObstacleClosureTrace = ({
           candidateCount: candidateDiagnostics.generatedCandidateCount,
           cacheHitCount: metrics.cacheHitCount
             + duplicateCandidateCount
+            + candidateDiagnostics.candidateCollectionCacheHitCount
             + candidateDiagnostics.qualityContextCacheHitCount,
           evaluationCount: metrics.evaluationCount
             + candidateDiagnostics.qualityContextBuildCount,

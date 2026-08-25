@@ -582,6 +582,7 @@ describe('repairBusinessNodeClearanceRisks', () => {
       data: { computedPath },
     }));
     const diagnostics = {
+      candidateCollectionCacheHitCount: 0,
       generatedCandidateCount: 0,
       qualityContextBuildCount: 0,
       qualityContextCacheHitCount: 0,
@@ -594,5 +595,6 @@ describe('repairBusinessNodeClearanceRisks', () => {
     })).toBe(edges);
     expect(diagnostics.qualityContextBuildCount).toBe(1);
     expect(diagnostics.qualityContextCacheHitCount).toBe(1);
+    expect(diagnostics.candidateCollectionCacheHitCount).toBe(1);
   });
 });

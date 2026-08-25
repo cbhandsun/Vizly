@@ -53,6 +53,7 @@ describe('createBaseReactFlowFinalEndpointEvaluation', () => {
 
     evaluation.hardReport(edges);
     finish(edges, edges, {
+      candidateCollectionCacheHitCount: 5,
       generatedCandidateCount: 10,
       qualityContextBuildCount: 2,
       qualityContextCacheHitCount: 4,
@@ -62,7 +63,7 @@ describe('createBaseReactFlowFinalEndpointEvaluation', () => {
     const trace = traces[0];
     expect(trace).toMatchObject({
       candidateCount: 10,
-      cacheHitCount: 7,
+      cacheHitCount: 12,
       changedEdgeCount: 0,
       evaluationCount: 3,
       resolution: 'skip',

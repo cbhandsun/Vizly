@@ -586,6 +586,7 @@ export const repairBaseReactFlowFinalEndpointOrder = <T extends Edge[]>(
     'final-endpoint-closure-obstacles-post-trunk',
   );
   const postTrunkObstacleDiagnostics: BusinessNodeClearanceRepairDiagnostics = {
+    candidateCollectionCacheHitCount: 0,
     generatedCandidateCount: 0,
     qualityContextBuildCount: 0,
     qualityContextCacheHitCount: 0,

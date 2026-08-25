@@ -5,7 +5,13 @@ import {
   iterateBusinessNodeClearanceCandidates,
   selectBusinessNodeClearanceCandidatesWithinHitBudget,
 } from './edgeBusinessNodeClearanceCandidateRanking';
+import {
+  createBusinessNodeClearanceCandidateCache,
+  resetBusinessNodeClearanceRepairDiagnostics,
+  type BusinessNodeClearanceRepairDiagnostics,
+} from './edgeBusinessNodeClearanceCandidateCache';
 import { createBusinessNodeClearanceCandidateCollection } from './edgeBusinessNodeClearanceCandidateCollection';
+import { createBusinessNodeClearanceRectContext } from './edgeBusinessNodeClearanceRectContext';
 import {
   createEdgePathQualityEvaluationContext,
 } from './edgeStrictCrossingGuard';
@@ -16,7 +22,6 @@ import {
 
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
-type PositionedNode = ReactFlowNode & { positionAbsolute?: Point };
 
 export interface BusinessNodeClearanceCandidateValidation {
   baselineEdges: Edge[];
@@ -24,12 +29,7 @@ export interface BusinessNodeClearanceCandidateValidation {
   changedEdgeIndex: number;
 }
 
-export interface BusinessNodeClearanceRepairDiagnostics {
-  generatedCandidateCount: number;
-  qualityContextBuildCount: number;
-  qualityContextCacheHitCount: number;
-  uniqueCandidateCount: number;
-}
+export type { BusinessNodeClearanceRepairDiagnostics } from './edgeBusinessNodeClearanceCandidateCache';
 
 export interface BusinessNodeClearanceRepairOptions {
   eligibleEdgeIds?: ReadonlySet<string>;
@@ -52,20 +52,6 @@ const CONTAINER_CLEARANCE_OVERFLOW = (
 const LEGACY_LANE_CLEARANCES = [20, 40, COMMERCIAL_BUSINESS_NODE_CLEARANCE] as const;
 const MIN_CLEARANCE_DETOUR_LEG = COMMERCIAL_BUSINESS_NODE_CLEARANCE / 2;
 const TERMINAL_BRANCH_STEM_LENGTHS = [48, 96, 192] as const;
-const CONTAINER_TYPES = new Set(['titleGroup', 'subGroup', 'group', 'domain', 'subDomain', 'swimlane']);
-
-const finiteNumber = (value: unknown, fallback = 0): number => (
-  typeof value === 'number' && Number.isFinite(value) ? value : fallback
-);
-
-const nodeRect = (node: ReactFlowNode): Rect | null => {
-  const position = (node as PositionedNode).positionAbsolute ?? node.position;
-  const width = finiteNumber(node.measured?.width ?? node.width ?? node.style?.width);
-  const height = finiteNumber(node.measured?.height ?? node.height ?? node.style?.height);
-  if (width <= 1 || height <= 1) return null;
-  return { x: finiteNumber(position.x), y: finiteNumber(position.y), width, height };
-};
-
 const edgePath = (edge: Edge): Point[] => {
   const raw = (edge.data as { computedPath?: unknown } | undefined)?.computedPath;
   if (!Array.isArray(raw)) return [];
@@ -475,21 +461,11 @@ const segmentDetourCandidate = (
 
 const clearanceCandidates = (
   path: Point[],
-  nodes: ReactFlowNode[],
-  edge: Edge,
+  rects: Rect[],
+  containerRects: Rect[],
   minimumClearance: number,
 ) => {
-  const rects = nodes.flatMap(node => {
-    if (node.id === edge.source || node.id === edge.target || CONTAINER_TYPES.has(String(node.type ?? ''))) return [];
-    const rect = nodeRect(node);
-    return rect ? [rect] : [];
-  });
   const candidates = createBusinessNodeClearanceCandidateCollection<Point[]>();
-  const containerRects = nodes.flatMap(node => {
-    if (!CONTAINER_TYPES.has(String(node.type ?? ''))) return [];
-    const rect = nodeRect(node);
-    return rect ? [rect] : [];
-  });
   const laneClearances = [...new Set([
     ...LEGACY_LANE_CLEARANCES,
     minimumClearance,
@@ -646,24 +622,15 @@ export const repairBusinessNodeClearanceRisks = (
   nodes: ReactFlowNode[],
   options: BusinessNodeClearanceRepairOptions = {},
 ): Edge[] => {
-  if (options.diagnostics) {
-    options.diagnostics.generatedCandidateCount = 0;
-    options.diagnostics.qualityContextBuildCount = 0;
-    options.diagnostics.qualityContextCacheHitCount = 0;
-    options.diagnostics.uniqueCandidateCount = 0;
-  }
+  resetBusinessNodeClearanceRepairDiagnostics(options.diagnostics);
   const minimumClearance = Number.isFinite(options.minimumClearance)
     ? Math.max(
       MINIMUM_BUSINESS_NODE_CLEARANCE,
       Math.min(256, options.minimumClearance ?? COMMERCIAL_BUSINESS_NODE_ROUTING_CLEARANCE),
     )
     : COMMERCIAL_BUSINESS_NODE_ROUTING_CLEARANCE;
-  const obstacles = new Map<string, Rect>();
-  for (const node of nodes) {
-    if (CONTAINER_TYPES.has(String(node.type ?? ''))) continue;
-    const rect = nodeRect(node);
-    if (rect) obstacles.set(node.id, rect);
-  }
+  const rectContext = createBusinessNodeClearanceRectContext(nodes);
+  const obstacles = new Map(rectContext.obstacles);
   const clearanceContextByEdgeId = new Map(edges.map(edge => [
     edge.id,
     createNodeClearanceEvaluationContext(nodes, edge),
@@ -672,6 +639,9 @@ export const repairBusinessNodeClearanceRisks = (
     edge.id,
     createRoutingObstacleEvaluationContext(edge, obstacles),
   ] as const));
+  const candidateCollectionCache = createBusinessNodeClearanceCandidateCache<
+    ReturnType<typeof clearanceCandidates>
+  >();
   let current = edges;
   let qualityBaselineEdges: Edge[] | null = null;
   let qualityContext: ReturnType<typeof createEdgePathQualityEvaluationContext> | null = null;
@@ -723,7 +693,22 @@ export const repairBusinessNodeClearanceRisks = (
         COMMERCIAL_BUSINESS_NODE_CLEARANCE,
       );
       const baselineHits = obstacleContext.countUnrelatedObstacleHits(path);
-      const candidateCollection = clearanceCandidates(path, nodes, edge, minimumClearance);
+      const candidateCollectionResult = candidateCollectionCache.getOrCreate({
+        path,
+        sourceId: edge.source,
+        targetId: edge.target,
+        minimumClearance,
+        create: () => clearanceCandidates(
+          path,
+          rectContext.rectsForTerminals(edge.source, edge.target),
+          rectContext.containerRects,
+          minimumClearance,
+        ),
+      });
+      const candidateCollection = candidateCollectionResult.value;
+      if (candidateCollectionResult.cacheHit && options.diagnostics) {
+        options.diagnostics.candidateCollectionCacheHitCount += 1;
+      }
       const uniqueCandidates = candidateCollection.paths;
       if (options.diagnostics) {
         options.diagnostics.generatedCandidateCount += candidateCollection.generatedCandidateCount;
