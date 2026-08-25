@@ -12,6 +12,7 @@ import {
   synthesizeSharedTargetTrunks,
 } from '../../strategies/shared/edgeSharedTrunkSynthesis';
 import type { RoutingTopologyPlan } from './baseReactFlowDisplayRoutingTopologyPlan';
+import { isDisplayRoutingCapabilityEnabled } from '../../routing/displayRoutingCapabilities';
 
 export type DisplayTopologyFirstSeedResult = Readonly<{
   edges: Edge[];
@@ -61,6 +62,9 @@ export const createDisplayTopologyFirstSeed = (
   nodes: Node[],
   topologyPlan: RoutingTopologyPlan,
 ): DisplayTopologyFirstSeedResult => {
+  if (!isDisplayRoutingCapabilityEnabled('topologyFirstSeed')) {
+    return { edges, applied: false };
+  }
   if (topologyPlan.groups.length === 0) return { edges, applied: false };
   const topologyMemberIndexes = new Set(
     topologyPlan.groups.flatMap(group => group.memberEdgeIndexes),

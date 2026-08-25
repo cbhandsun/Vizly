@@ -10,6 +10,7 @@ import {
   type BaseReactFlowRoutingChangeSet,
 } from './baseReactFlowDisplayRoutingChangeSet';
 import { mergeBaseReactFlowDisplayEdgePatches } from './baseReactFlowDisplayRoutingTransaction';
+import { isDisplayRoutingCapabilityEnabled } from '../../routing/displayRoutingCapabilities';
 
 export type BaseReactFlowDisplayIncrementalPlan = Readonly<{
   baseline: BaseReactFlowDisplayCommittedSnapshotBaseline;
@@ -32,6 +33,7 @@ export const createBaseReactFlowDisplayIncrementalPlan = ({
   nextEdges: Edge[];
   draggedNodeIds: readonly string[];
 }): BaseReactFlowDisplayIncrementalPlan | null => {
+  if (!isDisplayRoutingCapabilityEnabled('incrementalDisplayRouting')) return null;
   if (
     !baseline
     || (

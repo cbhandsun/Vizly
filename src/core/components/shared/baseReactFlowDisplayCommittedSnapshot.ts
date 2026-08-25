@@ -6,6 +6,7 @@ import {
   type RoutingOnlyDocumentSnapshot,
 } from '../../routing/persistedRoutingCandidate';
 import { EDGE_ROUTING_CACHE_VERSION } from '../../routing/routingVersion';
+import { isDisplayRoutingCapabilityEnabled } from '../../routing/displayRoutingCapabilities';
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
 import {
   computeDisplayRoutingHardReportDigest,
@@ -118,6 +119,7 @@ export const writeBaseReactFlowDisplayCommittedSnapshot = (options: {
   outputRouteSignature: string | null;
   workerSessionRef?: RoutingWorkerSessionRef;
 } & CommittedHardReportIdentity): boolean => {
+  if (!isDisplayRoutingCapabilityEnabled('routingSessionSnapshot')) return false;
   const snapshot = createCommittedSnapshot(options);
   if (!snapshot) return false;
   rememberSnapshot(
@@ -201,6 +203,7 @@ export const readBaseReactFlowDisplayCommittedSnapshot = ({
   inputGeometryDigest: string;
   sourceEdges: Edge[];
 }): BaseReactFlowDisplayCommittedSnapshotHit | null => {
+  if (!isDisplayRoutingCapabilityEnabled('routingSessionSnapshot')) return null;
   if (!hasValidIdentity(inputSignature, inputGeometryDigest)) return null;
   const key = snapshotKey(inputSignature, inputGeometryDigest);
   const snapshot = committedDisplaySnapshots.get(key);
@@ -262,6 +265,7 @@ export const commitBaseReactFlowDisplaySnapshot = (options: {
   workerSessionRef?: RoutingWorkerSessionRef;
   precompiledCapturePresetId?: string | null;
 } & CommittedHardReportIdentity): BaseReactFlowDisplayCommittedSnapshotBaseline | null => {
+  if (!isDisplayRoutingCapabilityEnabled('routingSessionSnapshot')) return null;
   const snapshot = createCommittedSnapshot(options);
   if (!snapshot) return null;
   rememberSnapshot(
@@ -295,6 +299,7 @@ export const clearBaseReactFlowDisplayCommittedSnapshots = (): void => {
 export const createBaseReactFlowRoutingOnlyDocumentSnapshot = (
   sourceEdges: Edge[],
 ): RoutingOnlyDocumentSnapshot | null => {
+  if (!isDisplayRoutingCapabilityEnabled('routingOnlyDocumentSnapshot')) return null;
   const snapshot = committedSnapshotBySourceEdges.get(sourceEdges);
   if (
     !snapshot

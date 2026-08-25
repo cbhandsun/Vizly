@@ -3,6 +3,7 @@ import {
   parseRoutingOnlyDocumentSnapshot,
   type PersistedRoutingCandidate,
 } from './persistedRoutingCandidate';
+import { isDisplayRoutingCapabilityEnabled } from './displayRoutingCapabilities';
 
 const MAX_DOCUMENT_ROUTING_CANDIDATES = 16;
 
@@ -29,6 +30,7 @@ const rememberCandidate = (candidate: PersistedRoutingCandidate): void => {
  * boundary. It is never committed or copied into the persistent L0 cache.
  */
 export const registerRoutingOnlyDocumentCandidate = (value: unknown): boolean => {
+  if (!isDisplayRoutingCapabilityEnabled('routingOnlyDocumentSnapshot')) return false;
   const snapshot = parseRoutingOnlyDocumentSnapshot(value);
   if (!snapshot) return false;
   rememberCandidate(snapshot.candidate);
@@ -44,6 +46,7 @@ export const readRoutingOnlyDocumentCandidate = ({
   inputSignature: string;
   inputGeometryDigest: string;
 }): PersistedRoutingCandidate | null => {
+  if (!isDisplayRoutingCapabilityEnabled('routingOnlyDocumentSnapshot')) return null;
   const stored = documentRoutingCandidates.get(candidateKey(inputSignature, inputGeometryDigest));
   if (!stored) return null;
   const candidate = parsePersistedRoutingCandidate(stored, {
