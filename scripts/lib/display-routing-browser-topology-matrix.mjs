@@ -54,6 +54,19 @@ const OPERATION_CASES = Object.freeze([
     reason: 'edge-remove',
     edgeDelta: 0,
   }),
+  Object.freeze({
+    id: 'container-collapse',
+    classification: 'topology',
+    reason: 'container-change',
+    edgeDelta: 0,
+    expectedRoutableEdgeCount: 7,
+  }),
+  Object.freeze({
+    id: 'container-expand',
+    classification: 'topology',
+    reason: 'container-change',
+    edgeDelta: 0,
+  }),
 ]);
 
 export const projectDisplayRoutingTopologyDiagnostics = ({
@@ -386,6 +399,26 @@ const applyEdgeRemove = session => session.evaluate(`(() => {
   return Number.isFinite(before) && before > 0;
 })()`);
 
+const toggleLogisticsContainer = async session => {
+  const prepared = await session.evaluate(`(() => {
+    const instance = window.reactFlowInstance;
+    const group = instance?.getNodes?.().find(node => node.id === 'titlegroup-logistics');
+    if (!group) return false;
+    instance.fitView?.({ nodes: [group], padding: 0.2, duration: 0 });
+    return true;
+  })()`);
+  if (!prepared) return false;
+  await delay(200);
+  return session.evaluate(`(() => {
+    const button = document.querySelector(
+      '.react-flow__node[data-id="titlegroup-logistics"] .title-group-collapse-btn',
+    );
+    if (!(button instanceof HTMLButtonElement)) return false;
+    button.click();
+    return true;
+  })()`);
+};
+
 const APPLY_OPERATION = Object.freeze({
   'node-resize': applyNodeResize,
   'multi-node-move': applyMultiNodeMove,
@@ -394,6 +427,53 @@ const APPLY_OPERATION = Object.freeze({
   'edge-add': applyEdgeAdd,
   'port-policy': applyPortPolicyChange,
   'edge-remove': applyEdgeRemove,
+  'container-collapse': toggleLogisticsContainer,
+  'container-expand': toggleLogisticsContainer,
+});
+
+export const projectDisplayRoutingTopologyAssertionDiagnostics = ({
+  operationCase,
+  result,
+  counterBaseline,
+  baselineEdgeCount,
+}) => ({
+  operationCase: {
+    id: operationCase?.id,
+    classification: operationCase?.classification,
+    reason: operationCase?.reason,
+    edgeDelta: operationCase?.edgeDelta,
+    expectedRoutableEdgeCount: operationCase?.expectedRoutableEdgeCount,
+  },
+  result: {
+    requestOperation: result?.requestOperation,
+    capturedRequestCount: result?.capturedRequestCount,
+    capturedResponseCount: result?.capturedResponseCount,
+    changeSet: {
+      classification: result?.changeSet?.classification,
+      reason: result?.changeSet?.reason,
+      changedNodeCount: result?.changeSet?.changedNodeIds?.length ?? 0,
+      changedEdgeCount: result?.changeSet?.changedEdgeIds?.length ?? 0,
+    },
+    requestEdgeCount: result?.requestEdgeCount,
+    responseEdgeCount: result?.responseEdgeCount,
+    renderedEdgeCount: result?.renderedEdgeCount,
+    mutableEdgeCount: result?.request?.mutableEdgeIds?.length ?? 0,
+    response: {
+      hardClean: result?.response?.hardClean,
+      hardReportClean: result?.response?.hardReport?.hardClean,
+      routeResolution: result?.response?.routeResolution,
+      fallbackLevel: result?.response?.fallbackLevel,
+      affectedEdgeCount: result?.response?.affectedEdgeCount,
+    },
+    routing: {
+      workerStartCount: result?.routing?.workerStartCount,
+      workerAbortCount: result?.routing?.workerAbortCount,
+      fallbackLevel: result?.routing?.fallbackLevel,
+      hasOutputRouteSignature: typeof result?.routing?.outputRouteSignature === 'string',
+    },
+  },
+  counterBaseline,
+  baselineEdgeCount,
 });
 
 export const assertDisplayRoutingTopologyOperationResult = ({
@@ -402,8 +482,14 @@ export const assertDisplayRoutingTopologyOperationResult = ({
   counterBaseline,
   baselineEdgeCount,
 }) => {
-  const diagnostics = JSON.stringify({ operationCase, result, counterBaseline, baselineEdgeCount }, null, 2);
-  const expectedEdgeCount = baselineEdgeCount + operationCase.edgeDelta;
+  const diagnostics = JSON.stringify(projectDisplayRoutingTopologyAssertionDiagnostics({
+    operationCase,
+    result,
+    counterBaseline,
+    baselineEdgeCount,
+  }), null, 2);
+  const expectedEdgeCount = operationCase.expectedRoutableEdgeCount
+    ?? baselineEdgeCount + operationCase.edgeDelta;
   if (result?.requestOperation !== 'incremental-route') {
     throw new Error(`Topology operation did not use the incremental Worker protocol: ${diagnostics}`);
   }
@@ -466,7 +552,7 @@ export const assertDisplayRoutingTopologyOperationGroupResult = operationResults
   const topologyResults = operationResults.filter(result => result?.classification === 'topology');
   if (topologyResults.length === 0) return;
   const diagnostics = JSON.stringify({ operationResults }, null, 2);
-  if (topologyResults.length !== 5) {
+  if (topologyResults.length !== 7) {
     throw new Error(`Topology operation group was incomplete: ${diagnostics}`);
   }
   for (const operationId of ['node-add', 'node-remove', 'edge-add', 'edge-remove']) {

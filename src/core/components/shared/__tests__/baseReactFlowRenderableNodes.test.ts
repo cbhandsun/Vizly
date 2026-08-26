@@ -1,4 +1,4 @@
-import type { Node } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -10,6 +10,7 @@ import {
   mergeBaseReactFlowMeasuredNodes,
   normalizeBaseReactFlowRenderableNodes,
 } from '../baseReactFlowRenderableNodes';
+import { filterBaseReactFlowRoutableEdges } from '../baseReactFlowRenderableEdges';
 
 describe('baseReactFlowRenderableNodes', () => {
   it('waits for every internal node to publish finite positive routing geometry', () => {
@@ -158,5 +159,45 @@ describe('baseReactFlowRenderableNodes', () => {
       position: { x: 50, y: 50 },
       positionAbsolute: { x: 50, y: 50 },
     });
+  });
+});
+
+const renderableNode = (id: string): Node => ({ id, position: { x: 0, y: 0 }, data: {} });
+const renderableEdge = (
+  id: string,
+  source: string,
+  target: string,
+  hidden = false,
+): Edge => ({ id, source, target, hidden });
+
+describe('baseReactFlowRenderableEdges', () => {
+  it('preserves the original edge array when every terminal is visible', () => {
+    const edges = [renderableEdge('visible', 'source', 'target')];
+
+    expect(filterBaseReactFlowRoutableEdges(
+      edges,
+      [renderableNode('source'), renderableNode('target')],
+    )).toBe(edges);
+  });
+
+  it('excludes hidden edges and edges whose collapsed terminals are absent', () => {
+    const visible = renderableEdge('visible', 'group', 'external');
+    const hiddenInternal = renderableEdge('hidden-internal', 'group', 'group', true);
+    const missingSource = renderableEdge('missing-source', 'collapsed-child', 'external');
+    const missingTarget = renderableEdge('missing-target', 'external', 'collapsed-child');
+
+    expect(filterBaseReactFlowRoutableEdges(
+      [visible, hiddenInternal, missingSource, missingTarget],
+      [renderableNode('group'), renderableNode('external')],
+    )).toEqual([visible]);
+  });
+
+  it('returns an empty projection for empty or fully hidden graphs', () => {
+    const empty: Edge[] = [];
+
+    expect(filterBaseReactFlowRoutableEdges(empty, [])).toBe(empty);
+    expect(filterBaseReactFlowRoutableEdges([
+      renderableEdge('hidden', 'source', 'target', true),
+    ], [renderableNode('source'), renderableNode('target')])).toEqual([]);
   });
 });

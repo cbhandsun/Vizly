@@ -196,11 +196,11 @@ export const createBaseReactFlowRoutingChangeSet = ({
   }
 
   let reason = reasonHint;
-  if (hasNodeAddition) reason = 'node-add';
+  if (hasContainerChange) reason = 'container-change';
+  else if (hasNodeAddition) reason = 'node-add';
   else if (hasNodeRemoval) reason = 'node-remove';
   else if (hasEdgeAddition) reason = 'edge-add';
   else if (hasEdgeRemoval) reason = 'edge-remove';
-  else if (hasContainerChange) reason = 'container-change';
   else if (hasPortPolicyChange) reason = 'port-policy';
   else if (hasNodeResize && reasonHint === 'unknown') reason = 'node-resize';
 

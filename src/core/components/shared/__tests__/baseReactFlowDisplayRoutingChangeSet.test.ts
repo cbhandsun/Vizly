@@ -142,6 +142,39 @@ describe('baseReactFlow display routing change set', () => {
     });
   });
 
+  it('keeps collapse semantics when the visible projection removes descendants and edges', () => {
+    const container: Node = {
+      id: 'container',
+      type: 'titleGroup',
+      position: { x: 0, y: 0 },
+      data: { collapsed: false },
+    };
+    const child: Node = {
+      id: 'child',
+      parentId: 'container',
+      position: { x: 20, y: 40 },
+      data: {},
+    };
+    const external: Node = {
+      id: 'external',
+      position: { x: 400, y: 40 },
+      data: {},
+    };
+    const visibleEdge: Edge = { id: 'visible', source: 'child', target: 'external' };
+
+    expect(createBaseReactFlowRoutingChangeSet({
+      previousNodes: [container, child, external],
+      previousEdges: [visibleEdge],
+      nextNodes: [{ ...container, data: { collapsed: true } }, external],
+      nextEdges: [{ ...visibleEdge, source: 'container' }],
+    })).toMatchObject({
+      reason: 'container-change',
+      classification: 'topology',
+      changedNodeIds: ['child', 'container'],
+      changedEdgeIds: ['visible'],
+    });
+  });
+
   it('keeps isolated node additions and removals incremental without mutable edges', () => {
     const isolatedNode: Node = {
       id: 'isolated',

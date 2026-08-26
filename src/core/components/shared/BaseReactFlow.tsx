@@ -46,6 +46,7 @@ import {
   mergeBaseReactFlowMeasuredNodes,
   normalizeBaseReactFlowRenderableNodes,
 } from './baseReactFlowRenderableNodes';
+import { useBaseReactFlowRoutableEdges } from './baseReactFlowRenderableEdges';
 import { useBaseReactFlowDisplayRouting } from './useBaseReactFlowDisplayRouting';
 import {
   bindBaseReactFlowWheelHandler,
@@ -270,6 +271,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   const routingNodes = useMemo(() => (
     mergeBaseReactFlowMeasuredNodes(visibleNodes, internalFlowNodes)
   ), [visibleNodes, internalFlowNodes]);
+  const routingEdges = useBaseReactFlowRoutableEdges(edges, routingNodes);
   const edgeLabelObstacles = useMemo(
     () => [...buildDisplayRoutingObstacles(routingNodes).values()],
     [routingNodes],
@@ -278,10 +280,10 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   const isLargeGraph = useMemo(() => {
     return computeBaseReactFlowIsLargeGraph({
       nodeCount: visibleNodes.length,
-      edgeCount: edges.length,
+      edgeCount: routingEdges.length,
       performanceConfig,
     });
-  }, [visibleNodes.length, edges.length, performanceConfig]);
+  }, [visibleNodes.length, routingEdges.length, performanceConfig]);
 
   const routingGeometryReady = useMemo(() => {
     void internalNodeGeometrySignature;
@@ -396,7 +398,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   }, [edgeTypes]);
 
   const { edges: displayEdges } = useBaseReactFlowDisplayRouting({
-    edges,
+    edges: routingEdges,
     routingNodes,
     routingGeometryReady,
     routingPaused: !isLayoutStable,

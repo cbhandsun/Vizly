@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assertDisplayRoutingTopologyOperationGroupResult,
   assertDisplayRoutingTopologyOperationResult,
+  projectDisplayRoutingTopologyAssertionDiagnostics,
   projectDisplayRoutingTopologyDiagnostics,
 } from './display-routing-browser-topology-matrix.mjs';
 
@@ -92,6 +93,38 @@ describe('display routing browser topology matrix', () => {
     expect(serialized).not.toContain('M 1 2');
   });
 
+  it('projects assertion diagnostics without captured route payloads', () => {
+    const projected = projectDisplayRoutingTopologyAssertionDiagnostics({
+      operationCase: topologyCase,
+      result: validResult({
+        changeSet: {
+          classification: 'topology',
+          reason: 'edge-add',
+          changedNodeIds: ['private-node'],
+          changedEdgeIds: ['private-edge'],
+        },
+        request: {
+          mutableEdgeIds: ['private-edge'],
+          edges: [{ id: 'private-edge', data: { computedPath: 'M 1 2 L 3 4' } }],
+        },
+        response: {
+          ...validResult().response,
+          edges: [{ id: 'private-edge', label: 'private label' }],
+        },
+      }),
+      counterBaseline: { workerStartCount: 1, workerAbortCount: 0 },
+      baselineEdgeCount: 14,
+    });
+    const serialized = JSON.stringify(projected);
+
+    expect(projected.result.changeSet).toMatchObject({
+      changedNodeCount: 1,
+      changedEdgeCount: 1,
+    });
+    expect(serialized).not.toContain('private');
+    expect(serialized).not.toContain('M 1 2');
+  });
+
   it('accepts hard-clean topology operations with or without in-job fallback', () => {
     expect(assertValid(validResult())).toBeUndefined();
     expect(assertValid(validResult({
@@ -131,6 +164,8 @@ describe('display routing browser topology matrix', () => {
       result('edge-add', 'none'),
       result('port-policy', 'full'),
       result('edge-remove', 'none'),
+      result('container-collapse', 'full'),
+      result('container-expand', 'full'),
     ])).toBeUndefined();
     expect(() => assertDisplayRoutingTopologyOperationGroupResult([
       result('node-add', 'none'),
@@ -138,6 +173,8 @@ describe('display routing browser topology matrix', () => {
       result('edge-add', 'none'),
       result('port-policy', 'none'),
       result('edge-remove', 'full'),
+      result('container-collapse', 'full'),
+      result('container-expand', 'full'),
     ])).toThrow(/edge-remove operation did not remain incremental/);
     expect(() => assertDisplayRoutingTopologyOperationGroupResult([
       result('node-add', 'none'),
@@ -145,7 +182,29 @@ describe('display routing browser topology matrix', () => {
       result('edge-add', 'none'),
       result('port-policy', 'full'),
       result('edge-remove', 'none'),
+      result('container-collapse', 'full'),
+      result('container-expand', 'full'),
     ])).toThrow(/node-remove operation did not remain incremental/);
+  });
+
+  it('requires a hard-clean collapsed container to route only visible edges', () => {
+    expect(assertDisplayRoutingTopologyOperationResult({
+      operationCase: {
+        id: 'container-collapse',
+        classification: 'topology',
+        reason: 'container-change',
+        edgeDelta: 0,
+        expectedRoutableEdgeCount: 3,
+      },
+      result: validResult({
+        changeSet: { classification: 'topology', reason: 'container-change' },
+        requestEdgeCount: 3,
+        responseEdgeCount: 3,
+        renderedEdgeCount: 3,
+      }),
+      counterBaseline: { workerStartCount: 7, workerAbortCount: 2 },
+      baselineEdgeCount: 14,
+    })).toBeUndefined();
   });
 
   it('allows a geometry resize to remain local', () => {
