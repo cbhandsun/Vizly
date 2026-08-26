@@ -249,7 +249,7 @@ export const createBrowserLogisticsRouteFixture = () => {
       },
       'edge-loms-visibility': {
         sourceHandle: 'bottom', targetHandle: 'top',
-        computedPath: [{ x: 1090.65, y: 653 }, { x: 1090.65, y: 802 }, { x: 1473, y: 1080 }, { x: 1434.3375, y: 1218 }, { x: 1434.3375, y: 1539 }],
+        computedPath: [{ x: 1091, y: 653 }, { x: 1091, y: 788 }, { x: 1230, y: 788 }, { x: 1230, y: 823 }, { x: 1438, y: 823 }, { x: 1438, y: 954 }, { x: 1434, y: 954 }, { x: 1434, y: 1066 }, { x: 1487, y: 1066 }, { x: 1487, y: 1232 }, { x: 1434, y: 1232 }, { x: 1434, y: 1539 }],
       },
       'edge-loms-wms': {
         sourceHandle: 'bottom', targetHandle: 'top',
@@ -261,15 +261,15 @@ export const createBrowserLogisticsRouteFixture = () => {
       },
       'edge-tms-carrier': {
         sourceHandle: 'top', targetHandle: 'bottom',
-        computedPath: [{ x: 1018, y: 811 }, { x: 1018, y: 722 }, { x: 1426, y: 722 }, { x: 1426, y: 203 }],
+        computedPath: [{ x: 1018, y: 811 }, { x: 1018, y: 690 }, { x: 1027, y: 690 }, { x: 1027, y: 823 }, { x: 1045, y: 823 }, { x: 1045, y: 835 }, { x: 1408, y: 835 }, { x: 1408, y: 823 }, { x: 1426, y: 823 }, { x: 1426, y: 203 }],
       },
       'edge-tms-downstream': {
         sourceHandle: 'top', targetHandle: 'bottom',
-        computedPath: [{ x: 1065, y: 812 }, { x: 1065, y: 723 }, { x: 1924, y: 723 }, { x: 1924, y: 181 }],
+        computedPath: [{ x: 1065, y: 812 }, { x: 1065, y: 790 }, { x: 1924, y: 790 }, { x: 1924, y: 181 }],
       },
       'edge-tms-visibility': {
         sourceHandle: 'bottom', targetHandle: 'top',
-        computedPath: [{ x: 1135, y: 931 }, { x: 1135, y: 1020 }, { x: 1508, y: 1020 }, { x: 1508, y: 1539 }],
+        computedPath: [{ x: 1135, y: 931 }, { x: 1135, y: 1020 }, { x: 1165, y: 1020 }, { x: 1165, y: 1256 }, { x: 1511, y: 1256 }, { x: 1511, y: 1539 }],
       },
       'edge-tms-yms': {
         sourceHandle: 'bottom', targetHandle: 'top',
@@ -281,21 +281,109 @@ export const createBrowserLogisticsRouteFixture = () => {
       },
       'edge-visibility-downstream': {
         sourceHandle: 'top', targetHandle: 'bottom',
-        computedPath: [{ x: 1434, y: 1539 }, { x: 1434, y: 1457 }, { x: 1997, y: 1457 }, { x: 1997, y: 181 }],
+        computedPath: [{ x: 1523, y: 1539 }, { x: 1523, y: 1513 }, { x: 1997, y: 1513 }, { x: 1997, y: 181 }],
       },
       'edge-wms-bms': {
         sourceHandle: 'bottom', targetHandle: 'top',
-        computedPath: [{ x: 191, y: 931 }, { x: 191, y: 1000 }, { x: 731, y: 1000 }, { x: 731, y: 1089 }],
+        computedPath: [{ x: 191, y: 931 }, { x: 191, y: 1000 }, { x: 250, y: 1000 }, { x: 250, y: 919 }, { x: 731, y: 919 }, { x: 731, y: 1089 }],
       },
       'edge-wms-visibility': {
         sourceHandle: 'bottom', targetHandle: 'top',
-        computedPath: [{ x: 262, y: 931 }, { x: 262, y: 1450 }, { x: 1360, y: 1450 }, { x: 1360, y: 1539 }],
+        computedPath: [{ x: 262, y: 931 }, { x: 262, y: 1042 }, { x: 193, y: 1042 }, { x: 193, y: 919 }, { x: -16, y: 919 }, { x: -16, y: 1256 }, { x: 262, y: 1256 }, { x: 262, y: 1450 }, { x: 1360, y: 1450 }, { x: 1360, y: 1539 }],
       },
       'edge-wms-wcs': {
         sourceHandle: 'bottom', targetHandle: 'top',
         computedPath: [{ x: 121, y: 931 }, { x: 121, y: 1020 }, { x: 181, y: 1020 }, { x: 181, y: 1089 }],
       },
     };
-    Object.assign(browserLockedRoutes, latestBrowserMeasuredRoutes);
+    const latestBrowserRouteMetadata: Record<string, Record<string, boolean>> = {
+      'edge-loms-customs': {
+        detachedSourceEndpointReanchored: false,
+        detachedTargetEndpointReanchored: false,
+        endpointOrthogonalRepaired: true,
+      },
+      'edge-loms-tms': {},
+      'edge-loms-visibility': {
+        hardObstacleRepaired: true,
+        obstacleClearanceOptimized: false,
+        sharedTrunkAware: true,
+        crossingOptimized: true,
+      },
+      'edge-loms-wms': {
+        detachedSourceEndpointReanchored: false,
+        detachedTargetEndpointReanchored: false,
+        endpointOrthogonalRepaired: true,
+      },
+      'edge-tms-bms': {
+        crossingOptimized: true,
+        sharedTrunkAware: true,
+        detachedSourceEndpointReanchored: false,
+        detachedTargetEndpointReanchored: false,
+        endpointOrthogonalRepaired: true,
+      },
+      'edge-tms-carrier': {
+        detachedSourceEndpointReanchored: false,
+        detachedTargetEndpointReanchored: false,
+        endpointOrthogonalRepaired: true,
+        sameNodeInOutCrossingRepaired: true,
+        crossingOptimized: true,
+        sharedTrunkAware: true,
+      },
+      'edge-tms-downstream': {
+        detachedSourceEndpointReanchored: true,
+        detachedTargetEndpointReanchored: false,
+        endpointOrthogonalRepaired: true,
+        crossingOptimized: true,
+        sharedTrunkAware: true,
+      },
+      'edge-tms-visibility': {
+        detachedSourceEndpointReanchored: false,
+        detachedTargetEndpointReanchored: false,
+        endpointOrthogonalRepaired: true,
+        displayNodeClearanceRepaired: true,
+      },
+      'edge-tms-yms': {
+        detachedSourceEndpointReanchored: false,
+        detachedTargetEndpointReanchored: false,
+        endpointOrthogonalRepaired: true,
+      },
+      'edge-upstream-loms': {
+        detachedSourceEndpointReanchored: false,
+        detachedTargetEndpointReanchored: false,
+        endpointOrthogonalRepaired: true,
+      },
+      'edge-visibility-downstream': {
+        detachedSourceEndpointReanchored: false,
+        detachedTargetEndpointReanchored: false,
+        endpointOrthogonalRepaired: true,
+        sameNodeInOutCrossingRepaired: true,
+      },
+      'edge-wms-bms': {
+        detachedSourceEndpointReanchored: false,
+        detachedTargetEndpointReanchored: false,
+        endpointOrthogonalRepaired: true,
+        crossingOptimized: true,
+        sharedTrunkAware: true,
+      },
+      'edge-wms-visibility': {
+        detachedSourceEndpointReanchored: false,
+        detachedTargetEndpointReanchored: false,
+        endpointOrthogonalRepaired: true,
+        displayNodeClearanceRepaired: true,
+        crossingOptimized: true,
+        sharedTrunkAware: true,
+      },
+      'edge-wms-wcs': {
+        detachedSourceEndpointReanchored: false,
+        detachedTargetEndpointReanchored: false,
+        endpointOrthogonalRepaired: true,
+      },
+    };
+    Object.entries(latestBrowserMeasuredRoutes).forEach(([edgeId, route]) => {
+      browserLockedRoutes[edgeId] = {
+        ...route,
+        metadata: latestBrowserRouteMetadata[edgeId],
+      };
+    });
   return { browserMeasuredNodes, browserLockedRoutes };
 };

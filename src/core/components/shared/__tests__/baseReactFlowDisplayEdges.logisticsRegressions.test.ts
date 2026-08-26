@@ -378,6 +378,14 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
       JSON.stringify({ quality, phaseTraces }, null, 2),
     ).toMatchObject({ resolution: 'skip' });
     expect(
+      phaseTraces.find(trace => trace.phase === 'quality-polish-micro'),
+      JSON.stringify({ quality, phaseTraces }, null, 2),
+    ).toMatchObject({ resolution: 'skip', candidateCount: 0, evaluationCount: 0 });
+    expect(
+      phaseTraces.find(trace => trace.phase === 'quality-polish-local-after-endpoint'),
+      JSON.stringify({ quality, phaseTraces }, null, 2),
+    ).toMatchObject({ resolution: 'skip', candidateCount: 0, evaluationCount: 0 });
+    expect(
       phaseTraces.find(
         trace => trace.phase === 'quality-crossing-global-refine-fixed-point',
       ),
@@ -431,6 +439,61 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
     const projected = projectBaseReactFlowDisplayWorkerInput(canvas);
     const { browserMeasuredNodes, browserLockedRoutes } =
       createBrowserLogisticsRouteFixture();
+    expect(Object.fromEntries(Object.entries(browserLockedRoutes).map(([edgeId, route]) => (
+      [edgeId, route.computedPath.length]
+    )))).toEqual({
+      'edge-loms-customs': 4,
+      'edge-loms-tms': 2,
+      'edge-loms-visibility': 12,
+      'edge-loms-wms': 4,
+      'edge-tms-bms': 8,
+      'edge-tms-carrier': 10,
+      'edge-tms-downstream': 4,
+      'edge-tms-visibility': 6,
+      'edge-tms-yms': 6,
+      'edge-upstream-loms': 4,
+      'edge-visibility-downstream': 4,
+      'edge-wms-bms': 6,
+      'edge-wms-visibility': 10,
+      'edge-wms-wcs': 4,
+    });
+    expect({
+      lomsVisibility: browserLockedRoutes['edge-loms-visibility'].computedPath.slice(1, 3),
+      tmsCarrier: browserLockedRoutes['edge-tms-carrier'].computedPath.slice(1, 3),
+      tmsDownstream: browserLockedRoutes['edge-tms-downstream'].computedPath[1],
+      tmsVisibility: browserLockedRoutes['edge-tms-visibility'].computedPath.slice(2, 4),
+      visibilityDownstream: browserLockedRoutes['edge-visibility-downstream'].computedPath[1],
+      wmsBms: browserLockedRoutes['edge-wms-bms'].computedPath.slice(2, 4),
+      wmsVisibility: browserLockedRoutes['edge-wms-visibility'].computedPath.slice(3, 5),
+    }).toEqual({
+      lomsVisibility: [{ x: 1091, y: 788 }, { x: 1230, y: 788 }],
+      tmsCarrier: [{ x: 1018, y: 690 }, { x: 1027, y: 690 }],
+      tmsDownstream: { x: 1065, y: 790 },
+      tmsVisibility: [{ x: 1165, y: 1020 }, { x: 1165, y: 1256 }],
+      visibilityDownstream: { x: 1523, y: 1513 },
+      wmsBms: [{ x: 250, y: 1000 }, { x: 250, y: 919 }],
+      wmsVisibility: [{ x: 193, y: 919 }, { x: -16, y: 919 }],
+    });
+    expect(Object.values(browserLockedRoutes).every(route => route.metadata !== undefined))
+      .toBe(true);
+    expect(browserLockedRoutes['edge-loms-visibility'].metadata).toEqual({
+      hardObstacleRepaired: true,
+      obstacleClearanceOptimized: false,
+      sharedTrunkAware: true,
+      crossingOptimized: true,
+    });
+    expect(browserLockedRoutes['edge-tms-carrier'].metadata).toMatchObject({
+      sameNodeInOutCrossingRepaired: true,
+      crossingOptimized: true,
+      sharedTrunkAware: true,
+    });
+    expect(browserLockedRoutes['edge-wms-visibility'].metadata).toMatchObject({
+      displayNodeClearanceRepaired: true,
+      crossingOptimized: true,
+      sharedTrunkAware: true,
+    });
+    expect(browserLockedRoutes['edge-wms-visibility'].metadata)
+      .not.toHaveProperty('detachedOverlapSeparated');
     const browserProjected = {
       ...projected,
       nodes: browserMeasuredNodes,
@@ -443,6 +506,7 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
           sourceHandle: lockedRoute.sourceHandle,
           targetHandle: lockedRoute.targetHandle,
           data: {
+            ...edge.data,
             auto: lockedRoute.auto ? ['source', 'target'] : [],
             autoSource: lockedRoute.auto === true,
             autoTarget: lockedRoute.auto === true,
@@ -474,6 +538,7 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
       endpointOrder,
       passageOrder,
       hardReport,
+      phaseTrace: response.phaseTrace,
       obstacleHits: edgeNodeObstacleHits(result, absoluteNodes),
       unsafeEdges: result.filter(edge => countRenderUnsafeEndpointStubs([edge]) > 0)
         .map(edge => ({ id: edge.id, path: finitePointPath((edge.data as { computedPath?: unknown } | undefined)?.computedPath) })),
@@ -494,6 +559,13 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
     const dualTarget = targetTrunks.find(trunk => trunk.edgeIds.includes(dualRoleEdgeIds[0] ?? ''));
     expect(dualRoleEdgeIds, diagnostics).not.toEqual([]);
     expect([dualSource, dualTarget].every(trunk => (trunk?.commonStemLength ?? 0) >= 48), diagnostics).toBe(true);
+    expect(
+      response.phaseTrace?.find(trace => trace.phase === 'final-evaluation-context'),
+      diagnostics,
+    ).toMatchObject({
+      candidateCount: result.length * 2,
+      resolution: 'accepted',
+    });
 
     const logisticsLoaderEntry = Object.entries(
       GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_LOADERS,
