@@ -12,9 +12,9 @@
 - port-policy 与 container expand 被浏览器矩阵固定为 `incremental-route`、`fallbackLevel=none`；首次 container collapse 仍在同一 Worker job 内安全 full fallback，不降低任何最终门禁；
 - `hidden`/`collapsed` 已进入受限 Worker 投影与协议校验，`collapsed:false` 与缺省 expanded 状态使用同一 identity；Worker 私有 session 可按完整 identity 回放返回旧 topology，仍重新校验 route signature、hard report、全图节点净空和冻结边界；
 - 同 realm committed snapshot、外部候选和 Worker 私有 session 继续保持不同信任边界；未采用把主线程 committed candidate 重新透传给 Worker 的重复协议；
-- 30 个独立 Logistics 动态完整冷路由样本为 median `2701ms`、p95 `6916ms`、max `8134ms`，5 个精简后复测样本为 median `2700ms`、p95 `3106ms`。页面/消息开销 p95 仅约 `22ms`，剩余耗时在 Worker 内 accepted 的全质量候选与 finalizer 阶段。
+- 最新同一 production build、固定 viewport、全新浏览器 profile 的 30 个独立 Logistics 动态完整冷路由样本为 median `1675ms`、p95 `2011ms`、max `2078ms`；Worker compute p95 为 `1999.9ms`，页面/消息开销 p95 仅 `14ms`。30/30 均为一次 Worker start、零 abort、单次 `full-route-repaired` 最终事务，剩余耗时集中在 Worker 内 crossing sweeps、endpoint closure 与 finalizer 的 accepted 全质量候选。
 
-因此，迭代 1–2 的统一门禁和 Routing Session 主链基本完成；迭代 3 的拓扑编辑覆盖已补齐，但稳定性能预算尚未闭环；迭代 4 的动态完整冷路由仍未达到产品方放宽后的 `1100ms` p95；迭代 5 的 Canvas 与 standalone 路由适配器、重复管线删除仍未完成。禁止用提高预算、跳过 accepted 修复阶段或降低质量门禁宣称完成。
+因此，迭代 1–2 的统一门禁和 Routing Session 主链基本完成；迭代 3 的拓扑编辑与正确性覆盖已补齐，但 30 样本浏览器增量性能验收尚未闭环；迭代 4 的动态完整冷路由仍未达到产品方放宽后的 `1100ms` p95，且 corridor lane/capacity 尚未形成实际分配，缺陷计划也尚未驱动内部 repair 阶段精确跳过；迭代 5 的 routing-only 文档快照、Canvas/standalone 渲染适配器和重复管线删除已经实现并通过对应测试。禁止用提高预算、跳过 accepted 修复阶段或降低质量门禁宣称完成。
 
 ## 0.1 首批实施记录（2026-07-27）
 
