@@ -9,10 +9,8 @@
     "src/core/types/gifshot.d.ts",
     "src/app/diagramViewerRouteLoader.ts",
     "src/core/components/shared/baseReactFlowDisplayDirection.ts",
-    "src/core/routing/renderedPathCache.ts",
     "src/core/strategies/domainDagreEdgePreparationSupport.ts",
     "src/core/themes/embeddedDiagramTheme.ts",
-    "src/core/utils/layout/domainContainerAccessors.ts",
-    "src/core/workers/pathfindingWorkerBoundary.ts"
+    "src/core/utils/layout/domainContainerAccessors.ts"
   ]
 }
