@@ -1,10 +1,22 @@
 # Vizly 首次打开与增量调整统一路由方案
 
-状态：首个实施批次已完成，增量正确性已闭环，冷启动与调度 p95 继续收敛
+状态：质量与会话主链已闭环；拓扑增量继续收敛，动态冷路由 p95 尚未达标
 适用范围：`BaseReactFlow` Canvas 最终显示路由、内置标准图、用户保存图、节点拖拽及局部编辑
 关联标准：`docs/edge-routing-goals.md`
 
-## 0. 实施状态（2026-07-27）
+## 0. 当前收敛状态（2026-08-26）
+
+本轮 production-build 验收结论：
+
+- 三张 canonical preset、TB/BT/LR/RL 与十类几何/拓扑编辑通过 hard report、商业净空和最终 SVG 审计，已执行的非正交、障碍命中、严格交叉、异常 overlap、短 stub、tiny dogleg、hairpin、低对比、重复 marker/交互路径和标签节点相交均为零；
+- port-policy 与 container expand 被浏览器矩阵固定为 `incremental-route`、`fallbackLevel=none`；首次 container collapse 仍在同一 Worker job 内安全 full fallback，不降低任何最终门禁；
+- `hidden`/`collapsed` 已进入受限 Worker 投影与协议校验，`collapsed:false` 与缺省 expanded 状态使用同一 identity；Worker 私有 session 可按完整 identity 回放返回旧 topology，仍重新校验 route signature、hard report、全图节点净空和冻结边界；
+- 同 realm committed snapshot、外部候选和 Worker 私有 session 继续保持不同信任边界；未采用把主线程 committed candidate 重新透传给 Worker 的重复协议；
+- 30 个独立 Logistics 动态完整冷路由样本为 median `2701ms`、p95 `6916ms`、max `8134ms`，5 个精简后复测样本为 median `2700ms`、p95 `3106ms`。页面/消息开销 p95 仅约 `22ms`，剩余耗时在 Worker 内 accepted 的全质量候选与 finalizer 阶段。
+
+因此，迭代 1–2 的统一门禁和 Routing Session 主链基本完成；迭代 3 的拓扑编辑覆盖已补齐，但稳定性能预算尚未闭环；迭代 4 的动态完整冷路由仍未达到产品方放宽后的 `1100ms` p95；迭代 5 的 Canvas 与 standalone 路由适配器、重复管线删除仍未完成。禁止用提高预算、跳过 accepted 修复阶段或降低质量门禁宣称完成。
+
+## 0.1 首批实施记录（2026-07-27）
 
 已经落地：
 
@@ -798,7 +810,7 @@ final-commit
 |---|---:|
 | 标准 Logistics 预编译 Worker 校验 p95 | `< 150ms` |
 | Logistics geometry ready 到 final commit p95 | `< 250ms` |
-| Logistics 动态完整冷路由 p95 | 演进目标 `< 750ms`，首批不作为硬退出条件 |
+| Logistics 动态完整冷路由 p95 | 当前产品门槛 `< 1100ms`（原 `<750ms` 已放宽），仍不得降低质量门禁 |
 | 同 realm、同 identity 再次打开 | `workerStart=0`，接近即时 |
 | 单节点拖拽、影响边不超过8条 p95 | `< 150ms` |
 | 拖拽松手到 final commit p95 | `< 300ms` |
