@@ -9,6 +9,7 @@ import {
   readDisplayRoutingVisualScaleAudit,
   readRenderedDisplayEdgeNodeIntersections,
 } from './lib/display-routing-browser-geometry.mjs';
+import { readRenderedDisplayEdgeHardGeometryAudit } from './lib/display-routing-browser-hard-geometry.mjs';
 import { withPrecompiledRouteBrowser } from './lib/precompiled-display-route-cdp.mjs';
 import { PRECOMPILED_DISPLAY_ROUTE_TARGETS } from './lib/precompiled-display-route-targets.mjs';
 import {
@@ -130,6 +131,9 @@ const auditFinalSvg = async (session, route, label) => {
   const commercialAudit = await session.evaluate(
     `(${readRenderedDisplayEdgeNodeIntersections.toString()})(${JSON.stringify(route.response.edges)}, 48)`,
   );
+  const hardAudit = await session.evaluate(
+    `(${readRenderedDisplayEdgeHardGeometryAudit.toString()})(${JSON.stringify(route.response.edges)}, ${JSON.stringify(route.request?.nodes)})`,
+  );
   const nodeGeometryParity = await session.evaluate(
     `(${readDisplayRoutingNodeGeometryParity.toString()})(${JSON.stringify(route.request?.nodes)})`,
   );
@@ -144,6 +148,7 @@ const auditFinalSvg = async (session, route, label) => {
   if (!displayRoutingFinalSvgGeometryIsClean({
     audit,
     commercialAudit,
+    hardAudit,
     expectedPathCount: route.response.edges.length,
   })) {
     throw new Error(`Final SVG geometry failed for ${label}: ${JSON.stringify({
@@ -153,6 +158,13 @@ const auditFinalSvg = async (session, route, label) => {
       obstacleHitCount: audit?.intersections?.length,
       minimumClearanceRiskCount: audit?.clearanceRisks?.length,
       commercialClearanceRiskCount: commercialAudit?.clearanceRisks?.length,
+      nonOrthogonalPathCount: hardAudit?.nonOrthogonalEdgeIds?.length,
+      detachedTerminalPathCount: hardAudit?.detachedTerminalEdgeIds?.length,
+      shortEndpointStubPathCount: hardAudit?.shortEndpointStubEdgeIds?.length,
+      tinyInteriorDoglegPathCount: hardAudit?.tinyInteriorDoglegEdgeIds?.length,
+      hairpinPathCount: hardAudit?.hairpinEdgeIds?.length,
+      strictCrossingCount: hardAudit?.strictCrossings?.length,
+      illegalOverlapCount: hardAudit?.illegalOverlaps?.length,
     })}`);
   }
   const visualAudit = await session.evaluate(
@@ -170,6 +182,7 @@ const auditFinalSvg = async (session, route, label) => {
     obstacleHits: audit.intersections.length,
     minimumClearanceRisks: audit.clearanceRisks.length,
     commercialClearanceRisks: commercialAudit.clearanceRisks.length,
+    hardGeometryAudit: hardAudit,
     nodeGeometryParity,
     visualAudit,
   };

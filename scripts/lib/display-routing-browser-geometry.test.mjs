@@ -11,6 +11,7 @@ import {
   replayDisplayRoutingResponseEdges,
   readVisibleDisplayRoutingNodeRect,
 } from './display-routing-browser-geometry.mjs';
+import { readRenderedDisplayEdgeHardGeometryAudit } from './display-routing-browser-hard-geometry.mjs';
 import { assertDisplayRoutingVisualScaleAudit } from './display-routing-browser-visual-audit.mjs';
 
 const rect = (x, y, width, height) => ({
@@ -52,21 +53,157 @@ describe('display routing browser geometry', () => {
       intersections: [],
       clearanceRisks: [],
     };
+    const cleanHardAudit = {
+      auditedPathCount: 2,
+      invalidEdgeIds: [],
+      nonOrthogonalEdgeIds: [],
+      detachedTerminalEdgeIds: [],
+      shortEndpointStubEdgeIds: [],
+      tinyInteriorDoglegEdgeIds: [],
+      hairpinEdgeIds: [],
+      strictCrossings: [],
+      illegalOverlaps: [],
+    };
     expect(displayRoutingFinalSvgGeometryIsClean({
       audit: cleanAudit,
       commercialAudit: cleanAudit,
+      hardAudit: cleanHardAudit,
       expectedPathCount: 2,
     })).toBe(true);
     expect(displayRoutingFinalSvgGeometryIsClean({
       audit: cleanAudit,
       commercialAudit: { ...cleanAudit, clearanceRisks: [{ clearance: 39 }] },
+      hardAudit: cleanHardAudit,
       expectedPathCount: 2,
     })).toBe(false);
     expect(displayRoutingFinalSvgGeometryIsClean({
       audit: { ...cleanAudit, auditedPathCount: 1 },
       commercialAudit: cleanAudit,
+      hardAudit: cleanHardAudit,
       expectedPathCount: 2,
     })).toBe(false);
+    expect(displayRoutingFinalSvgGeometryIsClean({
+      audit: cleanAudit,
+      commercialAudit: cleanAudit,
+      hardAudit: { ...cleanHardAudit, hairpinEdgeIds: ['edge'] },
+      expectedPathCount: 2,
+    })).toBe(false);
+  });
+
+  it('audits complete final SVG paths for orthogonal terminals and bounded defects', () => {
+    const nodes = [
+      { id: 'source', position: { x: 0, y: 0 }, width: 40, height: 40 },
+      { id: 'target', position: { x: 200, y: 0 }, width: 40, height: 40 },
+    ];
+    const edge = {
+      id: 'edge', source: 'source', target: 'target', sourceHandle: 'right', targetHandle: 'left',
+    };
+    const wrapper = path => ({
+      getAttribute: name => name === 'data-testid' ? 'rf__edge-edge' : null,
+      querySelector: selector => selector === '.shared-trunk-edge-interaction'
+        ? { getAttribute: name => name === 'd' ? path : null }
+        : null,
+    });
+    vi.stubGlobal('document', { querySelectorAll: () => [wrapper('M 40 20 L 200 20')] });
+
+    expect(readRenderedDisplayEdgeHardGeometryAudit([edge], nodes)).toEqual({
+      edgeCount: 1,
+      auditedPathCount: 1,
+      invalidEdgeIds: [],
+      nonOrthogonalEdgeIds: [],
+      detachedTerminalEdgeIds: [],
+      shortEndpointStubEdgeIds: [],
+      tinyInteriorDoglegEdgeIds: [],
+      hairpinEdgeIds: [],
+      strictCrossings: [],
+      illegalOverlaps: [],
+    });
+
+    document.querySelectorAll = () => [wrapper(
+      'M 40 20 L 60 20 L 60 80 L 70 80 L 70 20 L 200 20',
+    )];
+    expect(readRenderedDisplayEdgeHardGeometryAudit([edge], nodes)).toMatchObject({
+      shortEndpointStubEdgeIds: ['edge'],
+      tinyInteriorDoglegEdgeIds: ['edge'],
+      hairpinEdgeIds: ['edge'],
+    });
+
+    document.querySelectorAll = () => [wrapper('M 40 20 L 200 25')];
+    expect(readRenderedDisplayEdgeHardGeometryAudit([edge], nodes)).toMatchObject({
+      nonOrthogonalEdgeIds: ['edge'],
+      detachedTerminalEdgeIds: ['edge'],
+    });
+  });
+
+  it('detects strict crossings and unrelated overlap while allowing a shared source stem', () => {
+    const nodes = [
+      { id: 'h-source', position: { x: 0, y: 80 }, width: 40, height: 40 },
+      { id: 'h-target', position: { x: 240, y: 80 }, width: 40, height: 40 },
+      { id: 'v-source', position: { x: 120, y: 0 }, width: 40, height: 40 },
+      { id: 'v-target', position: { x: 120, y: 160 }, width: 40, height: 40 },
+    ];
+    const edges = [
+      {
+        id: 'horizontal', source: 'h-source', target: 'h-target',
+        sourceHandle: 'right', targetHandle: 'left',
+      },
+      {
+        id: 'vertical', source: 'v-source', target: 'v-target',
+        sourceHandle: 'bottom', targetHandle: 'top',
+      },
+    ];
+    const paths = new Map([
+      ['horizontal', 'M 40 100 L 240 100'],
+      ['vertical', 'M 140 40 L 140 160'],
+    ]);
+    const wrappers = edges.map(edge => ({
+      getAttribute: name => name === 'data-testid' ? `rf__edge-${edge.id}` : null,
+      querySelector: () => ({ getAttribute: name => name === 'd' ? paths.get(edge.id) : null }),
+    }));
+    vi.stubGlobal('document', { querySelectorAll: () => wrappers });
+    expect(readRenderedDisplayEdgeHardGeometryAudit(edges, nodes)).toMatchObject({
+      strictCrossings: [{ edgeA: 'horizontal', edgeB: 'vertical' }],
+      illegalOverlaps: [],
+    });
+
+    const sharedNodes = [
+      { id: 'source', position: { x: 0, y: 0 }, width: 40, height: 40 },
+      { id: 'target-a', position: { x: 240, y: 0 }, width: 40, height: 40 },
+      { id: 'target-b', position: { x: 240, y: 100 }, width: 40, height: 40 },
+    ];
+    const sharedEdges = [
+      { id: 'a', source: 'source', target: 'target-a', sourceHandle: 'right', targetHandle: 'left' },
+      { id: 'b', source: 'source', target: 'target-b', sourceHandle: 'right', targetHandle: 'left' },
+    ];
+    const sharedPaths = new Map([
+      ['a', 'M 40 20 L 120 20 L 240 20'],
+      ['b', 'M 40 20 L 120 20 L 120 120 L 240 120'],
+    ]);
+    const sharedWrappers = sharedEdges.map(edge => ({
+      getAttribute: name => name === 'data-testid' ? `rf__edge-${edge.id}` : null,
+      querySelector: () => ({ getAttribute: name => name === 'd' ? sharedPaths.get(edge.id) : null }),
+    }));
+    document.querySelectorAll = () => sharedWrappers;
+    expect(readRenderedDisplayEdgeHardGeometryAudit(sharedEdges, sharedNodes)).toMatchObject({
+      illegalOverlaps: [],
+    });
+
+    const unrelatedEdges = sharedEdges.map((edge, index) => ({
+      ...edge,
+      id: `unrelated-${index}`,
+      source: index === 0 ? 'source' : 'other-source',
+    }));
+    sharedNodes.push({ id: 'other-source', position: { x: 0, y: 0 }, width: 40, height: 40 });
+    const unrelatedWrappers = unrelatedEdges.map((edge, index) => ({
+      getAttribute: name => name === 'data-testid' ? `rf__edge-${edge.id}` : null,
+      querySelector: () => ({ getAttribute: name => name === 'd' ? sharedPaths.get(index === 0 ? 'a' : 'b') : null }),
+    }));
+    document.querySelectorAll = () => unrelatedWrappers;
+    expect(readRenderedDisplayEdgeHardGeometryAudit(unrelatedEdges, sharedNodes)).toMatchObject({
+      illegalOverlaps: [expect.objectContaining({
+        edgeA: 'unrelated-0', edgeB: 'unrelated-1', overlap: 80,
+      })],
+    });
   });
 
   it('replays routing-only responses and rejects mismatched patch identities', () => {

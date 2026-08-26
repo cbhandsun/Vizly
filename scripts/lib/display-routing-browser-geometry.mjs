@@ -32,10 +32,12 @@ export const replayDisplayRoutingResponseEdges = (response, request) => {
 export const displayRoutingFinalSvgGeometryIsClean = ({
   audit,
   commercialAudit,
+  hardAudit,
   expectedPathCount,
 }) => Boolean(
   audit
   && commercialAudit
+  && hardAudit
   && Number.isSafeInteger(expectedPathCount)
   && expectedPathCount >= 0
   && audit.auditedPathCount === expectedPathCount
@@ -52,6 +54,23 @@ export const displayRoutingFinalSvgGeometryIsClean = ({
   && commercialAudit.intersections.length === 0
   && Array.isArray(commercialAudit.clearanceRisks)
   && commercialAudit.clearanceRisks.length === 0
+  && hardAudit.auditedPathCount === expectedPathCount
+  && Array.isArray(hardAudit.invalidEdgeIds)
+  && hardAudit.invalidEdgeIds.length === 0
+  && Array.isArray(hardAudit.nonOrthogonalEdgeIds)
+  && hardAudit.nonOrthogonalEdgeIds.length === 0
+  && Array.isArray(hardAudit.detachedTerminalEdgeIds)
+  && hardAudit.detachedTerminalEdgeIds.length === 0
+  && Array.isArray(hardAudit.shortEndpointStubEdgeIds)
+  && hardAudit.shortEndpointStubEdgeIds.length === 0
+  && Array.isArray(hardAudit.tinyInteriorDoglegEdgeIds)
+  && hardAudit.tinyInteriorDoglegEdgeIds.length === 0
+  && Array.isArray(hardAudit.hairpinEdgeIds)
+  && hardAudit.hairpinEdgeIds.length === 0
+  && Array.isArray(hardAudit.strictCrossings)
+  && hardAudit.strictCrossings.length === 0
+  && Array.isArray(hardAudit.illegalOverlaps)
+  && hardAudit.illegalOverlaps.length === 0
 );
 
 export const readVisibleDisplayRoutingNodeRect = (nodeId) => {
