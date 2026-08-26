@@ -745,6 +745,7 @@ describe('repairBusinessNodeClearanceRisks', () => {
     }));
     const diagnostics = {
       candidateCollectionCacheHitCount: 0,
+      candidateRankCacheHitCount: 0,
       clearanceScoreCacheHitCount: 0,
       clearanceScannedNodeCount: 0,
       generatedCandidateCount: 0,
@@ -752,15 +753,22 @@ describe('repairBusinessNodeClearanceRisks', () => {
       qualityContextCacheHitCount: 0,
       uniqueCandidateCount: 0,
     };
+    const globallyValidatedEdgeIds: string[] = [];
 
     expect(repairBusinessNodeClearanceRisks(edges, nodes, {
       diagnostics,
-      validateCandidate: () => false,
+      validateCandidate: ({ candidateEdges, changedEdgeIndex }) => {
+        const changedEdge = candidateEdges[changedEdgeIndex];
+        if (changedEdge) globallyValidatedEdgeIds.push(changedEdge.id);
+        return false;
+      },
     })).toBe(edges);
     expect(diagnostics.qualityContextBuildCount).toBe(1);
     expect(diagnostics.qualityContextCacheHitCount).toBe(1);
     expect(diagnostics.candidateCollectionCacheHitCount).toBe(1);
+    expect(diagnostics.candidateRankCacheHitCount).toBe(1);
     expect(diagnostics.clearanceScoreCacheHitCount).toBeGreaterThan(0);
     expect(diagnostics.clearanceScannedNodeCount).toBeGreaterThan(0);
+    expect(new Set(globallyValidatedEdgeIds)).toEqual(new Set(['first', 'second']));
   });
 });

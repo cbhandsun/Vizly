@@ -4,6 +4,7 @@ import type { EdgePathQualityScore } from './edgePathQualityGeometry';
 import {
   iterateBusinessNodeClearanceCandidates,
 } from './edgeBusinessNodeClearanceCandidateRanking';
+import { createBusinessNodeClearanceCandidateRankCache } from './edgeBusinessNodeClearanceCandidateRankCache';
 import {
   createBusinessNodeClearanceCandidateCache,
   resetBusinessNodeClearanceRepairDiagnostics,
@@ -656,6 +657,7 @@ export const repairBusinessNodeClearanceRisks = (
   const candidateCollectionCache = createBusinessNodeClearanceCandidateCache<
     ReturnType<typeof clearanceCandidates>
   >();
+  const candidateRankCache = createBusinessNodeClearanceCandidateRankCache();
   let current = edges;
   let qualityBaselineEdges: Edge[] | null = null;
   let qualityContext: ReturnType<typeof createEdgePathQualityEvaluationContext> | null = null;
@@ -732,27 +734,21 @@ export const repairBusinessNodeClearanceRisks = (
         options.diagnostics.generatedCandidateCount += candidateCollection.generatedCandidateCount;
         options.diagnostics.uniqueCandidateCount += candidateCollection.uniqueCandidateCount;
       }
+      const candidateRankResult = candidateRankCache.getOrCreate(
+        candidateCollection,
+        candidateCollection.candidates,
+        candidate => clearanceContext.scorePair(
+          candidate,
+          edge,
+          minimumClearance,
+          COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+        ),
+      );
+      if (candidateRankResult.cacheHit && options.diagnostics) {
+        options.diagnostics.candidateRankCacheHitCount += 1;
+      }
       const rankedCandidates = iterateBusinessNodeClearanceCandidates(
-        candidateCollection.candidates.map(({ candidate, hits }) => {
-          const [risk, commercialRisk] = clearanceContext.scorePair(
-            candidate,
-            edge,
-            minimumClearance,
-            COMMERCIAL_BUSINESS_NODE_CLEARANCE,
-          );
-          return {
-            candidate,
-            risk,
-            commercialRisk,
-            hits,
-            length: candidate.slice(1).reduce((total, point, index) => (
-              total
-                + Math.abs(point.x - candidate[index].x)
-                + Math.abs(point.y - candidate[index].y)
-            ), 0),
-            bendCount: Math.max(0, candidate.length - 2),
-          };
-        }),
+        candidateRankResult.value,
         {
           hits: baselineHits,
           risk: baselineRisk,

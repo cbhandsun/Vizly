@@ -6,6 +6,7 @@ import {
   selectBusinessNodeClearanceCandidatesWithinHitBudget,
   type BusinessNodeClearanceCandidateRank,
 } from '../edgeBusinessNodeClearanceCandidateRanking';
+import { createBusinessNodeClearanceCandidateRankCache } from '../edgeBusinessNodeClearanceCandidateRankCache';
 
 const candidate = (
   id: string,
@@ -21,6 +22,38 @@ const candidate = (
 });
 
 describe('rankBusinessNodeClearanceCandidates', () => {
+  it('reuses only pure ranks for the same exact candidate collection', () => {
+    const cache = createBusinessNodeClearanceCandidateRankCache();
+    const collection = {};
+    const candidates = [
+      { candidate: [{ x: 0, y: 0 }, { x: 10, y: 0 }], hits: 1 },
+      { candidate: [{ x: 0, y: 0 }, { x: 0, y: 5 }, { x: 8, y: 5 }], hits: 0 },
+    ];
+    const scorePair = vi.fn((path: Array<{ x: number; y: number }>) => (
+      [path.length, path.length * 2] as const
+    ));
+
+    const first = cache.getOrCreate(collection, candidates, scorePair);
+    const hit = cache.getOrCreate(collection, candidates, scorePair);
+    const cloneMiss = cache.getOrCreate({}, candidates, scorePair);
+
+    expect(first.cacheHit).toBe(false);
+    expect(hit).toEqual({ value: first.value, cacheHit: true });
+    expect(hit.value).toBe(first.value);
+    expect(cloneMiss.cacheHit).toBe(false);
+    expect(scorePair).toHaveBeenCalledTimes(4);
+    expect(first.value.map(rank => ({
+      bends: rank.bendCount,
+      commercialRisk: rank.commercialRisk,
+      hits: rank.hits,
+      length: rank.length,
+      risk: rank.risk,
+    }))).toEqual([
+      { bends: 0, commercialRisk: 4, hits: 1, length: 10, risk: 2 },
+      { bends: 1, commercialRisk: 6, hits: 0, length: 13, risk: 3 },
+    ]);
+  });
+
   it('prunes candidates above the baseline hit budget before expensive scoring', () => {
     const countHits = vi.fn((entry: { hits: number }, maximumHits: number) => (
       entry.hits > maximumHits ? maximumHits + 1 : entry.hits
