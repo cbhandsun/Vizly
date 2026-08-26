@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assertDisplayRoutingTopologyOperationGroupResult,
   assertDisplayRoutingTopologyOperationResult,
+  displayRoutingCommittedEdgesMatchWorkerPatches,
   projectDisplayRoutingTopologyAssertionDiagnostics,
   projectDisplayRoutingTopologyDiagnostics,
 } from './display-routing-browser-topology-matrix.mjs';
@@ -44,6 +45,27 @@ const assertValid = result => assertDisplayRoutingTopologyOperationResult({
 });
 
 describe('display routing browser topology matrix', () => {
+  it('waits until React Flow has applied routing handles and paths from the Worker patch', () => {
+    const edge = {
+      id: 'edge', source: 'source', target: 'target', type: 'stablePath',
+      sourceHandle: 'right', targetHandle: 'left',
+      data: { computedPath: [{ x: 100, y: 30 }, { x: 300, y: 30 }] },
+    };
+    const patch = structuredClone(edge);
+
+    expect(displayRoutingCommittedEdgesMatchWorkerPatches([edge], [patch])).toBe(true);
+    expect(displayRoutingCommittedEdgesMatchWorkerPatches([{
+      ...edge,
+      sourceHandle: 'top',
+    }], [patch])).toBe(false);
+    expect(displayRoutingCommittedEdgesMatchWorkerPatches([{
+      ...edge,
+      data: { computedPath: [{ x: 100, y: 30 }, { x: 100, y: 90 }] },
+    }], [patch])).toBe(false);
+    expect(displayRoutingCommittedEdgesMatchWorkerPatches([edge], [])).toBe(false);
+    expect(displayRoutingCommittedEdgesMatchWorkerPatches(null, [patch])).toBe(false);
+  });
+
   it('projects timeout diagnostics without route geometry or user content', () => {
     const projected = projectDisplayRoutingTopologyDiagnostics({
       routing: {

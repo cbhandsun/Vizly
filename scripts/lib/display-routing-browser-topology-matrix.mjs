@@ -9,6 +9,65 @@ export { DISPLAY_ROUTING_TOPOLOGY_CASE_ID } from './display-routing-matrix-cases
 const TOPOLOGY_PRESET_ID = 'logistics-architecture-v1';
 const WAIT_TIMEOUT_MS = 60_000;
 
+/**
+ * The routing debug state is published immediately before React applies the
+ * deferred edge props. Do not snapshot React Flow's edge store until its
+ * terminal-render-critical fields match the Worker response; otherwise a
+ * verifier can pair a new computed path with previous source/target handles.
+ */
+export const displayRoutingCommittedEdgesMatchWorkerPatches = (
+  rawEdges,
+  rawPatches,
+) => {
+  const MAX_ITEMS = 5_000;
+  const MAX_POINTS = 512;
+  if (
+    !Array.isArray(rawEdges)
+    || !Array.isArray(rawPatches)
+    || rawEdges.length !== rawPatches.length
+    || rawEdges.length > MAX_ITEMS
+  ) return false;
+  const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
+  const tokenMatches = (edge, patch, key) => (
+    !hasOwn(patch, key) || edge?.[key] === patch[key]
+  );
+  const pathMatches = (edgeData, patchData, key) => {
+    if (!hasOwn(patchData, key)) return true;
+    const edgePath = edgeData?.[key];
+    const patchPath = patchData[key];
+    if (typeof patchPath === 'undefined') return typeof edgePath === 'undefined';
+    if (
+      !Array.isArray(edgePath)
+      || !Array.isArray(patchPath)
+      || edgePath.length !== patchPath.length
+      || edgePath.length > MAX_POINTS
+    ) return false;
+    return patchPath.every((point, index) => (
+      point && typeof point === 'object'
+      && Number.isFinite(point.x) && Number.isFinite(point.y)
+      && edgePath[index] && typeof edgePath[index] === 'object'
+      && edgePath[index].x === point.x && edgePath[index].y === point.y
+    ));
+  };
+  return rawPatches.every((patch, index) => {
+    const edge = rawEdges[index];
+    if (
+      !edge || !patch || typeof edge !== 'object' || typeof patch !== 'object'
+      || edge.id !== patch.id || edge.source !== patch.source || edge.target !== patch.target
+      || !tokenMatches(edge, patch, 'type')
+      || !tokenMatches(edge, patch, 'sourceHandle')
+      || !tokenMatches(edge, patch, 'targetHandle')
+    ) return false;
+    if (!hasOwn(patch, 'data')) return true;
+    if (!patch.data || typeof patch.data !== 'object' || Array.isArray(patch.data)) return false;
+    const edgeData = edge.data && typeof edge.data === 'object' && !Array.isArray(edge.data)
+      ? edge.data
+      : {};
+    return pathMatches(edgeData, patch.data, 'computedPath')
+      && pathMatches(edgeData, patch.data, 'elkPath');
+  });
+};
+
 const OPERATION_CASES = Object.freeze([
   Object.freeze({
     id: 'node-resize',
@@ -130,7 +189,7 @@ export const projectDisplayRoutingTopologyDiagnostics = ({
     routeResolution: response?.routeResolution,
     fallbackLevel: response?.fallbackLevel,
     affectedEdgeCount: response?.affectedEdgeCount,
-    patchCount: response?.patches?.length ?? response?.edges?.length ?? 0,
+    patchCount: response?.routingPatches?.length ?? response?.edges?.length ?? 0,
     hasRequestId: typeof response?.requestId === 'string',
   })),
   nodeCount,
@@ -139,6 +198,7 @@ export const projectDisplayRoutingTopologyDiagnostics = ({
 });
 
 const readOperationResultExpression = operationCase => `(() => {
+  const committedEdgesMatchWorkerPatches = ${displayRoutingCommittedEdgesMatchWorkerPatches.toString()};
   const requests = window.__vizlyRoutingRequests || [];
   const responses = window.__vizlyRoutingResponses || [];
   const request = [...requests].reverse().find(item => (
@@ -158,6 +218,7 @@ const readOperationResultExpression = operationCase => `(() => {
     || response.hardClean !== true
     || response.hardReport?.hardClean !== true
     || !Array.isArray(committedEdges)
+    || !committedEdgesMatchWorkerPatches(committedEdges, response.routingPatches)
   ) return null;
   return {
     operationId: ${JSON.stringify(operationCase.id)},

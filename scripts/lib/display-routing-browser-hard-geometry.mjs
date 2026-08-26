@@ -125,11 +125,12 @@ export const readRenderedDisplayEdgeHardGeometryAudit = (rawEdges, rawNodes) => 
   const invalidEdgeIds = [];
   const nonOrthogonalEdgeIds = [];
   const detachedTerminalEdgeIds = [];
+  const detachedTerminalFindings = [];
   const shortEndpointStubEdgeIds = [];
   const tinyInteriorDoglegEdgeIds = [];
   const hairpinEdgeIds = [];
   const audited = [];
-  for (const edge of edges) {
+  for (const [edgeIndex, edge] of edges.entries()) {
     const edgeId = typeof edge?.id === 'string' && edge.id.length > 0 && edge.id.length <= 500
       ? edge.id
       : '';
@@ -149,8 +150,17 @@ export const readRenderedDisplayEdgeHardGeometryAudit = (rawEdges, rawNodes) => 
       segmentCount: points.length - 1,
     }));
     if (segments.some(segment => !segment.axis)) recordFinding(nonOrthogonalEdgeIds, edgeId);
-    if (!terminalIsValid(edge, points, 'source') || !terminalIsValid(edge, points, 'target')) {
+    const sourceTerminalValid = terminalIsValid(edge, points, 'source');
+    const targetTerminalValid = terminalIsValid(edge, points, 'target');
+    if (!sourceTerminalValid || !targetTerminalValid) {
       recordFinding(detachedTerminalEdgeIds, edgeId);
+      recordFinding(detachedTerminalFindings, {
+        edgeIndex,
+        sourceSide: side(edge.sourceHandle),
+        targetSide: side(edge.targetHandle),
+        sourceTerminalValid,
+        targetTerminalValid,
+      });
     }
     if (length(points[0], points[1]) < MIN_ENDPOINT_STUB - EPS
       || length(points[points.length - 2], points[points.length - 1]) < MIN_ENDPOINT_STUB - EPS) {
@@ -358,6 +368,7 @@ export const readRenderedDisplayEdgeHardGeometryAudit = (rawEdges, rawNodes) => 
     invalidEdgeIds,
     nonOrthogonalEdgeIds,
     detachedTerminalEdgeIds,
+    detachedTerminalFindings,
     shortEndpointStubEdgeIds,
     tinyInteriorDoglegEdgeIds,
     hairpinEdgeIds,

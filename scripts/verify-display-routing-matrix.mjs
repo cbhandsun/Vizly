@@ -137,6 +137,9 @@ const auditFinalSvg = async (session, route, label) => {
   const nodeGeometryParity = await session.evaluate(
     `(${readDisplayRoutingNodeGeometryParity.toString()})(${JSON.stringify(route.request?.nodes)})`,
   );
+  const visualAudit = await session.evaluate(
+    `(${readDisplayRoutingVisualScaleAudit.toString()})()`,
+  );
   if (
     !nodeGeometryParity
     || nodeGeometryParity.comparedNodeCount < 1
@@ -160,6 +163,13 @@ const auditFinalSvg = async (session, route, label) => {
       commercialClearanceRiskCount: commercialAudit?.clearanceRisks?.length,
       nonOrthogonalPathCount: hardAudit?.nonOrthogonalEdgeIds?.length,
       detachedTerminalPathCount: hardAudit?.detachedTerminalEdgeIds?.length,
+      detachedTerminalPathIndexes: hardAudit?.detachedTerminalEdgeIds?.map(edgeId => (
+        route.response.edges.findIndex(edge => edge?.id === edgeId)
+      )),
+      detachedTerminalFindings: hardAudit?.detachedTerminalFindings,
+      computedRenderPathCount: visualAudit?.computedRenderPathCount,
+      fallbackRenderPathCount: visualAudit?.fallbackRenderPathCount,
+      missingRenderPathSourceCount: visualAudit?.missingRenderPathSourceCount,
       shortEndpointStubPathCount: hardAudit?.shortEndpointStubEdgeIds?.length,
       tinyInteriorDoglegPathCount: hardAudit?.tinyInteriorDoglegEdgeIds?.length,
       hairpinPathCount: hardAudit?.hairpinEdgeIds?.length,
@@ -167,9 +177,6 @@ const auditFinalSvg = async (session, route, label) => {
       illegalOverlapCount: hardAudit?.illegalOverlaps?.length,
     })}`);
   }
-  const visualAudit = await session.evaluate(
-    `(${readDisplayRoutingVisualScaleAudit.toString()})()`,
-  );
   assertDisplayRoutingVisualScaleAudit({
     name: label,
     audit: visualAudit,
