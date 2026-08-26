@@ -89,10 +89,17 @@ const projectDisplayWorkerNodes = (nodes: DisplayWorkerSourceNode[]): DisplayWor
       height: projectDisplayWorkerStyleDimension(style.height),
     };
     const projectedLayoutDirection = projectDisplayWorkerValue(data.layoutDirection);
+    const projectedData = {
+      ...(typeof projectedLayoutDirection === 'undefined'
+        ? {}
+        : { layoutDirection: projectedLayoutDirection }),
+      ...(data.collapsed === true ? { collapsed: true } : {}),
+    };
     return {
       id: node.id,
       type: node.type,
       parentId: node.parentId,
+      ...(node.hidden === true ? { hidden: true } : {}),
       position: projectDisplayWorkerPosition(node.position),
       positionAbsolute: resolveDisplayWorkerAbsolutePosition(node, nodeById),
       width: finiteNumberOrUndefined(node.width),
@@ -104,7 +111,7 @@ const projectDisplayWorkerNodes = (nodes: DisplayWorkerSourceNode[]): DisplayWor
         }
         : undefined,
       style: Object.values(projectedStyle).some(value => typeof value !== 'undefined') ? projectedStyle : undefined,
-      data: typeof projectedLayoutDirection === 'undefined' ? {} : { layoutDirection: projectedLayoutDirection },
+      data: projectedData,
     } as DisplayWorkerProjectedNode;
   });
 };

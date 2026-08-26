@@ -12,6 +12,9 @@ import {
   lockFinalDisplayComputedPaths,
 } from './baseReactFlowDisplayEdgeCore';
 import { createBaseReactFlowFinalEndpointEvaluation } from './baseReactFlowDisplayFinalEndpointEvaluation';
+import { commitComputedDisplayEdgeTerminals } from './baseReactFlowDisplayEndpointAnchoring';
+import { repairAxisMismatchedTerminalsWithBoundedPortRoles } from './baseReactFlowDisplayTerminalPortRepair';
+import { repairBaseReactFlowResidualOverlapAxisClosure } from './baseReactFlowDisplayResidualOverlapClosure';
 import { findBaseReactFlowStrictContextEdgePromotions } from './baseReactFlowDisplayIncrementalPromotion';
 import { repairFinalResidualStrictCrossings } from './baseReactFlowDisplayStrictResidualRepair';
 import { buildBaseReactFlowTopologyStrictTransactionCandidates } from './baseReactFlowDisplayTopologyStrictTransaction';
@@ -32,7 +35,8 @@ export type BaseReactFlowTopologyIncrementalKind =
   | 'edge-remove'
   | 'node-add'
   | 'node-remove'
-  | 'port-policy';
+  | 'port-policy'
+  | 'container-change';
 
 export type BaseReactFlowTopologyIncrementalProjection = Readonly<{
   kind: BaseReactFlowTopologyIncrementalKind;
@@ -52,6 +56,46 @@ export type BaseReactFlowTopologyIncrementalRouteOutcome = Readonly<{
   eligibleEdgeIds: string[];
   hardReport?: BaseDisplayBoundedCandidateReport;
 }>;
+
+const routeTopologyEdgeSet = ({
+  edges,
+  edgeIds,
+  nodes,
+  enableSmartEdges,
+  smartEdgePadding,
+  displayEdgeEpoch,
+}: {
+  edges: Edge[];
+  edgeIds: ReadonlySet<string>;
+  nodes: Node[];
+  enableSmartEdges: boolean;
+  smartEdgePadding: number;
+  displayEdgeEpoch: number;
+}): Edge[] | null => {
+  const sourceEdges = edges
+    .filter(edge => edgeIds.has(edge.id))
+    .map(edge => ({
+      ...clearTopologyMutableRoutingState(edge),
+      type: 'stablePath',
+    }));
+  if (sourceEdges.length !== edgeIds.size) return null;
+  const routedById = new Map(
+    createBaseReactFlowFastDisplayEdges({
+      edges: sourceEdges,
+      nodes,
+      enableSmartEdges,
+      smartEdgePadding,
+      isLargeGraph: false,
+      displayEdgeEpoch,
+    }).map(edge => [edge.id, edge] as const),
+  );
+  if (routedById.size !== edgeIds.size) return null;
+  return lockTopologyEligibleEdges(
+    edges.map(edge => routedById.get(edge.id) ?? edge),
+    nodes,
+    edgeIds,
+  );
+};
 
 const lockTopologyEligibleEdges = <T extends Edge[]>(
   edges: T,
@@ -220,6 +264,12 @@ const resolveTopologyKind = ({
     && additions.length === 0
     && changedExisting.length === 0
   ) return 'node-remove';
+  if (
+    reason === 'container-change'
+    && additions.length + removals.length + changedExisting.length > 0
+    && nodeAdditions.length + nodeRemovals.length + changedExistingNodes.length > 0
+    && !(nodeAdditions.length > 0 && nodeRemovals.length > 0)
+  ) return 'container-change';
   return null;
 };
 
@@ -244,13 +294,16 @@ export const createBaseReactFlowTopologyIncrementalProjection = ({
   nextEdges: Edge[];
   changeSet: BaseReactFlowRoutingChangeSet;
 }): BaseReactFlowTopologyIncrementalProjection | null => {
+  const changedItemCount = changeSet.changedNodeIds.length + changeSet.changedEdgeIds.length;
+  const maximumChangedItemCount = changeSet.reason === 'container-change'
+    ? 64
+    : MAX_BASE_REACT_FLOW_TOPOLOGY_INCREMENTAL_CHANGES;
   if (
     changeSet.classification !== 'topology'
     || !changeSet.topologyChanged
     || !changeSet.geometryChanged
-    || changeSet.changedNodeIds.length + changeSet.changedEdgeIds.length === 0
-    || changeSet.changedNodeIds.length + changeSet.changedEdgeIds.length
-      > MAX_BASE_REACT_FLOW_TOPOLOGY_INCREMENTAL_CHANGES
+    || changedItemCount === 0
+    || changedItemCount > maximumChangedItemCount
   ) return null;
 
   const baselineNodeById = uniqueItemsById(baselineNodes);
@@ -328,7 +381,10 @@ export const createBaseReactFlowTopologyIncrementalProjection = ({
   for (const [edgeId, nextEdge] of nextEdgeById) {
     const previous = baselineSourceById.get(edgeId);
     if (!previous || additions.includes(edgeId)) continue;
-    if (previous.source !== nextEdge.source || previous.target !== nextEdge.target) return null;
+    if (
+      (previous.source !== nextEdge.source || previous.target !== nextEdge.target)
+      && (kind !== 'container-change' || !changedExisting.includes(edgeId))
+    ) return null;
   }
 
   const changedPresentIds = new Set([...additions, ...changedExisting]);
@@ -407,26 +463,17 @@ export const createBaseReactFlowTopologyIncrementalCandidate = ({
       : null;
   }
   const changedIds = new Set(projection.changedPresentEdgeIds);
-  const sourceEdges = projection.edges.filter(edge => changedIds.has(edge.id));
-  if (sourceEdges.length !== changedIds.size) return null;
-  const routableSourceEdges = sourceEdges.map(edge => ({
-    ...edge,
-    type: 'stablePath',
-  }));
-  const routedById = new Map(
-    createBaseReactFlowFastDisplayEdges({
-      edges: routableSourceEdges,
-      nodes,
-      enableSmartEdges,
-      smartEdgePadding,
-      isLargeGraph: false,
-      displayEdgeEpoch,
-    }).map(edge => [edge.id, edge] as const),
-  );
-  if (routedById.size !== changedIds.size) return null;
-  const candidateEdges = projection.edges.map(edge => routedById.get(edge.id) ?? edge);
+  const candidateEdges = routeTopologyEdgeSet({
+    edges: projection.edges,
+    edgeIds: changedIds,
+    nodes,
+    enableSmartEdges,
+    smartEdgePadding,
+    displayEdgeEpoch,
+  });
+  if (!candidateEdges) return null;
   return {
-    edges: lockTopologyEligibleEdges(candidateEdges, nodes, changedIds),
+    edges: candidateEdges,
     eligibleEdgeIds: [...changedIds].sort(),
   };
 };
@@ -460,7 +507,21 @@ export const createBaseReactFlowTopologyIncrementalDisplayEdges = ({
   if (!candidate) return { edges: null, eligibleEdgeIds: [] };
   const evaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
   const eligibleIds = new Set(candidate.eligibleEdgeIds);
-  let candidateEdges = candidate.edges;
+  const terminalCommittedById = new Map(
+    repairAxisMismatchedTerminalsWithBoundedPortRoles(
+      commitComputedDisplayEdgeTerminals(
+        candidate.edges.filter(edge => eligibleIds.has(edge.id)),
+        nodes,
+      ),
+      nodes,
+      Math.max(8, eligibleIds.size * 4),
+    ).map(edge => [edge.id, edge] as const),
+  );
+  let candidateEdges = lockTopologyEligibleEdges(
+    candidate.edges.map(edge => terminalCommittedById.get(edge.id) ?? edge),
+    nodes,
+    eligibleIds,
+  );
   let hardReport = evaluation.hardReport(candidateEdges);
   if (reportHasOnlyStrictDefects(hardReport)) {
     const strictPromotions = findBaseReactFlowStrictContextEdgePromotions({
@@ -500,6 +561,35 @@ export const createBaseReactFlowTopologyIncrementalDisplayEdges = ({
         candidateEdges = lockTopologyEligibleEdges(strictRepaired, nodes, eligibleIds);
       }
       hardReport = evaluation.hardReport(candidateEdges);
+    }
+  }
+  if (hardReport.quality.unexplainedRelatedOverlap > 0) {
+    const overlapClosure = repairBaseReactFlowResidualOverlapAxisClosure(
+      candidateEdges,
+      nodes,
+      hardReport,
+    );
+    const changedByOverlap = overlapClosure.edges
+      .filter((edge, index) => edge !== candidateEdges[index])
+      .map(edge => edge.id);
+    const incidentContextIds = new Set(projection.incidentContextEdgeIds);
+    const promotionIds = changedByOverlap.filter(edgeId => !eligibleIds.has(edgeId));
+    const promotionsAreEligible = promotionIds.every(edgeId => incidentContextIds.has(edgeId))
+      && new Set([...eligibleIds, ...promotionIds]).size <= 8;
+    if (
+      overlapClosure.report.hardClean
+      && promotionsAreEligible
+    ) {
+      for (const edgeId of promotionIds) eligibleIds.add(edgeId);
+      const overlapBoundaryIsPreserved = preservesTopologyBoundary(
+        projection.edges,
+        overlapClosure.edges,
+        eligibleIds,
+      );
+      if (overlapBoundaryIsPreserved) {
+        candidateEdges = overlapClosure.edges;
+        hardReport = overlapClosure.report;
+      }
     }
   }
   if (hardReport.hardClean && eligibleIds.size > 0) {

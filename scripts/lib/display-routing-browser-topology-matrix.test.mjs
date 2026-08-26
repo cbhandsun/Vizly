@@ -162,10 +162,10 @@ describe('display routing browser topology matrix', () => {
       result('node-add', 'none'),
       result('node-remove', 'none'),
       result('edge-add', 'none'),
-      result('port-policy', 'full'),
+      result('port-policy', 'none'),
       result('edge-remove', 'none'),
       result('container-collapse', 'full'),
-      result('container-expand', 'full'),
+      result('container-expand', 'none'),
     ])).toBeUndefined();
     expect(() => assertDisplayRoutingTopologyOperationGroupResult([
       result('node-add', 'none'),
@@ -174,16 +174,16 @@ describe('display routing browser topology matrix', () => {
       result('port-policy', 'none'),
       result('edge-remove', 'full'),
       result('container-collapse', 'full'),
-      result('container-expand', 'full'),
+      result('container-expand', 'none'),
     ])).toThrow(/edge-remove operation did not remain incremental/);
     expect(() => assertDisplayRoutingTopologyOperationGroupResult([
       result('node-add', 'none'),
       result('node-remove', 'full'),
       result('edge-add', 'none'),
-      result('port-policy', 'full'),
+      result('port-policy', 'none'),
       result('edge-remove', 'none'),
       result('container-collapse', 'full'),
-      result('container-expand', 'full'),
+      result('container-expand', 'none'),
     ])).toThrow(/node-remove operation did not remain incremental/);
   });
 

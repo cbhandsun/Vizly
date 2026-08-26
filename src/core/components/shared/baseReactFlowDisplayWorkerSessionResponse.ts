@@ -8,7 +8,9 @@ import {
 import { createDisplayRoutingIdentity } from './baseReactFlowDisplayRoutingSession';
 import {
   readDisplayRoutingWorkerSession,
+  readDisplayRoutingWorkerSessionByIdentity,
   writeDisplayRoutingWorkerSession,
+  type DisplayRoutingWorkerSessionState,
 } from './baseReactFlowDisplayWorkerSession';
 import { appendDisplayRoutingPhaseTrace } from './baseReactFlowDisplayWorkerTraceRecorder';
 import type {
@@ -26,6 +28,7 @@ import type { DisplayRoutingWorkerSpatialSnapshot } from './baseReactFlowDisplay
 type ResolvedDisplayWorkerIncrementalRequest = Readonly<{
   request: DisplayEdgesWorkerResolvedIncrementalRouteRequest;
   baselineSpatialSnapshot: DisplayRoutingWorkerSpatialSnapshot | null;
+  exactNextSession: DisplayRoutingWorkerSessionState | null;
 }>;
 
 export const runDisplayWorkerIncrementalRequest = ({
@@ -47,6 +50,7 @@ export const runDisplayWorkerIncrementalRequest = ({
     ? createBaseReactFlowIncrementalDisplayEdges({
       request: resolved.request,
       baselineSpatialSnapshot: resolved.baselineSpatialSnapshot,
+      exactNextSession: resolved.exactNextSession,
       onPhaseTrace,
       onBoundedCandidate,
     })
@@ -65,6 +69,12 @@ export const resolveDisplayWorkerIncrementalRequest = (
     expectedIdentity: baselineIdentity,
     expectedOutputRouteSignature: request.baselineOutputRouteSignature,
   });
+  const exactNextSession = readDisplayRoutingWorkerSessionByIdentity({
+    expectedIdentity: createDisplayRoutingIdentity(
+      request.nextInputSignature,
+      request.nextInputGeometryDigest,
+    ),
+  });
   if (workerSession) {
     return {
       request: {
@@ -74,12 +84,14 @@ export const resolveDisplayWorkerIncrementalRequest = (
         baselinePatches: workerSession.displayPatches,
       },
       baselineSpatialSnapshot: workerSession.spatialSnapshot,
+      exactNextSession,
     };
   }
   return request.baselineNodes && request.baselineSourceEdges && request.baselinePatches
     ? {
       request: request as DisplayEdgesWorkerResolvedIncrementalRouteRequest,
       baselineSpatialSnapshot: null,
+      exactNextSession,
     }
     : null;
 };

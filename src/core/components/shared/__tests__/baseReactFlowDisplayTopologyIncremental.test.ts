@@ -190,6 +190,76 @@ describe('base React Flow topology incremental projection', () => {
     baselineEdges.forEach((edge, index) => expect(candidate?.edges[index]).toBe(edge));
   });
 
+  it('projects a collapsed container as a bounded endpoint and visibility transaction', () => {
+    const expandedNodes: Node[] = [
+      { id: 'group', type: 'titleGroup', position: { x: 0, y: 0 }, data: { collapsed: false } },
+      { id: 'child-a', parentId: 'group', position: { x: 20, y: 40 }, data: {} },
+      { id: 'child-b', parentId: 'group', position: { x: 120, y: 40 }, data: {} },
+      { id: 'outside', position: { x: 400, y: 40 }, data: {} },
+      { id: 'peer', position: { x: 600, y: 40 }, data: {} },
+    ];
+    const expandedSourceEdges: Edge[] = [
+      { id: 'internal', source: 'child-a', target: 'child-b', data: {} },
+      { id: 'boundary', source: 'child-b', target: 'outside', data: {} },
+      { id: 'external', source: 'outside', target: 'peer', data: {} },
+    ];
+    const expandedEdges = expandedSourceEdges.map((edge, index) => ({
+      ...edge,
+      type: 'stablePath',
+      data: {
+        computedPath: [{ x: index * 100, y: 0 }, { x: index * 100 + 80, y: 0 }],
+      },
+    }));
+    const expandedPatches = createBaseReactFlowDisplayEdgePatches(
+      expandedSourceEdges,
+      expandedEdges,
+    );
+    if (!expandedPatches) throw new Error('expected valid expanded routing patches');
+    const externalSourceEdge = expandedSourceEdges.find(edge => edge.id === 'external');
+    const routedExternalEdge = expandedEdges.find(edge => edge.id === 'external');
+    if (!externalSourceEdge || !routedExternalEdge) {
+      throw new Error('expected the external container fixture edge');
+    }
+    const collapsedNodes: Node[] = [
+      { id: 'group', type: 'titleGroup', position: { x: 0, y: 0 }, data: { collapsed: true } },
+      { id: 'outside', position: { x: 400, y: 40 }, data: {} },
+      { id: 'peer', position: { x: 600, y: 40 }, data: {} },
+    ];
+    const collapsedSourceEdges: Edge[] = [
+      { id: 'boundary', source: 'group', target: 'outside', data: { isProxied: true } },
+      externalSourceEdge,
+    ];
+    const changeSet = createBaseReactFlowRoutingChangeSet({
+      previousNodes: expandedNodes,
+      previousEdges: expandedSourceEdges,
+      nextNodes: collapsedNodes,
+      nextEdges: collapsedSourceEdges,
+      reasonHint: 'container-change',
+    });
+    const result = createBaseReactFlowTopologyIncrementalProjection({
+      baselineNodes: expandedNodes,
+      baselineSourceEdges: expandedSourceEdges,
+      baselineEdges: expandedEdges,
+      baselinePatches: expandedPatches,
+      nextNodes: collapsedNodes,
+      nextEdges: collapsedSourceEdges,
+      changeSet,
+    });
+
+    expect(changeSet).toMatchObject({
+      classification: 'topology',
+      reason: 'container-change',
+    });
+    expect(result).toMatchObject({
+      kind: 'container-change',
+      changedPresentEdgeIds: ['boundary'],
+      removedEdgeIds: ['internal'],
+    });
+    expect(result?.edges[0]).not.toBe(expandedEdges[1]);
+    expect(result?.edges[0].data).not.toHaveProperty('computedPath');
+    expect(result?.edges[1]).toBe(routedExternalEdge);
+  });
+
   it('validates an isolated node addition without rerouting frozen edges', () => {
     const isolated: Node = {
       id: 'isolated',

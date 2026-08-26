@@ -63,6 +63,7 @@ const DISPLAY_NODE_KEYS = new Set([
   'id',
   'type',
   'parentId',
+  'hidden',
   'position',
   'positionAbsolute',
   'width',
@@ -305,6 +306,7 @@ const isDisplayNode = (value: unknown, budget: DisplayValueBudget): value is Nod
   ) return false;
   if (!Object.keys(value).every(key => DISPLAY_NODE_KEYS.has(key))) return false;
   if (!isOptionalBoundedString(value.type) || !isOptionalBoundedString(value.parentId)) return false;
+  if (typeof value.hidden !== 'undefined' && typeof value.hidden !== 'boolean') return false;
   if (!isFinitePoint(value.position)) return false;
   if (typeof value.positionAbsolute !== 'undefined' && !isFinitePoint(value.positionAbsolute)) return false;
   if (typeof value.width !== 'undefined' && !isSafeDimensionNumber(value.width)) return false;

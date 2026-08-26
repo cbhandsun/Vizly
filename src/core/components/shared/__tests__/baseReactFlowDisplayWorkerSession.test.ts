@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { computeBaseReactFlowDisplayOutputRouteSignature } from '../baseReactFlowDisplayCache';
 import { computeBaseReactFlowDisplayEdgesWorkerResponse } from '../baseReactFlowDisplayEdges.worker';
 import { computeBaseReactFlowDisplayInputIdentityBundle } from '../baseReactFlowDisplayInputIdentity';
+import { projectBaseReactFlowDisplayWorkerInput } from '../baseReactFlowDisplayWorkerProjection';
 import {
   DISPLAY_ROUTING_PHASE_TRACE_LIMIT,
   type DisplayRoutingPhaseTrace,
@@ -20,11 +21,15 @@ import {
   isDisplayRoutingIdentity,
 } from '../baseReactFlowDisplayRoutingSession';
 import { createBaseReactFlowDisplayEdgePatches } from '../baseReactFlowDisplayWorkerClient';
-import { parseDisplayEdgesWorkerResponse } from '../baseReactFlowDisplayWorkerProtocol';
+import {
+  parseDisplayEdgesWorkerRequest,
+  parseDisplayEdgesWorkerResponse,
+} from '../baseReactFlowDisplayWorkerProtocol';
 import { completeDisplayWorkerResponse } from '../baseReactFlowDisplayWorkerSessionResponse';
 import {
   clearDisplayRoutingWorkerSessions,
   readDisplayRoutingWorkerSession,
+  readDisplayRoutingWorkerSessionByIdentity,
   writeDisplayRoutingWorkerSession,
 } from '../baseReactFlowDisplayWorkerSession';
 import { createTestDisplayHardReport } from './baseReactFlowDisplayWorkerTestFixtures';
@@ -56,6 +61,79 @@ const edges: Edge[] = [{
 afterEach(clearDisplayRoutingWorkerSessions);
 
 describe('display routing Worker-private session', () => {
+  it('normalizes absent and explicit expanded container flags to one identity', () => {
+    const containerNodes: Node[] = [{
+      id: 'container',
+      type: 'titleGroup',
+      position: { x: 0, y: 0 },
+      measured: { width: 400, height: 240 },
+      data: {},
+    }];
+    const implicit = computeBaseReactFlowDisplayInputIdentityBundle({
+      nodes: containerNodes,
+      edges: [],
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+    });
+    const explicit = computeBaseReactFlowDisplayInputIdentityBundle({
+      nodes: containerNodes.map(node => ({
+        ...node,
+        data: { ...node.data, collapsed: false },
+      })),
+      edges: [],
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+    });
+
+    expect(explicit).toEqual(implicit);
+  });
+
+  it('preserves collapsed topology fields in the Worker routing identity', () => {
+    const input = {
+      edges: [{ id: 'edge', source: 'container', target: 'target' }],
+      nodes: [
+        {
+          id: 'container',
+          type: 'group',
+          position: { x: 10, y: 20 },
+          positionAbsolute: { x: 10, y: 20 },
+          measured: { width: 240, height: 180 },
+          data: { layoutDirection: 'LR', collapsed: true },
+        },
+        {
+          id: 'target',
+          hidden: true,
+          position: { x: 400, y: 40 },
+          positionAbsolute: { x: 400, y: 40 },
+          measured: { width: 120, height: 60 },
+          data: {},
+        },
+      ],
+    };
+    const projected = projectBaseReactFlowDisplayWorkerInput(input);
+    const policy = {
+      enableSmartEdges: true,
+      smartEdgePadding: 16,
+      isLargeGraph: false,
+    };
+
+    expect(computeBaseReactFlowDisplayInputIdentityBundle({ ...input, ...policy }))
+      .toEqual(computeBaseReactFlowDisplayInputIdentityBundle({ ...projected, ...policy }));
+    const request = {
+      operation: 'repair' as const,
+      requestId: 'collapsed-projection',
+      repairMode: 'bounded' as const,
+      ...projected,
+    };
+    expect(parseDisplayEdgesWorkerRequest(request)).not.toBeNull();
+    expect(parseDisplayEdgesWorkerRequest({
+      ...request,
+      nodes: projected.nodes.map(node => ({ ...node, hidden: 'true' })),
+    })).toBeNull();
+  });
+
   it('binds session authority to both routing and visual contract versions', () => {
     const identity = createDisplayRoutingIdentity(
       '123',
@@ -164,6 +242,9 @@ describe('display routing Worker-private session', () => {
       outputRouteSignature: baselineOutputRouteSignature,
       segmentIndex: { edgeCount: edges.length },
     });
+    expect(readDisplayRoutingWorkerSessionByIdentity({
+      expectedIdentity: baselineSessionRef.identity,
+    })?.ref).toEqual(baselineSessionRef);
     const nextNodes: Node[] = [nodes[0], { ...nodes[1], position: { x: 320, y: 0 } }];
     const nextIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
       nodes: nextNodes,
@@ -187,7 +268,7 @@ describe('display routing Worker-private session', () => {
       nextEdges: edges,
     });
 
-    const response = computeBaseReactFlowDisplayEdgesWorkerResponse({
+    const request = {
       operation: 'incremental-route',
       requestId: 'incremental-private-session',
       edges,
@@ -210,7 +291,8 @@ describe('display routing Worker-private session', () => {
       changeSet,
       mutableEdgeIds: affectedClosure.mutableEdgeIds,
       contextEdgeIds: affectedClosure.contextEdgeIds,
-    });
+    } as const;
+    const response = computeBaseReactFlowDisplayEdgesWorkerResponse(request);
 
     expect(response).toMatchObject({
       hardClean: true,

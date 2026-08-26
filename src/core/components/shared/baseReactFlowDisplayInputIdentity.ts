@@ -81,7 +81,10 @@ export const visitBaseReactFlowDisplayInputIdentity = (
     feed(node.type);
     feed(node.parentId);
     feed(Boolean(node.hidden));
-    feed(data.collapsed);
+    // `false` and an absent flag both mean the container is expanded. Treat
+    // them as the same routing identity so an expand operation can safely
+    // replay an exact Worker-private session produced before the collapse.
+    feed(data.collapsed === true ? true : undefined);
     feed(Boolean(displayNode.positionAbsolute));
     feed(data.layoutDirection);
     feedGeometry(pos.x ?? 0);

@@ -65,6 +65,7 @@ const OPERATION_CASES = Object.freeze([
     classification: 'topology',
     reason: 'port-policy',
     edgeDelta: 1,
+    requiredFallbackLevel: 'none',
   }),
   Object.freeze({
     id: 'edge-remove',
@@ -84,6 +85,7 @@ const OPERATION_CASES = Object.freeze([
     classification: 'topology',
     reason: 'container-change',
     edgeDelta: 0,
+    requiredFallbackLevel: 'none',
   }),
 ]);
 
@@ -598,7 +600,14 @@ export const assertDisplayRoutingTopologyOperationGroupResult = operationResults
   if (topologyResults.length !== 7) {
     throw new Error(`Topology operation group was incomplete: ${diagnostics}`);
   }
-  for (const operationId of ['node-add', 'node-remove', 'edge-add', 'edge-remove']) {
+  for (const operationId of [
+    'node-add',
+    'node-remove',
+    'edge-add',
+    'port-policy',
+    'edge-remove',
+    'container-expand',
+  ]) {
     const result = topologyResults.find(item => item?.id === operationId);
     if (result?.fallbackLevel !== 'none') {
       throw new Error(`Topology ${operationId} operation did not remain incremental: ${diagnostics}`);

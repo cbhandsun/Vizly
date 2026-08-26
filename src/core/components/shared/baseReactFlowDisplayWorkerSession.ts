@@ -111,6 +111,27 @@ export const readDisplayRoutingWorkerSession = ({
   return state;
 };
 
+/**
+ * Resolves only a Worker-private state whose full routing identity matches.
+ * This intentionally accepts no caller-provided session id: it is used for
+ * reversible topology edits that return to geometry already committed by the
+ * same Worker realm.
+ */
+export const readDisplayRoutingWorkerSessionByIdentity = ({
+  expectedIdentity,
+}: {
+  expectedIdentity: RoutingIdentity;
+}): DisplayRoutingWorkerSessionState | null => {
+  const states = [...sessions.values()];
+  for (let index = states.length - 1; index >= 0; index -= 1) {
+    const state = states[index];
+    if (!displayRoutingIdentitiesMatch(state.ref.identity, expectedIdentity)) continue;
+    remember(state);
+    return state;
+  }
+  return null;
+};
+
 export const clearDisplayRoutingWorkerSessions = (): void => {
   sessions.clear();
   sessionSequence = 0;

@@ -50,6 +50,7 @@ import {
 import type {
   DisplayEdgesWorkerResolvedIncrementalRouteRequest,
 } from './baseReactFlowDisplayWorkerProtocol';
+import type { DisplayRoutingWorkerSessionState } from './baseReactFlowDisplayWorkerSession';
 import {
   createDisplayRoutingSegmentSpatialIndex,
   type DisplayRoutingWorkerSpatialSnapshot,
@@ -83,11 +84,13 @@ const INCREMENTAL_HARD_NODE_CLEARANCE = 16;
 export const createBaseReactFlowIncrementalDisplayEdges = ({
   request,
   baselineSpatialSnapshot,
+  exactNextSession,
   onPhaseTrace,
   onBoundedCandidate,
 }: {
   request: DisplayEdgesWorkerResolvedIncrementalRouteRequest;
   baselineSpatialSnapshot?: DisplayRoutingWorkerSpatialSnapshot | null;
+  exactNextSession?: DisplayRoutingWorkerSessionState | null;
   onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void;
   onBoundedCandidate?: (report: BaseDisplayBoundedCandidateReport) => void;
 }): BaseReactFlowDisplayIncrementalRouteOutcome => {
@@ -173,6 +176,7 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
       baselineEdges,
       baselinePatches,
       changeSet: verifiedChangeSet,
+      exactNextSession,
       onRejectedReport: onBoundedCandidate,
     });
     closureTimer.finish(

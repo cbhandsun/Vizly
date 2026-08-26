@@ -432,6 +432,84 @@ describe('Logistics incremental display routing', () => {
       responseVisibility ? [responseVisibility] : [],
     ), diagnostics).toBe(false);
 
+    const addedBaselineEdges = response.edges ?? [];
+    const addedBaselinePatches = createBaseReactFlowDisplayEdgePatches(
+      nextEdges,
+      addedBaselineEdges,
+    );
+    const addedBaselineSignature = computeBaseReactFlowDisplayOutputRouteSignature(
+      addedBaselineEdges,
+    );
+    if (!addedBaselinePatches || !addedBaselineSignature) {
+      throw new Error('expected a valid added-edge baseline');
+    }
+    const portEdges = nextEdges.map(edge => edge.id === addedEdge.id ? {
+      ...edge,
+      targetHandle: 'top',
+      data: { ...(edge.data || {}), autoTarget: false },
+    } : edge);
+    const portIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
+      nodes,
+      edges: portEdges,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+    });
+    const portChangeSet = createBaseReactFlowRoutingChangeSet({
+      previousNodes: nodes,
+      previousEdges: nextEdges,
+      nextNodes: nodes,
+      nextEdges: portEdges,
+      reasonHint: 'port-policy',
+    });
+    const portClosure = createBaseReactFlowRoutingAffectedClosure({
+      changeSet: portChangeSet,
+      previousNodes: nodes,
+      nextNodes: nodes,
+      baselineEdges: addedBaselineEdges,
+      nextEdges: portEdges,
+    });
+    const portRejectedReports: ReturnType<typeof getDisplayHardQualityGateReport>[] = [];
+    const portResponse = computeBaseReactFlowDisplayEdgesWorkerResponse({
+      operation: 'incremental-route',
+      requestId: 'logistics-port-policy-incremental',
+      edges: portEdges,
+      nodes,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+      displayEdgeEpoch: computeBaseReactFlowDisplayEdgeEpoch({ nodes, edges: portEdges }),
+      qualityMode: 'full',
+      baselineInputSignature: nextIdentity.cacheSignature,
+      baselineInputGeometryDigest: nextIdentity.geometryDigest,
+      baselineNodes: nodes,
+      baselineSourceEdges: nextEdges,
+      baselinePatches: addedBaselinePatches,
+      baselineOutputRouteSignature: addedBaselineSignature,
+      nextInputSignature: portIdentity.cacheSignature,
+      nextInputGeometryDigest: portIdentity.geometryDigest,
+      changeSet: portChangeSet,
+      mutableEdgeIds: portClosure.mutableEdgeIds,
+      contextEdgeIds: portClosure.contextEdgeIds,
+    }, report => portRejectedReports.push(report));
+    const portDiagnostics = JSON.stringify({
+      portChangeSet,
+      portClosure,
+      rejectedReports: portRejectedReports,
+      response: {
+        hardClean: portResponse.hardClean,
+        routeResolution: portResponse.routeResolution,
+        fallbackLevel: portResponse.fallbackLevel,
+        affectedEdgeCount: portResponse.affectedEdgeCount,
+        phaseTrace: portResponse.phaseTrace,
+      },
+    }, null, 2);
+    expect(portResponse, portDiagnostics).toMatchObject({
+      hardClean: true,
+      routeResolution: 'incremental-route',
+      fallbackLevel: 'none',
+    });
+
   }, 120_000);
 
   it('removes one edge without rerouting the surviving Logistics topology', async () => {
