@@ -51,6 +51,9 @@ describe('edge contrast paint CSS states', () => {
     expect(stylesheet).toMatch(
       /\.shared-trunk-terminal-marker-carrier\s*\{[^}]*stroke:\s*transparent\s*!important;[^}]*opacity:\s*1\s*!important;[^}]*pointer-events:\s*none\s*!important;/s,
     );
+    expect(stylesheet).toMatch(
+      /\.shared-trunk-semantic-fragment\.vizly-edge-contrast-marker-outline--dark,[\s\S]*\.shared-trunk-semantic-fragment\.vizly-edge-contrast-marker-outline--light\s*\{[^}]*filter:\s*drop-shadow\([^}]*--vizly-edge-marker-outline-color[^}]*\)\s*!important;/s,
+    );
     expect(stylesheet).not.toMatch(
       /\.vizly-edge-contrast-marker-outline[^}]*\bstroke\s*:/s,
     );

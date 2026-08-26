@@ -80,6 +80,28 @@ export const assertDisplayRoutingVisualScaleAudit = ({
       markerCount: audit?.markerCount,
       markerContrastAuditedCount: audit?.markerContrastAuditedCount,
       lowContrastMarkerCount: audit?.lowContrastMarkerCount,
+      lowContrastMarkerKinds: Array.isArray(audit?.lowContrastMarkers)
+        ? [...new Map(audit.lowContrastMarkers.map(item => [
+          JSON.stringify([
+            item?.resolved,
+            item?.outlined,
+            item?.className,
+            item?.contrastMode,
+            item?.semanticContrast,
+            item?.outlineContrast,
+            item?.contrast,
+          ]),
+          {
+            resolved: item?.resolved,
+            outlined: item?.outlined,
+            className: item?.className,
+            contrastMode: item?.contrastMode,
+            semanticContrast: item?.semanticContrast,
+            outlineContrast: item?.outlineContrast,
+            contrast: item?.contrast,
+          },
+        ])).values()].slice(0, 8)
+        : [],
       interactionEdgeCount: audit?.interactionEdgeCount,
       activeTraceEdgeCount: audit?.activeTraceEdgeCount,
       interactionPathCount: audit?.interactionPathCount,

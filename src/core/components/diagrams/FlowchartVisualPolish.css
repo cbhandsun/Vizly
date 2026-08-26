@@ -416,6 +416,18 @@
     filter: none !important;
 }
 
+/* A semantic fragment may own the only marker at a shared-trunk endpoint.
+   Restore its paint-only contrast boundary after the fragment's default
+   filter reset; the CSS variable is supplied by ContrastSafeBaseEdge. */
+.diagram-root .react-flow__edge
+    .react-flow__edge-path.shared-trunk-semantic-fragment.vizly-edge-contrast-marker-outline--dark,
+.diagram-root .react-flow__edge
+    .react-flow__edge-path.shared-trunk-semantic-fragment.vizly-edge-contrast-marker-outline--light {
+    filter: drop-shadow(
+        0 0 0.65px var(--vizly-edge-marker-outline-color, #334155)
+    ) !important;
+}
+
 .diagram-root .react-flow__edge .react-flow__edge-path.shared-trunk-accent-trace,
 .diagram-root .react-flow__edge .shared-trunk-accent-trace-underlay {
     opacity: 0 !important;

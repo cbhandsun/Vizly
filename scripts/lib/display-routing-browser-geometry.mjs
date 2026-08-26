@@ -605,6 +605,8 @@ export const readDisplayRoutingVisualScaleAudit = () => {
       edgeId: String(path.closest?.('[data-testid^="rf__edge-"]')?.getAttribute?.('data-testid') || '')
         .replace(/^rf__edge-/, '').slice(0, 500),
       markerId,
+      className: String(path.getAttribute?.('class') || '').slice(0, 200),
+      contrastMode: String(path.getAttribute?.('data-edge-contrast') || '').slice(0, 32),
       contrast: Math.max(fillContrast, strokeContrast, outlineContrast),
       semanticContrast: Math.max(fillContrast, strokeContrast),
       outlineContrast,
