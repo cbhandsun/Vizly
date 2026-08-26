@@ -30,6 +30,10 @@ import { assertDisplayRoutingVisualScaleAudit } from './lib/display-routing-brow
 import {
   verifyDisplayRoutingTopologyMatrix,
 } from './lib/display-routing-browser-topology-matrix.mjs';
+import {
+  assertDisplayRoutingCommittedReuse,
+  readDisplayRoutingCommittedReuseSnapshot,
+} from './lib/display-routing-browser-diagnostics.mjs';
 
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '').trim().replace(/\/$/, '');
 const WAIT_TIMEOUT_MS = 120_000;
@@ -223,6 +227,46 @@ const verifyPreset = target => withPrecompiledRouteBrowser(async session => {
     mountedNodes: mounted.nodes,
     mountedEdges: mounted.edges,
   });
+  let committedReuse = null;
+  if (target.presetId === 'wms-process-flow-v1') {
+    const readSnapshotExpression = `(${readDisplayRoutingCommittedReuseSnapshot.toString()})()`;
+    const before = await session.evaluate(readSnapshotExpression);
+    await session.evaluate(`(() => {
+      window.location.hash = '#/manage';
+      return true;
+    })()`);
+    await waitForValue(session, `(() => (
+      document.querySelectorAll('.react-flow__edge').length === 0
+      ? { unmounted: true }
+      : null
+    ))()`, `${target.presetId} canvas unmount`);
+    await session.evaluate(`(() => {
+      window.__vizlyRoutingRequests = [];
+      window.__vizlyRoutingResponses = [];
+      window.location.hash = ${JSON.stringify(`#/?diagram=${target.presetId}`)};
+      return true;
+    })()`);
+    const after = await waitForValue(session, `(() => {
+      const readSnapshot = ${readDisplayRoutingCommittedReuseSnapshot.toString()};
+      const snapshot = readSnapshot();
+      return snapshot.stage === 'final-applied'
+        && snapshot.renderedEdgeCount === ${route.response.edges.length}
+        ? snapshot
+        : null;
+    })()`, `${target.presetId} committed snapshot reuse`);
+    assertDisplayRoutingCommittedReuse({
+      before,
+      after,
+      expectedEdgeCount: route.response.edges.length,
+    });
+    committedReuse = {
+      cacheTrustLevel: after.cacheTrustLevel,
+      workerStartCount: after.workerStartCount,
+      workerAbortCount: after.workerAbortCount,
+      outputRouteSignature: after.outputRouteSignature,
+      renderedPathDigest: after.renderedPathDigest,
+    };
+  }
   return {
     id: target.presetId,
     resolution: route.response.routeResolution,
@@ -233,6 +277,7 @@ const verifyPreset = target => withPrecompiledRouteBrowser(async session => {
     totalRouteMs: route.routing.totalRouteMs,
     slowestPhases: summarizeSlowestDisplayRoutingPhases(route.response.phaseTrace),
     canonicalMount,
+    committedReuse,
     ...(await auditFinalSvg(session, route, target.presetId)),
   };
 });

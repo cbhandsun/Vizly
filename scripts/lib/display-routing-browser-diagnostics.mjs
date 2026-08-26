@@ -84,3 +84,73 @@ export const readDisplayRoutingIncrementalFailureStatus = (session, nodeId) => (
     )?.getAttribute('transform') || null,
   }))()`)
 );
+
+/** Read only bounded routing identity/counter data and a digest of final SVG paths. */
+export const readDisplayRoutingCommittedReuseSnapshot = () => {
+  // Keep this helper self-contained because its source is injected into CDP.
+  const hashText = value => {
+    let hash = 0x811c9dc5;
+    for (let index = 0; index < value.length; index += 1) {
+      hash ^= value.charCodeAt(index);
+      hash = Math.imul(hash, 0x01000193);
+    }
+    return (hash >>> 0).toString(16).padStart(8, '0');
+  };
+  const paths = [...document.querySelectorAll(
+    '.react-flow__edge .react-flow__edge-path',
+  )]
+    .map(path => path.getAttribute('d') || '')
+    .sort();
+  const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
+  return {
+    stage: routing.stage,
+    cacheTrustLevel: routing.cacheTrustLevel,
+    inputSignature: routing.signature,
+    inputGeometryDigest: routing.inputGeometryDigest,
+    outputRouteSignature: routing.outputRouteSignature,
+    workerStartCount: routing.workerStartCount,
+    workerAbortCount: routing.workerAbortCount,
+    requestCount: (window.__vizlyRoutingRequests || []).length,
+    responseCount: (window.__vizlyRoutingResponses || []).length,
+    renderedEdgeCount: document.querySelectorAll('.react-flow__edge').length,
+    renderedEdgesWithPathCount: [...document.querySelectorAll('.react-flow__edge')]
+      .filter(edge => edge.querySelector('.react-flow__edge-path')).length,
+    renderedPathCount: paths.length,
+    renderedPathDigest: hashText(paths.join('\u0000')),
+  };
+};
+
+export const assertDisplayRoutingCommittedReuse = ({ before, after, expectedEdgeCount }) => {
+  const issues = [];
+  const exactFields = [
+    'inputSignature',
+    'inputGeometryDigest',
+    'outputRouteSignature',
+    'renderedPathDigest',
+  ];
+  if (before?.stage !== 'final-applied') issues.push('before.stage');
+  if (after?.stage !== 'final-applied') issues.push('after.stage');
+  if (after?.cacheTrustLevel !== 'runtime-committed') issues.push('after.cacheTrustLevel');
+  if (after?.workerStartCount !== 0) issues.push('after.workerStartCount');
+  if (after?.workerAbortCount !== 0) issues.push('after.workerAbortCount');
+  if (after?.requestCount !== 0) issues.push('after.requestCount');
+  if (after?.responseCount !== 0) issues.push('after.responseCount');
+  if (after?.renderedEdgeCount !== expectedEdgeCount) issues.push('after.renderedEdgeCount');
+  if (after?.renderedEdgesWithPathCount !== expectedEdgeCount) {
+    issues.push('after.renderedEdgesWithPathCount');
+  }
+  if (!Number.isInteger(after?.renderedPathCount) || after.renderedPathCount < expectedEdgeCount) {
+    issues.push('after.renderedPathCount');
+  }
+  if (before?.renderedPathCount !== after?.renderedPathCount) {
+    issues.push('after.renderedPathCountExact');
+  }
+  for (const field of exactFields) {
+    if (typeof before?.[field] !== 'string' || before[field] !== after?.[field]) {
+      issues.push(`after.${field}`);
+    }
+  }
+  if (issues.length > 0) {
+    throw new Error(`Committed routing reuse failed: ${issues.join(', ')}`);
+  }
+};
