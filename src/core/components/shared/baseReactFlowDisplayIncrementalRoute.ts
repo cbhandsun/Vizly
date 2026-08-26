@@ -16,6 +16,7 @@ import {
 import { computeBaseReactFlowDisplayInputIdentityBundle } from './baseReactFlowDisplayInputIdentity';
 import { repairTerminalHandleHemisphereHairpins } from './baseReactFlowDisplayHemisphereHairpinRepair';
 import { createBaseReactFlowMovedNodeReconnectCandidates } from './baseReactFlowDisplayLocalReconnect';
+import { createBaseReactFlowRigidMoveSeed } from './baseReactFlowDisplayRigidMove';
 import { repairFastDisplayHardSafety } from './baseReactFlowFastEdgeSafety';
 import {
   findDisplayStrictCrossingHits,
@@ -277,17 +278,32 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
     candidateCount: transactionSourceEdges.length,
     onTrace: onPhaseTrace,
   });
-  const reconnectCandidates = createBaseReactFlowMovedNodeReconnectCandidates({
+  const rigidMoveSeed = createBaseReactFlowRigidMoveSeed({
     baselineEdges,
-    nodes: repairNodes,
+    baselineNodes: request.baselineNodes,
+    nextNodes: request.nodes,
     changedNodeIds: verifiedChangeSet.changedNodeIds,
     mutableEdgeIds: affectedClosure.mutableEdgeIds,
-    beamWidth: 1,
-    onDiagnostics: (diagnostics) => {
-      reconnectGeneratedPathCount = diagnostics.generatedPathCount;
-      reconnectEvaluatedPathCount = diagnostics.evaluatedPathCount;
-    },
   });
+  const rigidEdgeIds = new Set(rigidMoveSeed.rigidEdgeIds);
+  const reconnectMutableEdgeIds = affectedClosure.mutableEdgeIds.filter(
+    edgeId => !rigidEdgeIds.has(edgeId),
+  );
+  const reconnectCandidates = reconnectMutableEdgeIds.length > 0
+    ? createBaseReactFlowMovedNodeReconnectCandidates({
+        baselineEdges: rigidMoveSeed.edges,
+        nodes: repairNodes,
+        changedNodeIds: verifiedChangeSet.changedNodeIds,
+        mutableEdgeIds: reconnectMutableEdgeIds,
+        beamWidth: 1,
+        onDiagnostics: (diagnostics) => {
+          reconnectGeneratedPathCount = diagnostics.generatedPathCount;
+          reconnectEvaluatedPathCount = diagnostics.evaluatedPathCount;
+        },
+      })
+    : rigidMoveSeed.rigidEdgeIds.length > 0
+      ? [rigidMoveSeed.edges]
+      : [];
   reconnectSeedTimer.finish(
     reconnectCandidates.length > 0 ? 'accepted' : 'fallback',
     reconnectCandidates.length,
@@ -438,7 +454,7 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
           .flatMap(hit => [hit.a.edgeIndex, hit.b.edgeIndex])
           .map(edgeIndex => candidateEdges[edgeIndex]?.id)
           .filter((edgeId): edgeId is string => (
-            Boolean(edgeId) && mutableIds.has(edgeId)
+            Boolean(edgeId) && mutableIds.has(edgeId) && !rigidEdgeIds.has(edgeId)
           )),
       )];
       const refinedCandidates = createBaseReactFlowMovedNodeReconnectCandidates({

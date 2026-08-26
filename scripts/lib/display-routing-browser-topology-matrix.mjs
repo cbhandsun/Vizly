@@ -25,6 +25,24 @@ const OPERATION_CASES = Object.freeze([
     maximumMutableEdgeCount: 8,
   }),
   Object.freeze({
+    id: 'compound-subtree-move',
+    classification: 'geometry',
+    reason: 'unknown',
+    edgeDelta: 0,
+    expectedChangedNodeIds: Object.freeze([
+      'bms',
+      'customs',
+      'l-oms',
+      'titlegroup-logistics',
+      'tms',
+      'wcs',
+      'wms',
+      'yms',
+    ]),
+    maximumMutableEdgeCount: 13,
+    requiredFallbackLevel: 'none',
+  }),
+  Object.freeze({
     id: 'node-add',
     classification: 'topology',
     reason: 'node-add',
@@ -256,6 +274,21 @@ const applyMultiNodeMove = async session => {
   return true;
 };
 
+const applyCompoundSubtreeMove = session => session.evaluate(`(() => {
+  const instance = window.reactFlowInstance;
+  const containerId = 'titlegroup-logistics';
+  const container = instance?.getNodes?.().find(node => node.id === containerId);
+  if (!instance?.setNodes || !container) return false;
+  instance.setNodes(nodes => nodes.map(node => node.id === containerId ? {
+    ...node,
+    position: {
+      x: Number(node.position?.x || 0) + 24,
+      y: Number(node.position?.y || 0) + 8,
+    },
+  } : node));
+  return true;
+})()`);
+
 const applyNodeAdd = session => session.evaluate(`(() => {
   const instance = window.reactFlowInstance;
   const template = instance?.getNodes?.().find(node => node.id === 'wms');
@@ -422,6 +455,7 @@ const toggleLogisticsContainer = async session => {
 const APPLY_OPERATION = Object.freeze({
   'node-resize': applyNodeResize,
   'multi-node-move': applyMultiNodeMove,
+  'compound-subtree-move': applyCompoundSubtreeMove,
   'node-add': applyNodeAdd,
   'node-remove': applyNodeRemove,
   'edge-add': applyEdgeAdd,
@@ -520,6 +554,15 @@ export const assertDisplayRoutingTopologyOperationResult = ({
     throw new Error(`Geometry operation exceeded the mutable-edge budget: ${diagnostics}`);
   }
   if (
+    typeof operationCase.requiredFallbackLevel === 'string'
+    && (
+      result?.response?.fallbackLevel !== operationCase.requiredFallbackLevel
+      || result?.routing?.fallbackLevel !== operationCase.requiredFallbackLevel
+    )
+  ) {
+    throw new Error(`Geometry operation exceeded its fallback budget: ${diagnostics}`);
+  }
+  if (
     result?.capturedRequestCount !== 1
     || result?.capturedResponseCount !== 1
     || result?.routing?.workerStartCount - counterBaseline.workerStartCount !== 1
@@ -612,11 +655,11 @@ export const verifyDisplayRoutingTopologyMatrix = async options => ({
   operations: [
     ...await verifyOperationGroup({
       ...options,
-      operationCases: OPERATION_CASES.slice(0, 2),
+      operationCases: OPERATION_CASES.slice(0, 3),
     }),
     ...await verifyOperationGroup({
       ...options,
-      operationCases: OPERATION_CASES.slice(2),
+      operationCases: OPERATION_CASES.slice(3),
     }),
   ],
 });

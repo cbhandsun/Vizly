@@ -267,4 +267,41 @@ describe('display routing browser topology matrix', () => {
       request: { mutableEdgeIds: Array.from({ length: 9 }, (_, index) => `edge-${index}`) },
     })).toThrow(/mutable-edge budget/);
   });
+
+  it('requires a compound subtree move to remain incremental', () => {
+    const operationCase = {
+      id: 'compound-subtree-move',
+      classification: 'geometry',
+      reason: 'unknown',
+      edgeDelta: 0,
+      expectedChangedNodeIds: ['container', 'descendant'],
+      maximumMutableEdgeCount: 2,
+      requiredFallbackLevel: 'none',
+    };
+    const result = validResult({
+      changeSet: {
+        classification: 'geometry',
+        reason: 'unknown',
+        changedNodeIds: ['container', 'descendant'],
+      },
+      request: { mutableEdgeIds: ['internal', 'boundary'] },
+      requestEdgeCount: 14,
+      responseEdgeCount: 14,
+      renderedEdgeCount: 14,
+      response: { ...validResult().response, fallbackLevel: 'none' },
+      routing: { ...validResult().routing, fallbackLevel: 'none' },
+    });
+    const assertCompound = overrides => assertDisplayRoutingTopologyOperationResult({
+      operationCase,
+      result: { ...result, ...overrides },
+      counterBaseline: { workerStartCount: 7, workerAbortCount: 2 },
+      baselineEdgeCount: 14,
+    });
+
+    expect(assertCompound()).toBeUndefined();
+    expect(() => assertCompound({
+      response: { ...result.response, fallbackLevel: 'full' },
+      routing: { ...result.routing, fallbackLevel: 'full' },
+    })).toThrow(/fallback budget/);
+  });
 });

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import type { Edge } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
 import logisticsStandardData from '../../../../data/standardized/LogisticsStandardData.json';
@@ -17,6 +17,7 @@ import { computeBaseReactFlowDisplayInputIdentityBundle } from '../baseReactFlow
 import { getDisplayHardQualityGateReport } from '../baseReactFlowDisplayQualityGates';
 import { getExactDisplayHardReport } from '../baseReactFlowDisplayWorkerResponse';
 import { getDisplayComputedPath } from '../baseReactFlowDisplayGeometry';
+import { createBaseReactFlowRigidMoveSeed } from '../baseReactFlowDisplayRigidMove';
 import {
   createBaseReactFlowRoutingAffectedClosure,
   createBaseReactFlowRoutingChangeSet,
@@ -712,4 +713,195 @@ describe('Logistics incremental display routing', () => {
       removalResponse.edges ?? [],
     ), diagnostics).toBe(true);
   }, 120_000);
+
+  it('rigidly translates internal paths when the Logistics compound subtree moves', async () => {
+    const entry = Object.entries(GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_LOADERS)
+      .find(([, descriptor]) => descriptor.presetId === 'logistics-architecture-v1');
+    if (!entry) throw new Error('expected the Logistics precompiled loader');
+    const [inputSignature, descriptor] = entry;
+    const artifact = parseBaseReactFlowPrecompiledRouteArtifact(
+      getGeneratedPrecompiledRouteArtifactForTest('logistics-architecture-v1'), {
+      inputSignature,
+      inputGeometryDigest: descriptor.geometryDigest,
+      sourceHash: descriptor.sourceHash,
+    });
+    if (!artifact) throw new Error('expected the Logistics artifact to parse');
+
+    const sourceEdges = await createBrowserSourceEdges();
+    const baselineEdges = mergeBaseReactFlowDisplayEdgePatches(sourceEdges, artifact.edges);
+    if (!baselineEdges) throw new Error('expected the Logistics artifact patches to merge');
+    const baselineNodes = withAbsoluteNodePositions(browserLogisticsNodes);
+    const nextNodes = withAbsoluteNodePositions(browserLogisticsNodes.map(node => (
+      node.id === 'titlegroup-logistics'
+        ? {
+            ...node,
+            position: {
+              x: node.position.x + 24,
+              y: node.position.y + 8,
+            },
+          }
+        : node
+    )));
+    const baselinePatches = createBaseReactFlowDisplayEdgePatches(sourceEdges, baselineEdges);
+    const baselineOutputRouteSignature = computeBaseReactFlowDisplayOutputRouteSignature(
+      baselineEdges,
+    );
+    if (!baselinePatches || !baselineOutputRouteSignature) {
+      throw new Error('expected a valid compound-move baseline');
+    }
+    const baselineIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
+      nodes: baselineNodes,
+      edges: sourceEdges,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+    });
+    const nextIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
+      nodes: nextNodes,
+      edges: sourceEdges,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+    });
+    const changeSet = createBaseReactFlowRoutingChangeSet({
+      previousNodes: baselineNodes,
+      previousEdges: sourceEdges,
+      nextNodes,
+      nextEdges: sourceEdges,
+      reasonHint: 'node-drag',
+    });
+    const affectedClosure = createBaseReactFlowRoutingAffectedClosure({
+      changeSet,
+      previousNodes: baselineNodes,
+      nextNodes,
+      baselineEdges,
+      nextEdges: sourceEdges,
+    });
+    const rigidSeed = createBaseReactFlowRigidMoveSeed({
+      baselineEdges,
+      baselineNodes,
+      nextNodes,
+      changedNodeIds: changeSet.changedNodeIds,
+      mutableEdgeIds: affectedClosure.mutableEdgeIds,
+    });
+    const response = computeBaseReactFlowDisplayEdgesWorkerResponse({
+      operation: 'incremental-route',
+      requestId: 'logistics-compound-subtree-move',
+      edges: sourceEdges,
+      nodes: nextNodes,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+      displayEdgeEpoch: computeBaseReactFlowDisplayEdgeEpoch({
+        nodes: nextNodes,
+        edges: sourceEdges,
+      }),
+      qualityMode: 'full',
+      baselineInputSignature: baselineIdentity.cacheSignature,
+      baselineInputGeometryDigest: baselineIdentity.geometryDigest,
+      baselineNodes,
+      baselineSourceEdges: sourceEdges,
+      baselinePatches,
+      baselineOutputRouteSignature,
+      nextInputSignature: nextIdentity.cacheSignature,
+      nextInputGeometryDigest: nextIdentity.geometryDigest,
+      changeSet,
+      mutableEdgeIds: affectedClosure.mutableEdgeIds,
+      contextEdgeIds: affectedClosure.contextEdgeIds,
+    });
+    const report = response.edges ? getExactDisplayHardReport(response.edges, nextNodes) : null;
+    const diagnostics = JSON.stringify({
+      changeSet,
+      affectedEdgeCount: affectedClosure.mutableEdgeIds.length,
+      rigidEdgeCount: rigidSeed.rigidEdgeIds.length,
+      response: {
+        routeResolution: response.routeResolution,
+        fallbackLevel: response.fallbackLevel,
+        affectedEdgeCount: response.affectedEdgeCount,
+        phaseTrace: response.phaseTrace,
+      },
+      report,
+    }, null, 2);
+
+    expect(changeSet.changedNodeIds, diagnostics).toHaveLength(8);
+    expect(affectedClosure.mutableEdgeIds, diagnostics).toHaveLength(13);
+    expect(rigidSeed.rigidEdgeIds, diagnostics).toHaveLength(7);
+    expect(response, diagnostics).toMatchObject({
+      routeResolution: 'incremental-route',
+      fallbackLevel: 'none',
+      affectedEdgeCount: 13,
+      hardClean: true,
+    });
+    expect(report?.hardClean, diagnostics).toBe(true);
+    const baselineById = new Map(baselineEdges.map(edge => [edge.id, edge] as const));
+    const responseById = new Map(response.edges?.map(edge => [edge.id, edge] as const));
+    for (const edgeId of rigidSeed.rigidEdgeIds) {
+      const baselineEdge = baselineById.get(edgeId);
+      const responseEdge = responseById.get(edgeId);
+      if (!baselineEdge || !responseEdge) throw new Error('expected translated internal edge');
+      expect(getDisplayComputedPath(responseEdge), diagnostics).toEqual(
+        getDisplayComputedPath(baselineEdge)
+          .map(point => ({ x: point.x + 24, y: point.y + 8 })),
+      );
+    }
+    const frozenBaseline = baselineById.get('edge-visibility-downstream');
+    const frozenResponse = responseById.get('edge-visibility-downstream');
+    if (!frozenBaseline || !frozenResponse) throw new Error('expected frozen external edge');
+    expect(doBaseReactFlowDisplayRoutesMatchExactly(
+      [frozenBaseline],
+      [frozenResponse],
+    ), diagnostics).toBe(true);
+  }, 120_000);
+
+  it('fails rigid translation closed for empty, resized, asymmetric, and extreme input', () => {
+    const baselineNodes: Node[] = [
+      { id: 'source', position: { x: 0, y: 0 }, width: 100, height: 60, data: {} },
+      { id: 'target', position: { x: 200, y: 0 }, width: 100, height: 60, data: {} },
+    ];
+    const edge: Edge = {
+      id: 'edge',
+      source: 'source',
+      target: 'target',
+      data: { computedPath: [{ x: 100, y: 30 }, { x: 200, y: 30 }] },
+    };
+    const baselineEdges = [edge];
+    const createSeed = (nextNodes: Node[], candidateEdges = baselineEdges) => (
+      createBaseReactFlowRigidMoveSeed({
+        baselineEdges: candidateEdges,
+        baselineNodes,
+        nextNodes,
+        changedNodeIds: ['source', 'target'],
+        mutableEdgeIds: ['edge'],
+      })
+    );
+    const emptyEdges: Edge[] = [];
+    const empty = createSeed(baselineNodes, emptyEdges);
+    expect(empty.edges).toBe(emptyEdges);
+    expect(empty.rigidEdgeIds).toEqual([]);
+
+    const asymmetric = createSeed([
+      { ...baselineNodes[0], position: { x: 10, y: 8 } },
+      { ...baselineNodes[1], position: { x: 209, y: 8 } },
+    ]);
+    expect(asymmetric.edges).toBe(baselineEdges);
+    expect(asymmetric.rigidEdgeIds).toEqual([]);
+
+    const resized = createSeed([
+      { ...baselineNodes[0], position: { x: 10, y: 8 }, width: 101 },
+      { ...baselineNodes[1], position: { x: 210, y: 8 } },
+    ]);
+    expect(resized.rigidEdgeIds).toEqual([]);
+
+    const extreme = createSeed([
+      { ...baselineNodes[0], position: { x: 1_000_001, y: 0 } },
+      { ...baselineNodes[1], position: { x: 1_000_201, y: 0 } },
+    ]);
+    expect(extreme.rigidEdgeIds).toEqual([]);
+
+    const invalidPath = createSeed([
+      { ...baselineNodes[0], position: { x: 10, y: 8 } },
+      { ...baselineNodes[1], position: { x: 210, y: 8 } },
+    ], [{ ...edge, data: { computedPath: [{ x: Number.NaN, y: 0 }, { x: 1, y: 0 }] } }]);
+    expect(invalidPath.rigidEdgeIds).toEqual([]);
+  });
 });
