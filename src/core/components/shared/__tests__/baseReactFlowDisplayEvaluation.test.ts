@@ -41,7 +41,10 @@ import {
   createDisplayRoutingTopologyPlan,
   createDisplayRoutingTopologyWaypointAxes,
 } from '../baseReactFlowDisplayRoutingTopologyPlan';
-import { resolveReconnectCandidateBudgetPerEdge } from '../baseReactFlowDisplayLocalReconnect';
+import {
+  pushBoundedReconnectRankedCandidate,
+  resolveReconnectCandidateBudgetPerEdge,
+} from '../baseReactFlowDisplayLocalReconnect';
 import { chooseExactThresholdResidualCandidate } from '../baseReactFlowDisplayOverlapEvaluation';
 
 const edge = (path: Array<{ x: number; y: number }>): Edge => ({
@@ -221,6 +224,38 @@ describe('baseReactFlowDisplayEvaluation', () => {
     expect(resolveReconnectCandidateBudgetPerEdge(100)).toBe(256);
     expect(resolveReconnectCandidateBudgetPerEdge(0)).toBe(0);
     expect(resolveReconnectCandidateBudgetPerEdge(Number.NaN)).toBe(0);
+  });
+
+  it('retains only the stable best reconnect ranks while candidates stream in', () => {
+    const ranked: Array<{ id: string; hardDefects: number; score: number }> = [];
+    for (const candidate of [
+      { id: 'late', hardDefects: 2, score: 4 },
+      { id: 'first-tie', hardDefects: 0, score: 2 },
+      { id: 'best', hardDefects: 0, score: 1 },
+      { id: 'second-tie', hardDefects: 0, score: 2 },
+    ]) pushBoundedReconnectRankedCandidate(ranked, candidate, 2);
+
+    expect(ranked.map(candidate => candidate.id)).toEqual(['best', 'first-tie']);
+    pushBoundedReconnectRankedCandidate(ranked, { id: 'ignored', hardDefects: 0, score: 0 }, 0);
+    expect(ranked.map(candidate => candidate.id)).toEqual(['best', 'first-tie']);
+
+    const candidates = Array.from({ length: 200 }, (_, index) => ({
+      id: `candidate-${index}`,
+      hardDefects: (index * 7) % 5,
+      score: (index * 11) % 13,
+    }));
+    for (let limit = 1; limit <= 8; limit += 1) {
+      const bounded: typeof candidates = [];
+      for (const candidate of candidates) {
+        pushBoundedReconnectRankedCandidate(bounded, candidate, limit);
+      }
+      const legacy = candidates.toSorted((first, second) => (
+        first.hardDefects - second.hardDefects || first.score - second.score
+      )).slice(0, limit);
+      expect(bounded.map(candidate => candidate.id)).toEqual(
+        legacy.map(candidate => candidate.id),
+      );
+    }
   });
 
   it('tokenizes only explicit routing-quality intent flags', () => {

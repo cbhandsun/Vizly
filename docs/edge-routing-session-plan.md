@@ -13,8 +13,10 @@
 - `hidden`/`collapsed` 已进入受限 Worker 投影与协议校验，`collapsed:false` 与缺省 expanded 状态使用同一 identity；Worker 私有 session 可按完整 identity 回放返回旧 topology，仍重新校验 route signature、hard report、全图节点净空和冻结边界；
 - 同 realm committed snapshot、外部候选和 Worker 私有 session 继续保持不同信任边界；未采用把主线程 committed candidate 重新透传给 Worker 的重复协议；
 - 最新同一 production build、固定 viewport、全新浏览器 profile 的 30 个独立 Logistics 动态完整冷路由样本为 median `1675ms`、p95 `2011ms`、max `2078ms`；Worker compute p95 为 `1999.9ms`，页面/消息开销 p95 仅 `14ms`。30/30 均为一次 Worker start、零 abort、单次 `full-route-repaired` 最终事务，剩余耗时集中在 Worker 内 crossing sweeps、endpoint closure 与 finalizer 的 accepted 全质量候选。
+- 同环境的 30 个 production-browser 增量样本均保持一次 Worker start、零 abort、零 full fallback，WMS local route/release-to-final p95 为 `98.4ms/205ms` 并通过预算；L-OMS 为 `316ms/762ms`、TMS 为 `335.8ms/998ms`，未达到 `<150ms/<300ms`。失败热点在 Worker `local-reconnect-seed`，其 p95 分别为 `309.3ms/327.3ms`，不是响应后的 React 提交延迟。
+- reconnect 排名改为稳定的流式 bounded top-K 后，5 个独立筛选样本把 L-OMS local/release p95 降至 `93.7ms/214ms`、TMS 降至 `102.3ms/226ms`、WMS 降至 `57.1ms/131ms`，且 5/5 零 fallback；正式 30 样本在前 26 次通过后，第 27 次 WMS 请求因候选生成数从常态 `256` 漂移为 `244` 而安全进入同 job full fallback，最终仍 hard-clean。该批次证明了排名内存优化收益，但稳定矩阵仍未验收通过。
 
-因此，迭代 1–2 的统一门禁和 Routing Session 主链基本完成；迭代 3 的拓扑编辑与正确性覆盖已补齐，但 30 样本浏览器增量性能验收尚未闭环；迭代 4 的动态完整冷路由仍未达到产品方放宽后的 `1100ms` p95，且 corridor lane/capacity 尚未形成实际分配，缺陷计划也尚未驱动内部 repair 阶段精确跳过；迭代 5 的 routing-only 文档快照、Canvas/standalone 渲染适配器和重复管线删除已经实现并通过对应测试。禁止用提高预算、跳过 accepted 修复阶段或降低质量门禁宣称完成。
+因此，迭代 1–2 的统一门禁和 Routing Session 主链基本完成；迭代 3 的拓扑编辑与正确性覆盖已补齐，但 30 样本浏览器增量性能验收已证实 L-OMS/TMS 尾延迟未闭环；迭代 4 的动态完整冷路由仍未达到产品方放宽后的 `1100ms` p95，且 corridor lane/capacity 尚未形成实际分配，缺陷计划也尚未驱动内部 repair 阶段精确跳过；迭代 5 的 routing-only 文档快照、Canvas/standalone 渲染适配器和重复管线删除已经实现并通过对应测试。禁止用提高预算、跳过 accepted 修复阶段或降低质量门禁宣称完成。
 
 ## 0.1 首批实施记录（2026-07-27）
 

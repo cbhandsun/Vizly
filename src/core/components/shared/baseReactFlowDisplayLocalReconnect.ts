@@ -151,6 +151,33 @@ type RankedReconnectCandidate = Readonly<{
   hardDefects: number;
 }>;
 
+type ReconnectRank = Readonly<{
+  score: number;
+  hardDefects: number;
+}>;
+
+const compareReconnectRanks = (first: ReconnectRank, second: ReconnectRank): number => (
+  first.hardDefects - second.hardDefects
+  || first.score - second.score
+);
+
+export const pushBoundedReconnectRankedCandidate = <T extends ReconnectRank>(
+  ranked: T[],
+  candidate: T,
+  limit: number,
+): void => {
+  if (!Number.isSafeInteger(limit) || limit < 1) return;
+  const insertionIndex = ranked.findIndex(existing => (
+    compareReconnectRanks(candidate, existing) < 0
+  ));
+  if (insertionIndex < 0) {
+    if (ranked.length < limit) ranked.push(candidate);
+    return;
+  }
+  ranked.splice(insertionIndex, 0, candidate);
+  if (ranked.length > limit) ranked.pop();
+};
+
 type ReconnectTerminalEvaluationContext = Readonly<{
   terminalValidation: ReturnType<typeof createDisplayTerminalValidationSnapshot>;
   nodesById: ReadonlyMap<string, Node>;
@@ -221,14 +248,13 @@ const rankReconnectCandidates = ({
     const obstacleHits = obstacleContext.evaluateKnownChanges(candidateEdges, [edgeIndex]);
     const hardDefects = hardDefectCount(quality) + obstacleHits;
     const score = obstacleRepairScore(quality, obstacleHits);
-    ranked.push({ edges: candidateEdges, score, hardDefects });
+    pushBoundedReconnectRankedCandidate(
+      ranked,
+      { edges: candidateEdges, score, hardDefects },
+      limit,
+    );
   }
-  return ranked
-    .sort((first, second) => (
-      first.hardDefects - second.hardDefects
-      || first.score - second.score
-    ))
-    .slice(0, limit);
+  return ranked;
 };
 
 /**
