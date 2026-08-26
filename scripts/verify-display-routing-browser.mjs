@@ -19,6 +19,7 @@ import {
 import { DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT } from './lib/display-routing-browser-capture.mjs';
 import {
   prepareDisplayRoutingIncrementalCapture,
+  readDisplayRoutingRequestDebugSnapshot,
   readDisplayRoutingIncrementalFailureStatus,
   readDisplayRoutingViewportZoomFromSession,
 } from './lib/display-routing-browser-diagnostics.mjs';
@@ -234,6 +235,7 @@ const dragNode = async (session, nodeId, beforeRelease = null) => {
 };
 
 const finalIncrementalExpression = nodeId => `(() => {
+  const readRequestDebugSnapshot = ${readDisplayRoutingRequestDebugSnapshot.toString()};
   const requests = window.__vizlyRoutingRequests || [];
   const responses = window.__vizlyRoutingResponses || [];
   const boundedResponses = window.__vizlyBoundedCandidates || [];
@@ -260,45 +262,9 @@ const finalIncrementalExpression = nodeId => `(() => {
     requestId: request.requestId,
     capturedRequestCount: requests.length,
     capturedResponseCount: responses.length,
-    debugRequest: ${INCLUDE_INCREMENTAL_REQUEST_DIAGNOSTICS ? `{
-      changeSet: request.changeSet,
-      mutableEdgeIds: request.mutableEdgeIds,
-      contextEdgeIds: request.contextEdgeIds,
-      nodes: request.nodes.map(node => ({
-        id: node.id,
-        type: node.type,
-        parentId: node.parentId,
-        position: node.position,
-        positionAbsolute: node.positionAbsolute,
-        width: node.width,
-        height: node.height,
-        measured: node.measured,
-      })),
-      baselineNodes: request.baselineNodes.map(node => ({
-        id: node.id,
-        type: node.type,
-        parentId: node.parentId,
-        position: node.position,
-        positionAbsolute: node.positionAbsolute,
-        width: node.width,
-        height: node.height,
-        measured: node.measured,
-      })),
-      edges: request.edges.map(edge => ({
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        sourceHandle: edge.sourceHandle,
-        targetHandle: edge.targetHandle,
-        data: {
-          autoSource: edge.data?.autoSource,
-          autoTarget: edge.data?.autoTarget,
-          auto: edge.data?.auto,
-          computedPath: edge.data?.computedPath,
-        },
-      })),
-      baselinePatches: request.baselinePatches,
-    }` : 'null'},
+    debugRequest: ${INCLUDE_INCREMENTAL_REQUEST_DIAGNOSTICS
+      ? 'readRequestDebugSnapshot(request)'
+      : 'null'},
     requestOperation: request.operation,
     workerRequestAt: request.__browserCapturedAt,
     workerResponseAt: response.__browserCapturedAt,

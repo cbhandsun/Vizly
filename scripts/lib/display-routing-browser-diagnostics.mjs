@@ -1,5 +1,47 @@
 import { readDisplayRoutingViewportZoom } from './display-routing-browser-geometry.mjs';
 
+/** Session-hit incremental requests intentionally omit bootstrap baselines. */
+export const readDisplayRoutingRequestDebugSnapshot = request => {
+  // Keep this helper self-contained because its source is injected into CDP.
+  const projectNodes = value => (
+    Array.isArray(value)
+      ? value.map(node => ({
+        id: node?.id,
+        type: node?.type,
+        parentId: node?.parentId,
+        position: node?.position,
+        positionAbsolute: node?.positionAbsolute,
+        width: node?.width,
+        height: node?.height,
+        measured: node?.measured,
+      }))
+      : []
+  );
+  return {
+    changeSet: request?.changeSet,
+    mutableEdgeIds: Array.isArray(request?.mutableEdgeIds) ? request.mutableEdgeIds : [],
+    contextEdgeIds: Array.isArray(request?.contextEdgeIds) ? request.contextEdgeIds : [],
+    nodes: projectNodes(request?.nodes),
+    baselineNodes: projectNodes(request?.baselineNodes),
+    edges: Array.isArray(request?.edges)
+      ? request.edges.map(edge => ({
+        id: edge?.id,
+        source: edge?.source,
+        target: edge?.target,
+        sourceHandle: edge?.sourceHandle,
+        targetHandle: edge?.targetHandle,
+        data: {
+          autoSource: edge?.data?.autoSource,
+          autoTarget: edge?.data?.autoTarget,
+          auto: edge?.data?.auto,
+          computedPath: edge?.data?.computedPath,
+        },
+      }))
+      : [],
+    baselinePatches: Array.isArray(request?.baselinePatches) ? request.baselinePatches : [],
+  };
+};
+
 export const prepareDisplayRoutingIncrementalCapture = session => session.evaluate(`(() => {
   const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
   window.__vizlyIncrementalRoutingCounterBaseline = {

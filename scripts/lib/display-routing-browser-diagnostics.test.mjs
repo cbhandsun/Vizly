@@ -2,7 +2,10 @@ import vm from 'node:vm';
 
 import { describe, expect, it } from 'vitest';
 
-import { prepareDisplayRoutingIncrementalCapture } from './display-routing-browser-diagnostics.mjs';
+import {
+  prepareDisplayRoutingIncrementalCapture,
+  readDisplayRoutingRequestDebugSnapshot,
+} from './display-routing-browser-diagnostics.mjs';
 
 const prepareInContext = async routing => {
   const minimap = { style: { display: 'block' } };
@@ -26,6 +29,49 @@ const prepareInContext = async routing => {
 };
 
 describe('display routing browser diagnostics', () => {
+  it('projects session-hit requests without requiring bootstrap baselines', () => {
+    expect(readDisplayRoutingRequestDebugSnapshot({
+      mutableEdgeIds: ['edge-a'],
+      nodes: [{ id: 'node-a', position: { x: 1, y: 2 } }],
+      edges: [{ id: 'edge-a', source: 'node-a', target: 'node-b' }],
+    })).toMatchObject({
+      mutableEdgeIds: ['edge-a'],
+      contextEdgeIds: [],
+      nodes: [{ id: 'node-a', position: { x: 1, y: 2 } }],
+      baselineNodes: [],
+      edges: [{ id: 'edge-a', source: 'node-a', target: 'node-b' }],
+      baselinePatches: [],
+    });
+  });
+
+  it('fails closed to empty collections for malformed request fields', () => {
+    expect(readDisplayRoutingRequestDebugSnapshot({
+      mutableEdgeIds: 'edge-a',
+      nodes: null,
+      edges: {},
+      baselineNodes: Number.NaN,
+      baselinePatches: 'patch',
+    })).toMatchObject({
+      mutableEdgeIds: [],
+      contextEdgeIds: [],
+      nodes: [],
+      baselineNodes: [],
+      edges: [],
+      baselinePatches: [],
+    });
+  });
+
+  it('remains self-contained when injected into a browser realm', () => {
+    const context = vm.createContext({ request: { nodes: [{ id: 'node-a' }] } });
+    const result = vm.runInContext(
+      `(${readDisplayRoutingRequestDebugSnapshot.toString()})(request)`,
+      context,
+    );
+
+    expect(result.nodes).toEqual([{ id: 'node-a' }]);
+    expect(result.baselineNodes).toEqual([]);
+  });
+
   it('captures cumulative Worker counters before resetting incremental probes', async () => {
     const { minimap, window } = await prepareInContext({
       workerStartCount: 1,

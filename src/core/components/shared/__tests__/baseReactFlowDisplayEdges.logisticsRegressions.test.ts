@@ -617,6 +617,7 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
         expectedAffectedCount: 6,
       },
       { nodeId: 'wms', deltaX: 48.25, deltaY: 16, expectedMutableCount: 4 },
+      { nodeId: 'wms', deltaX: 40, deltaY: 12, expectedMutableCount: 4 },
       { nodeId: 'l-oms', deltaX: 48.25, deltaY: 16, expectedMutableCount: 5 },
       { nodeId: 'l-oms', deltaX: 36.75, deltaY: 6, expectedMutableCount: 5 },
     ] as const;
