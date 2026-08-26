@@ -11,6 +11,7 @@ import {
 import {
   assertDisplayRoutingDragResult,
   assertDisplayRoutingPerformanceBudget,
+  selectDisplayRoutingDragCases,
 } from './lib/display-routing-browser-performance.mjs';
 import {
   buildDisplayRoutingMachineResult,
@@ -39,11 +40,15 @@ const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '')
   .replace(/\/$/, '');
 const LOGISTICS_PRESET_ID = 'logistics-architecture-v1';
 const WAIT_TIMEOUT_MS = 60_000;
-const DRAG_CASES = Object.freeze([
+const AVAILABLE_DRAG_CASES = Object.freeze([
   { nodeId: 'tms', expectedMutableCount: 6, expectedAffectedCount: 6 },
   { nodeId: 'wms', expectedMutableCount: 4 },
   { nodeId: 'l-oms', expectedMutableCount: 5 },
 ]);
+const DRAG_CASES = selectDisplayRoutingDragCases(
+  process.env.DISPLAY_ROUTING_BROWSER_CASES,
+  AVAILABLE_DRAG_CASES,
+);
 const FIXED_VISUAL_ZOOMS = Object.freeze([0.5, 1, 2]);
 const INCLUDE_INCREMENTAL_REQUEST_DIAGNOSTICS = process.env
   .DISPLAY_ROUTING_BROWSER_DEBUG_REQUEST === '1';
@@ -611,7 +616,12 @@ const verifyNormalRenderedObstacleAudit = async () => withPrecompiledRouteBrowse
 
 const main = async () => {
   await assertDisplayRoutingProductionPreview(BASE_URL);
-  const normal = await verifyNormalRenderedObstacleAudit();
+  // Every performance case already audits its own initial and incremental SVG.
+  // Keep the standalone theme/export matrix in the normal verifier without
+  // paying for a second browser profile in every independent p95 sample.
+  const normal = COLLECT_PERFORMANCE_SAMPLES
+    ? null
+    : await verifyNormalRenderedObstacleAudit();
   const results = [];
   for (const dragCase of DRAG_CASES) {
     const captured = await withPrecompiledRouteBrowser(async session => {
@@ -738,22 +748,24 @@ const main = async () => {
     const cpuProfileLine = formatDisplayRoutingCpuProfile(result.cpuProfile);
     if (cpuProfileLine) console.log(`${result.nodeId} ${cpuProfileLine}`);
   }
-  console.log(
-    `normal: resolution=${normal.route.routeResolution}, `
-    + `renderedObstacleHits=${normal.audit.intersections.length}, `
-    + `renderedClearanceRisks=${normal.audit.clearanceRisks.length}, `
-    + `visibleRouteVariants=${normal.stability.distinctRouteCount}.`,
-  );
-  console.log(`visual-scales: ${normal.visualScales.map(audit => (
-    `${audit.name}=${audit.zoom.toFixed(3)}x/${audit.visibleLabelCount}labels`
-  )).join(', ')}.`);
-  if (normal.themeMatrix.length > 0) {
-    console.log(`themes: ${normal.themeMatrix.map(item => (
-      `${item.id}/${item.interactions.maximumPaintMs.toFixed(1)}ms-max-paint`
+  if (normal) {
+    console.log(
+      `normal: resolution=${normal.route.routeResolution}, `
+      + `renderedObstacleHits=${normal.audit.intersections.length}, `
+      + `renderedClearanceRisks=${normal.audit.clearanceRisks.length}, `
+      + `visibleRouteVariants=${normal.stability.distinctRouteCount}.`,
+    );
+    console.log(`visual-scales: ${normal.visualScales.map(audit => (
+      `${audit.name}=${audit.zoom.toFixed(3)}x/${audit.visibleLabelCount}labels`
     )).join(', ')}.`);
+    if (normal.themeMatrix.length > 0) {
+      console.log(`themes: ${normal.themeMatrix.map(item => (
+        `${item.id}/${item.interactions.maximumPaintMs.toFixed(1)}ms-max-paint`
+      )).join(', ')}.`);
+    }
+    const exportLine = formatDisplayRoutingExportMatrix(normal.exportMatrix);
+    if (exportLine) console.log(exportLine);
   }
-  const exportLine = formatDisplayRoutingExportMatrix(normal.exportMatrix);
-  if (exportLine) console.log(exportLine);
   const machineResult = buildDisplayRoutingMachineResult(results);
   if (EMIT_MACHINE_RESULT) {
     console.log(`DISPLAY_ROUTING_BROWSER_RESULT=${JSON.stringify(machineResult)}`);

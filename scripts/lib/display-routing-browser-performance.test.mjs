@@ -6,6 +6,7 @@ import {
   assertDisplayRoutingPerformanceSummaryBudget,
   displayRoutingIncrementalPhaseTraceIsComplete,
   EXPECTED_INCREMENTAL_DISPLAY_ROUTING_PHASE_SEQUENCES,
+  selectDisplayRoutingDragCases,
   summarizeDisplayRoutingSamples,
   summarizeSlowestDisplayRoutingPhases,
 } from './display-routing-browser-performance.mjs';
@@ -14,6 +15,12 @@ import {
   formatDisplayRoutingCpuProfile,
   summarizeDisplayRoutingCpuProfile,
 } from './display-routing-cpu-profile.mjs';
+
+const availableCases = [
+  { nodeId: 'tms', expectedMutableCount: 6 },
+  { nodeId: 'wms', expectedMutableCount: 4 },
+  { nodeId: 'l-oms', expectedMutableCount: 5 },
+];
 
 const incremental = overrides => ({
   releaseToFinalMs: 400,
@@ -45,6 +52,21 @@ const validDragResult = overrides => ({
   renderedEdgeCount: 14,
   renderedEdgesWithPathCount: 14,
   ...overrides,
+});
+
+describe('display-routing browser case selection', () => {
+  it('keeps the full matrix by default and selects a bounded explicit subset', () => {
+    expect(selectDisplayRoutingDragCases(undefined, availableCases)).toBe(availableCases);
+    expect(selectDisplayRoutingDragCases('wms,tms,wms', availableCases)).toEqual([
+      availableCases[1],
+      availableCases[0],
+    ]);
+  });
+
+  it.each([['unknown'], ['wms,unknown'], ['x'.repeat(129)]])(
+    'fails closed for invalid case input %j',
+    (value) => expect(() => selectDisplayRoutingDragCases(value, availableCases)).toThrow(),
+  );
 });
 
 describe('display routing browser performance budget', () => {

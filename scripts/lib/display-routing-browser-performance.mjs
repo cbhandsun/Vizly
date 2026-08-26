@@ -12,6 +12,22 @@ export const DISPLAY_ROUTING_P95_BUDGET_MS = Object.freeze({
   localRoute: 150,
 });
 
+export const selectDisplayRoutingDragCases = (value, availableCases) => {
+  if (!Array.isArray(availableCases) || availableCases.length === 0) return [];
+  if (typeof value === 'undefined' || String(value).trim() === '') return availableCases;
+  if (typeof value !== 'string' || value.length > 128) {
+    throw new Error('DISPLAY_ROUTING_BROWSER_CASES must be a bounded comma-separated string');
+  }
+  const requestedIds = [...new Set(value.split(',').map(item => item.trim()).filter(Boolean))];
+  const casesById = new Map(availableCases.map(item => [item?.nodeId, item]));
+  if (
+    requestedIds.length === 0
+    || requestedIds.length > availableCases.length
+    || requestedIds.some(nodeId => !casesById.has(nodeId))
+  ) throw new Error('DISPLAY_ROUTING_BROWSER_CASES contains an unsupported case');
+  return requestedIds.map(nodeId => casesById.get(nodeId));
+};
+
 const FAST_INCREMENTAL_DISPLAY_ROUTING_PHASES = Object.freeze([
   'incremental-closure',
   'local-route',
