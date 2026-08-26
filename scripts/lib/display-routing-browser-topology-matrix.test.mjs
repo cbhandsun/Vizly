@@ -117,4 +117,42 @@ describe('display routing browser topology matrix', () => {
       baselineEdgeCount: 14,
     })).toBeUndefined();
   });
+
+  it('requires a multi-node drag to keep the exact selected set and bounded closure', () => {
+    const operationCase = {
+      id: 'multi-node-move',
+      classification: 'geometry',
+      reason: 'node-drag',
+      edgeDelta: 0,
+      expectedChangedNodeIds: ['l-oms', 'wms'],
+      maximumMutableEdgeCount: 8,
+    };
+    const result = validResult({
+      changeSet: {
+        classification: 'geometry',
+        reason: 'node-drag',
+        changedNodeIds: ['l-oms', 'wms'],
+      },
+      request: { mutableEdgeIds: Array.from({ length: 8 }, (_, index) => `edge-${index}`) },
+      requestEdgeCount: 14,
+      responseEdgeCount: 14,
+      renderedEdgeCount: 14,
+      response: { ...validResult().response, fallbackLevel: 'none' },
+      routing: { ...validResult().routing, fallbackLevel: 'none' },
+    });
+    const assertMultiNode = overrides => assertDisplayRoutingTopologyOperationResult({
+      operationCase,
+      result: { ...result, ...overrides },
+      counterBaseline: { workerStartCount: 7, workerAbortCount: 2 },
+      baselineEdgeCount: 14,
+    });
+
+    expect(assertMultiNode()).toBeUndefined();
+    expect(() => assertMultiNode({
+      changeSet: { ...result.changeSet, changedNodeIds: ['wms'] },
+    })).toThrow(/unexpected node set/);
+    expect(() => assertMultiNode({
+      request: { mutableEdgeIds: Array.from({ length: 9 }, (_, index) => `edge-${index}`) },
+    })).toThrow(/mutable-edge budget/);
+  });
 });

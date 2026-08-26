@@ -1,6 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { DISPLAY_ROUTING_TOPOLOGY_CASE_ID } from './display-routing-matrix-cases.mjs';
+import { readDisplayRoutingNodeDragTarget } from './display-routing-browser-geometry.mjs';
 import { withPrecompiledRouteBrowser } from './precompiled-display-route-cdp.mjs';
 
 export { DISPLAY_ROUTING_TOPOLOGY_CASE_ID } from './display-routing-matrix-cases.mjs';
@@ -14,6 +15,14 @@ const OPERATION_CASES = Object.freeze([
     classification: 'geometry',
     reason: 'node-resize',
     edgeDelta: 0,
+  }),
+  Object.freeze({
+    id: 'multi-node-move',
+    classification: 'geometry',
+    reason: 'node-drag',
+    edgeDelta: 0,
+    expectedChangedNodeIds: Object.freeze(['l-oms', 'wms']),
+    maximumMutableEdgeCount: 8,
   }),
   Object.freeze({
     id: 'node-remove',
@@ -127,6 +136,49 @@ const applyNodeResize = session => session.evaluate(`(() => {
   } : node));
   return true;
 })()`);
+
+const applyMultiNodeMove = async session => {
+  const prepared = await session.evaluate(`(() => {
+    const instance = window.reactFlowInstance;
+    const selectedIds = new Set(['l-oms', 'wms']);
+    const selectedNodes = instance?.getNodes?.().filter(node => selectedIds.has(node.id));
+    if (!instance?.setNodes || selectedNodes?.length !== selectedIds.size) return false;
+    instance.setNodes(nodes => nodes.map(node => ({
+      ...node,
+      selected: selectedIds.has(node.id),
+    })));
+    instance.fitView?.({ nodes: selectedNodes, padding: 0.4, duration: 0 });
+    return true;
+  })()`);
+  if (!prepared) return false;
+  await delay(200);
+  const target = await session.evaluate(`(() => {
+    const readNodeDragTarget = ${readDisplayRoutingNodeDragTarget.toString()};
+    return readNodeDragTarget('wms');
+  })()`);
+  if (!target) return false;
+  const end = { x: target.x + 32, y: target.y + 10 };
+  await session.send('Input.dispatchMouseEvent', {
+    type: 'mouseMoved', ...target, button: 'none',
+  });
+  await session.send('Input.dispatchMouseEvent', {
+    type: 'mousePressed', ...target, button: 'left', buttons: 1, clickCount: 1,
+  });
+  for (let step = 1; step <= 4; step += 1) {
+    await session.send('Input.dispatchMouseEvent', {
+      type: 'mouseMoved',
+      x: target.x + ((end.x - target.x) * step) / 4,
+      y: target.y + ((end.y - target.y) * step) / 4,
+      button: 'left',
+      buttons: 1,
+    });
+    await delay(20);
+  }
+  await session.send('Input.dispatchMouseEvent', {
+    type: 'mouseReleased', ...end, button: 'left', buttons: 0, clickCount: 1,
+  });
+  return true;
+};
 
 const applyNodeAdd = session => session.evaluate(`(() => {
   const instance = window.reactFlowInstance;
@@ -306,6 +358,7 @@ const applyEdgeRemove = session => session.evaluate(`(() => {
 
 const APPLY_OPERATION = Object.freeze({
   'node-resize': applyNodeResize,
+  'multi-node-move': applyMultiNodeMove,
   'node-remove': applyNodeRemove,
   'edge-add': applyEdgeAdd,
   'port-policy': applyPortPolicyChange,
@@ -328,6 +381,26 @@ export const assertDisplayRoutingTopologyOperationResult = ({
     || result?.changeSet?.reason !== operationCase.reason
   ) {
     throw new Error(`Topology operation was misclassified: ${diagnostics}`);
+  }
+  if (
+    Array.isArray(operationCase.expectedChangedNodeIds)
+    && (
+      result?.changeSet?.changedNodeIds?.length !== operationCase.expectedChangedNodeIds.length
+      || operationCase.expectedChangedNodeIds.some((nodeId, index) => (
+        result.changeSet.changedNodeIds[index] !== nodeId
+      ))
+    )
+  ) {
+    throw new Error(`Geometry operation changed an unexpected node set: ${diagnostics}`);
+  }
+  if (
+    Number.isInteger(operationCase.maximumMutableEdgeCount)
+    && (
+      !Array.isArray(result?.request?.mutableEdgeIds)
+      || result.request.mutableEdgeIds.length > operationCase.maximumMutableEdgeCount
+    )
+  ) {
+    throw new Error(`Geometry operation exceeded the mutable-edge budget: ${diagnostics}`);
   }
   if (
     result?.capturedRequestCount !== 1
@@ -409,6 +482,9 @@ const verifyOperationGroup = ({
       reason: result.changeSet.reason,
       routeResolution: result.response.routeResolution,
       fallbackLevel: result.response.fallbackLevel,
+      mutableEdgeCount: result.request.mutableEdgeIds?.length ?? null,
+      localRouteMs: result.response.phaseTrace
+        ?.find(trace => trace?.phase === 'local-route')?.durationMs ?? null,
       workerDurationMs: result.response.workerDurationMs,
       ...(await auditFinalSvg(session, result, operationCase.id)),
     });
@@ -423,11 +499,11 @@ export const verifyDisplayRoutingTopologyMatrix = async options => ({
   operations: [
     ...await verifyOperationGroup({
       ...options,
-      operationCases: OPERATION_CASES.slice(0, 1),
+      operationCases: OPERATION_CASES.slice(0, 2),
     }),
     ...await verifyOperationGroup({
       ...options,
-      operationCases: OPERATION_CASES.slice(1),
+      operationCases: OPERATION_CASES.slice(2),
     }),
   ],
 });
