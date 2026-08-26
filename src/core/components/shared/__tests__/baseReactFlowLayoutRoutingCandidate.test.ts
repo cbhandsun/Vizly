@@ -213,8 +213,10 @@ describe('baseReactFlow layout routing candidate sequence', () => {
     expect(workerMocks.compute).toHaveBeenCalledOnce();
     expect(workerMocks.compute.mock.calls[0][0]).toMatchObject({
       requestId: 'layout:2',
+      inputSignature: expect.stringMatching(/^\d+$/),
+      inputGeometryDigest: expect.stringMatching(/^geometry-v1:[0-9a-f]{32}$/),
       qualityMode: 'full',
-      timeoutMs: 12_000,
+      timeoutMs: 30_000,
     });
     expect(workerMocks.compute.mock.calls[0][0]).not.toHaveProperty('cachedCandidateEdges');
     expect(workerMocks.compute.mock.calls[0][0].edges[0]).toMatchObject({

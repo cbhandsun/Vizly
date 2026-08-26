@@ -38,6 +38,7 @@ import { canCommitBaseReactFlowDisplayResult } from './baseReactFlowDisplayCommi
 import {
   canReuseBaseReactFlowDisplayCommittedSnapshot,
   commitBaseReactFlowDisplaySnapshot,
+  consumeBaseReactFlowStagedLayoutSnapshotHandoff,
   doesBaseReactFlowDisplayCommittedBaselineMatchIdentity,
   readBaseReactFlowDisplayCommittedSnapshot,
 } from './baseReactFlowDisplayCommittedSnapshot';
@@ -255,6 +256,9 @@ export const useBaseReactFlowDisplayRouting = ({
       ? committedFinalDisplayEntry
       : null;
     if (reusableCommittedFinalDisplayEntry || retainedCommittedEntry) {
+      if (reusableCommittedFinalDisplayEntry?.trustedTransactionHandoff) {
+        consumeBaseReactFlowStagedLayoutSnapshotHandoff(reusableCommittedFinalDisplayEntry);
+      }
       const outputRouteSignature = reusableCommittedFinalDisplayEntry?.outputRouteSignature
         ?? retainedCommittedEntry?.outputRouteSignature;
       const committedReuseTiming = resolveDisplayRoutingCommittedReuseTiming({

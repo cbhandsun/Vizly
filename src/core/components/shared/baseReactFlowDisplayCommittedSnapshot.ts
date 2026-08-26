@@ -69,6 +69,7 @@ export type BaseReactFlowDisplayCommittedSnapshotHit = Readonly<{
   edges: Edge[];
   outputRouteSignature: string;
   baseline: BaseReactFlowDisplayCommittedSnapshotBaseline;
+  trustedTransactionHandoff: boolean;
 }>;
 
 export const doesBaseReactFlowDisplayCommittedBaselineMatchIdentity = (
@@ -94,6 +95,8 @@ export const canReuseBaseReactFlowDisplayCommittedSnapshot = (
 ): candidate is BaseReactFlowDisplayCommittedSnapshotHit => (
   candidate !== null
   && (
+    candidate.trustedTransactionHandoff
+    ||
     activeBaseline === null
     || doesBaseReactFlowDisplayCommittedBaselineMatchIdentity(
       activeBaseline,
@@ -107,6 +110,8 @@ const committedDisplaySnapshots =
   new Map<string, BaseReactFlowDisplayCommittedSnapshotBaseline>();
 let committedSnapshotBySourceEdges =
   new WeakMap<Edge[], BaseReactFlowDisplayCommittedSnapshotBaseline>();
+const stagedLayoutSnapshotHandoffs = new Map<string, number>();
+const STAGED_LAYOUT_HANDOFF_TTL_MS = 10_000;
 
 const snapshotKey = (inputSignature: string, inputGeometryDigest: string): string => (
   `${inputSignature}\u0000${inputGeometryDigest}`
@@ -232,6 +237,11 @@ export const readBaseReactFlowDisplayCommittedSnapshot = ({
   const key = snapshotKey(inputSignature, inputGeometryDigest);
   const snapshot = committedDisplaySnapshots.get(key);
   if (!snapshot) return null;
+  const handoffExpiresAt = stagedLayoutSnapshotHandoffs.get(key) ?? 0;
+  const trustedTransactionHandoff = handoffExpiresAt >= Date.now();
+  if (handoffExpiresAt > 0 && !trustedTransactionHandoff) {
+    stagedLayoutSnapshotHandoffs.delete(key);
+  }
   const displayPatches = sanitizeBaseReactFlowTrustedDisplayPatches(
     sourceEdges,
     snapshot.displayPatches,
@@ -254,6 +264,7 @@ export const readBaseReactFlowDisplayCommittedSnapshot = ({
   return {
     edges,
     outputRouteSignature: snapshot.outputRouteSignature,
+    trustedTransactionHandoff,
     baseline: {
       identity: snapshot.identity,
       projectedSourceGeometry: {
@@ -277,6 +288,30 @@ export const readBaseReactFlowDisplayCommittedSnapshot = ({
       ...(snapshot.workerSessionRef ? { workerSessionRef: snapshot.workerSessionRef } : {}),
     },
   };
+};
+
+/** Marks only the exact edge array produced by an active staged layout transaction. */
+export const markBaseReactFlowStagedLayoutSnapshotHandoff = (
+  sourceEdges: Edge[],
+): boolean => {
+  const snapshot = committedSnapshotBySourceEdges.get(sourceEdges);
+  if (!snapshot) return false;
+  stagedLayoutSnapshotHandoffs.set(
+    snapshotKey(snapshot.inputSignature, snapshot.inputGeometryDigest),
+    Date.now() + STAGED_LAYOUT_HANDOFF_TTL_MS,
+  );
+  return true;
+};
+
+/** Consumes the short-lived layout handoff after Canvas adopts its snapshot. */
+export const consumeBaseReactFlowStagedLayoutSnapshotHandoff = (
+  candidate: BaseReactFlowDisplayCommittedSnapshotHit,
+): void => {
+  if (!candidate.trustedTransactionHandoff) return;
+  stagedLayoutSnapshotHandoffs.delete(snapshotKey(
+    candidate.baseline.inputSignature,
+    candidate.baseline.inputGeometryDigest,
+  ));
 };
 
 export const commitBaseReactFlowDisplaySnapshot = (options: {
@@ -313,6 +348,7 @@ export const commitBaseReactFlowDisplaySnapshot = (options: {
 export const clearBaseReactFlowDisplayCommittedSnapshots = (): void => {
   committedDisplaySnapshots.clear();
   committedSnapshotBySourceEdges = new WeakMap<Edge[], BaseReactFlowDisplayCommittedSnapshotBaseline>();
+  stagedLayoutSnapshotHandoffs.clear();
 };
 
 /**

@@ -66,7 +66,10 @@ export const useLayoutRoutingTransaction = ({
     const [
       { diagramConfigManager },
       displayWorkerModule,
-      { stageBaseReactFlowLayoutRouting },
+      {
+        clearBaseReactFlowLayoutNodeRuntimeGeometry,
+        stageBaseReactFlowLayoutRouting,
+      },
     ] = await Promise.all([
       import('../../../config/DiagramConfig'),
       import('../../shared/baseReactFlowDisplayWorkerClient'),
@@ -75,13 +78,14 @@ export const useLayoutRoutingTransaction = ({
     disposeWorkerRef.current = displayWorkerModule.disposeBaseReactFlowDisplayWorker;
     if (abortController.signal.aborted) throw new Error('layout-routing-cancelled');
 
+    const targetNodes = clearBaseReactFlowLayoutNodeRuntimeGeometry(nodes);
     let committedEdges = edges;
     if (edges.length > 0) {
       const performanceConfig = readBaseReactFlowPerformanceConfig({
         readConfig: () => diagramConfigManager.getConfig(),
       });
       const isLargeGraph = computeBaseReactFlowIsLargeGraph({
-        nodeCount: nodes.length,
+        nodeCount: targetNodes.length,
         edgeCount: edges.length,
         performanceConfig,
       });
@@ -89,7 +93,7 @@ export const useLayoutRoutingTransaction = ({
         workerRef,
         requestId: `layout:${requestSequenceRef.current += 1}`,
         sourceEdges: edges,
-        sourceNodes: nodes,
+        sourceNodes: targetNodes,
         isLargeGraph,
         signal: abortController.signal,
       });
@@ -103,7 +107,7 @@ export const useLayoutRoutingTransaction = ({
       takeSnapshot(nodesRef.current, edgesRef.current);
       // React 18 batches these state updates. The recorded trusted display
       // snapshot is already available when BaseReactFlow observes this graph.
-      setNodes(nodes);
+      setNodes(targetNodes);
       setEdges(committedEdges);
       await runAfterLayoutRenderFrames(() => {
         flushObstacles();

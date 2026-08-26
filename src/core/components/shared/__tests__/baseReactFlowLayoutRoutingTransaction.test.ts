@@ -2,11 +2,14 @@ import type { Edge, Node } from '@xyflow/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  canReuseBaseReactFlowDisplayCommittedSnapshot,
   clearBaseReactFlowDisplayCommittedSnapshots,
+  consumeBaseReactFlowStagedLayoutSnapshotHandoff,
   readBaseReactFlowDisplayCommittedSnapshot,
 } from '../baseReactFlowDisplayCommittedSnapshot';
 import { computeBaseReactFlowDisplayInputIdentityBundle } from '../baseReactFlowDisplayInputIdentity';
 import {
+  clearBaseReactFlowLayoutNodeRuntimeGeometry,
   commitBaseReactFlowStagedLayoutRoutingResult,
   seedBaseReactFlowStagedLayoutEdges,
 } from '../baseReactFlowLayoutRoutingTransaction';
@@ -74,6 +77,19 @@ const createWorkerResult = (hardClean: boolean) => {
 
 describe('baseReactFlowLayoutRoutingTransaction', () => {
   beforeEach(() => clearBaseReactFlowDisplayCommittedSnapshots());
+
+  it('drops stale React Flow runtime geometry before staging a new layout', () => {
+    const runtimeNodes = nodes.map(node => ({
+      ...node,
+      positionAbsolute: { x: -1_000, y: -2_000 },
+      internals: { positionAbsolute: { x: -1_000, y: -2_000 } },
+    })) as Node[];
+
+    const cleared = clearBaseReactFlowLayoutNodeRuntimeGeometry(runtimeNodes);
+
+    expect(cleared).toEqual(nodes);
+    expect(cleared).not.toBe(runtimeNodes);
+  });
 
   it('creates a private anchored orthogonal seed for full-quality refinement', () => {
     const [seed] = seedBaseReactFlowStagedLayoutEdges({ sourceEdges, sourceNodes: nodes });
@@ -296,11 +312,43 @@ describe('baseReactFlowLayoutRoutingTransaction', () => {
       smartEdgePadding: 20,
       isLargeGraph: false,
     });
-    expect(readBaseReactFlowDisplayCommittedSnapshot({
+    const stagedHit = readBaseReactFlowDisplayCommittedSnapshot({
       inputSignature: routedIdentity.cacheSignature,
       inputGeometryDigest: routedIdentity.geometryDigest,
       sourceEdges: committed!.routedEdges,
-    })?.edges).toEqual(committed!.routedEdges);
+    });
+    expect(stagedHit?.edges).toEqual(committed!.routedEdges);
+    expect(stagedHit?.trustedTransactionHandoff).toBe(true);
+    if (!stagedHit) throw new Error('expected a staged layout snapshot handoff');
+
+    const differentActiveBaseline = {
+      ...stagedHit.baseline,
+      identity: {
+        ...stagedHit.baseline.identity,
+        inputSignature: '1',
+      },
+      inputSignature: '1',
+    };
+    expect(canReuseBaseReactFlowDisplayCommittedSnapshot(
+      differentActiveBaseline,
+      stagedHit,
+      routedIdentity.cacheSignature,
+      routedIdentity.geometryDigest,
+    )).toBe(true);
+
+    consumeBaseReactFlowStagedLayoutSnapshotHandoff(stagedHit);
+    const consumedHit = readBaseReactFlowDisplayCommittedSnapshot({
+      inputSignature: routedIdentity.cacheSignature,
+      inputGeometryDigest: routedIdentity.geometryDigest,
+      sourceEdges: committed!.routedEdges,
+    });
+    expect(consumedHit?.trustedTransactionHandoff).toBe(false);
+    expect(canReuseBaseReactFlowDisplayCommittedSnapshot(
+      differentActiveBaseline,
+      consumedHit,
+      routedIdentity.cacheSignature,
+      routedIdentity.geometryDigest,
+    )).toBe(false);
 
     const shiftedNodes = nodes.map(node => node.id === 'target'
       ? { ...node, position: { x: 280, y: 0 } }

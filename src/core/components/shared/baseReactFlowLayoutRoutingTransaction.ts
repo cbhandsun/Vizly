@@ -5,6 +5,7 @@ import type { RoutingPatch } from '../../routing/routingPatch';
 import { computeBaseReactFlowDisplayOutputRouteSignature } from './baseReactFlowDisplayCache';
 import {
   readBaseReactFlowDisplayCommittedSnapshot,
+  markBaseReactFlowStagedLayoutSnapshotHandoff,
   writeBaseReactFlowDisplayCommittedSnapshot,
   type RoutingCommittedSnapshot,
 } from './baseReactFlowDisplayCommittedSnapshot';
@@ -26,18 +27,43 @@ import {
   repairBaseReactFlowDisplayEdgesInWorker,
   type BaseReactFlowDisplayWorkerResult,
 } from './baseReactFlowDisplayWorkerClient';
-import { LAYOUT_DISPLAY_WORKER_TIMEOUT_MS } from './baseReactFlowDisplayWorkerTimeout';
+import {
+  LAYOUT_DISPLAY_WORKER_TIMEOUT_MS,
+  LAYOUT_FULL_DISPLAY_WORKER_TIMEOUT_MS,
+} from './baseReactFlowDisplayWorkerTimeout';
 import { recordBaseReactFlowRejectedDisplayDiagnostics } from './baseReactFlowDisplayRejectedDiagnostics';
 import { repairAxisMismatchedTerminalsWithBoundedPortRoles } from './baseReactFlowDisplayTerminalPortRepair';
 import { buildLayoutFacingTerminalShortcutCandidates } from './baseReactFlowDisplayCommercialTerminalShortcut';
 import { repairResidualHairpinBridges } from '../../strategies/shared/edgeHairpinBridgeWidenRepair';
 import { clearBaseReactFlowLayoutEdgeRoutingData } from './baseReactFlowLayoutEdgeRoutingData';
+import { updateDisplayRoutingDebugState } from './baseReactFlowDisplayRoutingDebug';
 
 export { clearBaseReactFlowLayoutEdgeRoutingData } from './baseReactFlowLayoutEdgeRoutingData';
 
 export type BaseReactFlowLayoutRoutingCommit = Readonly<{
   routedEdges: Edge[];
 }>;
+
+type LayoutRuntimeNode = Node & Readonly<{
+  internals?: unknown;
+  positionAbsolute?: unknown;
+}>;
+
+/**
+ * A layout strategy owns the next relative positions. Runtime absolute
+ * geometry belongs to the previous React Flow render and must not enter the
+ * hidden transaction identity or the subsequent state commit.
+ */
+export const clearBaseReactFlowLayoutNodeRuntimeGeometry = (
+  nodes: Node[],
+): Node[] => nodes.map((sourceNode) => {
+  const {
+    internals: _internals,
+    positionAbsolute: _positionAbsolute,
+    ...node
+  } = sourceNode as LayoutRuntimeNode;
+  return node as Node;
+});
 
 /**
  * The full-quality worker refines an existing orthogonal candidate. Dynamic
@@ -202,7 +228,10 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
   const outputRouteSignature = computeBaseReactFlowDisplayOutputRouteSignature(routedEdges);
   const displayPatches = createBaseReactFlowDisplayEdgePatches(routedEdges, routedEdges);
   if (!outputRouteSignature || !displayPatches) return false;
-  const writeSnapshot = (edges: Edge[], patches: RoutingPatch[]): boolean => {
+  const writeSnapshot = (
+    edges: Edge[],
+    patches: RoutingPatch[],
+  ): ReturnType<typeof computeBaseReactFlowDisplayInputIdentityBundle> | null => {
     // Layout strategies keep child coordinates relative to their domain. The
     // display router identifies the same nodes by their projected absolute
     // geometry, so staged snapshots must use that canonical representation too.
@@ -217,7 +246,7 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
       smartEdgePadding,
       isLargeGraph,
     });
-    return writeBaseReactFlowDisplayCommittedSnapshot({
+    const written = writeBaseReactFlowDisplayCommittedSnapshot({
       inputSignature: identity.cacheSignature,
       inputGeometryDigest: identity.geometryDigest,
       sourceEdges: edges,
@@ -226,11 +255,19 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
       outputRouteSignature,
       ...hardReportIdentity,
     });
+    return written ? identity : null;
   };
-  const primaryWritten = writeSnapshot(routedEdges, displayPatches);
+  const primaryIdentity = writeSnapshot(routedEdges, displayPatches);
   const sourcePatches = createBaseReactFlowDisplayEdgePatches(sourceEdges, routedEdges);
-  if (sourcePatches) writeSnapshot(sourceEdges, sourcePatches);
-  return primaryWritten;
+  const sourceIdentity = sourcePatches ? writeSnapshot(sourceEdges, sourcePatches) : null;
+  if (primaryIdentity) markBaseReactFlowStagedLayoutSnapshotHandoff(routedEdges);
+  updateDisplayRoutingDebugState({
+    stagedLayoutPrimarySignature: primaryIdentity?.cacheSignature,
+    stagedLayoutPrimaryGeometryDigest: primaryIdentity?.geometryDigest,
+    stagedLayoutSourceSignature: sourceIdentity?.cacheSignature,
+    stagedLayoutSourceGeometryDigest: sourceIdentity?.geometryDigest,
+  });
+  return primaryIdentity !== null;
 };
 
 /** Routes target layout geometry without mutating the visible graph. */
@@ -332,8 +369,10 @@ export const stageBaseReactFlowLayoutRouting = async ({
     smartEdgePadding,
     isLargeGraph,
     displayEdgeEpoch: 0,
+    inputSignature: projectedIdentity.cacheSignature,
+    inputGeometryDigest: projectedIdentity.geometryDigest,
     qualityMode: 'full',
-    timeoutMs: LAYOUT_DISPLAY_WORKER_TIMEOUT_MS,
+    timeoutMs: LAYOUT_FULL_DISPLAY_WORKER_TIMEOUT_MS,
     signal,
   });
   const workerResult = initialResult;
