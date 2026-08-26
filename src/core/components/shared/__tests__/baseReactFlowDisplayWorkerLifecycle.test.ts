@@ -509,6 +509,8 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
         ...sourceEdges[0].data,
         computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
         h: ';50,0;',
+        sharedTrunkAware: true,
+        sharedTrunkSynthesized: true,
       },
     }];
     const displayPatches = createBaseReactFlowDisplayEdgePatches(sourceEdges, routedEdges);
@@ -528,7 +530,7 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
 
     const documentSnapshot = createBaseReactFlowRoutingOnlyDocumentSnapshot(sourceEdges);
     expect(documentSnapshot).toMatchObject({
-      schema: 'vizly-routing-only-document-v1',
+      schema: 'vizly-routing-only-document-v2',
       candidate: {
         inputSignature: '654',
         outputRouteSignature,
@@ -540,6 +542,8 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
           data: {
             computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
             h: ';50,0;',
+            sharedTrunkAware: true,
+            sharedTrunkSynthesized: true,
           },
         }],
       },

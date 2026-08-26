@@ -28,6 +28,10 @@ const candidate = () => createPersistedRoutingCandidate({
     data: {
       computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
       h: ';50,0;',
+      sharedTrunkAware: true,
+      sharedTrunkSynthesized: false,
+      isTreeBus: true,
+      overextendedTargetTrunkCorridorReclaimed: false,
     },
   }],
 });
@@ -60,6 +64,10 @@ describe('routing-only document snapshot', () => {
     expect(parseRoutingOnlyDocumentSnapshot({ ...snapshot, extra: true })).toBeNull();
     expect(parseRoutingOnlyDocumentSnapshot({
       ...snapshot,
+      schema: 'vizly-routing-only-document-v1',
+    })).toBeNull();
+    expect(parseRoutingOnlyDocumentSnapshot({
+      ...snapshot,
       candidate: { ...current, routingVersion: 'old' },
     })).toBeNull();
     expect(parseRoutingOnlyDocumentSnapshot({
@@ -69,6 +77,16 @@ describe('routing-only document snapshot', () => {
         patches: [{
           ...current.patches[0],
           data: { computedPath: [{ x: 0, y: 0 }, { x: Number.NaN, y: 1 }] },
+        }],
+      },
+    })).toBeNull();
+    expect(parseRoutingOnlyDocumentSnapshot({
+      ...snapshot,
+      candidate: {
+        ...current,
+        patches: [{
+          ...current.patches[0],
+          data: { ...current.patches[0].data, sharedTrunkAware: 'true' },
         }],
       },
     })).toBeNull();

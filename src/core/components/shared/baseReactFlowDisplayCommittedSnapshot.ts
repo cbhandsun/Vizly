@@ -22,7 +22,7 @@ import {
 import { isBaseReactFlowDisplayGeometryDigest } from './baseReactFlowDisplayInputIdentity';
 import {
   mergeBaseReactFlowDisplayEdgePatches,
-  sanitizeBaseReactFlowDisplayCachePatches,
+  sanitizeBaseReactFlowDocumentCandidatePatches,
   sanitizeBaseReactFlowTrustedDisplayPatches,
 } from './baseReactFlowDisplayRoutingTransaction';
 import { projectBaseReactFlowDisplayWorkerInput } from './baseReactFlowDisplayWorkerProjection';
@@ -365,7 +365,7 @@ export const createBaseReactFlowRoutingOnlyDocumentSnapshot = (
     !snapshot
     || snapshot.projectedSourceGeometry.edges.length !== sourceEdges.length
   ) return null;
-  const safePatches = sanitizeBaseReactFlowDisplayCachePatches(
+  const safePatches = sanitizeBaseReactFlowDocumentCandidatePatches(
     sourceEdges,
     snapshot.routingPatches,
   );

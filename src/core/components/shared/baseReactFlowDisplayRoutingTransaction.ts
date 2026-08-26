@@ -307,7 +307,12 @@ const sanitizeBaseReactFlowRoutingPatches = (
         }
       }
       if (options.allowRouterIntent) {
-        for (const key of ['sharedTrunkAware', 'sharedTrunkSynthesized', 'isTreeBus'] as const) {
+        for (const key of [
+          'sharedTrunkAware',
+          'sharedTrunkSynthesized',
+          'isTreeBus',
+          'overextendedTargetTrunkCorridorReclaimed',
+        ] as const) {
           if (!hasOwn(patch.data, key)) continue;
           const intent = patch.data[key];
           if (typeof intent === 'undefined' && options.allowUndefinedRoutingValues) {
@@ -338,6 +343,21 @@ export const sanitizeBaseReactFlowDisplayCachePatches = (
   allowRuntimeHandleChange: false,
   allowRouterIntent: false,
   allowNewTreeRouting: false,
+  allowUndefinedRoutingValues: false,
+});
+
+/**
+ * Projects a parsed routing-only document candidate onto the current graph.
+ * Unlike the browser cache boundary, a document snapshot may restore bounded
+ * router intent because it is still revalidated by the Worker before commit.
+ */
+export const sanitizeBaseReactFlowDocumentCandidatePatches = (
+  sourceEdges: Edge[],
+  patches: RoutingPatch[],
+): RoutingPatch[] | null => sanitizeBaseReactFlowRoutingPatches(sourceEdges, patches, {
+  allowRuntimeHandleChange: false,
+  allowRouterIntent: true,
+  allowNewTreeRouting: true,
   allowUndefinedRoutingValues: false,
 });
 
@@ -576,12 +596,13 @@ export const doBaseReactFlowDisplayRoutesMatchExactly = (
   return true;
 };
 
-export const mergeTrustedBaseReactFlowDisplayCacheEntry = (
+const mergeBaseReactFlowDisplayCandidateEntry = (
   sourceEdges: Edge[],
   cacheEntry: BaseReactFlowDisplayEdgesCacheEntry,
+  sanitizePatches: (sourceEdges: Edge[], patches: RoutingPatch[]) => RoutingPatch[] | null,
 ): Edge[] | null => {
   if (cacheEntry.hardClean !== true) return null;
-  const safePatches = sanitizeBaseReactFlowDisplayCachePatches(sourceEdges, cacheEntry.edges);
+  const safePatches = sanitizePatches(sourceEdges, cacheEntry.edges);
   if (!safePatches) return null;
   const merged = mergeBaseReactFlowDisplayEdgePatches(sourceEdges, safePatches);
   if (!merged) return null;
@@ -590,3 +611,21 @@ export const mergeTrustedBaseReactFlowDisplayCacheEntry = (
     cacheEntry.outputRouteSignature,
   ) ? merged : null;
 };
+
+export const mergeTrustedBaseReactFlowDisplayCacheEntry = (
+  sourceEdges: Edge[],
+  cacheEntry: BaseReactFlowDisplayEdgesCacheEntry,
+): Edge[] | null => mergeBaseReactFlowDisplayCandidateEntry(
+  sourceEdges,
+  cacheEntry,
+  sanitizeBaseReactFlowDisplayCachePatches,
+);
+
+export const mergeBaseReactFlowDocumentCandidateEntry = (
+  sourceEdges: Edge[],
+  candidate: BaseReactFlowDisplayEdgesCacheEntry,
+): Edge[] | null => mergeBaseReactFlowDisplayCandidateEntry(
+  sourceEdges,
+  candidate,
+  sanitizeBaseReactFlowDocumentCandidatePatches,
+);

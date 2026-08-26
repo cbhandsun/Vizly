@@ -3,8 +3,8 @@ import { parseRoutingLineHops } from './routingLineHops';
 import { ROUTING_IDENTIFIER_MAX_LENGTH } from './routingBoundaryLimits';
 import type { RoutingPatch } from './routingPatch';
 
-export const PERSISTED_ROUTING_CANDIDATE_SCHEMA = 'vizly-routing-only-candidate-v1';
-export const ROUTING_ONLY_DOCUMENT_SNAPSHOT_SCHEMA = 'vizly-routing-only-document-v1';
+export const PERSISTED_ROUTING_CANDIDATE_SCHEMA = 'vizly-routing-only-candidate-v2';
+export const ROUTING_ONLY_DOCUMENT_SNAPSHOT_SCHEMA = 'vizly-routing-only-document-v2';
 
 const MAX_PATCHES = 300;
 const MAX_TOKEN_LENGTH = 20_000;
@@ -23,7 +23,19 @@ const PATCH_KEYS = new Set([
   'targetHandle',
   'data',
 ]);
-const DATA_KEYS = new Set(['computedPath', 'elkPath', 'treeRouting', 'h']);
+const ROUTING_INTENT_KEYS = [
+  'sharedTrunkAware',
+  'sharedTrunkSynthesized',
+  'isTreeBus',
+  'overextendedTargetTrunkCorridorReclaimed',
+] as const;
+const DATA_KEYS = new Set([
+  'computedPath',
+  'elkPath',
+  'treeRouting',
+  'h',
+  ...ROUTING_INTENT_KEYS,
+]);
 const TREE_KEYS = new Set(['effectiveSourceHandle', 'effectiveTargetHandle', 'points']);
 const POINT_KEYS = new Set(['x', 'y']);
 const CANDIDATE_KEYS = new Set([
@@ -136,6 +148,11 @@ const parsePatch = (
       const lineHops = parseRoutingLineHops(value.data.h);
       if (!lineHops) return null;
       data.h = lineHops;
+    }
+    for (const key of ROUTING_INTENT_KEYS) {
+      if (!(key in value.data)) continue;
+      if (typeof value.data[key] !== 'boolean') return null;
+      data[key] = value.data[key];
     }
     if ('treeRouting' in value.data) {
       if (!isRecord(value.data.treeRouting) || !hasOnlyKeys(value.data.treeRouting, TREE_KEYS)) {

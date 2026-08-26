@@ -223,7 +223,12 @@ const hasSafeDisplayEdgePaths = (
   value: Record<string, unknown>,
   budget: DisplayValueBudget,
 ): boolean => {
-  for (const flag of ['sharedTrunkSynthesized', 'sharedTrunkAware', 'isTreeBus'] as const) {
+  for (const flag of [
+    'sharedTrunkSynthesized',
+    'sharedTrunkAware',
+    'isTreeBus',
+    'overextendedTargetTrunkCorridorReclaimed',
+  ] as const) {
     if (typeof value[flag] !== 'undefined' && typeof value[flag] !== 'boolean') return false;
   }
   if (typeof value.computedPath !== 'undefined' && !isBoundedPath(value.computedPath, budget)) return false;

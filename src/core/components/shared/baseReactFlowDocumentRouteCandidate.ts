@@ -2,7 +2,7 @@ import type { Edge } from '@xyflow/react';
 
 import { readRoutingOnlyDocumentCandidate } from '../../routing/routingDocumentCandidateRegistry';
 import { BASE_DISPLAY_ROUTING_VERSION } from './baseReactFlowDisplayCache';
-import { mergeTrustedBaseReactFlowDisplayCacheEntry } from './baseReactFlowDisplayRoutingTransaction';
+import { mergeBaseReactFlowDocumentCandidateEntry } from './baseReactFlowDisplayRoutingTransaction';
 
 export const loadBaseReactFlowDocumentRouteCandidate = ({
   inputSignature,
@@ -19,7 +19,7 @@ export const loadBaseReactFlowDocumentRouteCandidate = ({
     inputGeometryDigest,
   });
   if (!candidate) return null;
-  return mergeTrustedBaseReactFlowDisplayCacheEntry(sourceEdges, {
+  return mergeBaseReactFlowDocumentCandidateEntry(sourceEdges, {
     edges: candidate.patches,
     hardClean: true,
     inputGeometryDigest: candidate.inputGeometryDigest,
