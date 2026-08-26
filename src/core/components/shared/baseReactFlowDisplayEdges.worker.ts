@@ -71,6 +71,7 @@ import {
   withExactDisplayHardReport,
 } from './baseReactFlowDisplayWorkerResponse';
 import { finalizeAuditedIncrementalDisplayResponse } from './baseReactFlowDisplayIncrementalFinalization';
+import { finalizeDisplayWorkerIncrementalCandidate } from './baseReactFlowDisplayIncrementalWorkerFinalizer';
 import { shouldEscalateInteractiveDisplayRoute } from './baseReactFlowDisplayWorkerFallback';
 import {
   createTracedDisplayWorkerFinalEvaluation,
@@ -419,33 +420,24 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
     });
     incrementalAffectedEdgeCount = incremental.affectedEdgeCount;
     if (incremental.edges) {
-      const incrementalFinalizerTimer = startDisplayRoutingPhaseTrace({
-        phase: 'finalizer',
-        candidateCount: incremental.edges.length,
-        onTrace: recordPhaseTrace,
-      });
-      const incrementalResponse = finalizeContainerClearanceResponse({
-        requestId: request.requestId,
-        edges: incremental.edges,
-        hardClean: true,
-        hardReport: incremental.hardReport,
-        routeResolution: 'incremental-route',
-        phaseTrace,
-        affectedEdgeCount: incremental.affectedEdgeCount,
-        fallbackLevel: 'none',
-      }, request.nodes, {
-        eligibleEdgeIds: new Set(request.mutableEdgeIds),
-        initialHardReport: incremental.hardReport,
-        initialHardReportEdges: incremental.edges,
-        isLargeGraph: request.isLargeGraph,
+      const incrementalResponse = finalizeDisplayWorkerIncrementalCandidate({
+        request,
+        incremental,
         onPhaseTrace: recordPhaseTrace,
-        preferredEdges: request.edges,
+        finalizeResponse: (response, eligibleEdgeIds) => finalizeContainerClearanceResponse(
+          { ...response, phaseTrace },
+          request.nodes,
+          {
+            eligibleEdgeIds,
+            initialHardReport: incremental.hardReport,
+            initialHardReportEdges: incremental.edges ?? undefined,
+            isLargeGraph: request.isLargeGraph,
+            onPhaseTrace: recordPhaseTrace,
+            preferredEdges: request.edges,
+          },
+        ),
       });
-      return completeResponse(finishDisplayWorkerFinalization(
-        incrementalFinalizerTimer,
-        incrementalResponse,
-        0,
-      ));
+      if (incrementalResponse) return completeResponse(incrementalResponse);
     }
   }
   const incrementalFallbackMetadata = createDisplayRoutingFallbackMetadata(

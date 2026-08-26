@@ -1,11 +1,10 @@
-import type { Edge, Node } from '@xyflow/react';
+import type { Edge } from '@xyflow/react';
 
 import {
   COMMERCIAL_BUSINESS_NODE_CLEARANCE,
   repairBusinessNodeClearanceRisks,
 } from '../../strategies/shared/edgeBusinessNodeClearanceRepair';
 import { repairResidualHairpinBridges } from '../../strategies/shared/edgeHairpinBridgeWidenRepair';
-import { createNodeClearanceEvaluationContext } from '../../strategies/shared/edgeWaypointCandidateRepair';
 import {
   baseReactFlowDisplayOutputRouteSignatureMatches,
 } from './baseReactFlowDisplayCache';
@@ -20,7 +19,6 @@ import { createBaseReactFlowMovedNodeReconnectCandidates } from './baseReactFlow
 import { repairFastDisplayHardSafety } from './baseReactFlowFastEdgeSafety';
 import {
   findDisplayStrictCrossingHits,
-  getDisplayComputedPath,
   getDisplayNodeRect,
   isDisplayContainerNode,
 } from './baseReactFlowDisplayGeometry';
@@ -55,70 +53,27 @@ import {
   createDisplayRoutingSegmentSpatialIndex,
   type DisplayRoutingWorkerSpatialSnapshot,
 } from './baseReactFlowDisplayWorkerSpatialSnapshot';
+import {
+  baseReactFlowIncrementalEdgesHaveNodeClearance as hasNodeClearance,
+  baseReactFlowIdentifierListsMatch as sameIdentifiers,
+  baseReactFlowReportHasOnlyObstacleDefects as reportHasOnlyObstacleDefects,
+  baseReactFlowReportHasOnlyStrictDefects as reportHasOnlyStrictDefects,
+  baseReactFlowRoutingChangeSetMatches as routingChangeSetMatches,
+  preservesBaseReactFlowIncrementalBoundary as preservesIncrementalBoundary,
+} from './baseReactFlowDisplayIncrementalContracts';
+import {
+  createBaseReactFlowTopologyIncrementalDisplayEdges,
+  createBaseReactFlowTopologyIncrementalProjection,
+} from './baseReactFlowDisplayTopologyIncremental';
 
 export type BaseReactFlowDisplayIncrementalRouteOutcome = Readonly<{
   edges: Edge[] | null;
   affectedEdgeCount: number;
+  eligibleEdgeIds: string[];
   hardReport?: BaseDisplayBoundedCandidateReport;
 }>;
 
-const sameIdentifiers = (first: readonly string[], second: readonly string[]): boolean => (
-  first.length === second.length
-  && first.every((identifier, index) => identifier === second[index])
-);
-
 const INCREMENTAL_HARD_NODE_CLEARANCE = 16;
-
-const reportHasOnlyObstacleDefects = (
-  report: BaseDisplayBoundedCandidateReport,
-): boolean => (
-  report.obstacleHits > 0
-  && report.terminalsAnchored
-  && report.quality.nonOrthogonalSegments === 0
-  && report.quality.strictCrossings === 0
-  && report.quality.reverseOverlap === 0
-  && report.quality.unrelatedOverlap === 0
-  && report.quality.unexplainedRelatedOverlap === 0
-  && report.quality.shortEndpointStubs === 0
-  && report.quality.tinyInteriorDoglegs === 0
-  && report.quality.hairpins === 0
-);
-
-const reportHasOnlyStrictDefects = (
-  report: BaseDisplayBoundedCandidateReport,
-): boolean => (
-  report.obstacleHits === 0
-  && report.terminalsAnchored
-  && report.quality.nonOrthogonalSegments === 0
-  && report.quality.strictCrossings > 0
-  && report.quality.reverseOverlap === 0
-  && report.quality.unrelatedOverlap === 0
-  && report.quality.unexplainedRelatedOverlap === 0
-  && report.quality.shortEndpointStubs === 0
-  && report.quality.tinyInteriorDoglegs === 0
-  && report.quality.hairpins === 0
-);
-
-const preservesIncrementalBoundary = (
-  baselineEdges: Edge[],
-  candidateEdges: Edge[],
-  mutableIds: ReadonlySet<string>,
-): boolean => candidateEdges.every((edge, index) => (
-  mutableIds.has(edge.id) || edge === baselineEdges[index]
-));
-
-const hasNodeClearance = (
-  edges: Edge[],
-  nodes: Node[],
-  eligibleIds: ReadonlySet<string>,
-  minimumClearance = COMMERCIAL_BUSINESS_NODE_CLEARANCE,
-): boolean => edges.every(edge => (
-  !eligibleIds.has(edge.id)
-  || createNodeClearanceEvaluationContext(nodes, edge).score(
-    getDisplayComputedPath(edge),
-    minimumClearance,
-  ) <= 1e-6
-));
 
 /**
  * Attempts an incident-only route against a frozen hard-clean baseline.
@@ -162,7 +117,7 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
     || nextIdentity.geometryDigest !== request.nextInputGeometryDigest
   ) {
     closureTimer.finish('fallback');
-    return { edges: null, affectedEdgeCount: 0 };
+    return { edges: null, affectedEdgeCount: 0, eligibleEdgeIds: [] };
   }
 
   const baselinePatches = sanitizeBaseReactFlowTrustedDisplayPatches(
@@ -173,14 +128,15 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
     ? mergeBaseReactFlowDisplayEdgePatches(request.baselineSourceEdges, baselinePatches)
     : null;
   if (
-    !baselineEdges
+    !baselinePatches
+    || !baselineEdges
     || !baseReactFlowDisplayOutputRouteSignatureMatches(
       baselineEdges,
       request.baselineOutputRouteSignature,
     )
   ) {
     closureTimer.finish('fallback');
-    return { edges: null, affectedEdgeCount: 0 };
+    return { edges: null, affectedEdgeCount: 0, eligibleEdgeIds: [] };
   }
 
   const verifiedChangeSet = createBaseReactFlowRoutingChangeSet({
@@ -207,15 +163,55 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
     requestedContextEdgeIds,
   );
   const affectedEdgeCount = affectedClosure.mutableEdgeIds.length;
+  if (!routingChangeSetMatches(verifiedChangeSet, request.changeSet)) {
+    closureTimer.finish('fallback', affectedEdgeCount);
+    return { edges: null, affectedEdgeCount, eligibleEdgeIds: [] };
+  }
+  if (closureMatchesHints && verifiedChangeSet.topologyChanged) {
+    const projection = createBaseReactFlowTopologyIncrementalProjection({
+      baselineNodes: request.baselineNodes,
+      baselineSourceEdges: request.baselineSourceEdges,
+      baselineEdges,
+      baselinePatches,
+      nextNodes: request.nodes,
+      nextEdges: request.edges,
+      changeSet: verifiedChangeSet,
+    });
+    if (!projection) {
+      closureTimer.finish('fallback', affectedEdgeCount);
+      return { edges: null, affectedEdgeCount, eligibleEdgeIds: [] };
+    }
+    const repairNodes = withDisplayAbsolutePositions(
+      request.nodes,
+      new Map(request.nodes.map(node => [node.id, node] as const)),
+    );
+    const topology = createBaseReactFlowTopologyIncrementalDisplayEdges({
+      projection,
+      nodes: repairNodes,
+      enableSmartEdges: request.enableSmartEdges,
+      smartEdgePadding: request.smartEdgePadding,
+      displayEdgeEpoch: request.displayEdgeEpoch,
+      onRejectedReport: onBoundedCandidate,
+    });
+    closureTimer.finish(
+      topology.edges ? 'accepted' : 'fallback',
+      verifiedChangeSet.changedEdgeIds.length,
+    );
+    return {
+      edges: topology.edges,
+      affectedEdgeCount: verifiedChangeSet.changedEdgeIds.length,
+      eligibleEdgeIds: topology.eligibleEdgeIds,
+      ...(topology.hardReport ? { hardReport: topology.hardReport } : {}),
+    };
+  }
   if (
     !closureMatchesHints
-    || verifiedChangeSet.topologyChanged
     || !verifiedChangeSet.geometryChanged
     || affectedEdgeCount === 0
     || affectedEdgeCount > 64
   ) {
     closureTimer.finish('fallback', affectedEdgeCount);
-    return { edges: null, affectedEdgeCount };
+    return { edges: null, affectedEdgeCount, eligibleEdgeIds: [] };
   }
   const mutableIds = new Set(affectedClosure.mutableEdgeIds);
   const repairNodes = withDisplayAbsolutePositions(
@@ -254,7 +250,7 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
     closureTimer.finish('fallback', affectedEdgeCount, {
       cacheHitCount: sessionSpatialSnapshot ? 1 : 0,
     });
-    return { edges: null, affectedEdgeCount };
+    return { edges: null, affectedEdgeCount, eligibleEdgeIds: [] };
   }
   closureTimer.finish('accepted', affectedEdgeCount, {
     cacheHitCount: sessionSpatialSnapshot ? 1 : 0,
@@ -371,6 +367,7 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
     return {
       edges: lockedCandidateEdges,
       affectedEdgeCount: changedEdgeCount,
+      eligibleEdgeIds: [...transactionMutableIds].sort(),
       hardReport: report,
     };
   };
@@ -573,6 +570,7 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
       return {
         edges: candidateEdges,
         affectedEdgeCount: changedEdgeCount,
+        eligibleEdgeIds: [...transactionMutableIds].sort(),
         hardReport: reconnectReport,
       };
     }
@@ -632,6 +630,7 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
       return {
         edges: lockedExpandedCandidate,
         affectedEdgeCount: expandedChangedEdgeCount,
+        eligibleEdgeIds: [...transactionMutableIds].sort(),
         hardReport: expandedReport,
       };
     }
@@ -691,6 +690,9 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
   return {
     edges: hardReport.hardClean && candidateClearanceClean ? candidateEdges : null,
     affectedEdgeCount,
+    eligibleEdgeIds: hardReport.hardClean && candidateClearanceClean
+      ? [...transactionMutableIds].sort()
+      : [],
     ...(hardReport.hardClean && candidateClearanceClean ? { hardReport } : {}),
   };
 };

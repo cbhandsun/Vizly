@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { assertDisplayRoutingTopologyOperationResult } from './display-routing-browser-topology-matrix.mjs';
+import {
+  assertDisplayRoutingTopologyOperationGroupResult,
+  assertDisplayRoutingTopologyOperationResult,
+} from './display-routing-browser-topology-matrix.mjs';
 
 const topologyCase = Object.freeze({
   id: 'edge-add',
@@ -39,8 +42,12 @@ const assertValid = result => assertDisplayRoutingTopologyOperationResult({
 });
 
 describe('display routing browser topology matrix', () => {
-  it('accepts one hard-clean in-job topology fallback', () => {
+  it('accepts hard-clean topology operations with or without in-job fallback', () => {
     expect(assertValid(validResult())).toBeUndefined();
+    expect(assertValid(validResult({
+      response: { ...validResult().response, fallbackLevel: 'none' },
+      routing: { ...validResult().routing, fallbackLevel: 'none' },
+    }))).toBeUndefined();
   });
 
   it('rejects stale classification or non-atomic Worker delivery', () => {
@@ -54,13 +61,30 @@ describe('display routing browser topology matrix', () => {
     }))).toThrow(/one atomic Worker transaction/);
   });
 
-  it('rejects partial geometry and a topology response without full fallback', () => {
+  it('rejects partial geometry and inconsistent topology fallback reporting', () => {
     expect(() => assertValid(validResult({ renderedEdgeCount: 14 })))
       .toThrow(/hard-clean complete route/);
     expect(() => assertValid(validResult({
       response: { ...validResult().response, fallbackLevel: 'none' },
-      routing: { ...validResult().routing, fallbackLevel: 'none' },
-    }))).toThrow(/bounded in-job full fallback/);
+    }))).toThrow(/invalid fallback level/);
+    expect(() => assertValid(validResult({
+      response: { ...validResult().response, fallbackLevel: 'partial' },
+      routing: { ...validResult().routing, fallbackLevel: 'partial' },
+    }))).toThrow(/invalid fallback level/);
+  });
+
+  it('requires edge removal to avoid full fallback in the topology operation group', () => {
+    const result = (id, fallbackLevel) => ({ id, classification: 'topology', fallbackLevel });
+    expect(assertDisplayRoutingTopologyOperationGroupResult([
+      result('edge-add', 'full'),
+      result('port-policy', 'full'),
+      result('edge-remove', 'none'),
+    ])).toBeUndefined();
+    expect(() => assertDisplayRoutingTopologyOperationGroupResult([
+      result('edge-add', 'none'),
+      result('port-policy', 'none'),
+      result('edge-remove', 'full'),
+    ])).toThrow(/edge-remove operation did not remain incremental/);
   });
 
   it('allows a geometry resize to remain local', () => {

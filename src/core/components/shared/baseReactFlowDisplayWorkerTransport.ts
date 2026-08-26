@@ -21,6 +21,10 @@ type DisplayWorkerRequestHandler = (
   onBoundedCandidate?: (report: BaseDisplayBoundedCandidateReport) => void,
 ) => DisplayEdgesWorkerResponse;
 
+export const displayWorkerOperationPublishesBoundedCandidates = (
+  operation: DisplayEdgesWorkerRequest['operation'] | undefined,
+): boolean => operation !== 'incremental-route';
+
 /** Keeps the untrusted Worker message boundary outside the routing composition root. */
 export const createBaseReactFlowDisplayWorkerMessageHandler = (
   handleRequest: DisplayWorkerRequestHandler,
@@ -43,12 +47,17 @@ export const installBaseReactFlowDisplayWorkerTransport = (
     const workerStartedAt = performance.now();
     const requestId = readDisplayEdgesWorkerRequestId(event.data) ?? 'invalid-request';
     try {
-      const response = handleMessage(event.data, (boundedCandidate) => {
-        if (!boundedCandidate.hardClean) {
-          postDisplayEdgesResponse({ requestId, boundedCandidate });
-        }
-      });
       const transportRequest = parseDisplayEdgesWorkerRequest(event.data);
+      const onBoundedCandidate = displayWorkerOperationPublishesBoundedCandidates(
+        transportRequest?.operation,
+      )
+        ? (boundedCandidate: BaseDisplayBoundedCandidateReport): void => {
+          if (!boundedCandidate.hardClean) {
+            postDisplayEdgesResponse({ requestId, boundedCandidate });
+          }
+        }
+        : undefined;
+      const response = handleMessage(event.data, onBoundedCandidate);
       postTimedDisplayEdgesResponse(
         response,
         workerStartedAt,

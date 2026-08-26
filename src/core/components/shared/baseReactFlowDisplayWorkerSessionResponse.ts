@@ -39,6 +39,7 @@ export const runDisplayWorkerIncrementalRequest = ({
 }): Readonly<{
   edges: import('@xyflow/react').Edge[] | null;
   affectedEdgeCount: number;
+  eligibleEdgeIds: string[];
   hardReport?: BaseDisplayBoundedCandidateReport;
 }> => {
   const resolved = resolveDisplayWorkerIncrementalRequest(request);
@@ -49,7 +50,7 @@ export const runDisplayWorkerIncrementalRequest = ({
       onPhaseTrace,
       onBoundedCandidate,
     })
-    : { edges: null, affectedEdgeCount: 0 };
+    : { edges: null, affectedEdgeCount: 0, eligibleEdgeIds: [] };
 };
 
 export const resolveDisplayWorkerIncrementalRequest = (

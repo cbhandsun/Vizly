@@ -274,9 +274,25 @@ export const assertDisplayRoutingTopologyOperationResult = ({
   }
   if (
     operationCase.classification === 'topology'
-    && (result?.response?.fallbackLevel !== 'full' || result?.routing?.fallbackLevel !== 'full')
+    && (
+      !['none', 'full'].includes(result?.response?.fallbackLevel)
+      || result?.routing?.fallbackLevel !== result?.response?.fallbackLevel
+    )
   ) {
-    throw new Error(`Topology operation did not use the bounded in-job full fallback: ${diagnostics}`);
+    throw new Error(`Topology operation reported an invalid fallback level: ${diagnostics}`);
+  }
+};
+
+export const assertDisplayRoutingTopologyOperationGroupResult = operationResults => {
+  const topologyResults = operationResults.filter(result => result?.classification === 'topology');
+  if (topologyResults.length === 0) return;
+  const diagnostics = JSON.stringify({ operationResults }, null, 2);
+  if (topologyResults.length !== 3) {
+    throw new Error(`Topology operation group was incomplete: ${diagnostics}`);
+  }
+  const edgeRemoveResult = topologyResults.find(result => result?.id === 'edge-remove');
+  if (edgeRemoveResult?.fallbackLevel !== 'none') {
+    throw new Error(`Topology edge-remove operation did not remain incremental: ${diagnostics}`);
   }
 };
 
@@ -316,6 +332,7 @@ const verifyOperationGroup = ({
       ...(await auditFinalSvg(session, result, operationCase.id)),
     });
   }
+  assertDisplayRoutingTopologyOperationGroupResult(operationResults);
   return operationResults;
 });
 
