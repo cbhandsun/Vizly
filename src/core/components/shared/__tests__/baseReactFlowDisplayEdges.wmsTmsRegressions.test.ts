@@ -309,6 +309,13 @@ describe('baseReactFlowDisplayEdges WMS and TMS regressions', () => {
     expect(edgeNodeObstacleHits(result, absoluteNodes), diagnostics).toEqual([]);
     expect(displayEdgesHaveNodeAttachedTerminals(result, absoluteNodes), diagnostics).toBe(true);
     expect(displayEdgesHaveNodeAnchoredTerminals(result, absoluteNodes), diagnostics).toBe(true);
+    expect(
+      response.phaseTrace?.find(trace => trace.phase === 'final-evaluation-context'),
+      diagnostics,
+    ).toMatchObject({
+      candidateCount: result.length * 3,
+      resolution: 'accepted',
+    });
 
     const replay = computeBaseReactFlowDisplayEdgesWorkerResponse({
       operation: 'validate-or-route',

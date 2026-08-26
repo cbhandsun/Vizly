@@ -1,7 +1,12 @@
 import type { Edge } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
-import { shouldMaterializeDetachedMicroAlternative } from '../baseReactFlowDisplayFullRouteQualityPhase';
+import {
+  shouldMaterializeDetachedMicroAlternative,
+  shouldMaterializePostEndpointLocalAlternative,
+  shouldMaterializeQualityMicroAlternative,
+} from '../baseReactFlowDisplayFullRouteQualityPhase';
+import { calculateEdgePathQualityScore } from '../../../strategies/shared/edgeStrictCrossingGuard';
 import {
   selectDisplayQualityFinalOverlapOptions,
   selectDisplayQualityInitialDetachedOverlapOptions,
@@ -68,6 +73,36 @@ describe('baseReactFlowDisplayFullRouteQualityPhase', () => {
   it('does not duplicate the micro repair family after endpoint-first progress', () => {
     expect(shouldMaterializeDetachedMicroAlternative(false)).toBe(false);
     expect(shouldMaterializeDetachedMicroAlternative(true)).toBe(true);
+  });
+
+  it('materializes endpoint micro candidates only for an active defect family', () => {
+    const cleanQuality = calculateEdgePathQualityScore([{
+      id: 'clean',
+      source: 'source',
+      target: 'target',
+      data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
+    }]);
+
+    expect(shouldMaterializeQualityMicroAlternative(false, cleanQuality)).toBe(false);
+    expect(shouldMaterializeQualityMicroAlternative(false, {
+      ...cleanQuality,
+      hairpins: 1,
+    })).toBe(true);
+    expect(shouldMaterializeQualityMicroAlternative(false, {
+      ...cleanQuality,
+      hairpins: 1,
+      reverseOverlap: 1,
+    })).toBe(false);
+    expect(shouldMaterializeQualityMicroAlternative(true, {
+      ...cleanQuality,
+      hairpins: 1,
+    })).toBe(false);
+    expect(shouldMaterializePostEndpointLocalAlternative(false, cleanQuality)).toBe(true);
+    expect(shouldMaterializePostEndpointLocalAlternative(false, {
+      ...cleanQuality,
+      reverseOverlap: 1,
+    })).toBe(false);
+    expect(shouldMaterializePostEndpointLocalAlternative(true, cleanQuality)).toBe(false);
   });
 
   it('identifies only geometry-changing residual derivatives', () => {

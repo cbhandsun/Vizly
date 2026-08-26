@@ -292,7 +292,7 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       'candidate-validation',
       'seed',
       'seed-initial-gate',
-      'finalizer',
+      'final-evaluation-context',
       'final-clearance',
       'final-hard-safety',
       'final-safety-hard-gate',
@@ -301,8 +301,21 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       'final-safety-passage-order',
       'final-safety-closure',
       'final-commercial-safety-closure',
+      'final-exact-hard-report',
+      'finalizer',
       'session-commit',
     ]);
+    const finalizerTrace = workerResponse.phaseTrace?.find(trace => trace.phase === 'finalizer');
+    expect(finalizerTrace).toMatchObject({
+      resolution: 'accepted',
+      exclusiveDurationMs: expect.any(Number),
+    });
+    expect(finalizerTrace?.durationMs ?? 0).toBeGreaterThanOrEqual(
+      finalizerTrace?.exclusiveDurationMs ?? 0,
+    );
+    expect(workerResponse.phaseTrace?.find(
+      trace => trace.phase === 'final-evaluation-context',
+    )).toMatchObject({ resolution: 'accepted' });
   });
 
   it('returns one final response when a full route needs measured repair', () => {

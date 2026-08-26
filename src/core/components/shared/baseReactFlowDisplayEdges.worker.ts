@@ -72,7 +72,9 @@ import {
 import { finalizeAuditedIncrementalDisplayResponse } from './baseReactFlowDisplayIncrementalFinalization';
 import { shouldEscalateInteractiveDisplayRoute } from './baseReactFlowDisplayWorkerFallback';
 import {
-  createDisplayWorkerFinalEvaluation,
+  createTracedDisplayWorkerFinalEvaluation,
+  finalizeBoundedDisplayWorkerRepairResponse,
+  finishDisplayWorkerFinalization,
   type DisplayWorkerFinalizationOptions,
 } from './baseReactFlowDisplayWorkerFinalEvaluation';
 
@@ -82,16 +84,17 @@ const finalizeContainerClearanceResponse = (
   options: DisplayWorkerFinalizationOptions,
 ): DisplayEdgesWorkerResponse => {
   if (!response.edges) return response;
+  const finalEvaluationScope = createTracedDisplayWorkerFinalEvaluation({
+    nodes,
+    responseEdges: response.edges,
+    options,
+  });
   const {
     repairNodes,
     evaluation: finalEvaluation,
     hardQualityIsClean: finalHardQualityIsClean,
-  } = createDisplayWorkerFinalEvaluation({
-    nodes,
-    responseEdges: response.edges,
-    initialHardReport: options.initialHardReport,
-    initialHardReportEdges: options.initialHardReportEdges,
-  });
+    withExactHardReport,
+  } = finalEvaluationScope;
   const clearanceTimer = startDisplayRoutingPhaseTrace({
     phase: 'final-clearance',
     candidateCount: response.edges.length,
@@ -148,7 +151,7 @@ const finalizeContainerClearanceResponse = (
         safeClearanceEdges === response.edges
         || doBaseReactFlowDisplayRoutesMatchExactly(response.edges, safeClearanceEdges)
       )
-    ) return withExactDisplayHardReport(response, repairNodes);
+    ) return withExactHardReport(response);
   }
   const auditedIncrementalResponse = finalizeAuditedIncrementalDisplayResponse({
     response,
@@ -271,6 +274,11 @@ const finalizeContainerClearanceResponse = (
   // contract once more on the exact route that will be rendered, while using
   // that route as the true-trunk baseline so legitimate shared stems remain
   // atomic. Nothing may rewrite geometry after this point except path locking.
+  const lateClearanceTimer = startDisplayRoutingPhaseTrace({
+    phase: 'final-clearance',
+    candidateCount: commercialEdges.length,
+    onTrace: options.onPhaseTrace,
+  });
   const lateMinimumClearanceCandidate = requiresLateMinimumClearanceClosure
     ? repairMinimumBusinessNodeClearance(
       commercialEdges,
@@ -281,13 +289,10 @@ const finalizeContainerClearanceResponse = (
   const lateMinimumClearanceEdges = finalHardQualityIsClean(lateMinimumClearanceCandidate)
     ? lateMinimumClearanceCandidate
     : commercialEdges;
-  if (lateMinimumClearanceEdges !== commercialEdges) {
-    startDisplayRoutingPhaseTrace({
-      phase: 'final-clearance',
-      candidateCount: commercialEdges.length,
-      onTrace: options.onPhaseTrace,
-    }).finish('accepted', lateMinimumClearanceEdges.length);
-  }
+  lateClearanceTimer.finish(
+    lateMinimumClearanceEdges === commercialEdges ? 'skip' : 'accepted',
+    lateMinimumClearanceEdges === commercialEdges ? 0 : lateMinimumClearanceEdges.length,
+  );
   const canReuseCommercialClosure = canReuseBaseReactFlowFinalCommercialSafety({
     commercialClosureReady: commercialClosureReady
       && lateMinimumClearanceEdges === commercialEdges,
@@ -313,9 +318,13 @@ const finalizeContainerClearanceResponse = (
     repairNodes,
     response,
   });
+  const finalizedRoutesChanged = Boolean(
+    finalizedResponse.edges
+    && !doBaseReactFlowDisplayRoutesMatchExactly(response.edges, finalizedResponse.edges),
+  );
   if (
-    (options.commercialStabilizationPass ?? 0) < 2
-    && finalizedResponse !== response
+    (options.commercialStabilizationPass ?? 0) < (options.isLargeGraph ? 2 : 1)
+    && finalizedRoutesChanged
     && (
       response.routeResolution === 'full-route'
       || response.routeResolution === 'full-route-repaired'
@@ -326,13 +335,11 @@ const finalizeContainerClearanceResponse = (
     const stabilizedResponse = finalizeContainerClearanceResponse(finalizedResponse, nodes, {
       ...options,
       commercialStabilizationPass: (options.commercialStabilizationPass ?? 0) + 1,
+      finalEvaluation: finalEvaluationScope,
       preferredEdges: finalizedResponse.edges,
     });
     const stabilizedEdges = stabilizedResponse.edges;
-    const exactFinalizedResponse = withExactDisplayHardReport(
-      finalizedResponse,
-      repairNodes,
-    );
+    const exactFinalizedResponse = withExactHardReport(finalizedResponse);
     const finalizedCommercialClearanceIsClean = finalizedResponse.edges
       ? displayBusinessNodeCommercialClearanceIsClean(finalizedResponse.edges, repairNodes)
       : false;
@@ -354,10 +361,7 @@ const finalizeContainerClearanceResponse = (
       ? stabilizedResponse
       : exactFinalizedResponse;
   }
-  return withExactDisplayHardReport(
-    finalizedResponse,
-    repairNodes,
-  );
+  return withExactHardReport(finalizedResponse);
 };
 
 export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
@@ -393,22 +397,10 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
       phaseTrace,
     };
     if (request.repairMode === 'bounded') {
-      const repairNodes = withDisplayAbsolutePositions(
+      return completeResponse(finalizeBoundedDisplayWorkerRepairResponse(
+        repairResponse,
         request.nodes,
-        new Map(request.nodes.map(node => [node.id, node] as const)),
-      );
-      const clearanceEdges = repairMinimumBusinessNodeClearance(
-        repaired.edges,
-        repairNodes,
-        undefined,
-        false,
-      );
-      const safeEdges = baseReactFlowDisplayHardQualityIsClean(clearanceEdges, repairNodes)
-        ? clearanceEdges
-        : repaired.edges;
-      return completeResponse(
-        withExactDisplayHardReport({ ...repairResponse, edges: safeEdges }, repairNodes),
-      );
+      ));
     }
     return completeResponse(finalizeContainerClearanceResponse(repairResponse, request.nodes, {
       isLargeGraph: request.nodes.length > 36 || request.edges.length > 36,
@@ -447,10 +439,11 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
         onPhaseTrace: recordPhaseTrace,
         preferredEdges: request.edges,
       });
-      incrementalFinalizerTimer.finish(
-        incrementalResponse.hardClean === true ? 'accepted' : 'fallback',
-      );
-      return completeResponse(incrementalResponse);
+      return completeResponse(finishDisplayWorkerFinalization(
+        incrementalFinalizerTimer,
+        incrementalResponse,
+        0,
+      ));
     }
   }
   const incrementalFallbackMetadata = createDisplayRoutingFallbackMetadata(
@@ -630,7 +623,6 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
     false,
     false,
   );
-  finalizerTimer.finish(finalized.report.hardClean ? 'accepted' : 'fallback', finalized.edges.length);
   if (!finalized.report.hardClean) {
     const repairTimer = startDisplayRoutingPhaseTrace({
       phase: 'measured-repair',
@@ -651,7 +643,7 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
       false,
     );
     repairTimer.finish(repaired.report.hardClean ? 'accepted' : 'rejected', repaired.edges.length);
-    return completeResponse(finalizeContainerClearanceResponse({
+    const repairedResponse = finalizeContainerClearanceResponse({
       requestId: request.requestId,
       edges: repaired.edges,
       hardClean: repaired.report.hardClean,
@@ -664,9 +656,13 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
       isLargeGraph: request.isLargeGraph,
       onPhaseTrace: recordPhaseTrace,
       preferredEdges: request.edges,
-    }));
+    });
+    return completeResponse(finishDisplayWorkerFinalization(
+      finalizerTimer,
+      repairedResponse,
+    ));
   }
-  return completeResponse(finalizeContainerClearanceResponse({
+  const finalizedResponse = finalizeContainerClearanceResponse({
     requestId: request.requestId,
     edges: finalized.edges,
     hardClean: finalized.report.hardClean,
@@ -679,7 +675,11 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
     isLargeGraph: request.isLargeGraph,
     onPhaseTrace: recordPhaseTrace,
     preferredEdges: request.edges,
-  }));
+  });
+  return completeResponse(finishDisplayWorkerFinalization(
+    finalizerTimer,
+    finalizedResponse,
+  ));
 };
 
 export const handleBaseReactFlowDisplayWorkerMessage = (

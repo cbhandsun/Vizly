@@ -2,7 +2,6 @@ import type { Edge } from '@xyflow/react';
 
 import {
   createDisplayMicroCleanupDiagnostics,
-  repairDisplayMicroArtifacts,
 } from '../../strategies/shared/edgeDisplayMicroCleanup';
 import { repairEndpointLaneCrossings } from '../../strategies/shared/edgeEndpointLaneNudgeRepair';
 import { repairEndpointOrthogonalPaths } from '../../strategies/shared/edgeEndpointPathRepair';
@@ -56,12 +55,15 @@ import { createDisplayQualityDoglegRepairSession } from './baseReactFlowDisplayQ
 import { createDisplayQualityCrossingCandidates } from './baseReactFlowDisplayQualityCrossingCandidates';
 import { repairDisplayQualityTopology } from './baseReactFlowDisplayQualityTopology';
 import { repairBaseReactFlowQualityStructuralCrossings } from './baseReactFlowDisplayQualityStructuralCrossing';
+import { createDisplayQualityPostEndpointAlternatives } from './baseReactFlowDisplayQualityPostEndpointAlternatives';
 
 export {
   boundedQualityPolishNeedsMicroRepair,
   canSkipLargeDetachedOverlapRepair,
   separateLargeDetachedParallelOverlapsIfNeeded,
   shouldMaterializeDetachedMicroAlternative,
+  shouldMaterializePostEndpointLocalAlternative,
+  shouldMaterializeQualityMicroAlternative,
   shouldUseBoundedQualityResidualRepair,
 } from './baseReactFlowDisplayQualityPolishSupport';
 
@@ -489,46 +491,24 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
       ? 0
       : finalEndpointPolishCandidate.length,
   );
-  const microPolishTimer = recordPolishPhaseTrace
-    ? startDisplayRoutingPhaseTrace({
-        phase: 'quality-polish-micro',
-        candidateCount: finalEndpointPolishCandidate.length,
-        onTrace: recordPolishPhaseTrace,
-      })
-    : null;
   // Bounded polish already retains the detached-micro candidate above. Keep
   // the endpoint candidate separately and avoid repeating the same global
   // micro search after endpoint normalization; candidate selection can still
-  // choose either repair family independently.
-  const microPolishDiagnostics = createDisplayMicroCleanupDiagnostics();
-  const finalMicroPolishCandidate = useBoundedLargeRepair
-    ? finalEndpointPolishCandidate
-    : repairDisplayMicroArtifacts(
-      finalEndpointPolishCandidate,
-      undefined,
-      microPolishDiagnostics,
-      { allowCompoundRepairs: false },
-    );
-  const finalLocalAfterDetachedCandidate = useBoundedLargeRepair
-    ? finalEndpointPolishCandidate
-    : repairDoglegs(finalEndpointPolishCandidate);
-  const finalEndpointAfterLocalCandidate = useBoundedLargeRepair
-    ? finalLocalAfterDetachedCandidate
-    : repairEndpointOrthogonalPaths(finalLocalAfterDetachedCandidate, repairNodes);
-  microPolishTimer?.finish(
-    finalMicroPolishCandidate === finalEndpointPolishCandidate ? 'skip' : 'accepted',
-    finalMicroPolishCandidate === finalEndpointPolishCandidate
-      ? 0
-      : finalMicroPolishCandidate.length,
-    {
-      candidateCount: microPolishDiagnostics.generatedCandidateCount,
-      evaluationCount: microPolishDiagnostics.evaluatedCandidateCount,
-      cacheHitCount: microPolishDiagnostics.cacheHitCount
-        + microPolishDiagnostics.pairCacheHitCount,
-      scannedEdgePairCount: microPolishDiagnostics.scannedEdgePairCount,
-      scannedSegmentCount: microPolishDiagnostics.scannedSegmentCount,
-    },
-  );
+  // choose either repair family independently. Hard overlap is closed by the
+  // immediately following residual phase before later micro safety closure,
+  // so pair-gated micro candidates are not materialized against a baseline
+  // that cannot accept them atomically.
+  const {
+    microPolishCandidate: finalMicroPolishCandidate,
+    localCandidate: finalLocalAfterDetachedCandidate,
+    endpointAfterLocalCandidate: finalEndpointAfterLocalCandidate,
+  } = createDisplayQualityPostEndpointAlternatives({
+    endpointPolishCandidate: finalEndpointPolishCandidate,
+    repairNodes,
+    repairDoglegs,
+    useBoundedLargeRepair,
+    onPhaseTrace: recordPolishPhaseTrace,
+  });
   const detachedMicroDiagnostics = createDisplayMicroCleanupDiagnostics();
   const detachedMicroPolishTimer = recordPolishPhaseTrace
     ? startDisplayRoutingPhaseTrace({

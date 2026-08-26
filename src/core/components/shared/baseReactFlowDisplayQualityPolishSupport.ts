@@ -30,6 +30,18 @@ export const shouldMaterializeDetachedMicroAlternative = (
   useBoundedLargeRepair: boolean,
 ): boolean => useBoundedLargeRepair;
 
+export const shouldMaterializeQualityMicroAlternative = (
+  useBoundedLargeRepair: boolean,
+  quality: EdgePathQualityScore,
+): boolean => !useBoundedLargeRepair
+  && !hasHardDisplayOverlapRisk(quality)
+  && boundedQualityPolishNeedsMicroRepair(quality);
+
+export const shouldMaterializePostEndpointLocalAlternative = (
+  useBoundedLargeRepair: boolean,
+  quality: EdgePathQualityScore,
+): boolean => !useBoundedLargeRepair && !hasHardDisplayOverlapRisk(quality);
+
 export const createDetachedRepairDiagnostics = (): QualityEvaluationBudgetDiagnostics => ({
   evaluationCount: 0,
   cacheHitCount: 0,
