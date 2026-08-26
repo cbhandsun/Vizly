@@ -25,6 +25,12 @@ const OPERATION_CASES = Object.freeze([
     maximumMutableEdgeCount: 8,
   }),
   Object.freeze({
+    id: 'node-add',
+    classification: 'topology',
+    reason: 'node-add',
+    edgeDelta: 0,
+  }),
+  Object.freeze({
     id: 'node-remove',
     classification: 'topology',
     reason: 'node-remove',
@@ -215,39 +221,6 @@ const applyNodeRemove = session => session.evaluate(`(() => {
   return Number.isFinite(before) && before > 0;
 })()`);
 
-const prepareNodeRemoveBaseline = async session => {
-  const before = await session.evaluate(`(() => {
-    const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
-    return {
-      workerStartCount: Number.isFinite(routing.workerStartCount)
-        ? routing.workerStartCount
-        : 0,
-      requestId: routing.requestId,
-    };
-  })()`);
-  if (!await applyNodeAdd(session)) return false;
-  const deadline = Date.now() + WAIT_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    const ready = await session.evaluate(`(() => {
-      const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
-      const responses = window.__vizlyRoutingResponses || [];
-      const response = [...responses].reverse()
-        .find(item => item?.requestId === routing.requestId);
-      const nodeExists = window.reactFlowInstance?.getNodes?.()
-        .some(node => node.id === window.__vizlyTopologyAuditNodeId);
-      return routing.stage === 'final-applied'
-        && routing.requestId !== ${JSON.stringify(before.requestId)}
-        && routing.workerStartCount > ${JSON.stringify(before.workerStartCount)}
-        && response?.hardClean === true
-        && response?.hardReport?.hardClean === true
-        && nodeExists === true;
-    })()`);
-    if (ready) return true;
-    await delay(100);
-  }
-  return false;
-};
-
 const applyEdgeAdd = async session => {
   await session.evaluate(`(() => {
     const instance = window.reactFlowInstance;
@@ -359,6 +332,7 @@ const applyEdgeRemove = session => session.evaluate(`(() => {
 const APPLY_OPERATION = Object.freeze({
   'node-resize': applyNodeResize,
   'multi-node-move': applyMultiNodeMove,
+  'node-add': applyNodeAdd,
   'node-remove': applyNodeRemove,
   'edge-add': applyEdgeAdd,
   'port-policy': applyPortPolicyChange,
@@ -435,10 +409,10 @@ export const assertDisplayRoutingTopologyOperationGroupResult = operationResults
   const topologyResults = operationResults.filter(result => result?.classification === 'topology');
   if (topologyResults.length === 0) return;
   const diagnostics = JSON.stringify({ operationResults }, null, 2);
-  if (topologyResults.length !== 4) {
+  if (topologyResults.length !== 5) {
     throw new Error(`Topology operation group was incomplete: ${diagnostics}`);
   }
-  for (const operationId of ['node-remove', 'edge-add', 'edge-remove']) {
+  for (const operationId of ['node-add', 'node-remove', 'edge-add', 'edge-remove']) {
     const result = topologyResults.find(item => item?.id === operationId);
     if (result?.fallbackLevel !== 'none') {
       throw new Error(`Topology ${operationId} operation did not remain incremental: ${diagnostics}`);
@@ -462,10 +436,6 @@ const verifyOperationGroup = ({
   const baselineEdgeCount = initial.response.edges.length;
   const operationResults = [];
   for (const operationCase of operationCases) {
-    if (
-      operationCase.id === 'node-remove'
-      && !await prepareNodeRemoveBaseline(session)
-    ) throw new Error('Could not prepare the browser node-remove baseline');
     const counterBaseline = await prepareOperationCapture(session);
     const applied = await APPLY_OPERATION[operationCase.id](session);
     if (!applied) throw new Error(`Could not apply browser topology operation: ${operationCase.id}`);

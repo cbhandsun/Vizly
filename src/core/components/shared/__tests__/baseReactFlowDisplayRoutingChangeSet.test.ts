@@ -142,7 +142,7 @@ describe('baseReactFlow display routing change set', () => {
     });
   });
 
-  it('keeps an isolated node removal incremental without enabling empty node additions', () => {
+  it('keeps isolated node additions and removals incremental without mutable edges', () => {
     const isolatedNode: Node = {
       id: 'isolated',
       position: { x: 600, y: 200 },
@@ -181,7 +181,7 @@ describe('baseReactFlow display routing change set', () => {
     expect(removalClosure.mutableEdgeIds).toEqual([]);
     expect(hasBaseReactFlowDisplayIncrementalWork(removal, removalClosure)).toBe(true);
     expect(additionClosure.mutableEdgeIds).toEqual([]);
-    expect(hasBaseReactFlowDisplayIncrementalWork(addition, additionClosure)).toBe(false);
+    expect(hasBaseReactFlowDisplayIncrementalWork(addition, additionClosure)).toBe(true);
   });
 
   it('promotes descendant incident edges when a parent container moves', () => {

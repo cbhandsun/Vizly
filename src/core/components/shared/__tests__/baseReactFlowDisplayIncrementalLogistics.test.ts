@@ -531,7 +531,7 @@ describe('Logistics incremental display routing', () => {
     ), diagnostics).toBe(true);
   }, 120_000);
 
-  it('removes an isolated node without rerouting any Logistics edge', async () => {
+  it('adds and removes an isolated node without rerouting any Logistics edge', async () => {
     const entry = Object.entries(GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_LOADERS)
       .find(([, descriptor]) => descriptor.presetId === 'logistics-architecture-v1');
     if (!entry) throw new Error('expected the Logistics precompiled loader');
@@ -555,7 +555,7 @@ describe('Logistics incremental display routing', () => {
     if (!baselineEdges || !baselinePatches || !baselineOutputRouteSignature) {
       throw new Error('expected a valid Logistics incremental baseline');
     }
-    const nextNodes = withAbsoluteNodePositions(browserLogisticsNodes);
+    const sourceNodes = withAbsoluteNodePositions(browserLogisticsNodes);
     const isolatedNode = {
       id: 'routing-audit-isolated',
       type: 'custom',
@@ -566,85 +566,150 @@ describe('Logistics incremental display routing', () => {
       measured: { width: 160, height: 80 },
       data: {},
     };
-    const baselineNodes = [...nextNodes, isolatedNode];
-    const baselineIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
-      nodes: baselineNodes,
+    const addedNodes = [...sourceNodes, isolatedNode];
+    const sourceIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
+      nodes: sourceNodes,
       edges: sourceEdges,
       enableSmartEdges: true,
       smartEdgePadding: 20,
       isLargeGraph: false,
     });
-    const nextIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
-      nodes: nextNodes,
+    const addedIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
+      nodes: addedNodes,
       edges: sourceEdges,
       enableSmartEdges: true,
       smartEdgePadding: 20,
       isLargeGraph: false,
     });
-    const changeSet = createBaseReactFlowRoutingChangeSet({
-      previousNodes: baselineNodes,
+    const additionChangeSet = createBaseReactFlowRoutingChangeSet({
+      previousNodes: sourceNodes,
       previousEdges: sourceEdges,
-      nextNodes,
+      nextNodes: addedNodes,
       nextEdges: sourceEdges,
-      reasonHint: 'node-remove',
+      reasonHint: 'node-add',
     });
-    const affectedClosure = createBaseReactFlowRoutingAffectedClosure({
-      changeSet,
-      previousNodes: baselineNodes,
-      nextNodes,
+    const additionClosure = createBaseReactFlowRoutingAffectedClosure({
+      changeSet: additionChangeSet,
+      previousNodes: sourceNodes,
+      nextNodes: addedNodes,
       baselineEdges,
       nextEdges: sourceEdges,
     });
-    const response = computeBaseReactFlowDisplayEdgesWorkerResponse({
+    const additionResponse = computeBaseReactFlowDisplayEdgesWorkerResponse({
       operation: 'incremental-route',
-      requestId: 'logistics-node-remove-incremental',
+      requestId: 'logistics-node-add-incremental',
       edges: sourceEdges,
-      nodes: nextNodes,
+      nodes: addedNodes,
       enableSmartEdges: true,
       smartEdgePadding: 20,
       isLargeGraph: false,
       displayEdgeEpoch: computeBaseReactFlowDisplayEdgeEpoch({
-        nodes: nextNodes,
+        nodes: addedNodes,
         edges: sourceEdges,
       }),
       qualityMode: 'full',
-      baselineInputSignature: baselineIdentity.cacheSignature,
-      baselineInputGeometryDigest: baselineIdentity.geometryDigest,
-      baselineNodes,
+      baselineInputSignature: sourceIdentity.cacheSignature,
+      baselineInputGeometryDigest: sourceIdentity.geometryDigest,
+      baselineNodes: sourceNodes,
       baselineSourceEdges: sourceEdges,
       baselinePatches,
       baselineOutputRouteSignature,
-      nextInputSignature: nextIdentity.cacheSignature,
-      nextInputGeometryDigest: nextIdentity.geometryDigest,
-      changeSet,
-      mutableEdgeIds: affectedClosure.mutableEdgeIds,
-      contextEdgeIds: affectedClosure.contextEdgeIds,
+      nextInputSignature: addedIdentity.cacheSignature,
+      nextInputGeometryDigest: addedIdentity.geometryDigest,
+      changeSet: additionChangeSet,
+      mutableEdgeIds: additionClosure.mutableEdgeIds,
+      contextEdgeIds: additionClosure.contextEdgeIds,
+    });
+    const addedEdges = additionResponse.edges ?? [];
+    const addedPatches = createBaseReactFlowDisplayEdgePatches(sourceEdges, addedEdges);
+    const addedOutputRouteSignature = computeBaseReactFlowDisplayOutputRouteSignature(addedEdges);
+    if (!addedPatches || !addedOutputRouteSignature) {
+      throw new Error('expected a valid isolated-node addition baseline');
+    }
+    const removalChangeSet = createBaseReactFlowRoutingChangeSet({
+      previousNodes: addedNodes,
+      previousEdges: sourceEdges,
+      nextNodes: sourceNodes,
+      nextEdges: sourceEdges,
+      reasonHint: 'node-remove',
+    });
+    const removalClosure = createBaseReactFlowRoutingAffectedClosure({
+      changeSet: removalChangeSet,
+      previousNodes: addedNodes,
+      nextNodes: sourceNodes,
+      baselineEdges: addedEdges,
+      nextEdges: sourceEdges,
+    });
+    const removalResponse = computeBaseReactFlowDisplayEdgesWorkerResponse({
+      operation: 'incremental-route',
+      requestId: 'logistics-node-remove-incremental',
+      edges: sourceEdges,
+      nodes: sourceNodes,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+      displayEdgeEpoch: computeBaseReactFlowDisplayEdgeEpoch({
+        nodes: sourceNodes,
+        edges: sourceEdges,
+      }),
+      qualityMode: 'full',
+      baselineInputSignature: addedIdentity.cacheSignature,
+      baselineInputGeometryDigest: addedIdentity.geometryDigest,
+      baselineNodes: addedNodes,
+      baselineSourceEdges: sourceEdges,
+      baselinePatches: addedPatches,
+      baselineOutputRouteSignature: addedOutputRouteSignature,
+      nextInputSignature: sourceIdentity.cacheSignature,
+      nextInputGeometryDigest: sourceIdentity.geometryDigest,
+      changeSet: removalChangeSet,
+      mutableEdgeIds: removalClosure.mutableEdgeIds,
+      contextEdgeIds: removalClosure.contextEdgeIds,
     });
     const diagnostics = JSON.stringify({
-      changeSet,
-      affectedClosure,
-      routeResolution: response.routeResolution,
-      fallbackLevel: response.fallbackLevel,
-      hardClean: response.hardClean,
-      phaseTrace: response.phaseTrace,
+      additionChangeSet,
+      additionClosure,
+      additionResponse: {
+        routeResolution: additionResponse.routeResolution,
+        fallbackLevel: additionResponse.fallbackLevel,
+        hardClean: additionResponse.hardClean,
+      },
+      removalChangeSet,
+      removalClosure,
+      removalResponse: {
+        routeResolution: removalResponse.routeResolution,
+        fallbackLevel: removalResponse.fallbackLevel,
+        hardClean: removalResponse.hardClean,
+      },
     }, null, 2);
 
-    expect(changeSet, diagnostics).toMatchObject({
+    expect(additionChangeSet, diagnostics).toMatchObject({
+      classification: 'topology',
+      reason: 'node-add',
+      changedNodeIds: ['routing-audit-isolated'],
+      changedEdgeIds: [],
+    });
+    expect(removalChangeSet, diagnostics).toMatchObject({
       classification: 'topology',
       reason: 'node-remove',
       changedNodeIds: ['routing-audit-isolated'],
       changedEdgeIds: [],
     });
-    expect(response, diagnostics).toMatchObject({
-      routeResolution: 'incremental-route',
-      fallbackLevel: 'none',
-      affectedEdgeCount: 0,
-      hardClean: true,
-    });
-    expect(response.edges, diagnostics).toHaveLength(sourceEdges.length);
+    for (const response of [additionResponse, removalResponse]) {
+      expect(response, diagnostics).toMatchObject({
+        routeResolution: 'incremental-route',
+        fallbackLevel: 'none',
+        affectedEdgeCount: 0,
+        hardClean: true,
+      });
+      expect(response.edges, diagnostics).toHaveLength(sourceEdges.length);
+    }
     expect(doBaseReactFlowDisplayRoutesMatchExactly(
       baselineEdges,
-      response.edges ?? [],
+      addedEdges,
+    ), diagnostics).toBe(true);
+    expect(doBaseReactFlowDisplayRoutesMatchExactly(
+      baselineEdges,
+      removalResponse.edges ?? [],
     ), diagnostics).toBe(true);
   }, 120_000);
 });

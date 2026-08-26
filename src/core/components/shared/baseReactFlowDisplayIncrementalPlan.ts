@@ -25,7 +25,7 @@ export const hasBaseReactFlowDisplayIncrementalWork = (
   affectedClosure.mutableEdgeIds.length > 0
   || (
     changeSet.classification === 'topology'
-    && changeSet.reason === 'node-remove'
+    && (changeSet.reason === 'node-add' || changeSet.reason === 'node-remove')
     && changeSet.changedNodeIds.length > 0
     && changeSet.changedEdgeIds.length === 0
   )

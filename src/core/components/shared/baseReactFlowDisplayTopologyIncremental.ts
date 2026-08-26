@@ -30,6 +30,7 @@ export const MAX_BASE_REACT_FLOW_TOPOLOGY_INCREMENTAL_CHANGES = 8;
 export type BaseReactFlowTopologyIncrementalKind =
   | 'edge-add'
   | 'edge-remove'
+  | 'node-add'
   | 'node-remove'
   | 'port-policy';
 
@@ -202,6 +203,15 @@ const resolveTopologyKind = ({
     && additions.length === 0
     && removals.length === 0
   ) return 'port-policy';
+  if (
+    reason === 'node-add'
+    && nodeAdditions.length > 0
+    && nodeRemovals.length === 0
+    && changedExistingNodes.length === 0
+    && additions.length === 0
+    && removals.length === 0
+    && changedExisting.length === 0
+  ) return 'node-add';
   if (
     reason === 'node-remove'
     && nodeRemovals.length > 0
@@ -388,7 +398,11 @@ export const createBaseReactFlowTopologyIncrementalCandidate = ({
   displayEdgeEpoch: number;
 }): BaseReactFlowTopologyIncrementalCandidate | null => {
   if (projection.changedPresentEdgeIds.length === 0) {
-    return projection.kind === 'edge-remove' || projection.kind === 'node-remove'
+    return (
+      projection.kind === 'edge-remove'
+      || projection.kind === 'node-add'
+      || projection.kind === 'node-remove'
+    )
       ? { edges: projection.edges, eligibleEdgeIds: [] }
       : null;
   }

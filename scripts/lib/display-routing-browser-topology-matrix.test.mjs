@@ -76,18 +76,21 @@ describe('display routing browser topology matrix', () => {
   it('requires safe removal and edge-add operations to avoid full fallback', () => {
     const result = (id, fallbackLevel) => ({ id, classification: 'topology', fallbackLevel });
     expect(assertDisplayRoutingTopologyOperationGroupResult([
+      result('node-add', 'none'),
       result('node-remove', 'none'),
       result('edge-add', 'none'),
       result('port-policy', 'full'),
       result('edge-remove', 'none'),
     ])).toBeUndefined();
     expect(() => assertDisplayRoutingTopologyOperationGroupResult([
+      result('node-add', 'none'),
       result('node-remove', 'none'),
       result('edge-add', 'none'),
       result('port-policy', 'none'),
       result('edge-remove', 'full'),
     ])).toThrow(/edge-remove operation did not remain incremental/);
     expect(() => assertDisplayRoutingTopologyOperationGroupResult([
+      result('node-add', 'none'),
       result('node-remove', 'full'),
       result('edge-add', 'none'),
       result('port-policy', 'full'),

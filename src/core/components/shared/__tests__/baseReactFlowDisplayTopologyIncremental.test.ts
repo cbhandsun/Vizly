@@ -190,6 +190,54 @@ describe('base React Flow topology incremental projection', () => {
     baselineEdges.forEach((edge, index) => expect(candidate?.edges[index]).toBe(edge));
   });
 
+  it('validates an isolated node addition without rerouting frozen edges', () => {
+    const isolated: Node = {
+      id: 'isolated',
+      position: { x: 800, y: 800 },
+      width: 120,
+      height: 80,
+      data: {},
+    };
+    const nextNodes = [...nodes, isolated];
+    const changeSet = createBaseReactFlowRoutingChangeSet({
+      previousNodes: nodes,
+      previousEdges: baselineSourceEdges,
+      nextNodes,
+      nextEdges: baselineSourceEdges,
+    });
+    const result = createBaseReactFlowTopologyIncrementalProjection({
+      baselineNodes: nodes,
+      baselineSourceEdges,
+      baselineEdges,
+      baselinePatches,
+      nextNodes,
+      nextEdges: baselineSourceEdges,
+      changeSet,
+    });
+    const candidate = result ? createBaseReactFlowTopologyIncrementalCandidate({
+      projection: result,
+      nodes: nextNodes,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      displayEdgeEpoch: 1,
+    }) : null;
+
+    expect(result).toMatchObject({
+      kind: 'node-add',
+      changedPresentEdgeIds: [],
+      removedEdgeIds: [],
+    });
+    expect(candidate?.eligibleEdgeIds).toEqual([]);
+    baselineEdges.forEach((edge, index) => expect(candidate?.edges[index]).toBe(edge));
+    expect(project({
+      nextNodes,
+      nextEdges: [
+        ...baselineSourceEdges,
+        { id: 'isolated-edge', source: 'isolated', target: 'alpha' },
+      ],
+    })).toBeNull();
+  });
+
   it('creates a fresh edge-add seed without carrying trusted or source routing state', () => {
     const added: Edge = {
       id: 'edge-added',
