@@ -56,6 +56,55 @@ const OPERATION_CASES = Object.freeze([
   }),
 ]);
 
+export const projectDisplayRoutingTopologyDiagnostics = ({
+  routing = {}, requests = [], responses = [],
+  nodeCount = null, edgeCount = null, renderedEdgeCount = null,
+} = {}) => ({
+  routing: {
+    stage: routing?.stage,
+    workerStartCount: routing?.workerStartCount,
+    workerAbortCount: routing?.workerAbortCount,
+    workerResolution: routing?.workerResolution,
+    fallbackLevel: routing?.fallbackLevel,
+    hasRequestId: typeof routing?.requestId === 'string',
+    hasOutputRouteSignature: typeof routing?.outputRouteSignature === 'string',
+  },
+  requests: (Array.isArray(requests) ? requests : []).map(request => ({
+    operation: request?.operation,
+    classification: request?.changeSet?.classification,
+    reason: request?.changeSet?.reason,
+    changedNodeCount: request?.changeSet?.changedNodeIds?.length ?? 0,
+    changedEdgeCount: request?.changeSet?.changedEdgeIds?.length ?? 0,
+    mutableEdgeCount: request?.mutableEdgeIds?.length ?? 0,
+    contextEdgeCount: request?.contextEdgeIds?.length ?? 0,
+    nodeCount: request?.nodes?.length ?? 0,
+    edgeCount: request?.edges?.length ?? 0,
+    hasRequestId: typeof request?.requestId === 'string',
+  })),
+  responses: (Array.isArray(responses) ? responses : []).map(response => ({
+    hardClean: response?.hardClean,
+    hardReport: {
+      hardClean: response?.hardReport?.hardClean,
+      obstacleHits: response?.hardReport?.obstacleHits,
+      terminalsAttached: response?.hardReport?.terminalsAttached,
+      terminalsAnchored: response?.hardReport?.terminalsAnchored,
+      minimumClearanceViolations: response?.hardReport?.minimumClearanceViolations,
+      quality: Object.fromEntries([
+        'nonOrthogonalSegments', 'strictCrossings', 'reverseOverlap', 'unrelatedOverlap',
+        'unexplainedRelatedOverlap', 'shortEndpointStubs', 'tinyInteriorDoglegs', 'hairpins',
+      ].map(key => [key, response?.hardReport?.quality?.[key]])),
+    },
+    routeResolution: response?.routeResolution,
+    fallbackLevel: response?.fallbackLevel,
+    affectedEdgeCount: response?.affectedEdgeCount,
+    patchCount: response?.patches?.length ?? response?.edges?.length ?? 0,
+    hasRequestId: typeof response?.requestId === 'string',
+  })),
+  nodeCount,
+  edgeCount,
+  renderedEdgeCount,
+});
+
 const readOperationResultExpression = operationCase => `(() => {
   const requests = window.__vizlyRoutingRequests || [];
   const responses = window.__vizlyRoutingResponses || [];
@@ -108,22 +157,30 @@ const waitForOperationResult = async (session, operationCase) => {
     if (result) return result;
     await delay(100);
   }
-  const diagnostics = await session.evaluate(`(() => ({
-    routing: window.__vizlyBaseReactFlowDisplayRouting || {},
-    requests: window.__vizlyRoutingRequests || [],
-    responses: window.__vizlyRoutingResponses || [],
-    nodeCount: window.reactFlowInstance?.getNodes?.().length ?? null,
-    edgeCount: window.reactFlowInstance?.getEdges?.().length ?? null,
-    renderedEdgeCount: document.querySelectorAll('.react-flow__edge').length,
-  }))()`);
+  const diagnostics = await session.evaluate(`(() => {
+    const projectDiagnostics = ${projectDisplayRoutingTopologyDiagnostics.toString()};
+    return projectDiagnostics({
+      routing: window.__vizlyBaseReactFlowDisplayRouting || {},
+      requests: window.__vizlyRoutingRequests || [],
+      responses: window.__vizlyRoutingResponses || [],
+      nodeCount: window.reactFlowInstance?.getNodes?.().length ?? null,
+      edgeCount: window.reactFlowInstance?.getEdges?.().length ?? null,
+      renderedEdgeCount: document.querySelectorAll('.react-flow__edge').length,
+    });
+  })()`);
   throw new Error(`Timed out waiting for ${operationCase.id}:\n${JSON.stringify(diagnostics, null, 2)}`);
 };
 
 const prepareOperationCapture = async session => session.evaluate(`(() => {
   const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
-  window.__vizlyRoutingRequests = [];
-  window.__vizlyRoutingResponses = [];
-  window.__vizlyBoundedCandidates = [];
+  for (const key of [
+    '__vizlyRoutingRequests',
+    '__vizlyRoutingResponses',
+    '__vizlyBoundedCandidates',
+  ]) {
+    if (Array.isArray(window[key])) window[key].length = 0;
+    else window[key] = [];
+  }
   return {
     workerStartCount: routing.workerStartCount,
     workerAbortCount: routing.workerAbortCount,

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assertDisplayRoutingTopologyOperationGroupResult,
   assertDisplayRoutingTopologyOperationResult,
+  projectDisplayRoutingTopologyDiagnostics,
 } from './display-routing-browser-topology-matrix.mjs';
 
 const topologyCase = Object.freeze({
@@ -42,6 +43,55 @@ const assertValid = result => assertDisplayRoutingTopologyOperationResult({
 });
 
 describe('display routing browser topology matrix', () => {
+  it('projects timeout diagnostics without route geometry or user content', () => {
+    const projected = projectDisplayRoutingTopologyDiagnostics({
+      routing: {
+        stage: 'final-quality-rejected',
+        requestId: 'secret-request-id',
+        outputRouteSignature: 'secret-route-signature',
+      },
+      requests: [{
+        requestId: 'secret-request-id',
+        operation: 'incremental-route',
+        changeSet: {
+          classification: 'geometry',
+          reason: 'unknown',
+          changedNodeIds: ['customer-node-name'],
+          changedEdgeIds: ['customer-edge-name'],
+        },
+        nodes: [{ id: 'customer-node-name', data: { label: 'private label' } }],
+        edges: [{ id: 'customer-edge-name', computedPath: 'M 1 2 L 3 4' }],
+        mutableEdgeIds: ['customer-edge-name'],
+      }],
+      responses: [{
+        requestId: 'secret-request-id',
+        hardClean: false,
+        edges: [{ id: 'customer-edge-name', computedPath: 'M 1 2 L 3 4' }],
+        hardReport: { hardClean: false, obstacleHits: 1, quality: { strictCrossings: 2 } },
+      }],
+    });
+    const serialized = JSON.stringify(projected);
+
+    expect(projected.requests[0]).toMatchObject({
+      changedNodeCount: 1,
+      changedEdgeCount: 1,
+      mutableEdgeCount: 1,
+      nodeCount: 1,
+      edgeCount: 1,
+      hasRequestId: true,
+    });
+    expect(projected.responses[0]).toMatchObject({
+      hardClean: false,
+      patchCount: 1,
+      hasRequestId: true,
+      hardReport: { obstacleHits: 1, quality: { strictCrossings: 2 } },
+    });
+    expect(serialized).not.toContain('secret');
+    expect(serialized).not.toContain('customer');
+    expect(serialized).not.toContain('private label');
+    expect(serialized).not.toContain('M 1 2');
+  });
+
   it('accepts hard-clean topology operations with or without in-job fallback', () => {
     expect(assertValid(validResult())).toBeUndefined();
     expect(assertValid(validResult({
