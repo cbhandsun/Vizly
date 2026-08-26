@@ -258,7 +258,8 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     doglegRepairedEdges === finalGloballyRefinedEdges ? 'skip' : 'accepted',
     countChangedRoutingItems(finalGloballyRefinedEdges, doglegRepairedEdges),
     {
-      cacheHitCount: initialDoglegDiagnostics.cacheHitCount,
+      cacheHitCount: initialDoglegDiagnostics.cacheHitCount
+        + initialDoglegDiagnostics.deduplicatedCandidateCount,
       candidateCount: initialDoglegDiagnostics.candidateCount,
       evaluationCount: initialDoglegDiagnostics.qualityEvaluationCount,
     },
@@ -288,7 +289,8 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     repairedEdges === finalCrossingSweepEdges ? 'skip' : 'accepted',
     countChangedRoutingItems(finalCrossingSweepEdges, repairedEdges),
     {
-      cacheHitCount: finalDoglegDiagnostics.cacheHitCount,
+      cacheHitCount: finalDoglegDiagnostics.cacheHitCount
+        + finalDoglegDiagnostics.deduplicatedCandidateCount,
       candidateCount: finalDoglegDiagnostics.candidateCount,
       evaluationCount: finalDoglegDiagnostics.qualityEvaluationCount,
     },
@@ -433,7 +435,8 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     {
       candidateCount: localPolishDiagnostics.candidateCount,
       evaluationCount: localPolishDiagnostics.qualityEvaluationCount,
-      cacheHitCount: localPolishDiagnostics.cacheHitCount,
+      cacheHitCount: localPolishDiagnostics.cacheHitCount
+        + localPolishDiagnostics.deduplicatedCandidateCount,
     },
   );
   const detachedPolishTimer = recordPolishPhaseTrace

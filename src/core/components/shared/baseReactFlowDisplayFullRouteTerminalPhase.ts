@@ -264,7 +264,11 @@ export const runBaseReactFlowFullRouteTerminalPhase = (
     finalFallbackTransactionCandidate,
     repairNodes,
     inputSignature,
-    { deferCompoundRepair: true, onPhaseTrace },
+    {
+      deferCompoundRepair: true,
+      evaluation: context.evaluationSession,
+      onPhaseTrace,
+    },
   );
   finishFailClosed('fallback', failClosedEdges.length);
   finishFinalize('fallback', failClosedEdges.length);

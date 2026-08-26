@@ -24,8 +24,6 @@ import {
   runDisplayWorkerIncrementalRequest,
 } from './baseReactFlowDisplayWorkerSessionResponse';
 import {
-  parseDisplayEdgesWorkerRequest,
-  readDisplayEdgesWorkerRequestId,
   type DisplayEdgesWorkerRequest,
   type DisplayEdgesWorkerResponse,
 } from './baseReactFlowDisplayWorkerProtocol';
@@ -63,7 +61,10 @@ import {
   finalDisplayRenderContractIsLocked,
   selectHardCleanDisplayCandidate,
 } from './baseReactFlowDisplayCandidateValidation';
-import { installBaseReactFlowDisplayWorkerTransport } from './baseReactFlowDisplayWorkerTransport';
+import {
+  createBaseReactFlowDisplayWorkerMessageHandler,
+  installBaseReactFlowDisplayWorkerTransport,
+} from './baseReactFlowDisplayWorkerTransport';
 import { postDisplayEdgesResponse } from './baseReactFlowDisplayWorkerScope';
 import {
   finalizeStableIncrementalDisplayResponse,
@@ -75,6 +76,7 @@ import {
   createTracedDisplayWorkerFinalEvaluation,
   finalizeBoundedDisplayWorkerRepairResponse,
   finishDisplayWorkerFinalization,
+  type DisplayWorkerFinalEvaluation,
   type DisplayWorkerFinalizationOptions,
 } from './baseReactFlowDisplayWorkerFinalEvaluation';
 
@@ -589,6 +591,11 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
 
   const fullRouteSession = createBaseReactFlowFullRouteEvaluationSession(request.nodes);
   const { evaluation: fullRouteEvaluation, repairNodes } = fullRouteSession;
+  const fullRouteFinalEvaluation: DisplayWorkerFinalEvaluation = {
+    repairNodes,
+    evaluation: fullRouteEvaluation,
+    hardQualityIsClean: edges => fullRouteEvaluation.hardReport(edges).hardClean,
+  };
   const fullRouteEdges = createBaseReactFlowFullRouteEdges({
     ...commonInput,
     forceFullQuality: request.qualityMode === 'full' || escalatedFromInteractive,
@@ -623,6 +630,7 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
     false,
     false,
   );
+  fullRouteEvaluation.rememberHardReport(finalized.edges, finalized.report);
   if (!finalized.report.hardClean) {
     const repairTimer = startDisplayRoutingPhaseTrace({
       phase: 'measured-repair',
@@ -643,6 +651,7 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
       false,
     );
     repairTimer.finish(repaired.report.hardClean ? 'accepted' : 'rejected', repaired.edges.length);
+    fullRouteEvaluation.rememberHardReport(repaired.edges, repaired.report);
     const repairedResponse = finalizeContainerClearanceResponse({
       requestId: request.requestId,
       edges: repaired.edges,
@@ -653,6 +662,7 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
     }, request.nodes, {
       initialHardReport: repaired.report,
       initialHardReportEdges: repaired.edges,
+      finalEvaluation: fullRouteFinalEvaluation,
       isLargeGraph: request.isLargeGraph,
       onPhaseTrace: recordPhaseTrace,
       preferredEdges: request.edges,
@@ -672,6 +682,7 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
   }, request.nodes, {
     initialHardReport: finalized.report,
     initialHardReportEdges: finalized.edges,
+    finalEvaluation: fullRouteFinalEvaluation,
     isLargeGraph: request.isLargeGraph,
     onPhaseTrace: recordPhaseTrace,
     preferredEdges: request.edges,
@@ -682,18 +693,7 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
   ));
 };
 
-export const handleBaseReactFlowDisplayWorkerMessage = (
-  value: unknown,
-  onBoundedCandidate?: (report: BaseDisplayBoundedCandidateReport) => void,
-): DisplayEdgesWorkerResponse => {
-  const request = parseDisplayEdgesWorkerRequest(value);
-  if (!request) {
-    return {
-      requestId: readDisplayEdgesWorkerRequestId(value) ?? 'invalid-request',
-      error: 'display-edge-worker-invalid-request',
-    };
-  }
-  return computeBaseReactFlowDisplayEdgesWorkerResponse(request, onBoundedCandidate);
-};
+export const handleBaseReactFlowDisplayWorkerMessage =
+  createBaseReactFlowDisplayWorkerMessageHandler(computeBaseReactFlowDisplayEdgesWorkerResponse);
 
 installBaseReactFlowDisplayWorkerTransport(handleBaseReactFlowDisplayWorkerMessage);

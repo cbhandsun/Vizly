@@ -315,7 +315,7 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
     );
     expect(workerResponse.phaseTrace?.find(
       trace => trace.phase === 'final-evaluation-context',
-    )).toMatchObject({ resolution: 'accepted' });
+    )).toMatchObject({ resolution: 'hit' });
   });
 
   it('returns one final response when a full route needs measured repair', () => {

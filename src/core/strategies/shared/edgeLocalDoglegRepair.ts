@@ -79,6 +79,7 @@ export type LocalDoglegRepairDiagnostics = {
   processedEdgeCount: number;
   passCount: number;
   candidateCount: number;
+  deduplicatedCandidateCount: number;
   qualityEvaluationCount: number;
   cacheHitCount: number;
 };
@@ -88,6 +89,7 @@ export const createLocalDoglegRepairDiagnostics = (): LocalDoglegRepairDiagnosti
   processedEdgeCount: 0,
   passCount: 0,
   candidateCount: 0,
+  deduplicatedCandidateCount: 0,
   qualityEvaluationCount: 0,
   cacheHitCount: 0,
 });
@@ -143,6 +145,7 @@ function findBestLocalDoglegCandidate(
   const currentTinyInteriorSegments = countTinyInteriorSegments(path);
   let bestTinyInteriorSegments = currentTinyInteriorSegments;
   let bestQuality = currentQuality;
+  const evaluatedCandidatePathKeys = new Set<string>();
   const tryCandidate = (candidate: Point[] | null, options: { preserveEndpoints?: boolean } = {}) => {
     if (!candidate) return;
     candidateCount += 1;
@@ -151,6 +154,12 @@ function findBestLocalDoglegCandidate(
     const normalized = snapshot.path;
     if (normalized.length < 2) return;
     if (preserveEndpoints && !hasSameEndpoints(path, normalized)) return;
+    const candidateKey = exactCandidatePathKey(normalized);
+    if (candidateKey !== null && evaluatedCandidatePathKeys.has(candidateKey)) {
+      if (diagnostics) diagnostics.deduplicatedCandidateCount += 1;
+      return;
+    }
+    if (candidateKey !== null) evaluatedCandidatePathKeys.add(candidateKey);
     const obstacleHits = obstacleContext.countSegmentHits(
       snapshot.segments,
       Math.min(currentObstacleHits, bestObstacleHits),
@@ -197,7 +206,6 @@ function findBestLocalDoglegCandidate(
       && !fewerTinyDoglegs
       && !betterTerminalStub
     ) return;
-    const candidateKey = exactCandidatePathKey(normalized);
     let candidateQuality = candidateKey === null
       ? undefined
       : qualityByCandidatePath.get(candidateKey);
@@ -262,6 +270,11 @@ function findBestLocalDoglegCandidate(
     bestVisualNoise = visualNoise;
     bestTinyInteriorSegments = tinyInteriorSegments;
     bestQuality = candidateQuality;
+    // Candidate acceptance changes the comparison baseline. Keep deduplication
+    // exact by forgetting paths rejected against the previous best state; only
+    // the accepted path has already been evaluated against the new state.
+    evaluatedCandidatePathKeys.clear();
+    if (candidateKey !== null) evaluatedCandidatePathKeys.add(candidateKey);
   };
 
   tryCandidate(buildTerminalStubCandidate(path, true));

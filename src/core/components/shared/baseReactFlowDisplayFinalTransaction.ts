@@ -10,6 +10,7 @@ import { finalSameSideTrueTrunksDoNotRegress } from './baseReactFlowDisplayFinal
 import { compactDisplayEdgePaths } from './baseReactFlowDisplayGeometry';
 import { createBaseReactFlowDisplayMicroSafetyContext } from './baseReactFlowDisplayMicroSafety';
 import { getDisplayHardQualityGateReport } from './baseReactFlowDisplayQualityGates';
+import type { BaseReactFlowFinalEndpointEvaluation } from './baseReactFlowDisplayFinalEndpointEvaluation';
 import {
   countChangedRoutingItems,
   startDisplayRoutingPhaseTrace,
@@ -26,6 +27,7 @@ export const finalizeFailClosedDisplayTransaction = <T extends Edge[]>(
   inputSignature: string,
   options?: Readonly<{
     deferCompoundRepair?: boolean;
+    evaluation?: BaseReactFlowFinalEndpointEvaluation;
     onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void;
   }>,
 ): T => {
@@ -137,14 +139,16 @@ export const finalizeFailClosedDisplayTransaction = <T extends Edge[]>(
     countChangedRoutingItems(selectedCandidate, closedCandidate),
   );
   const gateTimer = startStage('terminal-fail-closed-gate', closedCandidate.length);
-  const report = getDisplayHardQualityGateReport(
-    closedCandidate,
-    repairNodes,
-    'polished',
-  );
+  const report = options?.evaluation?.hardReport(closedCandidate)
+    ?? getDisplayHardQualityGateReport(
+      closedCandidate,
+      repairNodes,
+      'polished',
+    );
   gateTimer.finish(report.hardClean ? 'accepted' : 'fallback');
 
-  return report.hardClean
-    ? markBaseDisplayFinalized(closedCandidate, inputSignature)
-    : closedCandidate;
+  if (!report.hardClean) return closedCandidate;
+  const finalized = markBaseDisplayFinalized(closedCandidate, inputSignature);
+  options?.evaluation?.rememberHardReport(finalized, report);
+  return finalized;
 };

@@ -564,7 +564,7 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
       diagnostics,
     ).toMatchObject({
       candidateCount: result.length * 2,
-      resolution: 'accepted',
+      resolution: 'hit',
     });
 
     const logisticsLoaderEntry = Object.entries(

@@ -46,9 +46,11 @@ describe('local dogleg repair diagnostics', () => {
     expect(diagnostics.qualityEvaluationCount).toBeLessThan(diagnostics.candidateCount);
     expect(diagnostics.passCount).toBeGreaterThan(1);
     expect(diagnostics.cacheHitCount).toBeGreaterThan(0);
+    expect(diagnostics.deduplicatedCandidateCount).toBeGreaterThan(0);
     expect(Object.keys(diagnostics).sort()).toEqual([
       'cacheHitCount',
       'candidateCount',
+      'deduplicatedCandidateCount',
       'passCount',
       'processedEdgeCount',
       'qualityEvaluationCount',

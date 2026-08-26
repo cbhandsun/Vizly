@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { calculateEdgePathQualityScore } from '../../../strategies/shared/edgeStrictCrossingGuard';
 import { finalizeFailClosedDisplayTransaction } from '../baseReactFlowDisplayFinalTransaction';
 import { getDisplayComputedPath } from '../baseReactFlowDisplayGeometry';
+import { createBaseReactFlowFinalEndpointEvaluation } from '../baseReactFlowDisplayFinalEndpointEvaluation';
 import type { DisplayRoutingPhaseTrace } from '../baseReactFlowDisplayRoutingTrace';
 
 const nodes: Array<Node & { positionAbsolute: { x: number; y: number } }> = [
@@ -54,6 +55,24 @@ describe('finalizeFailClosedDisplayTransaction', () => {
       evaluationCount: 0,
       scannedNodeCount: 0,
       resolution: 'skip',
+    });
+  });
+
+  it('publishes its final hard gate to the owning request evaluation', () => {
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
+    const result = finalizeFailClosedDisplayTransaction(
+      edgeWithPath([{ x: 100, y: 50 }, { x: 300, y: 50 }]),
+      nodes,
+      'session-signature',
+      { evaluation },
+    );
+    const afterTransaction = evaluation.readMetrics();
+
+    expect(afterTransaction.evaluationCount).toBe(1);
+    expect(evaluation.hardReport(result).hardClean).toBe(true);
+    expect(evaluation.readMetrics()).toMatchObject({
+      evaluationCount: afterTransaction.evaluationCount,
+      cacheHitCount: afterTransaction.cacheHitCount + 1,
     });
   });
 

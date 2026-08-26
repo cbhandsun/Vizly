@@ -78,7 +78,8 @@ export const repairDisplayQualityTopology = ({
     {
       candidateCount: doglegDiagnostics.candidateCount,
       evaluationCount: doglegDiagnostics.qualityEvaluationCount,
-      cacheHitCount: doglegDiagnostics.cacheHitCount,
+      cacheHitCount: doglegDiagnostics.cacheHitCount
+        + doglegDiagnostics.deduplicatedCandidateCount,
     },
   );
   const secondaryTrunkTimer = startDisplayRoutingPhaseTrace({

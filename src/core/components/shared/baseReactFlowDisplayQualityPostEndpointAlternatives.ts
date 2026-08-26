@@ -94,7 +94,8 @@ export const createDisplayQualityPostEndpointAlternatives = ({
     {
       candidateCount: localDiagnostics.candidateCount,
       evaluationCount: localDiagnostics.qualityEvaluationCount,
-      cacheHitCount: localDiagnostics.cacheHitCount,
+      cacheHitCount: localDiagnostics.cacheHitCount
+        + localDiagnostics.deduplicatedCandidateCount,
     },
   );
 

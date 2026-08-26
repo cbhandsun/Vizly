@@ -314,7 +314,7 @@ describe('baseReactFlowDisplayEdges WMS and TMS regressions', () => {
       diagnostics,
     ).toMatchObject({
       candidateCount: result.length * 3,
-      resolution: 'accepted',
+      resolution: 'hit',
     });
 
     const replay = computeBaseReactFlowDisplayEdgesWorkerResponse({

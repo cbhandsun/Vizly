@@ -2,6 +2,7 @@ import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEv
 import {
   parseDisplayEdgesWorkerRequest,
   readDisplayEdgesWorkerRequestId,
+  type DisplayEdgesWorkerRequest,
   type DisplayEdgesWorkerResponse,
 } from './baseReactFlowDisplayWorkerProtocol';
 import {
@@ -14,6 +15,25 @@ type DisplayWorkerMessageHandler = (
   value: unknown,
   onBoundedCandidate?: (report: BaseDisplayBoundedCandidateReport) => void,
 ) => DisplayEdgesWorkerResponse;
+
+type DisplayWorkerRequestHandler = (
+  request: DisplayEdgesWorkerRequest,
+  onBoundedCandidate?: (report: BaseDisplayBoundedCandidateReport) => void,
+) => DisplayEdgesWorkerResponse;
+
+/** Keeps the untrusted Worker message boundary outside the routing composition root. */
+export const createBaseReactFlowDisplayWorkerMessageHandler = (
+  handleRequest: DisplayWorkerRequestHandler,
+): DisplayWorkerMessageHandler => (value, onBoundedCandidate) => {
+  const request = parseDisplayEdgesWorkerRequest(value);
+  if (!request) {
+    return {
+      requestId: readDisplayEdgesWorkerRequestId(value) ?? 'invalid-request',
+      error: 'display-edge-worker-invalid-request',
+    };
+  }
+  return handleRequest(request, onBoundedCandidate);
+};
 
 export const installBaseReactFlowDisplayWorkerTransport = (
   handleMessage: DisplayWorkerMessageHandler,
