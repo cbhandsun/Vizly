@@ -1,12 +1,49 @@
 import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
-import { createBaseReactFlowDisplayEdges } from '../baseReactFlowDisplayEdges';
-import { computeBaseReactFlowDisplayEdgeEpoch } from '../baseReactFlowDisplayEdgeCore';
+import {
+  normalizeBaseEdge,
+  synthesizeStableFallbackPath,
+  withDisplayAbsolutePositions,
+} from '../baseReactFlowDisplayEdgeCore';
 import { resolveDisplayQualityBudget } from '../baseReactFlowDisplayEvaluation';
-import { finalizeDisplayEdgesForRenderMode } from '../baseReactFlowDisplayRenderPipeline';
+import {
+  commitDisplayEdgesForRenderMode,
+  finalizeDisplayEdgesForRenderMode,
+} from '../baseReactFlowDisplayRenderPipeline';
 import { displayEdgesHaveNodeAnchoredTerminals } from '../baseReactFlowTerminalAxisRepair';
 import { baseNodes } from './baseReactFlowDisplayEdges.testUtils';
+
+const renderCommittedEdges = ({
+  edges,
+  nodes,
+  enableSmartEdges,
+  smartEdgePadding,
+  isLargeGraph,
+  displayEdgeEpoch,
+}: {
+  edges: Edge[];
+  nodes: Node[];
+  enableSmartEdges: boolean;
+  smartEdgePadding: number;
+  isLargeGraph: boolean;
+  displayEdgeEpoch: number;
+}): Edge[] => {
+  const nodeById = new Map(nodes.map(node => [node.id, node] as const));
+  const normalizedEdges = edges.map(edge => synthesizeStableFallbackPath({
+    edge: normalizeBaseEdge({ edge, nodeById, displayEdgeEpoch }),
+    nodeById,
+  }));
+  return commitDisplayEdgesForRenderMode({
+    finalQualityEdges: normalizedEdges,
+    rawEdges: edges,
+    enableSmartEdges,
+    smartEdgePadding,
+    isLargeGraph,
+    inputSignature: `render-mode-test:${displayEdgeEpoch}`,
+    nodes: withDisplayAbsolutePositions(nodes, nodeById),
+  });
+};
 
 describe('baseReactFlowDisplayEdges render modes', () => {
   it('honors explicit full quality for large-graph hints below the extreme graph cap', () => {
@@ -54,7 +91,7 @@ describe('baseReactFlowDisplayEdges render modes', () => {
       },
     ];
 
-    const result = createBaseReactFlowDisplayEdges({
+    const result = renderCommittedEdges({
       edges,
       nodes: baseNodes,
       enableSmartEdges: false,
@@ -174,34 +211,6 @@ describe('baseReactFlowDisplayEdges render modes', () => {
     }
   });
 
-  it('reuses finalized display edges on the second render pass', () => {
-    const edges: Edge[] = [
-      { id: 'e1', source: 'source', target: 'target', type: 'advanced-smart-step' },
-    ];
-    const first = createBaseReactFlowDisplayEdges({
-      edges,
-      nodes: baseNodes,
-      enableSmartEdges: true,
-      smartEdgePadding: 20,
-      isLargeGraph: false,
-      displayEdgeEpoch: computeBaseReactFlowDisplayEdgeEpoch({ nodes: baseNodes, edges }),
-    });
-
-    const second = createBaseReactFlowDisplayEdges({
-      edges: first,
-      nodes: baseNodes,
-      enableSmartEdges: true,
-      smartEdgePadding: 20,
-      isLargeGraph: false,
-      displayEdgeEpoch: computeBaseReactFlowDisplayEdgeEpoch({ nodes: baseNodes, edges: first }),
-    });
-
-    expect(
-      second,
-      JSON.stringify({ first: first[0], second: second[0] }, null, 2),
-    ).toBe(first);
-  });
-
   it('normalizes auto-reverse handles and patches smart edge padding', () => {
     const edges: Edge[] = [
       {
@@ -218,7 +227,7 @@ describe('baseReactFlowDisplayEdges render modes', () => {
       },
     ];
 
-    const result = createBaseReactFlowDisplayEdges({
+    const result = renderCommittedEdges({
       edges,
       nodes: baseNodes,
       enableSmartEdges: true,
@@ -248,7 +257,7 @@ describe('baseReactFlowDisplayEdges render modes', () => {
       },
     ];
 
-    const result = createBaseReactFlowDisplayEdges({
+    const result = renderCommittedEdges({
       edges,
       nodes: baseNodes,
       enableSmartEdges: false,
@@ -272,7 +281,7 @@ describe('baseReactFlowDisplayEdges render modes', () => {
       },
     ];
 
-    const result = createBaseReactFlowDisplayEdges({
+    const result = renderCommittedEdges({
       edges,
       nodes: baseNodes,
       enableSmartEdges: true,
@@ -289,8 +298,15 @@ describe('baseReactFlowDisplayEdges render modes', () => {
     expect(path.every((point: any) => Number.isFinite(point.x) && Number.isFinite(point.y))).toBe(true);
   });
 
-  it('keeps layout-locked computed paths on the stable path renderer in basic mode while selecting legal terminal sides', () => {
-    const computedPath = [{ x: 50, y: 260 }, { x: 120, y: 260 }, { x: 350, y: 30 }];
+  it('keeps layout-locked computed paths on the stable path renderer in basic mode while preserving legal terminal sides', () => {
+    const computedPath = [
+      { x: 50, y: 260 },
+      { x: 50, y: 308 },
+      { x: 120, y: 308 },
+      { x: 120, y: -48 },
+      { x: 350, y: -48 },
+      { x: 350, y: 0 },
+    ];
     const edges: Edge[] = [
       {
         id: 'e1',
@@ -308,7 +324,7 @@ describe('baseReactFlowDisplayEdges render modes', () => {
       },
     ];
 
-    const result = createBaseReactFlowDisplayEdges({
+    const result = renderCommittedEdges({
       edges,
       nodes: baseNodes,
       enableSmartEdges: false,
@@ -319,17 +335,24 @@ describe('baseReactFlowDisplayEdges render modes', () => {
 
     expect(result[0].type).toBe('stablePath');
     const repairedPath = (result[0].data as any).computedPath;
-    expect(result[0].sourceHandle).toBe('right');
-    expect(repairedPath[0]).toEqual({ x: 100, y: 230 });
-    expect(result[0].targetHandle).toBe('left');
-    expect(repairedPath[repairedPath.length - 1]).toEqual({ x: 300, y: 30 });
+    expect(result[0].sourceHandle).toBe('bottom');
+    expect(repairedPath[0]).toEqual({ x: 50, y: 260 });
+    expect(result[0].targetHandle).toBe('top');
+    expect(repairedPath[repairedPath.length - 1]).toEqual({ x: 350, y: 0 });
     expect(displayEdgesHaveNodeAnchoredTerminals(result, baseNodes)).toBe(true);
-    expect((result[0].data as any).terminalPortBridgeRepaired).toBe(true);
+    expect((result[0].data as any).terminalPortBridgeRepaired).not.toBe(true);
     expect(result[0].label).toBe('Locked path');
   });
 
-  it('keeps post-processed locked computed paths on the stable path renderer in smart mode while selecting legal terminal sides', () => {
-    const computedPath = [{ x: 50, y: 260 }, { x: 120, y: 260 }, { x: 350, y: 30 }];
+  it('keeps post-processed locked computed paths on the stable path renderer in smart mode while preserving legal terminal sides', () => {
+    const computedPath = [
+      { x: 50, y: 260 },
+      { x: 50, y: 308 },
+      { x: 120, y: 308 },
+      { x: 120, y: -48 },
+      { x: 350, y: -48 },
+      { x: 350, y: 0 },
+    ];
     const edges: Edge[] = [
       {
         id: 'e1',
@@ -347,7 +370,7 @@ describe('baseReactFlowDisplayEdges render modes', () => {
       },
     ];
 
-    const result = createBaseReactFlowDisplayEdges({
+    const result = renderCommittedEdges({
       edges,
       nodes: baseNodes,
       enableSmartEdges: true,
@@ -358,12 +381,12 @@ describe('baseReactFlowDisplayEdges render modes', () => {
 
     expect(result[0].type).toBe('stablePath');
     const repairedPath = (result[0].data as any).computedPath;
-    expect(result[0].sourceHandle).toBe('right');
-    expect(repairedPath[0]).toEqual({ x: 100, y: 230 });
-    expect(result[0].targetHandle).toBe('left');
-    expect(repairedPath[repairedPath.length - 1]).toEqual({ x: 300, y: 30 });
+    expect(result[0].sourceHandle).toBe('bottom');
+    expect(repairedPath[0]).toEqual({ x: 50, y: 260 });
+    expect(result[0].targetHandle).toBe('top');
+    expect(repairedPath[repairedPath.length - 1]).toEqual({ x: 350, y: 0 });
     expect(displayEdgesHaveNodeAnchoredTerminals(result, baseNodes)).toBe(true);
-    expect((result[0].data as any).terminalPortBridgeRepaired).toBe(true);
+    expect((result[0].data as any).terminalPortBridgeRepaired).not.toBe(true);
     expect(result[0].label).toBe('Smart locked path');
   });
 
@@ -383,7 +406,7 @@ describe('baseReactFlowDisplayEdges render modes', () => {
       },
     ];
 
-    const result = createBaseReactFlowDisplayEdges({
+    const result = renderCommittedEdges({
       edges,
       nodes: baseNodes,
       enableSmartEdges: false,
@@ -411,7 +434,7 @@ describe('baseReactFlowDisplayEdges render modes', () => {
       },
     ];
 
-    const result = createBaseReactFlowDisplayEdges({
+    const result = renderCommittedEdges({
       edges,
       nodes: baseNodes,
       enableSmartEdges: true,
@@ -439,7 +462,7 @@ describe('baseReactFlowDisplayEdges render modes', () => {
       },
     ];
 
-    const result = createBaseReactFlowDisplayEdges({
+    const result = renderCommittedEdges({
       edges,
       nodes: baseNodes,
       enableSmartEdges: false,
@@ -490,7 +513,7 @@ describe('baseReactFlowDisplayEdges render modes', () => {
       },
     ];
 
-    const result = createBaseReactFlowDisplayEdges({
+    const result = renderCommittedEdges({
       edges,
       nodes,
       enableSmartEdges: true,

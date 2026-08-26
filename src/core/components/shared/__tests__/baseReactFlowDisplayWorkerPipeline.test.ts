@@ -4,10 +4,6 @@ import type { Edge, Node } from '@xyflow/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  baseReactFlowDisplayHardQualityIsClean,
-  createBaseReactFlowDisplayEdges,
-} from '../baseReactFlowDisplayEdges';
-import {
   computeBaseReactFlowDisplayOutputRouteSignature,
   readBaseReactFlowDisplayEdgesCacheEntry,
   withDisplayAbsolutePositions,
@@ -25,8 +21,12 @@ import * as finalEndpointOrder from '../baseReactFlowDisplayFinalEndpointOrder';
 import * as finalSafetyClosure from '../baseReactFlowDisplayFinalSafetyClosure';
 import * as measuredDisplayRepair from '../baseReactFlowDisplayMeasuredRepair';
 import * as outerPortTransaction from '../baseReactFlowDisplayOuterPortTransaction';
-import { getDisplayHardQualityGateReport } from '../baseReactFlowDisplayQualityGates';
+import {
+  baseReactFlowDisplayHardQualityIsClean,
+  getDisplayHardQualityGateReport,
+} from '../baseReactFlowDisplayQualityGates';
 import { computeBaseReactFlowDisplayInputIdentityBundle } from '../baseReactFlowDisplayInputIdentity';
+import { createDisplayRoutingIdentity } from '../baseReactFlowDisplayRoutingSession';
 import {
   createBaseReactFlowRoutingAffectedClosure,
   createBaseReactFlowRoutingChangeSet,
@@ -39,6 +39,8 @@ import {
   resolveBaseReactFlowDisplayedEdges,
 } from '../baseReactFlowDisplayWorkerClient';
 import { shouldEscalateInteractiveDisplayRoute } from '../baseReactFlowDisplayWorkerFallback';
+import { mergeBaseReactFlowDisplayEdgePatches } from '../baseReactFlowDisplayRoutingTransaction';
+import { getExactDisplayHardReport } from '../baseReactFlowDisplayWorkerResponse';
 
 const nodes: Node[] = [
   {
@@ -255,7 +257,14 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
     expect(fullRouteSpy).toHaveBeenCalledTimes(3);
   });
 
-  it('runs the shared finalizer and matches the direct final display route', () => {
+  it('runs the shared finalizer and commits an exactly replayable hard-clean route', () => {
+    const identityBundle = computeBaseReactFlowDisplayInputIdentityBundle({
+      edges,
+      nodes,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+    });
     const input = {
       edges,
       nodes,
@@ -263,8 +272,11 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       smartEdgePadding: 20,
       isLargeGraph: false,
       displayEdgeEpoch: 101,
+      inputIdentity: createDisplayRoutingIdentity(
+        identityBundle.cacheSignature,
+        identityBundle.geometryDigest,
+      ),
     };
-    const direct = createBaseReactFlowDisplayEdges(input);
     const finalizeSpy = vi.spyOn(
       displayFinalizer,
       'finalizeBaseReactFlowDisplayEdgesWithReport',
@@ -284,10 +296,35 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
     });
     expect(workerResponse).toMatchObject({
       requestId: 'worker-direct-parity',
-      edges: direct,
       hardClean: true,
       routeResolution: 'full-route',
     });
+    expect(workerResponse.error).toBeUndefined();
+    expect(workerResponse.edges).toBeDefined();
+    if (!workerResponse.edges) {
+      throw new Error('expected committed Worker route');
+    }
+    const repairNodes = withDisplayAbsolutePositions(
+      nodes,
+      new Map(nodes.map(node => [node.id, node] as const)),
+    );
+    expect(workerResponse.hardReport).toEqual(
+      getExactDisplayHardReport(workerResponse.edges, repairNodes),
+    );
+    expect(workerResponse.outputRouteSignature).toBe(
+      computeBaseReactFlowDisplayOutputRouteSignature(workerResponse.edges),
+    );
+    expect(workerResponse.edges.every(edge => {
+      const data = edge.data as Record<string, unknown> | undefined;
+      return edge.type === 'stablePath'
+        && data?.layoutPathLocked === true
+        && data?._layoutPathLocked === true;
+    })).toBe(true);
+    const replayPatches = createBaseReactFlowDisplayEdgePatches(edges, workerResponse.edges);
+    expect(replayPatches).not.toBeNull();
+    expect(mergeBaseReactFlowDisplayEdgePatches(edges, replayPatches ?? [])).toEqual(
+      workerResponse.edges,
+    );
     expect(workerResponse.phaseTrace?.map(trace => trace.phase)).toEqual([
       'candidate-validation',
       'seed',
