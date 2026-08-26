@@ -9,13 +9,14 @@ import {
   displayEdgesHaveNodeAttachedTerminals,
   getDisplayTerminalValidationReport,
 } from '../baseReactFlowTerminalAxisRepair';
-import { createBaseReactFlowDisplayEdges } from '../baseReactFlowDisplayEdges';
+import { computeBaseReactFlowDisplayEdgesWorkerResponse } from '../baseReactFlowDisplayEdges.worker';
 import { countDisplayObstacleHits } from '../baseReactFlowDisplayEvaluation';
 import {
   displayRenderedHardQualityGatesAreClean,
   getDisplayHardQualityGateReport,
 } from '../baseReactFlowDisplayQualityGates';
 import { computeBaseReactFlowDisplayEdgeEpoch } from '../baseReactFlowDisplayEdgeCore';
+import { projectBaseReactFlowDisplayWorkerInput } from '../baseReactFlowDisplayWorkerProjection';
 import {
   detachedDisplayEndpoints,
   edgeNodeObstacleHits,
@@ -31,19 +32,37 @@ import {
 
 export const assertBaseReactFlowDisplayQualityGates = async (dataset: unknown) => {
   const canvas = await standardDataToCanvas(dataset as any);
-  const result = createBaseReactFlowDisplayEdges({
-    edges: canvas.edges,
-    nodes: canvas.nodes,
+  const projected = projectBaseReactFlowDisplayWorkerInput(canvas);
+  const response = computeBaseReactFlowDisplayEdgesWorkerResponse({
+    operation: 'route',
+    requestId: `quality-gates:${String((dataset as { name?: unknown }).name ?? 'unnamed')}`,
+    edges: projected.edges,
+    nodes: projected.nodes,
     enableSmartEdges: true,
     smartEdgePadding: 20,
     isLargeGraph: false,
     displayEdgeEpoch: computeBaseReactFlowDisplayEdgeEpoch({
-      edges: canvas.edges,
-      nodes: canvas.nodes,
+      edges: projected.edges,
+      nodes: projected.nodes,
     }),
+    qualityMode: 'full',
   });
+  const workerDiagnostics = JSON.stringify({
+    name: (dataset as { name?: unknown }).name,
+    error: response.error,
+    hardClean: response.hardClean,
+    hardReport: response.hardReport,
+    routeResolution: response.routeResolution,
+    fallbackLevel: response.fallbackLevel,
+  }, null, 2);
+  expect(response.error, workerDiagnostics).toBeUndefined();
+  expect(response.hardClean, workerDiagnostics).toBe(true);
+  expect(response.hardReport?.hardClean, workerDiagnostics).toBe(true);
+  expect(response.edges).toBeDefined();
+  if (!response.edges) throw new Error('expected the production Worker to return final edges');
+  const result = response.edges;
   const quality = calculateEdgePathQualityScore(result);
-  const absoluteNodes = withAbsoluteNodePositions(canvas.nodes as any);
+  const absoluteNodes = withAbsoluteNodePositions(projected.nodes as any);
   const terminalValidationSnapshot = createDisplayTerminalValidationSnapshot(absoluteNodes);
   const nodeObstacleHits = edgeNodeObstacleHits(result, absoluteNodes);
   const hardGateObstacleHits = countDisplayObstacleHits(result, absoluteNodes);

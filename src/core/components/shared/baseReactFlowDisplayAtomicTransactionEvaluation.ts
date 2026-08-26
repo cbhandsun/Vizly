@@ -7,17 +7,7 @@ import {
   visualPolishHardQualityDoesNotRegress,
 } from './baseReactFlowDisplayEvaluation';
 import { createDisplayTerminalValidationSnapshot } from './baseReactFlowTerminalAxisRepair';
-
-const preservesLegalSharedTrunks = (
-  baseline: ReturnType<typeof auditFinalSameSideEndpointOrder>['legalSharedTrunks'],
-  candidate: ReturnType<typeof auditFinalSameSideEndpointOrder>['legalSharedTrunks'],
-): boolean => baseline.every(trunk => candidate.some(next => (
-  next.nodeId === trunk.nodeId
-  && next.role === trunk.role
-  && next.side === trunk.side
-  && trunk.edgeIds.every(edgeId => next.edgeIds.includes(edgeId))
-  && next.commonStemLength + 1e-6 >= trunk.commonStemLength
-)));
+import { preservesInitialTrueTrunksWithinClearanceMargin } from './baseReactFlowDisplayTrueTrunkContract';
 
 /**
  * Shared full-graph gate for bounded multi-edge transactions. Candidate
@@ -50,7 +40,7 @@ export const createAtomicRouteTransactionEvaluation = <T extends Edge[]>(
         const edge = candidate[index];
         return Boolean(edge && terminalValidation.validateEdge(edge).anchored);
       });
-      const trunksPreserved = preservesLegalSharedTrunks(
+      const trunksPreserved = preservesInitialTrueTrunksWithinClearanceMargin(
         baselineTrunks,
         auditFinalSameSideEndpointOrder(candidate, nodes).legalSharedTrunks,
       );

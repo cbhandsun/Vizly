@@ -1,6 +1,8 @@
 import type { Edge, Node } from '@xyflow/react';
 
+import { COMMERCIAL_BUSINESS_NODE_CLEARANCE } from '../../strategies/shared/edgeBusinessNodeClearanceRepair';
 import { createEdgePathQualityEvaluationContext } from '../../strategies/shared/edgeStrictCrossingGuard';
+import { createNodeClearanceGraphEvaluationContext } from '../../strategies/shared/edgeWaypointCandidateRepair';
 import { compactOrthogonalPath } from './baseReactFlowDisplayEdgeCore';
 import {
   countDisplayShortEndpointStubs,
@@ -23,6 +25,10 @@ import {
   buildStrictCrossingCompanionShiftVariants,
 } from './baseReactFlowDisplayTerminalPortRepair';
 import { finalStrictDisplaySweep } from './baseReactFlowDisplayStrictSweepRepair';
+import { repairFinalResidualStrictCrossings } from './baseReactFlowDisplayStrictResidualRepair';
+import { createAtomicRouteTransactionEvaluation } from './baseReactFlowDisplayAtomicTransactionEvaluation';
+import { createDisplayDeclaredAxisMismatchCounter } from './baseReactFlowDisplayDeclaredAxisTransaction';
+import { eligibleCommercialClearanceDoesNotRegress } from './baseReactFlowDisplayBusinessNodeClearance';
 
 export const MIN_RENDER_SAFE_ENDPOINT_STUB = 56;
 const MAX_FINAL_ENDPOINT_STUB_REPAIR_EVALUATIONS = 8;
@@ -206,28 +212,83 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
     const baselineQuality = qualityContext.evaluate(current);
     const obstacleContext = createDisplayObstacleEvaluationContext(current, nodes);
     const baselineObstacleHits = obstacleContext.evaluate(current);
+    const atomic = createAtomicRouteTransactionEvaluation(current, nodes);
+    const countAxisMismatches = createDisplayDeclaredAxisMismatchCounter(nodes);
+    const baselineAxisMismatches = current.map(countAxisMismatches);
+    const clearance = createNodeClearanceGraphEvaluationContext(nodes);
+    const totalCommercialRisk = (candidateEdges: Edge[]): number => candidateEdges.reduce(
+      (total, edge) => total + clearance.score(
+        getDisplayComputedPath(edge),
+        edge,
+        COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+      ),
+      0,
+    );
     let accepted: T | null = null;
+    let acceptedCommercialRisk = Number.POSITIVE_INFINITY;
     for (const candidatePath of buildRenderSafeEndpointStubPaths(getDisplayComputedPath(current[edgeIndex]))) {
       if (evaluations >= maxEvaluations) break;
-      evaluations += 1;
       const candidate = current.map((edge, index) => (
         index === edgeIndex ? withDisplayComputedPath(edge, candidatePath) : edge
       )) as T;
-      const candidateIssues = countRenderUnsafeEndpointStubs(candidate);
-      if (candidateIssues >= baselineIssues) continue;
-      const candidateQuality = qualityContext.evaluateChanged(candidate, [edgeIndex]);
+      const initialIssues = countRenderUnsafeEndpointStubs(candidate);
+      const initialQuality = qualityContext.evaluateChanged(candidate, [edgeIndex]);
+      const initialObstacleHits = obstacleContext.evaluate(candidate);
+      const variants: T[] = [candidate];
       if (
-        candidateQuality.nonOrthogonalSegments > baselineQuality.nonOrthogonalSegments
-        || candidateQuality.strictCrossings > baselineQuality.strictCrossings
-        || candidateQuality.reverseOverlap > baselineQuality.reverseOverlap
-        || candidateQuality.unrelatedOverlap > baselineQuality.unrelatedOverlap
-        || candidateQuality.unexplainedRelatedOverlap > baselineQuality.unexplainedRelatedOverlap
-        || candidateQuality.tinyInteriorDoglegs > baselineQuality.tinyInteriorDoglegs
-        || candidateQuality.hairpins > baselineQuality.hairpins
-      ) continue;
-      if (obstacleContext.evaluate(candidate) > baselineObstacleHits) continue;
-      accepted = candidate;
-      break;
+        initialIssues < baselineIssues
+        && initialObstacleHits <= baselineObstacleHits
+        && initialQuality.strictCrossings > baselineQuality.strictCrossings
+        && initialQuality.strictCrossings <= baselineQuality.strictCrossings + 2
+      ) {
+        variants.push(
+          ...buildStrictCrossingCompanionShiftVariants(candidate, edgeIndex),
+          finalStrictDisplaySweep(candidate, nodes),
+          repairFinalResidualStrictCrossings(candidate, nodes),
+        );
+      }
+      for (const variant of variants) {
+        if (evaluations >= maxEvaluations) break;
+        evaluations += 1;
+        const candidateIssues = countRenderUnsafeEndpointStubs(variant);
+        if (candidateIssues >= baselineIssues) continue;
+        const changedIndexes = variant.flatMap((edge, index) => (
+          edge === current[index] ? [] : [index]
+        ));
+        const changedEdgeIds = new Set(changedIndexes.map(index => current[index].id));
+        const candidateQuality = qualityContext.evaluateChanged(variant, changedIndexes);
+        if (
+          candidateQuality.nonOrthogonalSegments > baselineQuality.nonOrthogonalSegments
+          || candidateQuality.strictCrossings > baselineQuality.strictCrossings
+          || candidateQuality.reverseOverlap > baselineQuality.reverseOverlap
+          || candidateQuality.unrelatedOverlap > baselineQuality.unrelatedOverlap
+          || candidateQuality.unexplainedRelatedOverlap > baselineQuality.unexplainedRelatedOverlap
+          || candidateQuality.tinyInteriorDoglegs > baselineQuality.tinyInteriorDoglegs
+          || candidateQuality.hairpins > baselineQuality.hairpins
+        ) continue;
+        if (obstacleContext.evaluate(variant) > baselineObstacleHits) continue;
+        if (changedIndexes.some(index => (
+          countAxisMismatches(variant[index]) > baselineAxisMismatches[index]
+        ))) continue;
+        if (!eligibleCommercialClearanceDoesNotRegress(
+          current,
+          variant,
+          nodes,
+          changedEdgeIds,
+        )) continue;
+        const transaction = atomic.evaluate(variant, changedIndexes);
+        if (
+          !transaction.hardQualityDoesNotRegress
+          || !transaction.obstacleHitsDoNotRegress
+          || !transaction.terminalsAnchored
+          || !transaction.trunksPreserved
+        ) continue;
+        const candidateCommercialRisk = totalCommercialRisk(variant);
+        if (candidateCommercialRisk >= acceptedCommercialRisk - 1e-6) continue;
+        accepted = variant;
+        acceptedCommercialRisk = candidateCommercialRisk;
+      }
+      if (accepted) break;
     }
     if (!accepted) {
       skippedEdgeIds.add(current[edgeIndex].id);

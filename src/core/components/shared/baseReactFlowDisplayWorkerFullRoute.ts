@@ -8,6 +8,7 @@ import {
   type BaseReactFlowDisplayExactReport,
 } from './baseReactFlowDisplayFinalizer';
 import { closeBaseReactFlowFinalDisplayRoute } from './baseReactFlowDisplayFinalRouteClosure';
+import { closeBaseReactFlowDisplayWorkerEndpointContract } from './baseReactFlowDisplayWorkerEndpointClosure';
 import { createBaseReactFlowFullRouteEdges } from './baseReactFlowDisplayFullRoutePipeline';
 import type { BaseReactFlowDisplayEdgesArgs } from './baseReactFlowDisplayFullRouteTypes';
 import { createBaseReactFlowFullRouteEvaluationSession } from './baseReactFlowDisplayFullRouteEvaluationSession';
@@ -111,9 +112,13 @@ export const runBaseReactFlowDisplayWorkerFullRoute = ({
       inputSignature,
       exactReport: fullRouteExactReport,
     });
+    const endpointClosedEdges = closeBaseReactFlowDisplayWorkerEndpointContract(
+      closedEdges,
+      repairNodes,
+    );
     const closedResponse = withExactDisplayHardReport({
       ...response,
-      edges: closedEdges,
+      edges: endpointClosedEdges,
     }, repairNodes);
     return closedResponse.hardClean === true ? closedResponse : response;
   };

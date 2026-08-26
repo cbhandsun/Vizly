@@ -56,6 +56,17 @@ describe('baseReactFlowDisplayTrueTrunkContract', () => {
     )).toBe(false);
   });
 
+  it('allows a nested pair stem to be absorbed by a commercial-length superset trunk', () => {
+    const baseline = [
+      trunk('source', ['first', 'second'], 72),
+      trunk('source', ['first', 'second', 'third'], 60),
+    ];
+    const candidate = [trunk('source', ['first', 'second', 'third'], 60)];
+
+    expect(preservesInitialTrueTrunks(baseline, candidate)).toBe(false);
+    expect(preservesInitialTrueTrunksWithinClearanceMargin(baseline, candidate)).toBe(true);
+  });
+
   it('supersedes only a smaller intersecting source trunk at the restored endpoint', () => {
     const provisional = {
       ...trunk('source', ['dual', 'side-peer'], 56),
