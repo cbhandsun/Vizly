@@ -140,7 +140,7 @@ export const useCanvasRoutedEdge = (props: EdgeProps): SmartEdgeRoutingRenderMod
   const renderAdapter = useSmartEdgeRoutingRenderAdapter();
   const model = createCanvasRoutedEdgeModel(
     props,
-    smartEdgeRenderAdapterAcceptsCommittedGeometry(renderAdapter),
+    smartEdgeRenderAdapterAcceptsCommittedGeometry(renderAdapter, props.id),
   );
   const data = (props.data ?? {}) as CanvasRoutedEdgeData;
 

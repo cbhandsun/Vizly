@@ -6,7 +6,6 @@ import {
 } from './baseReactFlowDisplayEdgeCore';
 import {
   computeBaseReactFlowDisplayEdgesInWorker,
-  disposeBaseReactFlowDisplayWorker,
   prewarmBaseReactFlowDisplayWorker,
   resolveBaseReactFlowDisplayQualityPolicy,
   scheduleBaseReactFlowDisplayCacheWrite,
@@ -36,12 +35,11 @@ import { resolveBaseReactFlowDisplayCandidate } from './baseReactFlowDisplayCand
 import type { BaseReactFlowDisplayCandidateResolution } from './baseReactFlowDisplayCandidateResolver';
 import { canCommitBaseReactFlowDisplayResult } from './baseReactFlowDisplayCommitPolicy';
 import {
-  canReuseBaseReactFlowDisplayCommittedSnapshot,
   commitBaseReactFlowDisplaySnapshot,
   consumeBaseReactFlowStagedLayoutSnapshotHandoff,
-  doesBaseReactFlowDisplayCommittedBaselineMatchIdentity,
   readBaseReactFlowDisplayCommittedSnapshot,
 } from './baseReactFlowDisplayCommittedSnapshot';
+import { resolveBaseReactFlowDisplayCommittedReuse } from './baseReactFlowDisplayCommittedReuse';
 import { resolveDisplayGeometryBarrierPolicy, scheduleBaseReactFlowStableGeometry } from './baseReactFlowDisplayGeometryBarrier';
 import { createBaseReactFlowDisplayIncrementalPlan } from './baseReactFlowDisplayIncrementalPlan';
 import {
@@ -64,11 +62,11 @@ import {
 import { loadBaseReactFlowDocumentRouteCandidate } from './baseReactFlowDocumentRouteCandidate';
 import { useBaseReactFlowDisplayRoutingInput } from './useBaseReactFlowDisplayRoutingInput';
 import { useBaseReactFlowDisplayCommittedBaseline } from './useBaseReactFlowDisplayCommittedBaseline';
-
-export type {
-  UseBaseReactFlowDisplayRoutingOptions,
-  UseBaseReactFlowDisplayRoutingResult,
-} from './baseReactFlowDisplayRoutingTypes';
+import {
+  useBaseReactFlowActiveRenderAuthority,
+  useBaseReactFlowCommittedRenderAuthority,
+} from './useBaseReactFlowDisplayRenderAuthority';
+import { useBaseReactFlowDisplayWorker } from './useBaseReactFlowDisplayWorker';
 
 /**
  * Owns the asynchronous display-routing lifecycle while the canvas component
@@ -90,7 +88,6 @@ export const useBaseReactFlowDisplayRouting = ({
   onNodeDragFallbackResolved,
   onDisplayRoutingFinalApplied,
 }: UseBaseReactFlowDisplayRoutingOptions): UseBaseReactFlowDisplayRoutingResult => {
-  const displayEdgeWorkerRef = useRef<Worker | null>(null);
   const displayEdgeWorkerRequestSeqRef = useRef(0);
   const displayEdgeWorkerStartCountRef = useRef(0);
   const displayEdgeWorkerAbortCountRef = useRef(0);
@@ -109,10 +106,6 @@ export const useBaseReactFlowDisplayRouting = ({
     nodeDragFallbackIds,
     displayRoutingInputRef,
   });
-
-  useEffect(() => () => {
-    disposeBaseReactFlowDisplayWorker(displayEdgeWorkerRef);
-  }, []);
 
   const precompiledRegenerationPresetId =
     resolveBaseReactFlowPrecompiledRegenerationPresetIdFromWindow();
@@ -153,10 +146,9 @@ export const useBaseReactFlowDisplayRouting = ({
     inputGeometryDigest,
   });
 
-  useEffect(() => {
-    if (displayQualityPolicy.mode === 'skip' || committedFinalDisplayEntry) return;
-    prewarmBaseReactFlowDisplayWorker(displayEdgeWorkerRef);
-  }, [committedFinalDisplayEntry, displayQualityPolicy.mode]);
+  const displayEdgeWorkerRef = useBaseReactFlowDisplayWorker({
+    shouldPrewarm: displayQualityPolicy.mode !== 'skip' && !committedFinalDisplayEntry,
+  });
 
   const cachedDisplayCandidateEdges = useBaseReactFlowCachedDisplayCandidate({
     routingGeometryReady,
@@ -196,6 +188,10 @@ export const useBaseReactFlowDisplayRouting = ({
     isLargeGraph,
   });
   const [deferredDisplayEdges, setDeferredDisplayEdges] = useState<DeferredDisplayEdges | null>(null);
+  const {
+    committedRenderAuthority,
+    rememberCommittedRenderAuthority,
+  } = useBaseReactFlowCommittedRenderAuthority();
   useEffect(() => {
     const routingInput = displayRoutingInputRef.current;
     const nodeCount = routingInput?.nodes.length ?? 0;
@@ -237,30 +233,26 @@ export const useBaseReactFlowDisplayRouting = ({
     }
     const displayWorkerQualityMode = displayQualityPolicy.mode;
 
-    const retainedCommittedBaseline = forceFreshFullRoute
-      ? null
-      : committedSnapshotBaselineRef.current;
-    const retainedCommittedEntry = doesBaseReactFlowDisplayCommittedBaselineMatchIdentity(
-      retainedCommittedBaseline,
-      displayEdgeCacheSignature,
+    const {
+      retainedEntry: retainedCommittedEntry,
+      reusableEntry: reusableCommittedFinalDisplayEntry,
+      authorityBaseline,
+      authorityEdges,
+      outputRouteSignature,
+    } = resolveBaseReactFlowDisplayCommittedReuse({
+      forceFreshFullRoute,
+      retainedBaseline: committedSnapshotBaselineRef.current,
+      committedEntry: committedFinalDisplayEntry,
+      inputSignature: displayEdgeCacheSignature,
       inputGeometryDigest,
-    )
-      ? retainedCommittedBaseline
-      : null;
-    const reusableCommittedFinalDisplayEntry = canReuseBaseReactFlowDisplayCommittedSnapshot(
-      retainedCommittedBaseline,
-      committedFinalDisplayEntry,
-      displayEdgeCacheSignature,
-      inputGeometryDigest,
-    )
-      ? committedFinalDisplayEntry
-      : null;
+    });
     if (reusableCommittedFinalDisplayEntry || retainedCommittedEntry) {
       if (reusableCommittedFinalDisplayEntry?.trustedTransactionHandoff) {
         consumeBaseReactFlowStagedLayoutSnapshotHandoff(reusableCommittedFinalDisplayEntry);
       }
-      const outputRouteSignature = reusableCommittedFinalDisplayEntry?.outputRouteSignature
-        ?? retainedCommittedEntry?.outputRouteSignature;
+      if (authorityBaseline) {
+        rememberCommittedRenderAuthority(authorityBaseline, authorityEdges);
+      }
       const committedReuseTiming = resolveDisplayRoutingCommittedReuseTiming({
         current: previousDebugState,
         signature: displayEdgeCacheSignature,
@@ -564,6 +556,7 @@ export const useBaseReactFlowDisplayRouting = ({
           });
           if (committedBaseline) {
             committedSnapshotBaselineRef.current = committedBaseline;
+            rememberCommittedRenderAuthority(committedBaseline, mergedFinalEdges);
           }
         }
         updateDisplayRoutingFinalAppliedState({
@@ -655,6 +648,7 @@ export const useBaseReactFlowDisplayRouting = ({
     committedSnapshotBaselineRef,
     committedFinalDisplayEntry,
     displayEdgeCacheSignature,
+    displayEdgeWorkerRef,
     displayQualityPolicy,
     documentDisplayCandidateEdges,
     forceFreshFullRoute,
@@ -666,6 +660,7 @@ export const useBaseReactFlowDisplayRouting = ({
     onNodeDragFallbackResolved,
     onDisplayRoutingFinalApplied,
     precompiledRegenerationPresetId,
+    rememberCommittedRenderAuthority,
     routingGeometryReady,
     routingPaused,
   ]);
@@ -688,7 +683,15 @@ export const useBaseReactFlowDisplayRouting = ({
     nodeDragFallbackIds,
   });
 
+  const activeRenderAuthority = useBaseReactFlowActiveRenderAuthority({
+    committedRenderAuthority,
+    inputSignature: displayEdgeCacheSignature,
+    inputGeometryDigest,
+    displayedEdges,
+  });
+
   return {
     edges: displayedEdges,
+    renderAuthority: activeRenderAuthority,
   };
 };

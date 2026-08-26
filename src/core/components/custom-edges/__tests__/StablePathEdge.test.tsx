@@ -3,14 +3,27 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createDisplayRoutingRenderAuthority } from '../../../routing/displayRoutingRenderAuthority';
 
 import { StablePathEdge } from '../StablePathEdge';
 import {
-  ROUTING_SESSION_EDGE_RENDER_ADAPTER,
+  createRoutingSessionEdgeRenderAdapter,
   STANDALONE_EDGE_RENDER_ADAPTER,
   SmartEdgeRoutingRenderAdapterContext,
   type SmartEdgeRoutingRenderAdapter,
 } from '../smartEdgeRoutingRenderAdapter';
+
+const renderAuthority = createDisplayRoutingRenderAuthority({
+  inputSignature: '1234',
+  inputGeometryDigest: `geometry-v1:${'a'.repeat(32)}`,
+  outputRouteSignature: 'route-v2:3:3:0123456789abcdef',
+  hardReportDigest: 'hard-report-v1:0123456789abcdef',
+  authorizedEdgeIds: ['edge-test', 'horizontal', 'vertical'],
+});
+if (!renderAuthority) throw new Error('expected valid routing render authority');
+const ROUTING_SESSION_EDGE_RENDER_ADAPTER = createRoutingSessionEdgeRenderAdapter(
+  renderAuthority,
+);
 
 const { useLineJumpsMock, reactFlowStoreMock } = vi.hoisted(() => ({
   useLineJumpsMock: vi.fn(() => ({ jumps: [], jumpPath: null })),

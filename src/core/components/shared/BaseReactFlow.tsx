@@ -74,7 +74,7 @@ import {
 import type { BaseReactFlowProps } from './baseReactFlowTypes';
 import { useBaseReactFlowFitController } from './useBaseReactFlowFitController';
 import {
-  ROUTING_SESSION_EDGE_RENDER_ADAPTER,
+  resolveSmartEdgeRoutingRenderAdapter,
   SmartEdgeRoutingRenderAdapterContext,
 } from '../custom-edges/smartEdgeRoutingRenderAdapter';
 import { resolveBaseReactFlowRoutingComputation } from './baseReactFlowDragRoutingFreeze';
@@ -397,7 +397,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     });
   }, [edgeTypes]);
 
-  const { edges: displayEdges } = useBaseReactFlowDisplayRouting({
+  const { edges: displayEdges, renderAuthority: displayRenderAuthority } = useBaseReactFlowDisplayRouting({
     edges: routingEdges,
     routingNodes,
     routingGeometryReady,
@@ -420,6 +420,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     () => applySharedTrunkPaintPlan(commercialDisplayEdges),
     [commercialDisplayEdges],
   );
+  const displayRoutingRenderAdapter = resolveSmartEdgeRoutingRenderAdapter(displayRenderAuthority);
 
   const nodeInternalsRefreshKey = useMemo(
     () => createBaseReactFlowNodeInternalsRefreshSnapshot(visibleNodes).key,
@@ -576,7 +577,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
         position: 'relative',
       } : { width: '100%', height: '100%', position: 'relative' }}>
         <EdgeLabelObstacleContext.Provider value={edgeLabelObstacles}>
-        <SmartEdgeRoutingRenderAdapterContext.Provider value={ROUTING_SESSION_EDGE_RENDER_ADAPTER}>
+        <SmartEdgeRoutingRenderAdapterContext.Provider value={displayRoutingRenderAdapter}>
         <ReactFlow
           proOptions={proOptions}
           onlyRenderVisibleElements={isLargeGraph}

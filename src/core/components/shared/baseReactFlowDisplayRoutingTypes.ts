@@ -1,4 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
+import type { DisplayRoutingRenderAuthority } from '../../routing/displayRoutingRenderAuthority';
 
 export type UseBaseReactFlowDisplayRoutingOptions = {
   edges: Edge[];
@@ -18,4 +19,5 @@ export type UseBaseReactFlowDisplayRoutingOptions = {
 
 export type UseBaseReactFlowDisplayRoutingResult = {
   edges: Edge[];
+  renderAuthority: DisplayRoutingRenderAuthority | null;
 };
