@@ -130,6 +130,66 @@ describe('base React Flow topology incremental projection', () => {
     expect(result?.edges[1]).toBe(baselineEdges[0]);
   });
 
+  it('projects a node removal only when every incident edge is also removed', () => {
+    const nextNodes = nodes.filter(node => node.id !== 'hub');
+    const nextEdges: Edge[] = [];
+    const result = project({ nextNodes, nextEdges });
+
+    expect(result).toMatchObject({
+      kind: 'node-remove',
+      changedPresentEdgeIds: [],
+      removedEdgeIds: ['edge-alpha', 'edge-beta', 'edge-gamma'],
+      incidentContextEdgeIds: [],
+    });
+    expect(result?.edges).toEqual([]);
+
+    expect(project({
+      nextNodes,
+      nextEdges: [baselineSourceEdges[0]],
+    })).toBeNull();
+  });
+
+  it('keeps every surviving route reference when an isolated node is removed', () => {
+    const isolated: Node = {
+      id: 'isolated',
+      position: { x: 800, y: 800 },
+      width: 120,
+      height: 80,
+      data: {},
+    };
+    const baselineNodes = [...nodes, isolated];
+    const changeSet = createBaseReactFlowRoutingChangeSet({
+      previousNodes: baselineNodes,
+      previousEdges: baselineSourceEdges,
+      nextNodes: nodes,
+      nextEdges: baselineSourceEdges,
+    });
+    const result = createBaseReactFlowTopologyIncrementalProjection({
+      baselineNodes,
+      baselineSourceEdges,
+      baselineEdges,
+      baselinePatches,
+      nextNodes: nodes,
+      nextEdges: baselineSourceEdges,
+      changeSet,
+    });
+    const candidate = result ? createBaseReactFlowTopologyIncrementalCandidate({
+      projection: result,
+      nodes,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      displayEdgeEpoch: 1,
+    }) : null;
+
+    expect(result).toMatchObject({
+      kind: 'node-remove',
+      changedPresentEdgeIds: [],
+      removedEdgeIds: [],
+    });
+    expect(candidate?.eligibleEdgeIds).toEqual([]);
+    baselineEdges.forEach((edge, index) => expect(candidate?.edges[index]).toBe(edge));
+  });
+
   it('creates a fresh edge-add seed without carrying trusted or source routing state', () => {
     const added: Edge = {
       id: 'edge-added',

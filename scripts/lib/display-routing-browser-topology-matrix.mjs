@@ -16,6 +16,12 @@ const OPERATION_CASES = Object.freeze([
     edgeDelta: 0,
   }),
   Object.freeze({
+    id: 'node-remove',
+    classification: 'topology',
+    reason: 'node-remove',
+    edgeDelta: 0,
+  }),
+  Object.freeze({
     id: 'edge-add',
     classification: 'topology',
     reason: 'edge-add',
@@ -121,6 +127,74 @@ const applyNodeResize = session => session.evaluate(`(() => {
   } : node));
   return true;
 })()`);
+
+const applyNodeAdd = session => session.evaluate(`(() => {
+  const instance = window.reactFlowInstance;
+  const template = instance?.getNodes?.().find(node => node.id === 'wms');
+  if (!instance?.setNodes || !template) return false;
+  const id = 'routing-audit-isolated-node';
+  if (instance.getNodes().some(node => node.id === id)) return false;
+  window.__vizlyTopologyAuditNodeId = id;
+  instance.setNodes(nodes => [...nodes, {
+    ...template,
+    id,
+    parentId: undefined,
+    extent: undefined,
+    expandParent: undefined,
+    position: { x: 2_400, y: 2_000 },
+    positionAbsolute: { x: 2_400, y: 2_000 },
+    width: 160,
+    height: 80,
+    measured: { width: 160, height: 80 },
+    selected: false,
+    dragging: false,
+    data: { ...(template.data || {}), label: 'Routing audit node' },
+    style: { ...(template.style || {}), width: 160, height: 80 },
+  }]);
+  return true;
+})()`);
+
+const applyNodeRemove = session => session.evaluate(`(() => {
+  const instance = window.reactFlowInstance;
+  const id = window.__vizlyTopologyAuditNodeId;
+  if (!instance?.setNodes || typeof id !== 'string') return false;
+  const before = instance.getNodes?.().length;
+  instance.setNodes(nodes => nodes.filter(node => node.id !== id));
+  return Number.isFinite(before) && before > 0;
+})()`);
+
+const prepareNodeRemoveBaseline = async session => {
+  const before = await session.evaluate(`(() => {
+    const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
+    return {
+      workerStartCount: Number.isFinite(routing.workerStartCount)
+        ? routing.workerStartCount
+        : 0,
+      requestId: routing.requestId,
+    };
+  })()`);
+  if (!await applyNodeAdd(session)) return false;
+  const deadline = Date.now() + WAIT_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const ready = await session.evaluate(`(() => {
+      const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
+      const responses = window.__vizlyRoutingResponses || [];
+      const response = [...responses].reverse()
+        .find(item => item?.requestId === routing.requestId);
+      const nodeExists = window.reactFlowInstance?.getNodes?.()
+        .some(node => node.id === window.__vizlyTopologyAuditNodeId);
+      return routing.stage === 'final-applied'
+        && routing.requestId !== ${JSON.stringify(before.requestId)}
+        && routing.workerStartCount > ${JSON.stringify(before.workerStartCount)}
+        && response?.hardClean === true
+        && response?.hardReport?.hardClean === true
+        && nodeExists === true;
+    })()`);
+    if (ready) return true;
+    await delay(100);
+  }
+  return false;
+};
 
 const applyEdgeAdd = async session => {
   await session.evaluate(`(() => {
@@ -232,6 +306,7 @@ const applyEdgeRemove = session => session.evaluate(`(() => {
 
 const APPLY_OPERATION = Object.freeze({
   'node-resize': applyNodeResize,
+  'node-remove': applyNodeRemove,
   'edge-add': applyEdgeAdd,
   'port-policy': applyPortPolicyChange,
   'edge-remove': applyEdgeRemove,
@@ -287,12 +362,14 @@ export const assertDisplayRoutingTopologyOperationGroupResult = operationResults
   const topologyResults = operationResults.filter(result => result?.classification === 'topology');
   if (topologyResults.length === 0) return;
   const diagnostics = JSON.stringify({ operationResults }, null, 2);
-  if (topologyResults.length !== 3) {
+  if (topologyResults.length !== 4) {
     throw new Error(`Topology operation group was incomplete: ${diagnostics}`);
   }
-  const edgeRemoveResult = topologyResults.find(result => result?.id === 'edge-remove');
-  if (edgeRemoveResult?.fallbackLevel !== 'none') {
-    throw new Error(`Topology edge-remove operation did not remain incremental: ${diagnostics}`);
+  for (const operationId of ['node-remove', 'edge-add', 'edge-remove']) {
+    const result = topologyResults.find(item => item?.id === operationId);
+    if (result?.fallbackLevel !== 'none') {
+      throw new Error(`Topology ${operationId} operation did not remain incremental: ${diagnostics}`);
+    }
   }
 };
 
@@ -312,6 +389,10 @@ const verifyOperationGroup = ({
   const baselineEdgeCount = initial.response.edges.length;
   const operationResults = [];
   for (const operationCase of operationCases) {
+    if (
+      operationCase.id === 'node-remove'
+      && !await prepareNodeRemoveBaseline(session)
+    ) throw new Error('Could not prepare the browser node-remove baseline');
     const counterBaseline = await prepareOperationCapture(session);
     const applied = await APPLY_OPERATION[operationCase.id](session);
     if (!applied) throw new Error(`Could not apply browser topology operation: ${operationCase.id}`);

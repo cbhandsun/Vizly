@@ -5,6 +5,7 @@ import {
   createBaseReactFlowRoutingAffectedClosure,
   createBaseReactFlowRoutingChangeSet,
 } from '../baseReactFlowDisplayRoutingChangeSet';
+import { hasBaseReactFlowDisplayIncrementalWork } from '../baseReactFlowDisplayIncrementalPlan';
 
 const nodes: Node[] = [
   {
@@ -139,6 +140,48 @@ describe('baseReactFlow display routing change set', () => {
       reason: 'edge-remove',
       classification: 'topology',
     });
+  });
+
+  it('keeps an isolated node removal incremental without enabling empty node additions', () => {
+    const isolatedNode: Node = {
+      id: 'isolated',
+      position: { x: 600, y: 200 },
+      measured: { width: 100, height: 60 },
+      data: {},
+    };
+    const removal = createBaseReactFlowRoutingChangeSet({
+      previousNodes: [...nodes, isolatedNode],
+      previousEdges: edges,
+      nextNodes: nodes,
+      nextEdges: edges,
+      reasonHint: 'unknown',
+    });
+    const removalClosure = createBaseReactFlowRoutingAffectedClosure({
+      changeSet: removal,
+      previousNodes: [...nodes, isolatedNode],
+      nextNodes: nodes,
+      baselineEdges: edges,
+      nextEdges: edges,
+    });
+    const addition = createBaseReactFlowRoutingChangeSet({
+      previousNodes: nodes,
+      previousEdges: edges,
+      nextNodes: [...nodes, isolatedNode],
+      nextEdges: edges,
+      reasonHint: 'unknown',
+    });
+    const additionClosure = createBaseReactFlowRoutingAffectedClosure({
+      changeSet: addition,
+      previousNodes: nodes,
+      nextNodes: [...nodes, isolatedNode],
+      baselineEdges: edges,
+      nextEdges: edges,
+    });
+
+    expect(removalClosure.mutableEdgeIds).toEqual([]);
+    expect(hasBaseReactFlowDisplayIncrementalWork(removal, removalClosure)).toBe(true);
+    expect(additionClosure.mutableEdgeIds).toEqual([]);
+    expect(hasBaseReactFlowDisplayIncrementalWork(addition, additionClosure)).toBe(false);
   });
 
   it('promotes descendant incident edges when a parent container moves', () => {

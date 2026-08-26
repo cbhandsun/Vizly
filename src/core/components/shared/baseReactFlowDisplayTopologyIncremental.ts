@@ -30,6 +30,7 @@ export const MAX_BASE_REACT_FLOW_TOPOLOGY_INCREMENTAL_CHANGES = 8;
 export type BaseReactFlowTopologyIncrementalKind =
   | 'edge-add'
   | 'edge-remove'
+  | 'node-remove'
   | 'port-policy';
 
 export type BaseReactFlowTopologyIncrementalProjection = Readonly<{
@@ -158,11 +159,17 @@ const projectTrustedBaselineEdge = ({
 };
 
 const resolveTopologyKind = ({
+  nodeAdditions,
+  nodeRemovals,
+  changedExistingNodes,
   additions,
   removals,
   changedExisting,
   reason,
 }: {
+  nodeAdditions: readonly string[];
+  nodeRemovals: readonly string[];
+  changedExistingNodes: readonly string[];
   additions: readonly string[];
   removals: readonly string[];
   changedExisting: readonly string[];
@@ -170,22 +177,39 @@ const resolveTopologyKind = ({
 }): BaseReactFlowTopologyIncrementalKind | null => {
   if (
     reason === 'edge-add'
+    && nodeAdditions.length === 0
+    && nodeRemovals.length === 0
+    && changedExistingNodes.length === 0
     && additions.length > 0
     && removals.length === 0
     && changedExisting.length === 0
   ) return 'edge-add';
   if (
     reason === 'edge-remove'
+    && nodeAdditions.length === 0
+    && nodeRemovals.length === 0
+    && changedExistingNodes.length === 0
     && removals.length > 0
     && additions.length === 0
     && changedExisting.length === 0
   ) return 'edge-remove';
   if (
     reason === 'port-policy'
+    && nodeAdditions.length === 0
+    && nodeRemovals.length === 0
+    && changedExistingNodes.length === 0
     && changedExisting.length > 0
     && additions.length === 0
     && removals.length === 0
   ) return 'port-policy';
+  if (
+    reason === 'node-remove'
+    && nodeRemovals.length > 0
+    && nodeAdditions.length === 0
+    && changedExistingNodes.length === 0
+    && additions.length === 0
+    && changedExisting.length === 0
+  ) return 'node-remove';
   return null;
 };
 
@@ -214,9 +238,9 @@ export const createBaseReactFlowTopologyIncrementalProjection = ({
     changeSet.classification !== 'topology'
     || !changeSet.topologyChanged
     || !changeSet.geometryChanged
-    || changeSet.changedNodeIds.length !== 0
-    || changeSet.changedEdgeIds.length === 0
-    || changeSet.changedEdgeIds.length > MAX_BASE_REACT_FLOW_TOPOLOGY_INCREMENTAL_CHANGES
+    || changeSet.changedNodeIds.length + changeSet.changedEdgeIds.length === 0
+    || changeSet.changedNodeIds.length + changeSet.changedEdgeIds.length
+      > MAX_BASE_REACT_FLOW_TOPOLOGY_INCREMENTAL_CHANGES
   ) return null;
 
   const baselineNodeById = uniqueItemsById(baselineNodes);
@@ -235,6 +259,20 @@ export const createBaseReactFlowTopologyIncrementalProjection = ({
     || !edgesHaveValidEndpoints(baselineSourceEdges, new Set(baselineNodeById.keys()))
     || !edgesHaveValidEndpoints(nextEdges, new Set(nextNodeById.keys()))
   ) return null;
+
+  const nodeAdditions = [...nextNodeById.keys()]
+    .filter(nodeId => !baselineNodeById.has(nodeId))
+    .sort();
+  const nodeRemovals = [...baselineNodeById.keys()]
+    .filter(nodeId => !nextNodeById.has(nodeId))
+    .sort();
+  const changedExistingNodes = changeSet.changedNodeIds
+    .filter(nodeId => baselineNodeById.has(nodeId) && nextNodeById.has(nodeId))
+    .sort();
+  if (!sameIdentifiers(
+    [...nodeAdditions, ...nodeRemovals, ...changedExistingNodes].sort(),
+    [...changeSet.changedNodeIds].sort(),
+  )) return null;
 
   const patchById = new Map<string, RoutingPatch>();
   for (let index = 0; index < baselineSourceEdges.length; index += 1) {
@@ -267,6 +305,9 @@ export const createBaseReactFlowTopologyIncrementalProjection = ({
   const actualChangedIds = [...additions, ...removals, ...changedExisting].sort();
   if (!sameIdentifiers(actualChangedIds, [...changeSet.changedEdgeIds].sort())) return null;
   const kind = resolveTopologyKind({
+    nodeAdditions,
+    nodeRemovals,
+    changedExistingNodes,
     additions,
     removals,
     changedExisting,
@@ -347,7 +388,7 @@ export const createBaseReactFlowTopologyIncrementalCandidate = ({
   displayEdgeEpoch: number;
 }): BaseReactFlowTopologyIncrementalCandidate | null => {
   if (projection.changedPresentEdgeIds.length === 0) {
-    return projection.kind === 'edge-remove'
+    return projection.kind === 'edge-remove' || projection.kind === 'node-remove'
       ? { edges: projection.edges, eligibleEdgeIds: [] }
       : null;
   }

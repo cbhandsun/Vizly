@@ -530,4 +530,121 @@ describe('Logistics incremental display routing', () => {
       response.edges ?? [],
     ), diagnostics).toBe(true);
   }, 120_000);
+
+  it('removes an isolated node without rerouting any Logistics edge', async () => {
+    const entry = Object.entries(GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_LOADERS)
+      .find(([, descriptor]) => descriptor.presetId === 'logistics-architecture-v1');
+    if (!entry) throw new Error('expected the Logistics precompiled loader');
+    const [inputSignature, descriptor] = entry;
+    const artifact = parseBaseReactFlowPrecompiledRouteArtifact(
+      getGeneratedPrecompiledRouteArtifactForTest('logistics-architecture-v1'), {
+        inputSignature,
+        inputGeometryDigest: descriptor.geometryDigest,
+        sourceHash: descriptor.sourceHash,
+      });
+    if (!artifact) throw new Error('expected the Logistics artifact to parse');
+
+    const sourceEdges = await createBrowserSourceEdges();
+    const baselineEdges = mergeBaseReactFlowDisplayEdgePatches(sourceEdges, artifact.edges);
+    const baselinePatches = baselineEdges
+      ? createBaseReactFlowDisplayEdgePatches(sourceEdges, baselineEdges)
+      : null;
+    const baselineOutputRouteSignature = baselineEdges
+      ? computeBaseReactFlowDisplayOutputRouteSignature(baselineEdges)
+      : null;
+    if (!baselineEdges || !baselinePatches || !baselineOutputRouteSignature) {
+      throw new Error('expected a valid Logistics incremental baseline');
+    }
+    const nextNodes = withAbsoluteNodePositions(browserLogisticsNodes);
+    const isolatedNode = {
+      id: 'routing-audit-isolated',
+      type: 'custom',
+      position: { x: 2_400, y: 2_000 },
+      positionAbsolute: { x: 2_400, y: 2_000 },
+      width: 160,
+      height: 80,
+      measured: { width: 160, height: 80 },
+      data: {},
+    };
+    const baselineNodes = [...nextNodes, isolatedNode];
+    const baselineIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
+      nodes: baselineNodes,
+      edges: sourceEdges,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+    });
+    const nextIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
+      nodes: nextNodes,
+      edges: sourceEdges,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+    });
+    const changeSet = createBaseReactFlowRoutingChangeSet({
+      previousNodes: baselineNodes,
+      previousEdges: sourceEdges,
+      nextNodes,
+      nextEdges: sourceEdges,
+      reasonHint: 'node-remove',
+    });
+    const affectedClosure = createBaseReactFlowRoutingAffectedClosure({
+      changeSet,
+      previousNodes: baselineNodes,
+      nextNodes,
+      baselineEdges,
+      nextEdges: sourceEdges,
+    });
+    const response = computeBaseReactFlowDisplayEdgesWorkerResponse({
+      operation: 'incremental-route',
+      requestId: 'logistics-node-remove-incremental',
+      edges: sourceEdges,
+      nodes: nextNodes,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+      displayEdgeEpoch: computeBaseReactFlowDisplayEdgeEpoch({
+        nodes: nextNodes,
+        edges: sourceEdges,
+      }),
+      qualityMode: 'full',
+      baselineInputSignature: baselineIdentity.cacheSignature,
+      baselineInputGeometryDigest: baselineIdentity.geometryDigest,
+      baselineNodes,
+      baselineSourceEdges: sourceEdges,
+      baselinePatches,
+      baselineOutputRouteSignature,
+      nextInputSignature: nextIdentity.cacheSignature,
+      nextInputGeometryDigest: nextIdentity.geometryDigest,
+      changeSet,
+      mutableEdgeIds: affectedClosure.mutableEdgeIds,
+      contextEdgeIds: affectedClosure.contextEdgeIds,
+    });
+    const diagnostics = JSON.stringify({
+      changeSet,
+      affectedClosure,
+      routeResolution: response.routeResolution,
+      fallbackLevel: response.fallbackLevel,
+      hardClean: response.hardClean,
+      phaseTrace: response.phaseTrace,
+    }, null, 2);
+
+    expect(changeSet, diagnostics).toMatchObject({
+      classification: 'topology',
+      reason: 'node-remove',
+      changedNodeIds: ['routing-audit-isolated'],
+      changedEdgeIds: [],
+    });
+    expect(response, diagnostics).toMatchObject({
+      routeResolution: 'incremental-route',
+      fallbackLevel: 'none',
+      affectedEdgeCount: 0,
+      hardClean: true,
+    });
+    expect(response.edges, diagnostics).toHaveLength(sourceEdges.length);
+    expect(doBaseReactFlowDisplayRoutesMatchExactly(
+      baselineEdges,
+      response.edges ?? [],
+    ), diagnostics).toBe(true);
+  }, 120_000);
 });

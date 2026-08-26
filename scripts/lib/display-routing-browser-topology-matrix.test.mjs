@@ -73,18 +73,26 @@ describe('display routing browser topology matrix', () => {
     }))).toThrow(/invalid fallback level/);
   });
 
-  it('requires edge removal to avoid full fallback in the topology operation group', () => {
+  it('requires safe removal and edge-add operations to avoid full fallback', () => {
     const result = (id, fallbackLevel) => ({ id, classification: 'topology', fallbackLevel });
     expect(assertDisplayRoutingTopologyOperationGroupResult([
-      result('edge-add', 'full'),
+      result('node-remove', 'none'),
+      result('edge-add', 'none'),
       result('port-policy', 'full'),
       result('edge-remove', 'none'),
     ])).toBeUndefined();
     expect(() => assertDisplayRoutingTopologyOperationGroupResult([
+      result('node-remove', 'none'),
       result('edge-add', 'none'),
       result('port-policy', 'none'),
       result('edge-remove', 'full'),
     ])).toThrow(/edge-remove operation did not remain incremental/);
+    expect(() => assertDisplayRoutingTopologyOperationGroupResult([
+      result('node-remove', 'full'),
+      result('edge-add', 'none'),
+      result('port-policy', 'full'),
+      result('edge-remove', 'none'),
+    ])).toThrow(/node-remove operation did not remain incremental/);
   });
 
   it('allows a geometry resize to remain local', () => {

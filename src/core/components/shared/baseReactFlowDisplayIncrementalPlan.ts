@@ -18,6 +18,19 @@ export type BaseReactFlowDisplayIncrementalPlan = Readonly<{
   affectedClosure: BaseReactFlowRoutingAffectedClosure;
 }>;
 
+export const hasBaseReactFlowDisplayIncrementalWork = (
+  changeSet: BaseReactFlowRoutingChangeSet,
+  affectedClosure: BaseReactFlowRoutingAffectedClosure,
+): boolean => (
+  affectedClosure.mutableEdgeIds.length > 0
+  || (
+    changeSet.classification === 'topology'
+    && changeSet.reason === 'node-remove'
+    && changeSet.changedNodeIds.length > 0
+    && changeSet.changedEdgeIds.length === 0
+  )
+);
+
 export const createBaseReactFlowDisplayIncrementalPlan = ({
   baseline,
   nextInputSignature,
@@ -67,7 +80,7 @@ export const createBaseReactFlowDisplayIncrementalPlan = ({
     baselineEdges,
     nextEdges,
   });
-  return affectedClosure.mutableEdgeIds.length > 0
+  return hasBaseReactFlowDisplayIncrementalWork(changeSet, affectedClosure)
     ? { baseline, changeSet, affectedClosure }
     : null;
 };
