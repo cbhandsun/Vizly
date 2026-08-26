@@ -64,6 +64,7 @@ const waitForValue = async (session, expression, label) => {
         window.__vizlyBaseReactFlowDisplayRouting || {},
         window.__vizlyRoutingResponses || [],
         document.querySelectorAll('.react-flow__edge').length,
+        window.__vizlyRoutingRequests || [],
       );
     })()`);
     if (displayRoutingWaitStateHasTerminalFailure(state)) {
@@ -77,6 +78,7 @@ const waitForValue = async (session, expression, label) => {
       window.__vizlyBaseReactFlowDisplayRouting || {},
       window.__vizlyRoutingResponses || [],
       document.querySelectorAll('.react-flow__edge').length,
+      window.__vizlyRoutingRequests || [],
     );
   })()`);
   throw new Error(`Timed out waiting for ${label}:\n${JSON.stringify(state, null, 2)}`);
@@ -97,12 +99,18 @@ const prepareSession = async session => {
 const readFinalRouteExpression = expectedRequestPrefix => `(() => {
   const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
   if (routing.stage !== 'final-applied') return null;
-  if (${JSON.stringify(expectedRequestPrefix)}
-    && !String(routing.requestId || '').startsWith(${JSON.stringify(expectedRequestPrefix)})) return null;
   const requests = window.__vizlyRoutingRequests || [];
   const responses = window.__vizlyRoutingResponses || [];
-  const response = [...responses].reverse().find(item => item?.requestId === routing.requestId);
-  const request = [...requests].reverse().find(item => item?.requestId === routing.requestId);
+  const expectedPrefix = ${JSON.stringify(expectedRequestPrefix)};
+  const response = [...responses].reverse().find(item => (
+    typeof item?.requestId === 'string'
+    && (expectedPrefix
+      ? item.requestId.startsWith(expectedPrefix)
+      : item.requestId === routing.requestId)
+    && item.hardClean === true
+    && Array.isArray(item.edges)
+  ));
+  const request = [...requests].reverse().find(item => item?.requestId === response?.requestId);
   if (!response || response.hardClean !== true || !Array.isArray(response.edges)) return null;
   if (!response.hardReport || response.hardReport.hardClean !== true) return null;
   const renderedEdgeCount = document.querySelectorAll('.react-flow__edge').length;
@@ -287,7 +295,11 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
       + `&routingMatrix=${layoutCase.id}-${Date.now()}`
       + `#/?diagram=${encodeURIComponent(presetId)}`,
   });
-  await waitForValue(session, readFinalRouteExpression(''), `${layoutCase.id} initial route`);
+  const initialRoute = await waitForValue(
+    session,
+    readFinalRouteExpression(''),
+    `${layoutCase.id} initial route`,
+  );
   await session.evaluate('window.__vizlyRoutingResponses = []');
   const clickedAt = await clickLayout(session, layoutCase);
   const route = await waitForValue(
@@ -300,6 +312,12 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
     : route.routing.totalRouteMs;
   if (!Number.isFinite(totalRouteMs) || totalRouteMs > MAX_LAYOUT_ROUTE_MS) {
     throw new Error(`${layoutCase.id} exceeded ${MAX_LAYOUT_ROUTE_MS}ms: ${totalRouteMs}`);
+  }
+  if (route.routing.workerStartCount !== initialRoute.routing.workerStartCount) {
+    throw new Error(`${layoutCase.id} started a duplicate Canvas display Worker: ${JSON.stringify({
+      before: initialRoute.routing.workerStartCount,
+      after: route.routing.workerStartCount,
+    })}`);
   }
   const mounted = await session.evaluate(`(() => ({
     nodes: window.reactFlowInstance?.getNodes?.().map(node => ({ id: node.id })) || [],

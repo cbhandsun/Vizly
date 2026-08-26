@@ -332,5 +332,6 @@ export const renderPrecompiledDisplayRouteCaptureExpression = targetId => `(asyn
     inputGeometryDigest: routing.inputGeometryDigest,
     outputRouteSignature: routing.outputRouteSignature,
     workerResolution: response.routeResolution,
+    workerDurationMs: response.workerDurationMs,
   };
 })()`;

@@ -42,6 +42,10 @@ export type DisplayRoutingDebugState = {
   geometryBarrierMs?: number;
   geometryBarrierSamples?: number;
   hardGateDiagnostics?: BaseDisplayBoundedCandidateReport;
+  stagedLayoutPrimarySignature?: string;
+  stagedLayoutPrimaryGeometryDigest?: string;
+  stagedLayoutSourceSignature?: string;
+  stagedLayoutSourceGeometryDigest?: string;
 };
 
 type DisplayRoutingDebugWindow = Window & {

@@ -24,6 +24,10 @@ const isRecord = value => Boolean(value) && typeof value === 'object' && !Array.
 const finiteDuration = value => (
   Number.isFinite(value) && value >= 0 && value <= MAX_DURATION_MS ? value : null
 );
+const subtractDurations = (totalMs, partMs) => Number((totalMs - partMs).toFixed(3));
+const sumDurations = durations => Number(
+  durations.reduce((sum, durationMs) => sum + durationMs, 0).toFixed(3),
+);
 const boundedCounter = value => (
   Number.isSafeInteger(value) && value >= 0 && value <= MAX_COUNTER ? value : null
 );
@@ -108,6 +112,7 @@ export const buildPrecompiledDisplayRoutePerformanceResult = captures => {
     const measurement = isRecord(capture?.measurement) ? capture.measurement : null;
     const presetId = boundedToken(capture?.presetId, PRESET_ID_PATTERN);
     const routeMs = finiteDuration(measurement?.routeMs);
+    const workerDurationMs = finiteDuration(measurement?.workerDurationMs);
     const workerStartCount = boundedCounter(measurement?.workerStartCount);
     const workerAbortCount = boundedCounter(measurement?.workerAbortCount);
     const workerResolution = ROUTE_RESOLUTIONS.has(measurement?.workerResolution)
@@ -116,17 +121,33 @@ export const buildPrecompiledDisplayRoutePerformanceResult = captures => {
     if (
       !presetId
       || routeMs == null
+      || workerDurationMs == null
+      || workerDurationMs > routeMs
       || workerStartCount !== 1
       || workerAbortCount !== 0
       || !workerResolution
     ) throw new Error('Cold-route capture contains invalid measurement data');
+    const phaseTrace = projectPhaseTrace(measurement.phaseTrace);
+    const tracedExclusiveMs = sumDurations(
+      phaseTrace.map(trace => trace.exclusiveDurationMs),
+    );
+    if (tracedExclusiveMs > workerDurationMs + 1) {
+      throw new Error('Cold-route trace exceeds its Worker compute duration');
+    }
     return {
       presetId,
       routeMs,
+      workerDurationMs,
+      routeOverheadMs: subtractDurations(routeMs, workerDurationMs),
+      tracedExclusiveMs,
+      workerUntracedMs: subtractDurations(
+        workerDurationMs,
+        Math.min(workerDurationMs, tracedExclusiveMs),
+      ),
       workerResolution,
       workerStartCount,
       workerAbortCount,
-      phaseTrace: projectPhaseTrace(measurement.phaseTrace),
+      phaseTrace,
     };
   });
   if (new Set(presets.map(item => item.presetId)).size !== presets.length) {
@@ -199,6 +220,10 @@ export const summarizePrecompiledDisplayRoutePerformance = (
     )))].sort();
     presets[presetId] = {
       route: summarizeDisplayRoutingSamples(cases.map(item => item.routeMs)),
+      workerCompute: summarizeDisplayRoutingSamples(cases.map(item => item.workerDurationMs)),
+      routeOverhead: summarizeDisplayRoutingSamples(cases.map(item => item.routeOverheadMs)),
+      tracedCompute: summarizeDisplayRoutingSamples(cases.map(item => item.tracedExclusiveMs)),
+      untracedCompute: summarizeDisplayRoutingSamples(cases.map(item => item.workerUntracedMs)),
       resolutions: Object.fromEntries([...new Set(cases.map(item => item.workerResolution))]
         .sort()
         .map(resolution => [resolution, cases.filter(item => item.workerResolution === resolution).length])),

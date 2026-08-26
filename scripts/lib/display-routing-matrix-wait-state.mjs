@@ -1,4 +1,9 @@
-export const summarizeDisplayRoutingWaitState = (routingValue, responseValue, edgeCountValue) => {
+export const summarizeDisplayRoutingWaitState = (
+  routingValue,
+  responseValue,
+  edgeCountValue,
+  requestValue = [],
+) => {
   const record = value => (
     typeof value === 'object' && value !== null && !Array.isArray(value) ? value : {}
   );
@@ -11,8 +16,16 @@ export const summarizeDisplayRoutingWaitState = (routingValue, responseValue, ed
   const token = value => (
     typeof value === 'string' && /^[a-z0-9:-]{1,64}$/i.test(value) ? value : undefined
   );
+  const requestKind = value => (
+    typeof value !== 'string'
+      ? undefined
+      : value.startsWith('layout:')
+        ? 'layout'
+        : 'display'
+  );
   const routing = record(routingValue);
   const responses = Array.isArray(responseValue) ? responseValue : [];
+  const requests = Array.isArray(requestValue) ? requestValue : [];
   const response = record(responses.at(-1));
   const report = record(response.hardReport);
   const quality = record(report.quality);
@@ -21,6 +34,53 @@ export const summarizeDisplayRoutingWaitState = (routingValue, responseValue, ed
     ? routing.phaseProgressTrace.slice(-24)
     : [];
   const metric = key => finite(quality[key]);
+  const identityToken = value => (
+    typeof value === 'string'
+      && (/^\d{1,10}$/.test(value) || /^geometry-v1:[0-9a-f]{32}$/.test(value))
+      ? value
+      : undefined
+  );
+  const opaqueFingerprint = value => {
+    let hash = 2166136261;
+    const text = JSON.stringify(value);
+    for (let index = 0; index < text.length; index += 1) {
+      hash ^= text.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return String(hash >>> 0);
+  };
+  const nodeGeometryFingerprint = value => !Array.isArray(value) ? undefined : opaqueFingerprint(
+    value.map((item) => {
+      const node = record(item);
+      const position = record(node.positionAbsolute ?? node.position);
+      const measured = record(node.measured);
+      const style = record(node.style);
+      return [
+        node.id,
+        node.type,
+        node.parentId,
+        position.x,
+        position.y,
+        measured.width ?? node.width ?? style.width,
+        measured.height ?? node.height ?? style.height,
+      ];
+    }),
+  );
+  const edgeRouteFingerprint = value => !Array.isArray(value) ? undefined : opaqueFingerprint(
+    value.map((item) => {
+      const edge = record(item);
+      const data = record(edge.data);
+      return [
+        edge.id,
+        edge.source,
+        edge.target,
+        edge.sourceHandle,
+        edge.targetHandle,
+        edge.type,
+        data.computedPath,
+      ];
+    }),
+  );
   const projectTrace = (value) => {
     const trace = record(value);
     return {
@@ -41,6 +101,7 @@ export const summarizeDisplayRoutingWaitState = (routingValue, responseValue, ed
   return {
     routing: {
       stage: token(routing.stage),
+      requestKind: requestKind(routing.requestId),
       workerResolution: token(routing.workerResolution),
       nodeCount: integer(routing.nodeCount),
       edgeCount: integer(routing.edgeCount),
@@ -48,10 +109,54 @@ export const summarizeDisplayRoutingWaitState = (routingValue, responseValue, ed
       workerAbortCount: integer(routing.workerAbortCount),
       geometryBarrierResolution: token(routing.geometryBarrierResolution),
       geometryBarrierMs: finite(routing.geometryBarrierMs),
+      stagedLayoutPrimarySignature: identityToken(routing.stagedLayoutPrimarySignature),
+      stagedLayoutPrimaryGeometryDigest: identityToken(
+        routing.stagedLayoutPrimaryGeometryDigest,
+      ),
+      stagedLayoutSourceSignature: identityToken(routing.stagedLayoutSourceSignature),
+      stagedLayoutSourceGeometryDigest: identityToken(
+        routing.stagedLayoutSourceGeometryDigest,
+      ),
       phaseProgressTrace: progressTraces.map(projectTrace),
     },
     responseCount: responses.length,
+    responseTrace: responses.slice(-16).map((value) => {
+      const candidate = record(value);
+      const identity = record(candidate.nextIdentity ?? record(candidate.sessionRef).identity);
+      return {
+        requestKind: requestKind(candidate.requestId),
+        routeResolution: token(candidate.routeResolution),
+        hardClean: typeof candidate.hardClean === 'boolean' ? candidate.hardClean : undefined,
+        inputSignature: identityToken(identity.inputSignature),
+        inputGeometryDigest: identityToken(identity.inputGeometryDigest),
+        edgeRouteFingerprint: edgeRouteFingerprint(candidate.edges),
+        edgeObjectFingerprint: Array.isArray(candidate.edges)
+          ? opaqueFingerprint(candidate.edges)
+          : undefined,
+      };
+    }),
+    requestTrace: requests.slice(-16).map((value) => {
+      const request = record(value);
+      return {
+        requestKind: requestKind(request.requestId),
+        inputSignature: identityToken(request.inputSignature ?? request.nextInputSignature),
+        inputGeometryDigest: identityToken(
+          request.inputGeometryDigest ?? request.nextInputGeometryDigest,
+        ),
+        nodeCount: Array.isArray(request.nodes) ? integer(request.nodes.length) : undefined,
+        edgeCount: Array.isArray(request.edges) ? integer(request.edges.length) : undefined,
+        nodeGeometryFingerprint: nodeGeometryFingerprint(request.nodes),
+        edgeRouteFingerprint: edgeRouteFingerprint(request.edges),
+        nodeObjectFingerprint: Array.isArray(request.nodes)
+          ? opaqueFingerprint(request.nodes)
+          : undefined,
+        edgeObjectFingerprint: Array.isArray(request.edges)
+          ? opaqueFingerprint(request.edges)
+          : undefined,
+      };
+    }),
     lastResponse: {
+      requestKind: requestKind(response.requestId),
       routeResolution: token(response.routeResolution),
       hardClean: typeof response.hardClean === 'boolean' ? response.hardClean : undefined,
       workerDurationMs: finite(response.workerDurationMs),

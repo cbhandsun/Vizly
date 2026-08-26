@@ -15,6 +15,7 @@ const capture = (presetId, routeMs, extra = {}) => ({
   privatePath: 'must-not-survive',
   measurement: {
     routeMs,
+    workerDurationMs: routeMs * 0.8,
     workerResolution: 'full-route',
     workerStartCount: 1,
     workerAbortCount: 0,
@@ -80,6 +81,10 @@ describe('precompiled display route cold performance', () => {
     expect(result.presets[1]).toMatchObject({
       presetId: 'logistics-architecture-v1',
       routeMs: 700,
+      workerDurationMs: 560,
+      routeOverheadMs: 140,
+      tracedExclusiveMs: 233.333,
+      workerUntracedMs: 326.667,
       workerStartCount: 1,
       workerAbortCount: 0,
       phaseTrace: [{
@@ -107,6 +112,24 @@ describe('precompiled display route cold performance', () => {
       capture('safe', Number.POSITIVE_INFINITY),
     ])).toThrow(/invalid measurement/);
     expect(() => buildPrecompiledDisplayRoutePerformanceResult([
+      capture('safe', 10, { workerDurationMs: Number.NaN }),
+    ])).toThrow(/invalid measurement/);
+    expect(() => buildPrecompiledDisplayRoutePerformanceResult([
+      capture('safe', 10, { workerDurationMs: 11 }),
+    ])).toThrow(/invalid measurement/);
+    expect(() => buildPrecompiledDisplayRoutePerformanceResult([
+      capture('safe', 10, {
+        workerDurationMs: 5,
+        phaseTrace: [{
+          phase: 'quality',
+          durationMs: 10,
+          exclusiveDurationMs: 10,
+          changedEdgeCount: 0,
+          resolution: 'accepted',
+        }],
+      }),
+    ])).toThrow(/exceeds/);
+    expect(() => buildPrecompiledDisplayRoutePerformanceResult([
       capture('safe', 10, { workerAbortCount: 1 }),
     ])).toThrow(/invalid measurement/);
     expect(() => buildPrecompiledDisplayRoutePerformanceResult([
@@ -124,6 +147,7 @@ describe('precompiled display route cold performance', () => {
     expect(() => parsePrecompiledDisplayRoutePerformanceResult({ presets: [{
       presetId: 'safe',
       routeMs: 10,
+      workerDurationMs: 8,
       workerResolution: 'forged',
       workerStartCount: 1,
       workerAbortCount: 0,
@@ -162,6 +186,30 @@ describe('precompiled display route cold performance', () => {
       medianMs: 664,
       p95Ms: 678,
       maxMs: 679,
+    });
+    expect(summary.presets['logistics-architecture-v1'].workerCompute).toEqual({
+      sampleCount: 30,
+      medianMs: 531.2,
+      p95Ms: 542.4,
+      maxMs: 543.2,
+    });
+    expect(summary.presets['logistics-architecture-v1'].routeOverhead).toEqual({
+      sampleCount: 30,
+      medianMs: 132.8,
+      p95Ms: 135.6,
+      maxMs: 135.8,
+    });
+    expect(summary.presets['logistics-architecture-v1'].tracedCompute).toEqual({
+      sampleCount: 30,
+      medianMs: 221.333,
+      p95Ms: 226,
+      maxMs: 226.333,
+    });
+    expect(summary.presets['logistics-architecture-v1'].untracedCompute).toEqual({
+      sampleCount: 30,
+      medianMs: 309.867,
+      p95Ms: 316.4,
+      maxMs: 316.867,
     });
     expect(summary.presets['logistics-architecture-v1'].phases.quality).toMatchObject({
       sampleCount: 30,

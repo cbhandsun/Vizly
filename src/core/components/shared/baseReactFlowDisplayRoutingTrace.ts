@@ -92,6 +92,8 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
   'quality-polish-detached-local',
   'quality-polish-endpoint',
   'quality-polish-micro',
+  'quality-polish-local-after-endpoint',
+  'quality-polish-endpoint-after-local',
   'quality-polish-selection',
   'quality-polish-residual',
   'residual-exact',
@@ -138,6 +140,7 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
   'terminal-fail-closed-micro',
   'terminal-fail-closed-gate',
   'finalizer',
+  'final-evaluation-context',
   'measured-repair',
   'measured-repair-normalize',
   'measured-repair-lanes',
@@ -188,6 +191,7 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
   'final-commercial-source-stairs',
   'final-commercial-evaluation',
   'final-commercial-safety-closure',
+  'final-exact-hard-report',
   'session-commit',
 ] as const;
 
@@ -342,6 +346,8 @@ const DISPLAY_ROUTING_PHASE_PARENTS: Readonly<
   'quality-polish-detached-local': 'quality-polish-candidates',
   'quality-polish-endpoint': 'quality-polish-candidates',
   'quality-polish-micro': 'quality-polish-candidates',
+  'quality-polish-local-after-endpoint': 'quality-polish-candidates',
+  'quality-polish-endpoint-after-local': 'quality-polish-candidates',
   'quality-polish-selection': 'quality-polish',
   'quality-polish-residual': 'quality-polish',
   'quality-polish-obstacle-selection': 'quality-polish',
@@ -372,6 +378,7 @@ const DISPLAY_ROUTING_PHASE_PARENTS: Readonly<
   'terminal-fail-closed-selection': 'terminal-finalize-fail-closed',
   'terminal-fail-closed-micro': 'terminal-finalize-fail-closed',
   'terminal-fail-closed-gate': 'terminal-finalize-fail-closed',
+  'final-evaluation-context': 'finalizer',
   'measured-repair': 'finalizer',
   'measured-repair-normalize': 'measured-repair',
   'measured-repair-lanes': 'measured-repair',
@@ -422,6 +429,7 @@ const DISPLAY_ROUTING_PHASE_PARENTS: Readonly<
   'final-commercial-source-stairs': 'finalizer',
   'final-commercial-evaluation': 'finalizer',
   'final-commercial-safety-closure': 'finalizer',
+  'final-exact-hard-report': 'finalizer',
 });
 
 const readMonotonicTime = (): number => (

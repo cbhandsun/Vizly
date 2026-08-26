@@ -234,6 +234,7 @@ const captureTarget = async (session, target, source, routingVersion) => {
     inputGeometryDigest,
     outputRouteSignature,
     workerResolution,
+    workerDurationMs,
   } = captured;
   if (
     routing.routingVersion !== routingVersion
@@ -306,6 +307,7 @@ const captureTarget = async (session, target, source, routingVersion) => {
       workerStartCount: routing.workerStartCount,
       workerAbortCount: routing.workerAbortCount,
       routeMs: routing.routeMs,
+      workerDurationMs,
       phaseTrace: routing.phaseTrace,
     },
   };

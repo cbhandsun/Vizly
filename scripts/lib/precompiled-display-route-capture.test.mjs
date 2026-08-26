@@ -8,6 +8,7 @@ import {
   precompiledDisplayRouteContractsMatch,
   replayPrecompiledDisplayRoutePatches,
   replayTrustedDisplayRoutePatches,
+  renderPrecompiledDisplayRouteCaptureExpression,
 } from './precompiled-display-route-capture.mjs';
 
 const source = [{
@@ -31,6 +32,11 @@ const routed = [{
 }];
 
 describe('precompiled display route capture', () => {
+  it('captures bounded worker compute duration for cold-route diagnostics', () => {
+    expect(renderPrecompiledDisplayRouteCaptureExpression('safe-preset'))
+      .toContain('workerDurationMs: response.workerDurationMs');
+  });
+
   it('treats an in-job final repair as a fresh full route', () => {
     expect(isFreshFullRouteResolution('full-route')).toBe(true);
     expect(isFreshFullRouteResolution('full-route-repaired')).toBe(true);

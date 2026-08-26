@@ -9,6 +9,9 @@ describe('display routing matrix wait-state summary', () => {
   it('keeps bounded routing metrics while dropping geometry and user-authored content', () => {
     const summary = summarizeDisplayRoutingWaitState({
       stage: 'worker-response',
+      requestId: 'layout:2',
+      stagedLayoutPrimarySignature: '123456',
+      stagedLayoutPrimaryGeometryDigest: 'geometry-v1:0123456789abcdef0123456789abcdef',
       workerStartCount: 1,
       userLabel: 'private node name',
       phaseProgressTrace: [{
@@ -17,6 +20,7 @@ describe('display routing matrix wait-state summary', () => {
         privateGeometry: [{ x: 1, y: 2 }],
       }],
     }, [{
+      requestId: 'route-v2:opaque:4',
       routeResolution: 'full-route-repaired',
       hardClean: false,
       edges: [{ data: { computedPath: [{ x: 1, y: 2 }] }, label: 'private edge label' }],
@@ -33,16 +37,44 @@ describe('display routing matrix wait-state summary', () => {
         scannedEdgePairCount: 325,
         debugPath: [{ x: 10, y: 20 }],
       }],
-    }], 26);
+    }], 26, [{
+      requestId: 'layout:2',
+      inputSignature: '123456',
+      inputGeometryDigest: 'geometry-v1:0123456789abcdef0123456789abcdef',
+      nodes: [{ id: 'private-node' }],
+      edges: [{ id: 'private-edge' }],
+    }]);
 
     expect(summary).toMatchObject({
       routing: {
         stage: 'worker-response',
+        requestKind: 'layout',
+        stagedLayoutPrimarySignature: '123456',
+        stagedLayoutPrimaryGeometryDigest: 'geometry-v1:0123456789abcdef0123456789abcdef',
         workerStartCount: 1,
         phaseProgressTrace: [{ phase: 'quality', durationMs: 18 }],
       },
       responseCount: 1,
+      responseTrace: [{
+        requestKind: 'display',
+        routeResolution: 'full-route-repaired',
+        hardClean: false,
+        edgeRouteFingerprint: expect.stringMatching(/^\d+$/),
+        edgeObjectFingerprint: expect.stringMatching(/^\d+$/),
+      }],
+      requestTrace: [{
+        requestKind: 'layout',
+        inputSignature: '123456',
+        inputGeometryDigest: 'geometry-v1:0123456789abcdef0123456789abcdef',
+        nodeCount: 1,
+        edgeCount: 1,
+        nodeGeometryFingerprint: expect.stringMatching(/^\d+$/),
+        edgeRouteFingerprint: expect.stringMatching(/^\d+$/),
+        nodeObjectFingerprint: expect.stringMatching(/^\d+$/),
+        edgeObjectFingerprint: expect.stringMatching(/^\d+$/),
+      }],
       lastResponse: {
+        requestKind: 'display',
         routeResolution: 'full-route-repaired',
         hardClean: false,
         hardReport: {
