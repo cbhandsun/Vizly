@@ -62,9 +62,8 @@ import {
   preservesBaseReactFlowIncrementalBoundary as preservesIncrementalBoundary,
 } from './baseReactFlowDisplayIncrementalContracts';
 import {
-  createBaseReactFlowTopologyIncrementalDisplayEdges,
-  createBaseReactFlowTopologyIncrementalProjection,
-} from './baseReactFlowDisplayTopologyIncremental';
+  createBaseReactFlowTopologyIncrementalRoute,
+} from './baseReactFlowDisplayTopologyIncrementalRoute';
 
 export type BaseReactFlowDisplayIncrementalRouteOutcome = Readonly<{
   edges: Edge[] | null;
@@ -168,41 +167,18 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
     return { edges: null, affectedEdgeCount, eligibleEdgeIds: [] };
   }
   if (closureMatchesHints && verifiedChangeSet.topologyChanged) {
-    const projection = createBaseReactFlowTopologyIncrementalProjection({
-      baselineNodes: request.baselineNodes,
-      baselineSourceEdges: request.baselineSourceEdges,
+    const topology = createBaseReactFlowTopologyIncrementalRoute({
+      request,
       baselineEdges,
       baselinePatches,
-      nextNodes: request.nodes,
-      nextEdges: request.edges,
       changeSet: verifiedChangeSet,
-    });
-    if (!projection) {
-      closureTimer.finish('fallback', affectedEdgeCount);
-      return { edges: null, affectedEdgeCount, eligibleEdgeIds: [] };
-    }
-    const repairNodes = withDisplayAbsolutePositions(
-      request.nodes,
-      new Map(request.nodes.map(node => [node.id, node] as const)),
-    );
-    const topology = createBaseReactFlowTopologyIncrementalDisplayEdges({
-      projection,
-      nodes: repairNodes,
-      enableSmartEdges: request.enableSmartEdges,
-      smartEdgePadding: request.smartEdgePadding,
-      displayEdgeEpoch: request.displayEdgeEpoch,
       onRejectedReport: onBoundedCandidate,
     });
     closureTimer.finish(
       topology.edges ? 'accepted' : 'fallback',
-      verifiedChangeSet.changedEdgeIds.length,
+      topology.affectedEdgeCount,
     );
-    return {
-      edges: topology.edges,
-      affectedEdgeCount: verifiedChangeSet.changedEdgeIds.length,
-      eligibleEdgeIds: topology.eligibleEdgeIds,
-      ...(topology.hardReport ? { hardReport: topology.hardReport } : {}),
-    };
+    return topology;
   }
   if (
     !closureMatchesHints

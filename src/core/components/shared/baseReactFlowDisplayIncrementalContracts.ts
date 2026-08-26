@@ -14,6 +14,11 @@ export const baseReactFlowIdentifierListsMatch = (
   && first.every((identifier, index) => identifier === second[index])
 );
 
+export const baseReactFlowTopologyAffectedEdgeCount = (
+  changedEdgeIds: readonly string[],
+  eligibleEdgeIds: readonly string[],
+): number => new Set([...changedEdgeIds, ...eligibleEdgeIds]).size;
+
 export const baseReactFlowRoutingChangeSetMatches = (
   verified: BaseReactFlowRoutingChangeSet,
   requested: BaseReactFlowRoutingChangeSet,

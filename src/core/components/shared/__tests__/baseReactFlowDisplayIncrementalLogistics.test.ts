@@ -299,7 +299,7 @@ describe('Logistics incremental display routing', () => {
     expect(clearanceRisks, diagnostics).toEqual([]);
   }, 120_000);
 
-  it('routes a newly connected bare edge inside the topology fallback transaction', async () => {
+  it('routes a newly connected bare edge inside a bounded topology transaction', async () => {
     const entry = Object.entries(GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_LOADERS)
       .find(([, descriptor]) => descriptor.presetId === 'logistics-architecture-v1');
     if (!entry) throw new Error('expected the Logistics precompiled loader');
@@ -359,7 +359,7 @@ describe('Logistics incremental display routing', () => {
     });
     const response = computeBaseReactFlowDisplayEdgesWorkerResponse({
       operation: 'incremental-route',
-      requestId: 'logistics-edge-add-topology-fallback',
+      requestId: 'logistics-edge-add-incremental',
       edges: nextEdges,
       nodes,
       enableSmartEdges: true,
@@ -401,10 +401,36 @@ describe('Logistics incremental display routing', () => {
       reason: 'edge-add',
       topologyChanged: true,
     });
-    expect(response.fallbackLevel, diagnostics).toBe('full');
+    expect(response.routeResolution, diagnostics).toBe('incremental-route');
+    expect(response.fallbackLevel, diagnostics).toBe('none');
+    expect(response.affectedEdgeCount, diagnostics).toBe(2);
     expect(response.hardClean, diagnostics).toBe(true);
     expect(report?.hardClean, diagnostics).toBe(true);
+    expect(report?.commercialClearanceViolations, diagnostics).toBe(0);
     expect(addedPath.length, diagnostics).toBeGreaterThanOrEqual(2);
+    const frozenBaselineEdges = baselineEdges.filter(edge => edge.id !== 'edge-wms-visibility');
+    const responseById = new Map(response.edges?.map(edge => [edge.id, edge] as const));
+    const frozenResponseEdges = frozenBaselineEdges.flatMap(edge => {
+      const responseEdge = responseById.get(edge.id);
+      return responseEdge ? [responseEdge] : [];
+    });
+    expect(frozenResponseEdges, diagnostics).toHaveLength(frozenBaselineEdges.length);
+    expect(doBaseReactFlowDisplayRoutesMatchExactly(
+      frozenBaselineEdges,
+      frozenResponseEdges,
+    ), diagnostics).toBe(true);
+    const baselineVisibility = baselineEdges.find(edge => edge.id === 'edge-wms-visibility');
+    const responseVisibility = responseById.get('edge-wms-visibility');
+    expect(Boolean(baselineVisibility && responseVisibility), diagnostics).toBe(true);
+    expect(responseVisibility, diagnostics).toMatchObject({
+      sourceHandle: baselineVisibility?.sourceHandle,
+      targetHandle: baselineVisibility?.targetHandle,
+    });
+    expect(doBaseReactFlowDisplayRoutesMatchExactly(
+      baselineVisibility ? [baselineVisibility] : [],
+      responseVisibility ? [responseVisibility] : [],
+    ), diagnostics).toBe(false);
+
   }, 120_000);
 
   it('removes one edge without rerouting the surviving Logistics topology', async () => {

@@ -9,6 +9,7 @@
     --flow-visual-accent-soft: color-mix(in srgb, var(--flow-visual-accent) 14%, transparent);
     --flow-visual-accent-ring: color-mix(in srgb, var(--flow-visual-accent) 28%, transparent);
     --flow-visual-success: var(--theme-success-main, #10b981);
+    --flow-visual-edge-success: var(--theme-success-dark, #047857);
     --flow-visual-node-shadow:
         0 1px 2px rgba(15, 23, 42, 0.05),
         0 6px 18px -8px rgba(15, 23, 42, 0.22);
@@ -318,6 +319,11 @@
         filter 130ms ease;
 }
 
+/* Keep transient success paint above the 3:1 non-text contrast floor. */
+.diagram-root .react-flow__edge.just-connected .react-flow__edge-path {
+    stroke: var(--flow-visual-edge-success) !important;
+}
+
 .diagram-root .react-flow__edge-stablePath .react-flow__edge-path:not([style*='stroke:']) {
     stroke: #64748b;
     stroke-width: 1.5px;
@@ -601,6 +607,7 @@
 
 [data-theme='dark'] .diagram-root {
     --flow-visual-accent: var(--designer-accent, #818cf8);
+    --flow-visual-edge-success: var(--theme-success-light, #86efac);
     --flow-visual-node-shadow:
         0 1px 2px rgba(0, 0, 0, 0.32),
         0 8px 20px -10px rgba(0, 0, 0, 0.72);

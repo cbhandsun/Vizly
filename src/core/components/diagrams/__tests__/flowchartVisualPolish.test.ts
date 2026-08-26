@@ -162,6 +162,20 @@ describe('flowchart visual polish stylesheet', () => {
         );
     });
 
+    it('uses theme-aware contrast-safe success paint for a newly connected edge', () => {
+        const stylesheet = readRelativeFile('../FlowchartVisualPolish.css');
+
+        expect(stylesheet).toMatch(
+            /--flow-visual-edge-success:\s*var\(--theme-success-dark,\s*#047857\);/,
+        );
+        expect(stylesheet).toMatch(
+            /\.react-flow__edge\.just-connected \.react-flow__edge-path\s*\{[^}]*stroke:\s*var\(--flow-visual-edge-success\)\s*!important;/s,
+        );
+        expect(stylesheet).toMatch(
+            /\[data-theme='dark'\] \.diagram-root\s*\{[^}]*--flow-visual-edge-success:\s*var\(--theme-success-light,\s*#86efac\);/s,
+        );
+    });
+
     it('does not promote every node to a compositor layer during dragging', () => {
         const legacyStylesheet = readRelativeFile('../FlowchartDesigner.css');
 

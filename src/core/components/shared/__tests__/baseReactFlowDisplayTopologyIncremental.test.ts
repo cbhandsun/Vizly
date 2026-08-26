@@ -6,9 +6,12 @@ import {
   type BaseReactFlowRoutingChangeSet,
 } from '../baseReactFlowDisplayRoutingChangeSet';
 import {
+  createBaseReactFlowTopologyIncrementalCandidate,
   createBaseReactFlowTopologyIncrementalProjection,
   MAX_BASE_REACT_FLOW_TOPOLOGY_INCREMENTAL_CHANGES,
 } from '../baseReactFlowDisplayTopologyIncremental';
+import { findDisplayStrictCrossingHits } from '../baseReactFlowDisplayGeometry';
+import { buildBaseReactFlowTopologyStrictTransactionCandidates } from '../baseReactFlowDisplayTopologyStrictTransaction';
 import { createBaseReactFlowDisplayEdgePatches } from '../baseReactFlowDisplayRoutingTransaction';
 import { displayIncrementalCandidateRequiresTopologyCommitGate } from '../baseReactFlowDisplayIncrementalWorkerFinalizer';
 import { displayWorkerOperationPublishesBoundedCandidates } from '../baseReactFlowDisplayWorkerTransport';
@@ -180,6 +183,79 @@ describe('base React Flow topology incremental projection', () => {
       expect(addedSeed?.data).not.toHaveProperty(key);
     }
     expect(added.data).toHaveProperty('computedPath');
+  });
+
+  it('materializes only the changed edge while retaining every frozen route reference', () => {
+    const added: Edge = {
+      id: 'edge-added',
+      source: 'auxiliary',
+      target: 'target',
+      sourceHandle: 'right',
+      targetHandle: 'left',
+      data: {},
+    };
+    const projection = project({ nextEdges: [...baselineSourceEdges, added] });
+    if (!projection) throw new Error('expected a valid edge-add projection');
+
+    const candidate = createBaseReactFlowTopologyIncrementalCandidate({
+      projection,
+      nodes,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      displayEdgeEpoch: 1,
+    });
+
+    expect(candidate?.eligibleEdgeIds).toEqual(['edge-added']);
+    baselineEdges.forEach((edge, index) => expect(candidate?.edges[index]).toBe(edge));
+    expect(candidate?.edges.at(-1)).toMatchObject({
+      id: 'edge-added',
+      type: 'stablePath',
+    });
+  });
+
+  it('aligns a promoted internal segment to a related trunk without changing terminals', () => {
+    const changed: Edge = {
+      id: 'changed', source: 'source', target: 'target',
+      sourceHandle: 'right', targetHandle: 'left', type: 'stablePath',
+      data: { computedPath: [{ x: 0, y: 50 }, { x: 100, y: 50 }] },
+    };
+    const promoted: Edge = {
+      id: 'promoted', source: 'hub', target: 'auxiliary',
+      sourceHandle: 'bottom', targetHandle: 'top', type: 'stablePath',
+      data: { computedPath: [
+        { x: 50, y: -50 }, { x: 50, y: 0 },
+        { x: 50, y: 100 }, { x: 50, y: 150 },
+      ] },
+    };
+    const related: Edge = {
+      id: 'related', source: 'target', target: 'auxiliary', type: 'stablePath',
+      data: { computedPath: [
+        { x: -20, y: -50 }, { x: -20, y: 0 },
+        { x: -20, y: 100 }, { x: -20, y: 150 },
+      ] },
+    };
+    const edges = [changed, promoted, related];
+
+    const candidates = buildBaseReactFlowTopologyStrictTransactionCandidates({
+      edges,
+      changedEdgeIds: new Set(['changed']),
+      promotedEdgeIds: new Set(['promoted']),
+    });
+
+    expect(findDisplayStrictCrossingHits(edges)).toHaveLength(1);
+    expect(candidates.length).toBeGreaterThan(0);
+    expect(candidates[0]?.[0]).toBe(changed);
+    expect(candidates[0]?.[2]).toBe(related);
+    expect(candidates[0]?.[1]).toMatchObject({
+      sourceHandle: 'bottom',
+      targetHandle: 'top',
+    });
+    expect(findDisplayStrictCrossingHits(candidates[0] ?? [])).toHaveLength(0);
+    expect(buildBaseReactFlowTopologyStrictTransactionCandidates({
+      edges,
+      changedEdgeIds: new Set(),
+      promotedEdgeIds: new Set(['promoted']),
+    })).toEqual([]);
   });
 
   it('freshens a port-policy edge while preserving its new handles and authored policy', () => {

@@ -14,6 +14,7 @@ import {
 import { createBaseReactFlowFinalEndpointEvaluation } from './baseReactFlowDisplayFinalEndpointEvaluation';
 import { findBaseReactFlowStrictContextEdgePromotions } from './baseReactFlowDisplayIncrementalPromotion';
 import { repairFinalResidualStrictCrossings } from './baseReactFlowDisplayStrictResidualRepair';
+import { buildBaseReactFlowTopologyStrictTransactionCandidates } from './baseReactFlowDisplayTopologyStrictTransaction';
 import {
   baseReactFlowIncrementalEdgesHaveNodeClearance as topologyEdgesHaveClearance,
   baseReactFlowReportHasOnlyStrictDefects as reportHasOnlyStrictDefects,
@@ -49,6 +50,18 @@ export type BaseReactFlowTopologyIncrementalRouteOutcome = Readonly<{
   eligibleEdgeIds: string[];
   hardReport?: BaseDisplayBoundedCandidateReport;
 }>;
+
+const lockTopologyEligibleEdges = <T extends Edge[]>(
+  edges: T,
+  nodes: Node[],
+  eligibleEdgeIds: ReadonlySet<string>,
+): T => {
+  const lockedById = new Map(lockFinalDisplayComputedPaths(
+    edges.filter(edge => eligibleEdgeIds.has(edge.id)),
+    nodes,
+  ).map(edge => [edge.id, edge] as const));
+  return edges.map(edge => lockedById.get(edge.id) ?? edge) as T;
+};
 
 const ROUTING_DATA_KEYS = new Set([
   'computedPath',
@@ -358,7 +371,7 @@ export const createBaseReactFlowTopologyIncrementalCandidate = ({
   if (routedById.size !== changedIds.size) return null;
   const candidateEdges = projection.edges.map(edge => routedById.get(edge.id) ?? edge);
   return {
-    edges: lockFinalDisplayComputedPaths(candidateEdges, nodes),
+    edges: lockTopologyEligibleEdges(candidateEdges, nodes, changedIds),
     eligibleEdgeIds: [...changedIds].sort(),
   };
 };
@@ -404,11 +417,35 @@ export const createBaseReactFlowTopologyIncrementalDisplayEdges = ({
     });
     if (strictPromotions === null) return { edges: null, eligibleEdgeIds: [] };
     for (const edgeId of strictPromotions) eligibleIds.add(edgeId);
-    const strictRepaired = repairFinalResidualStrictCrossings(candidateEdges, nodes);
-    if (preservesTopologyBoundary(projection.edges, strictRepaired, eligibleIds)) {
-      candidateEdges = lockFinalDisplayComputedPaths(strictRepaired, nodes);
+    const transactionCandidates = buildBaseReactFlowTopologyStrictTransactionCandidates({
+      edges: candidateEdges,
+      changedEdgeIds: new Set(candidate.eligibleEdgeIds),
+      promotedEdgeIds: new Set(strictPromotions),
+    });
+    for (const transactionCandidate of transactionCandidates) {
+      if (!preservesTopologyBoundary(projection.edges, transactionCandidate, eligibleIds)) continue;
+      const lockedTransaction = lockTopologyEligibleEdges(
+        transactionCandidate,
+        nodes,
+        eligibleIds,
+      );
+      const transactionReport = evaluation.hardReport(lockedTransaction);
+      if (
+        transactionReport.hardClean
+        && topologyEdgesHaveClearance(lockedTransaction, nodes, eligibleIds)
+      ) {
+        candidateEdges = lockedTransaction;
+        hardReport = transactionReport;
+        break;
+      }
     }
-    hardReport = evaluation.hardReport(candidateEdges);
+    if (reportHasOnlyStrictDefects(hardReport)) {
+      const strictRepaired = repairFinalResidualStrictCrossings(candidateEdges, nodes);
+      if (preservesTopologyBoundary(projection.edges, strictRepaired, eligibleIds)) {
+        candidateEdges = lockTopologyEligibleEdges(strictRepaired, nodes, eligibleIds);
+      }
+      hardReport = evaluation.hardReport(candidateEdges);
+    }
   }
   if (hardReport.hardClean && eligibleIds.size > 0) {
     const clearanceRepaired = repairBusinessNodeClearanceRisks(candidateEdges, nodes, {
@@ -420,7 +457,11 @@ export const createBaseReactFlowTopologyIncrementalDisplayEdges = ({
       ),
     });
     if (preservesTopologyBoundary(projection.edges, clearanceRepaired, eligibleIds)) {
-      candidateEdges = lockFinalDisplayComputedPaths(clearanceRepaired, nodes);
+      candidateEdges = lockTopologyEligibleEdges(
+        clearanceRepaired,
+        nodes,
+        eligibleIds,
+      );
     }
     hardReport = evaluation.hardReport(candidateEdges);
   }
