@@ -4,10 +4,6 @@ import {
   lockFinalDisplayComputedPaths,
   withDisplayAbsolutePositions,
 } from './baseReactFlowDisplayEdgeCore';
-import {
-  finalizeBaseReactFlowDisplayEdgesWithReport,
-} from './baseReactFlowDisplayFinalizer';
-import { createBaseReactFlowFullRouteEdges } from './baseReactFlowDisplayFullRoutePipeline';
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
 import { repairBaseReactFlowMeasuredDisplayEdgesWithReport } from './baseReactFlowDisplayMeasuredRepair';
 import {
@@ -16,7 +12,6 @@ import {
 } from './baseReactFlowDisplayQualityGates';
 import { baseReactFlowDisplayCommercialQualityIsClean } from './baseReactFlowDisplayCommercialQuality';
 import { createBaseReactFlowInteractiveDisplayEdges } from './baseReactFlowDisplayQualitySeedPipeline';
-import { createBaseReactFlowPreDisplayFinalEdges } from './baseReactFlowDisplayPreDisplayPipeline';
 import { resolveDisplayWorkerCandidate } from './baseReactFlowDisplayWorkerCandidate';
 import { doBaseReactFlowDisplayRoutesMatchExactly } from './baseReactFlowDisplayRoutingTransaction';
 import {
@@ -31,7 +26,7 @@ import {
   startDisplayRoutingPhaseTrace,
   type DisplayRoutingPhaseTrace,
 } from './baseReactFlowDisplayRoutingTrace';
-import { createBaseReactFlowFullRouteEvaluationSession } from './baseReactFlowDisplayFullRouteEvaluationSession';
+import { runBaseReactFlowDisplayWorkerFullRoute } from './baseReactFlowDisplayWorkerFullRoute';
 import {
   createDisplayRoutingFallbackMetadata,
   createDisplayRoutingPhaseRecorder,
@@ -76,8 +71,6 @@ import { shouldEscalateInteractiveDisplayRoute } from './baseReactFlowDisplayWor
 import {
   createTracedDisplayWorkerFinalEvaluation,
   finalizeBoundedDisplayWorkerRepairResponse,
-  finishDisplayWorkerFinalization,
-  type DisplayWorkerFinalEvaluation,
   type DisplayWorkerFinalizationOptions,
 } from './baseReactFlowDisplayWorkerFinalEvaluation';
 
@@ -581,108 +574,18 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
     preparedInteractiveEdges = interactiveResponse.edges;
   }
 
-  const fullRouteSession = createBaseReactFlowFullRouteEvaluationSession(request.nodes);
-  const { evaluation: fullRouteEvaluation, repairNodes } = fullRouteSession;
-  const fullRouteFinalEvaluation: DisplayWorkerFinalEvaluation = {
-    repairNodes,
-    evaluation: fullRouteEvaluation,
-    hardQualityIsClean: edges => fullRouteEvaluation.hardReport(edges).hardClean,
-  };
-  const fullRouteEdges = createBaseReactFlowFullRouteEdges({
-    ...commonInput,
-    forceFullQuality: request.qualityMode === 'full' || escalatedFromInteractive,
+  return runBaseReactFlowDisplayWorkerFullRoute({
+    request,
+    commonInput,
+    escalatedFromInteractive,
     preparedInteractiveEdges,
-    onPhaseTrace: recordPhaseTrace,
-    evaluationSession: fullRouteEvaluation,
-    createPreDisplayFinalEdges: (preDisplayArgs) => {
-      return createBaseReactFlowPreDisplayFinalEdges({
-        ...preDisplayArgs,
-        onBoundedCandidate: (report) => {
-          preDisplayArgs.onBoundedCandidate?.(report);
-          onBoundedCandidate?.(report);
-        },
-      });
-    },
-  });
-  // Preserve the request-local exact proof produced by the full-route
-  // transaction. The finalizer and later closure still validate every route,
-  // but they no longer rebuild the same node/pair scan merely because the
-  // candidate crossed a module boundary.
-  const exactReport = fullRouteSession.exactReport(fullRouteEdges);
-  const finalizerTimer = startDisplayRoutingPhaseTrace({
-    phase: 'finalizer',
-    candidateCount: fullRouteEdges.length,
-    onTrace: recordPhaseTrace,
-  });
-  const finalized = finalizeBaseReactFlowDisplayEdgesWithReport(
-    fullRouteEdges,
-    request.nodes,
-    exactReport,
-    recordPhaseTrace,
-    false,
-    false,
-  );
-  fullRouteEvaluation.rememberHardReport(finalized.edges, finalized.report);
-  if (!finalized.report.hardClean) {
-    const repairTimer = startDisplayRoutingPhaseTrace({
-      phase: 'measured-repair',
-      candidateCount: finalized.edges.length,
-      onTrace: recordPhaseTrace,
-    });
-    const repaired = repairBaseReactFlowMeasuredDisplayEdgesWithReport(
-      finalized.edges,
-      request.nodes,
-      {
-        edges: finalized.edges,
-        inputNodes: request.nodes,
-        repairNodes,
-        report: finalized.report,
-      },
-      false,
-      recordPhaseTrace,
-      false,
-    );
-    repairTimer.finish(repaired.report.hardClean ? 'accepted' : 'rejected', repaired.edges.length);
-    fullRouteEvaluation.rememberHardReport(repaired.edges, repaired.report);
-    const repairedResponse = finalizeContainerClearanceResponse({
-      requestId: request.requestId,
-      edges: repaired.edges,
-      hardClean: repaired.report.hardClean,
-      routeResolution: 'full-route-repaired',
-      phaseTrace,
-      ...incrementalFallbackMetadata,
-    }, request.nodes, {
-      initialHardReport: repaired.report,
-      initialHardReportEdges: repaired.edges,
-      finalEvaluation: fullRouteFinalEvaluation,
-      isLargeGraph: request.isLargeGraph,
-      onPhaseTrace: recordPhaseTrace,
-      preferredEdges: request.edges,
-    });
-    return completeResponse(finishDisplayWorkerFinalization(
-      finalizerTimer,
-      repairedResponse,
-    ));
-  }
-  const finalizedResponse = finalizeContainerClearanceResponse({
-    requestId: request.requestId,
-    edges: finalized.edges,
-    hardClean: finalized.report.hardClean,
-    routeResolution: 'full-route',
     phaseTrace,
-    ...incrementalFallbackMetadata,
-  }, request.nodes, {
-    initialHardReport: finalized.report,
-    initialHardReportEdges: finalized.edges,
-    finalEvaluation: fullRouteFinalEvaluation,
-    isLargeGraph: request.isLargeGraph,
+    fallbackMetadata: incrementalFallbackMetadata,
     onPhaseTrace: recordPhaseTrace,
-    preferredEdges: request.edges,
+    onBoundedCandidate,
+    completeResponse,
+    finalizeResponse: finalizeContainerClearanceResponse,
   });
-  return completeResponse(finishDisplayWorkerFinalization(
-    finalizerTimer,
-    finalizedResponse,
-  ));
 };
 
 export const handleBaseReactFlowDisplayWorkerMessage =
