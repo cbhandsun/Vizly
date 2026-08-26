@@ -28,7 +28,6 @@ const policies = [{
 }, {
   fromPrefix: 'src/core/components/custom-edges/',
   forbiddenTargetPrefixes: [
-    'src/core/routing/renderedPathCache.ts',
     'src/core/workers/',
   ],
 }, {

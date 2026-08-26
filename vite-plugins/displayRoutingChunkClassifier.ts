@@ -21,10 +21,7 @@ export type DisplayRoutingChunkClassification = {
 
 const DISPLAY_WORKER_ENTRY_SUFFIX =
   '/src/core/components/shared/baseReactFlowDisplayEdges.worker.ts';
-const NON_APP_WORKER_ENTRY_SUFFIXES = [
-  DISPLAY_WORKER_ENTRY_SUFFIX,
-  '/src/core/workers/pathfinding.worker.ts',
-] as const;
+const NON_APP_WORKER_ENTRY_SUFFIXES = [DISPLAY_WORKER_ENTRY_SUFFIX] as const;
 
 const normalizeForMatch = (id: string): string => (
   id.replace(/\\/g, '/').split('?', 1)[0]

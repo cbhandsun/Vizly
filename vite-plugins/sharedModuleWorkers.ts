@@ -2,31 +2,21 @@ import { resolve } from 'node:path';
 import type { Plugin } from 'vite';
 
 const DISPLAY_WORKER_VIRTUAL_ID = 'virtual:vizly-display-worker-url';
-const PATHFINDING_WORKER_VIRTUAL_ID = 'virtual:vizly-pathfinding-worker-constructor';
 const RESOLVED_DISPLAY_WORKER_VIRTUAL_ID = `\0${DISPLAY_WORKER_VIRTUAL_ID}`;
-const RESOLVED_PATHFINDING_WORKER_VIRTUAL_ID = `\0${PATHFINDING_WORKER_VIRTUAL_ID}`;
 
 const DISPLAY_WORKER_CLIENT_SUFFIX = '/src/core/components/shared/baseReactFlowDisplayWorkerClient.ts';
-const PATHFINDING_WORKER_CONSUMER_SUFFIXES = [
-  '/src/core/workers/WorkerPool.ts',
-  '/src/core/workers/PathfindingWorkerPool.ts',
-] as const;
 
 const DISPLAY_WORKER_CONSTRUCTOR =
   "new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', import.meta.url),";
-const PATHFINDING_INLINE_IMPORT =
-  "import PathfindingWorker from './pathfinding.worker?worker&inline';";
 
 export type SharedModuleWorkersOptions = {
   displayWorker?: boolean;
-  pathfindingWorker?: boolean;
 };
 
 const resolveSharedModuleWorkerOptions = (
   options: SharedModuleWorkersOptions = {},
 ) => ({
   displayWorker: options.displayWorker !== false,
-  pathfindingWorker: options.pathfindingWorker !== false,
 });
 
 const normalizeModuleId = (id: string) => id.replace(/\\/g, '/');
@@ -76,21 +66,6 @@ export const transformSharedModuleWorkerConsumer = (
     };
   }
 
-  if (
-    resolvedOptions.pathfindingWorker
-    && PATHFINDING_WORKER_CONSUMER_SUFFIXES.some(suffix => normalizedId.endsWith(suffix))
-  ) {
-    return {
-      code: replaceExactlyOnce(
-        code,
-        PATHFINDING_INLINE_IMPORT,
-        `import PathfindingWorker from '${PATHFINDING_WORKER_VIRTUAL_ID}';`,
-        'inline pathfinding-worker import',
-      ),
-      map: null,
-    };
-  }
-
   return null;
 };
 
@@ -98,23 +73,14 @@ export const createSharedDisplayWorkerUrlModule = (referenceId: string): string 
   `export default import.meta.ROLLUP_FILE_URL_${referenceId};`
 );
 
-export const createSharedPathfindingWorkerConstructorModule = (referenceId: string): string => `
-const workerUrl = import.meta.ROLLUP_FILE_URL_${referenceId};
-
-export default class PathfindingWorker extends Worker {
-  constructor(options = {}) {
-    super(workerUrl, { ...options, type: 'module' });
-  }
-}
-`;
-
 /**
- * Emits routing workers as module entries in the main production graph.
+ * Emits the Canvas Routing Session Worker as a module entry in the main
+ * production graph.
  *
  * The source constructors remain unchanged for `vite dev`, including the
- * inline pathfinding-worker behavior. Only production uses external module
- * entries, allowing the browser and Rolldown to share routing chunks instead
- * of embedding or rebuilding them in each worker environment.
+ * native Worker behavior. Production uses an external module entry, allowing
+ * the browser and Rolldown to share routing chunks instead of rebuilding them
+ * in each realm.
  */
 export const sharedModuleWorkersPlugin = (
   projectRoot: string,
@@ -122,7 +88,6 @@ export const sharedModuleWorkersPlugin = (
 ): Plugin => {
   const resolvedOptions = resolveSharedModuleWorkerOptions(options);
   let displayWorkerReference: string | undefined;
-  let pathfindingWorkerReference: string | undefined;
 
   return {
     name: 'vizly:shared-module-workers',
@@ -139,17 +104,9 @@ export const sharedModuleWorkersPlugin = (
           name: 'baseReactFlowDisplayEdges.worker',
         });
       }
-      if (resolvedOptions.pathfindingWorker) {
-        pathfindingWorkerReference = this.emitFile({
-          type: 'chunk',
-          id: resolve(projectRoot, 'src/core/workers/pathfinding.worker.ts'),
-          name: 'pathfinding.worker',
-        });
-      }
     },
     resolveId(id) {
       if (id === DISPLAY_WORKER_VIRTUAL_ID) return RESOLVED_DISPLAY_WORKER_VIRTUAL_ID;
-      if (id === PATHFINDING_WORKER_VIRTUAL_ID) return RESOLVED_PATHFINDING_WORKER_VIRTUAL_ID;
       return null;
     },
     load(id) {
@@ -158,12 +115,6 @@ export const sharedModuleWorkersPlugin = (
           throw new Error('[vizly:shared-module-workers] Display worker was not emitted');
         }
         return createSharedDisplayWorkerUrlModule(displayWorkerReference);
-      }
-      if (id === RESOLVED_PATHFINDING_WORKER_VIRTUAL_ID) {
-        if (!pathfindingWorkerReference) {
-          throw new Error('[vizly:shared-module-workers] Pathfinding worker was not emitted');
-        }
-        return createSharedPathfindingWorkerConstructorModule(pathfindingWorkerReference);
       }
       return null;
     },

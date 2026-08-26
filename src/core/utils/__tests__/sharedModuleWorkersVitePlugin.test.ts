@@ -4,7 +4,6 @@ import { resolve } from 'node:path';
 
 import {
   createSharedDisplayWorkerUrlModule,
-  createSharedPathfindingWorkerConstructorModule,
   sharedModuleWorkersPlugin,
   transformSharedModuleWorkerConsumer,
 } from '../../../../vite-plugins/sharedModuleWorkers';
@@ -23,7 +22,6 @@ import {
 } from '../../../../vite-plugins/displayRoutingChunkClassifier';
 
 const displayWorkerId = 'C:\\repo\\src\\core\\components\\shared\\baseReactFlowDisplayEdges.worker.ts';
-const pathfindingWorkerId = 'C:/repo/src/core/workers/pathfinding.worker.ts';
 const appEntryId = 'C:/repo/src/main.tsx';
 
 const classifyGraph = (
@@ -46,14 +44,12 @@ describe('display routing chunk classifier', () => {
     const appOnly = 'C:/repo/src/core/appOnly.ts';
     const missing = 'C:/repo/src/core/routing/missing.ts';
     const vendor = 'C:/repo/node_modules/vendor/index.js';
-    const pathfindingOnly = 'C:/repo/src/core/workers/pathfindingOnly.ts';
     const graph = new Map<string, ChunkGraphModuleInfo | null>([
       [displayWorkerId, {
         isEntry: true,
         importedIds: [shared, workerPrivate, safeLog, missing, vendor],
         dynamicallyImportedIds: [workerDynamic],
       }],
-      [pathfindingWorkerId, { isEntry: true, importedIds: [workerPrivate, pathfindingOnly] }],
       [appEntryId, { isEntry: true, importedIds: [appOnly], dynamicallyImportedIds: [appRoute] }],
       [appRoute, { importedIds: [shared, safeLog, missing, vendor] }],
       [shared, { importedIds: [sharedCycle] }],
@@ -64,7 +60,6 @@ describe('display routing chunk classifier', () => {
       [appOnly, {}],
       [missing, null],
       [vendor, {}],
-      [pathfindingOnly, {}],
     ]);
 
     const result = classifyGraph(graph, id => id === safeLog);
@@ -79,7 +74,6 @@ describe('display routing chunk classifier', () => {
     expect(result.sharedModuleIds).not.toContain(missing);
     expect(result.sharedModuleIds).not.toContain(workerDynamic);
     expect(result.workerPrivateModuleIds).not.toContain(workerDynamic);
-    expect(result.sharedModuleIds).not.toContain(pathfindingOnly);
   });
 
   it('fails closed for missing, duplicate, or worker-only entry graphs', () => {
@@ -96,7 +90,6 @@ describe('display routing chunk classifier', () => {
 
     expect(() => classifyGraph(new Map([
       [displayWorkerId, { isEntry: true }],
-      [pathfindingWorkerId, { isEntry: true }],
     ]))).toThrow('No non-worker application entry found');
   });
 
@@ -215,25 +208,11 @@ const worker = new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', impor
     expect(result?.code).not.toContain('baseReactFlowDisplayEdges.worker.ts');
   });
 
-  it.each([
-    'C:/repo/src/core/workers/WorkerPool.ts',
-    'C:/repo/src/core/workers/PathfindingWorkerPool.ts',
-  ])('rewrites the inline pathfinding worker used by %s', (id) => {
-    const result = transformSharedModuleWorkerConsumer(
-      "import PathfindingWorker from './pathfinding.worker?worker&inline';",
-      id,
-    );
-
-    expect(result?.code).toBe(
-      "import PathfindingWorker from 'virtual:vizly-pathfinding-worker-constructor';",
-    );
-  });
-
   it('leaves unrelated modules untouched', () => {
     expect(transformSharedModuleWorkerConsumer('export const value = 1;', '/src/value.ts')).toBeNull();
   });
 
-  it('can keep the display worker on Vite native bundling without changing pathfinding', () => {
+  it('can keep the display worker on Vite native bundling', () => {
     const displaySource = `
 const worker = new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', import.meta.url), {
   type: 'module',
@@ -244,12 +223,6 @@ const worker = new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', impor
       'C:/repo/src/core/components/shared/baseReactFlowDisplayWorkerClient.ts',
       { displayWorker: false },
     )).toBeNull();
-
-    expect(transformSharedModuleWorkerConsumer(
-      "import PathfindingWorker from './pathfinding.worker?worker&inline';",
-      'C:/repo/src/core/workers/WorkerPool.ts',
-      { displayWorker: false },
-    )?.code).toContain('virtual:vizly-pathfinding-worker-constructor');
   });
 
   it('keeps measured repair inside the display worker implementation', () => {
@@ -361,11 +334,6 @@ const worker = new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', impor
     expect(createSharedDisplayWorkerUrlModule('displayRef')).toBe(
       'export default import.meta.ROLLUP_FILE_URL_displayRef;',
     );
-
-    const constructorModule = createSharedPathfindingWorkerConstructorModule('pathRef');
-    expect(constructorModule).toContain('import.meta.ROLLUP_FILE_URL_pathRef');
-    expect(constructorModule).toContain('class PathfindingWorker extends Worker');
-    expect(constructorModule).toContain("type: 'module'");
   });
 
   it('is restricted to production builds', () => {

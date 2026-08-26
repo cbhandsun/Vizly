@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import {
     useNodesState,
     useEdgesState,
@@ -9,7 +9,6 @@ import {
 import '@xyflow/react/dist/style.css';
 
 import { AdvancedSmartStepEdge } from '../custom-edges/AdvancedSmartEdge';
-import WorkerPool from '../../workers/WorkerPool';
 import BaseReactFlow from '../shared/BaseReactFlow';
 
 // Node generation helper
@@ -58,12 +57,9 @@ const edgeTypes = {
     smart: AdvancedSmartStepEdge,
 };
 
-type WorkerPoolStats = ReturnType<WorkerPool['getStats']>;
-
 export const PerformanceDemo: React.FC = () => {
     const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-    const [stats, setStats] = useState<WorkerPoolStats | null>(null);
 
     // Initial generation
     useEffect(() => {
@@ -83,20 +79,7 @@ export const PerformanceDemo: React.FC = () => {
         const { nodes: n, edges: e } = generateGraph(15, 0.3);
         setNodes(n);
         setEdges(e);
-        // Mark pool dirty
-        WorkerPool.getInstance().markDirty();
     };
-
-    const updateStats = () => {
-        const pool = WorkerPool.getInstance();
-        setStats(pool.getStats());
-    };
-
-    // Poll for stats
-    useEffect(() => {
-        const timer = setInterval(updateStats, 1000);
-        return () => clearInterval(timer);
-    }, []);
 
     return (
         <div style={{ width: '100%', height: '800px', display: 'flex', flexDirection: 'column' }}>
@@ -104,11 +87,6 @@ export const PerformanceDemo: React.FC = () => {
                 <h3>Performance Demo</h3>
                 <button onClick={handleForceRelayout}>Force Re-render (Check Cache)</button>
                 <button onClick={handleModifyGraph}>Regenerate Graph (Invalidate Cache)</button>
-                <div style={{ marginLeft: 20 }}>
-                    <strong>Workers:</strong> {stats?.poolSize || 0} |
-                    <strong> Busy:</strong> {stats?.busyCount || 0} |
-                    <strong> Queue:</strong> {stats?.queueLength || 0}
-                </div>
             </div>
             <div style={{ flex: 1, position: 'relative' }}>
                 <BaseReactFlow

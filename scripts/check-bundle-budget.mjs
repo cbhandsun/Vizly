@@ -57,6 +57,25 @@ const cssAssets = assets.filter((asset) => asset.type === 'css');
 const totalJsBytes = jsAssets.reduce((total, asset) => total + asset.bytes, 0);
 
 const violations = [];
+const displayWorkerAssets = jsAssets.filter(asset => (
+  asset.name.startsWith('baseReactFlowDisplayEdges.worker-')
+));
+const legacyPathfindingWorkerAssets = jsAssets.filter(asset => (
+  asset.name.startsWith('pathfinding.worker-')
+));
+
+if (displayWorkerAssets.length !== 1) {
+  violations.push(
+    `expected exactly one Canvas display-routing Worker asset; found ${displayWorkerAssets.length}`,
+  );
+}
+if (legacyPathfindingWorkerAssets.length > 0) {
+  violations.push(
+    `legacy pathfinding Worker asset must not be emitted: ${legacyPathfindingWorkerAssets
+      .map(asset => asset.name)
+      .join(', ')}`,
+  );
+}
 
 for (const asset of jsAssets) {
   if (asset.bytes > limits.maxJsChunkKB * 1024) {
