@@ -13,18 +13,6 @@ import {
   type SmartEdgeRoutingRenderAdapter,
 } from '../smartEdgeRoutingRenderAdapter';
 
-const renderAuthority = createDisplayRoutingRenderAuthority({
-  inputSignature: '1234',
-  inputGeometryDigest: `geometry-v1:${'a'.repeat(32)}`,
-  outputRouteSignature: 'route-v2:3:3:0123456789abcdef',
-  hardReportDigest: 'hard-report-v1:0123456789abcdef',
-  authorizedEdgeIds: ['edge-test', 'horizontal', 'vertical'],
-});
-if (!renderAuthority) throw new Error('expected valid routing render authority');
-const ROUTING_SESSION_EDGE_RENDER_ADAPTER = createRoutingSessionEdgeRenderAdapter(
-  renderAuthority,
-);
-
 const { useLineJumpsMock, reactFlowStoreMock } = vi.hoisted(() => ({
   useLineJumpsMock: vi.fn(() => ({ jumps: [], jumpPath: null })),
   reactFlowStoreMock: {
@@ -71,9 +59,33 @@ vi.mock('@xyflow/react', async () => {
   };
 });
 
+const createTestRoutingAdapter = (
+  props: Record<string, unknown>,
+): SmartEdgeRoutingRenderAdapter => {
+  const data = props.data && typeof props.data === 'object'
+    ? props.data as Record<string, unknown>
+    : null;
+  if (!Array.isArray(data?.computedPath) || data.computedPath.length < 2) {
+    return STANDALONE_EDGE_RENDER_ADAPTER;
+  }
+  const authority = createDisplayRoutingRenderAuthority({
+    inputSignature: '1234',
+    inputGeometryDigest: `geometry-v1:${'a'.repeat(32)}`,
+    outputRouteSignature: 'route-v2:3:3:0123456789abcdef',
+    hardReportDigest: 'hard-report-v1:0123456789abcdef',
+    authorizedEdges: [{
+      edgeId: typeof props.id === 'string' ? props.id : 'edge-test',
+      computedPath: data.computedPath,
+    }],
+  });
+  return authority
+    ? createRoutingSessionEdgeRenderAdapter(authority)
+    : STANDALONE_EDGE_RENDER_ADAPTER;
+};
+
 const createStablePathEdgeElement = (
   props: Record<string, unknown>,
-  renderAdapter: SmartEdgeRoutingRenderAdapter = ROUTING_SESSION_EDGE_RENDER_ADAPTER,
+  renderAdapter: SmartEdgeRoutingRenderAdapter = createTestRoutingAdapter(props),
 ) => (
     <SmartEdgeRoutingRenderAdapterContext.Provider value={renderAdapter}>
       <svg>
@@ -96,7 +108,7 @@ const createStablePathEdgeElement = (
 
 const renderStablePathEdge = (
   props: Record<string, unknown>,
-  renderAdapter: SmartEdgeRoutingRenderAdapter = ROUTING_SESSION_EDGE_RENDER_ADAPTER,
+  renderAdapter: SmartEdgeRoutingRenderAdapter = createTestRoutingAdapter(props),
 ) => render(createStablePathEdgeElement(props, renderAdapter));
 
 describe('StablePathEdge', () => {
@@ -199,7 +211,7 @@ describe('StablePathEdge', () => {
           { x: 1065, y: 812 },
         ],
       },
-    }, ROUTING_SESSION_EDGE_RENDER_ADAPTER);
+    });
 
     const path = screen.getByTestId('base-edge');
     expect(path.getAttribute('d')).toBe('M 1065 652 L 1065 812');
@@ -339,11 +351,26 @@ describe('StablePathEdge', () => {
         data={{ computedPath: points }}
       />
     );
+    const horizontalPoints = [{ x: 0, y: 40 }, { x: 160, y: 40 }];
+    const verticalPoints = [{ x: 80, y: 0 }, { x: 80, y: 100 }];
+    const lineJumpAuthority = createDisplayRoutingRenderAuthority({
+      inputSignature: '1234',
+      inputGeometryDigest: `geometry-v1:${'a'.repeat(32)}`,
+      outputRouteSignature: 'route-v2:3:3:0123456789abcdef',
+      hardReportDigest: 'hard-report-v1:0123456789abcdef',
+      authorizedEdges: [
+        { edgeId: 'horizontal', computedPath: horizontalPoints },
+        { edgeId: 'vertical', computedPath: verticalPoints },
+      ],
+    });
+    if (!lineJumpAuthority) throw new Error('expected line-jump render authority');
     const { container } = render(
-      <SmartEdgeRoutingRenderAdapterContext.Provider value={ROUTING_SESSION_EDGE_RENDER_ADAPTER}>
+      <SmartEdgeRoutingRenderAdapterContext.Provider
+        value={createRoutingSessionEdgeRenderAdapter(lineJumpAuthority)}
+      >
         <svg>
-          {stableEdge('horizontal', 'left', 'right', [{ x: 0, y: 40 }, { x: 160, y: 40 }])}
-          {stableEdge('vertical', 'top', 'bottom', [{ x: 80, y: 0 }, { x: 80, y: 100 }])}
+          {stableEdge('horizontal', 'left', 'right', horizontalPoints)}
+          {stableEdge('vertical', 'top', 'bottom', verticalPoints)}
         </svg>
       </SmartEdgeRoutingRenderAdapterContext.Provider>,
     );
@@ -426,7 +453,7 @@ describe('StablePathEdge', () => {
           backboneRanges: [],
         },
       },
-    }, ROUTING_SESSION_EDGE_RENDER_ADAPTER);
+    });
 
     const preparedTrace = container.querySelector('.shared-trunk-accent-trace');
     expect(preparedTrace?.getAttribute('style')).toContain('opacity: 0');
@@ -477,7 +504,7 @@ describe('StablePathEdge', () => {
           }],
         },
       },
-    }, ROUTING_SESSION_EDGE_RENDER_ADAPTER);
+    });
 
     const backbone = container.querySelector('.shared-trunk-canonical-backbone');
     expect(backbone?.getAttribute('d')).toBe('M 0 0 L 100 0');
@@ -552,7 +579,7 @@ describe('StablePathEdge', () => {
           }],
         },
       },
-    }, ROUTING_SESSION_EDGE_RENDER_ADAPTER);
+    });
 
     const backbone = container.querySelector('.shared-trunk-canonical-backbone');
     expect(backbone?.getAttribute('d')).toBe('M 80 0 L 160 0');
@@ -605,7 +632,7 @@ describe('StablePathEdge', () => {
           }],
         },
       },
-    }, ROUTING_SESSION_EDGE_RENDER_ADAPTER);
+    });
 
     const backbone = container.querySelector('.shared-trunk-canonical-backbone');
     expect(backbone?.getAttribute('style')).toContain('--vizly-shared-canonical-stroke: #64748B');
@@ -636,7 +663,7 @@ describe('StablePathEdge', () => {
         computedPath: [{ x: 0, y: 0 }, { x: 60, y: 0 }, { x: 120, y: 0 }],
         __vizlySharedTrunkPaint: sharedPlan,
       },
-    }, ROUTING_SESSION_EDGE_RENDER_ADAPTER);
+    });
 
     expect(screen.queryByText('Fully canonical bridge')).toBeNull();
     expect(idle.container.querySelector('.shared-trunk-accent-trace')?.getAttribute('style'))
@@ -657,7 +684,7 @@ describe('StablePathEdge', () => {
         computedPath: [{ x: 0, y: 0 }, { x: 60, y: 0 }, { x: 120, y: 0 }],
         __vizlySharedTrunkPaint: sharedPlan,
       },
-    }, ROUTING_SESSION_EDGE_RENDER_ADAPTER);
+    });
 
     const traces = active.container.querySelectorAll('.shared-trunk-accent-trace');
     expect(traces).toHaveLength(1);

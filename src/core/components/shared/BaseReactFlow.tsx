@@ -73,10 +73,7 @@ import {
 } from './baseReactFlowOverlayRenderers';
 import type { BaseReactFlowProps } from './baseReactFlowTypes';
 import { useBaseReactFlowFitController } from './useBaseReactFlowFitController';
-import {
-  resolveSmartEdgeRoutingRenderAdapter,
-  SmartEdgeRoutingRenderAdapterContext,
-} from '../custom-edges/smartEdgeRoutingRenderAdapter';
+import { RoutingSessionEdgeRenderProvider } from '../custom-edges/RoutingSessionEdgeRenderProvider';
 import { resolveBaseReactFlowRoutingComputation } from './baseReactFlowDragRoutingFreeze';
 import { BaseReactFlowInitializationOverlay } from './BaseReactFlowInitializationOverlay';
 import { applySharedTrunkPaintPlan } from '../../rendering/sharedTrunkPaint';
@@ -420,8 +417,6 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     () => applySharedTrunkPaintPlan(commercialDisplayEdges),
     [commercialDisplayEdges],
   );
-  const displayRoutingRenderAdapter = resolveSmartEdgeRoutingRenderAdapter(displayRenderAuthority);
-
   const nodeInternalsRefreshKey = useMemo(
     () => createBaseReactFlowNodeInternalsRefreshSnapshot(visibleNodes).key,
     [visibleNodes],
@@ -577,7 +572,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
         position: 'relative',
       } : { width: '100%', height: '100%', position: 'relative' }}>
         <EdgeLabelObstacleContext.Provider value={edgeLabelObstacles}>
-        <SmartEdgeRoutingRenderAdapterContext.Provider value={displayRoutingRenderAdapter}>
+        <RoutingSessionEdgeRenderProvider authority={displayRenderAuthority}>
         <ReactFlow
           proOptions={proOptions}
           onlyRenderVisibleElements={isLargeGraph}
@@ -676,7 +671,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
           <BaseReactFlowRightEdgeGuides />
           {children}
         </ReactFlow>
-        </SmartEdgeRoutingRenderAdapterContext.Provider>
+        </RoutingSessionEdgeRenderProvider>
         </EdgeLabelObstacleContext.Provider>
       </div>
       {!isContainerReady && <BaseReactFlowInitializationOverlay />}

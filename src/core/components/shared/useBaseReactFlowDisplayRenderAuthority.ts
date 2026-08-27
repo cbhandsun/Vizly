@@ -30,7 +30,15 @@ export const useBaseReactFlowCommittedRenderAuthority = (): Readonly<{
       inputGeometryDigest: baseline.identity.inputGeometryDigest,
       outputRouteSignature: baseline.outputRouteSignature,
       hardReportDigest: baseline.hardReportDigest,
-      authorizedEdgeIds: edges.map(edge => edge.id),
+      authorizedEdges: edges.flatMap((edge) => {
+        const data = edge.data && typeof edge.data === 'object'
+          ? edge.data as Record<string, unknown>
+          : null;
+        return Array.isArray(data?.computedPath) && data.computedPath.length >= 2
+          ? [{ edgeId: edge.id, computedPath: data.computedPath }]
+          : [];
+      }),
+      workerSessionRef: baseline.workerSessionRef,
     }));
   }, []);
   return { committedRenderAuthority, rememberCommittedRenderAuthority };
@@ -53,10 +61,17 @@ export const useBaseReactFlowActiveRenderAuthority = ({
     || committedRenderAuthority.inputGeometryDigest !== inputGeometryDigest
     || computeBaseReactFlowDisplayOutputRouteSignature(displayedEdges)
       !== committedRenderAuthority.outputRouteSignature
-    || !displayedEdges.every(edge => displayRoutingRenderAuthorityAllowsEdge(
-      committedRenderAuthority,
-      edge.id,
-    ))
+    || !displayedEdges.every((edge) => {
+      const data = edge.data && typeof edge.data === 'object'
+        ? edge.data as Record<string, unknown>
+        : null;
+      return !Array.isArray(data?.computedPath)
+        || displayRoutingRenderAuthorityAllowsEdge(
+          committedRenderAuthority,
+          edge.id,
+          data.computedPath,
+        );
+    })
   ) return null;
   return committedRenderAuthority;
 }, [committedRenderAuthority, displayedEdges, inputGeometryDigest, inputSignature]);

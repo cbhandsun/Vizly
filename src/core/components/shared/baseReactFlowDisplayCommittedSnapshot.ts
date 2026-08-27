@@ -139,26 +139,6 @@ const rememberSnapshot = (
   }
 };
 
-export const writeBaseReactFlowDisplayCommittedSnapshot = (options: {
-  inputSignature: string;
-  inputGeometryDigest: string;
-  sourceEdges: Edge[];
-  sourceNodes: Node[];
-  displayPatches: RoutingPatch[];
-  outputRouteSignature: string | null;
-  workerSessionRef?: RoutingWorkerSessionRef;
-} & CommittedHardReportIdentity): boolean => {
-  if (!isDisplayRoutingCapabilityEnabled('routingSessionSnapshot')) return false;
-  const snapshot = createCommittedSnapshot(options);
-  if (!snapshot) return false;
-  rememberSnapshot(
-    snapshotKey(options.inputSignature, options.inputGeometryDigest),
-    snapshot,
-  );
-  committedSnapshotBySourceEdges.set(options.sourceEdges, snapshot);
-  return true;
-};
-
 const createCommittedSnapshot = ({
   inputSignature,
   inputGeometryDigest,

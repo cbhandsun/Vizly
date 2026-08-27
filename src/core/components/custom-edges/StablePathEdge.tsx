@@ -162,6 +162,7 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
     const acceptsCommittedGeometry = smartEdgeRenderAdapterAcceptsCommittedGeometry(
         routingRenderAdapter,
         id,
+        edgeData?.computedPath,
     );
     const currentTheme = useEdgeTheme();
     const canvasBackground = currentTheme?.diagram?.canvas?.background ?? '#ffffff';

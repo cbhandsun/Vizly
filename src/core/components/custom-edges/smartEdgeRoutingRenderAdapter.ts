@@ -2,28 +2,43 @@ import { createContext, useContext } from 'react';
 
 import {
   displayRoutingRenderAuthorityAllowsEdge,
+  readDisplayRoutingRenderSessionContract,
   type DisplayRoutingRenderAuthority,
+  type DisplayRoutingRenderSessionContract,
 } from '../../routing/displayRoutingRenderAuthority';
 
-export type SmartEdgeRoutingRenderAdapter = Readonly<{
-  kind: 'standalone-fallback' | 'routing-session';
-  acceptsCommittedGeometry: boolean;
-  authority: DisplayRoutingRenderAuthority | null;
-}>;
+export type SmartEdgeRoutingRenderAdapter =
+  | Readonly<{
+    kind: 'standalone-fallback';
+    acceptsCommittedGeometry: false;
+    authority: null;
+    session: null;
+  }>
+  | Readonly<{
+    kind: 'routing-session';
+    acceptsCommittedGeometry: true;
+    authority: DisplayRoutingRenderAuthority;
+    session: DisplayRoutingRenderSessionContract;
+  }>;
 
 export const STANDALONE_EDGE_RENDER_ADAPTER: SmartEdgeRoutingRenderAdapter = Object.freeze({
   kind: 'standalone-fallback',
   acceptsCommittedGeometry: false,
   authority: null,
+  session: null,
 });
 
 export const createRoutingSessionEdgeRenderAdapter = (
   authority: DisplayRoutingRenderAuthority,
-): SmartEdgeRoutingRenderAdapter => Object.freeze({
-  kind: 'routing-session',
-  acceptsCommittedGeometry: true,
-  authority,
-});
+): SmartEdgeRoutingRenderAdapter => {
+  const session = readDisplayRoutingRenderSessionContract(authority);
+  return session ? Object.freeze({
+    kind: 'routing-session',
+    acceptsCommittedGeometry: true,
+    authority,
+    session,
+  }) : STANDALONE_EDGE_RENDER_ADAPTER;
+};
 
 export const resolveSmartEdgeRoutingRenderAdapter = (
   authority: DisplayRoutingRenderAuthority | null,
@@ -43,10 +58,12 @@ export const useSmartEdgeRoutingRenderAdapter = (): SmartEdgeRoutingRenderAdapte
 export const smartEdgeRenderAdapterAcceptsCommittedGeometry = (
   value: unknown,
   edgeId: unknown,
+  computedPath: unknown,
 ): boolean => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const adapter = value as Record<string, unknown>;
   return adapter.kind === 'routing-session'
     && adapter.acceptsCommittedGeometry === true
-    && displayRoutingRenderAuthorityAllowsEdge(adapter.authority, edgeId);
+    && adapter.session === readDisplayRoutingRenderSessionContract(adapter.authority)
+    && displayRoutingRenderAuthorityAllowsEdge(adapter.authority, edgeId, computedPath);
 };

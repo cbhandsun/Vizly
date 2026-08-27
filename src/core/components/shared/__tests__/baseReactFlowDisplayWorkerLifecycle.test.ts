@@ -17,7 +17,6 @@ import {
   createBaseReactFlowRoutingOnlyDocumentSnapshot,
   doesBaseReactFlowDisplayCommittedBaselineMatchIdentity,
   readBaseReactFlowDisplayCommittedSnapshot,
-  writeBaseReactFlowDisplayCommittedSnapshot,
 } from '../baseReactFlowDisplayCommittedSnapshot';
 import { resolveBaseReactFlowRoutingComputation } from '../baseReactFlowDragRoutingFreeze';
 import { createBaseReactFlowDisplayEdgePatches } from '../baseReactFlowDisplayRoutingTransaction';
@@ -211,7 +210,7 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
     if (!displayPatches || !outputRouteSignature) {
       throw new Error('expected a valid committed display snapshot');
     }
-    expect(writeBaseReactFlowDisplayCommittedSnapshot({
+    expect(commitBaseReactFlowDisplaySnapshot({
       inputSignature: '123',
       inputGeometryDigest: `geometry-v1:${'a'.repeat(32)}`,
       sourceEdges,
@@ -219,7 +218,7 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
       displayPatches,
       outputRouteSignature,
       hardReport: cleanHardReport,
-    })).toBe(true);
+    })).not.toBeNull();
 
     const mutablePath = (displayPatches?.[0].data as Record<string, unknown>)?.computedPath;
     if (Array.isArray(mutablePath)) mutablePath[1] = { x: 999, y: 999 };
@@ -302,7 +301,7 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
     if (!displayPatches || !outputRouteSignature) {
       throw new Error('expected a valid committed display snapshot');
     }
-    expect(writeBaseReactFlowDisplayCommittedSnapshot({
+    expect(commitBaseReactFlowDisplaySnapshot({
       inputSignature: 'invalid',
       inputGeometryDigest: `geometry-v1:${'a'.repeat(32)}`,
       sourceEdges,
@@ -310,8 +309,8 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
       displayPatches,
       outputRouteSignature,
       hardReport: cleanHardReport,
-    })).toBe(false);
-    expect(writeBaseReactFlowDisplayCommittedSnapshot({
+    })).toBeNull();
+    expect(commitBaseReactFlowDisplaySnapshot({
       inputSignature: '1',
       inputGeometryDigest: 'invalid-digest',
       sourceEdges,
@@ -319,10 +318,10 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
       displayPatches,
       outputRouteSignature,
       hardReport: cleanHardReport,
-    })).toBe(false);
+    })).toBeNull();
 
     for (let index = 0; index < 17; index += 1) {
-      expect(writeBaseReactFlowDisplayCommittedSnapshot({
+      expect(commitBaseReactFlowDisplaySnapshot({
         inputSignature: String(index + 1),
         inputGeometryDigest: `geometry-v1:${index.toString(16).padStart(32, '0')}`,
         sourceEdges,
@@ -330,7 +329,7 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
         displayPatches,
         outputRouteSignature,
         hardReport: cleanHardReport,
-      })).toBe(true);
+      })).not.toBeNull();
     }
     expect(readBaseReactFlowDisplayCommittedSnapshot({
       inputSignature: '1',
