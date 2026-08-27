@@ -206,6 +206,13 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
 
   it('reroutes invalid, stale, and malformed cache candidates in the same worker job', () => {
     const fullRouteSpy = vi.spyOn(fullRoutePipeline, 'createBaseReactFlowFullRouteEdges');
+    const identityBundle = computeBaseReactFlowDisplayInputIdentityBundle({
+      edges,
+      nodes,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+    });
     const routeInput = {
       edges,
       nodes,
@@ -214,6 +221,10 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       isLargeGraph: false,
       displayEdgeEpoch: 2,
       qualityMode: 'full' as const,
+      inputIdentity: createDisplayRoutingIdentity(
+        identityBundle.cacheSignature,
+        identityBundle.geometryDigest,
+      ),
     };
     const invalidCandidate = edges.map(edge => ({
       ...edge,
