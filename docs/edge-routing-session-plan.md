@@ -1,6 +1,6 @@
 # Vizly 首次打开与增量调整统一路由方案
 
-状态：质量、会话、拓扑与缺陷调度主链已闭环；正式 30 样本、远端 CI 与受限格式导出仍待最终验收
+状态：质量、会话、拓扑与缺陷调度主链已闭环；正式 30 样本、standalone 协议统一、远端 CI 与受限格式导出仍待最终验收
 适用范围：`BaseReactFlow` Canvas 最终显示路由、内置标准图、用户保存图、节点拖拽及局部编辑
 关联标准：`docs/edge-routing-goals.md`
 
@@ -9,6 +9,7 @@
 本轮 production-build 验收结论：
 
 - routing version 15 已把 corridor lane/capacity 的原子预留投影为 edge-owned waypoint axes；只有已有节点净空风险的边会进入昂贵候选评分，不会因为拥有预留车道而宽泛提升 sibling/peer；
+- final endpoint 审计现按精确 route signature 和 terminal policy 在单次 Worker 请求内有界复用；outer-port 与 measured-repair 共用同一 request-local hard-report session，并通过 changed-index parity 评估候选，最终独立 exact hard gate 仍保留；
 - `post-render-residual` 与 `strict-primary-overlap` 已由显式 `RoutingDefectPlan` 调度，无对应缺陷时生成带父阶段、独占耗时和零扫描量的确定性 skip trace；
 - 三张 v15 预编译产物可从同一 production build 重现，三张 `outputRouteSignature` 与 v14 完全一致；最新浏览器矩阵均命中 `validated-candidate`，同 identity 再开 WMS 为 `workerStart=0`；
 - 最新 production-browser 矩阵覆盖三张 canonical preset、TB/BT/LR/RL、compound 和十类拓扑编辑，最终 SVG 的非正交、障碍命中、商业净空、严格交叉、非法 overlap、短 stub、tiny dogleg、hairpin、低对比、重复 marker/交互路径和标签节点相交均为零；
@@ -19,8 +20,9 @@
 - 最新同一 production build、固定 viewport、全新浏览器 profile 的 30 个独立 Logistics 动态完整冷路由样本为 median `1675ms`、p95 `2011ms`、max `2078ms`；Worker compute p95 为 `1999.9ms`，页面/消息开销 p95 仅 `14ms`。30/30 均为一次 Worker start、零 abort、单次 `full-route-repaired` 最终事务，剩余耗时集中在 Worker 内 crossing sweeps、endpoint closure 与 finalizer 的 accepted 全质量候选。
 - 同环境的 30 个 production-browser 增量样本均保持一次 Worker start、零 abort、零 full fallback，WMS local route/release-to-final p95 为 `98.4ms/205ms` 并通过预算；L-OMS 为 `316ms/762ms`、TMS 为 `335.8ms/998ms`，未达到 `<150ms/<300ms`。失败热点在 Worker `local-reconnect-seed`，其 p95 分别为 `309.3ms/327.3ms`，不是响应后的 React 提交延迟。
 - reconnect 排名改为稳定的流式 bounded top-K 后，5 个独立筛选样本把 L-OMS local/release p95 降至 `93.7ms/214ms`、TMS 降至 `102.3ms/226ms`、WMS 降至 `57.1ms/131ms`，且 5/5 零 fallback；正式 30 样本在前 26 次通过后，第 27 次 WMS 请求因候选生成数从常态 `256` 漂移为 `244` 而安全进入同 job full fallback，最终仍 hard-clean。该批次证明了排名内存优化收益，但稳定矩阵仍未验收通过。
+- 最新共享评估批次的三张 production 预编译 route JSON、output signature 与最终路径保持不变；类型、Lint、架构、源码规模、DOM sink、secrets、生产构建、bundle 和预编译产物门禁通过。GitHub Actions 已触发但所有 job 在执行任何 step 前被账户付款/额度阻止，不能作为代码失败或通过证据。
 
-因此，迭代 1–2 的统一门禁和 Routing Session 主链已经闭环；迭代 3 的拓扑编辑、正确性和当前单轮用户路径预算已通过，正式 30 个独立样本仍需在稳定专用性能环境复验；迭代 4 的 corridor lane/capacity 分配和缺陷驱动阶段跳过已经落地，产品方接受约 `1.03s` 的动态完整冷路由参考水平，不再以原 `<750ms` 阻塞收敛；迭代 5 的 routing-only 文档快照、Canvas/standalone 渲染适配器和重复管线删除已经实现并通过对应测试。剩余外部阻塞为 GitHub Actions 计费/额度导致 job 未启动，以及 SVG/PDF entitlement 限制下的真实文件级导出审计；仍禁止通过跳过 accepted 修复阶段或降低质量门禁宣称完成。
+因此，迭代 1–2 的统一门禁和 Routing Session 主链已经闭环；迭代 0、3、4、5 仍为部分完成。迭代 3 的拓扑编辑和正确性已通过，但正式 30 个独立样本的 p95 与零 fallback 门禁尚未通过；迭代 4 的 corridor lane/capacity 分配和缺陷驱动阶段跳过已经落地，产品方接受约 `1.03s` 的动态完整冷路由参考水平，不再以原 `<750ms` 阻塞收敛，但当前正式样本仍高于仓库的 `1100ms` p95 门槛；迭代 5 已完成 routing-only 文档快照、旧 edge-owned 管线删除和 fail-closed 渲染所有权，standalone fallback adapter 尚未共享 Routing Session Worker protocol、hard report 与 routing version。剩余外部阻塞为 GitHub Actions 计费/额度导致 job 未启动，以及 SVG/PDF entitlement 限制下的真实文件级导出审计；仍禁止通过跳过 accepted 修复阶段或降低质量门禁宣称完成。
 
 ## 0.1 首批实施记录（2026-07-27）
 
@@ -842,6 +844,8 @@ final-commit
 
 ### Phase 0：基线与可观测性
 
+实施状态：单 Worker 最终事务、层级 trace、`full-route-repaired` 和生产预编译 capture 已实现；正式 benchmark 仍为独立专用任务，尚未在稳定环境验收并进入统一 CI 执行链。
+
 交付：
 
 1. Worker 阶段 trace。
@@ -966,6 +970,8 @@ npm run verify:display-routing-browser
 - topology-first seed 在进入 repair 前已经满足大部分硬门禁。
 
 ### Phase 5：用户文档快照与管线收敛
+
+实施状态：routing-only schema、外部候选边界、realm-local render authority 和旧 edge-owned 管线删除已完成；standalone adapter 当前只提供 fail-closed 降级，不持有 Routing Session、Worker protocol、hard report 或 routing version，因此协议统一退出条件尚未满足。
 
 交付：
 
