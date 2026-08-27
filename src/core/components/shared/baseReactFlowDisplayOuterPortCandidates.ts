@@ -76,6 +76,11 @@ const pathLength = (path: DisplayPoint[]): number => path.reduce((total, point, 
       + Math.abs(point.y - path[index - 1].y)
 ), 0);
 
+export const outerPortCandidateQuickScore = (
+  seedQuickScore: number,
+  path: DisplayPoint[],
+): number => seedQuickScore + pathLength(path);
+
 const pathSignature = (path: DisplayPoint[]): string => path
   .map(point => `${point.x.toFixed(3)},${point.y.toFixed(3)}`)
   .join('|');
@@ -490,7 +495,10 @@ export const buildBoundedOuterPortTransactionCandidates = <T extends Edge[]>(
           ringAxis: item.ringAxis,
           ringLane: item.ringLane,
           transitionLane: item.transitionLane,
-          quickScore: pathLength(path),
+          // Preserve the seed's pair-level crossing/overlap rank. Sorting only
+          // by the moved path length discarded that expensive signal and made
+          // the hard gate evaluate many low-quality port pairs first.
+          quickScore: outerPortCandidateQuickScore(seed.quickScore, path),
         });
       }
     }

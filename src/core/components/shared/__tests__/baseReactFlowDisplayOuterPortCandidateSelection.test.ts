@@ -1,9 +1,22 @@
 import { describe, expect, it } from 'vitest';
 
-import { interleaveOuterPortCandidateBuckets } from '../baseReactFlowDisplayOuterPortCandidates';
+import {
+  interleaveOuterPortCandidateBuckets,
+  outerPortCandidateQuickScore,
+} from '../baseReactFlowDisplayOuterPortCandidates';
 import { buildFacingPortPathCandidates } from '../baseReactFlowSharedNodePortRoleRepair';
 
 describe('outer port candidate selection', () => {
+  it('keeps the seed quality rank ahead of the generated path length', () => {
+    const shortPath = [{ x: 0, y: 0 }, { x: 10, y: 0 }];
+    const longerPath = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
+
+    expect(outerPortCandidateQuickScore(1_000, shortPath)).toBe(1_010);
+    expect(outerPortCandidateQuickScore(0, longerPath)).toBe(100);
+    expect(outerPortCandidateQuickScore(1_000, shortPath))
+      .toBeGreaterThan(outerPortCandidateQuickScore(0, longerPath));
+  });
+
   it('keeps a non-shortest topology in the next round before a global cap', () => {
     const selected = interleaveOuterPortCandidateBuckets([
       ['first-shortest', 'first-alternate'],
