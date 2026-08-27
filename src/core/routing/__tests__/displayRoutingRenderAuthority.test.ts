@@ -21,7 +21,16 @@ const workerSessionRef = {
 } as const;
 const edgeAPath = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
 const edgeBPath = [{ x: 0, y: 20 }, { x: 100, y: 20 }];
-const edgeGeometry = (edgeId: string, computedPath: readonly { x: number; y: number }[]) => ({
+const edgeAElkPath = [{ x: 0, y: 0 }, { x: 50, y: 10 }, { x: 100, y: 0 }];
+const edgeATreeRoutingPoints = [{ x: 0, y: 0 }, { x: 50, y: -10 }, { x: 100, y: 0 }];
+const edgeGeometry = (
+  edgeId: string,
+  computedPath: readonly { x: number; y: number }[],
+  optionalPaths: Readonly<{
+    elkPath?: unknown;
+    treeRoutingPoints?: unknown;
+  }> = {},
+) => ({
   edgeId,
   source: 'source',
   target: 'target',
@@ -29,6 +38,13 @@ const edgeGeometry = (edgeId: string, computedPath: readonly { x: number; y: num
   targetHandle: null,
   rendererType: 'stablePath',
   computedPath,
+  elkPath: optionalPaths.elkPath ?? null,
+  treeRoutingPoints: optionalPaths.treeRoutingPoints ?? null,
+});
+
+const edgeAClaim = () => edgeGeometry('edge-a', edgeAPath, {
+  elkPath: edgeAElkPath,
+  treeRoutingPoints: edgeATreeRoutingPoints,
 });
 
 const authority = () => createDisplayRoutingRenderAuthority({
@@ -37,7 +53,7 @@ const authority = () => createDisplayRoutingRenderAuthority({
   outputRouteSignature: 'route-v2:1:2:0123456789abcdef',
   hardReport: TEST_ROUTING_HARD_REPORT,
   authorizedEdges: [
-    edgeGeometry('edge-a', edgeAPath),
+    edgeAClaim(),
     edgeGeometry('edge-b', edgeBPath),
   ],
   workerSessionRef,
@@ -47,16 +63,14 @@ describe('displayRoutingRenderAuthority', () => {
   it('authorizes only listed edges on a realm-issued committed capability', () => {
     const issued = authority();
     expect(issued).not.toBeNull();
-    const claim = edgeGeometry('edge-a', edgeAPath);
+    const claim = edgeAClaim();
     expect(displayRoutingRenderAuthorityAllowsEdge(issued, claim)).toBe(true);
     expect(displayRoutingRenderAuthorityAllowsEdge(issued, {
       ...claim,
       computedPath: edgeAPath.map(point => ({ ...point })),
+      elkPath: edgeAElkPath.map(point => ({ ...point })),
+      treeRoutingPoints: edgeATreeRoutingPoints.map(point => ({ ...point })),
     })).toBe(true);
-    expect(displayRoutingRenderAuthorityAllowsEdge(issued, {
-      ...claim,
-      computedPath: [{ x: 0, y: 0 }, { x: 101, y: 0 }],
-    })).toBe(false);
     expect(displayRoutingRenderAuthorityAllowsEdge(issued, edgeGeometry('edge-c', edgeAPath))).toBe(false);
     expect(displayRoutingRenderAuthorityAllowsEdge({ ...issued }, claim)).toBe(false);
     if (!issued) throw new Error('expected a render authority');
@@ -64,25 +78,79 @@ describe('displayRoutingRenderAuthority', () => {
     expect(displayRoutingRenderAuthorityAllowsEdge(issued, edgeGeometry('edge-c', edgeAPath))).toBe(false);
   });
 
-  it('snapshots authorized coordinates so later source mutation cannot widen the proof', () => {
+  it.each([
+    ['source', { ...edgeAClaim(), source: 'forged-source' }],
+    ['target', { ...edgeAClaim(), target: 'forged-target' }],
+    ['source handle', { ...edgeAClaim(), sourceHandle: 'forged-source-handle' }],
+    ['target handle', { ...edgeAClaim(), targetHandle: 'forged-target-handle' }],
+    ['renderer type', { ...edgeAClaim(), rendererType: 'advanced-smart-step' }],
+    ['computedPath', {
+      ...edgeAClaim(),
+      computedPath: [{ x: 0, y: 0 }, { x: 101, y: 0 }],
+    }],
+    ['elkPath', {
+      ...edgeAClaim(),
+      elkPath: [{ x: 0, y: 0 }, { x: 51, y: 10 }, { x: 100, y: 0 }],
+    }],
+    ['treeRouting.points', {
+      ...edgeAClaim(),
+      treeRoutingPoints: [{ x: 0, y: 0 }, { x: 51, y: -10 }, { x: 100, y: 0 }],
+    }],
+    ['removed elkPath', { ...edgeAClaim(), elkPath: null }],
+    ['removed treeRouting.points', { ...edgeAClaim(), treeRoutingPoints: undefined }],
+  ])('rejects a same-id claim with forged %s geometry', (_field, forgedClaim) => {
+    expect(displayRoutingRenderAuthorityAllowsEdge(authority(), forgedClaim)).toBe(false);
+  });
+
+  it('allows style, marker, label, and selection changes outside routing geometry', () => {
+    const styleOnlyClaim = {
+      ...edgeAClaim(),
+      style: { stroke: '#123456', strokeWidth: 3 },
+      markerStart: 'url(#start)',
+      markerEnd: 'url(#end)',
+      label: 'latest business label',
+      selected: true,
+    };
+
+    expect(displayRoutingRenderAuthorityAllowsEdge(authority(), styleOnlyClaim)).toBe(true);
+  });
+
+  it('snapshots all authorized route coordinates so later source mutation cannot widen the proof', () => {
     const mutablePath = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
+    const mutableElkPath = [{ x: 0, y: 0 }, { x: 50, y: 10 }, { x: 100, y: 0 }];
+    const mutableTreeRoutingPoints = [
+      { x: 0, y: 0 },
+      { x: 50, y: -10 },
+      { x: 100, y: 0 },
+    ];
     const issued = createDisplayRoutingRenderAuthority({
       inputSignature: identity.inputSignature,
       inputGeometryDigest: identity.inputGeometryDigest,
       outputRouteSignature: workerSessionRef.outputRouteSignature,
       hardReport: TEST_ROUTING_HARD_REPORT,
-      authorizedEdges: [edgeGeometry('edge-a', mutablePath)],
+      authorizedEdges: [edgeGeometry('edge-a', mutablePath, {
+        elkPath: mutableElkPath,
+        treeRoutingPoints: mutableTreeRoutingPoints,
+      })],
       workerSessionRef,
     });
     mutablePath[1]!.x = 999;
+    mutableElkPath[1]!.x = 999;
+    mutableTreeRoutingPoints[1]!.x = 999;
 
     expect(displayRoutingRenderAuthorityAllowsEdge(
       issued,
-      edgeGeometry('edge-a', mutablePath),
+      edgeGeometry('edge-a', mutablePath, {
+        elkPath: mutableElkPath,
+        treeRoutingPoints: mutableTreeRoutingPoints,
+      }),
     )).toBe(false);
     expect(displayRoutingRenderAuthorityAllowsEdge(
       issued,
-      edgeGeometry('edge-a', [{ x: 0, y: 0 }, { x: 100, y: 0 }]),
+      edgeGeometry('edge-a', [{ x: 0, y: 0 }, { x: 100, y: 0 }], {
+        elkPath: [{ x: 0, y: 0 }, { x: 50, y: 10 }, { x: 100, y: 0 }],
+        treeRoutingPoints: [{ x: 0, y: 0 }, { x: 50, y: -10 }, { x: 100, y: 0 }],
+      }),
     )).toBe(true);
   });
 
@@ -123,6 +191,8 @@ describe('displayRoutingRenderAuthority', () => {
     { authorizedEdges: [] },
     { authorizedEdges: [{ ...edgeGeometry('', edgeAPath) }] },
     { authorizedEdges: [{ ...edgeGeometry('edge-a', []) }] },
+    { authorizedEdges: [{ ...edgeGeometry('edge-a', edgeAPath), elkPath: {} }] },
+    { authorizedEdges: [{ ...edgeGeometry('edge-a', edgeAPath), treeRoutingPoints: {} }] },
     { authorizedEdges: [{ ...edgeGeometry('edge-a', [
       { x: 0, y: 0 },
       { x: Number.POSITIVE_INFINITY, y: 0 },

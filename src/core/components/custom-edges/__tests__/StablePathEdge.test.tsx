@@ -68,6 +68,11 @@ const createTestRoutingAdapter = (
   if (!Array.isArray(data?.computedPath) || data.computedPath.length < 2) {
     return STANDALONE_EDGE_RENDER_ADAPTER;
   }
+  const treeRouting = data.treeRouting
+    && typeof data.treeRouting === 'object'
+    && !Array.isArray(data.treeRouting)
+    ? data.treeRouting as Record<string, unknown>
+    : null;
   const authority = createTestDisplayRoutingRenderAuthority({
     outputRouteSignature: 'route-v2:3:3:0123456789abcdef',
     authorizedEdges: [{
@@ -78,6 +83,8 @@ const createTestRoutingAdapter = (
       targetHandle: typeof props.targetHandleId === 'string' ? props.targetHandleId : null,
       rendererType: 'stablePath',
       computedPath: data.computedPath,
+      elkPath: data.elkPath,
+      treeRoutingPoints: treeRouting?.points,
     }],
   });
   return authority

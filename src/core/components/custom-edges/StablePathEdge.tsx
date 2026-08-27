@@ -14,6 +14,7 @@ import { getEdgeLabelAutoOffset } from './edgeLabelAvoidance';
 import { collectStablePathPeerPaths } from './stablePathEdgePeerPaths';
 import { useEdgeLabelObstacles } from './edgeLabelObstacleContext';
 import {
+    createDisplayRoutingRenderEdgeClaim,
     smartEdgeRenderAdapterAcceptsCommittedGeometry,
     useSmartEdgeRoutingRenderAdapter,
 } from './smartEdgeRoutingRenderAdapter';
@@ -161,15 +162,15 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
     const routingRenderAdapter = useSmartEdgeRoutingRenderAdapter();
     const acceptsCommittedGeometry = smartEdgeRenderAdapterAcceptsCommittedGeometry(
         routingRenderAdapter,
-        {
+        createDisplayRoutingRenderEdgeClaim({
             edgeId: id,
             source: props.source,
             target: props.target,
             sourceHandle: props.sourceHandleId ?? null,
             targetHandle: props.targetHandleId ?? null,
             rendererType: 'stablePath',
-            computedPath: edgeData?.computedPath,
-        },
+            data: edgeData,
+        }),
     );
     const currentTheme = useEdgeTheme();
     const canvasBackground = currentTheme?.diagram?.canvas?.background ?? '#ffffff';

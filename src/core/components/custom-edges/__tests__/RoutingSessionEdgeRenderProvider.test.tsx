@@ -23,6 +23,8 @@ const claim = {
   targetHandle: null,
   rendererType: 'stablePath',
   computedPath,
+  elkPath: null,
+  treeRoutingPoints: null,
 };
 const authority = createTestDisplayRoutingRenderAuthority({
   authorizedEdges: [{ edgeId: 'edge-a', computedPath }],

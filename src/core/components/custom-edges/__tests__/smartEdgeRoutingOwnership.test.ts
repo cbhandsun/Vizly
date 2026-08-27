@@ -10,6 +10,8 @@ import {
 } from '../smartEdgeRoutingRenderAdapter';
 
 const computedPath = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
+const elkPath = [{ x: 0, y: 0 }, { x: 50, y: 10 }, { x: 100, y: 0 }];
+const treeRoutingPoints = [{ x: 0, y: 0 }, { x: 50, y: -10 }, { x: 100, y: 0 }];
 const claim = {
   edgeId: 'edge-a',
   source: 'source',
@@ -18,10 +20,12 @@ const claim = {
   targetHandle: null,
   rendererType: 'stablePath',
   computedPath,
+  elkPath,
+  treeRoutingPoints,
 };
 
 const authority = createTestDisplayRoutingRenderAuthority({
-  authorizedEdges: [{ edgeId: 'edge-a', computedPath }],
+  authorizedEdges: [{ edgeId: 'edge-a', computedPath, elkPath, treeRoutingPoints }],
 });
 if (!authority) throw new Error('expected valid routing render authority');
 const routingAdapter = createRoutingSessionEdgeRenderAdapter(authority);
@@ -43,7 +47,12 @@ describe('smart edge routing render authority', () => {
     )).toBe(false);
     expect(smartEdgeRenderAdapterAcceptsCommittedGeometry(
       routingAdapter,
-      { ...claim, computedPath: computedPath.map(point => ({ ...point })) },
+      {
+        ...claim,
+        computedPath: computedPath.map(point => ({ ...point })),
+        elkPath: elkPath.map(point => ({ ...point })),
+        treeRoutingPoints: treeRoutingPoints.map(point => ({ ...point })),
+      },
     )).toBe(true);
     expect(smartEdgeRenderAdapterAcceptsCommittedGeometry(
       routingAdapter,
@@ -61,6 +70,32 @@ describe('smart edge routing render authority', () => {
       routingAdapter,
       { ...claim, rendererType: 'advanced-smart-step' },
     )).toBe(false);
+    expect(smartEdgeRenderAdapterAcceptsCommittedGeometry(
+      routingAdapter,
+      { ...claim, elkPath: [{ x: 0, y: 0 }, { x: 51, y: 10 }, { x: 100, y: 0 }] },
+    )).toBe(false);
+    expect(smartEdgeRenderAdapterAcceptsCommittedGeometry(
+      routingAdapter,
+      {
+        ...claim,
+        treeRoutingPoints: [{ x: 0, y: 0 }, { x: 51, y: -10 }, { x: 100, y: 0 }],
+      },
+    )).toBe(false);
+  });
+
+  it('keeps the adapter fast path valid for style-only render changes', () => {
+    const styleOnlyClaim = {
+      ...claim,
+      style: { stroke: '#123456' },
+      markerEnd: 'url(#arrow)',
+      label: 'updated label',
+      selected: true,
+    };
+
+    expect(smartEdgeRenderAdapterAcceptsCommittedGeometry(
+      routingAdapter,
+      styleOnlyClaim,
+    )).toBe(true);
   });
 
   it.each([

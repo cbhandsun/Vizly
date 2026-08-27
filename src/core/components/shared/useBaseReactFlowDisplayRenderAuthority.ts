@@ -2,6 +2,7 @@ import type { Edge } from '@xyflow/react';
 import { useCallback, useMemo, useState } from 'react';
 
 import {
+  createDisplayRoutingRenderEdgeClaim,
   createDisplayRoutingRenderAuthority,
   displayRoutingRenderAuthorityAllowsEdge,
   type DisplayRoutingRenderAuthority,
@@ -33,15 +34,15 @@ export const createBaseReactFlowCommittedRenderAuthority = (
         ? edge.data as Record<string, unknown>
         : null;
       return Array.isArray(data?.computedPath) && data.computedPath.length >= 2
-        ? [{
+        ? [createDisplayRoutingRenderEdgeClaim({
           edgeId: edge.id,
           source: edge.source,
           target: edge.target,
           sourceHandle: edge.sourceHandle ?? null,
           targetHandle: edge.targetHandle ?? null,
           rendererType: edge.type ?? null,
-          computedPath: data.computedPath,
-        }]
+          data,
+        })]
         : [];
     }),
     workerSessionRef: baseline.workerSessionRef,
@@ -91,15 +92,15 @@ export const useBaseReactFlowActiveRenderAuthority = ({
       return !Array.isArray(data?.computedPath)
         || displayRoutingRenderAuthorityAllowsEdge(
           committedRenderAuthority,
-          {
+          createDisplayRoutingRenderEdgeClaim({
             edgeId: edge.id,
             source: edge.source,
             target: edge.target,
             sourceHandle: edge.sourceHandle ?? null,
             targetHandle: edge.targetHandle ?? null,
             rendererType: edge.type ?? null,
-            computedPath: data.computedPath,
-          },
+            data,
+          }),
         );
     })
   ) return null;

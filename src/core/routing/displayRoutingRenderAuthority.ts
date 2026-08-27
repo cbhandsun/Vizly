@@ -56,6 +56,8 @@ export type DisplayRoutingAuthorizedEdgeGeometry = Readonly<{
   targetHandle: string | null;
   rendererType: string | null;
   computedPath: readonly DisplayRoutingRenderPoint[];
+  elkPath: readonly DisplayRoutingRenderPoint[] | null;
+  treeRoutingPoints: readonly DisplayRoutingRenderPoint[] | null;
 }>;
 
 export type DisplayRoutingRenderPoint = Readonly<{ x: number; y: number }>;
@@ -68,7 +70,47 @@ export type DisplayRoutingRenderEdgeClaim = Readonly<{
   targetHandle: unknown;
   rendererType: unknown;
   computedPath: unknown;
+  elkPath: unknown;
+  treeRoutingPoints: unknown;
 }>;
+
+export const createDisplayRoutingRenderEdgeClaim = ({
+  edgeId,
+  source,
+  target,
+  sourceHandle,
+  targetHandle,
+  rendererType,
+  data,
+}: Readonly<{
+  edgeId: unknown;
+  source: unknown;
+  target: unknown;
+  sourceHandle: unknown;
+  targetHandle: unknown;
+  rendererType: unknown;
+  data: unknown;
+}>): DisplayRoutingRenderEdgeClaim => {
+  const edgeData = data && typeof data === 'object' && !Array.isArray(data)
+    ? data as Record<string, unknown>
+    : null;
+  const treeRouting = edgeData?.treeRouting
+    && typeof edgeData.treeRouting === 'object'
+    && !Array.isArray(edgeData.treeRouting)
+    ? edgeData.treeRouting as Record<string, unknown>
+    : null;
+  return {
+    edgeId,
+    source,
+    target,
+    sourceHandle,
+    targetHandle,
+    rendererType,
+    computedPath: edgeData?.computedPath,
+    elkPath: edgeData?.elkPath,
+    treeRoutingPoints: treeRouting?.points,
+  };
+};
 
 const issuedAuthorities = new WeakMap<object, Readonly<{
   authorizedEdgeGeometry: ReadonlyMap<string, DisplayRoutingAuthorizedEdgeGeometry>;
@@ -97,23 +139,33 @@ const isDisplayRoutingRenderPoint = (value: unknown): value is DisplayRoutingRen
 
 const cloneDisplayRoutingRenderPath = (
   value: unknown,
+  minimumPoints = 2,
 ): readonly DisplayRoutingRenderPoint[] | null => {
   if (
     !Array.isArray(value)
-    || value.length < 2
+    || value.length < minimumPoints
     || value.length > MAX_AUTHORIZED_PATH_POINTS
     || !value.every(isDisplayRoutingRenderPoint)
   ) return null;
   return Object.freeze(value.map(point => Object.freeze({ x: point.x, y: point.y })));
 };
 
+const cloneOptionalDisplayRoutingRenderPath = (
+  value: unknown,
+): readonly DisplayRoutingRenderPoint[] | null | false => (
+  value === null || typeof value === 'undefined'
+    ? null
+    : cloneDisplayRoutingRenderPath(value, 0) ?? false
+);
+
 const displayRoutingRenderPathsMatch = (
   expected: readonly DisplayRoutingRenderPoint[],
   actual: unknown,
+  minimumPoints = 2,
 ): boolean => (
   Array.isArray(actual)
   && actual.length === expected.length
-  && actual.length >= 2
+  && actual.length >= minimumPoints
   && actual.length <= MAX_AUTHORIZED_PATH_POINTS
   && actual.every((point, index) => (
     isDisplayRoutingRenderPoint(point)
@@ -121,6 +173,13 @@ const displayRoutingRenderPathsMatch = (
     && point.y === expected[index]?.y
   ))
 );
+
+const displayRoutingOptionalRenderPathsMatch = (
+  expected: readonly DisplayRoutingRenderPoint[] | null,
+  actual: unknown,
+): boolean => expected === null
+  ? actual === null || typeof actual === 'undefined'
+  : displayRoutingRenderPathsMatch(expected, actual, 0);
 
 /**
  * Issues a realm-local rendering capability for one exact committed route.
@@ -139,7 +198,7 @@ export const createDisplayRoutingRenderAuthority = ({
   inputGeometryDigest: string;
   outputRouteSignature: string;
   hardReport: RoutingHardReport;
-  authorizedEdges: Iterable<DisplayRoutingAuthorizedEdgeGeometry>;
+  authorizedEdges: Iterable<DisplayRoutingRenderEdgeClaim>;
   workerSessionRef: RoutingWorkerSessionRef;
 }): DisplayRoutingRenderAuthority | null => {
   if (
@@ -159,7 +218,17 @@ export const createDisplayRoutingRenderAuthority = ({
   if (!safeWorkerSessionRef) return null;
   const edgeGeometry = new Map<string, DisplayRoutingAuthorizedEdgeGeometry>();
   for (const edge of authorizedEdges) {
-    const { edgeId, source, target, sourceHandle, targetHandle, rendererType, computedPath } = edge;
+    const {
+      edgeId,
+      source,
+      target,
+      sourceHandle,
+      targetHandle,
+      rendererType,
+      computedPath,
+      elkPath,
+      treeRoutingPoints,
+    } = edge;
     if (
       !isBoundedEdgeId(edgeId)
       || !isBoundedEdgeId(source)
@@ -169,7 +238,9 @@ export const createDisplayRoutingRenderAuthority = ({
       || !isBoundedOptionalToken(rendererType)
     ) return null;
     const safeComputedPath = cloneDisplayRoutingRenderPath(computedPath);
-    if (!safeComputedPath) return null;
+    const safeElkPath = cloneOptionalDisplayRoutingRenderPath(elkPath);
+    const safeTreeRoutingPoints = cloneOptionalDisplayRoutingRenderPath(treeRoutingPoints);
+    if (!safeComputedPath || safeElkPath === false || safeTreeRoutingPoints === false) return null;
     edgeGeometry.set(edgeId, Object.freeze({
       edgeId,
       source,
@@ -178,6 +249,8 @@ export const createDisplayRoutingRenderAuthority = ({
       targetHandle,
       rendererType,
       computedPath: safeComputedPath,
+      elkPath: safeElkPath,
+      treeRoutingPoints: safeTreeRoutingPoints,
     }));
     if (edgeGeometry.size > MAX_AUTHORIZED_EDGE_IDS) return null;
   }
@@ -235,5 +308,10 @@ export const displayRoutingRenderAuthorityAllowsEdge = (
     && expected.targetHandle === claim.targetHandle
     && expected.rendererType === claim.rendererType
     && displayRoutingRenderPathsMatch(expected.computedPath, claim.computedPath)
+    && displayRoutingOptionalRenderPathsMatch(expected.elkPath, claim.elkPath)
+    && displayRoutingOptionalRenderPathsMatch(
+      expected.treeRoutingPoints,
+      claim.treeRoutingPoints,
+    )
   );
 };

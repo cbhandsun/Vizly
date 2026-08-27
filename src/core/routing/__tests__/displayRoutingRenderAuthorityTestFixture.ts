@@ -1,6 +1,6 @@
 import {
   createDisplayRoutingRenderAuthority,
-  type DisplayRoutingAuthorizedEdgeGeometry,
+  type DisplayRoutingRenderEdgeClaim,
   type DisplayRoutingRenderAuthority,
 } from '../displayRoutingRenderAuthority';
 import { createDisplayRoutingIdentity } from '../routingSessionIdentity';
@@ -47,7 +47,7 @@ export const createTestDisplayRoutingRenderAuthority = ({
   authorizedEdges: Iterable<Readonly<{
     edgeId: string;
     computedPath: readonly { x: number; y: number }[];
-  }> & Partial<Omit<DisplayRoutingAuthorizedEdgeGeometry, 'edgeId' | 'computedPath'>>>;
+  }> & Partial<Omit<DisplayRoutingRenderEdgeClaim, 'edgeId' | 'computedPath'>>>;
   sessionId?: string;
 }): DisplayRoutingRenderAuthority | null => {
   const identity = createDisplayRoutingIdentity(inputSignature, inputGeometryDigest);
@@ -62,6 +62,8 @@ export const createTestDisplayRoutingRenderAuthority = ({
       sourceHandle: null,
       targetHandle: null,
       rendererType: 'stablePath',
+      elkPath: null,
+      treeRoutingPoints: null,
       ...edge,
     })),
     workerSessionRef: { sessionId, identity, outputRouteSignature },

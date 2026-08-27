@@ -42,7 +42,13 @@ const sourceEdges: Edge[] = [{
 const routedEdges: Edge[] = [{
   ...sourceEdges[0],
   type: 'stablePath',
-  data: { computedPath: [{ x: 100, y: 30 }, { x: 240, y: 30 }] },
+  data: {
+    computedPath: [{ x: 100, y: 30 }, { x: 240, y: 30 }],
+    elkPath: [{ x: 100, y: 30 }, { x: 170, y: 40 }, { x: 240, y: 30 }],
+    treeRouting: {
+      points: [{ x: 100, y: 30 }, { x: 170, y: 20 }, { x: 240, y: 30 }],
+    },
+  },
 }];
 
 const commitSnapshot = (includeWorkerSession = true) => {
@@ -128,7 +134,10 @@ describe('BaseReactFlow committed render authority', () => {
     expect(createBaseReactFlowCommittedRenderAuthority(replay.baseline, replay.edges.map(edge => ({
       ...edge,
       style: { stroke: '#123456' },
+      markerStart: { type: 'arrowclosed' },
+      markerEnd: { type: 'arrow' },
       label: 'latest business label',
+      selected: true,
     })))).not.toBeNull();
   });
 });

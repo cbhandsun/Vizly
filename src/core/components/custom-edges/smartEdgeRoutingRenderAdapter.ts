@@ -1,12 +1,15 @@
 import { createContext, useContext } from 'react';
 
 import {
+  createDisplayRoutingRenderEdgeClaim,
   displayRoutingRenderAuthorityAllowsEdge,
   readDisplayRoutingRenderSessionContract,
   type DisplayRoutingRenderAuthority,
   type DisplayRoutingRenderEdgeClaim,
   type DisplayRoutingRenderSessionContract,
 } from '../../routing/displayRoutingRenderAuthority';
+
+export { createDisplayRoutingRenderEdgeClaim };
 
 export type SmartEdgeRoutingRenderAdapter =
   | Readonly<{

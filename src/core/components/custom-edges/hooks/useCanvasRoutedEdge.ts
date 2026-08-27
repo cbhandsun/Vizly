@@ -4,6 +4,7 @@ import { createFilletedPath, getSmartLabelPosition } from '../../../algorithms/s
 import type { SimpleNodeData } from '../../../hooks/useNodeMap';
 import { getComputedPoints, type SmartPathPoint } from './smartPathCompatibility';
 import {
+  createDisplayRoutingRenderEdgeClaim,
   smartEdgeRenderAdapterAcceptsCommittedGeometry,
   useSmartEdgeRoutingRenderAdapter,
 } from '../smartEdgeRoutingRenderAdapter';
@@ -142,15 +143,15 @@ export const useCanvasRoutedEdge = (props: EdgeProps): SmartEdgeRoutingRenderMod
     props,
     smartEdgeRenderAdapterAcceptsCommittedGeometry(
       renderAdapter,
-      {
+      createDisplayRoutingRenderEdgeClaim({
         edgeId: props.id,
         source: props.source,
         target: props.target,
         sourceHandle: props.sourceHandleId ?? null,
         targetHandle: props.targetHandleId ?? null,
         rendererType: 'advanced-smart-step',
-        computedPath: (props.data as CanvasRoutedEdgeData | undefined)?.computedPath,
-      },
+        data: props.data,
+      }),
     ),
   );
   const data = (props.data ?? {}) as CanvasRoutedEdgeData;
