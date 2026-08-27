@@ -12,6 +12,13 @@ export const DISPLAY_ROUTING_P95_BUDGET_MS = Object.freeze({
   localRoute: 150,
 });
 
+export const parseDisplayRoutingBrowserVerificationMode = (rawArgs) => {
+  const args = Array.isArray(rawArgs) ? rawArgs : [];
+  if (args.length === 0) return 'full';
+  if (args.length === 1 && args[0] === '--interaction-only') return 'interaction';
+  throw new Error('Display-routing browser verifier accepts only --interaction-only');
+};
+
 export const selectDisplayRoutingDragCases = (value, availableCases) => {
   if (!Array.isArray(availableCases) || availableCases.length === 0) return [];
   if (typeof value === 'undefined' || String(value).trim() === '') return availableCases;

@@ -6,6 +6,7 @@ import {
   assertDisplayRoutingPerformanceSummaryBudget,
   displayRoutingIncrementalPhaseTraceIsComplete,
   EXPECTED_INCREMENTAL_DISPLAY_ROUTING_PHASE_SEQUENCES,
+  parseDisplayRoutingBrowserVerificationMode,
   parseDisplayRoutingSampleIndex,
   rotateDisplayRoutingDragCases,
   selectDisplayRoutingDragCases,
@@ -58,6 +59,19 @@ const validDragResult = overrides => ({
 });
 
 describe('display-routing browser case selection', () => {
+  it('selects a bounded full or isolated interaction verifier mode', () => {
+    expect(parseDisplayRoutingBrowserVerificationMode([])).toBe('full');
+    expect(parseDisplayRoutingBrowserVerificationMode(['--interaction-only']))
+      .toBe('interaction');
+    expect(() => parseDisplayRoutingBrowserVerificationMode(['--unknown']))
+      .toThrow(/only --interaction-only/);
+    expect(() => parseDisplayRoutingBrowserVerificationMode([
+      '--interaction-only',
+      '--unknown',
+    ])).toThrow(/only --interaction-only/);
+    expect(parseDisplayRoutingBrowserVerificationMode(null)).toBe('full');
+  });
+
   it('keeps the full matrix by default and selects a bounded explicit subset', () => {
     expect(selectDisplayRoutingDragCases(undefined, availableCases)).toBe(availableCases);
     expect(selectDisplayRoutingDragCases('wms,tms,wms', availableCases)).toEqual([

@@ -16,6 +16,7 @@ import {
 import {
   assertDisplayRoutingDragResult,
   assertDisplayRoutingPerformanceBudget,
+  parseDisplayRoutingBrowserVerificationMode,
   parseDisplayRoutingSampleIndex,
   rotateDisplayRoutingDragCases,
   selectDisplayRoutingDragCases,
@@ -67,7 +68,13 @@ const DRAG_CASES = COLLECT_PERFORMANCE_SAMPLES && !HAS_EXPLICIT_DRAG_CASES
 const FIXED_VISUAL_ZOOMS = Object.freeze([0.5, 1, 2]);
 const EMIT_MACHINE_RESULT = process.env.DISPLAY_ROUTING_BROWSER_JSON === '1';
 const INCLUDE_CPU_PROFILE = process.env.DISPLAY_ROUTING_BROWSER_CPU_PROFILE === '1';
+const VERIFICATION_MODE = parseDisplayRoutingBrowserVerificationMode(process.argv.slice(2));
+const INTERACTION_ONLY = VERIFICATION_MODE === 'interaction';
 const RUN_STARTED_AT = performance.now();
+
+if (INTERACTION_ONLY && COLLECT_PERFORMANCE_SAMPLES) {
+  throw new Error('--interaction-only cannot collect incremental-route performance samples');
+}
 
 const waitForValue = async (session, expression, timeoutMs = WAIT_TIMEOUT_MS) => {
   const deadline = Date.now() + timeoutMs;
@@ -610,10 +617,9 @@ const verifyNormalRenderedObstacleAudit = async () => withPrecompiledRouteBrowse
         2,
       )}`);
     }
-    const visualScales = await verifyFixedVisualScales(
-      session,
-      route.outputRouteSignature,
-    );
+    const visualScales = INTERACTION_ONLY
+      ? []
+      : await verifyFixedVisualScales(session, route.outputRouteSignature);
     const themeMatrix = COLLECT_PERFORMANCE_SAMPLES ? [] : await verifyDisplayRoutingThemeMatrix({
       session,
       expectedSignature: route.outputRouteSignature,
@@ -621,16 +627,20 @@ const verifyNormalRenderedObstacleAudit = async () => withPrecompiledRouteBrowse
       expectedWorkerAbortCount: stability.workerAbortCount,
       initialVisualScales: visualScales,
       verifyInteractionStates: () => verifyDisplayRoutingInteractionStates(session),
-      verifyVisualScales: () => verifyFixedVisualScales(session, route.outputRouteSignature),
+      verifyVisualScales: INTERACTION_ONLY
+        ? async () => []
+        : () => verifyFixedVisualScales(session, route.outputRouteSignature),
     });
-    const exportMatrix = COLLECT_PERFORMANCE_SAMPLES ? [] : await verifyDisplayRoutingExportMatrix({
-      session,
-      expectedSignature: route.outputRouteSignature,
-      expectedWorkerStartCount: stability.workerStartCount,
-      expectedWorkerAbortCount: stability.workerAbortCount,
-      expectedLogicalEdgeCount: 14,
-      requireLicensedExports: process.env.DISPLAY_ROUTING_REQUIRE_LICENSED_EXPORTS === '1',
-    });
+    const exportMatrix = COLLECT_PERFORMANCE_SAMPLES || INTERACTION_ONLY
+      ? []
+      : await verifyDisplayRoutingExportMatrix({
+        session,
+        expectedSignature: route.outputRouteSignature,
+        expectedWorkerStartCount: stability.workerStartCount,
+        expectedWorkerAbortCount: stability.workerAbortCount,
+        expectedLogicalEdgeCount: 14,
+        requireLicensedExports: process.env.DISPLAY_ROUTING_REQUIRE_LICENSED_EXPORTS === '1',
+      });
     return { route, audit, stability, visualScales, themeMatrix, exportMatrix };
   },
 );
@@ -644,7 +654,7 @@ const main = async () => {
     ? null
     : await verifyNormalRenderedObstacleAudit();
   const results = [];
-  for (const dragCase of DRAG_CASES) {
+  for (const dragCase of INTERACTION_ONLY ? [] : DRAG_CASES) {
     const captured = await withPrecompiledRouteBrowser(async session => {
       await session.send('Emulation.setDeviceMetricsOverride', {
         width: 1_600,
@@ -774,9 +784,11 @@ const main = async () => {
       + `renderedClearanceRisks=${normal.audit.clearanceRisks.length}, `
       + `visibleRouteVariants=${normal.stability.distinctRouteCount}.`,
     );
-    console.log(`visual-scales: ${normal.visualScales.map(audit => (
-      `${audit.name}=${audit.zoom.toFixed(3)}x/${audit.visibleLabelCount}labels`
-    )).join(', ')}.`);
+    if (normal.visualScales.length > 0) {
+      console.log(`visual-scales: ${normal.visualScales.map(audit => (
+        `${audit.name}=${audit.zoom.toFixed(3)}x/${audit.visibleLabelCount}labels`
+      )).join(', ')}.`);
+    }
     if (normal.themeMatrix.length > 0) {
       console.log(`themes: ${normal.themeMatrix.map(item => (
         `${item.id}/${item.interactions.maximumPaintMs.toFixed(1)}ms-max-paint`
