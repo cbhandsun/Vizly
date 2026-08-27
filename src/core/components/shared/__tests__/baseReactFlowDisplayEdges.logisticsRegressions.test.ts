@@ -439,6 +439,24 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
       phaseTraces.find(trace => trace.phase === 'terminal'),
       JSON.stringify({ quality, phaseTraces }, null, 2),
     ).toMatchObject({ resolution: 'accepted' });
+    const outerPortTrace = phaseTraces.find(
+      trace => trace.phase === 'terminal-finalize-outer-port',
+    );
+    expect(
+      outerPortTrace,
+      JSON.stringify({ quality, phaseTraces }, null, 2),
+    ).toBeDefined();
+    const fullPairScanCount =
+      (outerPortTrace?.evaluationCount ?? 0) *
+      ((projected.edges.length * (projected.edges.length - 1)) / 2);
+    expect(
+      outerPortTrace?.evaluationCount ?? 0,
+      JSON.stringify({ quality, phaseTraces }, null, 2),
+    ).toBeGreaterThan(0);
+    expect(
+      outerPortTrace?.scannedEdgePairCount ?? Number.POSITIVE_INFINITY,
+      JSON.stringify({ fullPairScanCount, quality, phaseTraces }, null, 2),
+    ).toBeLessThan(fullPairScanCount);
     expect(durationMs, JSON.stringify({ quality, phaseTraces, paths }, null, 2)).toBeLessThan(3_000);
   }, 30_000);
 

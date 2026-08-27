@@ -44,6 +44,24 @@ const reportIsGeometricallyClean = (
   && report.quality.unexplainedRelatedOverlap === 0
 );
 
+const normalizeOuterPortTerminalCandidate = <T extends Edge[]>(
+  edges: T,
+  nodes: Node[],
+): T => repairSubpixelEndpointStubPrecision(
+  anchorComputedDisplayEdgeEndpoints(
+    repairRenderSafeEndpointStubs(
+      repairFinalShortEndpointStubs(
+        repairSubpixelEndpointStubPrecision(edges),
+        nodes,
+      ),
+      nodes,
+      64,
+    ),
+    nodes,
+  ) as T,
+  MIN_RENDER_SAFE_ENDPOINT_STUB,
+) as T;
+
 /**
  * Resolves the final detached overlap/strict interlock by changing both port
  * roles and one bounded double-axis outer path as a single hard-gated
@@ -81,6 +99,13 @@ export const repairResidualOuterPortTransactionWithHardGate = <T extends Edge[]>
     includeStrictCrossings: true,
     maxCandidates: Math.min(64, maxExactEvaluations),
   });
+  // Terminal normalization touches the same broad set of edges for every
+  // sibling candidate. Compare candidates to one normalized reference so the
+  // exact changed-edge evaluator only rescans the outer-port edits themselves.
+  // Any broad or inexact delta still fails closed into the existing full gate.
+  const normalizedReference = options.evaluation
+    ? normalizeOuterPortTerminalCandidate(edges, nodes)
+    : edges;
   let remainingEvaluations = Math.min(64, Math.max(1, maxExactEvaluations));
   let evaluatedCandidateCount = 0;
   const finish = (resolution: 'accepted' | 'fallback', result: T): T => {
@@ -96,27 +121,17 @@ export const repairResidualOuterPortTransactionWithHardGate = <T extends Edge[]>
   };
   for (const candidate of candidates) {
     if (remainingEvaluations <= 0) break;
-    const terminalBase = repairSubpixelEndpointStubPrecision(
-      anchorComputedDisplayEdgeEndpoints(
-        repairRenderSafeEndpointStubs(
-          repairFinalShortEndpointStubs(
-            repairSubpixelEndpointStubPrecision(candidate.edges),
-            nodes,
-          ),
-          nodes,
-          64,
-        ),
-        nodes,
-      ) as T,
-      MIN_RENDER_SAFE_ENDPOINT_STUB,
-    ) as T;
-    const changedEdgeIndexes = getChangedBaseReactFlowDisplayRoutingIndexes(edges, terminalBase);
+    const terminalBase = normalizeOuterPortTerminalCandidate(candidate.edges, nodes);
+    const changedEdgeIndexes = getChangedBaseReactFlowDisplayRoutingIndexes(
+      normalizedReference,
+      terminalBase,
+    );
     const changedEdgeIndexSet = new Set(changedEdgeIndexes);
     const evaluationCandidate = terminalBase.map((edge, index) => (
-      changedEdgeIndexSet.has(index) ? edge : edges[index]
+      changedEdgeIndexSet.has(index) ? edge : normalizedReference[index]
     )) as T;
     const report = options.evaluation?.hardReportChanged(
-      edges,
+      normalizedReference,
       evaluationCandidate,
       changedEdgeIndexes,
     ) ?? getDisplayHardQualityGateReport(terminalBase, nodes, 'polished');
