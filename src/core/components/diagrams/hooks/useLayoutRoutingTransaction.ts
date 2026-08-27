@@ -100,7 +100,7 @@ export const useLayoutRoutingTransaction = ({
         if (!routingSessionRuntime.isCurrentJob(routingJob)) {
           throw new Error('layout-routing-cancelled');
         }
-        committedEdges = staged.routedEdges;
+        committedEdges = staged.committedSourceEdges;
         commitLayoutSnapshot = staged.commitSnapshot;
       }
       const commitResult = routingSessionRuntime.commitJob(routingJob, () => {

@@ -154,6 +154,9 @@ const auditFinalSvg = async (session, route, label) => {
     hardAudit,
     expectedPathCount: route.response.edges.length,
   })) {
+    const renderAuthorityStatus = await session.evaluate(
+      'window.__vizlyBaseReactFlowDisplayRouting?.renderAuthorityStatus ?? null',
+    );
     throw new Error(`Final SVG geometry failed for ${label}: ${JSON.stringify({
       expectedPathCount: route.response.edges.length,
       auditedPathCount: audit?.auditedPathCount,
@@ -170,6 +173,11 @@ const auditFinalSvg = async (session, route, label) => {
       computedRenderPathCount: visualAudit?.computedRenderPathCount,
       fallbackRenderPathCount: visualAudit?.fallbackRenderPathCount,
       missingRenderPathSourceCount: visualAudit?.missingRenderPathSourceCount,
+      acceptedRenderAuthorityCount: visualAudit?.acceptedRenderAuthorityCount,
+      rejectedRenderAuthorityCount: visualAudit?.rejectedRenderAuthorityCount,
+      acceptedRenderAttachmentCount: visualAudit?.acceptedRenderAttachmentCount,
+      rejectedRenderAttachmentCount: visualAudit?.rejectedRenderAttachmentCount,
+      renderAuthorityStatus,
       shortEndpointStubPathCount: hardAudit?.shortEndpointStubEdgeIds?.length,
       tinyInteriorDoglegPathCount: hardAudit?.tinyInteriorDoglegEdgeIds?.length,
       hairpinPathCount: hardAudit?.hairpinEdgeIds?.length,

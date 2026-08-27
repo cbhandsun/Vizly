@@ -46,6 +46,7 @@ import type { BaseReactFlowRoutingSessionRuntime } from './baseReactFlowRoutingS
 export { clearBaseReactFlowLayoutEdgeRoutingData } from './baseReactFlowLayoutEdgeRoutingData';
 
 export type BaseReactFlowLayoutRoutingCommit = Readonly<{
+  committedSourceEdges: Edge[];
   routedEdges: Edge[];
   commitSnapshot: (runtime: BaseReactFlowRoutingSessionRuntime) => boolean;
 }>;
@@ -195,6 +196,7 @@ export const commitBaseReactFlowStagedLayoutRoutingResult = ({
   })) return null;
 
   return {
+    committedSourceEdges: sourceEdges,
     routedEdges: merged.edges,
     commitSnapshot: runtime => writeBaseReactFlowStagedLayoutSnapshot({
       runtime,
@@ -270,6 +272,7 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
   const writeSnapshot = (
     edges: Edge[],
     patches: RoutingPatch[],
+    snapshotWorkerSessionRef: RoutingCommittedSnapshot['workerSessionRef'],
   ): ReturnType<typeof computeBaseReactFlowDisplayInputIdentityBundle> | null => {
     // Layout strategies keep child coordinates relative to their domain. The
     // display router identifies the same nodes by their projected absolute
@@ -292,22 +295,24 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
       sourceNodes,
       displayPatches: patches,
       outputRouteSignature,
-      workerSessionRef: safeWorkerSessionRef,
+      workerSessionRef: snapshotWorkerSessionRef,
       ...hardReportIdentity,
     });
     return committed ? identity : null;
   };
-  const primaryIdentity = writeSnapshot(routedEdges, displayPatches);
+  const primaryIdentity = writeSnapshot(routedEdges, displayPatches, undefined);
   const sourcePatches = createBaseReactFlowDisplayEdgePatches(sourceEdges, routedEdges);
-  const sourceIdentity = sourcePatches ? writeSnapshot(sourceEdges, sourcePatches) : null;
-  if (primaryIdentity) markBaseReactFlowStagedLayoutSnapshotHandoff(routedEdges);
+  const sourceIdentity = sourcePatches
+    ? writeSnapshot(sourceEdges, sourcePatches, safeWorkerSessionRef)
+    : null;
+  if (sourceIdentity) markBaseReactFlowStagedLayoutSnapshotHandoff(sourceEdges);
   updateDisplayRoutingDebugState({
     stagedLayoutPrimarySignature: primaryIdentity?.cacheSignature,
     stagedLayoutPrimaryGeometryDigest: primaryIdentity?.geometryDigest,
     stagedLayoutSourceSignature: sourceIdentity?.cacheSignature,
     stagedLayoutSourceGeometryDigest: sourceIdentity?.geometryDigest,
   });
-  return primaryIdentity !== null;
+  return sourceIdentity !== null;
 };
 
 /** Routes target layout geometry without mutating the visible graph. */
@@ -358,6 +363,7 @@ export const stageBaseReactFlowLayoutRouting = async ({
   const cachedWorkerSessionRef = cached?.baseline.workerSessionRef;
   if (cachedEdges && cachedHardReportDigest) {
     return {
+      committedSourceEdges: unseededSourceEdges,
       routedEdges: cachedEdges,
       commitSnapshot: runtime => writeBaseReactFlowStagedLayoutSnapshot({
         runtime,

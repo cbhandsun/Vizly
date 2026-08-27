@@ -607,6 +607,14 @@ export const readDisplayRoutingVisualScaleAudit = () => {
     const graphics = wrapper.querySelector?.('.stable-path-edge-graphics');
     return graphics?.getAttribute?.('data-render-path-source') ?? 'missing';
   });
+  const renderAuthorities = edgeWrappers.map(wrapper => (
+    wrapper.querySelector?.('.stable-path-edge-graphics')
+      ?.getAttribute?.('data-render-authority') ?? 'missing'
+  ));
+  const renderAttachments = edgeWrappers.map(wrapper => (
+    wrapper.querySelector?.('.stable-path-edge-graphics')
+      ?.getAttribute?.('data-render-attachment') ?? 'missing'
+  ));
   const duplicateMarkerEdges = edgeWrappers.flatMap(wrapper => {
     const markerCarrierCount = [...(wrapper.querySelectorAll?.('path') ?? [])].filter(path => {
       const pathStyle = getComputedStyle(path);
@@ -699,6 +707,10 @@ export const readDisplayRoutingVisualScaleAudit = () => {
     missingRenderPathSourceCount: renderPathSources.filter(source => (
       source !== 'computed' && source !== 'fallback'
     )).length,
+    acceptedRenderAuthorityCount: renderAuthorities.filter(value => value === 'accepted').length,
+    rejectedRenderAuthorityCount: renderAuthorities.filter(value => value === 'rejected').length,
+    acceptedRenderAttachmentCount: renderAttachments.filter(value => value === 'accepted').length,
+    rejectedRenderAttachmentCount: renderAttachments.filter(value => value === 'rejected').length,
     duplicateMarkerEdgeCount: duplicateMarkerEdges.length,
     duplicateMarkerEdges,
     edgeAccessibleNameMissingCount: edgeWrappers.filter(wrapper => {

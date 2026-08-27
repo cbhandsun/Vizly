@@ -1,5 +1,5 @@
 import type { Edge } from '@xyflow/react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   createDisplayRoutingRenderEdgeClaim,
@@ -12,6 +12,10 @@ import {
   isBaseReactFlowDisplayCommittedSnapshotBaselineTrusted,
   type BaseReactFlowDisplayCommittedSnapshotBaseline,
 } from './baseReactFlowDisplayCommittedSnapshot';
+import {
+  updateDisplayRoutingDebugState,
+  type BaseReactFlowRenderAuthorityStatus,
+} from './baseReactFlowDisplayRoutingDebug';
 
 export const createBaseReactFlowCommittedRenderAuthority = (
   baseline: BaseReactFlowDisplayCommittedSnapshotBaseline,
@@ -68,7 +72,7 @@ export const useBaseReactFlowCommittedRenderAuthority = (): Readonly<{
   return { committedRenderAuthority, rememberCommittedRenderAuthority };
 };
 
-export const useBaseReactFlowActiveRenderAuthority = ({
+export const resolveBaseReactFlowActiveRenderAuthority = ({
   committedRenderAuthority,
   inputSignature,
   inputGeometryDigest,
@@ -78,14 +82,22 @@ export const useBaseReactFlowActiveRenderAuthority = ({
   inputSignature: string;
   inputGeometryDigest: string;
   displayedEdges: Edge[];
-}): DisplayRoutingRenderAuthority | null => useMemo(() => {
-  if (
-    !committedRenderAuthority
-    || committedRenderAuthority.inputSignature !== inputSignature
-    || committedRenderAuthority.inputGeometryDigest !== inputGeometryDigest
-    || computeBaseReactFlowDisplayOutputRouteSignature(displayedEdges)
-      !== committedRenderAuthority.outputRouteSignature
-    || !displayedEdges.every((edge) => {
+}): Readonly<{
+  authority: DisplayRoutingRenderAuthority | null;
+  status: BaseReactFlowRenderAuthorityStatus;
+}> => {
+  if (!committedRenderAuthority) return { authority: null, status: 'missing-commit' };
+  if (committedRenderAuthority.inputSignature !== inputSignature) {
+    return { authority: null, status: 'input-signature-mismatch' };
+  }
+  if (committedRenderAuthority.inputGeometryDigest !== inputGeometryDigest) {
+    return { authority: null, status: 'input-geometry-mismatch' };
+  }
+  if (computeBaseReactFlowDisplayOutputRouteSignature(displayedEdges)
+      !== committedRenderAuthority.outputRouteSignature) {
+    return { authority: null, status: 'output-signature-mismatch' };
+  }
+  if (!displayedEdges.every((edge) => {
       const data = edge.data && typeof edge.data === 'object'
         ? edge.data as Record<string, unknown>
         : null;
@@ -102,7 +114,37 @@ export const useBaseReactFlowActiveRenderAuthority = ({
             data,
           }),
         );
-    })
-  ) return null;
-  return committedRenderAuthority;
-}, [committedRenderAuthority, displayedEdges, inputGeometryDigest, inputSignature]);
+    })) return { authority: null, status: 'edge-claim-mismatch' };
+  return { authority: committedRenderAuthority, status: 'accepted' };
+};
+
+export const useBaseReactFlowActiveRenderAuthority = ({
+  committedRenderAuthority,
+  inputSignature,
+  inputGeometryDigest,
+  displayedEdges,
+}: {
+  committedRenderAuthority: DisplayRoutingRenderAuthority | null;
+  inputSignature: string;
+  inputGeometryDigest: string;
+  displayedEdges: Edge[];
+}): DisplayRoutingRenderAuthority | null => {
+  const resolution = useMemo(
+    () => resolveBaseReactFlowActiveRenderAuthority({
+      committedRenderAuthority,
+      inputSignature,
+      inputGeometryDigest,
+      displayedEdges,
+    }),
+    [
+      committedRenderAuthority,
+      displayedEdges,
+      inputGeometryDigest,
+      inputSignature,
+    ],
+  );
+  useEffect(() => {
+    updateDisplayRoutingDebugState({ renderAuthorityStatus: resolution.status });
+  }, [resolution.status]);
+  return resolution.authority;
+};

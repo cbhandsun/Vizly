@@ -1,3 +1,5 @@
+import { setTimeout as delay } from 'node:timers/promises';
+
 import { withPrecompiledRouteBrowser } from './lib/precompiled-display-route-cdp.mjs';
 import {
   readDisplayRoutingNodePanGesture,

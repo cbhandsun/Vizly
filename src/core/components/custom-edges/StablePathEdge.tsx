@@ -206,12 +206,11 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
         [rawComputedPath],
     );
     const layoutEpoch = edgeData?._layoutEpoch;
-    const { edgePath, renderPath, renderPathSource } = useMemo(() => {
+    const { edgePath, renderPath, renderPathSource, attachmentAccepted } = useMemo(() => {
         // Layout epochs can refresh React Flow's internal absolute geometry
         // without changing the serialized path or endpoint props.
         void layoutEpoch;
-        const canUseComputedPath = acceptsCommittedGeometry
-            && computedPath
+        const isAttached = Boolean(computedPath
             && computedPath.length >= 2
             && isStablePathAttachedToLiveEndpoints(
                 rawComputedPath ?? computedPath,
@@ -224,7 +223,8 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
                 true,
                 sourceNode,
                 targetNode,
-            );
+            ));
+        const canUseComputedPath = acceptsCommittedGeometry && isAttached;
         const path = canUseComputedPath && computedPath
             ? computedPath
             : fallbackOrthogonalPoints(sourceX, sourceY, targetX, targetY, sourcePosition);
@@ -232,6 +232,7 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
             edgePath: sharedTrunkPointsToPath(path),
             renderPath: path,
             renderPathSource: canUseComputedPath ? 'computed' : 'fallback',
+            attachmentAccepted: isAttached,
         };
     }, [
         computedPath,
@@ -409,6 +410,8 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
                 data-shared-trunk-state={hasSharedTrunk ? 'shared' : undefined}
                 data-line-jump-count={jumps.length || undefined}
                 data-render-path-source={renderPathSource}
+                data-render-authority={acceptsCommittedGeometry ? 'accepted' : 'rejected'}
+                data-render-attachment={attachmentAccepted ? 'accepted' : 'rejected'}
                 data-source-node-geometry={hasStablePathLiveNodeGeometry(sourceNode) ? 'ready' : 'missing'}
                 data-target-node-geometry={hasStablePathLiveNodeGeometry(targetNode) ? 'ready' : 'missing'}
                 onPointerEnter={() => setIsPointerTracing(true)}

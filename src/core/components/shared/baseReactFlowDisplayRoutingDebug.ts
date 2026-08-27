@@ -46,7 +46,16 @@ export type DisplayRoutingDebugState = {
   stagedLayoutPrimaryGeometryDigest?: string;
   stagedLayoutSourceSignature?: string;
   stagedLayoutSourceGeometryDigest?: string;
+  renderAuthorityStatus?: BaseReactFlowRenderAuthorityStatus;
 };
+
+export type BaseReactFlowRenderAuthorityStatus =
+  | 'accepted'
+  | 'missing-commit'
+  | 'input-signature-mismatch'
+  | 'input-geometry-mismatch'
+  | 'output-signature-mismatch'
+  | 'edge-claim-mismatch';
 
 type DisplayRoutingDebugWindow = Window & {
   __vizlyBaseReactFlowDisplayRouting?: DisplayRoutingDebugState;

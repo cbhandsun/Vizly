@@ -87,6 +87,7 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
     mocks.loadDomainCompoundElkStrategy.mockResolvedValue(elkStrategy);
     mocks.loadDomainElkStrategy.mockResolvedValue(elkStrategy);
     mocks.stageLayoutRouting.mockResolvedValue({
+      committedSourceEdges: edges,
       routedEdges,
       commitSnapshot: vi.fn(() => true),
     });
@@ -107,13 +108,14 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
     }));
     expect(options.takeSnapshot).toHaveBeenCalledWith(nodes, edges);
     expect(options.setNodes).toHaveBeenCalledWith(nodes);
-    expect(options.setEdges).toHaveBeenCalledWith(routedEdges);
+    expect(options.setEdges).toHaveBeenCalledWith(edges);
     expect(options.setLayoutStable).toHaveBeenNthCalledWith(1, false);
     expect(options.setLayoutStable).toHaveBeenLastCalledWith(true);
   });
 
   it('rejects a layout response whose routing epoch was superseded', async () => {
     let resolveStage: ((value: {
+      committedSourceEdges: Edge[];
       routedEdges: Edge[];
       commitSnapshot: () => boolean;
     }) => void) | undefined;
@@ -130,7 +132,7 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
     });
     await waitFor(() => expect(mocks.stageLayoutRouting).toHaveBeenCalled());
     options.routingSessionRuntime.beginJob('display');
-    resolveStage?.({ routedEdges, commitSnapshot: vi.fn(() => true) });
+    resolveStage?.({ committedSourceEdges: edges, routedEdges, commitSnapshot: vi.fn(() => true) });
 
     await act(async () => {
       await expect(layoutPromise).rejects.toThrow('layout-routing-cancelled');

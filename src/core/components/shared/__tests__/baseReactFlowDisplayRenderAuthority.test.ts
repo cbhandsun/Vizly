@@ -13,7 +13,10 @@ import {
 import { computeBaseReactFlowDisplayInputIdentityBundle } from '../baseReactFlowDisplayInputIdentity';
 import { createBaseReactFlowDisplayEdgePatches } from '../baseReactFlowDisplayRoutingTransaction';
 import { projectBaseReactFlowDisplayWorkerInput } from '../baseReactFlowDisplayWorkerProjection';
-import { createBaseReactFlowCommittedRenderAuthority } from '../useBaseReactFlowDisplayRenderAuthority';
+import {
+  createBaseReactFlowCommittedRenderAuthority,
+  resolveBaseReactFlowActiveRenderAuthority,
+} from '../useBaseReactFlowDisplayRenderAuthority';
 import { createTestDisplayHardReport } from './baseReactFlowDisplayWorkerTestFixtures';
 
 const nodes: Node[] = [
@@ -139,5 +142,40 @@ describe('BaseReactFlow committed render authority', () => {
       label: 'latest business label',
       selected: true,
     })))).not.toBeNull();
+  });
+
+  it('reports the exact boundary that rejects an active render authority', () => {
+    const baseline = commitSnapshot();
+    if (!baseline) throw new Error('expected committed snapshot');
+    const committedRenderAuthority = createBaseReactFlowCommittedRenderAuthority(
+      baseline,
+      routedEdges,
+    );
+    if (!committedRenderAuthority) throw new Error('expected committed render authority');
+    const resolve = (override: Partial<Parameters<
+      typeof resolveBaseReactFlowActiveRenderAuthority
+    >[0]> = {}) => resolveBaseReactFlowActiveRenderAuthority({
+      committedRenderAuthority,
+      inputSignature: baseline.inputSignature,
+      inputGeometryDigest: baseline.inputGeometryDigest,
+      displayedEdges: routedEdges,
+      ...override,
+    });
+
+    expect(resolve()).toEqual({ authority: committedRenderAuthority, status: 'accepted' });
+    expect(resolve({ committedRenderAuthority: null }).status).toBe('missing-commit');
+    expect(resolve({ inputSignature: '9999' }).status).toBe('input-signature-mismatch');
+    expect(resolve({
+      inputGeometryDigest: `geometry-v1:${'b'.repeat(32)}`,
+    }).status).toBe('input-geometry-mismatch');
+    expect(resolve({
+      displayedEdges: routedEdges.map(edge => ({
+        ...edge,
+        data: {
+          ...edge.data,
+          computedPath: [{ x: 100, y: 30 }, { x: 260, y: 30 }],
+        },
+      })),
+    }).status).toBe('output-signature-mismatch');
   });
 });

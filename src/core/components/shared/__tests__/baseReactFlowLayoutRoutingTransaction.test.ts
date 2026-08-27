@@ -18,6 +18,7 @@ import {
   seedBaseReactFlowStagedLayoutEdges,
   type BaseReactFlowLayoutRoutingCommit,
 } from '../baseReactFlowLayoutRoutingTransaction';
+import { createBaseReactFlowCommittedRenderAuthority } from '../useBaseReactFlowDisplayRenderAuthority';
 import { createBaseReactFlowRoutingSessionRuntime } from '../baseReactFlowRoutingSessionRuntime';
 import { projectBaseReactFlowDisplayWorkerInput } from '../baseReactFlowDisplayWorkerProjection';
 import { createTestDisplayHardReport } from './baseReactFlowDisplayWorkerTestFixtures';
@@ -355,6 +356,38 @@ describe('baseReactFlowLayoutRoutingTransaction', () => {
         computedPath: [{ x: 100, y: 30 }, { x: 240, y: 30 }],
       },
     });
+    expect(committed!.committedSourceEdges).toEqual(sourceEdges);
+
+    const committedSourceProjected = projectBaseReactFlowDisplayWorkerInput({
+      edges: committed!.committedSourceEdges,
+      nodes,
+    });
+    const committedSourceIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
+      nodes: committedSourceProjected.nodes,
+      edges: committedSourceProjected.edges,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+    });
+    const stagedHit = readBaseReactFlowDisplayCommittedSnapshot({
+      inputSignature: committedSourceIdentity.cacheSignature,
+      inputGeometryDigest: committedSourceIdentity.geometryDigest,
+      sourceEdges: committed!.committedSourceEdges,
+    });
+    expect(stagedHit?.edges).toEqual(committed!.routedEdges);
+    expect(stagedHit?.trustedTransactionHandoff).toBe(true);
+    if (!stagedHit) throw new Error('expected a staged layout snapshot handoff');
+    expect(stagedHit.baseline.workerSessionRef).toMatchObject({
+      identity: {
+        inputSignature: committedSourceIdentity.cacheSignature,
+        inputGeometryDigest: committedSourceIdentity.geometryDigest,
+      },
+      outputRouteSignature: stagedHit.outputRouteSignature,
+    });
+    expect(createBaseReactFlowCommittedRenderAuthority(
+      stagedHit.baseline,
+      stagedHit.edges,
+    )).not.toBeNull();
 
     const routedProjected = projectBaseReactFlowDisplayWorkerInput({
       edges: committed!.routedEdges,
@@ -362,19 +395,18 @@ describe('baseReactFlowLayoutRoutingTransaction', () => {
     });
     const routedIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
       nodes: routedProjected.nodes,
-      edges: committed!.routedEdges,
+      edges: routedProjected.edges,
       enableSmartEdges: true,
       smartEdgePadding: 20,
       isLargeGraph: false,
     });
-    const stagedHit = readBaseReactFlowDisplayCommittedSnapshot({
+    const routedSnapshot = readBaseReactFlowDisplayCommittedSnapshot({
       inputSignature: routedIdentity.cacheSignature,
       inputGeometryDigest: routedIdentity.geometryDigest,
       sourceEdges: committed!.routedEdges,
     });
-    expect(stagedHit?.edges).toEqual(committed!.routedEdges);
-    expect(stagedHit?.trustedTransactionHandoff).toBe(true);
-    if (!stagedHit) throw new Error('expected a staged layout snapshot handoff');
+    expect(routedSnapshot?.baseline.workerSessionRef).toBeUndefined();
+    expect(routedSnapshot?.trustedTransactionHandoff).toBe(false);
 
     const differentActiveBaseline = {
       ...stagedHit.baseline,
@@ -387,34 +419,34 @@ describe('baseReactFlowLayoutRoutingTransaction', () => {
     expect(canReuseBaseReactFlowDisplayCommittedSnapshot(
       differentActiveBaseline,
       stagedHit,
-      routedIdentity.cacheSignature,
-      routedIdentity.geometryDigest,
+      committedSourceIdentity.cacheSignature,
+      committedSourceIdentity.geometryDigest,
     )).toBe(true);
 
     consumeBaseReactFlowStagedLayoutSnapshotHandoff(stagedHit);
     const consumedHit = readBaseReactFlowDisplayCommittedSnapshot({
-      inputSignature: routedIdentity.cacheSignature,
-      inputGeometryDigest: routedIdentity.geometryDigest,
-      sourceEdges: committed!.routedEdges,
+      inputSignature: committedSourceIdentity.cacheSignature,
+      inputGeometryDigest: committedSourceIdentity.geometryDigest,
+      sourceEdges: committed!.committedSourceEdges,
     });
     expect(consumedHit?.trustedTransactionHandoff).toBe(false);
     expect(canReuseBaseReactFlowDisplayCommittedSnapshot(
       differentActiveBaseline,
       consumedHit,
-      routedIdentity.cacheSignature,
-      routedIdentity.geometryDigest,
+      committedSourceIdentity.cacheSignature,
+      committedSourceIdentity.geometryDigest,
     )).toBe(false);
 
     const shiftedNodes = nodes.map(node => node.id === 'target'
       ? { ...node, position: { x: 280, y: 0 } }
       : node);
     const shiftedProjected = projectBaseReactFlowDisplayWorkerInput({
-      edges: committed!.routedEdges,
+      edges: committed!.committedSourceEdges,
       nodes: shiftedNodes,
     });
     const shiftedIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
       nodes: shiftedProjected.nodes,
-      edges: committed!.routedEdges,
+      edges: committed!.committedSourceEdges,
       enableSmartEdges: true,
       smartEdgePadding: 20,
       isLargeGraph: false,
@@ -422,7 +454,7 @@ describe('baseReactFlowLayoutRoutingTransaction', () => {
     expect(readBaseReactFlowDisplayCommittedSnapshot({
       inputSignature: shiftedIdentity.cacheSignature,
       inputGeometryDigest: shiftedIdentity.geometryDigest,
-      sourceEdges: committed!.routedEdges,
+      sourceEdges: committed!.committedSourceEdges,
     })).toBeNull();
   });
 
