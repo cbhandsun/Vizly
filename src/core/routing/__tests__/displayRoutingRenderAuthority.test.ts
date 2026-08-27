@@ -21,7 +21,7 @@ const workerSessionRef = {
 } as const;
 const edgeAPath = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
 const edgeBPath = [{ x: 0, y: 20 }, { x: 100, y: 20 }];
-const edgeGeometry = (edgeId: string, computedPath: object) => ({
+const edgeGeometry = (edgeId: string, computedPath: readonly { x: number; y: number }[]) => ({
   edgeId,
   source: 'source',
   target: 'target',
@@ -51,13 +51,39 @@ describe('displayRoutingRenderAuthority', () => {
     expect(displayRoutingRenderAuthorityAllowsEdge(issued, claim)).toBe(true);
     expect(displayRoutingRenderAuthorityAllowsEdge(issued, {
       ...claim,
-      computedPath: [...edgeAPath],
+      computedPath: edgeAPath.map(point => ({ ...point })),
+    })).toBe(true);
+    expect(displayRoutingRenderAuthorityAllowsEdge(issued, {
+      ...claim,
+      computedPath: [{ x: 0, y: 0 }, { x: 101, y: 0 }],
     })).toBe(false);
     expect(displayRoutingRenderAuthorityAllowsEdge(issued, edgeGeometry('edge-c', edgeAPath))).toBe(false);
     expect(displayRoutingRenderAuthorityAllowsEdge({ ...issued }, claim)).toBe(false);
     if (!issued) throw new Error('expected a render authority');
     (issued.authorizedEdgeIds as Set<string>).add('edge-c');
     expect(displayRoutingRenderAuthorityAllowsEdge(issued, edgeGeometry('edge-c', edgeAPath))).toBe(false);
+  });
+
+  it('snapshots authorized coordinates so later source mutation cannot widen the proof', () => {
+    const mutablePath = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
+    const issued = createDisplayRoutingRenderAuthority({
+      inputSignature: identity.inputSignature,
+      inputGeometryDigest: identity.inputGeometryDigest,
+      outputRouteSignature: workerSessionRef.outputRouteSignature,
+      hardReport: TEST_ROUTING_HARD_REPORT,
+      authorizedEdges: [edgeGeometry('edge-a', mutablePath)],
+      workerSessionRef,
+    });
+    mutablePath[1]!.x = 999;
+
+    expect(displayRoutingRenderAuthorityAllowsEdge(
+      issued,
+      edgeGeometry('edge-a', mutablePath),
+    )).toBe(false);
+    expect(displayRoutingRenderAuthorityAllowsEdge(
+      issued,
+      edgeGeometry('edge-a', [{ x: 0, y: 0 }, { x: 100, y: 0 }]),
+    )).toBe(true);
   });
 
   it('exposes only the immutable session proof issued for the committed Worker result', () => {
@@ -97,6 +123,14 @@ describe('displayRoutingRenderAuthority', () => {
     { authorizedEdges: [] },
     { authorizedEdges: [{ ...edgeGeometry('', edgeAPath) }] },
     { authorizedEdges: [{ ...edgeGeometry('edge-a', []) }] },
+    { authorizedEdges: [{ ...edgeGeometry('edge-a', [
+      { x: 0, y: 0 },
+      { x: Number.POSITIVE_INFINITY, y: 0 },
+    ]) }] },
+    { authorizedEdges: [{ ...edgeGeometry('edge-a', Array.from(
+      { length: 513 },
+      (_, index) => ({ x: index, y: 0 }),
+    )) }] },
     { authorizedEdges: Array.from({ length: 301 }, (_, index) => ({
       ...edgeGeometry(`edge-${index}`, edgeAPath),
     })) },

@@ -19,6 +19,8 @@ import {
 } from './routingHardReport';
 
 const MAX_AUTHORIZED_EDGE_IDS = 300;
+const MAX_AUTHORIZED_PATH_POINTS = 512;
+const MAX_AUTHORIZED_ABS_COORDINATE = 1_000_000_000;
 const INPUT_SIGNATURE_PATTERN = /^\d{1,10}$/;
 const GEOMETRY_DIGEST_PATTERN = /^geometry-v1:[0-9a-f]{32}$/;
 const OUTPUT_SIGNATURE_PATTERN = /^route-v2:\d{1,3}:\d{1,6}:[0-9a-f]{16}$/;
@@ -53,8 +55,10 @@ export type DisplayRoutingAuthorizedEdgeGeometry = Readonly<{
   sourceHandle: string | null;
   targetHandle: string | null;
   rendererType: string | null;
-  computedPath: object;
+  computedPath: readonly DisplayRoutingRenderPoint[];
 }>;
+
+export type DisplayRoutingRenderPoint = Readonly<{ x: number; y: number }>;
 
 export type DisplayRoutingRenderEdgeClaim = Readonly<{
   edgeId: unknown;
@@ -78,6 +82,44 @@ const isBoundedEdgeId = (value: unknown): value is string => (
 );
 const isBoundedOptionalToken = (value: unknown): value is string | null => (
   value === null || isBoundedEdgeId(value)
+);
+
+const isDisplayRoutingRenderPoint = (value: unknown): value is DisplayRoutingRenderPoint => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const point = value as Record<string, unknown>;
+  return typeof point.x === 'number'
+    && Number.isFinite(point.x)
+    && Math.abs(point.x) <= MAX_AUTHORIZED_ABS_COORDINATE
+    && typeof point.y === 'number'
+    && Number.isFinite(point.y)
+    && Math.abs(point.y) <= MAX_AUTHORIZED_ABS_COORDINATE;
+};
+
+const cloneDisplayRoutingRenderPath = (
+  value: unknown,
+): readonly DisplayRoutingRenderPoint[] | null => {
+  if (
+    !Array.isArray(value)
+    || value.length < 2
+    || value.length > MAX_AUTHORIZED_PATH_POINTS
+    || !value.every(isDisplayRoutingRenderPoint)
+  ) return null;
+  return Object.freeze(value.map(point => Object.freeze({ x: point.x, y: point.y })));
+};
+
+const displayRoutingRenderPathsMatch = (
+  expected: readonly DisplayRoutingRenderPoint[],
+  actual: unknown,
+): boolean => (
+  Array.isArray(actual)
+  && actual.length === expected.length
+  && actual.length >= 2
+  && actual.length <= MAX_AUTHORIZED_PATH_POINTS
+  && actual.every((point, index) => (
+    isDisplayRoutingRenderPoint(point)
+    && point.x === expected[index]?.x
+    && point.y === expected[index]?.y
+  ))
 );
 
 /**
@@ -126,8 +168,17 @@ export const createDisplayRoutingRenderAuthority = ({
       || !isBoundedOptionalToken(targetHandle)
       || !isBoundedOptionalToken(rendererType)
     ) return null;
-    if (!Array.isArray(computedPath) || computedPath.length < 2) return null;
-    edgeGeometry.set(edgeId, Object.freeze({ ...edge }));
+    const safeComputedPath = cloneDisplayRoutingRenderPath(computedPath);
+    if (!safeComputedPath) return null;
+    edgeGeometry.set(edgeId, Object.freeze({
+      edgeId,
+      source,
+      target,
+      sourceHandle,
+      targetHandle,
+      rendererType,
+      computedPath: safeComputedPath,
+    }));
     if (edgeGeometry.size > MAX_AUTHORIZED_EDGE_IDS) return null;
   }
   if (edgeGeometry.size === 0) return null;
@@ -183,6 +234,6 @@ export const displayRoutingRenderAuthorityAllowsEdge = (
     && expected.sourceHandle === claim.sourceHandle
     && expected.targetHandle === claim.targetHandle
     && expected.rendererType === claim.rendererType
-    && expected.computedPath === claim.computedPath
+    && displayRoutingRenderPathsMatch(expected.computedPath, claim.computedPath)
   );
 };

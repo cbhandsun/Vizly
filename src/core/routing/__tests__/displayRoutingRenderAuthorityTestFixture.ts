@@ -46,7 +46,7 @@ export const createTestDisplayRoutingRenderAuthority = ({
   hardReport?: RoutingHardReport;
   authorizedEdges: Iterable<Readonly<{
     edgeId: string;
-    computedPath: object;
+    computedPath: readonly { x: number; y: number }[];
   }> & Partial<Omit<DisplayRoutingAuthorizedEdgeGeometry, 'edgeId' | 'computedPath'>>>;
   sessionId?: string;
 }): DisplayRoutingRenderAuthority | null => {
