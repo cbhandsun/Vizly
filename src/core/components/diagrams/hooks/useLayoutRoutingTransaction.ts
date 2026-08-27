@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 
 import { runAfterLayoutRenderFrames } from '../../../utils/animateLayoutTransition';
@@ -7,6 +7,7 @@ import {
   computeBaseReactFlowIsLargeGraph,
   readBaseReactFlowPerformanceConfig,
 } from '../../shared/baseReactFlowRuntimeConfig';
+import type { BaseReactFlowRoutingSessionRuntime } from '../../shared/baseReactFlowRoutingSessionRuntime';
 
 type LayoutRoutingTransactionRequest = Readonly<{
   nodes: Node[];
@@ -21,6 +22,7 @@ type UseLayoutRoutingTransactionOptions = Readonly<{
   nodesRef: React.MutableRefObject<Node[]>;
   edgesRef: React.MutableRefObject<Edge[]>;
   takeSnapshot: (nodes: Node[], edges: Edge[]) => void;
+  routingSessionRuntime: BaseReactFlowRoutingSessionRuntime;
 }>;
 
 /**
@@ -36,88 +38,86 @@ export const useLayoutRoutingTransaction = ({
   nodesRef,
   edgesRef,
   takeSnapshot,
+  routingSessionRuntime,
 }: UseLayoutRoutingTransactionOptions) => {
-  const workerRef = useRef<Worker | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const requestSequenceRef = useRef(0);
-  const disposeWorkerRef = useRef<((workerRef: React.MutableRefObject<Worker | null>) => void) | null>(null);
-
-  useEffect(() => {
-    return () => {
-      abortControllerRef.current?.abort();
-      abortControllerRef.current = null;
-      disposeWorkerRef.current?.(workerRef);
-      disposeWorkerRef.current = null;
-    };
-  }, []);
-
   return useCallback(async ({
     nodes,
     edges,
     onCommitted,
   }: LayoutRoutingTransactionRequest): Promise<void> => {
-    abortControllerRef.current?.abort();
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
-
-    // Layout routing is an explicit interaction. Defer its worker and
-    // full-quality transaction until that interaction instead of charging
-    // every empty-canvas visit for the complete routing engine.
-    const [
-      { diagramConfigManager },
-      displayWorkerModule,
-      {
-        clearBaseReactFlowLayoutNodeRuntimeGeometry,
-        stageBaseReactFlowLayoutRouting,
-      },
-    ] = await Promise.all([
-      import('../../../config/DiagramConfig'),
-      import('../../shared/baseReactFlowDisplayWorkerClient'),
-      import('../../shared/baseReactFlowLayoutRoutingTransaction'),
-    ]);
-    disposeWorkerRef.current = displayWorkerModule.disposeBaseReactFlowDisplayWorker;
-    if (abortController.signal.aborted) throw new Error('layout-routing-cancelled');
-
-    const targetNodes = clearBaseReactFlowLayoutNodeRuntimeGeometry(nodes);
-    let committedEdges = edges;
-    if (edges.length > 0) {
-      const performanceConfig = readBaseReactFlowPerformanceConfig({
-        readConfig: () => diagramConfigManager.getConfig(),
-      });
-      const isLargeGraph = computeBaseReactFlowIsLargeGraph({
-        nodeCount: targetNodes.length,
-        edgeCount: edges.length,
-        performanceConfig,
-      });
-      const staged = await stageBaseReactFlowLayoutRouting({
-        workerRef,
-        requestId: `layout:${requestSequenceRef.current += 1}`,
-        sourceEdges: edges,
-        sourceNodes: targetNodes,
-        isLargeGraph,
-        signal: abortController.signal,
-      });
-      committedEdges = staged.routedEdges;
-    }
-
-    if (abortController.signal.aborted) throw new Error('layout-routing-cancelled');
-
+    const routingJob = routingSessionRuntime.beginJob('layout');
     setLayoutStable?.(false);
     try {
-      takeSnapshot(nodesRef.current, edgesRef.current);
-      // React 18 batches these state updates. The recorded trusted display
-      // snapshot is already available when BaseReactFlow observes this graph.
-      setNodes(targetNodes);
-      setEdges(committedEdges);
+      // Layout routing is an explicit interaction. Defer its worker and
+      // full-quality transaction until that interaction instead of charging
+      // every empty-canvas visit for the complete routing engine.
+      const [
+        { diagramConfigManager },
+        displayWorkerModule,
+        {
+          clearBaseReactFlowLayoutNodeRuntimeGeometry,
+          stageBaseReactFlowLayoutRouting,
+        },
+      ] = await Promise.all([
+        import('../../../config/DiagramConfig'),
+        import('../../shared/baseReactFlowDisplayWorkerClient'),
+        import('../../shared/baseReactFlowLayoutRoutingTransaction'),
+      ]);
+      routingSessionRuntime.registerWorkerDisposer(
+        displayWorkerModule.disposeBaseReactFlowDisplayWorker,
+      );
+      if (!routingSessionRuntime.isCurrentJob(routingJob)) {
+        throw new Error('layout-routing-cancelled');
+      }
+
+      const targetNodes = clearBaseReactFlowLayoutNodeRuntimeGeometry(nodes);
+      let committedEdges = edges;
+      let commitLayoutSnapshot = (): boolean => true;
+      if (edges.length > 0) {
+        const performanceConfig = readBaseReactFlowPerformanceConfig({
+          readConfig: () => diagramConfigManager.getConfig(),
+        });
+        const isLargeGraph = computeBaseReactFlowIsLargeGraph({
+          nodeCount: targetNodes.length,
+          edgeCount: edges.length,
+          performanceConfig,
+        });
+        const staged = await stageBaseReactFlowLayoutRouting({
+          workerRef: routingSessionRuntime.workerRef,
+          requestId: `layout:${routingJob.id}`,
+          sourceEdges: edges,
+          sourceNodes: targetNodes,
+          isLargeGraph,
+          signal: routingJob.signal,
+        });
+        committedEdges = staged.routedEdges;
+        commitLayoutSnapshot = staged.commitSnapshot;
+      }
+      const commitResult = routingSessionRuntime.commitJob(routingJob, () => {
+        if (!commitLayoutSnapshot()) {
+          throw new Error('layout-routing-hard-quality-rejected');
+        }
+        takeSnapshot(nodesRef.current, edgesRef.current);
+        // React 18 batches these state updates under the same routing epoch.
+        setNodes(targetNodes);
+        setEdges(committedEdges);
+      });
+      if (!commitResult.committed) throw new Error('layout-routing-cancelled');
       await runAfterLayoutRenderFrames(() => {
         flushObstacles();
         onCommitted?.();
       });
     } finally {
-      if (abortControllerRef.current === abortController) {
-        abortControllerRef.current = null;
-      }
+      routingSessionRuntime.cancelJob(routingJob);
       setLayoutStable?.(true);
     }
-  }, [edgesRef, nodesRef, setEdges, setLayoutStable, setNodes, takeSnapshot]);
+  }, [
+    edgesRef,
+    nodesRef,
+    routingSessionRuntime,
+    setEdges,
+    setLayoutStable,
+    setNodes,
+    takeSnapshot,
+  ]);
 };

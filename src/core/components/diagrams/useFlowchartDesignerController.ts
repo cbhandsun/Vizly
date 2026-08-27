@@ -473,7 +473,7 @@ export const useFlowchartDesignerController = ({
     }, [clearCanvasSelection, isCommentMode, contextMenuPaneClick]);
 
     // Features
-    const { autoRoutingEnabled, setAutoRoutingEnabled, isLayoutStable, isLayoutBusy, handleStrategyLayout, lastDomainStrategy, lastDomainDirection, lastNodeLayout } = useAutoRouting({
+    const { autoRoutingEnabled, setAutoRoutingEnabled, isLayoutStable, isLayoutBusy, handleStrategyLayout, lastDomainStrategy, lastDomainDirection, lastNodeLayout, routingSessionRuntime } = useAutoRouting({
         setNodes,
         setEdges,
         nodesRef,
@@ -669,7 +669,7 @@ export const useFlowchartDesignerController = ({
         handleWrappedDirectSave, hasCopiedStyle, highlightMainFlow, historyPanelVisible, id, isCommentMode, isConnecting, isContextToolbarHidden,
         isDirectSaveDisabled, isDragging, isDraggingNode, isDrawingMode, isInitialDiagramLoading, isLayoutBusy, isLayoutStable, isMarqueeActive, isMobile, isReadonly,
         isSidebarHidden, isSpacePressed, isValidConnection, isVersionHistoryOpen, isYjsSynced, collaborationStatus, jsonEditorInitialContent, jsonEditorVisible, jumpTo, laserEnabled, viewportPersistenceKey,
-        lastDomainDirection, lastDomainStrategy, lastNodeLayout, layerSyncedNodes, layers, leftDrawerOpen, leftDrawerWidth, messageContextHolder,
+        lastDomainDirection, lastDomainStrategy, lastNodeLayout, layerSyncedNodes, layers, leftDrawerOpen, leftDrawerWidth, messageContextHolder, routingSessionRuntime,
         mobilePropertyDrawerVisible, multiPage: { ...multiPage, ...commentAwarePageLifecycle }, nodes, nodesRef, notificationContextHolder, onAiTabIntercept, onCloudSave, onConnectStart, onDirectSave, onSaveAs,
         onDisplayRoutingFinalApplied, onDragOver, onDrop, onEdgeContextMenu, onEdgesChangeWithLock, onNodeContextMenu, onNodeDrag, onNodeDragStop, onNodesChangeWithLock, onSmartNodeDrag,
         onExportPermissionCheck, onOpenCollaboration, onOpenSettings, onOpenShareDialog, onOpenVersionHistory, onPaneContextMenu, onPaneDoubleClick, onPaneMouseLeave, onPaneMouseMove,

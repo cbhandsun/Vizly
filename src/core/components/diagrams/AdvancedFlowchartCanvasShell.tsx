@@ -14,6 +14,7 @@ import {
 } from './flowchartMultiSelection';
 import { getFlowchartMarqueeEdges } from './flowchartMarqueeInteraction';
 import { bindBaseReactFlowRendererAssistiveVisibility } from '../shared/baseReactFlowAssistiveVisibility';
+import type { BaseReactFlowRoutingSessionRuntime } from '../shared/baseReactFlowRoutingSessionRuntime';
 
 export interface FlowchartCanvasShellProps {
     nodes: Node[];
@@ -66,6 +67,7 @@ export interface FlowchartCanvasShellProps {
     onReconnectStart?: (event: MouseEvent | React.MouseEvent | TouchEvent | React.TouchEvent, edge: Edge, handleType: 'source' | 'target') => void;
     onReconnectEnd?: (event: MouseEvent | React.MouseEvent | TouchEvent | React.TouchEvent, edge: Edge) => void;
     onDisplayRoutingFinalApplied?: () => void;
+    routingSessionRuntime?: BaseReactFlowRoutingSessionRuntime;
     backgroundGridColor?: string;
     viewportPersistenceKey?: string;
     defaultCanvasHiddenFromAssistiveTech?: boolean;
@@ -122,6 +124,7 @@ export const AdvancedFlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> =
     onReconnectStart,
     onReconnectEnd,
     onDisplayRoutingFinalApplied,
+    routingSessionRuntime,
     backgroundGridColor,
     viewportPersistenceKey,
     defaultCanvasHiddenFromAssistiveTech = false,
@@ -270,6 +273,7 @@ export const AdvancedFlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> =
             onReconnectStart={editingEnabled ? onReconnectStart : undefined}
             onReconnectEnd={editingEnabled ? onReconnectEnd : undefined}
             onDisplayRoutingFinalApplied={onDisplayRoutingFinalApplied}
+            routingSessionRuntime={routingSessionRuntime}
         >
             {children}
         </BaseReactFlow>

@@ -24,6 +24,9 @@ import {
 } from '../baseReactFlowLayoutRoutingTransaction';
 import { getDisplayHardQualityGateReport } from '../baseReactFlowDisplayQualityGates';
 import { createBaseReactFlowDisplayEdgePatches } from '../baseReactFlowDisplayWorkerClient';
+import { computeBaseReactFlowDisplayOutputRouteSignature } from '../baseReactFlowDisplayCache';
+import { createDisplayRoutingWorkerCommitReceipt } from '../baseReactFlowDisplayWorkerCommitReceipt';
+import { createDisplayRoutingIdentity } from '../baseReactFlowDisplayRoutingSession';
 import { createTestDisplayHardReport } from './baseReactFlowDisplayWorkerTestFixtures';
 
 const nodes: Node[] = [
@@ -51,15 +54,40 @@ const edges: Edge[] = [{
   data: {},
 }];
 
-const successfulResult = (candidateEdges: Edge[]) => ({
-  edges: candidateEdges,
-  routingPatches: createBaseReactFlowDisplayEdgePatches(candidateEdges, candidateEdges),
-  projectedEdges: candidateEdges,
-  hardClean: true,
-  hardReport: createTestDisplayHardReport(),
-  routeResolution: 'repair' as const,
-  phaseTrace: [],
-});
+const successfulResult = (
+  candidateEdges: Edge[],
+  request: Readonly<{ inputSignature: string; inputGeometryDigest: string }>,
+) => {
+  const identity = createDisplayRoutingIdentity(
+    request.inputSignature,
+    request.inputGeometryDigest,
+  );
+  const outputRouteSignature = computeBaseReactFlowDisplayOutputRouteSignature(candidateEdges);
+  if (!outputRouteSignature) throw new Error('expected route signature');
+  const sessionRef = {
+    sessionId: 'display-session-v1:1',
+    identity,
+    outputRouteSignature,
+  } as const;
+  const hardReport = createTestDisplayHardReport();
+  const commitReceipt = createDisplayRoutingWorkerCommitReceipt({
+    identity,
+    outputRouteSignature,
+    hardReport,
+    sessionRef,
+  });
+  if (!commitReceipt) throw new Error('expected commit receipt');
+  return {
+    edges: candidateEdges,
+    routingPatches: createBaseReactFlowDisplayEdgePatches(candidateEdges, candidateEdges),
+    projectedEdges: candidateEdges,
+    hardClean: true,
+    hardReport,
+    routeResolution: 'repair' as const,
+    phaseTrace: [],
+    commitReceipt,
+  };
+};
 
 describe('baseReactFlow layout routing candidate sequence', () => {
   beforeEach(() => {
@@ -69,9 +97,11 @@ describe('baseReactFlow layout routing candidate sequence', () => {
   });
 
   it('commits a hard-clean bounded candidate without starting a full route', async () => {
-    workerMocks.repair.mockImplementation(async ({ edges: candidateEdges }: { edges: Edge[] }) => (
-      successfulResult(candidateEdges)
-    ));
+    workerMocks.repair.mockImplementation(async (request: {
+      edges: Edge[];
+      inputSignature: string;
+      inputGeometryDigest: string;
+    }) => successfulResult(request.edges, request));
 
     const result = await stageBaseReactFlowLayoutRouting({
       workerRef: { current: null },
@@ -82,6 +112,7 @@ describe('baseReactFlow layout routing candidate sequence', () => {
     });
 
     expect(result.routedEdges[0].type).toBe('stablePath');
+    expect(result.commitSnapshot()).toBe(true);
     expect(workerMocks.repair).toHaveBeenCalledOnce();
     expect(workerMocks.repair.mock.calls[0][0]).toMatchObject({
       requestId: 'layout:1:candidate-repair',
@@ -133,9 +164,11 @@ describe('baseReactFlow layout routing candidate sequence', () => {
   });
 
   it('replays an exact hard-clean layout without starting another Worker request', async () => {
-    workerMocks.repair.mockImplementation(async ({ edges: candidateEdges }: { edges: Edge[] }) => (
-      successfulResult(candidateEdges)
-    ));
+    workerMocks.repair.mockImplementation(async (request: {
+      edges: Edge[];
+      inputSignature: string;
+      inputGeometryDigest: string;
+    }) => successfulResult(request.edges, request));
 
     const first = await stageBaseReactFlowLayoutRouting({
       workerRef: { current: null },
@@ -144,6 +177,7 @@ describe('baseReactFlow layout routing candidate sequence', () => {
       sourceNodes: nodes,
       isLargeGraph: false,
     });
+    expect(first.commitSnapshot()).toBe(true);
     const second = await stageBaseReactFlowLayoutRouting({
       workerRef: { current: null },
       requestId: 'layout:cached-second',
@@ -175,15 +209,22 @@ describe('baseReactFlow layout routing candidate sequence', () => {
   });
 
   it('falls through to the unchanged full-quality route when the bounded candidate is rejected', async () => {
-    workerMocks.repair.mockImplementationOnce(async ({ edges: candidateEdges }: { edges: Edge[] }) => ({
-      ...successfulResult(candidateEdges),
+    workerMocks.repair.mockImplementationOnce(async (request: {
+      edges: Edge[];
+      inputSignature: string;
+      inputGeometryDigest: string;
+    }) => ({
+      ...successfulResult(request.edges, request),
       hardClean: false,
       hardReport: createTestDisplayHardReport(false),
+      commitReceipt: undefined,
     }));
-    workerMocks.compute.mockImplementation(async ({ edges: candidateEdges }: {
+    workerMocks.compute.mockImplementation(async (request: {
       edges: Edge[];
+      inputSignature: string;
+      inputGeometryDigest: string;
     }) => ({
-      ...successfulResult(candidateEdges),
+      ...successfulResult(request.edges, request),
       routeResolution: 'full-route' as const,
     }));
 
@@ -226,19 +267,25 @@ describe('baseReactFlow layout routing candidate sequence', () => {
   });
 
   it('rejects a failed full route without starting a second expensive repair pass', async () => {
-    workerMocks.repair.mockImplementationOnce(async ({ edges: candidateEdges }: {
+    workerMocks.repair.mockImplementationOnce(async (request: {
       edges: Edge[];
+      inputSignature: string;
+      inputGeometryDigest: string;
     }) => ({
-      ...successfulResult(candidateEdges),
+      ...successfulResult(request.edges, request),
       hardClean: false,
       hardReport: createTestDisplayHardReport(false),
+      commitReceipt: undefined,
     }));
-    workerMocks.compute.mockImplementation(async ({ edges: candidateEdges }: {
+    workerMocks.compute.mockImplementation(async (request: {
       edges: Edge[];
+      inputSignature: string;
+      inputGeometryDigest: string;
     }) => ({
-      ...successfulResult(candidateEdges),
+      ...successfulResult(request.edges, request),
       hardClean: false,
       hardReport: createTestDisplayHardReport(false),
+      commitReceipt: undefined,
       routeResolution: 'full-route' as const,
     }));
 

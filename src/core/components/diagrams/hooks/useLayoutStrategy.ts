@@ -1,6 +1,5 @@
 import { useCallback, useState, MutableRefObject } from 'react';
 import { Node, Edge, ReactFlowInstance } from '@xyflow/react';
-import { buildChildrenMap, getDescendantIds } from './useCollapsibleGroups';
 import { dispatchDiagramControl } from '../../shared/diagramControl';
 import { applyLayout, forceDirectedLayout, treeLayout } from '../../../utils/LayoutAlgorithms';
 import { coerceDiagramId, getQueryOrHashParamFromLocation } from '../../../utils/inputBoundary';
@@ -10,6 +9,8 @@ import {
 } from './layoutEdgeBoundary';
 import { useLayoutRoutingTransaction } from './useLayoutRoutingTransaction';
 import { clearBaseReactFlowLayoutEdgeRoutingData } from '../../shared/baseReactFlowLayoutEdgeRoutingData';
+import type { BaseReactFlowRoutingSessionRuntime } from '../../shared/baseReactFlowRoutingSessionRuntime';
+import { normalizeLayoutVisibilityNodes } from './layoutVisibilityNodes';
 import { isDirectedForestLayoutGraph } from './treeLayoutTopology';
 import { calculateLayeredLayoutWithReverse } from './reverseLayeredLayoutGeometry';
 import {
@@ -44,6 +45,7 @@ export {
     loadDomainCompoundElkStrategy,
     loadDomainElkStrategy,
 } from './layoutStrategyRuntime';
+export { normalizeLayoutVisibilityNodes } from './layoutVisibilityNodes';
 
 
 interface UseLayoutStrategyParams {
@@ -56,6 +58,7 @@ interface UseLayoutStrategyParams {
     diagramId?: string;
     loadLayoutPresetMap?: () => Promise<Record<string, unknown>>;
     setLayoutStable?: React.Dispatch<React.SetStateAction<boolean>>;
+    routingSessionRuntime: BaseReactFlowRoutingSessionRuntime;
 }
 
 const asRecord = (value: unknown): Record<string, unknown> => (
@@ -177,25 +180,6 @@ export const loadLayoutStrategyPresetFromCandidates = async (
     return resolveLayoutStrategyPresetFromCandidates(presetMap, candidates);
 };
 
-export const normalizeLayoutVisibilityNodes = (rawNodes: Node[]): Node[] => {
-    const collapsedGroups = rawNodes.filter(n => n.data?.collapsed);
-    const childrenMap = buildChildrenMap(rawNodes);
-    const hiddenNodeIds = new Set<string>();
-    collapsedGroups.forEach(group => {
-        getDescendantIds(rawNodes, group.id, childrenMap).forEach(id => hiddenNodeIds.add(id));
-    });
-
-    return rawNodes.map(n => {
-        const dataHidden = n.data?.hidden === true;
-        const shouldHide = hiddenNodeIds.has(n.id) || n.hidden === true || dataHidden;
-        if (shouldHide) {
-            return { ...n, hidden: true, data: { ...n.data, hidden: true } };
-        }
-        return { ...n, hidden: false };
-    });
-};
-
-
 export function useLayoutStrategy({
     setNodes,
     setEdges,
@@ -206,6 +190,7 @@ export function useLayoutStrategy({
     diagramId,
     loadLayoutPresetMap,
     setLayoutStable,
+    routingSessionRuntime,
 }: UseLayoutStrategyParams) {
     // lastDomainStrategy is retained as a public compatibility name, but it
     // represents the active top-level layout strategy (domain-aware or global).
@@ -227,6 +212,7 @@ export function useLayoutStrategy({
         nodesRef,
         edgesRef,
         takeSnapshot,
+        routingSessionRuntime,
     });
 
     /** ═══════════════════════════════════════════════════════════════

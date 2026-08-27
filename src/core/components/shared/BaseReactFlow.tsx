@@ -168,6 +168,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   onReconnectStart,
   onReconnectEnd,
   onDisplayRoutingFinalApplied,
+  routingSessionRuntime,
 }: BaseReactFlowProps) => {
   const rfInstance = useReactFlow();
   const rfStore = useStoreApi();
@@ -408,6 +409,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     nodeDragFallbackIds,
     onNodeDragFallbackResolved: handleNodeDragFallbackResolved,
     onDisplayRoutingFinalApplied,
+    routingSessionRuntime,
   });
   const commercialDisplayEdges = useMemo(
     () => applyBaseReactFlowEdgePresentation(displayEdges, edges),

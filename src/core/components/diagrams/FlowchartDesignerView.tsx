@@ -35,6 +35,7 @@ import { filterCommentsForPage } from './commentPageScope';
 import { useFlowchartDesignerViewSetup } from './useFlowchartDesignerViewSetup';
 import { resolveDesignerDragRenderPolicy } from './designerDragRenderPolicy';
 import { FlowchartLoadingOverlay } from './FlowchartLoadingOverlay';
+import { FlowchartReadonlyStatus } from './FlowchartReadonlyStatus';
 
 export type { FlowchartDesignerViewModel } from './flowchartDesignerViewModel';
 
@@ -193,6 +194,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         preset,
         quickAddMenu,
         reactFlowInstance,
+        routingSessionRuntime,
         reactFlowWrapper,
         redo,
         renderThemeSelector,
@@ -484,26 +486,9 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                         </div>
 
                         {isReadonly && !presentationActive && (
-                            <div
-                                role="status"
-                                aria-live="polite"
-                                style={{
-                                    position: 'absolute',
-                                    top: 72,
-                                    left: '50%',
-                                    transform: 'translateX(-50%)',
-                                    zIndex: 120,
-                                    padding: '8px 14px',
-                                    borderRadius: 999,
-                                    background: 'rgba(15, 23, 42, 0.9)',
-                                    color: '#fff',
-                                    fontSize: 13,
-                                    fontWeight: 600,
-                                    pointerEvents: 'none',
-                                }}
-                            >
-                                {t('designer.toolbar.readonlyStatus', '画布已锁定 · 仅可查看')}
-                            </div>
+                            <FlowchartReadonlyStatus
+                                text={t('designer.toolbar.readonlyStatus', '画布已锁定 · 仅可查看')}
+                            />
                         )}
 
                         <DiagramEditingProvider value={editingEnabled}>
@@ -549,6 +534,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                     onReconnectStart={handleReconnectStart}
                                     onReconnectEnd={handleReconnectEnd}
                                     onDisplayRoutingFinalApplied={onDisplayRoutingFinalApplied}
+                                    routingSessionRuntime={routingSessionRuntime}
                                     autoRoutingEnabled={autoRoutingEnabled}
                                     enableSmartEdges={true}
                                     showMinimap={showEditingChrome && showMinimap && reactFlowMinimapSupported}

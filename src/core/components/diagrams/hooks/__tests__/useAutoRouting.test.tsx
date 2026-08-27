@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
     handleStrategyLayout: vi.fn(),
     syncAutoPathSelection: vi.fn(),
     applyRoutingProfile: vi.fn(),
+    layoutOptions: undefined as unknown,
 }));
 
 vi.mock('@/core/config/DiagramConfig', () => ({
@@ -18,12 +19,15 @@ vi.mock('@/core/config/DiagramConfig', () => ({
 }));
 
 vi.mock('../useLayoutStrategy', () => ({
-    useLayoutStrategy: () => ({
-        handleStrategyLayout: mocks.handleStrategyLayout,
-        lastDomainStrategy: 'domain-dagre',
-        lastDomainDirection: 'TB',
-        lastNodeLayout: 'dagre',
-    }),
+    useLayoutStrategy: (options: unknown) => {
+        mocks.layoutOptions = options;
+        return {
+            handleStrategyLayout: mocks.handleStrategyLayout,
+            lastDomainStrategy: 'domain-dagre',
+            lastDomainDirection: 'TB',
+            lastNodeLayout: 'dagre',
+        };
+    },
 }));
 
 vi.mock('../useSmartRoutingConfig', () => ({
@@ -68,6 +72,7 @@ describe('useAutoRouting layout preference coordination', () => {
         mocks.handleStrategyLayout.mockResolvedValue(true);
         mocks.syncAutoPathSelection.mockReset();
         mocks.applyRoutingProfile.mockReset();
+        mocks.layoutOptions = undefined;
     });
 
     it('synchronizes an explicit preference change without a second cache owner', async () => {
@@ -76,6 +81,14 @@ describe('useAutoRouting layout preference coordination', () => {
         act(() => result.current.setAutoRoutingEnabled(false));
 
         await waitFor(() => expect(mocks.syncAutoPathSelection).toHaveBeenLastCalledWith(false));
+    });
+
+    it('owns one routing runtime and passes that exact session to layout routing', () => {
+        const { result } = renderHook(() => useAutoRouting(createOptions()));
+
+        expect(mocks.layoutOptions).toMatchObject({
+            routingSessionRuntime: result.current.routingSessionRuntime,
+        });
     });
 
     it('does not let a late layout completion overwrite a newer manual routing choice', async () => {

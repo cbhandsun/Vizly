@@ -19,6 +19,7 @@ import type {
   KeyCode,
 } from '@xyflow/react';
 import type { BackgroundVariant } from '@xyflow/react';
+import type { BaseReactFlowRoutingSessionRuntime } from './baseReactFlowRoutingSessionRuntime';
 
 export interface BaseReactFlowProps {
   onSelectionChange?: (params: { nodes: Node[]; edges: Edge[] }) => void;
@@ -104,4 +105,5 @@ export interface BaseReactFlowProps {
   ) => void;
   onReconnectEnd?: (event: MouseEvent | TouchEvent, edge: Edge) => void;
   onDisplayRoutingFinalApplied?: () => void;
+  routingSessionRuntime?: BaseReactFlowRoutingSessionRuntime;
 }

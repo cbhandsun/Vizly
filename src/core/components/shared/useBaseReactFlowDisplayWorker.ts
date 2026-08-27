@@ -1,24 +1,30 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 
 import {
   disposeBaseReactFlowDisplayWorker,
   prewarmBaseReactFlowDisplayWorker,
 } from './baseReactFlowDisplayWorkerClient';
+import {
+  useBaseReactFlowRoutingSessionRuntime,
+  type BaseReactFlowRoutingSessionRuntime,
+} from './baseReactFlowRoutingSessionRuntime';
 
 export const useBaseReactFlowDisplayWorker = ({
   shouldPrewarm,
+  routingSessionRuntime,
 }: {
   shouldPrewarm: boolean;
+  routingSessionRuntime?: BaseReactFlowRoutingSessionRuntime;
 }) => {
-  const workerRef = useRef<Worker | null>(null);
-
-  useEffect(() => () => {
-    disposeBaseReactFlowDisplayWorker(workerRef);
-  }, []);
+  const runtime = useBaseReactFlowRoutingSessionRuntime(routingSessionRuntime);
 
   useEffect(() => {
-    if (shouldPrewarm) prewarmBaseReactFlowDisplayWorker(workerRef);
-  }, [shouldPrewarm]);
+    runtime.registerWorkerDisposer(disposeBaseReactFlowDisplayWorker);
+  }, [runtime]);
 
-  return workerRef;
+  useEffect(() => {
+    if (shouldPrewarm) prewarmBaseReactFlowDisplayWorker(runtime.workerRef);
+  }, [runtime, shouldPrewarm]);
+
+  return runtime;
 };

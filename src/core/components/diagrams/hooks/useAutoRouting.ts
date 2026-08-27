@@ -3,6 +3,7 @@ import { Edge, Node, ReactFlowInstance } from '@xyflow/react';
 import { diagramConfigManager, EdgeConfig } from '@/core/config/DiagramConfig';
 import { useLayoutStrategy } from './useLayoutStrategy';
 import { syncAutoPathSelection, applyRoutingProfile, DESIGNER_ROUTING_PROFILE } from './useSmartRoutingConfig';
+import { useBaseReactFlowRoutingSessionRuntime } from '../../shared/baseReactFlowRoutingSessionRuntime';
 
 interface UseAutoRoutingOptions {
     setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
@@ -45,6 +46,7 @@ export function useAutoRouting({
     const [isLayoutBusy, setIsLayoutBusy] = useState(false);
     const routingPreferenceVersionRef = useRef(0);
     const layoutInFlightRef = useRef(false);
+    const routingSessionRuntime = useBaseReactFlowRoutingSessionRuntime();
 
     const setAutoRoutingEnabled = useCallback<React.Dispatch<React.SetStateAction<boolean>>>((nextValue) => {
         routingPreferenceVersionRef.current += 1;
@@ -62,6 +64,7 @@ export function useAutoRouting({
         diagramId,
         loadLayoutPresetMap,
         setLayoutStable: setIsLayoutStable,
+        routingSessionRuntime,
     });
 
     // 布局时自动启用 autoRouting + 管理稳定性标记
@@ -118,5 +121,6 @@ export function useAutoRouting({
         lastDomainStrategy,
         lastDomainDirection,
         lastNodeLayout,
+        routingSessionRuntime,
     };
 }

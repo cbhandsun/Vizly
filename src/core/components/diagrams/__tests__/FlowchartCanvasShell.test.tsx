@@ -47,6 +47,7 @@ import {
   createSnappedPositionChange,
   getNonPositionNodeChanges,
 } from '../hooks/useFlowchartDragBuffer';
+import { createBaseReactFlowRoutingSessionRuntime } from '../../shared/baseReactFlowRoutingSessionRuntime';
 
 describe('FlowchartCanvasShell', () => {
   beforeEach(() => {
@@ -187,6 +188,7 @@ describe('FlowchartCanvasShell', () => {
 
   it('removes every canvas mutation entry point when editing is disabled', async () => {
     const noop = vi.fn();
+    const routingSessionRuntime = createBaseReactFlowRoutingSessionRuntime();
     render(
       <FlowchartCanvasShell
         nodes={[{ id: 'A', position: { x: 0, y: 0 }, data: {}, selected: true }]}
@@ -218,6 +220,7 @@ describe('FlowchartCanvasShell', () => {
         connectionMode={'loose' as never}
         isDragging={false}
         editingEnabled={false}
+        routingSessionRuntime={routingSessionRuntime}
       />,
     );
 
@@ -236,6 +239,7 @@ describe('FlowchartCanvasShell', () => {
     expect(props.onNodesChange).toBeUndefined();
     expect(props.onEdgesChange).toBeUndefined();
     expect(props.onConnect).toBeUndefined();
+    expect(props.routingSessionRuntime).toBe(routingSessionRuntime);
     expect(props.onPaneDoubleClick).toBeUndefined();
     expect((props.nodes as Node[])[0].selected).toBe(false);
     expect((props.edges as Edge[])[0].selected).toBe(false);

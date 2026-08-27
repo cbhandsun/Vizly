@@ -8,6 +8,10 @@ import {
   readBaseReactFlowDisplayCommittedSnapshot,
 } from '../baseReactFlowDisplayCommittedSnapshot';
 import { computeBaseReactFlowDisplayInputIdentityBundle } from '../baseReactFlowDisplayInputIdentity';
+import { computeBaseReactFlowDisplayOutputRouteSignature } from '../baseReactFlowDisplayCache';
+import type { BaseDisplayBoundedCandidateReport } from '../baseReactFlowDisplayEvaluation';
+import { createDisplayRoutingWorkerCommitReceipt } from '../baseReactFlowDisplayWorkerCommitReceipt';
+import { createDisplayRoutingIdentity } from '../baseReactFlowDisplayRoutingSession';
 import {
   clearBaseReactFlowLayoutNodeRuntimeGeometry,
   commitBaseReactFlowStagedLayoutRoutingResult,
@@ -47,6 +51,46 @@ const sourceEdges: Edge[] = [{
 
 const projectedNodes = projectBaseReactFlowDisplayWorkerInput({ edges: [], nodes }).nodes;
 
+const withCommitReceipt = <T extends Readonly<{
+  edges: Edge[];
+  hardReport: BaseDisplayBoundedCandidateReport;
+}>>(
+  result: T,
+  inputEdges: Edge[],
+  inputNodes: Node[],
+): T & Readonly<{ commitReceipt: NonNullable<ReturnType<typeof createDisplayRoutingWorkerCommitReceipt>> }> => {
+  const projected = projectBaseReactFlowDisplayWorkerInput({
+    edges: inputEdges,
+    nodes: inputNodes,
+  });
+  const inputIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
+    nodes: projected.nodes,
+    edges: projected.edges,
+    enableSmartEdges: true,
+    smartEdgePadding: 20,
+    isLargeGraph: false,
+  });
+  const identity = createDisplayRoutingIdentity(
+    inputIdentity.cacheSignature,
+    inputIdentity.geometryDigest,
+  );
+  const outputRouteSignature = computeBaseReactFlowDisplayOutputRouteSignature(result.edges);
+  if (!outputRouteSignature) throw new Error('expected route signature');
+  const sessionRef = {
+    sessionId: 'display-session-v1:2',
+    identity,
+    outputRouteSignature,
+  } as const;
+  const commitReceipt = createDisplayRoutingWorkerCommitReceipt({
+    identity,
+    outputRouteSignature,
+    hardReport: result.hardReport,
+    sessionRef,
+  });
+  if (!commitReceipt) throw new Error('expected commit receipt');
+  return { ...result, commitReceipt };
+};
+
 const createWorkerResult = (hardClean: boolean) => {
   const projected = projectBaseReactFlowDisplayWorkerInput({ edges: sourceEdges, nodes });
   const routingPatches: Edge[] = [{
@@ -58,7 +102,7 @@ const createWorkerResult = (hardClean: boolean) => {
       computedPath: [{ x: 100, y: 30 }, { x: 240, y: 30 }],
     },
   }];
-  return {
+  const result = {
     edges: [{
       ...projected.edges[0],
       type: 'stablePath',
@@ -73,6 +117,7 @@ const createWorkerResult = (hardClean: boolean) => {
     routeResolution: 'full-route' as const,
     phaseTrace: [],
   };
+  return hardClean ? withCommitReceipt(result, sourceEdges, nodes) : result;
 };
 
 describe('baseReactFlowLayoutRoutingTransaction', () => {
@@ -292,6 +337,7 @@ describe('baseReactFlowLayoutRoutingTransaction', () => {
     });
 
     expect(committed).not.toBeNull();
+    expect(committed!.commitSnapshot()).toBe(true);
     expect(committed!.routedEdges[0]).toMatchObject({
       type: 'stablePath',
       sourceHandle: 'right',
@@ -416,7 +462,7 @@ describe('baseReactFlowLayoutRoutingTransaction', () => {
     const committed = commitBaseReactFlowStagedLayoutRoutingResult({
       sourceEdges: nestedEdges,
       sourceNodes: nestedNodes,
-      workerResult: {
+      workerResult: withCommitReceipt({
         projectedEdges: projected.edges,
         edges: [{
           ...projected.edges[0],
@@ -436,12 +482,13 @@ describe('baseReactFlowLayoutRoutingTransaction', () => {
         }],
         hardClean: true,
         hardReport: createTestDisplayHardReport(true, 120),
-        routeResolution: 'full-route',
+        routeResolution: 'full-route' as const,
         phaseTrace: [],
-      },
+      }, nestedEdges, nestedNodes),
     });
 
     expect(committed).not.toBeNull();
+    expect(committed!.commitSnapshot()).toBe(true);
     const displayInput = projectBaseReactFlowDisplayWorkerInput({
       edges: committed!.routedEdges,
       nodes: nestedNodes,

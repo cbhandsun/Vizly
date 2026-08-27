@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 import type { DisplayRoutingRenderAuthority } from '../../routing/displayRoutingRenderAuthority';
+import type { BaseReactFlowRoutingSessionRuntime } from './baseReactFlowRoutingSessionRuntime';
 
 export type UseBaseReactFlowDisplayRoutingOptions = {
   edges: Edge[];
@@ -15,6 +16,7 @@ export type UseBaseReactFlowDisplayRoutingOptions = {
   nodeDragFallbackIds: readonly string[];
   onNodeDragFallbackResolved: () => void;
   onDisplayRoutingFinalApplied?: () => void;
+  routingSessionRuntime?: BaseReactFlowRoutingSessionRuntime;
 };
 
 export type UseBaseReactFlowDisplayRoutingResult = {

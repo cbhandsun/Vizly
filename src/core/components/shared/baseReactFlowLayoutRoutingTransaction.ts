@@ -37,11 +37,17 @@ import { buildLayoutFacingTerminalShortcutCandidates } from './baseReactFlowDisp
 import { repairResidualHairpinBridges } from '../../strategies/shared/edgeHairpinBridgeWidenRepair';
 import { clearBaseReactFlowLayoutEdgeRoutingData } from './baseReactFlowLayoutEdgeRoutingData';
 import { updateDisplayRoutingDebugState } from './baseReactFlowDisplayRoutingDebug';
+import type { DisplayRoutingWorkerCommitReceipt } from './baseReactFlowDisplayWorkerCommitReceipt';
+import {
+  createDisplayRoutingIdentity,
+  displayRoutingIdentitiesMatch,
+} from './baseReactFlowDisplayRoutingSession';
 
 export { clearBaseReactFlowLayoutEdgeRoutingData } from './baseReactFlowLayoutEdgeRoutingData';
 
 export type BaseReactFlowLayoutRoutingCommit = Readonly<{
   routedEdges: Edge[];
+  commitSnapshot: () => boolean;
 }>;
 
 type LayoutRuntimeNode = Node & Readonly<{
@@ -164,7 +170,7 @@ export const commitBaseReactFlowStagedLayoutRoutingResult = ({
   smartEdgePadding?: number;
   isLargeGraph?: boolean;
 }): BaseReactFlowLayoutRoutingCommit | null => {
-  if (!Array.isArray(workerResult.routingPatches) || !workerResult.hardReport) return null;
+  if (!Array.isArray(workerResult.routingPatches) || !workerResult.commitReceipt) return null;
   const workerInputRoutingPatches = createBaseReactFlowDisplayEdgePatches(
     sourceEdges,
     workerResult.projectedEdges,
@@ -188,17 +194,18 @@ export const commitBaseReactFlowStagedLayoutRoutingResult = ({
     routesMatch,
   })) return null;
 
-  if (!writeBaseReactFlowStagedLayoutSnapshot({
-    sourceEdges,
+  return {
     routedEdges: merged.edges,
-    sourceNodes,
-    enableSmartEdges,
-    smartEdgePadding,
-    isLargeGraph,
-    hardReport: workerResult.hardReport,
-    workerSessionRef: workerResult.sessionRef,
-  })) return null;
-  return { routedEdges: merged.edges };
+    commitSnapshot: () => writeBaseReactFlowStagedLayoutSnapshot({
+      sourceEdges,
+      routedEdges: merged.edges,
+      sourceNodes,
+      enableSmartEdges,
+      smartEdgePadding,
+      isLargeGraph,
+      commitReceipt: workerResult.commitReceipt,
+    }),
+  };
 };
 
 const writeBaseReactFlowStagedLayoutSnapshot = ({
@@ -208,7 +215,7 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
   enableSmartEdges,
   smartEdgePadding,
   isLargeGraph,
-  hardReport,
+  commitReceipt,
   hardReportDigest,
   workerSessionRef,
 }: {
@@ -218,12 +225,12 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
   enableSmartEdges: boolean;
   smartEdgePadding: number;
   isLargeGraph: boolean;
-  hardReport?: NonNullable<BaseReactFlowDisplayWorkerResult['hardReport']>;
+  commitReceipt?: DisplayRoutingWorkerCommitReceipt;
   hardReportDigest?: RoutingCommittedSnapshot['hardReportDigest'];
   workerSessionRef?: RoutingCommittedSnapshot['workerSessionRef'];
 }): boolean => {
-  const hardReportIdentity = hardReport
-    ? { hardReport }
+  const hardReportIdentity = commitReceipt
+    ? { hardReport: commitReceipt.hardReport }
     : hardReportDigest
       ? { hardReportDigest }
       : null;
@@ -231,6 +238,28 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
   const outputRouteSignature = computeBaseReactFlowDisplayOutputRouteSignature(routedEdges);
   const displayPatches = createBaseReactFlowDisplayEdgePatches(routedEdges, routedEdges);
   if (!outputRouteSignature || !displayPatches) return false;
+  if (commitReceipt) {
+    const projectedInput = projectBaseReactFlowDisplayWorkerInput({
+      edges: sourceEdges,
+      nodes: sourceNodes,
+    });
+    const sourceIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
+      nodes: projectedInput.nodes,
+      edges: projectedInput.edges,
+      enableSmartEdges,
+      smartEdgePadding,
+      isLargeGraph,
+    });
+    const expectedIdentity = createDisplayRoutingIdentity(
+      sourceIdentity.cacheSignature,
+      sourceIdentity.geometryDigest,
+    );
+    if (
+      !displayRoutingIdentitiesMatch(commitReceipt.identity, expectedIdentity)
+      || commitReceipt.outputRouteSignature !== outputRouteSignature
+    ) return false;
+  }
+  const safeWorkerSessionRef = commitReceipt?.sessionRef ?? workerSessionRef;
   const writeSnapshot = (
     edges: Edge[],
     patches: RoutingPatch[],
@@ -256,7 +285,7 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
       sourceNodes,
       displayPatches: patches,
       outputRouteSignature,
-      workerSessionRef,
+      workerSessionRef: safeWorkerSessionRef,
       ...hardReportIdentity,
     });
     return committed ? identity : null;
@@ -319,17 +348,20 @@ export const stageBaseReactFlowLayoutRouting = async ({
     : null;
   const cachedHardReportDigest = cached?.baseline.hardReportDigest;
   const cachedWorkerSessionRef = cached?.baseline.workerSessionRef;
-  if (cachedEdges && writeBaseReactFlowStagedLayoutSnapshot({
-    sourceEdges: unseededSourceEdges,
-    routedEdges: cachedEdges,
-    sourceNodes: projectedSource.nodes,
-    enableSmartEdges,
-    smartEdgePadding,
-    isLargeGraph,
-    hardReportDigest: cachedHardReportDigest,
-    workerSessionRef: cachedWorkerSessionRef,
-  })) {
-    return { routedEdges: cachedEdges };
+  if (cachedEdges && cachedHardReportDigest) {
+    return {
+      routedEdges: cachedEdges,
+      commitSnapshot: () => writeBaseReactFlowStagedLayoutSnapshot({
+        sourceEdges: unseededSourceEdges,
+        routedEdges: cachedEdges,
+        sourceNodes: projectedSource.nodes,
+        enableSmartEdges,
+        smartEdgePadding,
+        isLargeGraph,
+        hardReportDigest: cachedHardReportDigest,
+        workerSessionRef: cachedWorkerSessionRef,
+      }),
+    };
   }
   const stagedSeedEdges = seedBaseReactFlowStagedLayoutEdges({
     sourceEdges,
