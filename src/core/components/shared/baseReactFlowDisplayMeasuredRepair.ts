@@ -30,7 +30,15 @@ import { repairAxisMismatchedTerminalsWithBoundedPortRoles } from './baseReactFl
 import { repairDisplayLoopShortcuts } from './baseReactFlowDisplayLoopShortcutRepair';
 import { repairDisplayMicroArtifacts } from '../../strategies/shared/edgeDisplayMicroCleanup';
 import { createBaseReactFlowDisplayMicroSafetyContext } from './baseReactFlowDisplayMicroSafety';
-import { createBaseDisplayHardGateMemo } from './baseReactFlowDisplayHardGateMemo';
+import {
+  createBaseDisplayHardGateMemo,
+  type BaseDisplayHardGateMemo,
+} from './baseReactFlowDisplayHardGateMemo';
+import type {
+  BaseReactFlowEvaluationMetrics,
+  BaseReactFlowFinalEndpointEvaluation,
+} from './baseReactFlowDisplayFinalEndpointEvaluation';
+import { getChangedBaseReactFlowDisplayRoutingIndexes } from './baseReactFlowDisplayRoutingTransaction';
 import { createDisplayTerminalValidationSnapshot } from './baseReactFlowTerminalValidation';
 import {
   countChangedRoutingItems,
@@ -45,6 +53,7 @@ export type BaseReactFlowMeasuredDisplayInitialEvaluation = Readonly<{
   inputNodes: Node[];
   repairNodes: Node[];
   report: BaseDisplayBoundedCandidateReport;
+  evaluation?: BaseReactFlowFinalEndpointEvaluation;
 }>;
 
 export type BaseReactFlowMeasuredDisplayRepairOutcome = Readonly<{
@@ -86,12 +95,23 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
     nodes,
     new Map(nodes.map(node => [node.id, node] as const)),
   );
-  const hardGateMemo = createBaseDisplayHardGateMemo(
-    repairNodes,
-    createDisplayTerminalValidationSnapshot(repairNodes),
-  );
+  const sharedEvaluation = trustedInitialEvaluation?.evaluation?.nodes === repairNodes
+    ? trustedInitialEvaluation.evaluation
+    : undefined;
+  let hardGateMemo: BaseDisplayHardGateMemo | undefined;
+  const getLocalHardGateMemo = (): BaseDisplayHardGateMemo => {
+    hardGateMemo ??= createBaseDisplayHardGateMemo(
+      repairNodes,
+      createDisplayTerminalValidationSnapshot(repairNodes),
+    );
+    return hardGateMemo;
+  };
   if (trustedInitialEvaluation) {
-    hardGateMemo.rememberReport(edges, trustedInitialEvaluation.report);
+    if (sharedEvaluation) {
+      sharedEvaluation.rememberHardReport(edges, trustedInitialEvaluation.report);
+    } else {
+      getLocalHardGateMemo().rememberReport(edges, trustedInitialEvaluation.report);
+    }
   }
   const reportFor = (
     candidate: Edge[],
@@ -102,7 +122,14 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
       && previousReport
       && sameEdgeReferences(candidate, previousEdges)
       ? previousReport
-      : hardGateMemo.getReport(candidate, repairNodes, 'polished')
+      : sharedEvaluation && previousEdges
+        ? sharedEvaluation.hardReportChanged(
+          previousEdges,
+          candidate,
+          getChangedBaseReactFlowDisplayRoutingIndexes(previousEdges, candidate),
+        )
+        : sharedEvaluation?.hardReport(candidate)
+          ?? getLocalHardGateMemo().getReport(candidate, repairNodes, 'polished')
   );
   const outcomeFor = (
     candidate: Edge[],
@@ -164,9 +191,14 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
     | 'measured-repair-terminal'
     | 'measured-repair-fallback'
   >;
+  const readEvaluationMetrics = (): BaseReactFlowEvaluationMetrics => (
+    sharedEvaluation?.readMetrics()
+      ?? hardGateMemo?.readMetrics()
+      ?? { evaluationCount: 0, cacheHitCount: 0, scannedNodeCount: 0, scannedEdgePairCount: 0 }
+  );
   const diffMetrics = (
-    before: ReturnType<typeof hardGateMemo.readMetrics>,
-    after: ReturnType<typeof hardGateMemo.readMetrics>,
+    before: BaseReactFlowEvaluationMetrics,
+    after: BaseReactFlowEvaluationMetrics,
   ): DisplayRoutingPhaseMetrics => ({
     evaluationCount: Math.max(0, after.evaluationCount - before.evaluationCount),
     cacheHitCount: Math.max(0, after.cacheHitCount - before.cacheHitCount),
@@ -181,7 +213,7 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
     createCandidate: () => Edge[],
   ): boolean => {
     const baseline = current;
-    const metricsBefore = hardGateMemo.readMetrics();
+    const metricsBefore = readEvaluationMetrics();
     const timer = startDisplayRoutingPhaseTrace({
       phase,
       candidateCount: baseline.length,
@@ -191,7 +223,7 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
     timer.finish(
       hardClean ? 'accepted' : sameEdgeReferences(baseline, current) ? 'skip' : 'fallback',
       countChangedRoutingItems(baseline, current),
-      diffMetrics(metricsBefore, hardGateMemo.readMetrics()),
+      diffMetrics(metricsBefore, readEvaluationMetrics()),
     );
     return hardClean;
   };
@@ -334,7 +366,7 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
     onTrace: onPhaseTrace,
   });
   const fallbackBaseline = current;
-  const fallbackMetricsBefore = hardGateMemo.readMetrics();
+  const fallbackMetricsBefore = readEvaluationMetrics();
   const fastRepaired = repairFastDisplayHardSafety(current, repairNodes);
   const fastAnchoredRepaired = keepNodeAnchoredTerminalCandidates(
     fastRepaired,
@@ -348,7 +380,7 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
   fallbackTimer.finish(
     fastStrictReport.hardClean ? 'accepted' : 'fallback',
     countChangedRoutingItems(fallbackBaseline, fastStrictRepaired),
-    diffMetrics(fallbackMetricsBefore, hardGateMemo.readMetrics()),
+    diffMetrics(fallbackMetricsBefore, readEvaluationMetrics()),
   );
   if (fastStrictReport.hardClean) {
     return outcomeFor(fastStrictRepaired, fastStrictRepaired, fastStrictReport);
@@ -394,7 +426,7 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
       candidateCount: anchoredSelected.length,
       onTrace: onPhaseTrace,
     });
-    const residualMetricsBefore = hardGateMemo.readMetrics();
+    const residualMetricsBefore = readEvaluationMetrics();
     const loopClosed = repairDisplayLoopShortcuts(
       anchoredSelected,
       repairNodes,
@@ -423,7 +455,7 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
       residualTimer.finish(
         'accepted',
         countChangedRoutingItems(anchoredSelected, residualClosed),
-        diffMetrics(residualMetricsBefore, hardGateMemo.readMetrics()),
+        diffMetrics(residualMetricsBefore, readEvaluationMetrics()),
       );
       return outcomeFor(residualClosed, residualClosed, residualClosedReport);
     }
@@ -455,14 +487,14 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
       residualTimer.finish(
         'accepted',
         countChangedRoutingItems(anchoredSelected, residualClosed),
-        diffMetrics(residualMetricsBefore, hardGateMemo.readMetrics()),
+        diffMetrics(residualMetricsBefore, readEvaluationMetrics()),
       );
       return outcomeFor(residualClosed, residualClosed, residualClosedReport);
     }
     residualTimer.finish(
       'rejected',
       countChangedRoutingItems(anchoredSelected, residualClosed),
-      diffMetrics(residualMetricsBefore, hardGateMemo.readMetrics()),
+      diffMetrics(residualMetricsBefore, readEvaluationMetrics()),
     );
   }
   if (displayEdgesHaveNodeAttachedTerminals(anchoredSelected, repairNodes)) {

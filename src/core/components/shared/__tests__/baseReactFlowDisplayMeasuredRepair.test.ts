@@ -7,6 +7,7 @@ import {
   repairBaseReactFlowMeasuredDisplayEdgesWithReport,
 } from '../baseReactFlowDisplayMeasuredRepair';
 import { getDisplayHardQualityGateReport } from '../baseReactFlowDisplayQualityGates';
+import { createBaseReactFlowFinalEndpointEvaluation } from '../baseReactFlowDisplayFinalEndpointEvaluation';
 import type { DisplayRoutingPhaseTrace } from '../baseReactFlowDisplayRoutingTrace';
 
 const nodes: Node[] = [
@@ -138,6 +139,38 @@ describe('measured display repair outcome', () => {
 
     expect(outcome.report.hardClean).toBe(true);
     expect(outcome.report.terminalsAnchored).toBe(true);
+  });
+
+  it('shares exact hard-report evidence with the request-local evaluation session', () => {
+    const axisMismatchEdges: Edge[] = [{
+      ...edges[0],
+      data: {
+        computedPath: [
+          { x: 100, y: 50 },
+          { x: 100, y: 150 },
+          { x: 220, y: 150 },
+          { x: 220, y: 50 },
+        ],
+      },
+    }];
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation(repairNodes);
+    const initialReport = evaluation.hardReport(axisMismatchEdges);
+    const outcome = repairBaseReactFlowMeasuredDisplayEdgesWithReport(
+      axisMismatchEdges,
+      nodes,
+      {
+        edges: axisMismatchEdges,
+        inputNodes: nodes,
+        repairNodes,
+        report: initialReport,
+        evaluation,
+      },
+    );
+    const beforeReuse = evaluation.readMetrics();
+
+    expect(outcome.report.hardClean).toBe(true);
+    expect(evaluation.hardReport(outcome.edges)).toEqual(outcome.report);
+    expect(evaluation.readMetrics().cacheHitCount).toBe(beforeReuse.cacheHitCount + 1);
   });
 
   it('closes terminal repair regressions from the measured WMS browser geometry', () => {

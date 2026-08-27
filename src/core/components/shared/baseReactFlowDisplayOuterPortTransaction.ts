@@ -14,7 +14,7 @@ import {
   diffBaseReactFlowEvaluationMetrics,
   type BaseReactFlowFinalEndpointEvaluation,
 } from './baseReactFlowDisplayFinalEndpointEvaluation';
-import { doBaseReactFlowDisplayRoutesMatchExactly } from './baseReactFlowDisplayRoutingTransaction';
+import { getChangedBaseReactFlowDisplayRoutingIndexes } from './baseReactFlowDisplayRoutingTransaction';
 import {
   startDisplayRoutingPhaseTrace,
   type DisplayRoutingPhaseTrace,
@@ -28,19 +28,6 @@ export type BaseReactFlowOuterPortTransactionOptions = Readonly<{
   }>;
   onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void;
 }>;
-
-const changedRoutingIndexes = (
-  baseline: readonly Edge[],
-  candidate: readonly Edge[],
-): number[] => {
-  if (baseline.length !== candidate.length) return candidate.map((_, index) => index);
-  return candidate.flatMap((edge, index) => (
-    baseline[index]
-    && doBaseReactFlowDisplayRoutesMatchExactly([baseline[index]], [edge])
-      ? []
-      : [index]
-  ));
-};
 
 const reportIsGeometricallyClean = (
   report: ReturnType<typeof getDisplayHardQualityGateReport>,
@@ -102,7 +89,7 @@ export const repairResidualOuterPortTransactionWithHardGate = <T extends Edge[]>
       : {};
     timer.finish(
       resolution,
-      changedRoutingIndexes(edges, result).length,
+      getChangedBaseReactFlowDisplayRoutingIndexes(edges, result).length,
       { ...metrics, candidateCount: evaluatedCandidateCount },
     );
     return result;
@@ -123,7 +110,7 @@ export const repairResidualOuterPortTransactionWithHardGate = <T extends Edge[]>
       ) as T,
       MIN_RENDER_SAFE_ENDPOINT_STUB,
     ) as T;
-    const changedEdgeIndexes = changedRoutingIndexes(edges, terminalBase);
+    const changedEdgeIndexes = getChangedBaseReactFlowDisplayRoutingIndexes(edges, terminalBase);
     const changedEdgeIndexSet = new Set(changedEdgeIndexes);
     const evaluationCandidate = terminalBase.map((edge, index) => (
       changedEdgeIndexSet.has(index) ? edge : edges[index]

@@ -151,6 +151,7 @@ export const runBaseReactFlowDisplayWorkerFullRoute = ({
         inputNodes: request.nodes,
         repairNodes,
         report: finalized.report,
+        evaluation: fullRouteEvaluation,
       },
       false,
       onPhaseTrace,

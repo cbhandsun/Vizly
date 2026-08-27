@@ -173,6 +173,7 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
         inputNodes: nodes,
         repairNodes,
         report: routedReport,
+        evaluation,
       },
       deferStrictOnlyMeasuredRepair,
       onPhaseTrace,

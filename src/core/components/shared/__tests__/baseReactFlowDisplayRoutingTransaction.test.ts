@@ -5,6 +5,7 @@ import { computeBaseReactFlowDisplayOutputRouteSignature } from '../baseReactFlo
 import {
   createBaseReactFlowDisplayEdgePatches,
   doBaseReactFlowDisplayRoutesMatchExactly,
+  getChangedBaseReactFlowDisplayRoutingIndexes,
   mergeBaseReactFlowDisplayEdgePatches,
   mergeBaseReactFlowDisplayRoutingTransactions,
   mergeTrustedBaseReactFlowDisplayCacheEntry,
@@ -129,6 +130,28 @@ describe('baseReactFlowDisplayRoutingTransaction', () => {
       },
     };
     expect(doBaseReactFlowDisplayRoutesMatchExactly(routes, merged)).toBe(false);
+  });
+
+  it('returns only exact routing-owned candidate changes', () => {
+    const baseline: Edge[] = [
+      {
+        id: 'a', source: 'source-a', target: 'target-a',
+        data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
+      },
+      {
+        id: 'b', source: 'source-b', target: 'target-b',
+        data: { computedPath: [{ x: 0, y: 10 }, { x: 100, y: 10 }] },
+      },
+    ];
+    const candidate = baseline.map(edge => ({ ...edge, label: 'ignored metadata' }));
+    candidate[1] = {
+      ...candidate[1],
+      data: { computedPath: [{ x: 0, y: 10 }, { x: 120, y: 10 }] },
+    };
+
+    expect(getChangedBaseReactFlowDisplayRoutingIndexes(baseline, candidate)).toEqual([1]);
+    expect(getChangedBaseReactFlowDisplayRoutingIndexes(baseline, candidate.slice(0, 1)))
+      .toEqual([0]);
   });
 
   it('rejects malformed routes even when both sides contain the same values', () => {

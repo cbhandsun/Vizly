@@ -596,6 +596,20 @@ export const doBaseReactFlowDisplayRoutesMatchExactly = (
   return true;
 };
 
+/** Returns the exact routing-owned indexes changed by an immutable candidate. */
+export const getChangedBaseReactFlowDisplayRoutingIndexes = (
+  baseline: readonly Edge[],
+  candidate: readonly Edge[],
+): number[] => {
+  if (baseline.length !== candidate.length) return candidate.map((_, index) => index);
+  return candidate.flatMap((edge, index) => (
+    baseline[index]
+    && doBaseReactFlowDisplayRoutesMatchExactly([baseline[index]], [edge])
+      ? []
+      : [index]
+  ));
+};
+
 const mergeBaseReactFlowDisplayCandidateEntry = (
   sourceEdges: Edge[],
   cacheEntry: BaseReactFlowDisplayEdgesCacheEntry,
