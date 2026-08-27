@@ -6,17 +6,12 @@ import {
 import {
   computeBaseReactFlowDisplayEdgesInWorker,
   prewarmBaseReactFlowDisplayWorker,
-  resolveBaseReactFlowDisplayQualityPolicy,
   type DeferredDisplayEdges,
   type DisplayRoutingInput,
 } from './baseReactFlowDisplayWorkerClient';
 import {
   computeBaseReactFlowDisplayEdgesIncrementallyInWorker,
 } from './baseReactFlowDisplayIncrementalWorkerClient';
-import {
-  resolveBaseReactFlowPrecompiledCapturePresetId,
-  resolveBaseReactFlowPrecompiledRegenerationPresetIdFromWindow,
-} from './baseReactFlowPrecompiledCaptureMode';
 import {
   readDisplayRoutingDebugState,
   resolveDisplayRoutingCommittedReuseTiming,
@@ -63,6 +58,7 @@ import {
 } from './useBaseReactFlowDisplayRenderAuthority';
 import { useBaseReactFlowDisplayWorker } from './useBaseReactFlowDisplayWorker';
 import { useBaseReactFlowDisplayRoutingResult } from './useBaseReactFlowDisplayRoutingResult';
+import { useBaseReactFlowDisplayQualityPolicy } from './useBaseReactFlowDisplayQualityPolicy';
 
 /**
  * Owns the asynchronous display-routing lifecycle while the canvas component
@@ -103,22 +99,15 @@ export const useBaseReactFlowDisplayRouting = ({
     displayRoutingInputRef,
   });
 
-  const precompiledRegenerationPresetId =
-    resolveBaseReactFlowPrecompiledRegenerationPresetIdFromWindow();
-  const forceFreshFullRoute = precompiledRegenerationPresetId !== null;
-
-  const displayQualityPolicy = useMemo(() => (
-    resolveBaseReactFlowDisplayQualityPolicy({
-      nodeCount: routingNodes.length,
-      edgeCount: edges.length,
-      isLargeGraph,
-      forceFullQuality: typeof window !== 'undefined'
-        && resolveBaseReactFlowPrecompiledCapturePresetId({
-          search: window.location.search,
-          hash: window.location.hash,
-        }) !== null,
-    })
-  ), [routingNodes.length, edges.length, isLargeGraph]);
+  const {
+    displayQualityPolicy,
+    forceFreshFullRoute,
+    precompiledRegenerationPresetId,
+  } = useBaseReactFlowDisplayQualityPolicy({
+    nodeCount: routingNodes.length,
+    edgeCount: edges.length,
+    isLargeGraph,
+  });
 
   const committedFinalDisplayEntry = useMemo(() => (
     routingGeometryReady && !forceFreshFullRoute
