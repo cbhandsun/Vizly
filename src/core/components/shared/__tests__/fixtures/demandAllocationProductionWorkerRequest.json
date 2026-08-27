@@ -1,5 +1,11 @@
 {
   "requestId": "3316775788:1",
+  "inputIdentity": {
+    "routingVersion": "15",
+    "visualVersion": "commercial-hard-gate-v1",
+    "inputSignature": "2113580664",
+    "inputGeometryDigest": "geometry-v1:959447b9afedc5b100c74395ce889f05"
+  },
   "edges": [
     {
       "id": "e1",
