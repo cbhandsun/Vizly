@@ -3,7 +3,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createDisplayRoutingRenderAuthority } from '../../../routing/displayRoutingRenderAuthority';
+import { createTestDisplayRoutingRenderAuthority } from '../../../routing/__tests__/displayRoutingRenderAuthorityTestFixture';
 
 import { StablePathEdge } from '../StablePathEdge';
 import {
@@ -68,13 +68,15 @@ const createTestRoutingAdapter = (
   if (!Array.isArray(data?.computedPath) || data.computedPath.length < 2) {
     return STANDALONE_EDGE_RENDER_ADAPTER;
   }
-  const authority = createDisplayRoutingRenderAuthority({
-    inputSignature: '1234',
-    inputGeometryDigest: `geometry-v1:${'a'.repeat(32)}`,
+  const authority = createTestDisplayRoutingRenderAuthority({
     outputRouteSignature: 'route-v2:3:3:0123456789abcdef',
-    hardReportDigest: 'hard-report-v1:0123456789abcdef',
     authorizedEdges: [{
       edgeId: typeof props.id === 'string' ? props.id : 'edge-test',
+      source: typeof props.source === 'string' ? props.source : 'source',
+      target: typeof props.target === 'string' ? props.target : 'target',
+      sourceHandle: typeof props.sourceHandleId === 'string' ? props.sourceHandleId : null,
+      targetHandle: typeof props.targetHandleId === 'string' ? props.targetHandleId : null,
+      rendererType: 'stablePath',
       computedPath: data.computedPath,
     }],
   });
@@ -353,14 +355,19 @@ describe('StablePathEdge', () => {
     );
     const horizontalPoints = [{ x: 0, y: 40 }, { x: 160, y: 40 }];
     const verticalPoints = [{ x: 80, y: 0 }, { x: 80, y: 100 }];
-    const lineJumpAuthority = createDisplayRoutingRenderAuthority({
-      inputSignature: '1234',
-      inputGeometryDigest: `geometry-v1:${'a'.repeat(32)}`,
+    const lineJumpAuthority = createTestDisplayRoutingRenderAuthority({
       outputRouteSignature: 'route-v2:3:3:0123456789abcdef',
-      hardReportDigest: 'hard-report-v1:0123456789abcdef',
       authorizedEdges: [
-        { edgeId: 'horizontal', computedPath: horizontalPoints },
-        { edgeId: 'vertical', computedPath: verticalPoints },
+        {
+          edgeId: 'horizontal', source: 'left', target: 'right',
+          sourceHandle: null, targetHandle: null, rendererType: 'stablePath',
+          computedPath: horizontalPoints,
+        },
+        {
+          edgeId: 'vertical', source: 'top', target: 'bottom',
+          sourceHandle: null, targetHandle: null, rendererType: 'stablePath',
+          computedPath: verticalPoints,
+        },
       ],
     });
     if (!lineJumpAuthority) throw new Error('expected line-jump render authority');

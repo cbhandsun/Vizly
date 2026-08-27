@@ -4,6 +4,7 @@ import {
   displayRoutingRenderAuthorityAllowsEdge,
   readDisplayRoutingRenderSessionContract,
   type DisplayRoutingRenderAuthority,
+  type DisplayRoutingRenderEdgeClaim,
   type DisplayRoutingRenderSessionContract,
 } from '../../routing/displayRoutingRenderAuthority';
 
@@ -57,13 +58,12 @@ export const useSmartEdgeRoutingRenderAdapter = (): SmartEdgeRoutingRenderAdapte
 
 export const smartEdgeRenderAdapterAcceptsCommittedGeometry = (
   value: unknown,
-  edgeId: unknown,
-  computedPath: unknown,
+  claim: DisplayRoutingRenderEdgeClaim,
 ): boolean => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const adapter = value as Record<string, unknown>;
   return adapter.kind === 'routing-session'
     && adapter.acceptsCommittedGeometry === true
     && adapter.session === readDisplayRoutingRenderSessionContract(adapter.authority)
-    && displayRoutingRenderAuthorityAllowsEdge(adapter.authority, edgeId, computedPath);
+    && displayRoutingRenderAuthorityAllowsEdge(adapter.authority, claim);
 };

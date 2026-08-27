@@ -1,6 +1,7 @@
 import {
   EDGE_ROUTING_CACHE_VERSION,
   EDGE_ROUTING_VISUAL_VERSION,
+  EDGE_ROUTING_WORKER_PROTOCOL_VERSION,
 } from './routingVersion';
 import { ROUTING_IDENTIFIER_MAX_LENGTH } from './routingBoundaryLimits';
 import {
@@ -11,39 +12,62 @@ import {
   type RoutingIdentity,
   type RoutingWorkerSessionRef,
 } from './routingSessionIdentity';
+import {
+  cloneRoutingHardReport,
+  computeDisplayRoutingHardReportDigest,
+  type RoutingHardReport,
+} from './routingHardReport';
 
 const MAX_AUTHORIZED_EDGE_IDS = 300;
 const INPUT_SIGNATURE_PATTERN = /^\d{1,10}$/;
 const GEOMETRY_DIGEST_PATTERN = /^geometry-v1:[0-9a-f]{32}$/;
 const OUTPUT_SIGNATURE_PATTERN = /^route-v2:\d{1,3}:\d{1,6}:[0-9a-f]{16}$/;
-const HARD_REPORT_DIGEST_PATTERN = /^hard-report-v1:[0-9a-f]{16}$/;
 
 export type DisplayRoutingRenderAuthority = Readonly<{
+  protocolVersion: typeof EDGE_ROUTING_WORKER_PROTOCOL_VERSION;
   routingVersion: typeof EDGE_ROUTING_CACHE_VERSION;
   visualVersion: typeof EDGE_ROUTING_VISUAL_VERSION;
   inputSignature: string;
   inputGeometryDigest: string;
   outputRouteSignature: string;
   hardReportDigest: string;
+  hardReport: RoutingHardReport;
   authorizedEdgeIds: ReadonlySet<string>;
   session: DisplayRoutingRenderSessionContract;
 }>;
 
 export type DisplayRoutingRenderSessionContract = Readonly<{
   schema: 'vizly-routing-session-render-v1';
+  protocolVersion: typeof EDGE_ROUTING_WORKER_PROTOCOL_VERSION;
   identity: RoutingIdentity;
   outputRouteSignature: string;
   hardReportDigest: string;
-  workerSessionRef?: RoutingWorkerSessionRef;
+  hardReport: RoutingHardReport;
+  workerSessionRef: RoutingWorkerSessionRef;
 }>;
 
 export type DisplayRoutingAuthorizedEdgeGeometry = Readonly<{
   edgeId: string;
+  source: string;
+  target: string;
+  sourceHandle: string | null;
+  targetHandle: string | null;
+  rendererType: string | null;
   computedPath: object;
 }>;
 
+export type DisplayRoutingRenderEdgeClaim = Readonly<{
+  edgeId: unknown;
+  source: unknown;
+  target: unknown;
+  sourceHandle: unknown;
+  targetHandle: unknown;
+  rendererType: unknown;
+  computedPath: unknown;
+}>;
+
 const issuedAuthorities = new WeakMap<object, Readonly<{
-  authorizedEdgeGeometry: ReadonlyMap<string, object>;
+  authorizedEdgeGeometry: ReadonlyMap<string, DisplayRoutingAuthorizedEdgeGeometry>;
   session: DisplayRoutingRenderSessionContract;
 }>>();
 
@@ -51,6 +75,9 @@ const isBoundedEdgeId = (value: unknown): value is string => (
   typeof value === 'string'
   && value.length > 0
   && value.length <= ROUTING_IDENTIFIER_MAX_LENGTH
+);
+const isBoundedOptionalToken = (value: unknown): value is string | null => (
+  value === null || isBoundedEdgeId(value)
 );
 
 /**
@@ -62,56 +89,66 @@ export const createDisplayRoutingRenderAuthority = ({
   inputSignature,
   inputGeometryDigest,
   outputRouteSignature,
-  hardReportDigest,
+  hardReport,
   authorizedEdges,
   workerSessionRef,
 }: {
   inputSignature: string;
   inputGeometryDigest: string;
   outputRouteSignature: string;
-  hardReportDigest: string;
+  hardReport: RoutingHardReport;
   authorizedEdges: Iterable<DisplayRoutingAuthorizedEdgeGeometry>;
-  workerSessionRef?: RoutingWorkerSessionRef;
+  workerSessionRef: RoutingWorkerSessionRef;
 }): DisplayRoutingRenderAuthority | null => {
   if (
     !INPUT_SIGNATURE_PATTERN.test(inputSignature)
     || !GEOMETRY_DIGEST_PATTERN.test(inputGeometryDigest)
     || !OUTPUT_SIGNATURE_PATTERN.test(outputRouteSignature)
-    || !HARD_REPORT_DIGEST_PATTERN.test(hardReportDigest)
   ) return null;
+  const safeHardReport = cloneRoutingHardReport(hardReport);
+  if (!safeHardReport || !safeHardReport.hardClean) return null;
+  const hardReportDigest = computeDisplayRoutingHardReportDigest(safeHardReport);
   const identity = createDisplayRoutingIdentity(inputSignature, inputGeometryDigest);
-  const safeWorkerSessionRef = typeof workerSessionRef === 'undefined'
-    ? undefined
-    : isDisplayRoutingWorkerSessionRef(workerSessionRef)
-      && displayRoutingIdentitiesMatch(workerSessionRef.identity, identity)
-      && workerSessionRef.outputRouteSignature === outputRouteSignature
-      ? workerSessionRef
-      : null;
-  if (safeWorkerSessionRef === null) return null;
-  const edgeGeometry = new Map<string, object>();
-  for (const { edgeId, computedPath } of authorizedEdges) {
-    if (!isBoundedEdgeId(edgeId)) return null;
+  const safeWorkerSessionRef = isDisplayRoutingWorkerSessionRef(workerSessionRef)
+    && displayRoutingIdentitiesMatch(workerSessionRef.identity, identity)
+    && workerSessionRef.outputRouteSignature === outputRouteSignature
+    ? workerSessionRef
+    : null;
+  if (!safeWorkerSessionRef) return null;
+  const edgeGeometry = new Map<string, DisplayRoutingAuthorizedEdgeGeometry>();
+  for (const edge of authorizedEdges) {
+    const { edgeId, source, target, sourceHandle, targetHandle, rendererType, computedPath } = edge;
+    if (
+      !isBoundedEdgeId(edgeId)
+      || !isBoundedEdgeId(source)
+      || !isBoundedEdgeId(target)
+      || !isBoundedOptionalToken(sourceHandle)
+      || !isBoundedOptionalToken(targetHandle)
+      || !isBoundedOptionalToken(rendererType)
+    ) return null;
     if (!Array.isArray(computedPath) || computedPath.length < 2) return null;
-    edgeGeometry.set(edgeId, computedPath);
+    edgeGeometry.set(edgeId, Object.freeze({ ...edge }));
     if (edgeGeometry.size > MAX_AUTHORIZED_EDGE_IDS) return null;
   }
   if (edgeGeometry.size === 0) return null;
   const session: DisplayRoutingRenderSessionContract = Object.freeze({
     schema: 'vizly-routing-session-render-v1',
+    protocolVersion: EDGE_ROUTING_WORKER_PROTOCOL_VERSION,
     identity,
     outputRouteSignature,
     hardReportDigest,
-    ...(safeWorkerSessionRef
-      ? { workerSessionRef: cloneDisplayRoutingWorkerSessionRef(safeWorkerSessionRef) }
-      : {}),
+    hardReport: safeHardReport,
+    workerSessionRef: cloneDisplayRoutingWorkerSessionRef(safeWorkerSessionRef),
   });
   const authority: DisplayRoutingRenderAuthority = Object.freeze({
+    protocolVersion: EDGE_ROUTING_WORKER_PROTOCOL_VERSION,
     routingVersion: EDGE_ROUTING_CACHE_VERSION,
     visualVersion: EDGE_ROUTING_VISUAL_VERSION,
     inputSignature,
     inputGeometryDigest,
     outputRouteSignature,
     hardReportDigest,
+    hardReport: safeHardReport,
     authorizedEdgeIds: new Set(edgeGeometry.keys()),
     session,
   });
@@ -132,13 +169,20 @@ export const readDisplayRoutingRenderSessionContract = (
 
 export const displayRoutingRenderAuthorityAllowsEdge = (
   authority: unknown,
-  edgeId: unknown,
-  computedPath: unknown,
-): boolean => (
-  Boolean(authority && typeof authority === 'object')
-  && isBoundedEdgeId(edgeId)
-  && typeof computedPath === 'object'
-  && computedPath !== null
-  && issuedAuthorities.get(authority as object)?.authorizedEdgeGeometry.get(edgeId)
-    === computedPath
-);
+  claim: DisplayRoutingRenderEdgeClaim,
+): boolean => {
+  if (!authority || typeof authority !== 'object' || !isBoundedEdgeId(claim.edgeId)) {
+    return false;
+  }
+  const expected = issuedAuthorities.get(authority)
+    ?.authorizedEdgeGeometry.get(claim.edgeId);
+  return Boolean(
+    expected
+    && expected.source === claim.source
+    && expected.target === claim.target
+    && expected.sourceHandle === claim.sourceHandle
+    && expected.targetHandle === claim.targetHandle
+    && expected.rendererType === claim.rendererType
+    && expected.computedPath === claim.computedPath
+  );
+};

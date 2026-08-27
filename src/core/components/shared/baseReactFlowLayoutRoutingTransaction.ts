@@ -216,6 +216,7 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
   smartEdgePadding,
   isLargeGraph,
   commitReceipt,
+  hardReport,
   hardReportDigest,
   workerSessionRef,
 }: {
@@ -226,14 +227,17 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
   smartEdgePadding: number;
   isLargeGraph: boolean;
   commitReceipt?: DisplayRoutingWorkerCommitReceipt;
+  hardReport?: RoutingCommittedSnapshot['hardReport'];
   hardReportDigest?: RoutingCommittedSnapshot['hardReportDigest'];
   workerSessionRef?: RoutingCommittedSnapshot['workerSessionRef'];
 }): boolean => {
   const hardReportIdentity = commitReceipt
     ? { hardReport: commitReceipt.hardReport }
-    : hardReportDigest
-      ? { hardReportDigest }
-      : null;
+    : hardReport
+      ? { hardReport }
+      : hardReportDigest
+        ? { hardReportDigest }
+        : null;
   if (!hardReportIdentity) return false;
   const outputRouteSignature = computeBaseReactFlowDisplayOutputRouteSignature(routedEdges);
   const displayPatches = createBaseReactFlowDisplayEdgePatches(routedEdges, routedEdges);
@@ -347,6 +351,7 @@ export const stageBaseReactFlowLayoutRouting = async ({
     ? lockFinalDisplayComputedPaths(cached.edges, projectedSource.nodes)
     : null;
   const cachedHardReportDigest = cached?.baseline.hardReportDigest;
+  const cachedHardReport = cached?.baseline.hardReport;
   const cachedWorkerSessionRef = cached?.baseline.workerSessionRef;
   if (cachedEdges && cachedHardReportDigest) {
     return {
@@ -358,6 +363,7 @@ export const stageBaseReactFlowLayoutRouting = async ({
         enableSmartEdges,
         smartEdgePadding,
         isLargeGraph,
+        hardReport: cachedHardReport,
         hardReportDigest: cachedHardReportDigest,
         workerSessionRef: cachedWorkerSessionRef,
       }),

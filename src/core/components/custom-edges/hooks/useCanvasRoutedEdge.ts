@@ -142,8 +142,15 @@ export const useCanvasRoutedEdge = (props: EdgeProps): SmartEdgeRoutingRenderMod
     props,
     smartEdgeRenderAdapterAcceptsCommittedGeometry(
       renderAdapter,
-      props.id,
-      (props.data as CanvasRoutedEdgeData | undefined)?.computedPath,
+      {
+        edgeId: props.id,
+        source: props.source,
+        target: props.target,
+        sourceHandle: props.sourceHandleId ?? null,
+        targetHandle: props.targetHandleId ?? null,
+        rendererType: 'advanced-smart-step',
+        computedPath: (props.data as CanvasRoutedEdgeData | undefined)?.computedPath,
+      },
     ),
   );
   const data = (props.data ?? {}) as CanvasRoutedEdgeData;

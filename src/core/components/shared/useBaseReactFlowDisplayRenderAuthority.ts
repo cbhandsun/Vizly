@@ -7,9 +7,46 @@ import {
   type DisplayRoutingRenderAuthority,
 } from '../../routing/displayRoutingRenderAuthority';
 import { computeBaseReactFlowDisplayOutputRouteSignature } from './baseReactFlowDisplayEdgeCore';
-import type {
-  BaseReactFlowDisplayCommittedSnapshotBaseline,
+import {
+  isBaseReactFlowDisplayCommittedSnapshotBaselineTrusted,
+  type BaseReactFlowDisplayCommittedSnapshotBaseline,
 } from './baseReactFlowDisplayCommittedSnapshot';
+
+export const createBaseReactFlowCommittedRenderAuthority = (
+  baseline: BaseReactFlowDisplayCommittedSnapshotBaseline,
+  edges: readonly Edge[],
+): DisplayRoutingRenderAuthority | null => {
+  if (
+    !isBaseReactFlowDisplayCommittedSnapshotBaselineTrusted(baseline)
+    || !baseline.workerSessionRef
+    || !baseline.hardReport
+    || computeBaseReactFlowDisplayOutputRouteSignature([...edges])
+      !== baseline.outputRouteSignature
+  ) return null;
+  return createDisplayRoutingRenderAuthority({
+    inputSignature: baseline.identity.inputSignature,
+    inputGeometryDigest: baseline.identity.inputGeometryDigest,
+    outputRouteSignature: baseline.outputRouteSignature,
+    hardReport: baseline.hardReport,
+    authorizedEdges: edges.flatMap((edge) => {
+      const data = edge.data && typeof edge.data === 'object'
+        ? edge.data as Record<string, unknown>
+        : null;
+      return Array.isArray(data?.computedPath) && data.computedPath.length >= 2
+        ? [{
+          edgeId: edge.id,
+          source: edge.source,
+          target: edge.target,
+          sourceHandle: edge.sourceHandle ?? null,
+          targetHandle: edge.targetHandle ?? null,
+          rendererType: edge.type ?? null,
+          computedPath: data.computedPath,
+        }]
+        : [];
+    }),
+    workerSessionRef: baseline.workerSessionRef,
+  });
+};
 
 export const useBaseReactFlowCommittedRenderAuthority = (): Readonly<{
   committedRenderAuthority: DisplayRoutingRenderAuthority | null;
@@ -25,21 +62,7 @@ export const useBaseReactFlowCommittedRenderAuthority = (): Readonly<{
     baseline: BaseReactFlowDisplayCommittedSnapshotBaseline,
     edges: readonly Edge[],
   ): void => {
-    setCommittedRenderAuthority(createDisplayRoutingRenderAuthority({
-      inputSignature: baseline.identity.inputSignature,
-      inputGeometryDigest: baseline.identity.inputGeometryDigest,
-      outputRouteSignature: baseline.outputRouteSignature,
-      hardReportDigest: baseline.hardReportDigest,
-      authorizedEdges: edges.flatMap((edge) => {
-        const data = edge.data && typeof edge.data === 'object'
-          ? edge.data as Record<string, unknown>
-          : null;
-        return Array.isArray(data?.computedPath) && data.computedPath.length >= 2
-          ? [{ edgeId: edge.id, computedPath: data.computedPath }]
-          : [];
-      }),
-      workerSessionRef: baseline.workerSessionRef,
-    }));
+    setCommittedRenderAuthority(createBaseReactFlowCommittedRenderAuthority(baseline, edges));
   }, []);
   return { committedRenderAuthority, rememberCommittedRenderAuthority };
 };
@@ -68,8 +91,15 @@ export const useBaseReactFlowActiveRenderAuthority = ({
       return !Array.isArray(data?.computedPath)
         || displayRoutingRenderAuthorityAllowsEdge(
           committedRenderAuthority,
-          edge.id,
-          data.computedPath,
+          {
+            edgeId: edge.id,
+            source: edge.source,
+            target: edge.target,
+            sourceHandle: edge.sourceHandle ?? null,
+            targetHandle: edge.targetHandle ?? null,
+            rendererType: edge.type ?? null,
+            computedPath: data.computedPath,
+          },
         );
     })
   ) return null;

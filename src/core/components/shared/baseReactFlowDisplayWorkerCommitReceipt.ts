@@ -10,9 +10,11 @@ import {
 } from '../../routing/routingSessionIdentity';
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
 import {
+  cloneRoutingHardReport,
   computeDisplayRoutingHardReportDigest,
   isDisplayRoutingHardReportDigest,
   type DisplayRoutingHardReportDigest,
+  type RoutingHardReport,
 } from './baseReactFlowDisplayHardReportDigest';
 import { isDisplayWorkerBoundedCandidateReport } from './baseReactFlowDisplayWorkerQualityProtocol';
 
@@ -23,7 +25,7 @@ export type DisplayRoutingWorkerCommitReceipt = Readonly<{
   protocolVersion: typeof EDGE_ROUTING_WORKER_PROTOCOL_VERSION;
   identity: RoutingIdentity;
   outputRouteSignature: string;
-  hardReport: BaseDisplayBoundedCandidateReport;
+  hardReport: RoutingHardReport;
   hardReportDigest: DisplayRoutingHardReportDigest;
   sessionRef: RoutingWorkerSessionRef;
 }>;
@@ -31,32 +33,6 @@ export type DisplayRoutingWorkerCommitReceipt = Readonly<{
 const isRecord = (value: unknown): value is Record<string, unknown> => (
   value !== null && typeof value === 'object' && !Array.isArray(value)
 );
-
-const copyDisplayRoutingHardReport = (
-  report: BaseDisplayBoundedCandidateReport,
-): BaseDisplayBoundedCandidateReport => {
-  const clearanceEdgeIds = report.minimumClearanceViolationEdgeIds
-    ? [...report.minimumClearanceViolationEdgeIds]
-    : undefined;
-  if (clearanceEdgeIds) Object.freeze(clearanceEdgeIds);
-  return Object.freeze({
-    candidate: report.candidate,
-    hardClean: report.hardClean,
-    obstacleHits: report.obstacleHits,
-    terminalsAttached: report.terminalsAttached,
-    terminalsAnchored: report.terminalsAnchored,
-    quality: Object.freeze({ ...report.quality }),
-    ...(typeof report.minimumClearanceViolations === 'number'
-      ? { minimumClearanceViolations: report.minimumClearanceViolations }
-      : {}),
-    ...(clearanceEdgeIds
-      ? { minimumClearanceViolationEdgeIds: clearanceEdgeIds }
-      : {}),
-    ...(typeof report.commercialClearanceViolations === 'number'
-      ? { commercialClearanceViolations: report.commercialClearanceViolations }
-      : {}),
-  });
-};
 
 export const createDisplayRoutingWorkerCommitReceipt = ({
   identity,
@@ -82,7 +58,8 @@ export const createDisplayRoutingWorkerCommitReceipt = ({
     identity.inputSignature,
     identity.inputGeometryDigest,
   );
-  const safeHardReport = copyDisplayRoutingHardReport(hardReport);
+  const safeHardReport = cloneRoutingHardReport(hardReport);
+  if (!safeHardReport) return null;
   return Object.freeze({
     schema: 'vizly-routing-session-commit-v1',
     protocolVersion: EDGE_ROUTING_WORKER_PROTOCOL_VERSION,

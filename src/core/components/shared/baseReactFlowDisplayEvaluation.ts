@@ -60,7 +60,7 @@ export type BaseDisplayBoundedCandidateReport = {
   quality: EdgePathQualityScore;
   /** Visual-risk diagnostics for unrelated business-node clearance below 16px. */
   minimumClearanceViolations?: number;
-  minimumClearanceViolationEdgeIds?: string[];
+  minimumClearanceViolationEdgeIds?: readonly string[];
   /** Final-only commercial contract; internal candidate gates continue to use 16px. */
   commercialClearanceViolations?: number;
 };

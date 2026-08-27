@@ -4,6 +4,7 @@ import {
   compareArchitectureBoundaryBaseline,
   findForbiddenArchitectureEdges,
   findForbiddenPublicApiImports,
+  findRestrictedNamedImportViolations,
   findRuntimeImportCycles,
   resolveProjectImport,
 } from './architecture-boundaries.mjs';
@@ -122,6 +123,29 @@ describe('architecture boundaries', () => {
     })).toEqual([
       'src/core/components/diagrams/FlowchartDesigner.tsx',
       'src/core/plugins/FlowchartPlugin.tsx',
+    ]);
+  });
+
+  it('restricts commit-capability imports to their declared production owner', () => {
+    expect(findRestrictedNamedImportViolations({
+      imports: [{
+        fromFile: 'src/core/components/custom-edges/Standalone.tsx',
+        targetFile: 'src/core/routing/displayRoutingRenderAuthority.ts',
+        names: ['createDisplayRoutingRenderAuthority', 'readDisplayRoutingRenderSessionContract'],
+      }, {
+        fromFile: 'src/core/components/shared/useBaseReactFlowDisplayRenderAuthority.ts',
+        targetFile: 'src/core/routing/displayRoutingRenderAuthority.ts',
+        names: ['createDisplayRoutingRenderAuthority'],
+      }],
+      policies: [{
+        targetFile: 'src/core/routing/displayRoutingRenderAuthority.ts',
+        restrictedNames: ['createDisplayRoutingRenderAuthority'],
+        allowedImporters: [
+          'src/core/components/shared/useBaseReactFlowDisplayRenderAuthority.ts',
+        ],
+      }],
+    })).toEqual([
+      'src/core/components/custom-edges/Standalone.tsx -> src/core/routing/displayRoutingRenderAuthority.ts [createDisplayRoutingRenderAuthority]',
     ]);
   });
 });

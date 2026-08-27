@@ -10,9 +10,11 @@ import { isDisplayRoutingCapabilityEnabled } from '../../routing/displayRoutingC
 import type { RoutingPatch } from '../../routing/routingPatch';
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
 import {
+  cloneRoutingHardReport,
   computeDisplayRoutingHardReportDigest,
   isDisplayRoutingHardReportDigest,
   type DisplayRoutingHardReportDigest,
+  type RoutingHardReport,
 } from './baseReactFlowDisplayHardReportDigest';
 
 import {
@@ -51,6 +53,7 @@ export type RoutingCommittedSnapshot = Readonly<{
   routingPatches: RoutingPatch[];
   outputRouteSignature: string;
   hardReportDigest: DisplayRoutingHardReportDigest;
+  hardReport?: RoutingHardReport;
   workerSessionRef?: RoutingWorkerSessionRef;
 }>;
 
@@ -110,6 +113,7 @@ const committedDisplaySnapshots =
   new Map<string, BaseReactFlowDisplayCommittedSnapshotBaseline>();
 let committedSnapshotBySourceEdges =
   new WeakMap<Edge[], BaseReactFlowDisplayCommittedSnapshotBaseline>();
+let trustedCommittedSnapshotBaselines = new WeakSet<object>();
 const stagedLayoutSnapshotHandoffs = new Map<string, number>();
 const STAGED_LAYOUT_HANDOFF_TTL_MS = 10_000;
 
@@ -180,6 +184,8 @@ const createCommittedSnapshot = ({
       ? hardReportDigest
       : null;
   if (!safeHardReportDigest) return null;
+  const safeHardReport = hardReport ? cloneRoutingHardReport(hardReport) : null;
+  if (hardReport && !safeHardReport) return null;
   const safeWorkerSessionRef = isDisplayRoutingWorkerSessionRef(workerSessionRef)
     && displayRoutingIdentitiesMatch(workerSessionRef.identity, expectedIdentity)
     && workerSessionRef.outputRouteSignature === outputRouteSignature
@@ -193,6 +199,7 @@ const createCommittedSnapshot = ({
     },
     routingPatches: safePatches,
     hardReportDigest: safeHardReportDigest,
+    ...(safeHardReport ? { hardReport: safeHardReport } : {}),
     inputSignature,
     inputGeometryDigest,
     nodes: projectedInput.nodes,
@@ -241,34 +248,45 @@ export const readBaseReactFlowDisplayCommittedSnapshot = ({
     nodes: snapshot.nodes,
   });
   committedSnapshotBySourceEdges.set(sourceEdges, snapshot);
+  const baseline: BaseReactFlowDisplayCommittedSnapshotBaseline = {
+    identity: snapshot.identity,
+    projectedSourceGeometry: {
+      nodes: baselineInput.nodes,
+      edges: baselineInput.edges,
+    },
+    routingPatches: sanitizeBaseReactFlowTrustedDisplayPatches(
+      snapshot.sourceEdges,
+      snapshot.displayPatches,
+    ) ?? [],
+    hardReportDigest: snapshot.hardReportDigest,
+    ...(snapshot.hardReport ? { hardReport: snapshot.hardReport } : {}),
+    inputSignature: snapshot.inputSignature,
+    inputGeometryDigest: snapshot.inputGeometryDigest,
+    nodes: baselineInput.nodes,
+    sourceEdges: baselineInput.edges,
+    displayPatches: sanitizeBaseReactFlowTrustedDisplayPatches(
+      snapshot.sourceEdges,
+      snapshot.displayPatches,
+    ) ?? [],
+    outputRouteSignature: snapshot.outputRouteSignature,
+    ...(snapshot.workerSessionRef ? { workerSessionRef: snapshot.workerSessionRef } : {}),
+  };
+  trustedCommittedSnapshotBaselines.add(baseline);
   return {
     edges,
     outputRouteSignature: snapshot.outputRouteSignature,
     trustedTransactionHandoff,
-    baseline: {
-      identity: snapshot.identity,
-      projectedSourceGeometry: {
-        nodes: baselineInput.nodes,
-        edges: baselineInput.edges,
-      },
-      routingPatches: sanitizeBaseReactFlowTrustedDisplayPatches(
-        snapshot.sourceEdges,
-        snapshot.displayPatches,
-      ) ?? [],
-      hardReportDigest: snapshot.hardReportDigest,
-      inputSignature: snapshot.inputSignature,
-      inputGeometryDigest: snapshot.inputGeometryDigest,
-      nodes: baselineInput.nodes,
-      sourceEdges: baselineInput.edges,
-      displayPatches: sanitizeBaseReactFlowTrustedDisplayPatches(
-        snapshot.sourceEdges,
-        snapshot.displayPatches,
-      ) ?? [],
-      outputRouteSignature: snapshot.outputRouteSignature,
-      ...(snapshot.workerSessionRef ? { workerSessionRef: snapshot.workerSessionRef } : {}),
-    },
+    baseline,
   };
 };
+
+/** Realm-local proof that a baseline came from the committed snapshot store. */
+export const isBaseReactFlowDisplayCommittedSnapshotBaselineTrusted = (
+  value: unknown,
+): value is BaseReactFlowDisplayCommittedSnapshotBaseline => (
+  Boolean(value && typeof value === 'object')
+  && trustedCommittedSnapshotBaselines.has(value as object)
+);
 
 /** Marks only the exact edge array produced by an active staged layout transaction. */
 export const markBaseReactFlowStagedLayoutSnapshotHandoff = (
@@ -311,6 +329,7 @@ export const commitBaseReactFlowDisplaySnapshot = (options: {
     snapshotKey(options.inputSignature, options.inputGeometryDigest),
     snapshot,
   );
+  trustedCommittedSnapshotBaselines.add(snapshot);
   committedSnapshotBySourceEdges.set(options.sourceEdges, snapshot);
   if (options.precompiledCapturePresetId) {
     publishBaseReactFlowPrecompiledCommittedRoute({
@@ -328,6 +347,7 @@ export const commitBaseReactFlowDisplaySnapshot = (options: {
 export const clearBaseReactFlowDisplayCommittedSnapshots = (): void => {
   committedDisplaySnapshots.clear();
   committedSnapshotBySourceEdges = new WeakMap<Edge[], BaseReactFlowDisplayCommittedSnapshotBaseline>();
+  trustedCommittedSnapshotBaselines = new WeakSet<object>();
   stagedLayoutSnapshotHandoffs.clear();
 };
 

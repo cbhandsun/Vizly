@@ -4,9 +4,10 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import {
-  createDisplayRoutingRenderAuthority,
   type DisplayRoutingRenderAuthority,
 } from '../../../routing/displayRoutingRenderAuthority';
+import { createTestDisplayRoutingRenderAuthority } from '../../../routing/__tests__/displayRoutingRenderAuthorityTestFixture';
+import { EDGE_ROUTING_WORKER_PROTOCOL_VERSION } from '../../../routing/routingVersion';
 import { RoutingSessionEdgeRenderProvider } from '../RoutingSessionEdgeRenderProvider';
 import {
   smartEdgeRenderAdapterAcceptsCommittedGeometry,
@@ -14,11 +15,16 @@ import {
 } from '../smartEdgeRoutingRenderAdapter';
 
 const computedPath = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
-const authority = createDisplayRoutingRenderAuthority({
-  inputSignature: '1234',
-  inputGeometryDigest: `geometry-v1:${'a'.repeat(32)}`,
-  outputRouteSignature: 'route-v2:1:2:0123456789abcdef',
-  hardReportDigest: 'hard-report-v1:0123456789abcdef',
+const claim = {
+  edgeId: 'edge-a',
+  source: 'source',
+  target: 'target',
+  sourceHandle: null,
+  targetHandle: null,
+  rendererType: 'stablePath',
+  computedPath,
+};
+const authority = createTestDisplayRoutingRenderAuthority({
   authorizedEdges: [{ edgeId: 'edge-a', computedPath }],
 });
 if (!authority) throw new Error('expected valid routing render authority');
@@ -26,11 +32,14 @@ if (!authority) throw new Error('expected valid routing render authority');
 const Probe = () => {
   const adapter = useSmartEdgeRoutingRenderAdapter();
   return (
-    <output data-testid="adapter">
+    <output
+      data-testid="adapter"
+      data-protocol-version={adapter.session?.protocolVersion}
+      data-hard-clean={String(adapter.session?.hardReport.hardClean ?? false)}
+    >
       {adapter.kind}:{String(smartEdgeRenderAdapterAcceptsCommittedGeometry(
         adapter,
-        'edge-a',
-        computedPath,
+        claim,
       ))}
     </output>
   );
@@ -45,6 +54,10 @@ describe('RoutingSessionEdgeRenderProvider', () => {
     );
 
     expect(screen.getByTestId('adapter').textContent).toBe('routing-session:true');
+    expect(screen.getByTestId('adapter').getAttribute('data-protocol-version')).toBe(
+      String(EDGE_ROUTING_WORKER_PROTOCOL_VERSION),
+    );
+    expect(screen.getByTestId('adapter').getAttribute('data-hard-clean')).toBe('true');
   });
 
   it.each([

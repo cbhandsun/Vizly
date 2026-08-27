@@ -7,6 +7,7 @@ import {
   compareArchitectureBoundaryBaseline,
   findForbiddenArchitectureEdges,
   findForbiddenPublicApiImports,
+  findRestrictedNamedImportViolations,
   findRuntimeImportCycles,
   normalizeArchitecturePath,
   resolveProjectImport,
@@ -29,6 +30,10 @@ const policies = [{
   fromPrefix: 'src/core/components/custom-edges/',
   forbiddenTargetPrefixes: [
     'src/core/workers/',
+    'src/core/components/shared/baseReactFlowDisplayCommittedSnapshot',
+    'src/core/components/shared/baseReactFlowDisplayWorker',
+    'src/core/components/shared/baseReactFlowRoutingSessionRuntime',
+    'src/core/services/EdgeRoutingCoordinator',
   ],
 }, {
   fromPrefix: 'src/core/algorithms/',
@@ -105,6 +110,7 @@ const sourceFiles = new Set([...new Set([
 
 const fileImports = new Map();
 const runtimeImportGraph = new Map();
+const runtimeNamedImports = [];
 const isTestFile = (file) => file.includes('/__tests__/') || /\.(?:test|spec)\.[^/]+$/i.test(file);
 const hasOnlyTypeNamedBindings = (bindings) => (
   ts.isNamedImports(bindings)
@@ -127,6 +133,7 @@ for (const file of sourceFiles) {
   for (const statement of sourceFile.statements) {
     let specifier = null;
     let typeOnly = false;
+    let namedImports = [];
 
     if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) {
       specifier = statement.moduleSpecifier.text;
@@ -137,6 +144,11 @@ for (const file of sourceFiles) {
         && clause.namedBindings
         && hasOnlyTypeNamedBindings(clause.namedBindings)
       ));
+      if (clause?.namedBindings && ts.isNamedImports(clause.namedBindings)) {
+        namedImports = clause.namedBindings.elements
+          .filter(element => !element.isTypeOnly)
+          .map(element => (element.propertyName ?? element.name).text);
+      }
     } else if (ts.isExportDeclaration(statement)
       && statement.moduleSpecifier
       && ts.isStringLiteral(statement.moduleSpecifier)) {
@@ -147,11 +159,21 @@ for (const file of sourceFiles) {
         && statement.exportClause.elements.length > 0
         && statement.exportClause.elements.every((element) => element.isTypeOnly)
       ));
+      if (statement.exportClause && ts.isNamedExports(statement.exportClause)) {
+        namedImports = statement.exportClause.elements
+          .filter(element => !element.isTypeOnly)
+          .map(element => (element.propertyName ?? element.name).text);
+      }
     }
 
     if (!specifier || typeOnly) continue;
     const targetFile = resolveProjectImport({ fromFile: file, specifier, sourceFiles });
-    if (targetFile) runtimeImports.add(targetFile);
+    if (targetFile) {
+      runtimeImports.add(targetFile);
+      if (namedImports.length > 0) {
+        runtimeNamedImports.push({ fromFile: file, targetFile, names: namedImports });
+      }
+    }
   }
 
   runtimeImportGraph.set(file, [...runtimeImports]);
@@ -174,6 +196,16 @@ const publicApiViolations = findForbiddenPublicApiImports({
   entryFile: 'src/core/index.ts',
   forbiddenTargetPrefixes: ['src/core/components/', 'src/core/plugins/'],
   allowedTargets: ['src/core/plugins/builtInPlugins.ts'],
+});
+const restrictedNamedImportViolations = findRestrictedNamedImportViolations({
+  imports: runtimeNamedImports,
+  policies: [{
+    targetFile: 'src/core/routing/displayRoutingRenderAuthority.ts',
+    restrictedNames: ['createDisplayRoutingRenderAuthority'],
+    allowedImporters: [
+      'src/core/components/shared/useBaseReactFlowDisplayRenderAuthority.ts',
+    ],
+  }],
 });
 
 if (comparison.additions.length > 0 || comparison.removals.length > 0) {
@@ -201,6 +233,12 @@ if (runtimeCycles.length > 0) {
 if (publicApiViolations.length > 0) {
   console.error('The core public entry point must not eagerly import UI or individual plugins:');
   publicApiViolations.forEach((file) => console.error(`  - src/core/index.ts -> ${file}`));
+  process.exit(1);
+}
+
+if (restrictedNamedImportViolations.length > 0) {
+  console.error('Restricted routing commit capabilities have unauthorized importers:');
+  restrictedNamedImportViolations.forEach(violation => console.error(`  - ${violation}`));
   process.exit(1);
 }
 

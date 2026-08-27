@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import {
-  createDisplayRoutingRenderAuthority,
-  readDisplayRoutingRenderSessionContract,
-} from '../../../routing/displayRoutingRenderAuthority';
+import { readDisplayRoutingRenderSessionContract } from '../../../routing/displayRoutingRenderAuthority';
+import { createTestDisplayRoutingRenderAuthority } from '../../../routing/__tests__/displayRoutingRenderAuthorityTestFixture';
+import { EDGE_ROUTING_WORKER_PROTOCOL_VERSION } from '../../../routing/routingVersion';
 
 import {
   createRoutingSessionEdgeRenderAdapter,
@@ -11,12 +10,17 @@ import {
 } from '../smartEdgeRoutingRenderAdapter';
 
 const computedPath = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
+const claim = {
+  edgeId: 'edge-a',
+  source: 'source',
+  target: 'target',
+  sourceHandle: null,
+  targetHandle: null,
+  rendererType: 'stablePath',
+  computedPath,
+};
 
-const authority = createDisplayRoutingRenderAuthority({
-  inputSignature: '1234',
-  inputGeometryDigest: `geometry-v1:${'a'.repeat(32)}`,
-  outputRouteSignature: 'route-v2:1:2:0123456789abcdef',
-  hardReportDigest: 'hard-report-v1:0123456789abcdef',
+const authority = createTestDisplayRoutingRenderAuthority({
   authorizedEdges: [{ edgeId: 'edge-a', computedPath }],
 });
 if (!authority) throw new Error('expected valid routing render authority');
@@ -26,26 +30,32 @@ describe('smart edge routing render authority', () => {
   it('accepts only the current hard-gated Routing Session adapter', () => {
     expect(routingAdapter.kind).toBe('routing-session');
     expect(routingAdapter.session).toBe(readDisplayRoutingRenderSessionContract(authority));
+    expect(routingAdapter.session?.protocolVersion).toBe(EDGE_ROUTING_WORKER_PROTOCOL_VERSION);
+    expect(routingAdapter.session?.hardReport.hardClean).toBe(true);
     expect(STANDALONE_EDGE_RENDER_ADAPTER.session).toBeNull();
     expect(smartEdgeRenderAdapterAcceptsCommittedGeometry(
       routingAdapter,
-      'edge-a',
-      computedPath,
+      claim,
     )).toBe(true);
     expect(smartEdgeRenderAdapterAcceptsCommittedGeometry(
       STANDALONE_EDGE_RENDER_ADAPTER,
-      'edge-a',
-      computedPath,
+      claim,
     )).toBe(false);
     expect(smartEdgeRenderAdapterAcceptsCommittedGeometry(
       routingAdapter,
-      'edge-a',
-      [...computedPath],
+      { ...claim, computedPath: [...computedPath] },
     )).toBe(false);
     expect(smartEdgeRenderAdapterAcceptsCommittedGeometry(
       routingAdapter,
-      'edge-b',
-      computedPath,
+      { ...claim, edgeId: 'edge-b' },
+    )).toBe(false);
+    expect(smartEdgeRenderAdapterAcceptsCommittedGeometry(
+      routingAdapter,
+      { ...claim, targetHandle: 'right' },
+    )).toBe(false);
+    expect(smartEdgeRenderAdapterAcceptsCommittedGeometry(
+      routingAdapter,
+      { ...claim, rendererType: 'advanced-smart-step' },
     )).toBe(false);
   });
 
@@ -60,8 +70,7 @@ describe('smart edge routing render authority', () => {
   ])('fails closed for malformed, stale, or downgraded authority: %j', value => {
     expect(smartEdgeRenderAdapterAcceptsCommittedGeometry(
       value,
-      'edge-a',
-      computedPath,
+      claim,
     )).toBe(false);
   });
 });

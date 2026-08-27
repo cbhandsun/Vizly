@@ -61,6 +61,24 @@ export const compareArchitectureBoundaryBaseline = (actualEdges, baselineEdges) 
   };
 };
 
+export const findRestrictedNamedImportViolations = ({ imports, policies }) => {
+  const violations = new Set();
+  for (const entry of imports) {
+    for (const policy of policies) {
+      if (
+        entry.targetFile !== policy.targetFile
+        || policy.allowedImporters.includes(entry.fromFile)
+      ) continue;
+      for (const name of entry.names) {
+        if (policy.restrictedNames.includes(name)) {
+          violations.add(`${entry.fromFile} -> ${entry.targetFile} [${name}]`);
+        }
+      }
+    }
+  }
+  return [...violations].sort();
+};
+
 /** Finds strongly connected import groups in a directed module graph. */
 export const findRuntimeImportCycles = (importGraph) => {
   let nextIndex = 0;
