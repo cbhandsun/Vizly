@@ -11,7 +11,7 @@ describe('routing performance workflow', () => {
     expect(workflow).toContain("- cron: '0 9 * * 1'");
     expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).toContain('default: 30');
-    expect(occurrences('node scripts/resolve-routing-performance-sample-count.mjs')).toBe(2);
+    expect(occurrences('node scripts/resolve-routing-performance-sample-count.mjs')).toBe(3);
     expect(resolveRoutingPerformanceSampleCount({ eventName: 'push' })).toBe(5);
     expect(resolveRoutingPerformanceSampleCount({ eventName: 'schedule' })).toBe(30);
     expect(resolveRoutingPerformanceSampleCount({
@@ -29,20 +29,23 @@ describe('routing performance workflow', () => {
   );
 
   it('uses isolated production builds and the bounded benchmark entry points', () => {
-    expect(occurrences('npm run build')).toBe(2);
-    expect(occurrences("-WindowStyle Hidden -PassThru")).toBe(2);
-    expect(occurrences("'--strictPort'")).toBe(2);
+    expect(occurrences('npm run build')).toBe(3);
+    expect(occurrences("-WindowStyle Hidden -PassThru")).toBe(3);
+    expect(occurrences("'--strictPort'")).toBe(3);
     expect(workflow).toContain('DISPLAY_ROUTING_COLD_SAMPLE_COUNT');
     expect(workflow).toContain('npm run benchmark:display-routing-cold');
     expect(workflow).toContain('DISPLAY_ROUTING_SAMPLE_COUNT');
     expect(workflow).toContain('npm run benchmark:display-routing-browser');
+    expect(workflow).toContain('Run independent interaction-paint samples');
+    expect(workflow).toContain('npm run verify:display-routing-interaction');
   });
 
-  it('always stops its own preview process and retains both aggregate reports', () => {
-    expect(occurrences('Stop-Process -Id ([int]$env:ROUTING_PREVIEW_PID)')).toBe(2);
-    expect(occurrences('if: ${{ always() }}')).toBe(4);
+  it('always stops its own preview process and retains every isolated report', () => {
+    expect(occurrences('Stop-Process -Id ([int]$env:ROUTING_PREVIEW_PID)')).toBe(3);
+    expect(occurrences('if: ${{ always() }}')).toBe(6);
     expect(workflow).toContain('cold-routing.txt');
     expect(workflow).toContain('incremental-routing.txt');
-    expect(occurrences('retention-days: 30')).toBe(2);
+    expect(workflow).toContain('interaction-paint.txt');
+    expect(occurrences('retention-days: 30')).toBe(3);
   });
 });
