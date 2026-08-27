@@ -8,38 +8,38 @@ export type GeneratedBaseReactFlowPrecompiledRouteDescriptor = {
 };
 
 const generatedPrecompiledRouteAsset0 = new URL(
-  './precompiledRoutes/route-2137411381.json',
+  './precompiledRoutes/route-1417152958.json',
   import.meta.url,
 );
 
 const generatedPrecompiledRouteDescriptor0: GeneratedBaseReactFlowPrecompiledRouteDescriptor = {
   presetId: "wms-process-flow-v1",
   sourceHash: "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
-  geometryDigest: "geometry-v1:d9234b85d9949e25f100a349e440f8b1",
+  geometryDigest: "geometry-v1:6933a4d0ae9ed2a8b4f4b14092ba34c4",
   load: () => loadBaseReactFlowPrecompiledRouteAsset(generatedPrecompiledRouteAsset0),
 };
 
 const generatedPrecompiledRouteAsset1 = new URL(
-  './precompiledRoutes/route-4136477641.json',
+  './precompiledRoutes/route-1553610876.json',
   import.meta.url,
 );
 
 const generatedPrecompiledRouteDescriptor1: GeneratedBaseReactFlowPrecompiledRouteDescriptor = {
   presetId: "logistics-architecture-v1",
   sourceHash: "source-v1:da286fbefa1a0d0a3ba3bf5a6589d2edba849af0f477ddb910ecad4d91649986",
-  geometryDigest: "geometry-v1:ccc5671074d696dc3442f5eaf5f52010",
+  geometryDigest: "geometry-v1:0cb0f24303d795fb7a123befd3e20fc7",
   load: () => loadBaseReactFlowPrecompiledRouteAsset(generatedPrecompiledRouteAsset1),
 };
 
 const generatedPrecompiledRouteAsset2 = new URL(
-  './precompiledRoutes/route-492804593.json',
+  './precompiledRoutes/route-2113580664.json',
   import.meta.url,
 );
 
 const generatedPrecompiledRouteDescriptor2: GeneratedBaseReactFlowPrecompiledRouteDescriptor = {
   presetId: "wms-demand-allocation-strategy-v2",
   sourceHash: "source-v1:ea82c502ab6535b5c8f8367c591861e540396a41955a15c6b5f94f922264b7de",
-  geometryDigest: "geometry-v1:7a13cc646ccb02ac24b4c114becf6930",
+  geometryDigest: "geometry-v1:959447b9afedc5b100c74395ce889f05",
   load: () => loadBaseReactFlowPrecompiledRouteAsset(generatedPrecompiledRouteAsset2),
 };
 
@@ -48,9 +48,9 @@ export const GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_LOADERS: Record<
   string,
   GeneratedBaseReactFlowPrecompiledRouteDescriptor
 > = {
-  "2137411381": generatedPrecompiledRouteDescriptor0,
-  "4136477641": generatedPrecompiledRouteDescriptor1,
-  "492804593": generatedPrecompiledRouteDescriptor2,
+  "1417152958": generatedPrecompiledRouteDescriptor0,
+  "1553610876": generatedPrecompiledRouteDescriptor1,
+  "2113580664": generatedPrecompiledRouteDescriptor2,
 };
 
 /**
