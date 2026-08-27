@@ -1,0 +1,198 @@
+name: Routing performance
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/routing-performance.yml'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - 'src/core/components/custom-edges/**'
+      - 'src/core/components/shared/**'
+      - 'src/core/routing/**'
+      - 'src/core/strategies/shared/**'
+      - 'scripts/*display-routing*'
+      - 'scripts/lib/display-routing-*'
+      - 'scripts/lib/precompiled-display-route-*'
+  schedule:
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+    inputs:
+      sample_count:
+        description: Independent fresh-profile samples per benchmark
+        required: true
+        default: 30
+        type: number
+
+permissions:
+  contents: read
+
+concurrency:
+  group: routing-performance-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PRECOMPILED_ROUTE_BASE_URL: http://127.0.0.1:4174
+
+jobs:
+  cold-routing:
+    name: Cold routing samples
+    runs-on: windows-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.2
+          cache: npm
+
+      - name: Pin npm
+        run: npm install --global npm@12.0.1
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Resolve bounded sample count
+        shell: pwsh
+        env:
+          ROUTING_PERF_EVENT_NAME: ${{ github.event_name }}
+          ROUTING_PERF_REQUESTED_SAMPLE_COUNT: ${{ inputs.sample_count }}
+        run: |
+          $sampleCount = node scripts/resolve-routing-performance-sample-count.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "ROUTING_PERF_SAMPLE_COUNT=$sampleCount" >> $env:GITHUB_ENV
+
+      - name: Build production application
+        run: npm run build
+
+      - name: Start isolated production preview
+        shell: pwsh
+        run: |
+          $preview = Start-Process -FilePath 'npm.cmd' -ArgumentList @(
+            'run', 'preview', '--', '--host', '127.0.0.1', '--port', '4174', '--strictPort'
+          ) -WindowStyle Hidden -PassThru
+          "ROUTING_PREVIEW_PID=$($preview.Id)" >> $env:GITHUB_ENV
+          for ($attempt = 1; $attempt -le 60; $attempt += 1) {
+            if ($preview.HasExited) {
+              throw "Production preview exited with code $($preview.ExitCode)."
+            }
+            try {
+              Invoke-WebRequest -Uri $env:PRECOMPILED_ROUTE_BASE_URL -UseBasicParsing -TimeoutSec 2 | Out-Null
+              exit 0
+            } catch {
+              Start-Sleep -Seconds 1
+            }
+          }
+          throw 'Production preview did not become ready within 60 seconds.'
+
+      - name: Run independent cold-route samples
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path 'artifacts/routing-performance' | Out-Null
+          $env:DISPLAY_ROUTING_COLD_SAMPLE_COUNT = $env:ROUTING_PERF_SAMPLE_COUNT
+          npm run benchmark:display-routing-cold 2>&1 |
+            Tee-Object -FilePath 'artifacts/routing-performance/cold-routing.txt'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Stop production preview
+        if: ${{ always() }}
+        shell: pwsh
+        run: |
+          if ($env:ROUTING_PREVIEW_PID -match '^\d+$') {
+            Stop-Process -Id ([int]$env:ROUTING_PREVIEW_PID) -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Upload cold-route report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: routing-performance-cold-${{ github.run_attempt }}
+          path: artifacts/routing-performance/cold-routing.txt
+          if-no-files-found: error
+          retention-days: 30
+
+  incremental-routing:
+    name: Incremental routing samples
+    runs-on: windows-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.2
+          cache: npm
+
+      - name: Pin npm
+        run: npm install --global npm@12.0.1
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Resolve bounded sample count
+        shell: pwsh
+        env:
+          ROUTING_PERF_EVENT_NAME: ${{ github.event_name }}
+          ROUTING_PERF_REQUESTED_SAMPLE_COUNT: ${{ inputs.sample_count }}
+        run: |
+          $sampleCount = node scripts/resolve-routing-performance-sample-count.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "ROUTING_PERF_SAMPLE_COUNT=$sampleCount" >> $env:GITHUB_ENV
+
+      - name: Build production application
+        run: npm run build
+
+      - name: Start isolated production preview
+        shell: pwsh
+        run: |
+          $preview = Start-Process -FilePath 'npm.cmd' -ArgumentList @(
+            'run', 'preview', '--', '--host', '127.0.0.1', '--port', '4174', '--strictPort'
+          ) -WindowStyle Hidden -PassThru
+          "ROUTING_PREVIEW_PID=$($preview.Id)" >> $env:GITHUB_ENV
+          for ($attempt = 1; $attempt -le 60; $attempt += 1) {
+            if ($preview.HasExited) {
+              throw "Production preview exited with code $($preview.ExitCode)."
+            }
+            try {
+              Invoke-WebRequest -Uri $env:PRECOMPILED_ROUTE_BASE_URL -UseBasicParsing -TimeoutSec 2 | Out-Null
+              exit 0
+            } catch {
+              Start-Sleep -Seconds 1
+            }
+          }
+          throw 'Production preview did not become ready within 60 seconds.'
+
+      - name: Run independent incremental-route samples
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path 'artifacts/routing-performance' | Out-Null
+          $env:DISPLAY_ROUTING_SAMPLE_COUNT = $env:ROUTING_PERF_SAMPLE_COUNT
+          npm run benchmark:display-routing-browser 2>&1 |
+            Tee-Object -FilePath 'artifacts/routing-performance/incremental-routing.txt'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Stop production preview
+        if: ${{ always() }}
+        shell: pwsh
+        run: |
+          if ($env:ROUTING_PREVIEW_PID -match '^\d+$') {
+            Stop-Process -Id ([int]$env:ROUTING_PREVIEW_PID) -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Upload incremental-route report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: routing-performance-incremental-${{ github.run_attempt }}
+          path: artifacts/routing-performance/incremental-routing.txt
+          if-no-files-found: error
+          retention-days: 30
