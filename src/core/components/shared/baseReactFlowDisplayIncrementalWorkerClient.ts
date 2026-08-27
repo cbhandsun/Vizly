@@ -96,7 +96,7 @@ export const computeBaseReactFlowDisplayEdgesIncrementallyInWorker = async ({
       displayEdgeEpoch,
       qualityMode: 'full',
       inputIdentity: createDisplayRoutingIdentity(nextInputSignature, nextInputGeometryDigest),
-      ...(baselineSessionRef ? { baselineSessionRef } : {}),
+      ...(canUseWorkerSession && baselineSessionRef ? { baselineSessionRef } : {}),
       baselineInputSignature,
       baselineInputGeometryDigest,
       ...(!canUseWorkerSession ? {

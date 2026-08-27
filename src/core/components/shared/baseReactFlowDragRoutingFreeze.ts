@@ -5,6 +5,7 @@ import {
   computeBaseReactFlowDisplayInputIdentityBundle,
   type BaseReactFlowDisplayInputIdentityBundle,
 } from './baseReactFlowDisplayInputIdentity';
+import { projectBaseReactFlowDisplayWorkerInput } from './baseReactFlowDisplayWorkerProjection';
 
 /**
  * Avoids rebuilding full-graph routing identities while a node is moving.
@@ -57,11 +58,14 @@ export const resolveBaseReactFlowDragAwareInputIdentity = ({
     cacheSignature: 'node-drag-paused',
     geometryDigest: 'node-drag-paused',
   },
-  compute: () => computeBaseReactFlowDisplayInputIdentityBundle({
-    nodes,
-    edges,
-    enableSmartEdges,
-    smartEdgePadding,
-    isLargeGraph,
-  }),
+  compute: () => {
+    const projected = projectBaseReactFlowDisplayWorkerInput({ nodes, edges });
+    return computeBaseReactFlowDisplayInputIdentityBundle({
+      nodes: projected.nodes,
+      edges: projected.edges,
+      enableSmartEdges,
+      smartEdgePadding,
+      isLargeGraph,
+    });
+  },
 });

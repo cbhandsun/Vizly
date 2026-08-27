@@ -123,6 +123,24 @@ const readFinalRouteExpression = expectedRequestPrefix => `(() => {
   return { routing, request, response, renderedEdgeCount };
 })()`;
 
+const readLatestCompletedRouteExpression = `(() => {
+  const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
+  const requests = window.__vizlyRoutingRequests || [];
+  const responses = window.__vizlyRoutingResponses || [];
+  const response = [...responses].reverse().find(item => item?.hardClean === true);
+  const request = [...requests].reverse().find(item => item?.requestId === response?.requestId)
+    ?? requests.at(-1);
+  const currentEdges = window.reactFlowInstance?.getEdges?.() || [];
+  return routing.stage === 'final-applied' && request && response && currentEdges.length > 0
+    ? {
+      routing,
+      request,
+      response: { ...response, edges: Array.isArray(response.edges) ? response.edges : currentEdges },
+      renderedEdgeCount: document.querySelectorAll('.react-flow__edge').length,
+    }
+    : null;
+})()`;
+
 const auditFinalSvg = async (session, route, label) => {
   await delay(500);
   const audit = await session.evaluate(
@@ -403,6 +421,71 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
     mountedNodes: mounted.nodes,
     mountedEdges: mounted.edges,
   });
+  const layoutAudit = await auditFinalSvg(session, route, layoutCase.id);
+  let postLayoutMove = null;
+  if (layoutCase.id === 'domain-compound-elk-lr') {
+    const dragNodeId = await session.evaluate(`(() => {
+      const instance = window.reactFlowInstance;
+      const edges = instance?.getEdges?.() || [];
+      const incidentIds = new Set(edges.flatMap(edge => [edge.source, edge.target]));
+      const connected = (instance?.getNodes?.() || []).filter(node => incidentIds.has(node.id));
+      return connected.find(node => !node.parentId)?.id ?? connected[0]?.id ?? null;
+    })()`);
+    if (!dragNodeId) throw new Error(`${layoutCase.id} has no connected drag target`);
+    await session.evaluate(`(() => {
+      window.__vizlyRoutingRequests = [];
+      window.__vizlyRoutingResponses = [];
+      return true;
+    })()`);
+    const moved = await session.evaluate(`(() => {
+      const instance = window.reactFlowInstance;
+      if (!instance?.setNodes) return false;
+      instance.setNodes(nodes => nodes.map(node => node.id === ${JSON.stringify(dragNodeId)} ? {
+        ...node,
+        position: {
+          x: Number(node.position?.x || 0) + 40,
+          y: Number(node.position?.y || 0) + 12,
+        },
+      } : node));
+      return true;
+    })()`);
+    if (!moved) throw new Error(`${layoutCase.id} could not move ${dragNodeId}`);
+    const incremental = await waitForValue(
+      session,
+      readLatestCompletedRouteExpression,
+      `${layoutCase.id} post-layout move`,
+    );
+    if (
+      incremental.request?.operation !== 'incremental-route'
+      || incremental.response.routeResolution !== 'incremental-route'
+      || incremental.routing.workerStartCount !== initialRoute.routing.workerStartCount + 1
+    ) {
+      throw new Error(`${layoutCase.id} did not preserve its incremental Worker session: ${JSON.stringify({
+        requestOperation: incremental.request?.operation,
+        nodeId: dragNodeId,
+        routeResolution: incremental.response.routeResolution,
+        initialWorkerStartCount: initialRoute.routing.workerStartCount,
+        finalWorkerStartCount: incremental.routing.workerStartCount,
+        incrementalPlanStatus: incremental.routing.incrementalPlanStatus,
+        incrementalBaselineSignature: incremental.routing.incrementalBaselineSignature,
+        hasBaselineSessionRef: Boolean(incremental.request?.baselineSessionRef),
+        affectedEdgeCount: incremental.response.affectedEdgeCount,
+        fallbackLevel: incremental.response.fallbackLevel,
+        phaseTrace: incremental.response.phaseTrace?.map(trace => ({
+          phase: trace.phase,
+          resolution: trace.resolution,
+          candidateCount: trace.candidateCount,
+          changedEdgeCount: trace.changedEdgeCount,
+        })),
+      })}`);
+    }
+    postLayoutMove = {
+      nodeId: dragNodeId,
+      resolution: incremental.response.routeResolution,
+      affectedEdgeCount: incremental.response.affectedEdgeCount,
+      ...(await auditFinalSvg(session, incremental, `${layoutCase.id} post-layout move`)),
+    };
+  }
   return {
     id: layoutCase.id,
     resolution: route.response.routeResolution,
@@ -413,7 +496,8 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
     totalRouteMs,
     slowestPhases: summarizeSlowestDisplayRoutingPhases(route.response.phaseTrace),
     canonicalMount,
-    ...(await auditFinalSvg(session, route, layoutCase.id)),
+    postLayoutMove,
+    ...layoutAudit,
   };
 });
 

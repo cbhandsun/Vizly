@@ -354,6 +354,15 @@ export const useBaseReactFlowDisplayRouting = ({
         nextEdges: activeRoutingInput.edges,
         draggedNodeIds: nodeDragFallbackKey ? nodeDragFallbackKey.split('\0') : [],
       });
+      updateDisplayRoutingDebugState({
+        incrementalBaselineSignature:
+          committedSnapshotBaselineRef.current?.identity.inputSignature,
+        incrementalPlanStatus: incrementalPlan
+          ? 'ready'
+          : committedSnapshotBaselineRef.current
+            ? 'rejected'
+            : 'missing-baseline',
+      });
       if (!incrementalPlan && !cachedDisplayCandidateEdges) {
         updateDisplayRoutingDebugState({
           stage: 'precompiled-candidate-loading',

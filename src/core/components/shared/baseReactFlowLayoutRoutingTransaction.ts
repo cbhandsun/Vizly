@@ -399,27 +399,20 @@ export const stageBaseReactFlowLayoutRouting = async ({
     inputSignature: projectedIdentity.cacheSignature,
     inputGeometryDigest: projectedIdentity.geometryDigest,
   });
-  const candidateCommit = candidateRepairResult.hardClean
-    ? commitBaseReactFlowStagedLayoutRoutingResult({
+  // The bounded repair uses seeded paths as its working source. Promote its
+  // result through a canonical source-edge request before committing so the
+  // Worker-private session stores source -> final patches under the same
+  // identity exposed to the incremental client.
+  const canonicalCandidateEdges = candidateRepairResult.hardClean
+    ? candidateRepairResult.edges
+    : seedBaseReactFlowStagedLayoutEdges({
       sourceEdges: unseededSourceEdges,
-      sourceNodes: projectedSource.nodes,
-      workerResult: candidateRepairResult,
-      enableSmartEdges,
-      smartEdgePadding,
-      isLargeGraph,
-    })
-    : null;
-  if (candidateCommit) {
-    return candidateCommit;
-  }
-  const fallbackSeedEdges = seedBaseReactFlowStagedLayoutEdges({
-    sourceEdges: unseededSourceEdges,
-    sourceNodes,
-  });
+      sourceNodes,
+    });
   const initialResult = await computeBaseReactFlowDisplayEdgesInWorker({
     workerRef,
     requestId,
-    edges: fallbackSeedEdges,
+    edges: unseededSourceEdges,
     nodes: sourceNodes,
     enableSmartEdges,
     smartEdgePadding,
@@ -427,6 +420,8 @@ export const stageBaseReactFlowLayoutRouting = async ({
     displayEdgeEpoch: 0,
     inputSignature: projectedIdentity.cacheSignature,
     inputGeometryDigest: projectedIdentity.geometryDigest,
+    cachedCandidateEdges: canonicalCandidateEdges,
+    candidateSource: 'persistent',
     qualityMode: 'full',
     timeoutMs: LAYOUT_FULL_DISPLAY_WORKER_TIMEOUT_MS,
     signal,

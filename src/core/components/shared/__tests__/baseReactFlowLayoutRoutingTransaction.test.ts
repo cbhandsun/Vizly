@@ -384,6 +384,17 @@ describe('baseReactFlowLayoutRoutingTransaction', () => {
       },
       outputRouteSignature: stagedHit.outputRouteSignature,
     });
+    const replayedBaselineIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
+      nodes: stagedHit.baseline.projectedSourceGeometry.nodes,
+      edges: stagedHit.baseline.projectedSourceGeometry.edges,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+    });
+    expect(replayedBaselineIdentity).toMatchObject({
+      cacheSignature: stagedHit.baseline.identity.inputSignature,
+      geometryDigest: stagedHit.baseline.identity.inputGeometryDigest,
+    });
     expect(createBaseReactFlowCommittedRenderAuthority(
       stagedHit.baseline,
       stagedHit.edges,
