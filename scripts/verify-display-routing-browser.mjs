@@ -1,5 +1,3 @@
-import { setTimeout as delay } from 'node:timers/promises';
-
 import { withPrecompiledRouteBrowser } from './lib/precompiled-display-route-cdp.mjs';
 import {
   readDisplayRoutingNodePanGesture,
@@ -41,12 +39,12 @@ import { assertDisplayRoutingProductionPreview } from './lib/display-routing-pro
 import { verifyDisplayRoutingThemeMatrix } from './lib/display-routing-browser-theme-matrix.mjs';
 import { verifyDisplayRoutingInteractionStates } from './lib/display-routing-browser-interaction-audit.mjs';
 import { DISPLAY_ROUTING_EXPORT_CAPTURE_SCRIPT, formatDisplayRoutingExportMatrix, verifyDisplayRoutingExportMatrix } from './lib/display-routing-browser-export-audit.mjs';
+import { waitForDisplayRoutingBrowserValue as waitForValue } from './lib/display-routing-browser-wait.mjs';
 
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '')
   .trim()
   .replace(/\/$/, '');
 const LOGISTICS_PRESET_ID = 'logistics-architecture-v1';
-const WAIT_TIMEOUT_MS = 60_000;
 const AVAILABLE_DRAG_CASES = Object.freeze([
   { nodeId: 'tms', expectedMutableCount: 6, expectedAffectedCount: 6 },
   { nodeId: 'wms', expectedMutableCount: 4 },
@@ -75,49 +73,6 @@ const RUN_STARTED_AT = performance.now();
 if (INTERACTION_ONLY && COLLECT_PERFORMANCE_SAMPLES) {
   throw new Error('--interaction-only cannot collect incremental-route performance samples');
 }
-
-const waitForValue = async (session, expression, timeoutMs = WAIT_TIMEOUT_MS) => {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const value = await session.evaluate(expression);
-    if (value) return value;
-    await delay(100);
-  }
-  const diagnostics = await session.evaluate(`(() => {
-    const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
-    return {
-      routing: {
-        stage: routing.stage,
-        workerStartCount: routing.workerStartCount,
-        workerAbortCount: routing.workerAbortCount,
-        workerResolution: routing.workerResolution,
-        fallbackLevel: routing.fallbackLevel,
-        outputRouteSignaturePresent: typeof routing.outputRouteSignature === 'string',
-      },
-      requestCount: (window.__vizlyRoutingRequests || []).length,
-      responseCount: (window.__vizlyRoutingResponses || []).length,
-      requests: (window.__vizlyRoutingRequests || []).map(request => ({
-        operation: request?.operation,
-        edgeCount: Array.isArray(request?.edges) ? request.edges.length : null,
-      })),
-      responses: (window.__vizlyRoutingResponses || []).map(response => ({
-        hardClean: response?.hardClean,
-        routeResolution: response?.routeResolution,
-        fallbackLevel: response?.fallbackLevel,
-        edgeCount: Array.isArray(response?.edges)
-          ? response.edges.length
-          : (Array.isArray(response?.routingPatches) ? response.routingPatches.length : null),
-      })),
-      renderedEdgeCount: document.querySelectorAll('.react-flow__edge').length,
-      renderedPathCount: document.querySelectorAll(
-        '.react-flow__edge .react-flow__edge-path',
-      ).length,
-    };
-  })()`);
-  throw new Error(
-    `Timed out waiting for browser state\n${JSON.stringify(diagnostics, null, 2)}`,
-  );
-};
 
 const initialReadyExpression = `(() => {
   const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
