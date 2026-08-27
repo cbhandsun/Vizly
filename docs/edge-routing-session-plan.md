@@ -847,7 +847,7 @@ final-commit
 
 ### Phase 0：基线与可观测性
 
-实施状态：单 Worker 最终事务、层级 trace、`full-route-repaired` 和生产预编译 capture 已实现；main 短采样及定时/手动 30 样本的独立性能工作流已进入 CI 配置，冷路由与增量路由使用互相隔离的 production-build job。远端首次执行仍受 GitHub 账户计费阻塞，尚不能宣称性能退出条件已验收通过。
+实施状态：单 Worker 最终事务、层级 trace、`full-route-repaired` 和生产预编译 capture 已实现；main 短采样及定时/手动 30 样本的独立性能工作流已进入 CI 配置，冷路由与增量路由使用互相隔离的 production-build job。本地正式 30 样本已能稳定区分 Worker 与页面开销并定位热点；远端执行仍受 GitHub 账户计费阻塞，且 Logistics 冷路由 p95 仍高于仓库预算，因此性能退出条件尚未完成。
 
 交付：
 
@@ -910,7 +910,7 @@ final-commit
 
 ### Phase 3：节点拖拽增量路由
 
-实施状态：单节点 TMS/WMS/L-OMS、arbitrary drag、尺寸/拓扑变化、Worker session 命中/重建和正确性退出条件已满足；当前单轮 production-browser 预算通过，正式 30 个独立样本仍需在稳定专用性能环境复验。
+实施状态：单节点 TMS/WMS/L-OMS、arbitrary drag、尺寸/拓扑变化、Worker session 命中/重建和正确性退出条件已满足；最新正式 30-profile 矩阵保持零 abort、零 full fallback、未受影响路径稳定，三类 local-route 均通过预算。L-OMS/WMS 的最终提交 p95 通过，TMS release-to-final/worker-to-final p95 为 `315/317ms`，仍比 `<300ms` 预算高 `15–17ms`。
 
 交付：
 
@@ -949,7 +949,7 @@ npm run verify:display-routing-browser
 
 ### Phase 4：空间索引与拓扑优先
 
-实施状态：Worker 私有节点/线段索引、候选轴、显式 topology plan、side/sector/flowRole 分组、原子 corridor lane/capacity 预留和缺陷驱动阶段调度均已落地；大图保留有界候选与安全全扫描回退。
+实施状态：Worker 私有节点/线段索引、候选轴、显式 topology plan、side/sector/flowRole 分组、原子 corridor lane/capacity 预留和缺陷驱动阶段调度均已落地；大图保留有界候选与安全全扫描回退。自动回归已证明 O2M topology-first seed 会在 repair 前实际生成硬指标不退化的共享主干，不再只验证 skip/reject 分支；当前剩余缺口是 Logistics 正式冷路由 p95 `2011ms` 仍高于仓库 `1100ms` 预算。
 
 交付：
 
