@@ -4,6 +4,7 @@ import {
   readDisplayEdgesWorkerRequestId,
   type DisplayEdgesWorkerRequest,
   type DisplayEdgesWorkerResponse,
+  type DisplayEdgesWorkerValidatedRequest,
 } from './baseReactFlowDisplayWorkerProtocol';
 import {
   displayEdgesWorkerScope,
@@ -17,7 +18,7 @@ type DisplayWorkerMessageHandler = (
 ) => DisplayEdgesWorkerResponse;
 
 type DisplayWorkerRequestHandler = (
-  request: DisplayEdgesWorkerRequest,
+  request: DisplayEdgesWorkerValidatedRequest,
   onBoundedCandidate?: (report: BaseDisplayBoundedCandidateReport) => void,
 ) => DisplayEdgesWorkerResponse;
 

@@ -148,6 +148,33 @@ export type DisplayEdgesWorkerRequest =
   | DisplayEdgesWorkerIncrementalRouteRequest
   | DisplayEdgesWorkerRepairRequest;
 
+/**
+ * A request that has crossed the Worker protocol boundary. Pure routing tests
+ * may omit identity when they do not publish a session, but production
+ * transport only exposes this validated form to the Worker computation.
+ */
+type DisplayEdgesWorkerValidatedRouteRequest = Omit<
+  DisplayEdgesWorkerRouteRequest,
+  'inputIdentity'
+> & { inputIdentity: RoutingIdentity };
+type DisplayEdgesWorkerValidatedValidateRequest = Omit<
+  DisplayEdgesWorkerValidateOrRouteRequest,
+  'inputIdentity'
+> & { inputIdentity: RoutingIdentity };
+type DisplayEdgesWorkerValidatedIncrementalRequest = Omit<
+  DisplayEdgesWorkerIncrementalRouteRequest,
+  'inputIdentity'
+> & { inputIdentity: RoutingIdentity };
+type DisplayEdgesWorkerValidatedRepairRequest = Omit<
+  DisplayEdgesWorkerRepairRequest,
+  'inputIdentity'
+> & { inputIdentity: RoutingIdentity };
+export type DisplayEdgesWorkerValidatedRequest =
+  | DisplayEdgesWorkerValidatedRouteRequest
+  | DisplayEdgesWorkerValidatedValidateRequest
+  | DisplayEdgesWorkerValidatedIncrementalRequest
+  | DisplayEdgesWorkerValidatedRepairRequest;
+
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const prototype = Object.getPrototypeOf(value);
@@ -360,7 +387,7 @@ export const readDisplayEdgesWorkerRequestId = (value: unknown): string | null =
  */
 export const parseDisplayEdgesWorkerRequest = (
   value: unknown,
-): DisplayEdgesWorkerRequest | null => {
+): DisplayEdgesWorkerValidatedRequest | null => {
   if (!isRecord(value)) return null;
   const requestId = readDisplayEdgesWorkerRequestId(value);
   if (!requestId || !isDisplayGraph(value.edges, value.nodes)) return null;
@@ -398,7 +425,7 @@ export const parseDisplayEdgesWorkerRequest = (
   ) return null;
   if (value.qualityMode !== 'full' && value.qualityMode !== 'interactive') return null;
   if (!isDisplayRoutingIdentity(value.inputIdentity)) return null;
-  const routeRequest: Omit<DisplayEdgesWorkerRouteRequest, 'operation'> = {
+  const routeRequest: Omit<DisplayEdgesWorkerValidatedRouteRequest, 'operation'> = {
     requestId,
     edges,
     nodes,
