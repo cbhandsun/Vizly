@@ -2,6 +2,18 @@ import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEv
 
 type DisplayRoutingDefectQuality = BaseDisplayBoundedCandidateReport['quality'];
 
+export type RoutingDefectStageName =
+  | 'post-render-residual'
+  | 'strict-primary-overlap';
+
+export type RoutingDefectStageDecision = Readonly<{
+  stage: RoutingDefectStageName;
+  scheduled: boolean;
+  defect: 'overlap';
+}>;
+
+export type RoutingDefectStagePlan = readonly RoutingDefectStageDecision[];
+
 export type RoutingDefectPlan = Readonly<{
   hardClean: boolean;
   needsObstacleRepair: boolean;
@@ -11,7 +23,35 @@ export type RoutingDefectPlan = Readonly<{
   needsMicroRepair: boolean;
   onlyTerminalAxisDefects: boolean;
   terminalClosureEligible: boolean;
+  orderedStages: RoutingDefectStagePlan;
 }>;
+
+export const displayRoutingDefectStageIsScheduled = (
+  plan: RoutingDefectStagePlan,
+  stage: RoutingDefectStageName,
+): boolean => plan.some(decision => (
+  decision.stage === stage && decision.scheduled
+));
+
+export const createDisplayRoutingDefectStagePlan = (
+  quality: DisplayRoutingDefectQuality,
+): RoutingDefectStagePlan => {
+  const needsOverlapRepair = quality.reverseOverlap > 0
+    || quality.unrelatedOverlap > 0
+    || quality.unexplainedRelatedOverlap > 0;
+  return [
+    {
+      stage: 'post-render-residual',
+      scheduled: needsOverlapRepair,
+      defect: 'overlap',
+    },
+    {
+      stage: 'strict-primary-overlap',
+      scheduled: needsOverlapRepair,
+      defect: 'overlap',
+    },
+  ];
+};
 
 export const displayRoutingQualityNeedsMicroRepair = (
   quality: DisplayRoutingDefectQuality,
@@ -62,5 +102,6 @@ export const createDisplayRoutingDefectPlan = (
     needsMicroRepair,
     onlyTerminalAxisDefects,
     terminalClosureEligible,
+    orderedStages: createDisplayRoutingDefectStagePlan(quality),
   };
 };

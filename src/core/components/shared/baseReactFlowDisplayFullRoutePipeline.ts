@@ -211,6 +211,7 @@ export const createBaseReactFlowFullRouteEdges = (args: BaseReactFlowDisplayEdge
     context,
     postRenderResult.edges,
     postRenderResult.quality,
+    postRenderDefectPlan,
     postRenderResult.skipInitialStrictOverlapRepair,
   );
   strictTimer.finish(

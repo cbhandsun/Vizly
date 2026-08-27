@@ -53,7 +53,11 @@ import {
   keepDisplayTerminalValidationNonRegressing,
 } from './baseReactFlowTerminalValidation';
 import type { BaseReactFlowFullRouteContext } from './baseReactFlowDisplayFullRouteTypes';
-import { createDisplayRoutingDefectPlan } from './baseReactFlowDisplayRoutingDefectPlan';
+import {
+  createDisplayRoutingDefectPlan,
+  displayRoutingDefectStageIsScheduled,
+  type RoutingDefectPlan,
+} from './baseReactFlowDisplayRoutingDefectPlan';
 
 export type BaseReactFlowFullRouteStrictResult =
   | { kind: 'finalized'; edges: Edge[] }
@@ -63,6 +67,7 @@ export const runBaseReactFlowFullRouteStrictPhase = (
   context: BaseReactFlowFullRouteContext,
   postSoftEdges: Edge[],
   postSoftQuality: EdgePathQualityScore,
+  defectPlan: RoutingDefectPlan,
   skipInitialOverlapRepair = false,
 ): BaseReactFlowFullRouteStrictResult => {
   const {
@@ -87,13 +92,16 @@ export const runBaseReactFlowFullRouteStrictPhase = (
       ? candidate
       : baseline
   );
+  const overlapScheduled = displayRoutingDefectStageIsScheduled(
+    defectPlan.orderedStages,
+    'strict-primary-overlap',
+  ) && !skipInitialOverlapRepair;
   const overlapTimer = startDisplayRoutingPhaseTrace({
     phase: 'strict-primary-overlap',
-    candidateCount: postSoftEdges.length,
+    candidateCount: overlapScheduled ? postSoftEdges.length : 0,
     onTrace: recordPrimaryPhaseTrace,
   });
-  const finalDetachedObstacleCandidate = hasHardDisplayOverlapRisk(postSoftQuality)
-    && !skipInitialOverlapRepair
+  const finalDetachedObstacleCandidate = overlapScheduled
     ? (() => {
       const detachedCandidate = separateDetachedParallelOverlaps(
         postSoftEdges,
@@ -128,6 +136,13 @@ export const runBaseReactFlowFullRouteStrictPhase = (
   overlapTimer.finish(
     finalDetachedObstacleCandidate === postSoftEdges ? 'skip' : 'accepted',
     finalDetachedObstacleCandidate === postSoftEdges ? 0 : finalDetachedObstacleCandidate.length,
+    overlapScheduled ? undefined : {
+      evaluationCount: 0,
+      cacheHitCount: 0,
+      scannedNodeCount: 0,
+      scannedSegmentCount: 0,
+      scannedEdgePairCount: 0,
+    },
   );
   const endpointTargetTimer = startDisplayRoutingPhaseTrace({
     phase: 'strict-primary-endpoint-target',

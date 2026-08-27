@@ -36,7 +36,9 @@ import {
 } from './baseReactFlowDisplayRenderPipeline';
 import { createBaseReactFlowDisplayMicroSafetyContext } from './baseReactFlowDisplayMicroSafety';
 import {
+  createDisplayRoutingDefectStagePlan,
   createDisplayRoutingDefectPlan,
+  displayRoutingDefectStageIsScheduled,
   displayRoutingQualityNeedsMicroRepair,
   displayRoutingQualityNeedsTerminalRepair,
 } from './baseReactFlowDisplayRoutingDefectPlan';
@@ -248,12 +250,19 @@ export const runBaseReactFlowFullRoutePostRenderPhase = (
       ? 0
       : postFinalizeObstacleCleaned.length,
   );
+  const postFinalizeObstacleQuality = calculateEdgePathQualityScore(postFinalizeObstacleCleaned);
+  const postRenderStagePlan = createDisplayRoutingDefectStagePlan(
+    postFinalizeObstacleQuality,
+  );
+  const residualScheduled = displayRoutingDefectStageIsScheduled(
+    postRenderStagePlan,
+    'post-render-residual',
+  );
   const residualTimer = startDisplayRoutingPhaseTrace({
     phase: 'post-render-residual',
-    candidateCount: postFinalizeObstacleCleaned.length,
+    candidateCount: residualScheduled ? postFinalizeObstacleCleaned.length : 0,
     onTrace: recordSoftClosurePhaseTrace,
   });
-  const postFinalizeObstacleQuality = calculateEdgePathQualityScore(postFinalizeObstacleCleaned);
   const useBoundedPostRenderResidualRepair = shouldUseBoundedPostRenderResidualRepair(
     useBoundedLargeRepair,
     mustCloseHardOverlapFirst,
@@ -261,7 +270,7 @@ export const runBaseReactFlowFullRoutePostRenderPhase = (
   const preResidualOutputSignature = recordSoftClosurePhaseTrace
     ? computeBaseReactFlowDisplayOutputRouteSignature(postFinalizeObstacleCleaned)
     : null;
-  const finalPostSoftResidualCleaned = hasHardDisplayOverlapRisk(postFinalizeObstacleQuality)
+  const finalPostSoftResidualCleaned = residualScheduled
     ? repairResidualDisplayOverlaps(
       postFinalizeObstacleCleaned,
       repairNodes,
@@ -289,6 +298,13 @@ export const runBaseReactFlowFullRoutePostRenderPhase = (
   residualTimer.finish(
     residualGeometryChanged ? 'accepted' : 'skip',
     residualGeometryChanged ? finalPostSoftResidualCleaned.length : 0,
+    residualScheduled ? undefined : {
+      evaluationCount: 0,
+      cacheHitCount: 0,
+      scannedNodeCount: 0,
+      scannedSegmentCount: 0,
+      scannedEdgePairCount: 0,
+    },
   );
   const terminalGateTimer = startDisplayRoutingPhaseTrace({
     phase: 'post-render-terminal-gate',

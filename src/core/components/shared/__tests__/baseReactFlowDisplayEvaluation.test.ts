@@ -34,6 +34,8 @@ import {
 } from '../baseReactFlowDisplayFullRoutePostRenderPhase';
 import {
   createDisplayRoutingDefectPlan,
+  createDisplayRoutingDefectStagePlan,
+  displayRoutingDefectStageIsScheduled,
   displayRoutingQualityNeedsMicroRepair,
   displayRoutingQualityNeedsTerminalRepair,
 } from '../baseReactFlowDisplayRoutingDefectPlan';
@@ -203,6 +205,49 @@ describe('baseReactFlowDisplayEvaluation', () => {
       ...quality,
       shortEndpointStubs: 1,
     })).toBe(true);
+
+    const cleanOverlapPlan = createDisplayRoutingDefectPlan({
+      candidate: 'polished',
+      hardClean: false,
+      terminalsAttached: true,
+      terminalsAnchored: true,
+      obstacleHits: 1,
+      quality: { ...quality, strictCrossings: 1, hairpins: 1 },
+    });
+    expect(cleanOverlapPlan.orderedStages.map(stage => stage.stage)).toEqual([
+      'post-render-residual',
+      'strict-primary-overlap',
+    ]);
+    expect(displayRoutingDefectStageIsScheduled(
+      cleanOverlapPlan.orderedStages,
+      'strict-primary-overlap',
+    )).toBe(false);
+    expect(displayRoutingDefectStageIsScheduled(
+      createDisplayRoutingDefectStagePlan(quality),
+      'post-render-residual',
+    )).toBe(false);
+    for (const overlapQuality of [
+      { reverseOverlap: 1 },
+      { unrelatedOverlap: 1 },
+      { unexplainedRelatedOverlap: 1 },
+    ]) {
+      const overlapPlan = createDisplayRoutingDefectPlan({
+        candidate: 'polished',
+        hardClean: false,
+        terminalsAttached: true,
+        terminalsAnchored: true,
+        obstacleHits: 0,
+        quality: { ...quality, ...overlapQuality },
+      });
+      expect(displayRoutingDefectStageIsScheduled(
+        overlapPlan.orderedStages,
+        'strict-primary-overlap',
+      )).toBe(true);
+      expect(displayRoutingDefectStageIsScheduled(
+        overlapPlan.orderedStages,
+        'post-render-residual',
+      )).toBe(true);
+    }
   });
   it('bounds post-render residual repair for large routes or hard-overlap handoff', () => {
     expect(shouldUseBoundedPostRenderResidualRepair(false, false)).toBe(false);
