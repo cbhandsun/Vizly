@@ -1,6 +1,6 @@
 # Vizly 首次打开与增量调整统一路由方案
 
-状态：质量、会话、拓扑与缺陷调度主链已闭环；专用 30 样本任务已建立但远端执行受计费阻塞，standalone 协议统一与受限格式导出仍待最终验收
+状态：质量、会话、拓扑、缺陷调度与 standalone 渲染协议主链已闭环；专用 30 样本任务已建立但远端执行受计费阻塞，受限格式导出仍待最终验收
 适用范围：`BaseReactFlow` Canvas 最终显示路由、内置标准图、用户保存图、节点拖拽及局部编辑
 关联标准：`docs/edge-routing-goals.md`
 
@@ -22,9 +22,10 @@
 - reconnect 排名改为稳定的流式 bounded top-K 后，5 个独立筛选样本把 L-OMS local/release p95 降至 `93.7ms/214ms`、TMS 降至 `102.3ms/226ms`、WMS 降至 `57.1ms/131ms`，且 5/5 零 fallback；正式 30 样本在前 26 次通过后，第 27 次 WMS 请求因候选生成数从常态 `256` 漂移为 `244` 而安全进入同 job full fallback，最终仍 hard-clean。该批次证明了排名内存优化收益，但稳定矩阵仍未验收通过。
 - 最新共享评估批次的三张 production 预编译 route JSON、output signature 与最终路径保持不变；类型、Lint、架构、源码规模、DOM sink、secrets、生产构建、bundle 和预编译产物门禁通过。GitHub Actions 已触发但所有 job 在执行任何 step 前被账户付款/额度阻止，不能作为代码失败或通过证据。
 - Canvas display routing 与自动布局现共用同一个 Canvas-scoped Routing Session runtime、Worker ref 和提交 epoch；新布局会抢占旧 display job，stale layout/display response 均不能提交。布局 Worker 结果只暂存 geometry，必须在当前 epoch 内以同一 commit receipt 原子写入 committed snapshot 与 React nodes/edges。
+- Canvas 与 standalone custom edge 现在只消费同一份 realm-local committed render proof；proof 同时绑定 Worker protocol、routing/visual version、完整 hard report 及其 digest、Worker session ref、output signature 和逐边 source/target/handle/renderer/path 对象身份。重建或克隆的 baseline、digest-only 旧快照、伪造 session、handle/type/path 替换均 fail closed；生产代码中原始 authority issuer 只允许由 Canvas Routing Session adapter 导入，custom edge 不得导入 Worker、committed store、session runtime 或 `EdgeRoutingCoordinator`。
 - 新增独立 `Routing performance` 工作流：路由相关 main push 对冷路由和增量路由分别执行 5 个短样本；每周和手动任务默认分别执行 30 个全新浏览器 profile 样本。两个场景使用各自的 production build/preview job，输出 aggregate report artifact，避免冷启动、预编译和拖拽样本互相污染。工作流代码与契约测试已通过，本轮仍因 GitHub 账户计费无法取得远端执行结果。
 
-因此，迭代 1–2 的统一门禁和 Routing Session 主链已经闭环；迭代 0、3、4、5 仍为部分完成。迭代 0 已具备独立、隔离和默认 30 样本的专用性能任务，但远端未能执行；迭代 3 的拓扑编辑和正确性已通过，但正式 30 个独立样本的 p95 与零 fallback 门禁尚未通过；迭代 4 的 corridor lane/capacity 分配和缺陷驱动阶段跳过已经落地，产品方接受约 `1.03s` 的动态完整冷路由参考水平，不再以原 `<750ms` 阻塞收敛，但当前正式样本仍高于仓库的 `1100ms` p95 门槛；迭代 5 已完成 routing-only 文档快照、旧 edge-owned 管线删除、Canvas layout/display 共享 runtime 和 fail-closed 渲染所有权，standalone fallback adapter 尚未共享完整 Routing Session Worker protocol、hard report 与 routing version。剩余外部阻塞为 GitHub Actions 计费/额度导致 job 未启动，以及 SVG/PDF entitlement 限制下的真实文件级导出审计；仍禁止通过跳过 accepted 修复阶段或降低质量门禁宣称完成。
+因此，迭代 1–2 与迭代 5 的统一门禁、Routing Session 和渲染协议主链已经闭环；迭代 0、3、4 仍为部分完成。迭代 0 已具备独立、隔离和默认 30 样本的专用性能任务，但远端未能执行；迭代 3 的拓扑编辑和正确性已通过，但正式 30 个独立样本的 p95 与零 fallback 门禁尚未通过；迭代 4 的 corridor lane/capacity 分配和缺陷驱动阶段跳过已经落地，产品方接受约 `1.03s` 的动态完整冷路由参考水平，不再以原 `<750ms` 阻塞收敛，但当前正式样本仍高于仓库的 `1100ms` p95 门槛。迭代 5 已完成 routing-only 文档快照、旧 edge-owned 管线删除、Canvas layout/display 共享 runtime，以及 standalone 对完整 Worker protocol、hard report、routing version、session ref 和逐边几何身份的同源 proof 消费；digest-only 旧 proof 安全失效并回退，不会成为第二个路由事实来源。剩余外部阻塞为 GitHub Actions 计费/额度导致 job 未启动，以及 SVG/PDF entitlement 限制下的真实文件级导出审计；仍禁止通过跳过 accepted 修复阶段或降低质量门禁宣称完成。
 
 ## 0.1 首批实施记录（2026-07-27）
 
@@ -973,7 +974,7 @@ npm run verify:display-routing-browser
 
 ### Phase 5：用户文档快照与管线收敛
 
-实施状态：routing-only schema、外部候选边界、realm-local render authority、Canvas layout/display 共享 runtime 和旧 edge-owned 管线删除已完成；standalone adapter 当前只提供 fail-closed 降级或消费 Canvas 签发的 render proof，不持有完整 Routing Session Worker protocol 与 hard report，因此协议统一退出条件尚未满足。
+实施状态：已完成。routing-only schema、外部候选边界、realm-local render authority、Canvas layout/display 共享 runtime 和旧 edge-owned 管线删除均已落地；standalone adapter 不启动第二个 Worker，只消费 Canvas Routing Session 签发并绑定完整 Worker protocol、hard report、routing/visual version、session ref、output signature 与逐边几何身份的 render proof。生产 authority issuer 与 custom-edge import 边界均由架构门禁固定。
 
 交付：
 
