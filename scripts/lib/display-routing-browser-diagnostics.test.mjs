@@ -6,7 +6,7 @@ import {
   assertDisplayRoutingCommittedReuse,
   prepareDisplayRoutingIncrementalCapture,
   readDisplayRoutingCommittedReuseSnapshot,
-  readDisplayRoutingRequestDebugSnapshot,
+  readDisplayRoutingRequestDriftProbe,
 } from './display-routing-browser-diagnostics.mjs';
 
 const prepareInContext = async routing => {
@@ -31,47 +31,103 @@ const prepareInContext = async routing => {
 };
 
 describe('display routing browser diagnostics', () => {
-  it('projects session-hit requests without requiring bootstrap baselines', () => {
-    expect(readDisplayRoutingRequestDebugSnapshot({
-      mutableEdgeIds: ['edge-a'],
-      nodes: [{ id: 'node-a', position: { x: 1, y: 2 } }],
-      edges: [{ id: 'edge-a', source: 'node-a', target: 'node-b' }],
-    })).toMatchObject({
-      mutableEdgeIds: ['edge-a'],
+  it('summarizes session-hit requests without exposing graph content', () => {
+    const probe = readDisplayRoutingRequestDriftProbe({
+      operation: 'incremental-route',
+      baselineSessionRef: { sessionId: 'private-session-secret' },
+      baselineInputGeometryDigest: 'private-baseline-signature',
+      baselineOutputRouteSignature: 'private-route-signature',
+      nextInputGeometryDigest: 'private-next-signature',
+      mutableEdgeIds: ['private-edge-a'],
       contextEdgeIds: [],
-      nodes: [{ id: 'node-a', position: { x: 1, y: 2 } }],
-      baselineNodes: [],
-      edges: [{ id: 'edge-a', source: 'node-a', target: 'node-b' }],
-      baselinePatches: [],
+      changeSet: {
+        reason: 'node-drag',
+        classification: 'geometry',
+        topologyChanged: false,
+        geometryChanged: true,
+        changedNodeIds: ['private-node-a'],
+        changedEdgeIds: [],
+      },
+      nodes: [{
+        id: 'private-node-a',
+        position: { x: 1.25, y: 2 },
+        measured: { width: 100, height: 60 },
+      }],
+      edges: [{
+        id: 'private-edge-a',
+        source: 'private-node-a',
+        target: 'private-node-b',
+        data: { computedPath: [{ x: 1.25, y: 2 }, { x: 9, y: 2 }] },
+      }],
     });
+    expect(probe).toMatchObject({
+      schema: 'routing-drift-v1',
+      operation: 'incremental-route',
+      baseline: {
+        sessionRefPresent: true,
+        inlineBootstrapPresent: false,
+        nodeCount: 0,
+        edgeCount: 0,
+        patchCount: 0,
+      },
+      next: {
+        nodeCount: 1,
+        edgeCount: 1,
+        fractionalGeometryCount: 1,
+        nonFiniteGeometryCount: 0,
+        measuredSizePresentCount: 1,
+      },
+      change: {
+        reason: 'node-drag',
+        classification: 'geometry',
+        changedNodeCount: 1,
+        mutableEdgeCount: 1,
+      },
+    });
+    expect(probe.next.projectedGeometryDigest).toMatch(/^probe-v1:[0-9a-f]{32}$/);
+    const serialized = JSON.stringify(probe);
+    for (const sensitive of [
+      'private-session-secret', 'private-baseline-signature', 'private-route-signature',
+      'private-next-signature', 'private-edge-a', 'private-node-a', '1.25',
+    ]) expect(serialized).not.toContain(sensitive);
   });
 
-  it('fails closed to empty collections for malformed request fields', () => {
-    expect(readDisplayRoutingRequestDebugSnapshot({
+  it('fails closed to bounded empty summaries for malformed request fields', () => {
+    expect(readDisplayRoutingRequestDriftProbe({
+      operation: 'unsafe-operation',
       mutableEdgeIds: 'edge-a',
       nodes: null,
       edges: {},
       baselineNodes: Number.NaN,
       baselinePatches: 'patch',
     })).toMatchObject({
-      mutableEdgeIds: [],
-      contextEdgeIds: [],
-      nodes: [],
-      baselineNodes: [],
-      edges: [],
-      baselinePatches: [],
+      schema: 'routing-drift-v1',
+      operation: 'invalid',
+      baseline: { nodeCount: 0, edgeCount: 0, patchCount: 0 },
+      next: { nodeCount: 0, edgeCount: 0, nonFiniteGeometryCount: 0 },
+      change: {
+        reason: 'invalid',
+        classification: 'invalid',
+        mutableEdgeCount: 0,
+        contextEdgeCount: 0,
+      },
     });
   });
 
   it('remains self-contained when injected into a browser realm', () => {
-    const context = vm.createContext({ request: { nodes: [{ id: 'node-a' }] } });
+    const context = vm.createContext({
+      request: { operation: 'route', nodes: [{ id: 'node-a' }] },
+    });
     const result = vm.runInContext(
-      `(${readDisplayRoutingRequestDebugSnapshot.toString()})(request)`,
+      `(${readDisplayRoutingRequestDriftProbe.toString()})(request)`,
       context,
     );
 
-    expect(result.nodes).toEqual([{ id: 'node-a' }]);
-    expect(result.baselineNodes).toEqual([]);
+    expect(result).toMatchObject({
+      schema: 'routing-drift-v1',
+      operation: 'route',
+      next: { nodeCount: 1, edgeCount: 0 },
+    });
   });
 
   it('captures cumulative Worker counters before resetting incremental probes', async () => {
@@ -87,6 +143,10 @@ describe('display routing browser diagnostics', () => {
     expect(window.__vizlyRoutingRequests).toEqual([]);
     expect(window.__vizlyRoutingResponses).toEqual([]);
     expect(window.__vizlyRouteSamplingEnabled).toBe(false);
+    expect(window.__vizlyInitialRoutingDriftProbe).toMatchObject({
+      schema: 'routing-drift-v1',
+      operation: 'invalid',
+    });
     expect(minimap.style.display).toBe('none');
   });
 

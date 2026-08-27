@@ -20,7 +20,7 @@ import {
 import { DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT } from './lib/display-routing-browser-capture.mjs';
 import {
   prepareDisplayRoutingIncrementalCapture,
-  readDisplayRoutingRequestDebugSnapshot,
+  readDisplayRoutingRequestDriftProbe,
   readDisplayRoutingIncrementalFailureStatus,
   readDisplayRoutingViewportZoomFromSession,
 } from './lib/display-routing-browser-diagnostics.mjs';
@@ -50,8 +50,6 @@ const DRAG_CASES = selectDisplayRoutingDragCases(
   AVAILABLE_DRAG_CASES,
 );
 const FIXED_VISUAL_ZOOMS = Object.freeze([0.5, 1, 2]);
-const INCLUDE_INCREMENTAL_REQUEST_DIAGNOSTICS = process.env
-  .DISPLAY_ROUTING_BROWSER_DEBUG_REQUEST === '1';
 const EMIT_MACHINE_RESULT = process.env.DISPLAY_ROUTING_BROWSER_JSON === '1';
 const INCLUDE_CPU_PROFILE = process.env.DISPLAY_ROUTING_BROWSER_CPU_PROFILE === '1';
 const COLLECT_PERFORMANCE_SAMPLES = process.env.DISPLAY_ROUTING_BROWSER_COLLECT_PERFORMANCE === '1';
@@ -66,34 +64,36 @@ const waitForValue = async (session, expression, timeoutMs = WAIT_TIMEOUT_MS) =>
   const diagnostics = await session.evaluate(`(() => {
     const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
     return {
-      url: location.href,
-      routing,
+      routing: {
+        stage: routing.stage,
+        workerStartCount: routing.workerStartCount,
+        workerAbortCount: routing.workerAbortCount,
+        workerResolution: routing.workerResolution,
+        fallbackLevel: routing.fallbackLevel,
+        outputRouteSignaturePresent: typeof routing.outputRouteSignature === 'string',
+      },
       requestCount: (window.__vizlyRoutingRequests || []).length,
       responseCount: (window.__vizlyRoutingResponses || []).length,
       requests: (window.__vizlyRoutingRequests || []).map(request => ({
-        requestId: request?.requestId,
         operation: request?.operation,
         edgeCount: Array.isArray(request?.edges) ? request.edges.length : null,
       })),
       responses: (window.__vizlyRoutingResponses || []).map(response => ({
-        requestId: response?.requestId,
         hardClean: response?.hardClean,
         routeResolution: response?.routeResolution,
+        fallbackLevel: response?.fallbackLevel,
         edgeCount: Array.isArray(response?.edges)
           ? response.edges.length
           : (Array.isArray(response?.routingPatches) ? response.routingPatches.length : null),
-        error: response?.error,
       })),
       renderedEdgeCount: document.querySelectorAll('.react-flow__edge').length,
       renderedPathCount: document.querySelectorAll(
         '.react-flow__edge .react-flow__edge-path',
       ).length,
-      visibleRouteSamples: window.__vizlyRenderedRouteSamples || [],
     };
   })()`);
   throw new Error(
-    `Timed out waiting for browser state: ${expression.slice(0, 120)}\n`
-    + JSON.stringify(diagnostics, null, 2),
+    `Timed out waiting for browser state\n${JSON.stringify(diagnostics, null, 2)}`,
   );
 };
 
@@ -240,10 +240,9 @@ const dragNode = async (session, nodeId, beforeRelease = null) => {
 };
 
 const finalIncrementalExpression = nodeId => `(() => {
-  const readRequestDebugSnapshot = ${readDisplayRoutingRequestDebugSnapshot.toString()};
+  const readRequestDriftProbe = ${readDisplayRoutingRequestDriftProbe.toString()};
   const requests = window.__vizlyRoutingRequests || [];
   const responses = window.__vizlyRoutingResponses || [];
-  const boundedResponses = window.__vizlyBoundedCandidates || [];
   const request = [...requests].reverse().find(item => item?.operation === 'incremental-route');
   if (!request) return null;
   const response = [...responses].reverse().find(item => item?.requestId === request.requestId);
@@ -267,9 +266,10 @@ const finalIncrementalExpression = nodeId => `(() => {
     requestId: request.requestId,
     capturedRequestCount: requests.length,
     capturedResponseCount: responses.length,
-    debugRequest: ${INCLUDE_INCREMENTAL_REQUEST_DIAGNOSTICS
-      ? 'readRequestDebugSnapshot(request)'
-      : 'null'},
+    driftProbe: {
+      initial: window.__vizlyInitialRoutingDriftProbe || null,
+      incremental: readRequestDriftProbe(request),
+    },
     requestOperation: request.operation,
     workerRequestAt: request.__browserCapturedAt,
     workerResponseAt: response.__browserCapturedAt,
@@ -295,10 +295,6 @@ const finalIncrementalExpression = nodeId => `(() => {
         : (Array.isArray(response.routingPatches) ? response.routingPatches.length : null),
       workerDurationMs: response.workerDurationMs,
     },
-    boundedCandidates: boundedResponses
-      .filter(item => item?.requestId === request.requestId && item?.boundedCandidate)
-      .map(item => item.boundedCandidate)
-      .slice(-4),
     routing: {
       routeMs: routing.routeMs,
       scheduledAt: routing.scheduledAt,
@@ -712,9 +708,7 @@ const main = async () => {
       incremental.finalToObservedMs = Number.isFinite(incremental.routing.finalAppliedAt)
         ? observedAt - incremental.routing.finalAppliedAt
         : null;
-      assertDisplayRoutingDragResult(dragCase, incremental, {
-        includeRequestDiagnostics: INCLUDE_INCREMENTAL_REQUEST_DIAGNOSTICS,
-      });
+      assertDisplayRoutingDragResult(dragCase, incremental);
       const incrementalRenderedObstacleAudit = await waitForRenderedObstacleAudit(
         session,
         `${dragCase.nodeId} incremental route`,

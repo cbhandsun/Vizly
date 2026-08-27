@@ -88,6 +88,38 @@ describe('display routing browser performance budget', () => {
     )).toThrow(/single Worker transaction/);
   });
 
+  it('keeps failure diagnostics bounded to safe counters and drift probes', () => {
+    const sensitive = {
+      debugRequest: {
+        nodes: [{ id: 'private-node', position: { x: 123.456, y: 789.123 } }],
+        edges: [{ id: 'private-edge', data: { computedPath: 'private-path' } }],
+      },
+      routing: {
+        ...validDragResult().routing,
+        outputRouteSignature: 'private-output-signature',
+      },
+      capturedRequestCount: 2,
+      driftProbe: {
+        initial: { schema: 'routing-drift-v1', next: { nodeCount: 28 } },
+      },
+    };
+    let message = '';
+    try {
+      assertDisplayRoutingDragResult(
+        { nodeId: 'private-node', expectedMutableCount: 6 },
+        validDragResult(sensitive),
+      );
+    } catch (error) {
+      message = String(error);
+    }
+
+    expect(message).toContain('single Worker transaction');
+    expect(message).toContain('routing-drift-v1');
+    for (const forbidden of [
+      'private-node', 'private-edge', 'private-path', 'private-output-signature', '123.456',
+    ]) expect(message).not.toContain(forbidden);
+  });
+
   it('accepts only the complete fast or repaired incremental phase sequence', () => {
     for (const phases of EXPECTED_INCREMENTAL_DISPLAY_ROUTING_PHASE_SEQUENCES) {
       expect(displayRoutingIncrementalPhaseTraceIsComplete(
@@ -316,6 +348,11 @@ describe('display routing browser performance budget', () => {
           scannedNodeCount: null,
           scannedSegmentCount: null,
           scannedEdgePairCount: null,
+          workItemCount: null,
+          budgetCount: null,
+          underBudgetCount: null,
+          minimumCandidateCount: null,
+          maximumCandidateCount: null,
           candidateCount: null,
         }],
       }],
@@ -349,6 +386,11 @@ describe('display routing browser performance budget', () => {
           scannedNodeCount: null,
           scannedSegmentCount: null,
           scannedEdgePairCount: null,
+          workItemCount: null,
+          budgetCount: null,
+          underBudgetCount: null,
+          minimumCandidateCount: null,
+          maximumCandidateCount: null,
           candidateCount: null,
         }],
       }],

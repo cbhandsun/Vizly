@@ -101,11 +101,36 @@ export const displayRoutingIncrementalPhaseTraceIsComplete = phaseTrace => {
 export const assertDisplayRoutingDragResult = (
   dragCase,
   result,
-  { includeRequestDiagnostics = false } = {},
 ) => {
-  const diagnostics = JSON.stringify(includeRequestDiagnostics
-    ? { dragCase, debugRequest: result?.debugRequest, boundedCandidates: result?.boundedCandidates }
-    : { dragCase, result }, null, 2);
+  const diagnostics = JSON.stringify({
+    expected: {
+      mutableEdgeCount: dragCase?.expectedMutableCount,
+      affectedEdgeCount: dragCase?.expectedAffectedCount,
+    },
+    observed: {
+      mutableEdgeCount: result?.mutableEdgeCount,
+      capturedRequestCount: result?.capturedRequestCount,
+      capturedResponseCount: result?.capturedResponseCount,
+      response: {
+        hardClean: result?.response?.hardClean,
+        routeResolution: result?.response?.routeResolution,
+        affectedEdgeCount: result?.response?.affectedEdgeCount,
+        fallbackLevel: result?.response?.fallbackLevel,
+        edgeCount: result?.response?.edgeCount,
+        phaseTrace: result?.response?.phaseTrace,
+      },
+      routing: {
+        fallbackLevel: result?.routing?.fallbackLevel,
+        workerStartCountDelta: result?.routing?.workerStartCountDelta,
+        workerAbortCount: result?.routing?.workerAbortCount,
+        workerAbortCountDelta: result?.routing?.workerAbortCountDelta,
+      },
+      renderedEdgeCount: result?.renderedEdgeCount,
+      renderedEdgesWithPathCount: result?.renderedEdgesWithPathCount,
+      outputRouteSignaturePresent: typeof result?.routing?.outputRouteSignature === 'string',
+    },
+    driftProbe: result?.driftProbe,
+  }, null, 2);
   if (result?.mutableEdgeCount !== dragCase?.expectedMutableCount) {
     throw new Error(`Unexpected mutable closure:\n${diagnostics}`);
   }
@@ -144,8 +169,9 @@ export const assertDisplayRoutingDragResult = (
   }
   if (
     !displayRoutingIncrementalPhaseTraceIsComplete(result.response.phaseTrace)
-    || !result.response.phaseTrace.slice(0, 3)
-      .every(trace => trace.resolution === 'accepted')
+    || !['incremental-closure', 'local-route', 'hard-gate'].every(phase => (
+      result.response.phaseTrace.find(trace => trace.phase === phase)?.resolution === 'accepted'
+    ))
   ) {
     throw new Error(`Incremental phase trace was incomplete:\n${diagnostics}`);
   }

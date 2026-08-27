@@ -1,49 +1,157 @@
 import { readDisplayRoutingViewportZoom } from './display-routing-browser-geometry.mjs';
 
-/** Session-hit incremental requests intentionally omit bootstrap baselines. */
-export const readDisplayRoutingRequestDebugSnapshot = request => {
-  // Keep this helper self-contained because its source is injected into CDP.
-  const projectNodes = value => (
-    Array.isArray(value)
-      ? value.map(node => ({
-        id: node?.id,
-        type: node?.type,
-        parentId: node?.parentId,
-        position: node?.position,
-        positionAbsolute: node?.positionAbsolute,
-        width: node?.width,
-        height: node?.height,
-        measured: node?.measured,
-      }))
-      : []
+/**
+ * Returns a bounded, content-free request fingerprint for browser-only drift
+ * diagnosis. The source is injected into CDP, so this function must remain
+ * self-contained and may not expose graph IDs, coordinates, paths, or routing
+ * signatures.
+ */
+export const readDisplayRoutingRequestDriftProbe = request => {
+  const boundedArray = (value, limit = 2_048) => (
+    Array.isArray(value) ? value.slice(0, limit) : []
   );
+  const finite = value => typeof value === 'number' && Number.isFinite(value);
+  const normalizedNumber = value => finite(value)
+    ? Math.round(value * 1_000) / 1_000
+    : null;
+  const hashText = (domain, value) => {
+    const text = `${domain}\u0000${String(value)}`;
+    const seeds = [0x811c9dc5, 0x9e3779b9, 0x85ebca6b, 0xc2b2ae35];
+    return `probe-v1:${seeds.map((seed, seedIndex) => {
+      let hash = seed;
+      for (let index = 0; index < text.length; index += 1) {
+        hash ^= text.charCodeAt(index) + seedIndex;
+        hash = Math.imul(hash, 0x01000193);
+      }
+      return (hash >>> 0).toString(16).padStart(8, '0');
+    }).join('')}`;
+  };
+  const digestString = (domain, value) => (
+    typeof value === 'string' && value.length > 0 && value.length <= 512
+      ? hashText(domain, value)
+      : null
+  );
+  const nodes = boundedArray(request?.nodes);
+  const baselineNodes = boundedArray(request?.baselineNodes);
+  const edges = boundedArray(request?.edges);
+  const baselineSourceEdges = boundedArray(request?.baselineSourceEdges);
+  const baselinePatches = boundedArray(request?.baselinePatches);
+  const nodeIndexById = new Map(nodes.map((node, index) => [node?.id, index]));
+  const edgeIndexById = new Map(edges.map((edge, index) => [edge?.id, index]));
+  let fractionalGeometryCount = 0;
+  let nonFiniteGeometryCount = 0;
+  let absolutePositionPresentCount = 0;
+  let measuredSizePresentCount = 0;
+  const projectNumber = value => {
+    if (!finite(value)) {
+      if (typeof value !== 'undefined' && value !== null) nonFiniteGeometryCount += 1;
+      return null;
+    }
+    if (!Number.isInteger(value)) fractionalGeometryCount += 1;
+    return normalizedNumber(value);
+  };
+  const nodeGeometry = nodes.map(node => {
+    if (finite(node?.positionAbsolute?.x) && finite(node?.positionAbsolute?.y)) {
+      absolutePositionPresentCount += 1;
+    }
+    if (finite(node?.measured?.width) && finite(node?.measured?.height)) {
+      measuredSizePresentCount += 1;
+    }
+    return [
+      projectNumber(node?.position?.x),
+      projectNumber(node?.position?.y),
+      projectNumber(node?.positionAbsolute?.x),
+      projectNumber(node?.positionAbsolute?.y),
+      projectNumber(node?.width),
+      projectNumber(node?.height),
+      projectNumber(node?.measured?.width),
+      projectNumber(node?.measured?.height),
+      nodeIndexById.get(node?.parentId) ?? -1,
+    ];
+  });
+  const edgeTopology = edges.map(edge => [
+    nodeIndexById.get(edge?.source) ?? -1,
+    nodeIndexById.get(edge?.target) ?? -1,
+    typeof edge?.sourceHandle === 'string',
+    typeof edge?.targetHandle === 'string',
+  ]);
+  const edgePaths = edges.map(edge => boundedArray(edge?.data?.computedPath, 512).map(point => [
+    normalizedNumber(point?.x),
+    normalizedNumber(point?.y),
+  ]));
+  const ordinalSet = (value, indexById) => boundedArray(value)
+    .map(item => indexById.get(item) ?? -1)
+    .sort((left, right) => left - right);
+  const changeSet = request?.changeSet && typeof request.changeSet === 'object'
+    ? request.changeSet
+    : {};
+  const allowedOperation = new Set([
+    'route', 'validate-or-route', 'incremental-route', 'repair',
+  ]);
+  const allowedReason = new Set([
+    'node-drag', 'node-resize', 'node-add', 'node-remove', 'edge-add',
+    'edge-remove', 'port-policy', 'container-change', 'layout', 'unknown',
+  ]);
+  const allowedClassification = new Set(['none', 'style-only', 'geometry', 'topology']);
+  const projectedGeometry = JSON.stringify({ nodeGeometry, edgeTopology, edgePaths });
   return {
-    changeSet: request?.changeSet,
-    mutableEdgeIds: Array.isArray(request?.mutableEdgeIds) ? request.mutableEdgeIds : [],
-    contextEdgeIds: Array.isArray(request?.contextEdgeIds) ? request.contextEdgeIds : [],
-    nodes: projectNodes(request?.nodes),
-    baselineNodes: projectNodes(request?.baselineNodes),
-    edges: Array.isArray(request?.edges)
-      ? request.edges.map(edge => ({
-        id: edge?.id,
-        source: edge?.source,
-        target: edge?.target,
-        sourceHandle: edge?.sourceHandle,
-        targetHandle: edge?.targetHandle,
-        data: {
-          autoSource: edge?.data?.autoSource,
-          autoTarget: edge?.data?.autoTarget,
-          auto: edge?.data?.auto,
-          computedPath: edge?.data?.computedPath,
-        },
-      }))
-      : [],
-    baselinePatches: Array.isArray(request?.baselinePatches) ? request.baselinePatches : [],
+    schema: 'routing-drift-v1',
+    operation: allowedOperation.has(request?.operation) ? request.operation : 'invalid',
+    baseline: {
+      sessionRefPresent: Boolean(request?.baselineSessionRef),
+      inlineBootstrapPresent: baselineNodes.length > 0
+        && baselineSourceEdges.length > 0
+        && baselinePatches.length > 0,
+      inputDigest: digestString('baseline-input', request?.baselineInputGeometryDigest),
+      routeDigest: digestString('baseline-route', request?.baselineOutputRouteSignature),
+      nodeCount: baselineNodes.length,
+      edgeCount: baselineSourceEdges.length,
+      patchCount: baselinePatches.length,
+    },
+    next: {
+      inputDigest: digestString('next-input', request?.nextInputGeometryDigest),
+      projectedGeometryDigest: hashText('projected-geometry', projectedGeometry),
+      nodeGeometryDigest: hashText('node-geometry', JSON.stringify(nodeGeometry)),
+      edgeTopologyDigest: hashText('edge-topology', JSON.stringify(edgeTopology)),
+      edgeSourcePathDigest: hashText('edge-source-path', JSON.stringify(edgePaths)),
+      nodeCount: nodes.length,
+      edgeCount: edges.length,
+      fractionalGeometryCount,
+      nonFiniteGeometryCount,
+      absolutePositionPresentCount,
+      measuredSizePresentCount,
+    },
+    change: {
+      reason: allowedReason.has(changeSet.reason) ? changeSet.reason : 'invalid',
+      classification: allowedClassification.has(changeSet.classification)
+        ? changeSet.classification
+        : 'invalid',
+      topologyChanged: changeSet.topologyChanged === true,
+      geometryChanged: changeSet.geometryChanged === true,
+      changedNodeCount: boundedArray(changeSet.changedNodeIds).length,
+      changedEdgeCount: boundedArray(changeSet.changedEdgeIds).length,
+      mutableEdgeCount: boundedArray(request?.mutableEdgeIds).length,
+      contextEdgeCount: boundedArray(request?.contextEdgeIds).length,
+      changedSetDigest: hashText('changed-set', JSON.stringify({
+        nodes: ordinalSet(changeSet.changedNodeIds, nodeIndexById),
+        edges: ordinalSet(changeSet.changedEdgeIds, edgeIndexById),
+      })),
+      closureSetDigest: hashText('closure-set', JSON.stringify({
+        mutable: ordinalSet(request?.mutableEdgeIds, edgeIndexById),
+        context: ordinalSet(request?.contextEdgeIds, edgeIndexById),
+      })),
+    },
   };
 };
 
 export const prepareDisplayRoutingIncrementalCapture = session => session.evaluate(`(() => {
+  const readRequestDriftProbe = ${readDisplayRoutingRequestDriftProbe.toString()};
   const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
+  const existingRequests = window.__vizlyRoutingRequests || [];
+  const initialRequest = [...existingRequests].reverse().find(item => (
+    item?.operation !== 'incremental-route'
+  ));
+  window.__vizlyInitialRoutingDriftProbe = readRequestDriftProbe(initialRequest);
   window.__vizlyIncrementalRoutingCounterBaseline = {
     workerStartCount: Number.isFinite(routing.workerStartCount) ? routing.workerStartCount : 0,
     workerAbortCount: Number.isFinite(routing.workerAbortCount) ? routing.workerAbortCount : 0,
@@ -68,20 +176,28 @@ export const readDisplayRoutingViewportZoomFromSession = async session => {
 
 export const readDisplayRoutingIncrementalFailureStatus = (session, nodeId) => (
   session.evaluate(`(() => ({
-    routing: window.__vizlyBaseReactFlowDisplayRouting || {},
+    routing: (() => {
+      const value = window.__vizlyBaseReactFlowDisplayRouting || {};
+      return {
+        stage: value.stage,
+        workerStartCount: value.workerStartCount,
+        workerAbortCount: value.workerAbortCount,
+        workerResolution: value.workerResolution,
+        fallbackLevel: value.fallbackLevel,
+      };
+    })(),
     requests: (window.__vizlyRoutingRequests || []).map(item => ({
-      requestId: item?.requestId,
       operation: item?.operation,
       mutableEdgeCount: item?.mutableEdgeIds?.length,
     })),
     responses: (window.__vizlyRoutingResponses || []).map(item => ({
-      requestId: item?.requestId,
       routeResolution: item?.routeResolution,
       hardClean: item?.hardClean,
+      fallbackLevel: item?.fallbackLevel,
     })),
-    nodeTransform: document.querySelector(
+    targetNodePresent: Boolean(document.querySelector(
       '.react-flow__node[data-id=${JSON.stringify(nodeId)}]',
-    )?.getAttribute('transform') || null,
+    )),
   }))()`)
 );
 
