@@ -112,50 +112,9 @@ export const readVisibleDisplayRoutingNodeRect = (nodeId) => {
     : null;
 };
 
-export const readDisplayRoutingNodeDragTarget = (nodeId) => {
-  if (typeof nodeId !== 'string' || nodeId.length === 0 || nodeId.length > 500) return null;
-  const element = [...document.querySelectorAll('.react-flow__node[data-id]')]
-    .find(candidate => candidate.getAttribute('data-id') === nodeId);
-  const pane = document.querySelector('.react-flow__pane');
-  if (!element || !pane) return null;
-  const bounds = element.getBoundingClientRect();
-  const paneBounds = pane.getBoundingClientRect();
-  const values = [
-    bounds.x,
-    bounds.y,
-    bounds.width,
-    bounds.height,
-    paneBounds.left,
-    paneBounds.top,
-    paneBounds.right,
-    paneBounds.bottom,
-  ];
-  if (!values.every(Number.isFinite) || bounds.width <= 1 || bounds.height <= 1) return null;
-
-  const ratios = [0.5, 0.35, 0.65, 0.2, 0.8];
-  for (const yRatio of ratios) {
-    for (const xRatio of ratios) {
-      const x = bounds.x + bounds.width * xRatio;
-      const y = bounds.y + bounds.height * yRatio;
-      if (
-        x < paneBounds.left
-        || x > paneBounds.right
-        || y < paneBounds.top
-        || y > paneBounds.bottom
-      ) continue;
-      const hit = document.elementFromPoint(x, y);
-      if (hit && (hit === element || element.contains(hit))) {
-        return { x, y };
-      }
-    }
-  }
-  return null;
-};
-
-export const readDisplayRoutingViewportZoom = () => {
-  const zoom = Number(window.reactFlowInstance?.getViewport?.()?.zoom);
-  return Number.isFinite(zoom) && zoom >= 0.05 && zoom <= 8 ? zoom : null;
-};
+export const readDisplayRoutingViewportZoom = () => (
+  readDisplayRoutingViewportSnapshot()?.zoom ?? null
+);
 
 export const readDisplayRoutingNodePanGesture = (nodeId) => {
   if (typeof nodeId !== 'string' || nodeId.length === 0 || nodeId.length > 500) return null;
@@ -765,3 +724,6 @@ export const readDisplayRoutingVisualScaleAudit = () => {
     labelNodeOverlaps,
   };
 };
+import { readDisplayRoutingViewportSnapshot } from './display-routing-browser-viewport.mjs';
+
+export { readDisplayRoutingNodeDragTarget } from './display-routing-browser-viewport.mjs';

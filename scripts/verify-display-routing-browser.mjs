@@ -2,12 +2,17 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import { withPrecompiledRouteBrowser } from './lib/precompiled-display-route-cdp.mjs';
 import {
-  readDisplayRoutingNodeDragTarget,
   readDisplayRoutingNodePanGesture,
   readDisplayRoutingVisualScaleAudit,
   readRenderedDisplayEdgeNodeIntersections,
   replayDisplayRoutingResponseEdges,
 } from './lib/display-routing-browser-geometry.mjs';
+import {
+  displayRoutingDragSnapshotExpression,
+  displayRoutingViewportSnapshotsMatch,
+  readDisplayRoutingNodeDragTarget,
+  waitForStableDisplayRoutingViewport,
+} from './lib/display-routing-browser-viewport.mjs';
 import {
   assertDisplayRoutingDragResult,
   assertDisplayRoutingPerformanceBudget,
@@ -22,7 +27,6 @@ import {
   prepareDisplayRoutingIncrementalCapture,
   readDisplayRoutingRequestDriftProbe,
   readDisplayRoutingIncrementalFailureStatus,
-  readDisplayRoutingViewportZoomFromSession,
 } from './lib/display-routing-browser-diagnostics.mjs';
 import {
   formatDisplayRoutingCpuProfile,
@@ -137,7 +141,8 @@ const dragNode = async (session, nodeId, beforeRelease = null) => {
     const readNodePanGesture = ${readDisplayRoutingNodePanGesture.toString()};
     return readNodePanGesture(${JSON.stringify(nodeId)});
   })()`;
-  let target = await session.evaluate(dragTargetExpression);
+  let stableSnapshot = await waitForStableDisplayRoutingViewport(session, nodeId);
+  let target = stableSnapshot.target;
   for (let attempt = 0; !target && attempt < 8; attempt += 1) {
     const gesture = await session.evaluate(panGestureExpression);
     if (!gesture) {
@@ -178,10 +183,13 @@ const dragNode = async (session, nodeId, beforeRelease = null) => {
       clickCount: 1,
     });
     await delay(150);
-    target = await session.evaluate(dragTargetExpression);
+    stableSnapshot = await waitForStableDisplayRoutingViewport(session, nodeId);
+    target = stableSnapshot.target;
   }
   target ??= await waitForValue(session, dragTargetExpression);
-  const viewportZoom = await readDisplayRoutingViewportZoomFromSession(session);
+  stableSnapshot = await waitForStableDisplayRoutingViewport(session, nodeId);
+  target = stableSnapshot.target ?? target;
+  const viewportZoom = stableSnapshot.viewport.zoom;
   const startX = target.x;
   const startY = target.y;
   const endX = startX + 40 * viewportZoom;
@@ -228,12 +236,18 @@ const dragNode = async (session, nodeId, beforeRelease = null) => {
     buttons: 0,
     clickCount: 1,
   });
+  const releasedAt = Date.now();
+  await delay(34);
+  const releaseSnapshot = await session.evaluate(displayRoutingDragSnapshotExpression(nodeId));
+  if (!displayRoutingViewportSnapshotsMatch(stableSnapshot.viewport, releaseSnapshot?.viewport)) {
+    throw new Error('Display routing viewport changed during the drag gesture');
+  }
   return {
     startX,
     startY,
     endX,
     endY,
-    releasedAt: Date.now(),
+    releasedAt,
     viewportZoom,
     hitStack,
   };

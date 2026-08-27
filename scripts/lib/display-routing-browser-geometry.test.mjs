@@ -11,6 +11,11 @@ import {
   replayDisplayRoutingResponseEdges,
   readVisibleDisplayRoutingNodeRect,
 } from './display-routing-browser-geometry.mjs';
+import {
+  displayRoutingViewportSamplesAreStable,
+  displayRoutingViewportSnapshotsMatch,
+  readDisplayRoutingViewportSnapshot,
+} from './display-routing-browser-viewport.mjs';
 import { readRenderedDisplayEdgeHardGeometryAudit } from './display-routing-browser-hard-geometry.mjs';
 import { assertDisplayRoutingVisualScaleAudit } from './display-routing-browser-visual-audit.mjs';
 
@@ -229,11 +234,63 @@ describe('display routing browser geometry', () => {
 
   it('bounds the viewport zoom used to normalize drag distance', () => {
     vi.stubGlobal('window', {
-      reactFlowInstance: { getViewport: () => ({ zoom: 0.625 }) },
+      reactFlowInstance: { getViewport: () => ({ x: 10, y: 20, zoom: 0.625 }) },
     });
+    expect(readDisplayRoutingViewportSnapshot()).toEqual({ x: 10, y: 20, zoom: 0.625 });
     expect(readDisplayRoutingViewportZoom()).toBe(0.625);
-    window.reactFlowInstance.getViewport = () => ({ zoom: Number.POSITIVE_INFINITY });
+    window.reactFlowInstance.getViewport = () => ({
+      x: 10,
+      y: 20,
+      zoom: Number.POSITIVE_INFINITY,
+    });
+    expect(readDisplayRoutingViewportSnapshot()).toBeNull();
     expect(readDisplayRoutingViewportZoom()).toBeNull();
+  });
+
+  it('requires consecutive stable viewport samples before a drag', () => {
+    expect(displayRoutingViewportSamplesAreStable([
+      { x: 100, y: 200, zoom: 0.625, sampledAt: 0 },
+      { x: 100.02, y: 199.98, zoom: 0.62505, sampledAt: 130 },
+      { x: 100.01, y: 200.01, zoom: 0.62504, sampledAt: 260 },
+    ])).toBe(true);
+    expect(displayRoutingViewportSamplesAreStable([
+      { x: 100, y: 200, zoom: 0.625, sampledAt: 0 },
+      { x: 108, y: 190, zoom: 0.61, sampledAt: 130 },
+      { x: 116, y: 180, zoom: 0.59, sampledAt: 260 },
+    ])).toBe(false);
+    expect(displayRoutingViewportSamplesAreStable([
+      { x: 100, y: 200, zoom: 0.625, sampledAt: 0 },
+      null,
+      { x: 100, y: 200, zoom: 0.625, sampledAt: 260 },
+    ])).toBe(false);
+    expect(displayRoutingViewportSamplesAreStable([
+      { x: 100, y: 200, zoom: 0.625, sampledAt: 0 },
+    ])).toBe(false);
+    expect(displayRoutingViewportSamplesAreStable([
+      { x: 100, y: 200, zoom: 0.625, sampledAt: 0 },
+      { x: 100, y: 200, zoom: 0.625, sampledAt: 100 },
+      { x: 100, y: 200, zoom: 0.625, sampledAt: 200 },
+      { x: 108, y: 190, zoom: 0.61, sampledAt: 220 },
+      { x: 108, y: 190, zoom: 0.61, sampledAt: 300 },
+    ])).toBe(false);
+    expect(displayRoutingViewportSamplesAreStable([
+      { x: 100, y: 200, zoom: 0.625, sampledAt: 0 },
+      { x: 108, y: 190, zoom: 0.61, sampledAt: 220 },
+      { x: 108, y: 190, zoom: 0.61, sampledAt: 480 },
+    ])).toBe(true);
+    expect(displayRoutingViewportSamplesAreStable([
+      { x: 100, y: 200, zoom: 0.625, targetX: 50, targetY: 60, sampledAt: 0 },
+      { x: 100, y: 200, zoom: 0.625, targetX: 55, targetY: 65, sampledAt: 200 },
+      { x: 100, y: 200, zoom: 0.625, targetX: 55, targetY: 65, sampledAt: 260 },
+    ])).toBe(false);
+    expect(displayRoutingViewportSnapshotsMatch(
+      { x: 100, y: 200, zoom: 0.625 },
+      { x: 100.02, y: 199.98, zoom: 0.62505 },
+    )).toBe(true);
+    expect(displayRoutingViewportSnapshotsMatch(
+      { x: 100, y: 200, zoom: 0.625 },
+      { x: 100, y: 200, zoom: 0.61 },
+    )).toBe(false);
   });
 
   it('compares worker node geometry with rendered DOM geometry without returning identifiers', () => {

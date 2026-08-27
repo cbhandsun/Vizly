@@ -228,6 +228,62 @@ export const summarizeDisplayRoutingSamples = (values) => {
   };
 };
 
+export const summarizeDisplayRoutingOutlierSamples = (
+  samplesValue,
+  nodeId,
+  limit = 5,
+) => {
+  if (
+    !Array.isArray(samplesValue)
+    || typeof nodeId !== 'string'
+    || nodeId.length === 0
+    || nodeId.length > 128
+    || !Number.isSafeInteger(limit)
+    || limit < 1
+    || limit > 20
+  ) return [];
+  const finiteMetric = value => (
+    Number.isFinite(value) && value >= 0 && value <= 600_000 ? value : null
+  );
+  const digest = value => (
+    typeof value === 'string' && /^probe-v1:[0-9a-f]{32}$/.test(value) ? value : null
+  );
+  return samplesValue.flatMap((sample, sampleIndex) => {
+    const dragCase = Array.isArray(sample?.dragCases)
+      ? sample.dragCases.find(item => item?.nodeId === nodeId)
+      : null;
+    if (!dragCase) return [];
+    const phaseTrace = Array.isArray(dragCase.phaseTrace) ? dragCase.phaseTrace : [];
+    const localRoute = phaseTrace.find(trace => trace?.phase === 'local-route');
+    const generation = phaseTrace.find(
+      trace => trace?.phase === 'local-reconnect-path-generation',
+    );
+    return [{
+      sampleIndex: sampleIndex + 1,
+      releaseToFinalMs: finiteMetric(dragCase.releaseToFinalMs),
+      workerComputeMs: finiteMetric(dragCase.workerDurationMs),
+      workerDeliveryWaitMs: finiteMetric(dragCase.workerDeliveryWaitMs),
+      workerLongTaskTotalMs: finiteMetric(dragCase.workerLongTaskTotalMs),
+      workerLongTaskMaxMs: finiteMetric(dragCase.workerLongTaskMaxMs),
+      localRouteMs: finiteMetric(localRoute?.durationMs),
+      nodeGeometryDigest: digest(
+        dragCase?.driftProbe?.incremental?.next?.nodeGeometryDigest,
+      ),
+      generation: {
+        candidateCount: finiteMetric(generation?.candidateCount),
+        underBudgetCount: finiteMetric(generation?.underBudgetCount),
+        minimumCandidateCount: finiteMetric(generation?.minimumCandidateCount),
+        maximumCandidateCount: finiteMetric(generation?.maximumCandidateCount),
+      },
+      slowestPhases: summarizeSlowestDisplayRoutingPhases(phaseTrace, 4),
+    }];
+  }).sort((left, right) => (
+    (right.localRouteMs ?? -1) - (left.localRouteMs ?? -1)
+    || (right.releaseToFinalMs ?? -1) - (left.releaseToFinalMs ?? -1)
+    || left.sampleIndex - right.sampleIndex
+  )).slice(0, limit);
+};
+
 export const assertDisplayRoutingPerformanceBudget = (
   dragCase,
   initial,

@@ -82,6 +82,35 @@ const waitForBrowserExit = async (browser, timeoutMs = 5_000) => {
   ]);
 };
 
+export const closePrecompiledRouteBrowser = async (
+  session,
+  browser,
+  waitForExit = waitForBrowserExit,
+) => {
+  let gracefulCloseRequested = false;
+  if (session) {
+    try {
+      await Promise.race([
+        session.send('Browser.close'),
+        delay(2_000).then(() => { throw new Error('Timed out closing browser through CDP'); }),
+      ]);
+      gracefulCloseRequested = true;
+    } catch {
+      // The browser process fallback below owns cleanup after a failed CDP close.
+    } finally {
+      session.close();
+    }
+  }
+  if (!gracefulCloseRequested && browser.exitCode == null && browser.signalCode == null) {
+    browser.kill();
+  }
+  await waitForExit(browser);
+  if (browser.exitCode == null && browser.signalCode == null) {
+    browser.kill();
+    await waitForExit(browser);
+  }
+};
+
 class CdpPageSession {
   constructor(webSocketUrl) {
     this.webSocketUrl = webSocketUrl;
@@ -168,6 +197,7 @@ export const withPrecompiledRouteBrowser = async (run) => {
     `--user-data-dir=${profile}`,
     'about:blank',
   ], { stdio: 'ignore', windowsHide: true });
+  let session = null;
   try {
     await waitForJson(`http://127.0.0.1:${port}/json/version`);
     const targetResponse = await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, {
@@ -175,20 +205,15 @@ export const withPrecompiledRouteBrowser = async (run) => {
     });
     if (!targetResponse.ok) throw new Error('Failed to create a browser target');
     const target = await targetResponse.json();
-    const session = new CdpPageSession(target.webSocketDebuggerUrl);
+    session = new CdpPageSession(target.webSocketDebuggerUrl);
     await session.open();
-    try {
-      await session.send('Page.enable');
-      await session.send('Runtime.enable');
-      return await run(session);
-    } finally {
-      session.close();
-    }
+    await session.send('Page.enable');
+    await session.send('Runtime.enable');
+    return await run(session);
   } finally {
-    if (browser.exitCode == null) browser.kill();
-    await waitForBrowserExit(browser);
+    await closePrecompiledRouteBrowser(session, browser);
     await retryPrecompiledRouteBrowserProfileCleanup(() => (
       rm(profile, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
-    ));
+    ), delay, 12);
   }
 };

@@ -8,6 +8,7 @@ import {
   EXPECTED_INCREMENTAL_DISPLAY_ROUTING_PHASE_SEQUENCES,
   selectDisplayRoutingDragCases,
   summarizeDisplayRoutingSamples,
+  summarizeDisplayRoutingOutlierSamples,
   summarizeSlowestDisplayRoutingPhases,
 } from './display-routing-browser-performance.mjs';
 import { buildDisplayRoutingMachineResult } from './display-routing-browser-result.mjs';
@@ -210,6 +211,58 @@ describe('display routing browser performance budget', () => {
     expect(summarizeDisplayRoutingSamples('invalid')).toBeNull();
   });
 
+  it('reports bounded content-free slow sample evidence', () => {
+    const sample = (localRouteMs, digest, candidateCount = 256) => ({
+      dragCases: [{
+        nodeId: 'wms',
+        releaseToFinalMs: localRouteMs + 50,
+        workerDurationMs: localRouteMs + 20,
+        workerDeliveryWaitMs: 10,
+        workerLongTaskTotalMs: 80,
+        workerLongTaskMaxMs: 60,
+        driftProbe: {
+          incremental: { next: { nodeGeometryDigest: digest } },
+        },
+        phaseTrace: [{
+          phase: 'local-route',
+          durationMs: localRouteMs,
+          exclusiveDurationMs: 0,
+        }, {
+          phase: 'local-reconnect-path-generation',
+          parentPhase: 'local-reconnect-seed',
+          durationMs: 20,
+          exclusiveDurationMs: 20,
+          candidateCount,
+          underBudgetCount: 0,
+          minimumCandidateCount: 64,
+          maximumCandidateCount: 64,
+          privatePath: 'discarded',
+        }],
+      }],
+    });
+    const digest = `probe-v1:${'a'.repeat(32)}`;
+    expect(summarizeDisplayRoutingOutlierSamples([
+      sample(50, digest),
+      sample(500, digest),
+    ], 'wms', 1)).toEqual([expect.objectContaining({
+      sampleIndex: 2,
+      localRouteMs: 500,
+      nodeGeometryDigest: digest,
+      generation: {
+        candidateCount: 256,
+        underBudgetCount: 0,
+        minimumCandidateCount: 64,
+        maximumCandidateCount: 64,
+      },
+      slowestPhases: expect.arrayContaining([expect.objectContaining({
+        phase: 'local-reconnect-path-generation',
+      })]),
+    })]);
+    expect(JSON.stringify(summarizeDisplayRoutingOutlierSamples([
+      sample(500, 'private-digest'),
+    ], 'wms'))).not.toContain('private');
+  });
+
   it('returns the validated measurements', () => {
     expect(assertDisplayRoutingPerformanceBudget(
       { nodeId: 'wms' },
@@ -314,6 +367,51 @@ describe('display routing browser performance budget', () => {
         parsedToFinalMs: 11,
         mutableEdgeCount: 4,
         routing: { workerStartCountDelta: 1, workerAbortCountDelta: 0 },
+        driftProbe: {
+          initial: {
+            schema: 'routing-drift-v1',
+            operation: 'validate-or-route',
+            baseline: {},
+            next: {
+              projectedGeometryDigest: `probe-v1:${'a'.repeat(32)}`,
+              nodeGeometryDigest: `probe-v1:${'b'.repeat(32)}`,
+              edgeTopologyDigest: `probe-v1:${'c'.repeat(32)}`,
+              edgeSourcePathDigest: `probe-v1:${'d'.repeat(32)}`,
+              nodeCount: 14,
+              edgeCount: 14,
+              fractionalGeometryCount: 18,
+              nonFiniteGeometryCount: 0,
+              absolutePositionPresentCount: 14,
+              measuredSizePresentCount: 14,
+              privateCoordinates: [1, 2, 3],
+            },
+            change: {},
+          },
+          incremental: {
+            schema: 'routing-drift-v1',
+            operation: 'incremental-route',
+            baseline: {
+              sessionRefPresent: true,
+              inputDigest: `probe-v1:${'e'.repeat(32)}`,
+              routeDigest: 'private-route-signature',
+            },
+            next: {
+              inputDigest: `probe-v1:${'f'.repeat(32)}`,
+              nodeGeometryDigest: `probe-v1:${'1'.repeat(32)}`,
+              edgeSourcePathDigest: `probe-v1:${'2'.repeat(32)}`,
+            },
+            change: {
+              reason: 'node-drag',
+              classification: 'geometry',
+              changedNodeCount: 1,
+              mutableEdgeCount: 4,
+              contextEdgeCount: 5,
+              changedSetDigest: `probe-v1:${'3'.repeat(32)}`,
+              closureSetDigest: `probe-v1:${'4'.repeat(32)}`,
+              privateNodeId: 'private-node-id',
+            },
+          },
+        },
         response: {
           affectedEdgeCount: 4,
           fallbackLevel: 'none',
@@ -375,6 +473,72 @@ describe('display routing browser performance budget', () => {
         fallbackLevel: 'none',
         workerStartCount: 1,
         workerAbortCount: 0,
+        driftProbe: {
+          initial: {
+            operation: 'validate-or-route',
+            baseline: {
+              sessionRefPresent: false,
+              inlineBootstrapPresent: false,
+              inputDigest: null,
+              routeDigest: null,
+            },
+            next: {
+              inputDigest: null,
+              projectedGeometryDigest: `probe-v1:${'a'.repeat(32)}`,
+              nodeGeometryDigest: `probe-v1:${'b'.repeat(32)}`,
+              edgeTopologyDigest: `probe-v1:${'c'.repeat(32)}`,
+              edgeSourcePathDigest: `probe-v1:${'d'.repeat(32)}`,
+              nodeCount: 14,
+              edgeCount: 14,
+              fractionalGeometryCount: 18,
+              nonFiniteGeometryCount: 0,
+              absolutePositionPresentCount: 14,
+              measuredSizePresentCount: 14,
+            },
+            change: {
+              reason: 'invalid',
+              classification: 'invalid',
+              changedNodeCount: null,
+              changedEdgeCount: null,
+              mutableEdgeCount: null,
+              contextEdgeCount: null,
+              changedSetDigest: null,
+              closureSetDigest: null,
+            },
+          },
+          incremental: {
+            operation: 'incremental-route',
+            baseline: {
+              sessionRefPresent: true,
+              inlineBootstrapPresent: false,
+              inputDigest: `probe-v1:${'e'.repeat(32)}`,
+              routeDigest: null,
+            },
+            next: {
+              inputDigest: `probe-v1:${'f'.repeat(32)}`,
+              projectedGeometryDigest: null,
+              nodeGeometryDigest: `probe-v1:${'1'.repeat(32)}`,
+              edgeTopologyDigest: null,
+              edgeSourcePathDigest: `probe-v1:${'2'.repeat(32)}`,
+              nodeCount: null,
+              edgeCount: null,
+              fractionalGeometryCount: null,
+              nonFiniteGeometryCount: null,
+              absolutePositionPresentCount: null,
+              measuredSizePresentCount: null,
+            },
+            change: {
+              reason: 'node-drag',
+              classification: 'geometry',
+              changedNodeCount: 1,
+              changedEdgeCount: null,
+              mutableEdgeCount: 4,
+              contextEdgeCount: 5,
+              changedSetDigest: `probe-v1:${'3'.repeat(32)}`,
+              closureSetDigest: `probe-v1:${'4'.repeat(32)}`,
+            },
+          },
+        },
         phaseTrace: [{
           phase: 'local-route',
           parentPhase: null,
@@ -395,6 +559,14 @@ describe('display routing browser performance budget', () => {
         }],
       }],
     });
+    expect(JSON.stringify(buildDisplayRoutingMachineResult([{
+      incremental: {
+        driftProbe: {
+          initial: { schema: 'routing-drift-v1', next: { privatePath: 'private-path' } },
+          incremental: { schema: 'routing-drift-v1', change: { privateNodeId: 'private-node' } },
+        },
+      },
+    }]))).not.toContain('private-');
   });
 
   it('aggregates CPU self time without retaining script URLs', () => {

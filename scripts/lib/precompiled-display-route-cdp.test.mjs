@@ -1,8 +1,72 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { retryPrecompiledRouteBrowserProfileCleanup } from './precompiled-display-route-cdp.mjs';
+import {
+  closePrecompiledRouteBrowser,
+  retryPrecompiledRouteBrowserProfileCleanup,
+} from './precompiled-display-route-cdp.mjs';
 
 describe('precompiled display route browser profile cleanup', () => {
+  it('requests graceful browser shutdown before profile cleanup', async () => {
+    const session = {
+      send: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn(),
+    };
+    const browser = {
+      exitCode: null,
+      signalCode: null,
+      kill: vi.fn(),
+    };
+    const waitForExit = vi.fn().mockImplementation(async () => {
+      browser.exitCode = 0;
+    });
+
+    await closePrecompiledRouteBrowser(session, browser, waitForExit);
+
+    expect(session.send).toHaveBeenCalledWith('Browser.close');
+    expect(session.close).toHaveBeenCalledOnce();
+    expect(browser.kill).not.toHaveBeenCalled();
+    expect(waitForExit).toHaveBeenCalledOnce();
+  });
+
+  it('falls back to process termination when graceful shutdown fails', async () => {
+    const session = {
+      send: vi.fn().mockRejectedValue(new Error('closed socket')),
+      close: vi.fn(),
+    };
+    const browser = {
+      exitCode: null,
+      signalCode: null,
+      kill: vi.fn(),
+    };
+    const waitForExit = vi.fn().mockImplementation(async () => {
+      browser.signalCode = 'SIGTERM';
+    });
+
+    await closePrecompiledRouteBrowser(session, browser, waitForExit);
+
+    expect(session.close).toHaveBeenCalledOnce();
+    expect(browser.kill).toHaveBeenCalledOnce();
+    expect(waitForExit).toHaveBeenCalledOnce();
+  });
+
+  it('leaves final lock detection to bounded profile cleanup after termination', async () => {
+    const session = {
+      send: vi.fn().mockRejectedValue(new Error('closed socket')),
+      close: vi.fn(),
+    };
+    const browser = {
+      exitCode: null,
+      signalCode: null,
+      kill: vi.fn(),
+    };
+    const waitForExit = vi.fn().mockResolvedValue(undefined);
+
+    await expect(closePrecompiledRouteBrowser(session, browser, waitForExit))
+      .resolves.toBeUndefined();
+    expect(browser.kill).toHaveBeenCalledTimes(2);
+    expect(waitForExit).toHaveBeenCalledTimes(2);
+  });
+
   it('returns immediately after a successful cleanup', async () => {
     const remove = vi.fn().mockResolvedValue(undefined);
     const wait = vi.fn();

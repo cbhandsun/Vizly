@@ -1,4 +1,53 @@
 const finiteMetric = value => Number.isFinite(value) && value >= 0 ? value : null;
+const safeProbeDigest = value => (
+  typeof value === 'string' && /^probe-v1:[0-9a-f]{32}$/.test(value) ? value : null
+);
+
+const projectDriftProbeSide = value => {
+  if (!value || value.schema !== 'routing-drift-v1') return null;
+  return {
+    operation: ['route', 'validate-or-route', 'incremental-route', 'repair', 'invalid']
+      .includes(value.operation) ? value.operation : 'invalid',
+    baseline: {
+      sessionRefPresent: value?.baseline?.sessionRefPresent === true,
+      inlineBootstrapPresent: value?.baseline?.inlineBootstrapPresent === true,
+      inputDigest: safeProbeDigest(value?.baseline?.inputDigest),
+      routeDigest: safeProbeDigest(value?.baseline?.routeDigest),
+    },
+    next: {
+      inputDigest: safeProbeDigest(value?.next?.inputDigest),
+      projectedGeometryDigest: safeProbeDigest(value?.next?.projectedGeometryDigest),
+      nodeGeometryDigest: safeProbeDigest(value?.next?.nodeGeometryDigest),
+      edgeTopologyDigest: safeProbeDigest(value?.next?.edgeTopologyDigest),
+      edgeSourcePathDigest: safeProbeDigest(value?.next?.edgeSourcePathDigest),
+      nodeCount: finiteMetric(value?.next?.nodeCount),
+      edgeCount: finiteMetric(value?.next?.edgeCount),
+      fractionalGeometryCount: finiteMetric(value?.next?.fractionalGeometryCount),
+      nonFiniteGeometryCount: finiteMetric(value?.next?.nonFiniteGeometryCount),
+      absolutePositionPresentCount: finiteMetric(value?.next?.absolutePositionPresentCount),
+      measuredSizePresentCount: finiteMetric(value?.next?.measuredSizePresentCount),
+    },
+    change: {
+      reason: typeof value?.change?.reason === 'string'
+        ? value.change.reason.slice(0, 32)
+        : 'invalid',
+      classification: typeof value?.change?.classification === 'string'
+        ? value.change.classification.slice(0, 32)
+        : 'invalid',
+      changedNodeCount: finiteMetric(value?.change?.changedNodeCount),
+      changedEdgeCount: finiteMetric(value?.change?.changedEdgeCount),
+      mutableEdgeCount: finiteMetric(value?.change?.mutableEdgeCount),
+      contextEdgeCount: finiteMetric(value?.change?.contextEdgeCount),
+      changedSetDigest: safeProbeDigest(value?.change?.changedSetDigest),
+      closureSetDigest: safeProbeDigest(value?.change?.closureSetDigest),
+    },
+  };
+};
+
+const projectDriftProbe = value => ({
+  initial: projectDriftProbeSide(value?.initial),
+  incremental: projectDriftProbeSide(value?.incremental),
+});
 
 const projectPhaseTrace = value => Array.isArray(value) ? value.slice(0, 128).flatMap(trace => {
   if (!trace || typeof trace.phase !== 'string' || trace.phase.length > 128) return [];
@@ -92,6 +141,7 @@ export const buildDisplayRoutingMachineResult = (results) => ({
       fallbackLevel: result?.incremental?.response?.fallbackLevel === 'none' ? 'none' : 'full',
       workerStartCount: finiteMetric(result?.incremental?.routing?.workerStartCountDelta),
       workerAbortCount: finiteMetric(result?.incremental?.routing?.workerAbortCountDelta),
+      driftProbe: projectDriftProbe(result?.incremental?.driftProbe),
       phaseTrace: projectPhaseTrace(result?.incremental?.response?.phaseTrace),
     };
   }) : [],
