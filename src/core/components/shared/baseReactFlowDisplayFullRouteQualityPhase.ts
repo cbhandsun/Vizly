@@ -39,7 +39,10 @@ import {
   type DisplayRoutingPhaseTrace,
 } from './baseReactFlowDisplayRoutingTrace';
 import type { BaseReactFlowFullRouteContext } from './baseReactFlowDisplayFullRouteTypes';
-import { createDisplayRoutingTopologyWaypointAxes } from './baseReactFlowDisplayRoutingTopologyPlan';
+import {
+  createDisplayRoutingTopologyWaypointAxes,
+  createDisplayRoutingTopologyWaypointAxesByEdgeId,
+} from './baseReactFlowDisplayRoutingTopologyPlan';
 import {
   createDisplayTopologyFirstSeed,
 } from './baseReactFlowDisplayTopologyFirstSeed';
@@ -119,6 +122,11 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
         onlyNodeRiskEdges: true,
         preferredAxes: createDisplayRoutingTopologyWaypointAxes(
           topologyPlan,
+          useBoundedLargeRepair,
+        ),
+        preferredAxesByEdgeId: createDisplayRoutingTopologyWaypointAxesByEdgeId(
+          topologyPlan,
+          topologySeed.edges,
           useBoundedLargeRepair,
         ),
         diagnostics: globalRouteDiagnostics,

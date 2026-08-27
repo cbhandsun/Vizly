@@ -137,6 +137,46 @@ describe('edge routing module boundaries', () => {
     expect(reduceEdgeCrossingsWithWaypoints(emptyEdges, [], 'TB')).toBe(emptyEdges);
   });
 
+  it('materializes reserved waypoint axes only for their owning edge', () => {
+    const edges: Edge[] = [{
+      id: 'owner',
+      source: 'source-a',
+      target: 'target-a',
+      data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
+    }, {
+      id: 'unowned',
+      source: 'source-b',
+      target: 'target-b',
+      data: { computedPath: [{ x: 0, y: 100 }, { x: 100, y: 100 }] },
+    }];
+    const nodes: Array<Node & { positionAbsolute: { x: number; y: number } }> = [{
+      id: 'owner-obstacle',
+      position: { x: 40, y: -10 },
+      positionAbsolute: { x: 40, y: -10 },
+      width: 20,
+      height: 20,
+      measured: { width: 20, height: 20 },
+      data: {},
+    }];
+    const baselineDiagnostics = createEdgeWaypointRefinementDiagnostics();
+    reduceEdgeCrossingsWithWaypoints(edges, nodes, 'TB', {
+      onlyNodeRiskEdges: true,
+      preferredAxesByEdgeId: new Map([['owner', { x: [], y: [] }]]),
+      diagnostics: baselineDiagnostics,
+    });
+    const reservedDiagnostics = createEdgeWaypointRefinementDiagnostics();
+    const result = reduceEdgeCrossingsWithWaypoints(edges, nodes, 'TB', {
+      onlyNodeRiskEdges: true,
+      preferredAxesByEdgeId: new Map([['owner', { x: [], y: [40] }]]),
+      diagnostics: reservedDiagnostics,
+    });
+
+    expect(reservedDiagnostics.processedCandidateEdgeCount).toBe(1);
+    expect(reservedDiagnostics.generatedCandidateCount)
+      .toBeGreaterThan(baselineDiagnostics.generatedCandidateCount);
+    expect(result[1]).toBe(edges[1]);
+  });
+
   it('reports bounded aggregate candidate and scan work without graph identifiers', () => {
     const diagnostics = createEdgeWaypointRefinementDiagnostics();
     const edges: Edge[] = [

@@ -49,6 +49,11 @@ export type RoutingTopologyWaypointAxes = Readonly<{
   y: readonly number[];
 }>;
 
+export type RoutingTopologyWaypointAxesByEdgeId = ReadonlyMap<
+  string,
+  RoutingTopologyWaypointAxes
+>;
+
 /**
  * Projects topology into the narrow waypoint boundary consumed by the routing
  * strategy. Bounded large graphs stay on their frozen baseline until their
@@ -66,6 +71,38 @@ export const createDisplayRoutingTopologyWaypointAxes = (
     .filter(corridor => corridor.axis === 'horizontal')
     .map(corridor => corridor.center);
   return x.length > 0 || y.length > 0 ? { x, y } : undefined;
+};
+
+/**
+ * Projects successful lane reservations into edge-owned waypoint axes. Dual
+ * source/target reservations merge onto the same edge without exposing group
+ * or corridor metadata outside the Worker routing pipeline.
+ */
+export const createDisplayRoutingTopologyWaypointAxesByEdgeId = (
+  plan: RoutingTopologyPlan,
+  edges: readonly Edge[],
+  useBoundedLargeRepair: boolean,
+): RoutingTopologyWaypointAxesByEdgeId | undefined => {
+  if (useBoundedLargeRepair) return undefined;
+  const mutableAxes = new Map<string, { x: Set<number>; y: Set<number> }>();
+  for (const reservation of plan.corridorReservations.reservations) {
+    if (reservation.status !== 'reserved' || reservation.corridorIndex === null) continue;
+    const corridor = plan.corridors[reservation.corridorIndex];
+    if (!corridor) continue;
+    for (const assignment of reservation.memberAssignments) {
+      const edgeId = edges[assignment.edgeIndex]?.id;
+      if (!edgeId || !Number.isFinite(assignment.laneCenter)) continue;
+      const axes = mutableAxes.get(edgeId) ?? { x: new Set<number>(), y: new Set<number>() };
+      if (corridor.axis === 'vertical') axes.x.add(assignment.laneCenter);
+      else axes.y.add(assignment.laneCenter);
+      mutableAxes.set(edgeId, axes);
+    }
+  }
+  if (mutableAxes.size === 0) return undefined;
+  return new Map([...mutableAxes].map(([edgeId, axes]) => [edgeId, {
+    x: [...axes.x].sort((left, right) => left - right),
+    y: [...axes.y].sort((left, right) => left - right),
+  }]));
 };
 
 const readSide = (handle: unknown): RoutingTerminalSide => {

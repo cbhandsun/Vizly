@@ -566,6 +566,7 @@ export function reduceEdgeCrossingsWithWaypoints(
     onlySoftRiskEdges?: boolean;
     maxCandidateEdges?: number;
     preferredAxes?: RoutingWaypointCandidateAxes;
+    preferredAxesByEdgeId?: ReadonlyMap<string, RoutingWaypointCandidateAxes>;
     diagnostics?: EdgeWaypointRefinementDiagnostics;
     disableScoreLowerBoundPruning?: boolean;
     disableNodeVisualIndex?: boolean;
@@ -610,6 +611,7 @@ export function reduceEdgeCrossingsWithWaypoints(
   for (const { edge, path } of edgeOrder) {
     const hasNodeRisk = pathHasNodeRoutingRisk(path, nodes, edge);
     const hasSoftRisk = pathHasVisualComplexityRisk(path);
+    const ownerPreferredAxes = options.preferredAxesByEdgeId?.get(edge.id);
     if (options.onlyNodeRiskEdges && !hasNodeRisk) {
       chosenPaths.set(edge.id, path);
       acceptedSegments.push(originalSegmentsById.get(edge.id) ?? toEdgeRoutingSegments(path));
@@ -647,7 +649,7 @@ export function reduceEdgeCrossingsWithWaypoints(
     const candidates = generateWaypointCandidates(path, layoutDirection, nodes, edge, {
       includeNodeAwareLanes: hasSoftRisk,
       knownNodeRoutingRisk: hasNodeRisk,
-      preferredAxes: options.preferredAxes,
+      preferredAxes: ownerPreferredAxes ?? options.preferredAxes,
     });
     const sharedTrunkContext = createSharedTrunkPreservationContext(
       path,

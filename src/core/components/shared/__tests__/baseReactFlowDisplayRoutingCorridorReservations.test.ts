@@ -6,10 +6,12 @@ import {
 } from '../baseReactFlowDisplayRoutingCorridorReservations';
 import {
   createDisplayRoutingTopologyPlan,
+  createDisplayRoutingTopologyWaypointAxesByEdgeId,
   type RoutingCorridorPlan,
   type RoutingFlowRole,
   type RoutingTerminalSide,
   type RoutingTopologyGroup,
+  type RoutingTopologyPlan,
 } from '../baseReactFlowDisplayRoutingTopologyPlan';
 
 const corridor = (
@@ -152,6 +154,26 @@ describe('baseReactFlowDisplayRoutingCorridorReservations', () => {
       { groupIndex: 1, status: 'reserved', corridorIndex: 1 },
     ]);
     expect(plan.exhaustedGroupIndexes).toEqual([]);
+
+    const topologyPlan: RoutingTopologyPlan = {
+      nodeCount: 0,
+      edgeCount: 1,
+      groups: [sourceDual, targetDual],
+      candidateAxes: { x: [], y: [] },
+      corridors: [corridor('vertical', [50]), corridor('horizontal', [50])],
+      corridorReservations: plan,
+    };
+    const edges: Edge[] = [{ id: 'dual', source: 'source', target: 'target' }];
+    expect(createDisplayRoutingTopologyWaypointAxesByEdgeId(
+      topologyPlan,
+      edges,
+      false,
+    )?.get('dual')).toEqual({ x: [50], y: [50] });
+    expect(createDisplayRoutingTopologyWaypointAxesByEdgeId(
+      topologyPlan,
+      edges,
+      true,
+    )).toBeUndefined();
   });
 
   it('fails closed for empty, malformed, non-finite, and over-capacity inputs', () => {
