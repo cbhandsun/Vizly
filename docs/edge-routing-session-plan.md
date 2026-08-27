@@ -13,7 +13,7 @@
 - `post-render-residual` 与 `strict-primary-overlap` 已由显式 `RoutingDefectPlan` 调度，无对应缺陷时生成带父阶段、独占耗时和零扫描量的确定性 skip trace；
 - 三张 v15 预编译产物可从同一 production build 重现，三张 `outputRouteSignature` 与 v14 完全一致；最新浏览器矩阵均命中 `validated-candidate`，同 identity 再开 WMS 为 `workerStart=0`；
 - 最新 production-browser 矩阵覆盖三张 canonical preset、TB/BT/LR/RL、compound 和十类拓扑编辑，最终 SVG 的非正交、障碍命中、商业净空、严格交叉、非法 overlap、短 stub、tiny dogleg、hairpin、低对比、重复 marker/交互路径和标签节点相交均为零；
-- 交互 trace 浏览器门禁已从允许 `95%` 覆盖收紧为至少 `99.5%`（仅为 SVG line-jump 长度测量保留 `0.5%` 下偏差）；最新 production replay 实测覆盖率 `1.0097` 通过，但 selected paint 为 `119.8ms`，未通过既有 `<=100ms` 门槛，因此仍需在隔离性能任务中复验交互时延，不能通过放宽门禁收口；
+- 交互 trace 浏览器门禁已从允许 `95%` 覆盖收紧为至少 `99.5%`（仅为 SVG line-jump 长度测量保留 `0.5%` 下偏差）；共享全矩阵曾出现 selected paint `119.8ms` 调度离群值，新增 interaction-only fresh-profile 入口后连续 5 个 production 样本全部通过，light/dark/high-contrast 最大值分别为 `86.6/82.4/66.9ms`，每次完整 SVG 障碍与商业净空均为零。专用性能工作流现于 main push 跑 5 个、定时/手动跑 30 个独立样本，仍不放宽 `<=100ms` 门槛；
 - 最新单轮真实拖拽中 TMS/WMS/L-OMS 的 local route 为 `117/59.6/110.4ms`，release-to-final 为 `295/144/224ms`，均满足 `<150ms/<300ms`；PNG 文件级导出通过，SVG 已验证 entitlement 前的安全预览，PDF 因产品 entitlement 未能做真实文件级导出审计；
 - port-policy 与 container expand 被浏览器矩阵固定为 `incremental-route`、`fallbackLevel=none`；首次 container collapse 仍在同一 Worker job 内安全 full fallback，不降低任何最终门禁；
 - `hidden`/`collapsed` 已进入受限 Worker 投影与协议校验，`collapsed:false` 与缺省 expanded 状态使用同一 identity；Worker 私有 session 可按完整 identity 回放返回旧 topology，仍重新校验 route signature、hard report、全图节点净空和冻结边界；
