@@ -6,6 +6,8 @@ import {
   assertDisplayRoutingPerformanceSummaryBudget,
   displayRoutingIncrementalPhaseTraceIsComplete,
   EXPECTED_INCREMENTAL_DISPLAY_ROUTING_PHASE_SEQUENCES,
+  parseDisplayRoutingSampleIndex,
+  rotateDisplayRoutingDragCases,
   selectDisplayRoutingDragCases,
   summarizeDisplayRoutingSamples,
   summarizeDisplayRoutingOutlierSamples,
@@ -67,6 +69,28 @@ describe('display-routing browser case selection', () => {
   it.each([['unknown'], ['wms,unknown'], ['x'.repeat(129)]])(
     'fails closed for invalid case input %j',
     (value) => expect(() => selectDisplayRoutingDragCases(value, availableCases)).toThrow(),
+  );
+
+  it('rotates the full performance matrix across three balanced positions', () => {
+    expect(parseDisplayRoutingSampleIndex(undefined)).toBeNull();
+    expect(parseDisplayRoutingSampleIndex('2')).toBe(2);
+    expect(rotateDisplayRoutingDragCases(availableCases, 1)).toBe(availableCases);
+    expect(rotateDisplayRoutingDragCases(availableCases, 2)).toEqual([
+      availableCases[1],
+      availableCases[2],
+      availableCases[0],
+    ]);
+    expect(rotateDisplayRoutingDragCases(availableCases, 3)).toEqual([
+      availableCases[2],
+      availableCases[0],
+      availableCases[1],
+    ]);
+    expect(rotateDisplayRoutingDragCases(availableCases, 4)).toBe(availableCases);
+  });
+
+  it.each([['0'], ['101'], ['1.5'], ['invalid']])(
+    'fails closed for invalid sample index %j',
+    value => expect(() => parseDisplayRoutingSampleIndex(value)).toThrow(),
   );
 });
 
@@ -213,7 +237,8 @@ describe('display routing browser performance budget', () => {
 
   it('reports bounded content-free slow sample evidence', () => {
     const sample = (localRouteMs, digest, candidateCount = 256) => ({
-      dragCases: [{
+      benchmark: { elapsedMs: localRouteMs + 1_000 },
+      dragCases: [{ nodeId: 'tms' }, {
         nodeId: 'wms',
         releaseToFinalMs: localRouteMs + 50,
         workerDurationMs: localRouteMs + 20,
@@ -246,6 +271,9 @@ describe('display routing browser performance budget', () => {
       sample(500, digest),
     ], 'wms', 1)).toEqual([expect.objectContaining({
       sampleIndex: 2,
+      caseOrder: ['tms', 'wms'],
+      casePosition: 2,
+      elapsedMs: 1_500,
       localRouteMs: 500,
       nodeGeometryDigest: digest,
       generation: {
@@ -419,7 +447,11 @@ describe('display routing browser performance budget', () => {
           phaseTrace: [{ phase: 'local-route', durationMs: 30 }],
         },
       },
-    }])).toEqual({
+    }], { sampleIndex: 2, elapsedMs: 123.5 })).toEqual({
+      benchmark: {
+        sampleIndex: 2,
+        elapsedMs: 123.5,
+      },
       initialRouteMs: [25],
       initialRoutes: [{
         nodeId: 'wms',

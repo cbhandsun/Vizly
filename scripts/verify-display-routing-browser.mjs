@@ -16,6 +16,8 @@ import {
 import {
   assertDisplayRoutingDragResult,
   assertDisplayRoutingPerformanceBudget,
+  parseDisplayRoutingSampleIndex,
+  rotateDisplayRoutingDragCases,
   selectDisplayRoutingDragCases,
 } from './lib/display-routing-browser-performance.mjs';
 import {
@@ -49,14 +51,23 @@ const AVAILABLE_DRAG_CASES = Object.freeze([
   { nodeId: 'wms', expectedMutableCount: 4 },
   { nodeId: 'l-oms', expectedMutableCount: 5 },
 ]);
-const DRAG_CASES = selectDisplayRoutingDragCases(
+const COLLECT_PERFORMANCE_SAMPLES = process.env.DISPLAY_ROUTING_BROWSER_COLLECT_PERFORMANCE === '1';
+const SAMPLE_INDEX = parseDisplayRoutingSampleIndex(
+  process.env.DISPLAY_ROUTING_BROWSER_SAMPLE_INDEX,
+);
+const SELECTED_DRAG_CASES = selectDisplayRoutingDragCases(
   process.env.DISPLAY_ROUTING_BROWSER_CASES,
   AVAILABLE_DRAG_CASES,
 );
+const HAS_EXPLICIT_DRAG_CASES = typeof process.env.DISPLAY_ROUTING_BROWSER_CASES === 'string'
+  && process.env.DISPLAY_ROUTING_BROWSER_CASES.trim().length > 0;
+const DRAG_CASES = COLLECT_PERFORMANCE_SAMPLES && !HAS_EXPLICIT_DRAG_CASES
+  ? rotateDisplayRoutingDragCases(SELECTED_DRAG_CASES, SAMPLE_INDEX)
+  : SELECTED_DRAG_CASES;
 const FIXED_VISUAL_ZOOMS = Object.freeze([0.5, 1, 2]);
 const EMIT_MACHINE_RESULT = process.env.DISPLAY_ROUTING_BROWSER_JSON === '1';
 const INCLUDE_CPU_PROFILE = process.env.DISPLAY_ROUTING_BROWSER_CPU_PROFILE === '1';
-const COLLECT_PERFORMANCE_SAMPLES = process.env.DISPLAY_ROUTING_BROWSER_COLLECT_PERFORMANCE === '1';
+const RUN_STARTED_AT = performance.now();
 
 const waitForValue = async (session, expression, timeoutMs = WAIT_TIMEOUT_MS) => {
   const deadline = Date.now() + timeoutMs;
@@ -774,7 +785,10 @@ const main = async () => {
     const exportLine = formatDisplayRoutingExportMatrix(normal.exportMatrix);
     if (exportLine) console.log(exportLine);
   }
-  const machineResult = buildDisplayRoutingMachineResult(results);
+  const machineResult = buildDisplayRoutingMachineResult(results, {
+    sampleIndex: SAMPLE_INDEX,
+    elapsedMs: performance.now() - RUN_STARTED_AT,
+  });
   if (EMIT_MACHINE_RESULT) {
     console.log(`DISPLAY_ROUTING_BROWSER_RESULT=${JSON.stringify(machineResult)}`);
   }

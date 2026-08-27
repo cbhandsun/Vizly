@@ -28,6 +28,27 @@ export const selectDisplayRoutingDragCases = (value, availableCases) => {
   return requestedIds.map(nodeId => casesById.get(nodeId));
 };
 
+export const parseDisplayRoutingSampleIndex = (value) => {
+  if (typeof value === 'undefined' || String(value).trim() === '') return null;
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > 100) {
+    throw new Error('DISPLAY_ROUTING_BROWSER_SAMPLE_INDEX must be an integer from 1 to 100');
+  }
+  return parsed;
+};
+
+export const rotateDisplayRoutingDragCases = (casesValue, sampleIndex) => {
+  if (!Array.isArray(casesValue) || casesValue.length <= 1 || sampleIndex === null) {
+    return casesValue;
+  }
+  if (!Number.isSafeInteger(sampleIndex) || sampleIndex < 1 || sampleIndex > 100) {
+    throw new Error('Display-routing sample index must be an integer from 1 to 100');
+  }
+  const offset = (sampleIndex - 1) % casesValue.length;
+  if (offset === 0) return casesValue;
+  return [...casesValue.slice(offset), ...casesValue.slice(0, offset)];
+};
+
 const FAST_INCREMENTAL_DISPLAY_ROUTING_PHASES = Object.freeze([
   'incremental-closure',
   'local-route',
@@ -253,6 +274,12 @@ export const summarizeDisplayRoutingOutlierSamples = (
       ? sample.dragCases.find(item => item?.nodeId === nodeId)
       : null;
     if (!dragCase) return [];
+    const caseOrder = Array.isArray(sample?.dragCases)
+      ? sample.dragCases.flatMap(item => (
+        typeof item?.nodeId === 'string' && item.nodeId.length <= 128 ? [item.nodeId] : []
+      ))
+      : [];
+    const casePosition = caseOrder.indexOf(nodeId);
     const phaseTrace = Array.isArray(dragCase.phaseTrace) ? dragCase.phaseTrace : [];
     const localRoute = phaseTrace.find(trace => trace?.phase === 'local-route');
     const generation = phaseTrace.find(
@@ -260,6 +287,9 @@ export const summarizeDisplayRoutingOutlierSamples = (
     );
     return [{
       sampleIndex: sampleIndex + 1,
+      caseOrder,
+      casePosition: casePosition >= 0 ? casePosition + 1 : null,
+      elapsedMs: finiteMetric(sample?.benchmark?.elapsedMs),
       releaseToFinalMs: finiteMetric(dragCase.releaseToFinalMs),
       workerComputeMs: finiteMetric(dragCase.workerDurationMs),
       workerDeliveryWaitMs: finiteMetric(dragCase.workerDeliveryWaitMs),

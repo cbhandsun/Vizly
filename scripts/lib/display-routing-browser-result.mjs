@@ -73,7 +73,15 @@ const projectPhaseTrace = value => Array.isArray(value) ? value.slice(0, 128).fl
   }];
 }) : [];
 
-export const buildDisplayRoutingMachineResult = (results) => ({
+export const buildDisplayRoutingMachineResult = (results, benchmarkValue = null) => ({
+  benchmark: {
+    sampleIndex: Number.isSafeInteger(benchmarkValue?.sampleIndex)
+      && benchmarkValue.sampleIndex >= 1
+      && benchmarkValue.sampleIndex <= 100
+      ? benchmarkValue.sampleIndex
+      : null,
+    elapsedMs: finiteMetric(benchmarkValue?.elapsedMs),
+  },
   initialRouteMs: Array.isArray(results)
     ? results.map(result => finiteMetric(result?.initial?.routeMs))
     : [],
