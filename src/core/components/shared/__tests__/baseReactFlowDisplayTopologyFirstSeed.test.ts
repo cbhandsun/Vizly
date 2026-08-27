@@ -28,6 +28,7 @@ const emptyPlan: RoutingTopologyPlan = {
   groups: [],
   candidateAxes: { x: [], y: [] },
   corridors: [],
+  corridorReservations: { reservations: [], exhaustedGroupIndexes: [] },
 };
 
 const sharedPlan: RoutingTopologyPlan = {
@@ -43,6 +44,7 @@ const sharedPlan: RoutingTopologyPlan = {
     laneDemand: 2,
     memberEdgeIndexes: [0, 1],
     dualRoleMemberIndexes: [],
+    endpointCenter: null,
   }],
 };
 

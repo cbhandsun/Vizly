@@ -117,6 +117,7 @@ describe('baseReactFlowDisplayEvaluation', () => {
       groups: [],
       candidateAxes: { x: [], y: [] },
       corridors: [],
+      corridorReservations: { reservations: [], exhaustedGroupIndexes: [] },
     });
     const plan = createDisplayRoutingTopologyPlan([{
       id: 'bad', position: { x: Number.POSITIVE_INFINITY, y: Number.NaN },

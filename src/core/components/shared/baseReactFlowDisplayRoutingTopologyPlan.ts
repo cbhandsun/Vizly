@@ -1,6 +1,10 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import { getDisplayComputedPath, getDisplayNodeRect } from './baseReactFlowDisplayGeometry';
+import {
+  createDisplayRoutingCorridorReservationPlan,
+  type RoutingCorridorReservationPlan,
+} from './baseReactFlowDisplayRoutingCorridorReservations';
 
 export type RoutingTerminalSide = 'top' | 'right' | 'bottom' | 'left' | 'unknown';
 export type RoutingSector = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw' | 'same';
@@ -19,6 +23,7 @@ export type RoutingTopologyGroup = Readonly<{
   laneDemand: number;
   memberEdgeIndexes: number[];
   dualRoleMemberIndexes: number[];
+  endpointCenter: Readonly<{ x: number; y: number }> | null;
 }>;
 
 export type RoutingCorridorPlan = Readonly<{
@@ -36,6 +41,7 @@ export type RoutingTopologyPlan = Readonly<{
   groups: RoutingTopologyGroup[];
   candidateAxes: Readonly<{ x: number[]; y: number[] }>;
   corridors: RoutingCorridorPlan[];
+  corridorReservations: RoutingCorridorReservationPlan;
 }>;
 
 export type RoutingTopologyWaypointAxes = Readonly<{
@@ -111,6 +117,18 @@ const sector = (source: Node | undefined, target: Node | undefined): RoutingSect
   return value ? value as RoutingSector : 'same';
 };
 
+const reverseSector = (value: RoutingSector): RoutingSector => ({
+  n: 's',
+  ne: 'sw',
+  e: 'w',
+  se: 'nw',
+  s: 'n',
+  sw: 'ne',
+  w: 'e',
+  nw: 'se',
+  same: 'same',
+})[value] as RoutingSector;
+
 const boundedAxes = (values: Iterable<number>): number[] => [...new Set([...values]
   .filter(value => Number.isFinite(value) && Math.abs(value) <= 1_000_000_000)
   .map(value => Math.round(value * 100) / 100))]
@@ -178,11 +196,19 @@ export const createDisplayRoutingTopologyPlan = (
       const endpointId = kind === 'source' ? edge.source : edge.target;
       const explicitSide = readSide(kind === 'source' ? edge.sourceHandle : edge.targetHandle);
       const side = explicitSide === 'unknown' ? pathSide(edge, kind) : explicitSide;
-      const key = `${kind}\u001f${endpointId}\u001f${side}\u001f${edgeSector}\u001f${role}`;
+      const endpointSector = kind === 'source' ? edgeSector : reverseSector(edgeSector);
+      const key = `${kind}\u001f${endpointId}\u001f${side}\u001f${endpointSector}\u001f${role}`;
       const members = groupMembers.get(key) ?? [];
       members.push(edgeIndex);
       groupMembers.set(key, members);
-      groupMetadata.set(key, { kind, endpointId, side, sector: edgeSector, flowRole: role });
+      groupMetadata.set(key, {
+        kind,
+        endpointId,
+        side,
+        sector: endpointSector,
+        flowRole: role,
+        endpointCenter: nodeCenter(nodeById.get(endpointId)),
+      });
       (kind === 'source' ? sourceMembership : targetMembership).set(edgeIndex, key);
     }
     for (const point of getDisplayComputedPath(edge)) {
@@ -222,14 +248,16 @@ export const createDisplayRoutingTopologyPlan = (
       dualRoleMemberIndexes: memberEdgeIndexes.filter(index => dualIndexes.has(index)),
     }];
   });
+  const corridors = [
+    ...createCorridors(nodeRects.map(rect => ({ start: rect.y, end: rect.y + rect.height })), 'horizontal'),
+    ...createCorridors(nodeRects.map(rect => ({ start: rect.x, end: rect.x + rect.width })), 'vertical'),
+  ];
   return {
     nodeCount: nodes.length,
     edgeCount: edges.length,
     groups,
     candidateAxes: { x: boundedAxes(xAxes), y: boundedAxes(yAxes) },
-    corridors: [
-      ...createCorridors(nodeRects.map(rect => ({ start: rect.y, end: rect.y + rect.height })), 'horizontal'),
-      ...createCorridors(nodeRects.map(rect => ({ start: rect.x, end: rect.x + rect.width })), 'vertical'),
-    ],
+    corridors,
+    corridorReservations: createDisplayRoutingCorridorReservationPlan(groups, corridors),
   };
 };
