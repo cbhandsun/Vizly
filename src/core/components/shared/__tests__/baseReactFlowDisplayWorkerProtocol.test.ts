@@ -14,25 +14,12 @@ import {
 import { createDisplayRoutingIdentity } from '../baseReactFlowDisplayRoutingSession';
 import { createDisplayRoutingPhaseRecorder } from '../baseReactFlowDisplayWorkerTraceRecorder';
 import { createDisplayEdgesTransportResponse } from '../baseReactFlowDisplayWorkerScope';
-import { createTestDisplayHardReport } from './baseReactFlowDisplayWorkerTestFixtures';
-
-const nodes = [
-  { id: 'source', position: { x: 0, y: 0 }, data: {} },
-  { id: 'target', position: { x: 100, y: 0 }, data: {} },
-];
-
-const validRepairRequest = {
-  operation: 'repair',
-  requestId: 'repair-1',
-  edges: [{
-    id: 'edge',
-    source: 'source',
-    target: 'target',
-    data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
-  }],
-  nodes,
-  repairMode: 'bounded',
-} as const;
+import {
+  TEST_DISPLAY_WORKER_NODES as nodes,
+  TEST_DISPLAY_WORKER_REPAIR_REQUEST as validRepairRequest,
+  createTestBoundedDisplayRoutingPhaseTrace,
+  createTestDisplayHardReport,
+} from './baseReactFlowDisplayWorkerTestFixtures';
 
 const cleanHardReport = createTestDisplayHardReport();
 
@@ -133,15 +120,8 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
     })]);
   });
 
-  const boundedPhaseTrace = Array.from(
-    { length: DISPLAY_ROUTING_PHASE_TRACE_LIMIT },
-    () => ({
-      phase: 'quality-crossing-global-refine',
-      durationMs: 1,
-      candidateCount: 1,
-      changedEdgeCount: 0,
-      resolution: 'skip',
-    } as const),
+  const boundedPhaseTrace = createTestBoundedDisplayRoutingPhaseTrace(
+    DISPLAY_ROUTING_PHASE_TRACE_LIMIT,
   );
 
   it('derives bounded parent and exclusive phase metrics without graph data', () => {

@@ -1,4 +1,33 @@
 import type { BaseDisplayBoundedCandidateReport } from '../baseReactFlowDisplayEvaluation';
+import type { DisplayRoutingPhaseTrace } from '../baseReactFlowDisplayRoutingTrace';
+
+export const TEST_DISPLAY_WORKER_NODES = [
+  { id: 'source', position: { x: 0, y: 0 }, data: {} },
+  { id: 'target', position: { x: 100, y: 0 }, data: {} },
+];
+
+export const TEST_DISPLAY_WORKER_REPAIR_REQUEST = {
+  operation: 'repair',
+  requestId: 'repair-1',
+  edges: [{
+    id: 'edge',
+    source: 'source',
+    target: 'target',
+    data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
+  }],
+  nodes: TEST_DISPLAY_WORKER_NODES,
+  repairMode: 'bounded',
+} as const;
+
+export const createTestBoundedDisplayRoutingPhaseTrace = (
+  limit: number,
+): DisplayRoutingPhaseTrace[] => Array.from({ length: limit }, () => ({
+  phase: 'quality-crossing-global-refine',
+  durationMs: 1,
+  candidateCount: 1,
+  changedEdgeCount: 0,
+  resolution: 'skip',
+}));
 
 export const createTestDisplayHardReport = (
   hardClean = true,
