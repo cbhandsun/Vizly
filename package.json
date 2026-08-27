@@ -106,7 +106,6 @@
     "generate:precompiled-routes:check": "node scripts/generate-precompiled-display-routes.mjs --check",
     "measure:precompiled-route": "node scripts/generate-precompiled-display-routes.mjs --measure-only",
     "verify:display-routing-browser": "node scripts/verify-display-routing-browser.mjs",
-    "verify:display-routing-interaction": "node scripts/verify-display-routing-browser.mjs --interaction-only",
     "verify:display-routing-matrix": "node scripts/verify-display-routing-matrix.mjs",
     "benchmark:display-routing-browser": "node scripts/benchmark-display-routing-browser.mjs",
     "benchmark:display-routing-cold": "node scripts/benchmark-precompiled-display-routing-cold.mjs",

@@ -259,7 +259,7 @@ jobs:
           for ($sample = 1; $sample -le [int]$env:ROUTING_PERF_SAMPLE_COUNT; $sample += 1) {
             "interaction-paint sample $sample/$env:ROUTING_PERF_SAMPLE_COUNT" |
               Tee-Object -FilePath $reportPath -Append
-            npm run verify:display-routing-interaction 2>&1 |
+            node scripts/verify-display-routing-browser.mjs --interaction-only 2>&1 |
               Tee-Object -FilePath $reportPath -Append
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }

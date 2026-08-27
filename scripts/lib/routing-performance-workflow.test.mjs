@@ -37,7 +37,9 @@ describe('routing performance workflow', () => {
     expect(workflow).toContain('DISPLAY_ROUTING_SAMPLE_COUNT');
     expect(workflow).toContain('npm run benchmark:display-routing-browser');
     expect(workflow).toContain('Run independent interaction-paint samples');
-    expect(workflow).toContain('npm run verify:display-routing-interaction');
+    expect(workflow).toContain(
+      'node scripts/verify-display-routing-browser.mjs --interaction-only',
+    );
   });
 
   it('always stops its own preview process and retains every isolated report', () => {
