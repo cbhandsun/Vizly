@@ -4,6 +4,13 @@ const EDGE_WRAPPER_SELECTOR = '[data-testid^="rf__edge-"]';
 const INTERACTION_SELECTOR = '.react-flow__edge-interaction';
 const TRACE_SELECTOR = '.shared-trunk-accent-trace';
 const INTERACTION_PAINT_BUDGET_MS = 100;
+// The semantic trace follows rendered line-jump arcs while React Flow's
+// interaction path follows the underlying orthogonal polyline, so its measured
+// length can legitimately be slightly longer. It must never omit a material
+// part of the logical route: allow only a bounded 0.5% SVG measurement drift
+// below complete coverage.
+const MINIMUM_COMPLETE_TRACE_COVERAGE = 0.995;
+const MAXIMUM_COMPLETE_TRACE_COVERAGE = 1.2;
 
 export const assertDisplayRoutingInteractionPaint = ({ kind, state, durationMs }) => {
   const active = kind === 'hover'
@@ -15,8 +22,8 @@ export const assertDisplayRoutingInteractionPaint = ({ kind, state, durationMs }
     && state?.interactionPathCount === 1
     && state?.traceVisible === true
     && Number.isFinite(state?.traceCoverage)
-    && state.traceCoverage >= 0.95
-    && state.traceCoverage <= 1.2
+    && state.traceCoverage >= MINIMUM_COMPLETE_TRACE_COVERAGE
+    && state.traceCoverage <= MAXIMUM_COMPLETE_TRACE_COVERAGE
     && Number.isFinite(durationMs)
     && durationMs >= 0
     && durationMs <= INTERACTION_PAINT_BUDGET_MS;
@@ -25,6 +32,8 @@ export const assertDisplayRoutingInteractionPaint = ({ kind, state, durationMs }
     kind,
     durationMs,
     budgetMs: INTERACTION_PAINT_BUDGET_MS,
+    minimumTraceCoverage: MINIMUM_COMPLETE_TRACE_COVERAGE,
+    maximumTraceCoverage: MAXIMUM_COMPLETE_TRACE_COVERAGE,
     state: state ? {
       hovered: state.hovered,
       focused: state.focused,

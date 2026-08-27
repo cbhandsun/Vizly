@@ -32,6 +32,8 @@ describe('display routing browser interaction audit', () => {
     ['duplicate interaction path', { interactionPathCount: 2 }, 10],
     ['hidden trace', { traceVisible: false }, 10],
     ['partial trace', { traceCoverage: 0.5 }, 10],
+    ['trace below complete-coverage tolerance', { traceCoverage: 0.994 }, 10],
+    ['implausibly long trace', { traceCoverage: 1.201 }, 10],
     ['slow paint', {}, 100.1],
   ])('fails closed for %s', (_name, overrides, durationMs) => {
     expect(() => assertDisplayRoutingInteractionPaint({
@@ -39,6 +41,14 @@ describe('display routing browser interaction audit', () => {
       state: { ...state, hovered: true, ...overrides },
       durationMs,
     })).toThrow(/paint failed/);
+  });
+
+  it.each([0.995, 1.2])('accepts the bounded complete-coverage boundary %s', (traceCoverage) => {
+    expect(assertDisplayRoutingInteractionPaint({
+      kind: 'hover',
+      state: { ...state, hovered: true, traceCoverage },
+      durationMs: 100,
+    })).toEqual({ kind: 'hover', durationMs: 100 });
   });
 
   it('accepts a fully settled interaction state', () => {
