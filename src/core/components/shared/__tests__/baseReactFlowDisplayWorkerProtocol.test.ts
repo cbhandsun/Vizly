@@ -199,6 +199,11 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       candidateCount: 180,
       evaluationCount: 96,
       cacheHitCount: 84,
+      workItemCount: 4,
+      budgetCount: 256,
+      underBudgetCount: 1,
+      minimumCandidateCount: 52,
+      maximumCandidateCount: 64,
     });
 
     expect(traces).toEqual([expect.objectContaining({
@@ -207,6 +212,11 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       candidateCount: 180,
       evaluationCount: 96,
       cacheHitCount: 84,
+      workItemCount: 4,
+      budgetCount: 256,
+      underBudgetCount: 1,
+      minimumCandidateCount: 52,
+      maximumCandidateCount: 64,
     })]);
   });
 

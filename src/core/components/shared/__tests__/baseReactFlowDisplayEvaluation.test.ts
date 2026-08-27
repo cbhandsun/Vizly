@@ -42,6 +42,7 @@ import {
   createDisplayRoutingTopologyWaypointAxes,
 } from '../baseReactFlowDisplayRoutingTopologyPlan';
 import {
+  createBaseReactFlowMovedNodeReconnectCandidates,
   pushBoundedReconnectRankedCandidate,
   resolveReconnectCandidateBudgetPerEdge,
 } from '../baseReactFlowDisplayLocalReconnect';
@@ -256,6 +257,69 @@ describe('baseReactFlowDisplayEvaluation', () => {
         legacy.map(candidate => candidate.id),
       );
     }
+  });
+
+  it('reports bounded reconnect generation and ranking subphases without graph content', () => {
+    const nodes: Node[] = [
+      {
+        id: 'private-source',
+        position: { x: 0, y: 0 },
+        measured: { width: 100, height: 60 },
+        data: {},
+      },
+      {
+        id: 'private-target',
+        position: { x: 320, y: 0 },
+        measured: { width: 100, height: 60 },
+        data: {},
+      },
+    ];
+    const baselineEdges: Edge[] = [{
+      id: 'private-edge',
+      source: 'private-source',
+      target: 'private-target',
+      sourceHandle: 'right',
+      targetHandle: 'left',
+      data: {
+        computedPath: [{ x: 100, y: 30 }, { x: 300, y: 30 }],
+      },
+    }];
+    const traces: Array<Record<string, unknown>> = [];
+    const diagnostics: Array<Record<string, unknown>> = [];
+
+    const candidates = createBaseReactFlowMovedNodeReconnectCandidates({
+      baselineEdges,
+      nodes,
+      changedNodeIds: ['private-target'],
+      mutableEdgeIds: ['private-edge'],
+      beamWidth: 1,
+      onDiagnostics: value => diagnostics.push(value),
+      onPhaseTrace: value => traces.push(value),
+    });
+
+    expect(candidates).toHaveLength(1);
+    expect(diagnostics).toEqual([expect.objectContaining({
+      generatedPathCount: expect.any(Number),
+      evaluatedPathCount: expect.any(Number),
+    })]);
+    expect(traces.map(trace => trace.phase)).toEqual(expect.arrayContaining([
+      'local-reconnect-setup',
+      'local-reconnect-path-generation',
+      'local-reconnect-ranking',
+      'local-reconnect-strict-scan',
+    ]));
+    const generation = traces.find(trace => trace.phase === 'local-reconnect-path-generation');
+    expect(generation).toMatchObject({
+      parentPhase: 'local-reconnect-seed',
+      candidateCount: expect.any(Number),
+      evaluationCount: 256,
+      workItemCount: 1,
+      budgetCount: 256,
+      underBudgetCount: expect.any(Number),
+      minimumCandidateCount: expect.any(Number),
+      maximumCandidateCount: expect.any(Number),
+    });
+    expect(JSON.stringify({ traces, diagnostics })).not.toContain('private-');
   });
 
   it('tokenizes only explicit routing-quality intent flags', () => {

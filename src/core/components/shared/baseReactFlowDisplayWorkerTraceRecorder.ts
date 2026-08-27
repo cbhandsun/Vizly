@@ -18,6 +18,30 @@ export const appendDisplayRoutingPhaseTrace = (
     const sumCount = (first: number | undefined, second: number | undefined): number => (
       Math.min(1_000_000, Math.max(0, first ?? 0) + Math.max(0, second ?? 0))
     );
+    const sumOptionalCount = (
+      first: number | undefined,
+      second: number | undefined,
+    ): number | undefined => (
+      typeof first === 'undefined' && typeof second === 'undefined'
+        ? undefined
+        : sumCount(first, second)
+    );
+    const minimumCount = (
+      first: number | undefined,
+      second: number | undefined,
+    ): number | undefined => {
+      if (typeof first === 'undefined') return second;
+      if (typeof second === 'undefined') return first;
+      return Math.min(Math.max(0, first), Math.max(0, second));
+    };
+    const maximumCount = (
+      first: number | undefined,
+      second: number | undefined,
+    ): number | undefined => {
+      if (typeof first === 'undefined') return second;
+      if (typeof second === 'undefined') return first;
+      return Math.max(Math.max(0, first), Math.max(0, second));
+    };
     const resolutionRank = {
       skip: 0,
       hit: 1,
@@ -25,6 +49,20 @@ export const appendDisplayRoutingPhaseTrace = (
       rejected: 3,
       fallback: 4,
     } as const;
+    const workItemCount = sumOptionalCount(existing.workItemCount, trace.workItemCount);
+    const budgetCount = sumOptionalCount(existing.budgetCount, trace.budgetCount);
+    const underBudgetCount = sumOptionalCount(
+      existing.underBudgetCount,
+      trace.underBudgetCount,
+    );
+    const minimumCandidateCount = minimumCount(
+      existing.minimumCandidateCount,
+      trace.minimumCandidateCount,
+    );
+    const maximumCandidateCount = maximumCount(
+      existing.maximumCandidateCount,
+      trace.maximumCandidateCount,
+    );
     phaseTrace[existingIndex] = {
       ...existing,
       durationMs: Math.min(600_000, existing.durationMs + trace.durationMs),
@@ -41,6 +79,21 @@ export const appendDisplayRoutingPhaseTrace = (
         existing.scannedEdgePairCount,
         trace.scannedEdgePairCount,
       ),
+      ...(workItemCount !== undefined
+        ? { workItemCount }
+        : {}),
+      ...(budgetCount !== undefined
+        ? { budgetCount }
+        : {}),
+      ...(underBudgetCount !== undefined
+        ? { underBudgetCount }
+        : {}),
+      ...(minimumCandidateCount !== undefined
+        ? { minimumCandidateCount }
+        : {}),
+      ...(maximumCandidateCount !== undefined
+        ? { maximumCandidateCount }
+        : {}),
       resolution: resolutionRank[trace.resolution] > resolutionRank[existing.resolution]
         ? trace.resolution
         : existing.resolution,

@@ -11,6 +11,11 @@ const OPTIONAL_COUNT_KEYS = [
   'scannedNodeCount',
   'scannedSegmentCount',
   'scannedEdgePairCount',
+  'workItemCount',
+  'budgetCount',
+  'underBudgetCount',
+  'minimumCandidateCount',
+  'maximumCandidateCount',
 ] as const;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
@@ -39,7 +44,7 @@ export const isDisplayRoutingPhaseTrace = (
   if (!isRecord(value)) return false;
   const keys = Object.keys(value);
   return keys.length >= 5
-    && keys.length <= 12
+    && keys.length <= 17
     && keys.every(key => (
       key === 'phase'
       || key === 'parentPhase'

@@ -304,6 +304,7 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
           reconnectGeneratedPathCount = diagnostics.generatedPathCount;
           reconnectEvaluatedPathCount = diagnostics.evaluatedPathCount;
         },
+        onPhaseTrace,
       })
     : rigidMoveSeed.rigidEdgeIds.length > 0
       ? [rigidMoveSeed.edges]

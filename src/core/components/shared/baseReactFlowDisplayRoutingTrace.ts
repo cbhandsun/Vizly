@@ -3,6 +3,10 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
   'incremental-closure',
   'local-route',
   'local-reconnect-seed',
+  'local-reconnect-setup',
+  'local-reconnect-path-generation',
+  'local-reconnect-ranking',
+  'local-reconnect-strict-scan',
   'local-reconnect-candidates',
   'local-fast-fallback',
   'hard-gate',
@@ -219,6 +223,11 @@ export type DisplayRoutingPhaseMetrics = Readonly<{
   scannedNodeCount?: number;
   scannedSegmentCount?: number;
   scannedEdgePairCount?: number;
+  workItemCount?: number;
+  budgetCount?: number;
+  underBudgetCount?: number;
+  minimumCandidateCount?: number;
+  maximumCandidateCount?: number;
 }>;
 
 export type DisplayRoutingPhaseTrace = Readonly<{
@@ -233,6 +242,11 @@ export type DisplayRoutingPhaseTrace = Readonly<{
   scannedNodeCount?: number;
   scannedSegmentCount?: number;
   scannedEdgePairCount?: number;
+  workItemCount?: number;
+  budgetCount?: number;
+  underBudgetCount?: number;
+  minimumCandidateCount?: number;
+  maximumCandidateCount?: number;
   resolution: DisplayRoutingPhaseResolution;
 }>;
 
@@ -260,6 +274,10 @@ const DISPLAY_ROUTING_PHASE_PARENTS: Readonly<
   Partial<Record<DisplayRoutingPhaseName, DisplayRoutingPhaseName>>
 > = Object.freeze({
   'local-reconnect-seed': 'local-route',
+  'local-reconnect-setup': 'local-reconnect-seed',
+  'local-reconnect-path-generation': 'local-reconnect-seed',
+  'local-reconnect-ranking': 'local-reconnect-seed',
+  'local-reconnect-strict-scan': 'local-reconnect-seed',
   'local-reconnect-candidates': 'local-route',
   'local-fast-fallback': 'local-route',
   'seed-interactive': 'seed',
@@ -529,6 +547,21 @@ export const startDisplayRoutingPhaseTrace = ({
         scannedNodeCount: toBoundedCount(metrics.scannedNodeCount ?? 0),
         scannedSegmentCount: toBoundedCount(metrics.scannedSegmentCount ?? 0),
         scannedEdgePairCount: toBoundedCount(metrics.scannedEdgePairCount ?? 0),
+        ...(typeof metrics.workItemCount === 'number'
+          ? { workItemCount: toBoundedCount(metrics.workItemCount) }
+          : {}),
+        ...(typeof metrics.budgetCount === 'number'
+          ? { budgetCount: toBoundedCount(metrics.budgetCount) }
+          : {}),
+        ...(typeof metrics.underBudgetCount === 'number'
+          ? { underBudgetCount: toBoundedCount(metrics.underBudgetCount) }
+          : {}),
+        ...(typeof metrics.minimumCandidateCount === 'number'
+          ? { minimumCandidateCount: toBoundedCount(metrics.minimumCandidateCount) }
+          : {}),
+        ...(typeof metrics.maximumCandidateCount === 'number'
+          ? { maximumCandidateCount: toBoundedCount(metrics.maximumCandidateCount) }
+          : {}),
         resolution,
       });
     },

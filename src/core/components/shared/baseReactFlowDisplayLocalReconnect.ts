@@ -18,6 +18,10 @@ import {
   withDisplayComputedPath,
   type DisplayPoint,
 } from './baseReactFlowDisplayGeometry';
+import {
+  startDisplayRoutingPhaseTrace,
+  type DisplayRoutingPhaseTrace,
+} from './baseReactFlowDisplayRoutingTrace';
 import { displayTerminalRoleNeedsDeclaredAxisRepair } from './baseReactFlowDisplayTerminalPortCandidates';
 import { createDisplayTerminalValidationSnapshot } from './baseReactFlowTerminalValidation';
 
@@ -269,6 +273,7 @@ export const createBaseReactFlowMovedNodeReconnectCandidates = ({
   mutableEdgeIds,
   beamWidth = 4,
   onDiagnostics,
+  onPhaseTrace,
 }: {
   baselineEdges: Edge[];
   nodes: Node[];
@@ -276,6 +281,7 @@ export const createBaseReactFlowMovedNodeReconnectCandidates = ({
   mutableEdgeIds: readonly string[];
   beamWidth?: number;
   onDiagnostics?: (diagnostics: BaseReactFlowReconnectDiagnostics) => void;
+  onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void;
 }): Edge[][] => {
   if (!Number.isSafeInteger(beamWidth) || beamWidth < 1 || beamWidth > 8) return [];
   const diagnostics: MutableReconnectDiagnostics = {
@@ -283,6 +289,11 @@ export const createBaseReactFlowMovedNodeReconnectCandidates = ({
     evaluatedPathCount: 0,
   };
   try {
+  const setupTimer = startDisplayRoutingPhaseTrace({
+    phase: 'local-reconnect-setup',
+    candidateCount: mutableEdgeIds.length,
+    onTrace: onPhaseTrace,
+  });
   const changedNodes = new Set(changedNodeIds);
   const mutableEdges = new Set(mutableEdgeIds);
   const nodesById = new Map(nodes.map(node => [node.id, node] as const));
@@ -294,6 +305,11 @@ export const createBaseReactFlowMovedNodeReconnectCandidates = ({
     .map((edge, edgeIndex) => (mutableEdges.has(edge.id) ? edgeIndex : -1))
     .filter(edgeIndex => edgeIndex >= 0);
   const candidateBudgetPerEdge = resolveReconnectCandidateBudgetPerEdge(mutableIndexes.length);
+  setupTimer.finish(
+    candidateBudgetPerEdge > 0 ? 'accepted' : 'fallback',
+    0,
+    { candidateCount: mutableIndexes.length },
+  );
   if (candidateBudgetPerEdge === 0) return [];
   let states: RankedReconnectCandidate[] = [{
     edges: baselineEdges,
@@ -310,6 +326,11 @@ export const createBaseReactFlowMovedNodeReconnectCandidates = ({
       if (changedNodes.has(edge.source)) roles.push('source');
       if (changedNodes.has(edge.target)) roles.push('target');
       if (roles.length === 0) return [];
+      const generationTimer = startDisplayRoutingPhaseTrace({
+        phase: 'local-reconnect-path-generation',
+        candidateCount: candidateBudgetPerEdge,
+        onTrace: onPhaseTrace,
+      });
       const paths = reconnectPathsForRoles({
         edge,
         edges: state.edges,
@@ -319,7 +340,25 @@ export const createBaseReactFlowMovedNodeReconnectCandidates = ({
         maxCandidates: candidateBudgetPerEdge,
       });
       diagnostics.generatedPathCount += paths.length;
-      expanded.push(...rankReconnectCandidates({
+      generationTimer.finish(
+        paths.length > 0 ? 'accepted' : 'fallback',
+        0,
+        {
+          candidateCount: paths.length,
+          evaluationCount: candidateBudgetPerEdge,
+          workItemCount: 1,
+          budgetCount: candidateBudgetPerEdge,
+          underBudgetCount: paths.length < candidateBudgetPerEdge ? 1 : 0,
+          minimumCandidateCount: paths.length,
+          maximumCandidateCount: paths.length,
+        },
+      );
+      const rankingTimer = startDisplayRoutingPhaseTrace({
+        phase: 'local-reconnect-ranking',
+        candidateCount: paths.length,
+        onTrace: onPhaseTrace,
+      });
+      const ranked = rankReconnectCandidates({
         edges: state.edges,
         edgeIndex,
         candidatePaths: paths,
@@ -327,7 +366,13 @@ export const createBaseReactFlowMovedNodeReconnectCandidates = ({
         terminalContext,
         diagnostics,
         limit: beamWidth,
-      }));
+      });
+      expanded.push(...ranked);
+      rankingTimer.finish(
+        ranked.length > 0 ? 'accepted' : 'rejected',
+        0,
+        { candidateCount: paths.length, evaluationCount: paths.length },
+      );
     }
     states = expanded
       .sort((first, second) => (
@@ -342,10 +387,16 @@ export const createBaseReactFlowMovedNodeReconnectCandidates = ({
     const refined: RankedReconnectCandidate[] = [];
     let hasStrictParticipant = false;
     for (const state of states) {
+      const strictScanTimer = startDisplayRoutingPhaseTrace({
+        phase: 'local-reconnect-strict-scan',
+        candidateCount: state.edges.length,
+        onTrace: onPhaseTrace,
+      });
       const participantIndexes = [...new Set(
         findDisplayStrictCrossingHits(state.edges)
           .flatMap(hit => [hit.a.edgeIndex, hit.b.edgeIndex]),
       )].filter(edgeIndex => mutableEdges.has(state.edges[edgeIndex]?.id ?? ''));
+      strictScanTimer.finish(participantIndexes.length > 0 ? 'hit' : 'skip');
       if (participantIndexes.length === 0) {
         refined.push(state);
         continue;
@@ -357,6 +408,11 @@ export const createBaseReactFlowMovedNodeReconnectCandidates = ({
         const roles: DisplayTerminalRole[] = [];
         if (changedNodes.has(baselineEdge.source)) roles.push('source');
         if (changedNodes.has(baselineEdge.target)) roles.push('target');
+        const generationTimer = startDisplayRoutingPhaseTrace({
+          phase: 'local-reconnect-path-generation',
+          candidateCount: candidateBudgetPerEdge,
+          onTrace: onPhaseTrace,
+        });
         const paths = reconnectPathsForRoles({
           edge: baselineEdge,
           edges: state.edges,
@@ -366,7 +422,25 @@ export const createBaseReactFlowMovedNodeReconnectCandidates = ({
           maxCandidates: candidateBudgetPerEdge,
         });
         diagnostics.generatedPathCount += paths.length;
-        refined.push(...rankReconnectCandidates({
+        generationTimer.finish(
+          paths.length > 0 ? 'accepted' : 'fallback',
+          0,
+          {
+            candidateCount: paths.length,
+            evaluationCount: candidateBudgetPerEdge,
+            workItemCount: 1,
+            budgetCount: candidateBudgetPerEdge,
+            underBudgetCount: paths.length < candidateBudgetPerEdge ? 1 : 0,
+            minimumCandidateCount: paths.length,
+            maximumCandidateCount: paths.length,
+          },
+        );
+        const rankingTimer = startDisplayRoutingPhaseTrace({
+          phase: 'local-reconnect-ranking',
+          candidateCount: paths.length,
+          onTrace: onPhaseTrace,
+        });
+        const ranked = rankReconnectCandidates({
           edges: state.edges,
           edgeIndex,
           candidatePaths: paths,
@@ -374,7 +448,13 @@ export const createBaseReactFlowMovedNodeReconnectCandidates = ({
           terminalContext,
           diagnostics,
           limit: beamWidth,
-        }));
+        });
+        refined.push(...ranked);
+        rankingTimer.finish(
+          ranked.length > 0 ? 'accepted' : 'rejected',
+          0,
+          { candidateCount: paths.length, evaluationCount: paths.length },
+        );
       }
     }
     if (!hasStrictParticipant || refined.length === 0) break;

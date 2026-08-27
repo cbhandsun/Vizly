@@ -298,6 +298,17 @@ describe('Logistics incremental display routing', () => {
     expect(response.affectedEdgeCount, diagnostics).toBe(4);
     expect(report?.hardClean, diagnostics).toBe(true);
     expect(clearanceRisks, diagnostics).toEqual([]);
+    const generationTrace = response.phaseTrace?.find(
+      trace => trace.phase === 'local-reconnect-path-generation',
+    );
+    expect(generationTrace, diagnostics).toMatchObject({
+      workItemCount: 4,
+      budgetCount: 256,
+      candidateCount: 256,
+      underBudgetCount: 0,
+      minimumCandidateCount: 64,
+      maximumCandidateCount: 64,
+    });
   }, 120_000);
 
   it('routes a newly connected bare edge inside a bounded topology transaction', async () => {

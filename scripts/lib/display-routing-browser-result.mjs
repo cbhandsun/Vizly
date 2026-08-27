@@ -15,6 +15,11 @@ const projectPhaseTrace = value => Array.isArray(value) ? value.slice(0, 128).fl
     scannedNodeCount: finiteMetric(trace.scannedNodeCount),
     scannedSegmentCount: finiteMetric(trace.scannedSegmentCount),
     scannedEdgePairCount: finiteMetric(trace.scannedEdgePairCount),
+    workItemCount: finiteMetric(trace.workItemCount),
+    budgetCount: finiteMetric(trace.budgetCount),
+    underBudgetCount: finiteMetric(trace.underBudgetCount),
+    minimumCandidateCount: finiteMetric(trace.minimumCandidateCount),
+    maximumCandidateCount: finiteMetric(trace.maximumCandidateCount),
     candidateCount: finiteMetric(trace.candidateCount),
   }];
 }) : [];
