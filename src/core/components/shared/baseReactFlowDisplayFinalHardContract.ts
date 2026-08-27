@@ -38,6 +38,9 @@ export const closeBaseReactFlowDisplayFinalHardContract = <T extends Edge[]>(
     nodes,
     undefined,
     onPhaseTrace,
+    false,
+    true,
+    evaluation,
   );
   return finalized.report.hardClean
     ? finalized

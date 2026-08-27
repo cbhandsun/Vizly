@@ -134,6 +134,7 @@ export const runBaseReactFlowDisplayWorkerFullRoute = ({
     onPhaseTrace,
     false,
     false,
+    fullRouteEvaluation,
   );
   fullRouteEvaluation.rememberHardReport(finalized.edges, finalized.report);
   if (!finalized.report.hardClean) {

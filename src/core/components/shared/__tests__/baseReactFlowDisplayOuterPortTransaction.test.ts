@@ -6,6 +6,8 @@ import { countRenderUnsafeEndpointStubs } from '../baseReactFlowDisplayEndpointS
 import { NEAR_PARALLEL_LANE_TOLERANCE } from '../baseReactFlowDisplayGeometry';
 import { repairResidualOuterPortTransactionWithHardGate } from '../baseReactFlowDisplayOuterPortTransaction';
 import { getDisplayHardQualityGateReport } from '../baseReactFlowDisplayQualityGates';
+import { createBaseReactFlowFinalEndpointEvaluation } from '../baseReactFlowDisplayFinalEndpointEvaluation';
+import type { DisplayRoutingPhaseTrace } from '../baseReactFlowDisplayRoutingTrace';
 
 const node = (id: string, x: number, y: number): Node => ({
   id,
@@ -200,6 +202,35 @@ describe('outer port transaction', () => {
 
     expect(repaired).not.toBe(edges);
     expect(getDisplayHardQualityGateReport(repaired, graphNodes, 'polished').hardClean).toBe(true);
+  });
+
+  it('reuses request-local changed hard reports without changing the selected route', () => {
+    const edges = overlappingEdges();
+    const expected = repairResidualOuterPortTransactionWithHardGate(edges, graphNodes, 64);
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation(graphNodes);
+    const initialReport = evaluation.hardReport(edges);
+    const traces: DisplayRoutingPhaseTrace[] = [];
+
+    const repaired = repairResidualOuterPortTransactionWithHardGate(
+      edges,
+      graphNodes,
+      64,
+      {
+        evaluation,
+        initialReport: { edges, report: initialReport },
+        onPhaseTrace: trace => traces.push(trace),
+      },
+    );
+
+    expect(repaired).toEqual(expected);
+    expect(getDisplayHardQualityGateReport(repaired, graphNodes, 'polished'))
+      .toEqual(getDisplayHardQualityGateReport(expected, graphNodes, 'polished'));
+    expect(traces).toContainEqual(expect.objectContaining({
+      phase: 'finalizer-outer-port',
+      resolution: 'accepted',
+    }));
+    expect(traces[0]?.candidateCount).toBeGreaterThan(0);
+    expect(traces[0]?.evaluationCount).toBeGreaterThan(0);
   });
 
   it('repairs subpixel-short stubs in the same atomic outer transaction', () => {

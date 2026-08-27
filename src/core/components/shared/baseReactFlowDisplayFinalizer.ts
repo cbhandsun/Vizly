@@ -18,6 +18,7 @@ import { repairDeclaredTerminalRolesWithHardGate } from './baseReactFlowDeclared
 import { repairRenderSafeTerminalAxes } from './baseReactFlowRenderTerminalSafety';
 import { repairSharedPortAndTinyTerminalLanes } from './baseReactFlowDisplaySharedPortLaneRepair';
 import { repairFinalResidualStrictCrossings } from './baseReactFlowDisplayStrictResidualRepair';
+import type { BaseReactFlowFinalEndpointEvaluation } from './baseReactFlowDisplayFinalEndpointEvaluation';
 import {
   startDisplayRoutingPhaseTrace,
   type DisplayRoutingPhaseTrace,
@@ -108,6 +109,7 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
   onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void,
   deferStrictOnlyMeasuredRepair = false,
   allowCompoundMeasuredResidualClosure = true,
+  evaluation?: BaseReactFlowFinalEndpointEvaluation,
 ): BaseReactFlowDisplayFinalizerOutcome<T> => {
   const trustedEvaluation = resolveTrustedInitialEvaluation(
     fullRouteEdges,
@@ -118,12 +120,15 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
     nodes,
     new Map(nodes.map(node => [node.id, node] as const)),
   );
-  let routedEdges = fullRouteEdges;
-  let routedReport = trustedEvaluation?.report ?? getDisplayHardQualityGateReport(
-    routedEdges,
-    repairNodes,
-    'polished',
+  if (trustedEvaluation && evaluation) {
+    evaluation.rememberHardReport(fullRouteEdges, trustedEvaluation.report);
+  }
+  const hardReportFor = (candidateEdges: readonly Edge[]): BaseDisplayBoundedCandidateReport => (
+    evaluation?.hardReport(candidateEdges)
+      ?? getDisplayHardQualityGateReport([...candidateEdges], repairNodes, 'polished')
   );
+  let routedEdges = fullRouteEdges;
+  let routedReport = trustedEvaluation?.report ?? hardReportFor(routedEdges);
   let hasAtomicOuterPortHardBaseline = false;
 
   // A candidate that is already geometrically clean should not enter the
@@ -141,11 +146,7 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
       ),
     ) as T;
     if (directAxisCandidate !== routedEdges) {
-      const directAxisReport = getDisplayHardQualityGateReport(
-        directAxisCandidate,
-        repairNodes,
-        'polished',
-      );
+      const directAxisReport = hardReportFor(directAxisCandidate);
       if (directAxisReport.hardClean) {
         routedEdges = directAxisCandidate;
         routedReport = directAxisReport;
@@ -201,11 +202,7 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
       ),
     ) as T;
     if (residualLaneCandidate !== routedEdges) {
-      const residualLaneReport = getDisplayHardQualityGateReport(
-        residualLaneCandidate,
-        repairNodes,
-        'polished',
-      );
+      const residualLaneReport = hardReportFor(residualLaneCandidate);
       if (residualLaneReport.hardClean) {
         routedEdges = residualLaneCandidate;
         routedReport = residualLaneReport;
@@ -223,7 +220,7 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
     ) as T;
     const directAxisReport = directAxisCandidate === routedEdges
       ? routedReport
-      : getDisplayHardQualityGateReport(directAxisCandidate, repairNodes, 'polished');
+      : hardReportFor(directAxisCandidate);
     if (directAxisReport.hardClean) {
       routedEdges = directAxisCandidate;
       routedReport = directAxisReport;
@@ -235,14 +232,15 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
       routedEdges,
       repairNodes,
       64,
+      {
+        evaluation,
+        initialReport: { edges: routedEdges, report: routedReport },
+        onPhaseTrace,
+      },
     ) as T
     : routedEdges;
   if (atomicOuterPortEdges !== routedEdges) {
-    const atomicOuterPortReport = getDisplayHardQualityGateReport(
-      atomicOuterPortEdges,
-      repairNodes,
-      'polished',
-    );
+    const atomicOuterPortReport = hardReportFor(atomicOuterPortEdges);
     if (atomicOuterPortReport.hardClean) {
       // 48px is the formal hard minimum. Keep the complete transaction as the
       // rollback baseline, then allow exactly one independently hard-gated
@@ -256,7 +254,7 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
   const renderSafeEdges = repairRenderSafeEndpointStubs(routedEdges, repairNodes) as T;
   const renderSafeEndpointReport = renderSafeEdges === routedEdges
     ? routedReport
-    : getDisplayHardQualityGateReport(renderSafeEdges, repairNodes, 'polished');
+    : hardReportFor(renderSafeEdges);
   if (
     renderSafeEndpointReport.hardClean
     && countRenderUnsafeEndpointStubs(renderSafeEdges) === 0
@@ -274,7 +272,7 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
   ) as T;
   const renderSafeReport = renderSafeAxisEdges === renderSafeEdges
     ? renderSafeEndpointReport
-    : getDisplayHardQualityGateReport(renderSafeAxisEdges, repairNodes, 'polished');
+    : hardReportFor(renderSafeAxisEdges);
   if (
     renderSafeReport.hardClean
     && countRenderUnsafeEndpointStubs(renderSafeAxisEdges) === 0
@@ -288,14 +286,15 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
       renderSafeAxisEdges,
       repairNodes,
       64,
+      {
+        evaluation,
+        initialReport: { edges: renderSafeAxisEdges, report: renderSafeReport },
+        onPhaseTrace,
+      },
     ) as T
     : renderSafeAxisEdges;
   if (outerPortSafeEdges !== renderSafeAxisEdges) {
-    const outerPortSafeReport = getDisplayHardQualityGateReport(
-      outerPortSafeEdges,
-      repairNodes,
-      'polished',
-    );
+    const outerPortSafeReport = hardReportFor(outerPortSafeEdges);
     if (outerPortSafeReport.hardClean) {
       const preferredOuterPortEdges = repairRenderSafeEndpointStubs(
         outerPortSafeEdges,
@@ -303,7 +302,7 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
       ) as T;
       const preferredOuterPortReport = preferredOuterPortEdges === outerPortSafeEdges
         ? outerPortSafeReport
-        : getDisplayHardQualityGateReport(preferredOuterPortEdges, repairNodes, 'polished');
+        : hardReportFor(preferredOuterPortEdges);
       return (
         preferredOuterPortReport.hardClean
         && countRenderUnsafeEndpointStubs(preferredOuterPortEdges) === 0
@@ -324,7 +323,7 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
   ) {
     return {
       edges: declaredRoleSafeEdges,
-      report: getDisplayHardQualityGateReport(declaredRoleSafeEdges, repairNodes, 'polished'),
+      report: hardReportFor(declaredRoleSafeEdges),
     };
   }
 
@@ -338,7 +337,7 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
   ) as T;
   const axisSafeReport = axisSafeEdges === renderSafeAxisEdges
     ? renderSafeReport
-    : getDisplayHardQualityGateReport(axisSafeEdges, repairNodes, 'polished');
+    : hardReportFor(axisSafeEdges);
   return (
     countRenderUnsafeEndpointStubs(axisSafeEdges) === 0
     && axisSafeReport.hardClean
@@ -353,10 +352,13 @@ export const finalizeBaseReactFlowDisplayEdges = <T extends Edge[]>(
   exactReport?: BaseReactFlowDisplayExactReport,
   onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void,
   deferStrictOnlyMeasuredRepair = false,
+  evaluation?: BaseReactFlowFinalEndpointEvaluation,
 ): T => finalizeBaseReactFlowDisplayEdgesWithReport(
   fullRouteEdges,
   nodes,
   exactReport,
   onPhaseTrace,
   deferStrictOnlyMeasuredRepair,
+  true,
+  evaluation,
 ).edges;

@@ -73,6 +73,8 @@ export const closeBaseReactFlowFinalDisplayRoute = ({
       args.nodes,
       preFinalizerEdges === routedEdges ? exactReport : undefined,
       args.onPhaseTrace,
+      false,
+      evaluationSession,
     );
   finalizerTimer.finish(
     'accepted',

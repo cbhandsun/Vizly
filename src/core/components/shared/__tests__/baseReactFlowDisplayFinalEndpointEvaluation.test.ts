@@ -148,18 +148,37 @@ describe('createBaseReactFlowFinalEndpointEvaluation', () => {
     });
   });
 
-  it('does not reuse metadata-sensitive order evidence for a copied candidate', () => {
+  it('reuses exact request-local evidence for a copied immutable route', () => {
     const evaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
     const candidate = edges.map(edge => ({
       ...edge,
       data: edge.data ? { ...edge.data } : undefined,
     }));
 
+    expect(evaluation.endpointOrder(candidate)).toBe(evaluation.endpointOrder(edges));
+    expect(evaluation.passageOrder(candidate)).toBe(evaluation.passageOrder(edges));
+    expect(evaluation.hardReport(candidate)).toBe(evaluation.hardReport(edges));
+    expect(evaluation.terminalReport(candidate)).toBe(evaluation.terminalReport(edges));
+    evaluation.unsafeEndpointStubs(candidate);
+    const metricsBeforeExactClone = evaluation.readMetrics();
+    evaluation.unsafeEndpointStubs(edges);
+    expect(evaluation.readMetrics().evaluationCount).toBe(metricsBeforeExactClone.evaluationCount);
+  });
+
+  it('does not reuse endpoint audit evidence after a terminal-policy-only change', () => {
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
+    const candidate = edges.map((edge, index) => index === 1 ? {
+      ...edge,
+      data: {
+        ...edge.data,
+        sourcePortPolicy: 'fixed-pos',
+      },
+    } : edge);
+
     expect(evaluation.endpointOrder(candidate)).not.toBe(evaluation.endpointOrder(edges));
     expect(evaluation.passageOrder(candidate)).not.toBe(evaluation.passageOrder(edges));
-    expect(evaluation.endpointOrder(candidate)).toEqual(evaluation.endpointOrder(edges));
-    expect(evaluation.passageOrder(candidate)).toEqual(evaluation.passageOrder(edges));
-    expect(evaluation.hardReport(candidate)).toBe(evaluation.hardReport(edges));
+    expect(evaluation.endpointOrder(candidate).movableEndpointCount)
+      .toBeLessThan(evaluation.endpointOrder(edges).movableEndpointCount);
   });
 
   it('does not reuse route-bound evidence after endpoint geometry changes', () => {

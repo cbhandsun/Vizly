@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 
+import { readEdgeTerminalPolicy } from '../../routing/utils/edgeTerminalPolicy';
 import {
   auditFinalSameSideEndpointOrder,
 } from '../../strategies/shared/edgeFinalSameSideEndpointOrderRepair';
@@ -44,6 +45,48 @@ export type BaseReactFlowEvaluationMetrics = Readonly<{
   scannedEdgePairCount: number;
 }>;
 
+const MAX_REQUEST_LOCAL_ROUTE_EVIDENCE = 256;
+
+const terminalPolicyToken = (edge: Edge): string => (
+  (['source', 'target'] as const).map((role) => {
+    const policy = readEdgeTerminalPolicy(edge, role);
+    return [
+      policy.forbidden,
+      policy.runtimeFixed,
+      policy.sourceExactFixed,
+      policy.positionFixed,
+      policy.sideFixed,
+    ].map(value => value ? '1' : '0').join('');
+  }).join(':')
+);
+
+/**
+ * Endpoint and passage audits consume source-authored terminal policy in
+ * addition to rendered geometry. Bind their request-local cache to both so a
+ * copied immutable route can reuse evidence without treating a policy-only
+ * change as the same input.
+ */
+const endpointAuditSignature = (edges: readonly Edge[]): string | null => {
+  const routeSignature = computeBaseReactFlowDisplayOutputRouteSignature([...edges]);
+  return routeSignature
+    ? `${routeSignature}\u001f${edges.map(terminalPolicyToken).join('\u001e')}`
+    : null;
+};
+
+const rememberBoundedRouteEvidence = <T>(
+  evidenceBySignature: Map<string, T>,
+  signature: string | null,
+  evidence: T,
+): void => {
+  if (!signature) return;
+  if (!evidenceBySignature.has(signature)
+    && evidenceBySignature.size >= MAX_REQUEST_LOCAL_ROUTE_EVIDENCE) {
+    const oldestSignature = evidenceBySignature.keys().next().value as string | undefined;
+    if (oldestSignature !== undefined) evidenceBySignature.delete(oldestSignature);
+  }
+  evidenceBySignature.set(signature, evidence);
+};
+
 export const diffBaseReactFlowEvaluationMetrics = (
   before: BaseReactFlowEvaluationMetrics,
   after: BaseReactFlowEvaluationMetrics,
@@ -76,15 +119,28 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
     readonly Edge[],
     ReturnType<typeof auditFinalSameSideEndpointOrder>
   >();
+  const endpointOrderBySignature = new Map<
+    string,
+    ReturnType<typeof auditFinalSameSideEndpointOrder>
+  >();
   const passageOrderByEdges = new WeakMap<
     readonly Edge[],
+    ReturnType<typeof auditFinalSameSidePassageOrder>
+  >();
+  const passageOrderBySignature = new Map<
+    string,
     ReturnType<typeof auditFinalSameSidePassageOrder>
   >();
   const terminalReportByEdges = new WeakMap<
     readonly Edge[],
     ReturnType<typeof getDisplayTerminalValidationReport>
   >();
+  const terminalReportBySignature = new Map<
+    string,
+    ReturnType<typeof getDisplayTerminalValidationReport>
+  >();
   const unsafeStubsByEdges = new WeakMap<readonly Edge[], number>();
+  const unsafeStubsBySignature = new Map<string, number>();
   const changedHardReportByBaseline = new WeakMap<
     readonly Edge[],
     Readonly<{
@@ -105,9 +161,17 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
         cacheHitCount += 1;
         return cached;
       }
+      const signature = endpointAuditSignature(edges);
+      const routeCached = signature ? endpointOrderBySignature.get(signature) : undefined;
+      if (routeCached) {
+        cacheHitCount += 1;
+        endpointOrderByEdges.set(edges, routeCached);
+        return routeCached;
+      }
       evaluationCount += 1;
       const audit = auditFinalSameSideEndpointOrder(edges, nodes);
       endpointOrderByEdges.set(edges, audit);
+      rememberBoundedRouteEvidence(endpointOrderBySignature, signature, audit);
       return audit;
     },
     hardReport(edges) {
@@ -161,9 +225,17 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
         cacheHitCount += 1;
         return cached;
       }
+      const signature = endpointAuditSignature(edges);
+      const routeCached = signature ? passageOrderBySignature.get(signature) : undefined;
+      if (routeCached) {
+        cacheHitCount += 1;
+        passageOrderByEdges.set(edges, routeCached);
+        return routeCached;
+      }
       evaluationCount += 1;
       const audit = auditFinalSameSidePassageOrder(edges, nodes);
       passageOrderByEdges.set(edges, audit);
+      rememberBoundedRouteEvidence(passageOrderBySignature, signature, audit);
       return audit;
     },
     terminalReport(edges) {
@@ -172,9 +244,17 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
         cacheHitCount += 1;
         return cached;
       }
+      const signature = computeBaseReactFlowDisplayOutputRouteSignature([...edges]);
+      const routeCached = signature ? terminalReportBySignature.get(signature) : undefined;
+      if (routeCached) {
+        cacheHitCount += 1;
+        terminalReportByEdges.set(edges, routeCached);
+        return routeCached;
+      }
       evaluationCount += 1;
       const report = getDisplayTerminalValidationReport(edges.slice(), terminalSnapshot);
       terminalReportByEdges.set(edges, report);
+      rememberBoundedRouteEvidence(terminalReportBySignature, signature, report);
       return report;
     },
     unsafeEndpointStubs(edges) {
@@ -183,9 +263,17 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
         cacheHitCount += 1;
         return cached;
       }
+      const signature = computeBaseReactFlowDisplayOutputRouteSignature([...edges]);
+      const routeCached = signature ? unsafeStubsBySignature.get(signature) : undefined;
+      if (typeof routeCached === 'number') {
+        cacheHitCount += 1;
+        unsafeStubsByEdges.set(edges, routeCached);
+        return routeCached;
+      }
       evaluationCount += 1;
       const count = countRenderUnsafeEndpointStubs(edges.slice());
       unsafeStubsByEdges.set(edges, count);
+      rememberBoundedRouteEvidence(unsafeStubsBySignature, signature, count);
       return count;
     },
     readMetrics() {

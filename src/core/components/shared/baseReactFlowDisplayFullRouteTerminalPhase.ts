@@ -248,10 +248,20 @@ export const runBaseReactFlowFullRouteTerminalPhase = (
       finalAttachedTransactionCandidate,
       finalOrthogonalTransactionCandidate,
     );
+  const finalFallbackTransactionReport = context.evaluationSession.hardReport(
+    finalFallbackTransactionCandidate,
+  );
   const finalOuterPortCandidate = repairResidualOuterPortTransactionWithHardGate(
     finalFallbackTransactionCandidate,
     repairNodes,
     64,
+    {
+      evaluation: context.evaluationSession,
+      initialReport: {
+        edges: finalFallbackTransactionCandidate,
+        report: finalFallbackTransactionReport,
+      },
+    },
   );
   if (finalOuterPortCandidate !== finalFallbackTransactionCandidate) {
     finishOuterPort('accepted', finalOuterPortCandidate.length);
