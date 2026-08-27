@@ -226,6 +226,10 @@ export function useLayoutStrategy({
         nodeLayout?: string,
         direction?: FlowchartLayoutDirection,
     ) => {
+        // The layout intent must own the Canvas routing epoch before any
+        // asynchronous strategy/ELK work starts. Otherwise a stale layout
+        // result could open a fresh epoch after a newer display commit.
+        const routingJob = routingSessionRuntime.beginJob('layout');
         const dir = direction || 'TB';
         const appliedDirection = dir;
         const axisDirection = dir === 'LR' || dir === 'RL' ? 'LR' : 'TB';
@@ -326,7 +330,12 @@ export function useLayoutStrategy({
                 // used by commercial layered layout engines. Same-rank and
                 // return edges still follow their actual relative geometry.
                 const treeEdges = prepareLayeredLayoutEdges(treeResult, treeSourceEdges, dir);
-                await commitLayout({ nodes: treeResult, edges: treeEdges, onCommitted: twoStepFitView });
+                await commitLayout({
+                    nodes: treeResult,
+                    edges: treeEdges,
+                    routingJob,
+                    onCommitted: twoStepFitView,
+                });
             } else if (strategyName === 'force') {
                 // ── 扁平力导向布局（对齐 SVG 版：不检测域） ──
                 const { refineLayout } = await import('../../../strategies/shared/LayoutRefinement');
@@ -377,7 +386,12 @@ export function useLayoutStrategy({
                         data: clearBaseReactFlowLayoutEdgeRoutingData(e.data),
                     }))
                     : prepareLayeredLayoutEdges(forceResult, forceSourceEdges, dir);
-                await commitLayout({ nodes: forceResult, edges: forceEdges, onCommitted: twoStepFitView });
+                await commitLayout({
+                    nodes: forceResult,
+                    edges: forceEdges,
+                    routingJob,
+                    onCommitted: twoStepFitView,
+                });
             } else {
                 // ── 域感知策略布局 ──
                 const isDomainLane = isOrderedDomainLaneLayoutStrategy(strategyName);
@@ -626,6 +640,7 @@ export function useLayoutStrategy({
                         await commitLayout({
                             nodes: finalNodes,
                             edges: finalEdges,
+                            routingJob,
                             onCommitted: twoStepFitView,
                         });
                     };
@@ -671,8 +686,19 @@ export function useLayoutStrategy({
         } catch (err) {
             logLayoutStrategyFailure(strategyName, err);
             return false;
+        } finally {
+            routingSessionRuntime.cancelJob(routingJob);
         }
-    }, [commitLayout, diagramId, loadLayoutPresetMap, reactFlowInstance, nodesRef, edgesRef, twoStepFitView]);
+    }, [
+        commitLayout,
+        diagramId,
+        loadLayoutPresetMap,
+        reactFlowInstance,
+        nodesRef,
+        edgesRef,
+        routingSessionRuntime,
+        twoStepFitView,
+    ]);
 
     return {
         handleStrategyLayout,

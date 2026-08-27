@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 import type { MutableRefObject } from 'react';
 
+import {
+  commitBaseReactFlowDisplaySnapshot,
+  type BaseReactFlowDisplayCommittedSnapshotBaseline,
+  type BaseReactFlowDisplaySnapshotCommitOptions,
+} from './baseReactFlowDisplayCommittedSnapshot';
+
 export type BaseReactFlowRoutingSessionJobOwner = 'display' | 'layout';
 
 export type BaseReactFlowRoutingSessionJob = Readonly<{
@@ -23,6 +29,9 @@ export type BaseReactFlowRoutingSessionRuntime = Readonly<{
     job: BaseReactFlowRoutingSessionJob,
     commit: () => T,
   ) => BaseReactFlowRoutingSessionCommitResult<T>;
+  commitDisplaySnapshot: (
+    options: BaseReactFlowDisplaySnapshotCommitOptions,
+  ) => BaseReactFlowDisplayCommittedSnapshotBaseline | null;
   registerWorkerDisposer: (
     disposer: (workerRef: MutableRefObject<Worker | null>) => void,
   ) => void;
@@ -49,6 +58,7 @@ export const createBaseReactFlowRoutingSessionRuntime = (
   const workerRef: MutableRefObject<Worker | null> = { current: null };
   let nextJobId = 0;
   let activeJob: ActiveRoutingJob | null = null;
+  let committingJob: BaseReactFlowRoutingSessionJob | null = null;
   let workerDisposer = terminateWorkerDirectly;
   let disposed = false;
 
@@ -90,12 +100,20 @@ export const createBaseReactFlowRoutingSessionRuntime = (
     cancelJob,
     commitJob: (job, commit) => {
       if (!isCurrentJob(job)) return { committed: false };
+      committingJob = job;
       try {
-        return { committed: true, value: commit() };
-      } finally {
+        const value = commit();
         if (activeJob?.publicJob === job) activeJob = null;
+        return { committed: true, value };
+      } finally {
+        committingJob = null;
       }
     },
+    commitDisplaySnapshot: options => (
+      committingJob && isCurrentJob(committingJob)
+        ? commitBaseReactFlowDisplaySnapshot(options)
+        : null
+    ),
     registerWorkerDisposer: (disposer) => {
       if (!disposed) workerDisposer = disposer;
     },
@@ -104,6 +122,7 @@ export const createBaseReactFlowRoutingSessionRuntime = (
       disposed = true;
       activeJob?.abortController.abort();
       activeJob = null;
+      committingJob = null;
       workerDisposer(workerRef);
     },
   };

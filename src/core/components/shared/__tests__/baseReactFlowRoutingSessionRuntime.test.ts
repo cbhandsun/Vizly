@@ -32,6 +32,31 @@ describe('baseReactFlowRoutingSessionRuntime', () => {
     expect(commit).toHaveBeenCalledOnce();
   });
 
+  it('keeps a thrown commit attempt current unless newer work supersedes it', () => {
+    const runtime = createBaseReactFlowRoutingSessionRuntime();
+    const retryableJob = runtime.beginJob('layout');
+    const failure = new Error('layout-routing-hard-quality-rejected');
+
+    expect(() => runtime.commitJob(retryableJob, () => { throw failure; })).toThrow(failure);
+    expect(runtime.isCurrentJob(retryableJob)).toBe(true);
+
+    const displayJob = runtime.beginJob('display');
+    expect(retryableJob.signal.aborted).toBe(true);
+    expect(runtime.commitJob(retryableJob, () => 'stale-retry')).toEqual({ committed: false });
+    expect(runtime.isCurrentJob(displayJob)).toBe(true);
+  });
+
+  it('still consumes a non-throwing rejected result', () => {
+    const runtime = createBaseReactFlowRoutingSessionRuntime();
+    const job = runtime.beginJob('display');
+
+    expect(runtime.commitJob(job, () => ({ accepted: false }))).toEqual({
+      committed: true,
+      value: { accepted: false },
+    });
+    expect(runtime.isCurrentJob(job)).toBe(false);
+  });
+
   it('aborts active work and disposes the shared Worker exactly once', () => {
     const runtime = createBaseReactFlowRoutingSessionRuntime();
     const job = runtime.beginJob('display');

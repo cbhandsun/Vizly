@@ -6,8 +6,11 @@ import type { Edge, Node } from '@xyflow/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  calculateLayeredLayoutWithReverse: vi.fn(),
   disposeWorker: vi.fn(),
   flushObstacles: vi.fn(),
+  loadDomainCompoundElkStrategy: vi.fn(),
+  loadDomainElkStrategy: vi.fn(),
   stageLayoutRouting: vi.fn(),
 }));
 
@@ -35,7 +38,18 @@ vi.mock('../../../custom-edges/obstacleContext', () => ({
   flushObstacles: mocks.flushObstacles,
 }));
 
+vi.mock('../layoutStrategyRuntime', () => ({
+  LAYERED_TREE_ROUTING_SPACING: { levelSpacing: 120, nodeSpacing: 120 },
+  loadDomainCompoundElkStrategy: mocks.loadDomainCompoundElkStrategy,
+  loadDomainElkStrategy: mocks.loadDomainElkStrategy,
+}));
+
+vi.mock('../reverseLayeredLayoutGeometry', () => ({
+  calculateLayeredLayoutWithReverse: mocks.calculateLayeredLayoutWithReverse,
+}));
+
 import { useLayoutRoutingTransaction } from '../useLayoutRoutingTransaction';
+import { useLayoutStrategy } from '../useLayoutStrategy';
 import { createBaseReactFlowRoutingSessionRuntime } from '../../../shared/baseReactFlowRoutingSessionRuntime';
 
 const nodes: Node[] = [
@@ -65,7 +79,13 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
   beforeEach(() => {
     mocks.disposeWorker.mockReset();
     mocks.flushObstacles.mockReset();
+    mocks.calculateLayeredLayoutWithReverse.mockReset();
+    mocks.loadDomainCompoundElkStrategy.mockReset();
+    mocks.loadDomainElkStrategy.mockReset();
     mocks.stageLayoutRouting.mockReset();
+    const elkStrategy = { getName: () => 'elk-layered' };
+    mocks.loadDomainCompoundElkStrategy.mockResolvedValue(elkStrategy);
+    mocks.loadDomainElkStrategy.mockResolvedValue(elkStrategy);
     mocks.stageLayoutRouting.mockResolvedValue({
       routedEdges,
       commitSnapshot: vi.fn(() => true),
@@ -75,9 +95,10 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
   it('preempts display work and routes through the Canvas Worker ref', async () => {
     const options = createOptions();
     const displayJob = options.routingSessionRuntime.beginJob('display');
+    const routingJob = options.routingSessionRuntime.beginJob('layout');
     const { result } = renderHook(() => useLayoutRoutingTransaction(options));
 
-    await act(async () => result.current({ nodes, edges }));
+    await act(async () => result.current({ nodes, edges, routingJob }));
 
     expect(displayJob.signal.aborted).toBe(true);
     expect(mocks.stageLayoutRouting).toHaveBeenCalledWith(expect.objectContaining({
@@ -100,11 +121,12 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
       resolveStage = resolve;
     }));
     const options = createOptions();
+    const routingJob = options.routingSessionRuntime.beginJob('layout');
     const { result } = renderHook(() => useLayoutRoutingTransaction(options));
     let layoutPromise: Promise<void> | undefined;
 
     act(() => {
-      layoutPromise = result.current({ nodes, edges });
+      layoutPromise = result.current({ nodes, edges, routingJob });
     });
     await waitFor(() => expect(mocks.stageLayoutRouting).toHaveBeenCalled());
     options.routingSessionRuntime.beginJob('display');
@@ -117,5 +139,59 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
     expect(options.setNodes).not.toHaveBeenCalled();
     expect(options.setEdges).not.toHaveBeenCalled();
     expect(options.setLayoutStable).toHaveBeenLastCalledWith(true);
+  });
+
+  it('does not start staging for a layout intent superseded before the transaction', async () => {
+    const options = createOptions();
+    const routingJob = options.routingSessionRuntime.beginJob('layout');
+    options.routingSessionRuntime.beginJob('display');
+    const { result } = renderHook(() => useLayoutRoutingTransaction(options));
+
+    await act(async () => {
+      await expect(result.current({ nodes, edges, routingJob }))
+        .rejects.toThrow('layout-routing-cancelled');
+    });
+
+    expect(mocks.stageLayoutRouting).not.toHaveBeenCalled();
+    expect(options.takeSnapshot).not.toHaveBeenCalled();
+    expect(options.setNodes).not.toHaveBeenCalled();
+    expect(options.setEdges).not.toHaveBeenCalled();
+    expect(options.setLayoutStable).not.toHaveBeenCalled();
+  });
+
+  it('drops a deferred ELK result superseded before routing staging', async () => {
+    let resolveLayout: ((value: { nodes: Node[]; edges: Edge[] }) => void) | undefined;
+    mocks.calculateLayeredLayoutWithReverse.mockReturnValueOnce(new Promise((resolve) => {
+      resolveLayout = resolve;
+    }));
+    const options = createOptions();
+    const { result } = renderHook(() => useLayoutStrategy({
+      ...options,
+      reactFlowInstance: null,
+    }));
+    let layoutPromise: Promise<boolean> | undefined;
+
+    act(() => {
+      layoutPromise = result.current.handleStrategyLayout('domain-elk');
+    });
+    await waitFor(() => expect(mocks.calculateLayeredLayoutWithReverse).toHaveBeenCalled());
+
+    options.nodesRef.current = nodes.map(node => ({
+      ...node,
+      position: { x: node.position.x + 25, y: node.position.y },
+    }));
+    options.edgesRef.current = edges.map(edge => ({ ...edge, label: 'newer graph' }));
+    const displayJob = options.routingSessionRuntime.beginJob('display');
+    resolveLayout?.({ nodes, edges });
+
+    await act(async () => {
+      await expect(layoutPromise).resolves.toBe(false);
+    });
+
+    expect(mocks.stageLayoutRouting).not.toHaveBeenCalled();
+    expect(options.takeSnapshot).not.toHaveBeenCalled();
+    expect(options.setNodes).not.toHaveBeenCalled();
+    expect(options.setEdges).not.toHaveBeenCalled();
+    expect(options.routingSessionRuntime.isCurrentJob(displayJob)).toBe(true);
   });
 });

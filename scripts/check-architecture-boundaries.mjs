@@ -205,6 +205,12 @@ const restrictedNamedImportViolations = findRestrictedNamedImportViolations({
     allowedImporters: [
       'src/core/components/shared/useBaseReactFlowDisplayRenderAuthority.ts',
     ],
+  }, {
+    targetFile: 'src/core/components/shared/baseReactFlowDisplayCommittedSnapshot.ts',
+    restrictedNames: ['commitBaseReactFlowDisplaySnapshot'],
+    allowedImporters: [
+      'src/core/components/shared/baseReactFlowRoutingSessionRuntime.ts',
+    ],
   }],
 });
 

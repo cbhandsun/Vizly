@@ -312,7 +312,7 @@ export const consumeBaseReactFlowStagedLayoutSnapshotHandoff = (
   ));
 };
 
-export const commitBaseReactFlowDisplaySnapshot = (options: {
+export type BaseReactFlowDisplaySnapshotCommitOptions = {
   inputSignature: string;
   inputGeometryDigest: string;
   sourceEdges: Edge[];
@@ -321,7 +321,12 @@ export const commitBaseReactFlowDisplaySnapshot = (options: {
   outputRouteSignature: string | null;
   workerSessionRef?: RoutingWorkerSessionRef;
   precompiledCapturePresetId?: string | null;
-} & CommittedHardReportIdentity): BaseReactFlowDisplayCommittedSnapshotBaseline | null => {
+} & CommittedHardReportIdentity;
+
+/** Internal mutation primitive; production callers commit through the Canvas runtime. */
+export const commitBaseReactFlowDisplaySnapshot = (
+  options: BaseReactFlowDisplaySnapshotCommitOptions,
+): BaseReactFlowDisplayCommittedSnapshotBaseline | null => {
   if (!isDisplayRoutingCapabilityEnabled('routingSessionSnapshot')) return null;
   const snapshot = createCommittedSnapshot(options);
   if (!snapshot) return null;

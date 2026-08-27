@@ -113,4 +113,19 @@ describe('baseReactFlowDisplaySessionCommit', () => {
     expect(result.result).toEqual({ committed: false });
     expect(applyFinalGeometry).not.toHaveBeenCalled();
   });
+
+  it('rejects direct snapshot mutation outside the current commit epoch', () => {
+    const runtime = createBaseReactFlowRoutingSessionRuntime();
+
+    expect(runtime.commitDisplaySnapshot({
+      inputSignature: '1234',
+      inputGeometryDigest,
+      sourceEdges,
+      sourceNodes,
+      displayPatches,
+      outputRouteSignature,
+      hardReport,
+      workerSessionRef: commitReceipt.sessionRef,
+    })).toBeNull();
+  });
 });

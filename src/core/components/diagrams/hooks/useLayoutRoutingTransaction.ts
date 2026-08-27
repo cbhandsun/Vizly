@@ -7,11 +7,15 @@ import {
   computeBaseReactFlowIsLargeGraph,
   readBaseReactFlowPerformanceConfig,
 } from '../../shared/baseReactFlowRuntimeConfig';
-import type { BaseReactFlowRoutingSessionRuntime } from '../../shared/baseReactFlowRoutingSessionRuntime';
+import type {
+  BaseReactFlowRoutingSessionJob,
+  BaseReactFlowRoutingSessionRuntime,
+} from '../../shared/baseReactFlowRoutingSessionRuntime';
 
 type LayoutRoutingTransactionRequest = Readonly<{
   nodes: Node[];
   edges: Edge[];
+  routingJob: BaseReactFlowRoutingSessionJob;
   onCommitted?: () => void;
 }>;
 
@@ -43,9 +47,12 @@ export const useLayoutRoutingTransaction = ({
   return useCallback(async ({
     nodes,
     edges,
+    routingJob,
     onCommitted,
   }: LayoutRoutingTransactionRequest): Promise<void> => {
-    const routingJob = routingSessionRuntime.beginJob('layout');
+    if (routingJob.owner !== 'layout' || !routingSessionRuntime.isCurrentJob(routingJob)) {
+      throw new Error('layout-routing-cancelled');
+    }
     setLayoutStable?.(false);
     try {
       // Layout routing is an explicit interaction. Defer its worker and
@@ -72,7 +79,7 @@ export const useLayoutRoutingTransaction = ({
 
       const targetNodes = clearBaseReactFlowLayoutNodeRuntimeGeometry(nodes);
       let committedEdges = edges;
-      let commitLayoutSnapshot = (): boolean => true;
+      let commitLayoutSnapshot = (_runtime: BaseReactFlowRoutingSessionRuntime): boolean => true;
       if (edges.length > 0) {
         const performanceConfig = readBaseReactFlowPerformanceConfig({
           readConfig: () => diagramConfigManager.getConfig(),
@@ -90,11 +97,14 @@ export const useLayoutRoutingTransaction = ({
           isLargeGraph,
           signal: routingJob.signal,
         });
+        if (!routingSessionRuntime.isCurrentJob(routingJob)) {
+          throw new Error('layout-routing-cancelled');
+        }
         committedEdges = staged.routedEdges;
         commitLayoutSnapshot = staged.commitSnapshot;
       }
       const commitResult = routingSessionRuntime.commitJob(routingJob, () => {
-        if (!commitLayoutSnapshot()) {
+        if (!commitLayoutSnapshot(routingSessionRuntime)) {
           throw new Error('layout-routing-hard-quality-rejected');
         }
         takeSnapshot(nodesRef.current, edgesRef.current);
@@ -108,7 +118,6 @@ export const useLayoutRoutingTransaction = ({
         onCommitted?.();
       });
     } finally {
-      routingSessionRuntime.cancelJob(routingJob);
       setLayoutStable?.(true);
     }
   }, [

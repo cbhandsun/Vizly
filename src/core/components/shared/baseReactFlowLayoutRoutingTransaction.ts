@@ -4,7 +4,6 @@ import type { RoutingPatch } from '../../routing/routingPatch';
 
 import { computeBaseReactFlowDisplayOutputRouteSignature } from './baseReactFlowDisplayCache';
 import {
-  commitBaseReactFlowDisplaySnapshot,
   readBaseReactFlowDisplayCommittedSnapshot,
   markBaseReactFlowStagedLayoutSnapshotHandoff,
   type RoutingCommittedSnapshot,
@@ -42,12 +41,13 @@ import {
   createDisplayRoutingIdentity,
   displayRoutingIdentitiesMatch,
 } from './baseReactFlowDisplayRoutingSession';
+import type { BaseReactFlowRoutingSessionRuntime } from './baseReactFlowRoutingSessionRuntime';
 
 export { clearBaseReactFlowLayoutEdgeRoutingData } from './baseReactFlowLayoutEdgeRoutingData';
 
 export type BaseReactFlowLayoutRoutingCommit = Readonly<{
   routedEdges: Edge[];
-  commitSnapshot: () => boolean;
+  commitSnapshot: (runtime: BaseReactFlowRoutingSessionRuntime) => boolean;
 }>;
 
 type LayoutRuntimeNode = Node & Readonly<{
@@ -196,7 +196,8 @@ export const commitBaseReactFlowStagedLayoutRoutingResult = ({
 
   return {
     routedEdges: merged.edges,
-    commitSnapshot: () => writeBaseReactFlowStagedLayoutSnapshot({
+    commitSnapshot: runtime => writeBaseReactFlowStagedLayoutSnapshot({
+      runtime,
       sourceEdges,
       routedEdges: merged.edges,
       sourceNodes,
@@ -209,6 +210,7 @@ export const commitBaseReactFlowStagedLayoutRoutingResult = ({
 };
 
 const writeBaseReactFlowStagedLayoutSnapshot = ({
+  runtime,
   sourceEdges,
   routedEdges,
   sourceNodes,
@@ -220,6 +222,7 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
   hardReportDigest,
   workerSessionRef,
 }: {
+  runtime: BaseReactFlowRoutingSessionRuntime;
   sourceEdges: Edge[];
   routedEdges: Edge[];
   sourceNodes: Node[];
@@ -282,7 +285,7 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
       smartEdgePadding,
       isLargeGraph,
     });
-    const committed = commitBaseReactFlowDisplaySnapshot({
+    const committed = runtime.commitDisplaySnapshot({
       inputSignature: identity.cacheSignature,
       inputGeometryDigest: identity.geometryDigest,
       sourceEdges: edges,
@@ -356,7 +359,8 @@ export const stageBaseReactFlowLayoutRouting = async ({
   if (cachedEdges && cachedHardReportDigest) {
     return {
       routedEdges: cachedEdges,
-      commitSnapshot: () => writeBaseReactFlowStagedLayoutSnapshot({
+      commitSnapshot: runtime => writeBaseReactFlowStagedLayoutSnapshot({
+        runtime,
         sourceEdges: unseededSourceEdges,
         routedEdges: cachedEdges,
         sourceNodes: projectedSource.nodes,

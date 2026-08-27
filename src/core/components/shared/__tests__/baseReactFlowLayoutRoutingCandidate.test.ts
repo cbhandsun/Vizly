@@ -21,7 +21,9 @@ import { clearBaseReactFlowDisplayCommittedSnapshots } from '../baseReactFlowDis
 import {
   seedBaseReactFlowStagedLayoutEdges,
   stageBaseReactFlowLayoutRouting,
+  type BaseReactFlowLayoutRoutingCommit,
 } from '../baseReactFlowLayoutRoutingTransaction';
+import { createBaseReactFlowRoutingSessionRuntime } from '../baseReactFlowRoutingSessionRuntime';
 import { getDisplayHardQualityGateReport } from '../baseReactFlowDisplayQualityGates';
 import { createBaseReactFlowDisplayEdgePatches } from '../baseReactFlowDisplayWorkerClient';
 import { computeBaseReactFlowDisplayOutputRouteSignature } from '../baseReactFlowDisplayCache';
@@ -43,6 +45,13 @@ const nodes: Node[] = [
     data: {},
   },
 ];
+
+const commitLayoutSnapshot = (commit: BaseReactFlowLayoutRoutingCommit): boolean => {
+  const runtime = createBaseReactFlowRoutingSessionRuntime();
+  const job = runtime.beginJob('layout');
+  const result = runtime.commitJob(job, () => commit.commitSnapshot(runtime));
+  return result.committed && result.value;
+};
 
 const edges: Edge[] = [{
   id: 'source-target',
@@ -112,7 +121,7 @@ describe('baseReactFlow layout routing candidate sequence', () => {
     });
 
     expect(result.routedEdges[0].type).toBe('stablePath');
-    expect(result.commitSnapshot()).toBe(true);
+    expect(commitLayoutSnapshot(result)).toBe(true);
     expect(workerMocks.repair).toHaveBeenCalledOnce();
     expect(workerMocks.repair.mock.calls[0][0]).toMatchObject({
       requestId: 'layout:1:candidate-repair',
@@ -177,7 +186,7 @@ describe('baseReactFlow layout routing candidate sequence', () => {
       sourceNodes: nodes,
       isLargeGraph: false,
     });
-    expect(first.commitSnapshot()).toBe(true);
+    expect(commitLayoutSnapshot(first)).toBe(true);
     const second = await stageBaseReactFlowLayoutRouting({
       workerRef: { current: null },
       requestId: 'layout:cached-second',

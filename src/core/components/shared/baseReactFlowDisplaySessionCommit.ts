@@ -1,9 +1,8 @@
 import type { Edge, Node } from '@xyflow/react';
 import type { RoutingPatch } from '../../routing/routingPatch';
 
-import {
-  commitBaseReactFlowDisplaySnapshot,
-  type BaseReactFlowDisplayCommittedSnapshotBaseline,
+import type {
+  BaseReactFlowDisplayCommittedSnapshotBaseline,
 } from './baseReactFlowDisplayCommittedSnapshot';
 import { writeBaseReactFlowDisplayEdgesCache } from './baseReactFlowDisplayEdgeCore';
 import { scheduleBaseReactFlowDisplayCacheWrite } from './baseReactFlowDisplayWorkerClient';
@@ -68,7 +67,7 @@ export const commitBaseReactFlowDisplaySessionResult = ({
       !displayRoutingIdentitiesMatch(commitReceipt.identity, expectedIdentity)
       || commitReceipt.outputRouteSignature !== outputRouteSignature
     ) return { accepted: false } as const;
-    const baseline = commitBaseReactFlowDisplaySnapshot({
+    const baseline = runtime.commitDisplaySnapshot({
       inputSignature,
       inputGeometryDigest,
       sourceEdges,

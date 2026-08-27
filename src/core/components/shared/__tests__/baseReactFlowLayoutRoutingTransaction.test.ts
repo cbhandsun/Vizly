@@ -16,7 +16,9 @@ import {
   clearBaseReactFlowLayoutNodeRuntimeGeometry,
   commitBaseReactFlowStagedLayoutRoutingResult,
   seedBaseReactFlowStagedLayoutEdges,
+  type BaseReactFlowLayoutRoutingCommit,
 } from '../baseReactFlowLayoutRoutingTransaction';
+import { createBaseReactFlowRoutingSessionRuntime } from '../baseReactFlowRoutingSessionRuntime';
 import { projectBaseReactFlowDisplayWorkerInput } from '../baseReactFlowDisplayWorkerProjection';
 import { createTestDisplayHardReport } from './baseReactFlowDisplayWorkerTestFixtures';
 
@@ -48,6 +50,13 @@ const sourceEdges: Edge[] = [{
   type: 'advanced-smart-step',
   data: {},
 }];
+
+const commitLayoutSnapshot = (commit: BaseReactFlowLayoutRoutingCommit): boolean => {
+  const runtime = createBaseReactFlowRoutingSessionRuntime();
+  const job = runtime.beginJob('layout');
+  const result = runtime.commitJob(job, () => commit.commitSnapshot(runtime));
+  return result.committed && result.value;
+};
 
 const projectedNodes = projectBaseReactFlowDisplayWorkerInput({ edges: [], nodes }).nodes;
 
@@ -337,7 +346,7 @@ describe('baseReactFlowLayoutRoutingTransaction', () => {
     });
 
     expect(committed).not.toBeNull();
-    expect(committed!.commitSnapshot()).toBe(true);
+    expect(commitLayoutSnapshot(committed!)).toBe(true);
     expect(committed!.routedEdges[0]).toMatchObject({
       type: 'stablePath',
       sourceHandle: 'right',
@@ -488,7 +497,7 @@ describe('baseReactFlowLayoutRoutingTransaction', () => {
     });
 
     expect(committed).not.toBeNull();
-    expect(committed!.commitSnapshot()).toBe(true);
+    expect(commitLayoutSnapshot(committed!)).toBe(true);
     const displayInput = projectBaseReactFlowDisplayWorkerInput({
       edges: committed!.routedEdges,
       nodes: nestedNodes,
