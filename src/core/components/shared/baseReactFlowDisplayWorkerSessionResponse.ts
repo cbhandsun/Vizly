@@ -24,6 +24,8 @@ import type {
   DisplayEdgesWorkerResponse,
 } from './baseReactFlowDisplayWorkerProtocol';
 import type { DisplayRoutingWorkerSpatialSnapshot } from './baseReactFlowDisplayWorkerSpatialSnapshot';
+import { createDisplayRoutingWorkerCommitReceipt } from './baseReactFlowDisplayWorkerCommitReceipt';
+import { isDisplayWorkerBoundedCandidateReport } from './baseReactFlowDisplayWorkerQualityProtocol';
 
 type ResolvedDisplayWorkerIncrementalRequest = Readonly<{
   request: DisplayEdgesWorkerResolvedIncrementalRouteRequest;
@@ -118,9 +120,7 @@ export const completeDisplayWorkerResponse = ({
   });
   const nextIdentity = request.operation === 'incremental-route'
     ? createDisplayRoutingIdentity(request.nextInputSignature, request.nextInputGeometryDigest)
-    : request.operation === 'repair'
-      ? undefined
-      : request.inputIdentity;
+    : request.inputIdentity;
   if (!nextIdentity) {
     sessionTimer.finish('skip');
     return withFinalTrace(response);
@@ -132,7 +132,12 @@ export const completeDisplayWorkerResponse = ({
     request.edges,
     response.edges,
   );
-  if (!outputRouteSignature || !displayPatches) {
+  if (
+    !outputRouteSignature
+    || !displayPatches
+    || !isDisplayWorkerBoundedCandidateReport(response.hardReport)
+    || !response.hardReport.hardClean
+  ) {
     sessionTimer.finish('rejected');
     return withFinalTrace(response);
   }
@@ -145,12 +150,23 @@ export const completeDisplayWorkerResponse = ({
     finalEdges: response.edges,
     hardReport: response.hardReport,
   });
+  const commitReceipt = createDisplayRoutingWorkerCommitReceipt({
+    identity: nextIdentity,
+    outputRouteSignature,
+    hardReport: response.hardReport,
+    sessionRef,
+  });
+  if (!commitReceipt) {
+    sessionTimer.finish('rejected');
+    return withFinalTrace(response);
+  }
   sessionTimer.finish('accepted', displayPatches.length);
   return withFinalTrace({
     ...response,
     nextIdentity,
     outputRouteSignature,
     sessionRef,
+    commitReceipt,
   });
 };
 

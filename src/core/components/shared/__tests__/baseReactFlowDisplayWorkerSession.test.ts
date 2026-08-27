@@ -125,6 +125,10 @@ describe('display routing Worker-private session', () => {
       operation: 'repair' as const,
       requestId: 'collapsed-projection',
       repairMode: 'bounded' as const,
+      inputIdentity: createDisplayRoutingIdentity(
+        '123',
+        `geometry-v1:${'a'.repeat(32)}`,
+      ),
       ...projected,
     };
     expect(parseDisplayEdgesWorkerRequest(request)).not.toBeNull();

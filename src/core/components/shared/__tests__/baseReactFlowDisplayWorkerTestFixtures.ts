@@ -1,5 +1,13 @@
 import type { BaseDisplayBoundedCandidateReport } from '../baseReactFlowDisplayEvaluation';
 import type { DisplayRoutingPhaseTrace } from '../baseReactFlowDisplayRoutingTrace';
+import { createDisplayRoutingIdentity } from '../baseReactFlowDisplayRoutingSession';
+import {
+  isDisplayRoutingIdentity,
+  type RoutingIdentity,
+} from '../../../routing/routingSessionIdentity';
+import { computeBaseReactFlowDisplayOutputRouteSignature } from '../baseReactFlowDisplayCache';
+import { mergeBaseReactFlowDisplayEdgePatches } from '../baseReactFlowDisplayRoutingTransaction';
+import { createDisplayRoutingWorkerCommitReceipt } from '../baseReactFlowDisplayWorkerCommitReceipt';
 
 export const TEST_DISPLAY_WORKER_NODES = [
   { id: 'source', position: { x: 0, y: 0 }, data: {} },
@@ -16,6 +24,10 @@ export const TEST_DISPLAY_WORKER_REPAIR_REQUEST = {
     data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
   }],
   nodes: TEST_DISPLAY_WORKER_NODES,
+  inputIdentity: createDisplayRoutingIdentity(
+    '1234',
+    `geometry-v1:${'a'.repeat(32)}`,
+  ),
   repairMode: 'bounded',
 } as const;
 
@@ -58,18 +70,58 @@ export const createTestDisplayHardReport = (
   },
 });
 
-export const withRequiredTestDisplayHardReport = (value: unknown): unknown => {
+export const withRequiredTestDisplayHardReport = (
+  value: unknown,
+  requestValue?: unknown,
+): unknown => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
   const response = value as Record<string, unknown>;
-  if (
+  const request = requestValue && typeof requestValue === 'object' && !Array.isArray(requestValue)
+    ? requestValue as Record<string, unknown>
+    : null;
+  const hardReport = !('hardReport' in response)
+    ? createTestDisplayHardReport(response.hardClean === true)
+    : response.hardReport;
+  const withHardReport = (
     ('edges' in response || 'routingPatches' in response)
     && typeof response.hardClean === 'boolean'
     && !('hardReport' in response)
+  ) ? { ...response, hardReport } : response;
+  if (
+    response.hardClean !== true
+    || !isDisplayRoutingIdentity(request?.inputIdentity)
+    || response.commitReceipt
+    || typeof hardReport !== 'object'
+    || hardReport === null
   ) {
-    return {
-      ...response,
-      hardReport: createTestDisplayHardReport(response.hardClean),
-    };
+    return withHardReport;
   }
-  return value;
+  const responseEdges = Array.isArray(response.edges)
+    ? response.edges
+    : Array.isArray(response.routingPatches) && Array.isArray(request?.edges)
+      ? mergeBaseReactFlowDisplayEdgePatches(request.edges, response.routingPatches)
+      : null;
+  const outputRouteSignature = responseEdges
+    ? computeBaseReactFlowDisplayOutputRouteSignature(responseEdges)
+    : null;
+  if (!outputRouteSignature) return withHardReport;
+  const identity = request.inputIdentity as RoutingIdentity;
+  const sessionRef = {
+    sessionId: 'display-session-v1:1',
+    identity,
+    outputRouteSignature,
+  } as const;
+  const commitReceipt = createDisplayRoutingWorkerCommitReceipt({
+    identity,
+    outputRouteSignature,
+    hardReport: hardReport as BaseDisplayBoundedCandidateReport,
+    sessionRef,
+  });
+  return commitReceipt ? {
+    ...withHardReport,
+    nextIdentity: identity,
+    outputRouteSignature,
+    sessionRef,
+    commitReceipt,
+  } : withHardReport;
 };

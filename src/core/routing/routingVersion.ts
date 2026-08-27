@@ -7,3 +7,6 @@ export const EDGE_ROUTING_CACHE_VERSION = '15';
  * compatible.
  */
 export const EDGE_ROUTING_VISUAL_VERSION = 'commercial-hard-gate-v1';
+
+/** Version of the structured-clone contract used for commit-capable Worker results. */
+export const EDGE_ROUTING_WORKER_PROTOCOL_VERSION = 'display-routing-worker-v1';

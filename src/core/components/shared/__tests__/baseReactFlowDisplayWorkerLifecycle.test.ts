@@ -28,6 +28,7 @@ import {
   computeDisplayRoutingHardReportDigest,
   isDisplayRoutingHardReportDigest,
 } from '../baseReactFlowDisplayHardReportDigest';
+import { createDisplayRoutingIdentity } from '../baseReactFlowDisplayRoutingSession';
 import {
   createTestDisplayHardReport,
   withRequiredTestDisplayHardReport,
@@ -73,7 +74,9 @@ const installWorkerHarness = () => {
     },
     emitMessage: (data: unknown) => {
       for (const listener of activeListeners?.get('message') ?? []) {
-        listener({ data: withRequiredTestDisplayHardReport(data) } as MessageEvent);
+        listener({
+          data: withRequiredTestDisplayHardReport(data, posted.at(-1)),
+        } as MessageEvent);
       }
     },
   };
@@ -126,6 +129,10 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
         isLargeGraph: false,
         displayEdgeEpoch: 1,
         qualityMode: 'full',
+        inputIdentity: createDisplayRoutingIdentity(
+          '1234',
+          `geometry-v1:${'a'.repeat(32)}`,
+        ),
       },
       qualityMode: 'full',
       timeoutMs: 1_000,
@@ -160,6 +167,8 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
     const edges = [{ id: 'edge', source: 'source', target: 'target' }];
     const harness = installWorkerHarness();
     const repair = repairBaseReactFlowDisplayEdgesInWorker({
+      inputSignature: '1234',
+      inputGeometryDigest: `geometry-v1:${'a'.repeat(32)}`,
       workerRef: { current: null },
       requestId: 'repair-caller-gated',
       edges,

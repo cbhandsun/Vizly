@@ -31,6 +31,10 @@ type WorkerHarnessRequest = {
 };
 
 const cleanHardReport = createTestDisplayHardReport();
+const TEST_REPAIR_IDENTITY_INPUT = {
+  inputSignature: '1234',
+  inputGeometryDigest: `geometry-v1:${'a'.repeat(32)}`,
+} as const;
 
 const installWorkerHarness = (
   onPost: (
@@ -66,7 +70,7 @@ const installWorkerHarness = (
       onPost(request, (response) => {
         queueMicrotask(() => {
           this.emit('message', {
-            data: withRequiredTestDisplayHardReport(response),
+            data: withRequiredTestDisplayHardReport(response, request),
           } as MessageEvent);
         });
       }, type => this.listenerCount(type));
@@ -269,65 +273,6 @@ describe('baseReactFlowDisplayWorkerClient', () => {
     expect(workerRef.current).toBeNull();
   });
 
-  it('accepts a single in-job repaired response from the prewarmed worker', async () => {
-    const listeners = new Map<string, Set<EventListener>>();
-    let postedCount = 0;
-    class TestWorker {
-      addEventListener(type: string, listener: EventListener) {
-        const entries = listeners.get(type) ?? new Set<EventListener>();
-        entries.add(listener);
-        listeners.set(type, entries);
-      }
-
-      removeEventListener(type: string, listener: EventListener) {
-        listeners.get(type)?.delete(listener);
-      }
-
-      postMessage(message: { requestId: string }) {
-        postedCount += 1;
-        queueMicrotask(() => {
-          for (const listener of listeners.get('message') ?? []) {
-            listener({
-              data: {
-                requestId: message.requestId,
-                edges: [{ id: 'edge', source: 'source', target: 'target' }],
-                hardClean: true,
-                hardReport: cleanHardReport,
-                routeResolution: 'full-route-repaired',
-              },
-            } as MessageEvent);
-          }
-        });
-      }
-
-      terminate() {}
-    }
-    vi.stubGlobal('Worker', TestWorker);
-    const workerRef = { current: null };
-
-    expect(prewarmBaseReactFlowDisplayWorker(workerRef)).toBe(true);
-    const warmedWorker = workerRef.current;
-    await expect(computeBaseReactFlowDisplayEdgesInWorker({
-      workerRef,
-      requestId: 'prewarmed',
-      edges: [{ id: 'edge', source: 'source', target: 'target' }],
-      nodes: [
-        { id: 'source', position: { x: 0, y: 0 }, data: {} },
-        { id: 'target', position: { x: 100, y: 0 }, data: {} },
-      ],
-      enableSmartEdges: true,
-      smartEdgePadding: 20,
-      isLargeGraph: false,
-      displayEdgeEpoch: 1,
-    })).resolves.toMatchObject({
-      edges: [{ id: 'edge', source: 'source', target: 'target' }],
-      hardClean: true,
-      routeResolution: 'full-route-repaired',
-    });
-    expect(workerRef.current).toBe(warmedWorker);
-    expect(postedCount).toBe(1);
-  });
-
   it('reuses the prewarmed worker for a route request and its repair-only follow-up', async () => {
     const routeEdges = [{
       id: 'edge',
@@ -368,6 +313,7 @@ describe('baseReactFlowDisplayWorkerClient', () => {
       displayEdgeEpoch: 1,
     })).resolves.toMatchObject({ edges: routeEdges, hardClean: false });
     await expect(repairBaseReactFlowDisplayEdgesInWorker({
+      ...TEST_REPAIR_IDENTITY_INPUT,
       workerRef,
       requestId: 'route-then-repair:repair',
       edges: routeEdges,
@@ -384,7 +330,12 @@ describe('baseReactFlowDisplayWorkerClient', () => {
   });
 
   it('terminates a worker that reports a resolution belonging to another operation', async () => {
-    const edges = [{ id: 'edge', source: 'source', target: 'target', data: {} }];
+    const edges = [{
+      id: 'edge',
+      source: 'source',
+      target: 'target',
+      data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
+    }];
     const harness = installWorkerHarness((request, emit) => emit({
       requestId: request.requestId,
       edges,
@@ -460,6 +411,7 @@ describe('baseReactFlowDisplayWorkerClient', () => {
     }));
 
     await expect(repairBaseReactFlowDisplayEdgesInWorker({
+      ...TEST_REPAIR_IDENTITY_INPUT,
       workerRef: { current: null },
       requestId: 'repair-non-clean',
       edges,
@@ -485,6 +437,7 @@ describe('baseReactFlowDisplayWorkerClient', () => {
     const workerRef = { current: null };
 
     await expect(repairBaseReactFlowDisplayEdgesInWorker({
+      ...TEST_REPAIR_IDENTITY_INPUT,
       workerRef,
       requestId: 'repair-invalid-response',
       edges: [{ id: 'edge', source: 'source', target: 'target' }],
@@ -502,6 +455,7 @@ describe('baseReactFlowDisplayWorkerClient', () => {
     const workerRef = { current: null };
     const controller = new AbortController();
     const pending = repairBaseReactFlowDisplayEdgesInWorker({
+      ...TEST_REPAIR_IDENTITY_INPUT,
       workerRef,
       requestId: 'repair-stale',
       edges: [{ id: 'edge', source: 'source', target: 'target' }],
@@ -524,6 +478,7 @@ describe('baseReactFlowDisplayWorkerClient', () => {
     const harness = installWorkerHarness(() => {});
     const workerRef = { current: null };
     const pending = repairBaseReactFlowDisplayEdgesInWorker({
+      ...TEST_REPAIR_IDENTITY_INPUT,
       workerRef,
       requestId: 'repair-timeout',
       edges: [{ id: 'edge', source: 'source', target: 'target' }],

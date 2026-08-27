@@ -2,7 +2,7 @@ import type { Edge, Node } from '@xyflow/react';
 import type { MutableRefObject } from 'react';
 import type { RoutingPatch } from '../../routing/routingPatch';
 import {
-  parseDisplayEdgesWorkerResponse,
+  parseDisplayEdgesWorkerCommitResponse,
   readDisplayEdgesWorkerRequestId,
   type DisplayEdgesWorkerResponse,
   type DisplayEdgesWorkerRequest,
@@ -33,6 +33,8 @@ import {
 } from './baseReactFlowDisplayRoutingTransaction';
 import { createDisplayWorkerFinalQualityError } from './baseReactFlowDisplayWorkerFailure';
 import { projectBaseReactFlowDisplayWorkerInput } from './baseReactFlowDisplayWorkerProjection';
+import { computeBaseReactFlowDisplayInputIdentityBundle } from './baseReactFlowDisplayInputIdentity';
+import { displayWorkerCommitReceiptMatchesRequest } from './baseReactFlowDisplayWorkerCommitBoundary';
 import {
   DISPLAY_WORKER_TIMEOUT_MS,
   INTERACTIVE_DISPLAY_WORKER_TIMEOUT_MS,
@@ -74,6 +76,7 @@ export type BaseReactFlowDisplayWorkerResult = {
   nextIdentity?: RoutingIdentity;
   outputRouteSignature?: string;
   sessionRef?: RoutingWorkerSessionRef;
+  commitReceipt?: DisplayEdgesWorkerResponse['commitReceipt'];
   /** Aggregate timestamp after protocol validation and routing-only sanitization. */
   workerResponseParsedAt?: number;
 };
@@ -373,7 +376,7 @@ export const requestBaseReactFlowDisplayEdgesWorker = ({
     const handleMessage = (event: MessageEvent<unknown>) => {
       const responseRequestId = readDisplayEdgesWorkerRequestId(event.data);
       if (responseRequestId !== request.requestId) return;
-      const response = parseDisplayEdgesWorkerResponse(event.data, request.requestId);
+      const response = parseDisplayEdgesWorkerCommitResponse(event.data, request.requestId);
       if (!response) {
         finish(() => {
           updateDisplayRoutingDebugState({
@@ -408,6 +411,10 @@ export const requestBaseReactFlowDisplayEdgesWorker = ({
         : null;
       const routeResolution = response.routeResolution;
       if (responseEdges) {
+        if (!displayWorkerCommitReceiptMatchesRequest({ request, response, responseEdges })) {
+          finish(() => reject(new Error('display-edge-worker-commit-receipt-mismatch')), true);
+          return;
+        }
         if (
           !routeResolution
           || !doesBaseReactFlowDisplayWorkerResolutionMatchOperation(
@@ -495,6 +502,7 @@ export const requestBaseReactFlowDisplayEdgesWorker = ({
           nextIdentity: response.nextIdentity,
           outputRouteSignature: response.outputRouteSignature,
           sessionRef: response.sessionRef,
+          commitReceipt: response.commitReceipt,
           workerResponseParsedAt: Date.now(),
         });
       });
@@ -576,6 +584,17 @@ export const computeBaseReactFlowDisplayEdgesInWorker = async ({
   signal?: AbortSignal;
 }): Promise<BaseReactFlowDisplayWorkerResult> => {
   const projectedInput = projectBaseReactFlowDisplayWorkerInput({ edges, nodes });
+  const computedIdentity = computeBaseReactFlowDisplayInputIdentityBundle({
+    nodes: projectedInput.nodes,
+    edges: projectedInput.edges,
+    enableSmartEdges,
+    smartEdgePadding,
+    isLargeGraph,
+  });
+  const inputIdentity = createDisplayRoutingIdentity(
+    inputSignature ?? computedIdentity.cacheSignature,
+    inputGeometryDigest ?? computedIdentity.geometryDigest,
+  );
   const rawPrecompiledPatches = cachedCandidateEdges && candidateSource === 'precompiled'
     ? createBaseReactFlowDisplayEdgePatches(edges, cachedCandidateEdges)
     : null;
@@ -593,9 +612,7 @@ export const computeBaseReactFlowDisplayEdgesInWorker = async ({
     isLargeGraph,
     displayEdgeEpoch,
     qualityMode,
-    ...(inputSignature && inputGeometryDigest
-      ? { inputIdentity: createDisplayRoutingIdentity(inputSignature, inputGeometryDigest) }
-      : {}),
+    inputIdentity,
   };
   const result = await requestBaseReactFlowDisplayEdgesWorker({
     workerRef,
@@ -624,6 +641,8 @@ export const repairBaseReactFlowDisplayEdgesInWorker = async ({
   signal,
   requireHardClean = true,
   repairMode = 'finalized',
+  inputSignature,
+  inputGeometryDigest,
 }: {
   workerRef: MutableRefObject<Worker | null>;
   requestId: string;
@@ -633,6 +652,8 @@ export const repairBaseReactFlowDisplayEdgesInWorker = async ({
   signal?: AbortSignal;
   requireHardClean?: boolean;
   repairMode?: 'bounded' | 'finalized';
+  inputSignature: string;
+  inputGeometryDigest: string;
 }): Promise<BaseReactFlowDisplayWorkerResult> => {
   const projectedInput = projectBaseReactFlowDisplayWorkerInput({ edges, nodes });
   const result = await requestBaseReactFlowDisplayEdgesWorker({
@@ -642,6 +663,7 @@ export const repairBaseReactFlowDisplayEdgesInWorker = async ({
       requestId,
       edges: projectedInput.edges,
       nodes: projectedInput.nodes,
+      inputIdentity: createDisplayRoutingIdentity(inputSignature, inputGeometryDigest),
       repairMode,
     },
     qualityMode: 'full',

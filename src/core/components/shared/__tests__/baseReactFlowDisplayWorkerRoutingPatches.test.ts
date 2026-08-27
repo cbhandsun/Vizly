@@ -2,10 +2,15 @@ import type { Edge } from '@xyflow/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { requestBaseReactFlowDisplayEdgesWorker } from '../baseReactFlowDisplayWorkerClient';
-import { createTestDisplayHardReport } from './baseReactFlowDisplayWorkerTestFixtures';
+import { createDisplayRoutingIdentity } from '../baseReactFlowDisplayRoutingSession';
+import {
+  createTestDisplayHardReport,
+  withRequiredTestDisplayHardReport,
+} from './baseReactFlowDisplayWorkerTestFixtures';
 
 const installWorkerHarness = () => {
   let activeListeners: Map<string, Set<EventListener>> | null = null;
+  let activeRequest: unknown;
   class TestWorker {
     private readonly listeners = new Map<string, Set<EventListener>>();
 
@@ -23,7 +28,9 @@ const installWorkerHarness = () => {
       this.listeners.get(type)?.delete(listener);
     }
 
-    postMessage() {}
+    postMessage(request: unknown) {
+      activeRequest = request;
+    }
 
     terminate() {}
   }
@@ -31,7 +38,9 @@ const installWorkerHarness = () => {
   return {
     emitMessage: (data: unknown) => {
       for (const listener of activeListeners?.get('message') ?? []) {
-        listener({ data } as MessageEvent);
+        listener({
+          data: withRequiredTestDisplayHardReport(data, activeRequest),
+        } as MessageEvent);
       }
     },
   };
@@ -61,6 +70,10 @@ describe('display Worker routing-only response boundary', () => {
         isLargeGraph: false,
         displayEdgeEpoch: 1,
         qualityMode: 'full',
+        inputIdentity: createDisplayRoutingIdentity(
+          '1234',
+          `geometry-v1:${'a'.repeat(32)}`,
+        ),
       },
     });
     harness.emitMessage({

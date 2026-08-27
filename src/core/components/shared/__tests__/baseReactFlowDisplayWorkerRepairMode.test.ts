@@ -8,6 +8,7 @@ import * as measuredDisplayRepair from '../baseReactFlowDisplayMeasuredRepair';
 import { getDisplayComputedPath } from '../baseReactFlowDisplayGeometry';
 import { COMMERCIAL_BUSINESS_NODE_CLEARANCE } from '../../../strategies/shared/edgeBusinessNodeClearanceRepair';
 import { scoreNodeClearanceRisk } from '../../../strategies/shared/edgeWaypointCandidateRepair';
+import { createDisplayRoutingIdentity } from '../baseReactFlowDisplayRoutingSession';
 
 const nodes: Node[] = [
   { id: 'source', position: { x: 0, y: 0 }, measured: { width: 100, height: 60 }, data: {} },
@@ -22,6 +23,10 @@ const edges: Edge[] = [{
   targetHandle: 'left',
   data: { computedPath: [{ x: 100, y: 30 }, { x: 300, y: 30 }] },
 }];
+const inputIdentity = createDisplayRoutingIdentity(
+  '1234',
+  `geometry-v1:${'a'.repeat(32)}`,
+);
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -38,6 +43,7 @@ describe('baseReactFlowDisplayEdges worker repair mode', () => {
       requestId: 'repair-only',
       edges,
       nodes,
+      inputIdentity,
       repairMode: 'bounded',
     });
 
@@ -59,6 +65,7 @@ describe('baseReactFlowDisplayEdges worker repair mode', () => {
       requestId: 'repair-minimum-clearance',
       repairMode: 'bounded',
       nodes: repairNodes,
+      inputIdentity,
       edges: [{
         id: 'edge',
         source: 'source',

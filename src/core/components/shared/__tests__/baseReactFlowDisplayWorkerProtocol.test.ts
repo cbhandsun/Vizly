@@ -481,6 +481,10 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       isLargeGraph: false,
       displayEdgeEpoch: 2,
       qualityMode: 'full',
+      inputIdentity: createDisplayRoutingIdentity(
+        '456',
+        `geometry-v1:${'c'.repeat(32)}`,
+      ),
       baselineInputSignature: '123',
       baselineInputGeometryDigest: `geometry-v1:${'a'.repeat(32)}`,
       baselineNodes: nodes,
@@ -686,8 +690,13 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       requestId: 'bounded-data',
       edges: [{ id: 'edge', source: 'source', target: 'target', data }],
       nodes,
+      inputIdentity: validRepairRequest.inputIdentity,
       repairMode: 'bounded',
     });
+    expect(parseDisplayEdgesWorkerRequest({
+      ...validRepairRequest,
+      inputIdentity: undefined,
+    })).toBeNull();
     const cyclic: Record<string, unknown> = {};
     cyclic.self = cyclic;
     expect(parseDisplayEdgesWorkerRequest(request(cyclic))).toBeNull();
@@ -718,6 +727,7 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       requestId: 'point-budget',
       edges: overPointBudgetEdges,
       nodes,
+      inputIdentity: validRepairRequest.inputIdentity,
       repairMode: 'bounded',
     })).toBeNull();
   });

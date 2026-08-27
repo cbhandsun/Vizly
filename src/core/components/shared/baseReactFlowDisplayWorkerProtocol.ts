@@ -23,6 +23,8 @@ import type {
   DisplayEdgesWorkerResponse,
   DisplayRoutingFallbackLevel,
 } from './baseReactFlowDisplayWorkerResponseProtocol';
+import { parseDisplayRoutingWorkerCommitReceipt } from './baseReactFlowDisplayWorkerCommitReceipt';
+import { computeDisplayRoutingHardReportDigest } from './baseReactFlowDisplayHardReportDigest';
 
 export type {
   DisplayEdgesWorkerResponse,
@@ -106,6 +108,7 @@ export type DisplayEdgesWorkerRepairRequest = {
   requestId: string;
   edges: Edge[];
   nodes: Node[];
+  inputIdentity?: RoutingIdentity;
   /**
    * Bounded repair performs only the measured, local repair pass. Finalized
    * repair additionally runs the commercial safety closure and is reserved for
@@ -364,12 +367,16 @@ export const parseDisplayEdgesWorkerRequest = (
   const edges = value.edges as Edge[];
   const nodes = value.nodes as Node[];
   if (value.operation === 'repair') {
-    if (value.repairMode !== 'bounded' && value.repairMode !== 'finalized') return null;
+    if (
+      (value.repairMode !== 'bounded' && value.repairMode !== 'finalized')
+      || !isDisplayRoutingIdentity(value.inputIdentity)
+    ) return null;
     return {
       operation: 'repair',
       requestId,
       edges,
       nodes,
+      inputIdentity: value.inputIdentity,
       repairMode: value.repairMode,
     };
   }
@@ -390,10 +397,7 @@ export const parseDisplayEdgesWorkerRequest = (
     || (value.displayEdgeEpoch as number) < 0
   ) return null;
   if (value.qualityMode !== 'full' && value.qualityMode !== 'interactive') return null;
-  if (
-    typeof value.inputIdentity !== 'undefined'
-    && !isDisplayRoutingIdentity(value.inputIdentity)
-  ) return null;
+  if (!isDisplayRoutingIdentity(value.inputIdentity)) return null;
   const routeRequest: Omit<DisplayEdgesWorkerRouteRequest, 'operation'> = {
     requestId,
     edges,
@@ -403,9 +407,7 @@ export const parseDisplayEdgesWorkerRequest = (
     isLargeGraph: value.isLargeGraph,
     displayEdgeEpoch: value.displayEdgeEpoch as number,
     qualityMode: value.qualityMode,
-    ...(isDisplayRoutingIdentity(value.inputIdentity)
-      ? { inputIdentity: value.inputIdentity }
-      : {}),
+    inputIdentity: value.inputIdentity,
   };
   if (value.operation === 'incremental-route') {
     const changeSet = parseDisplayRoutingChangeSet(value.changeSet);
@@ -510,6 +512,7 @@ export const parseDisplayEdgesWorkerResponse = (
       || typeof value.nextIdentity !== 'undefined'
       || typeof value.outputRouteSignature !== 'undefined'
       || typeof value.sessionRef !== 'undefined'
+      || typeof value.commitReceipt !== 'undefined'
       || typeof value.workerDurationMs !== 'undefined'
     ) return null;
     if (typeof value.error !== 'string') return null;
@@ -529,6 +532,7 @@ export const parseDisplayEdgesWorkerResponse = (
       || typeof value.nextIdentity !== 'undefined'
       || typeof value.outputRouteSignature !== 'undefined'
       || typeof value.sessionRef !== 'undefined'
+      || typeof value.commitReceipt !== 'undefined'
       || typeof value.workerDurationMs !== 'undefined'
     ) return null;
     return isDisplayWorkerBoundedCandidateReport(value.boundedCandidate)
@@ -546,6 +550,7 @@ export const parseDisplayEdgesWorkerResponse = (
       || typeof value.nextIdentity !== 'undefined'
       || typeof value.outputRouteSignature !== 'undefined'
       || typeof value.sessionRef !== 'undefined'
+      || typeof value.commitReceipt !== 'undefined'
       || typeof value.workerDurationMs !== 'undefined'
     ) return null;
     return isDisplayRoutingPhaseTrace(value.phaseProgress)
@@ -571,13 +576,28 @@ export const parseDisplayEdgesWorkerResponse = (
   );
   const hasSessionMetadata = typeof value.nextIdentity !== 'undefined'
     || typeof value.outputRouteSignature !== 'undefined'
-    || typeof value.sessionRef !== 'undefined';
+    || typeof value.sessionRef !== 'undefined'
+    || typeof value.commitReceipt !== 'undefined';
+  const commitReceipt = typeof value.commitReceipt === 'undefined'
+    ? undefined
+    : parseDisplayRoutingWorkerCommitReceipt(value.commitReceipt);
   const sessionMetadataIsValid = !hasSessionMetadata || (
     isDisplayRoutingIdentity(value.nextIdentity)
     && OUTPUT_ROUTE_SIGNATURE_PATTERN.test(String(value.outputRouteSignature ?? ''))
     && isDisplayRoutingWorkerSessionRef(value.sessionRef)
     && displayRoutingIdentitiesMatch(value.sessionRef.identity, value.nextIdentity)
     && value.sessionRef.outputRouteSignature === value.outputRouteSignature
+    && commitReceipt !== null
+    && (
+      typeof commitReceipt === 'undefined'
+      || (
+        displayRoutingIdentitiesMatch(commitReceipt.identity, value.nextIdentity)
+        && commitReceipt.outputRouteSignature === value.outputRouteSignature
+        && commitReceipt.sessionRef.sessionId === value.sessionRef.sessionId
+        && commitReceipt.hardReportDigest
+          === computeDisplayRoutingHardReportDigest(hardReport ?? commitReceipt.hardReport)
+      )
+    )
   );
   if (
     !(hasEdges
@@ -621,6 +641,21 @@ export const parseDisplayEdgesWorkerResponse = (
     nextIdentity: hasSessionMetadata ? value.nextIdentity as RoutingIdentity : undefined,
     outputRouteSignature: hasSessionMetadata ? value.outputRouteSignature as string : undefined,
     sessionRef: hasSessionMetadata ? value.sessionRef as RoutingWorkerSessionRef : undefined,
+    commitReceipt: commitReceipt ?? undefined,
     workerDurationMs,
   };
+};
+
+/**
+ * Main-thread commit boundary. Progress, error, and rejected final responses
+ * remain parseable, while a hard-clean geometry result must carry the complete
+ * current-version receipt issued by the Worker session.
+ */
+export const parseDisplayEdgesWorkerCommitResponse = (
+  value: unknown,
+  expectedRequestId: string,
+): DisplayEdgesWorkerResponse | null => {
+  const response = parseDisplayEdgesWorkerResponse(value, expectedRequestId);
+  if (!response || response.hardClean !== true) return response;
+  return response.commitReceipt ? response : null;
 };

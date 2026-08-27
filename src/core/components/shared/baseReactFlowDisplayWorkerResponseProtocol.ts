@@ -3,6 +3,7 @@ import type { RoutingPatch } from '../../routing/routingPatch';
 
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
 import type { DisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
+import type { DisplayRoutingWorkerCommitReceipt } from './baseReactFlowDisplayWorkerCommitReceipt';
 import type {
   RoutingIdentity,
   RoutingWorkerSessionRef,
@@ -34,5 +35,6 @@ export type DisplayEdgesWorkerResponse = {
   nextIdentity?: RoutingIdentity;
   outputRouteSignature?: string;
   sessionRef?: RoutingWorkerSessionRef;
+  commitReceipt?: DisplayRoutingWorkerCommitReceipt;
   workerDurationMs?: number;
 };

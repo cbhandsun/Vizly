@@ -348,6 +348,8 @@ export const stageBaseReactFlowLayoutRouting = async ({
     signal,
     requireHardClean: false,
     repairMode: 'bounded',
+    inputSignature: projectedIdentity.cacheSignature,
+    inputGeometryDigest: projectedIdentity.geometryDigest,
   });
   const candidateCommit = candidateRepairResult.hardClean
     ? commitBaseReactFlowStagedLayoutRoutingResult({
