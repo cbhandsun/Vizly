@@ -23,6 +23,7 @@ import {
   createBaseReactFlowRoutingChangeSet,
 } from '../baseReactFlowDisplayRoutingChangeSet';
 import { parseBaseReactFlowPrecompiledRouteArtifact } from '../baseReactFlowPrecompiledRouteArtifact';
+import { mergeTrustedBaseReactFlowPrecompiledRouteArtifact } from '../baseReactFlowPrecompiledRouteRegistry';
 import {
   createBaseReactFlowDisplayEdgePatches,
 } from '../baseReactFlowDisplayWorkerClient';
@@ -195,7 +196,10 @@ describe('Logistics incremental display routing', () => {
     if (!artifact) throw new Error('expected the Logistics artifact to parse');
 
     const sourceEdges = await createBrowserSourceEdges();
-    const baselineEdges = mergeBaseReactFlowDisplayEdgePatches(sourceEdges, artifact.edges);
+    const baselineEdges = mergeTrustedBaseReactFlowPrecompiledRouteArtifact(
+      sourceEdges,
+      artifact,
+    );
     if (!baselineEdges) throw new Error('expected the Logistics artifact patches to merge');
     const baselineNodes = withAbsoluteNodePositions(browserLogisticsNodes);
     const nextNodes = withAbsoluteNodePositions(browserLogisticsNodes.map(node => (
