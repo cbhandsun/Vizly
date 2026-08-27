@@ -35,6 +35,7 @@ import {
   assertDisplayRoutingCommittedReuse,
   readDisplayRoutingCommittedReuseSnapshot,
 } from './lib/display-routing-browser-diagnostics.mjs';
+import { resolveDisplayRoutingFinalRouteSnapshot } from './lib/display-routing-matrix-final-route.mjs';
 
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '').trim().replace(/\/$/, '');
 const WAIT_TIMEOUT_MS = 120_000;
@@ -106,21 +107,16 @@ const readFinalRouteExpression = expectedRequestPrefix => `(() => {
   if (routing.stage !== 'final-applied') return null;
   const requests = window.__vizlyRoutingRequests || [];
   const responses = window.__vizlyRoutingResponses || [];
-  const expectedPrefix = ${JSON.stringify(expectedRequestPrefix)};
-  const response = [...responses].reverse().find(item => (
-    typeof item?.requestId === 'string'
-    && (expectedPrefix
-      ? item.requestId.startsWith(expectedPrefix)
-      : item.requestId === routing.requestId)
-    && item.hardClean === true
-    && Array.isArray(item.edges)
-  ));
-  const request = [...requests].reverse().find(item => item?.requestId === response?.requestId);
-  if (!response || response.hardClean !== true || !Array.isArray(response.edges)) return null;
-  if (!response.hardReport || response.hardReport.hardClean !== true) return null;
   const renderedEdgeCount = document.querySelectorAll('.react-flow__edge').length;
-  if (renderedEdgeCount !== response.edges.length) return null;
-  return { routing, request, response, renderedEdgeCount };
+  const resolveFinalRoute = ${resolveDisplayRoutingFinalRouteSnapshot.toString()};
+  return resolveFinalRoute({
+    routing,
+    requests,
+    responses,
+    currentEdges: window.reactFlowInstance?.getEdges?.() || [],
+    renderedEdgeCount,
+    expectedRequestPrefix: ${JSON.stringify(expectedRequestPrefix)},
+  });
 })()`;
 
 const readLatestCompletedRouteExpression = `(() => {
