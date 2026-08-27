@@ -11,7 +11,7 @@
 - routing version 15 已把 corridor lane/capacity 的原子预留投影为 edge-owned waypoint axes；只有已有节点净空风险的边会进入昂贵候选评分，不会因为拥有预留车道而宽泛提升 sibling/peer；
 - final endpoint 审计现按精确 route signature 和 terminal policy 在单次 Worker 请求内有界复用；outer-port 与 measured-repair 共用同一 request-local hard-report session，并通过 changed-index parity 评估候选，最终独立 exact hard gate 仍保留；
 - `post-render-residual` 与 `strict-primary-overlap` 已由显式 `RoutingDefectPlan` 调度，无对应缺陷时生成带父阶段、独占耗时和零扫描量的确定性 skip trace；
-- 三张 v15 预编译产物可从同一 production build 重现，三张 `outputRouteSignature` 与 v14 完全一致；最新浏览器矩阵均命中 `validated-candidate`，同 identity 再开 WMS 为 `workerStart=0`；
+- 三张 v15 预编译产物可从同一 production build 重现；最新 WMS Demand Allocation 产物与 manifest 已按当前 routing source 重新生成，连续 production reproduction 通过，浏览器直接命中 `validated-candidate`，最终 signature 为 `route-v2:26:164:d8711ac2fc858b00`；同 identity 再开 WMS 为 `workerStart=0`；
 - 最新 production-browser 矩阵覆盖三张 canonical preset、TB/BT/LR/RL、compound 和十类拓扑编辑，最终 SVG 的非正交、障碍命中、商业净空、严格交叉、非法 overlap、短 stub、tiny dogleg、hairpin、低对比、重复 marker/交互路径和标签节点相交均为零；
 - 交互 trace 浏览器门禁已从允许 `95%` 覆盖收紧为至少 `99.5%`（仅为 SVG line-jump 长度测量保留 `0.5%` 下偏差）；共享全矩阵曾出现 selected paint `119.8ms` 调度离群值，新增 interaction-only fresh-profile 入口后连续 5 个 production 样本全部通过，light/dark/high-contrast 最大值分别为 `86.6/82.4/66.9ms`，每次完整 SVG 障碍与商业净空均为零。专用性能工作流现于 main push 跑 5 个、定时/手动跑 30 个独立样本，仍不放宽 `<=100ms` 门槛；
 - 最新单轮真实拖拽中 TMS/WMS/L-OMS 的 local route 为 `117/59.6/110.4ms`，release-to-final 为 `295/144/224ms`，均满足 `<150ms/<300ms`；PNG 文件级导出通过，SVG 已验证 entitlement 前的安全预览，PDF 因产品 entitlement 未能做真实文件级导出审计；
@@ -19,10 +19,12 @@
 - `hidden`/`collapsed` 已进入受限 Worker 投影与协议校验，`collapsed:false` 与缺省 expanded 状态使用同一 identity；Worker 私有 session 可按完整 identity 回放返回旧 topology，仍重新校验 route signature、hard report、全图节点净空和冻结边界；
 - 同 realm committed snapshot、外部候选和 Worker 私有 session 继续保持不同信任边界；未采用把主线程 committed candidate 重新透传给 Worker 的重复协议；
 - 最新同一 production build、固定 viewport、全新浏览器 profile 的 30 个独立 Logistics 动态完整冷路由样本为 median `1675ms`、p95 `2011ms`、max `2078ms`；Worker compute p95 为 `1999.9ms`，页面/消息开销 p95 仅 `14ms`。30/30 均为一次 Worker start、零 abort、单次 `full-route-repaired` 最终事务，剩余耗时集中在 Worker 内 crossing sweeps、endpoint closure 与 finalizer 的 accepted 全质量候选。
+- 后续针对同一 Logistics 冷路径的 5 个 fresh-profile 聚焦复验为 median `2346ms`、p95/max `2443ms`，Worker compute p95 `2421.7ms`、页面/消息开销 p95 `24.3ms`，5/5 仍为一次 start、零 abort、`full-route-repaired`。这证明仓库 `1100ms` 门槛和产品方可接受的约 `1.03s` 参考水平都尚未达到；两次高思考只读审计均未找到可在不减少 accepted 候选或降低质量门禁前提下安全落地的短优化，因此停止无证据性能试探，但不把该项标为完成。
 - reconnect 排名改为稳定的流式 bounded top-K 后，最新 30 个全新 profile 的 production-browser 增量样本全部保持一次 Worker start、零 abort、零 full fallback；此前第 27 次 WMS 候选数漂移未再复现。L-OMS local/release-to-final/worker-to-final p95 为 `120.8/245/253ms`，WMS 为 `76.9/176/180ms`，均通过预算；TMS local route 通过 `<150ms`，release-to-final/worker-to-final p95 为 `315/317ms`，仅剩最终提交预算分别超出 `15/17ms`。TMS Worker compute p95 为 `310.8ms`，响应后的提交开销不是主因。
-- 最新共享评估批次的三张 production 预编译 route JSON、output signature 与最终路径保持不变；类型、Lint、架构、源码规模、DOM sink、secrets、生产构建、bundle 和预编译产物门禁通过。GitHub Actions 已触发但所有 job 在执行任何 step 前被账户付款/额度阻止，不能作为代码失败或通过证据。
-- Canvas display routing 与自动布局现共用同一个 Canvas-scoped Routing Session runtime、Worker ref 和提交 epoch；新布局会抢占旧 display job，stale layout/display response 均不能提交。布局 Worker 结果只暂存 geometry，必须在当前 epoch 内以同一 commit receipt 原子写入 committed snapshot 与 React nodes/edges。
-- Canvas 与 standalone custom edge 现在只消费同一份 realm-local committed render proof；proof 同时绑定 Worker protocol、routing/visual version、完整 hard report 及其 digest、Worker session ref、output signature 和逐边 source/target/handle/renderer/有界精确 path 坐标快照。合法 React Flow 投影可重建等值 edge/path 对象，但任意坐标、handle 或 renderer 变化均 fail closed；签发后修改原数组也不能污染 authority。重建或克隆的 baseline、digest-only 旧快照和伪造 session 仍会被拒绝；生产代码中原始 authority issuer 只允许由 Canvas Routing Session adapter 导入，custom edge 不得导入 Worker、committed store、session runtime 或 `EdgeRoutingCoordinator`。
+- 最新共享评估批次的类型、Lint、current/TS6/strict-core 类型、explicit-any、架构、源码规模、DOM sink、secrets、生产构建、bundle 和预编译产物门禁通过。GitHub Actions 已触发但所有 job 在执行任何 step 前被账户付款/额度阻止，不能作为代码失败或通过证据。
+- Canvas display routing 与自动布局现共用同一个 Canvas-scoped Routing Session runtime、Worker ref 和提交 epoch；所有 route/validate/incremental/repair 请求经 Worker transport 后都收窄为 identity 已验证类型，hard-clean 响应缺少完整 session/commit receipt 无法进入主线程提交边界。底层 committed snapshot mutation 只能由 runtime 在当前 `commitJob` scope 调用，架构门禁禁止其他生产模块导入该 primitive。
+- layout intent 现在在首次动态 import/ELK `await` 前同步取得 epoch，并贯穿 tree/force/domain route、hard-quality retry 和最终 React commit；异步等待期间一旦 display job 抢占，旧 ELK 结果不会启动 stage、不会写 snapshot，也不会更新 nodes/edges。commit callback 抛错会保留同一 retry epoch，正常返回才消费，避免 fallback 通过新建 job 覆盖外部更新。
+- Canvas 与 standalone custom edge 现在只消费同一份 realm-local committed render proof；proof 同时绑定 Worker protocol、routing/visual version、完整 hard report 及其 digest、Worker session ref、output signature 和逐边 source/target/handle/renderer，以及 `computedPath`、`elkPath`、`treeRouting.points` 三组有界精确坐标快照。任一路由几何变化均 fail closed，style、marker、label、selection 变化不污染 proof；签发后修改原数组也不能扩大 authority。重建或克隆的 baseline、digest-only 旧快照和伪造 session 仍会被拒绝；生产代码中原始 authority issuer 只允许由 Canvas Routing Session adapter 导入，custom edge 不得导入 Worker、committed store、session runtime 或 `EdgeRoutingCoordinator`。
 - 上述等值投影修复经 production build 复验：初始三图全部命中 `validated-candidate`，最终完整 SVG 障碍与商业净空审计恢复为零；其后正式 30-profile 增量矩阵保持 90 次初始事务与 90 次拖拽事务零 fallback、零 abort，三类 local-route 均通过预算。唯一未达标项为 TMS release-to-final/worker-to-final p95 `315/317ms`；一次后续 5-profile 预检降至 `299/300ms`，但 phase trace 未证明候选流水线发生确定性跳过，因此未把该波动当作已完成优化，也未放宽门禁。
 - 新增独立 `Routing performance` 工作流：路由相关 main push 对冷路由和增量路由分别执行 5 个短样本；每周和手动任务默认分别执行 30 个全新浏览器 profile 样本。两个场景使用各自的 production build/preview job，输出 aggregate report artifact，避免冷启动、预编译和拖拽样本互相污染。工作流代码与契约测试已通过，本轮仍因 GitHub 账户计费无法取得远端执行结果。
 
@@ -975,7 +977,7 @@ npm run verify:display-routing-browser
 
 ### Phase 5：用户文档快照与管线收敛
 
-实施状态：已完成。routing-only schema、外部候选边界、realm-local render authority、Canvas layout/display 共享 runtime 和旧 edge-owned 管线删除均已落地；standalone adapter 不启动第二个 Worker，只消费 Canvas Routing Session 签发并绑定完整 Worker protocol、hard report、routing/visual version、session ref、output signature 与逐边几何身份的 render proof。生产 authority issuer 与 custom-edge import 边界均由架构门禁固定。
+实施状态：功能主链已完成。routing-only schema、外部候选边界、realm-local render authority、Canvas layout/display 共享 runtime 和旧 edge-owned 管线删除均已落地；standalone adapter 不启动第二个 Worker，只消费 Canvas Routing Session 签发并绑定完整 Worker protocol、hard report、routing/visual version、session ref、output signature 与逐边完整路由几何的 render proof。snapshot mutation、authority issuer 与 custom-edge import 边界均由架构门禁固定；pre-stage ELK intent 已纳入同一 epoch，等待期间的外部 display/edit 会使旧布局 fail closed。
 
 交付：
 
