@@ -99,13 +99,6 @@ export const repairResidualOuterPortTransactionWithHardGate = <T extends Edge[]>
     includeStrictCrossings: true,
     maxCandidates: Math.min(64, maxExactEvaluations),
   });
-  // Terminal normalization touches the same broad set of edges for every
-  // sibling candidate. Compare candidates to one normalized reference so the
-  // exact changed-edge evaluator only rescans the outer-port edits themselves.
-  // Any broad or inexact delta still fails closed into the existing full gate.
-  const normalizedReference = options.evaluation
-    ? normalizeOuterPortTerminalCandidate(edges, nodes)
-    : edges;
   let remainingEvaluations = Math.min(64, Math.max(1, maxExactEvaluations));
   let evaluatedCandidateCount = 0;
   const finish = (resolution: 'accepted' | 'fallback', result: T): T => {
@@ -119,6 +112,17 @@ export const repairResidualOuterPortTransactionWithHardGate = <T extends Edge[]>
     );
     return result;
   };
+  // Normalizing the entire graph is only useful as the exact comparison base
+  // for a real outer-port candidate. Large graphs can reach this stage with a
+  // hard residual that has no applicable bounded transaction.
+  if (candidates.length === 0) return finish('fallback', edges);
+  // Terminal normalization touches the same broad set of edges for every
+  // sibling candidate. Compare candidates to one normalized reference so the
+  // exact changed-edge evaluator only rescans the outer-port edits themselves.
+  // Any broad or inexact delta still fails closed into the existing full gate.
+  const normalizedReference = options.evaluation
+    ? normalizeOuterPortTerminalCandidate(edges, nodes)
+    : edges;
   for (const candidate of candidates) {
     if (remainingEvaluations <= 0) break;
     const terminalBase = normalizeOuterPortTerminalCandidate(candidate.edges, nodes);

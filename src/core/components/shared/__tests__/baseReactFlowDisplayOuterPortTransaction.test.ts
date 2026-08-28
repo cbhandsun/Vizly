@@ -1,6 +1,8 @@
 import type { Edge, Node } from '@xyflow/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import * as endpointStubRepair from '../baseReactFlowDisplayEndpointStubRepair';
+import * as outerPortCandidates from '../baseReactFlowDisplayOuterPortCandidates';
 import { buildBoundedOuterPortTransactionCandidates } from '../baseReactFlowDisplayOuterPortCandidates';
 import { countRenderUnsafeEndpointStubs } from '../baseReactFlowDisplayEndpointStubRepair';
 import { NEAR_PARALLEL_LANE_TOLERANCE } from '../baseReactFlowDisplayGeometry';
@@ -107,6 +109,10 @@ const crossingOnlyEdges = (): Edge[] => [
 ];
 
 describe('outer port transaction', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('enters the bounded port search for a strict-only residual when explicitly requested', () => {
     expect(buildBoundedOuterPortTransactionCandidates(
       crossingOnlyEdges(),
@@ -202,6 +208,38 @@ describe('outer port transaction', () => {
 
     expect(repaired).not.toBe(edges);
     expect(getDisplayHardQualityGateReport(repaired, graphNodes, 'polished').hardClean).toBe(true);
+  });
+
+  it('does not normalize the full graph when no bounded candidate exists', () => {
+    const edges = crossingOnlyEdges();
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation(graphNodes);
+    const initialReport = evaluation.hardReport(edges);
+    const traces: DisplayRoutingPhaseTrace[] = [];
+    const candidateSpy = vi.spyOn(
+      outerPortCandidates,
+      'buildBoundedOuterPortTransactionCandidates',
+    ).mockReturnValueOnce([]);
+    const shortStubSpy = vi.spyOn(endpointStubRepair, 'repairFinalShortEndpointStubs');
+    const renderStubSpy = vi.spyOn(endpointStubRepair, 'repairRenderSafeEndpointStubs');
+
+    const repaired = repairResidualOuterPortTransactionWithHardGate(edges, graphNodes, 64, {
+      evaluation,
+      initialReport: { edges, report: initialReport },
+      onPhaseTrace: trace => traces.push(trace),
+    });
+
+    expect(initialReport.hardClean).toBe(false);
+    expect(initialReport.quality.strictCrossings).toBeGreaterThan(0);
+    expect(candidateSpy).toHaveBeenCalledOnce();
+    expect(shortStubSpy).not.toHaveBeenCalled();
+    expect(renderStubSpy).not.toHaveBeenCalled();
+    expect(repaired).toBe(edges);
+    expect(traces).toContainEqual(expect.objectContaining({
+      phase: 'finalizer-outer-port',
+      resolution: 'fallback',
+      candidateCount: 0,
+      evaluationCount: 0,
+    }));
   });
 
   it('reuses request-local changed hard reports without changing the selected route', () => {
