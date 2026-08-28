@@ -1,6 +1,8 @@
 import type { Edge, Node } from '@xyflow/react';
 
+import { BoundedEvaluationLruCache } from '../../strategies/shared/boundedEvaluationLruCache';
 import type { BaseReactFlowFinalEndpointEvaluation } from './baseReactFlowDisplayFinalEndpointEvaluation';
+import { computeBaseDisplayHardGateEvidenceSignature } from './baseReactFlowDisplayHardGateMemo';
 import { repairResidualDisplayOverlaps } from './baseReactFlowDisplayOverlapRepair';
 import { collectExactThresholdResidualPairs } from './baseReactFlowDisplayReverseParallelRepair';
 import { repairFinalResidualStrictCrossings } from './baseReactFlowDisplayStrictResidualRepair';
@@ -26,6 +28,13 @@ const exactResidualOverlapScore = (edges: readonly Edge[]): number => (
     .reduce((total, pair) => total + pair.overlap, 0)
 );
 
+const RESIDUAL_OVERLAP_SCORE_CACHE_LIMITS = Object.freeze({
+  entries: 64,
+  edgeSlots: 4_096,
+  segmentSlots: 0,
+  pairSlots: 0,
+});
+
 export const createBaseReactFlowFinalEndpointResidualRepair = ({
   nodes,
   evaluation,
@@ -42,13 +51,31 @@ export const createBaseReactFlowFinalEndpointResidualRepair = ({
   scoreResidualOverlap?: (edges: readonly Edge[]) => number;
 }): BaseReactFlowFinalEndpointResidualRepair => {
   const residualOverlapScoreByEdges = new WeakMap<readonly Edge[], number>();
+  const residualOverlapScoreBySignature = new BoundedEvaluationLruCache<number>(
+    RESIDUAL_OVERLAP_SCORE_CACHE_LIMITS,
+  );
   const strictOutcomeByEdges = new WeakMap<readonly Edge[], Edge[]>();
   const overlapOutcomeByEdges = new WeakMap<readonly Edge[], Edge[]>();
   const readResidualOverlapScore = (edges: readonly Edge[]): number => {
     const cached = residualOverlapScoreByEdges.get(edges);
     if (typeof cached === 'number') return cached;
+    const signature = computeBaseDisplayHardGateEvidenceSignature(edges);
+    const cachedBySignature = signature
+      ? residualOverlapScoreBySignature.get(signature)
+      : undefined;
+    if (typeof cachedBySignature === 'number') {
+      residualOverlapScoreByEdges.set(edges, cachedBySignature);
+      return cachedBySignature;
+    }
     const score = scoreResidualOverlap(edges);
     residualOverlapScoreByEdges.set(edges, score);
+    if (signature) {
+      residualOverlapScoreBySignature.set(signature, score, {
+        edges: edges.length,
+        segments: 0,
+        pairs: 0,
+      });
+    }
     return score;
   };
   const strict = (baseline: Edge[]): Edge[] => {
@@ -95,6 +122,10 @@ export const createBaseReactFlowFinalEndpointResidualRepair = ({
   };
 
   const fixedPoint = (baseline: Edge[]): Edge[] => {
+    if (
+      evaluation.hardReport(baseline).quality.strictCrossings === 0
+      && readResidualOverlapScore(baseline) === 0
+    ) return baseline;
     let current = baseline;
     for (let pass = 0; pass < 4; pass += 1) {
       const before = current;

@@ -157,6 +157,77 @@ describe('createBaseReactFlowFinalEndpointEvaluation', () => {
     expect(scoreResidualOverlap).toHaveBeenCalledOnce();
   });
 
+  it('reuses a zero residual score across equivalent route copies but not policy changes', () => {
+    const scoreResidualOverlap = vi.fn(() => 0);
+    const repairOverlap = vi.fn((candidate: Edge[]) => candidate);
+    const repairStrict = vi.fn((candidate: Edge[]) => candidate);
+    const residualRepair = createBaseReactFlowFinalEndpointResidualRepair({
+      nodes,
+      evaluation: createBaseReactFlowFinalEndpointEvaluation(nodes),
+      validate: () => true,
+      repairOverlap,
+      repairStrict,
+      scoreResidualOverlap,
+    });
+    const equivalent = edges.map(edge => ({
+      ...edge,
+      data: {
+        ...edge.data,
+        computedPath: (edge.data?.computedPath as Array<{ x: number; y: number }>).map(
+          point => ({ ...point }),
+        ),
+      },
+    }));
+    const policyChanged = equivalent.map((edge, index) => (
+      index === 0 ? { ...edge, sourceHandle: 'left' } : edge
+    ));
+
+    expect(residualRepair.fixedPoint(edges)).toBe(edges);
+    expect(residualRepair.fixedPoint(equivalent)).toBe(equivalent);
+    expect(scoreResidualOverlap).toHaveBeenCalledOnce();
+    expect(residualRepair.fixedPoint(policyChanged)).toBe(policyChanged);
+    expect(scoreResidualOverlap).toHaveBeenCalledTimes(2);
+    expect(repairStrict).not.toHaveBeenCalled();
+    expect(repairOverlap).not.toHaveBeenCalled();
+  });
+
+  it('does not use the zero-overlap fast path while a strict crossing remains', () => {
+    const baseline: Edge[] = [
+      {
+        id: 'horizontal',
+        source: 'left',
+        target: 'right',
+        data: { computedPath: [{ x: 0, y: 50 }, { x: 100, y: 50 }] },
+      },
+      {
+        id: 'vertical',
+        source: 'top',
+        target: 'bottom',
+        data: { computedPath: [{ x: 50, y: 0 }, { x: 50, y: 100 }] },
+      },
+    ];
+    const resolved = [
+      baseline[0],
+      {
+        ...baseline[1],
+        data: { computedPath: [{ x: 150, y: 0 }, { x: 150, y: 100 }] },
+      },
+    ];
+    const repairStrict = vi.fn((candidate: Edge[]) => (
+      candidate === baseline ? resolved : candidate
+    ));
+    const residualRepair = createBaseReactFlowFinalEndpointResidualRepair({
+      nodes: [],
+      evaluation: createBaseReactFlowFinalEndpointEvaluation([]),
+      validate: () => true,
+      repairStrict,
+      scoreResidualOverlap: () => 0,
+    });
+
+    expect(residualRepair.fixedPoint(baseline)).toBe(resolved);
+    expect(repairStrict).toHaveBeenCalled();
+  });
+
   it('reuses deterministic residual repair outcomes for the same immutable route', () => {
     const repairOverlap = vi.fn((candidate: Edge[]) => candidate);
     const residualRepair = createBaseReactFlowFinalEndpointResidualRepair({
