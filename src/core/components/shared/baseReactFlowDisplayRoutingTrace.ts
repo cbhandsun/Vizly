@@ -169,6 +169,8 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
   'final-endpoint-closure-obstacles-sibling',
   'final-endpoint-closure-obstacles-micro',
   'final-endpoint-closure-terminal',
+  'final-endpoint-closure-terminal-stubs',
+  'final-endpoint-closure-terminal-micro',
   'final-endpoint-closure-commercial',
   'final-safety-closure',
   'final-safety-hard-gate',
@@ -422,6 +424,8 @@ const DISPLAY_ROUTING_PHASE_PARENTS: Readonly<
   'final-endpoint-closure-obstacles-sibling': 'final-endpoint-closure-obstacles',
   'final-endpoint-closure-obstacles-micro': 'final-endpoint-closure-obstacles',
   'final-endpoint-closure-terminal': 'final-endpoint-closure',
+  'final-endpoint-closure-terminal-stubs': 'final-endpoint-closure-terminal',
+  'final-endpoint-closure-terminal-micro': 'final-endpoint-closure-terminal',
   'final-endpoint-closure-commercial': 'final-endpoint-closure',
   'final-safety-closure': 'finalizer',
   'final-safety-hard-gate': 'final-safety-closure',
@@ -569,3 +573,13 @@ export const startDisplayRoutingPhaseTrace = ({
     },
   };
 };
+
+export const startFinalEndpointTerminalClosureTrace = (
+  phase: 'final-endpoint-closure-terminal-stubs' | 'final-endpoint-closure-terminal-micro',
+  candidateCount: number,
+  onTrace?: (trace: DisplayRoutingPhaseTrace) => void,
+): DisplayRoutingPhaseTimer => startDisplayRoutingPhaseTrace({
+  phase,
+  candidateCount,
+  onTrace,
+});

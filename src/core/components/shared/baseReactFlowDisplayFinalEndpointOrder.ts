@@ -42,6 +42,7 @@ import {
 } from './baseReactFlowDisplayFinalEndpointGate';
 import {
   countChangedRoutingItems,
+  startFinalEndpointTerminalClosureTrace,
   startDisplayRoutingPhaseTrace,
 } from './baseReactFlowDisplayRoutingTrace';
 import { buildSiblingTerminalObstacleSkirtCandidates } from './baseReactFlowDisplaySiblingTerminalObstacleRepair';
@@ -626,10 +627,26 @@ export const repairBaseReactFlowFinalEndpointOrder = <T extends Edge[]>(
   );
   const terminalClosureTimer = closureStage('final-endpoint-closure-terminal');
   const beforeTerminalClosure = repaired;
+  const stubClosureTimer = startFinalEndpointTerminalClosureTrace(
+    'final-endpoint-closure-terminal-stubs', repaired.length, options.onPhaseTrace,
+  );
+  const beforeStubClosure = repaired;
   repaired = commitRenderSafeStubCandidate(repaired, repairNodes, options, evaluation);
+  stubClosureTimer.finish(
+    repaired === beforeStubClosure ? 'skip' : 'accepted',
+    countChangedRoutingItems(beforeStubClosure, repaired),
+  );
+  const microClosureTimer = startFinalEndpointTerminalClosureTrace(
+    'final-endpoint-closure-terminal-micro', repaired.length, options.onPhaseTrace,
+  );
+  const beforeMicroClosure = repaired;
   repaired = repairFinalTerminalMicroDoglegs(repaired, repairNodes, {
     validateCandidate: validateTopologyCandidate,
   });
+  microClosureTimer.finish(
+    repaired === beforeMicroClosure ? 'skip' : 'accepted',
+    countChangedRoutingItems(beforeMicroClosure, repaired),
+  );
   terminalClosureTimer.finish(
     repaired === beforeTerminalClosure ? 'skip' : 'accepted',
     countChangedRoutingItems(beforeTerminalClosure, repaired),

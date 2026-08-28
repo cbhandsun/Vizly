@@ -200,6 +200,8 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
   let current = edges;
   let evaluations = 0;
   const skippedEdgeIds = new Set<string>();
+  const qualityContext = createEdgePathQualityEvaluationContext(edges);
+  let qualityState = qualityContext.createState(edges);
   // Nodes are immutable for the whole repair transaction. Reuse the spatial
   // index and its per-edge segment memo across accepted candidates instead of
   // rebuilding both for every candidate gate.
@@ -216,20 +218,21 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
       );
     });
     if (edgeIndex < 0) break;
-    const qualityContext = createEdgePathQualityEvaluationContext(current);
-    const baselineQuality = qualityContext.evaluate(current);
+    const baselineQuality = qualityState.score;
     const obstacleContext = createDisplayObstacleEvaluationContext(current, nodes);
     const baselineObstacleHits = obstacleContext.evaluate(current);
     const atomic = createAtomicRouteTransactionEvaluation(current, nodes, {
       qualityContext,
       obstacleContext,
       baselineQuality,
+      baselineQualityState: qualityState,
       baselineObstacleHits,
       endpointOrder,
     });
     const countAxisMismatches = createDisplayDeclaredAxisMismatchCounter(nodes);
     const baselineAxisMismatches = current.map(countAxisMismatches);
     let accepted: T | null = null;
+    let acceptedQualityState: ReturnType<typeof qualityContext.evaluateStateChanged> | null = null;
     let acceptedCommercialRiskDelta = Number.POSITIVE_INFINITY;
     for (const candidatePath of buildRenderSafeEndpointStubPaths(getDisplayComputedPath(current[edgeIndex]))) {
       if (evaluations >= maxEvaluations) break;
@@ -237,7 +240,11 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
         index === edgeIndex ? withDisplayComputedPath(edge, candidatePath) : edge
       )) as T;
       const initialIssues = countRenderUnsafeEndpointStubs(candidate);
-      const initialQuality = qualityContext.evaluateChanged(candidate, [edgeIndex]);
+      const initialQuality = qualityContext.evaluateStateChanged(
+        qualityState,
+        candidate,
+        [edgeIndex],
+      ).score;
       const initialObstacleHits = obstacleContext.evaluate(candidate);
       const variants: T[] = [candidate];
       if (
@@ -261,7 +268,12 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
           edge === current[index] ? [] : [index]
         ));
         const changedEdgeIds = new Set(changedIndexes.map(index => current[index].id));
-        const candidateQuality = qualityContext.evaluateChanged(variant, changedIndexes);
+        const candidateQualityState = qualityContext.evaluateStateChanged(
+          qualityState,
+          variant,
+          changedIndexes,
+        );
+        const candidateQuality = candidateQualityState.score;
         if (
           candidateQuality.nonOrthogonalSegments > baselineQuality.nonOrthogonalSegments
           || candidateQuality.strictCrossings > baselineQuality.strictCrossings
@@ -307,6 +319,7 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
         ), 0);
         if (candidateCommercialRiskDelta >= acceptedCommercialRiskDelta - 1e-6) continue;
         accepted = variant;
+        acceptedQualityState = candidateQualityState;
         acceptedCommercialRiskDelta = candidateCommercialRiskDelta;
       }
       if (accepted) break;
@@ -316,6 +329,8 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
       continue;
     }
     current = accepted;
+    qualityState = acceptedQualityState
+      ?? qualityContext.createState(accepted);
   }
   return current;
 };

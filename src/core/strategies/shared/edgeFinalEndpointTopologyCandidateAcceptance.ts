@@ -5,12 +5,18 @@ import {
   type SameSideEndpointOrderMetrics,
   type SameSideEndpointTrunkIdentity,
 } from './edgeFinalSameSideEndpointOrderRepair';
-import { createEdgePathQualityEvaluationContext } from './edgeStrictCrossingGuard';
+import {
+  createEdgePathQualityEvaluationContext,
+  type EdgePathQualityEvaluationContext,
+  type EdgePathQualityScore,
+} from './edgeStrictCrossingGuard';
 import {
   EPS,
   buildObstacleMap,
+  countEdgeObstacleHits,
   hardQualityDoesNotRegress,
   totalObstacleHits,
+  type Rect,
 } from './edgeSharedEndpointPortOrderGeometry';
 
 export type FinalEndpointTopologyCandidateValidation = Readonly<{
@@ -30,6 +36,34 @@ type Candidate = Readonly<{
   edges: Edge[];
   changedEdgeIndexes: readonly number[];
 }>;
+
+export type FinalEndpointTopologyBaselineEvaluation = Readonly<{
+  baselineEdges: Edge[];
+  nodes: ReactFlowNode[];
+  baselineOrder: SameSideEndpointOrderMetrics;
+  quality: EdgePathQualityEvaluationContext;
+  baselineQuality: EdgePathQualityScore;
+  obstacles: Map<string, Rect>;
+  baselineObstacleHits: number;
+}>;
+
+export const createFinalEndpointTopologyBaselineEvaluation = (
+  baselineEdges: Edge[],
+  nodes: ReactFlowNode[],
+  baselineOrder = auditFinalSameSideEndpointOrder(baselineEdges, nodes),
+): FinalEndpointTopologyBaselineEvaluation => {
+  const quality = createEdgePathQualityEvaluationContext(baselineEdges);
+  const obstacles = buildObstacleMap(nodes);
+  return {
+    baselineEdges,
+    nodes,
+    baselineOrder,
+    quality,
+    baselineQuality: quality.evaluate(baselineEdges),
+    obstacles,
+    baselineObstacleHits: totalObstacleHits(baselineEdges, obstacles),
+  };
+};
 
 const preservesTrueTrunks = (
   baseline: readonly SameSideEndpointTrunkIdentity[],
@@ -52,17 +86,20 @@ export const acceptFinalEndpointTopologyCandidate = (
     candidateOrder: SameSideEndpointOrderMetrics,
   ) => boolean,
   allowedBacktrackIncrease = 0,
+  reusable?: FinalEndpointTopologyBaselineEvaluation,
 ): Edge[] | null => {
-  const baselineOrder = auditFinalSameSideEndpointOrder(current, nodes);
+  const evaluation = reusable?.baselineEdges === current && reusable.nodes === nodes
+    ? reusable
+    : createFinalEndpointTopologyBaselineEvaluation(current, nodes);
+  const baselineOrder = evaluation.baselineOrder;
   const candidateOrder = auditFinalSameSideEndpointOrder(candidate.edges, nodes);
   if (!improvement(baselineOrder, candidateOrder)) return null;
   if (candidateOrder.invalidEndpointCount > baselineOrder.invalidEndpointCount) return null;
   if (!preservesTrueTrunks(baselineOrder.legalSharedTrunks, candidateOrder.legalSharedTrunks)) {
     return null;
   }
-  const quality = createEdgePathQualityEvaluationContext(current);
-  const baselineQuality = quality.evaluate(current);
-  const candidateQuality = quality.evaluateChanged(
+  const baselineQuality = evaluation.baselineQuality;
+  const candidateQuality = evaluation.quality.evaluateChanged(
     candidate.edges,
     candidate.changedEdgeIndexes,
   );
@@ -80,8 +117,17 @@ export const acceptFinalEndpointTopologyCandidate = (
         <= baselineQuality.backtrackPenalty + allowedBacktrackIncrease;
     if (!onlyBoundedBacktrackRegressed) return null;
   }
-  const obstacles = buildObstacleMap(nodes);
-  if (totalObstacleHits(candidate.edges, obstacles) > totalObstacleHits(current, obstacles)) {
+  const changedIndexes = [...new Set(candidate.changedEdgeIndexes)];
+  const candidateObstacleHits = changedIndexes.every(index => (
+    Number.isInteger(index) && index >= 0 && index < candidate.edges.length
+  ))
+    ? changedIndexes.reduce((total, index) => (
+        total
+        + countEdgeObstacleHits(candidate.edges[index], evaluation.obstacles)
+        - countEdgeObstacleHits(current[index], evaluation.obstacles)
+      ), evaluation.baselineObstacleHits)
+    : totalObstacleHits(candidate.edges, evaluation.obstacles);
+  if (candidateObstacleHits > evaluation.baselineObstacleHits) {
     return null;
   }
   if (options.validateCandidate) {

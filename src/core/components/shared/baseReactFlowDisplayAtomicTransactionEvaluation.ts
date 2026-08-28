@@ -4,6 +4,7 @@ import { auditFinalSameSideEndpointOrder } from '../../strategies/shared/edgeFin
 import {
   createEdgePathQualityEvaluationContext,
   type EdgePathQualityEvaluationContext,
+  type EdgePathQualityEvaluationState,
   type EdgePathQualityScore,
 } from '../../strategies/shared/edgeStrictCrossingGuard';
 import {
@@ -31,6 +32,7 @@ export const createAtomicRouteTransactionEvaluation = <T extends Edge[]>(
     qualityContext: EdgePathQualityEvaluationContext;
     obstacleContext: DisplayObstacleEvaluationContext;
     baselineQuality: EdgePathQualityScore;
+    baselineQualityState?: EdgePathQualityEvaluationState;
     baselineObstacleHits: number;
     endpointOrder?: AtomicEndpointOrderEvaluation;
   }>,
@@ -52,7 +54,13 @@ export const createAtomicRouteTransactionEvaluation = <T extends Edge[]>(
     baselineQuality,
     baselineObstacleHits,
     evaluate(candidate: T, changedIndexes: number[]) {
-      const quality = qualityContext.evaluateChanged(candidate, changedIndexes);
+      const quality = reusable?.baselineQualityState
+        ? qualityContext.evaluateStateChanged(
+            reusable.baselineQualityState,
+            candidate,
+            changedIndexes,
+          ).score
+        : qualityContext.evaluateChanged(candidate, changedIndexes);
       const obstacleHits = obstacleContext.evaluateKnownChanges(candidate, changedIndexes);
       const terminalsAnchored = !canValidateTerminals || changedIndexes.every(index => {
         const edge = candidate[index];

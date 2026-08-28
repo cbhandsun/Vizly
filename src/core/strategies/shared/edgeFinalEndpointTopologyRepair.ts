@@ -18,6 +18,7 @@ import {
 import { orientedTerminalPath, terminalMicroDoglegRepairPaths } from './edgeFinalTerminalMicroDoglegCandidates';
 import {
   acceptFinalEndpointTopologyCandidate as acceptCandidate,
+  createFinalEndpointTopologyBaselineEvaluation,
   type FinalEndpointTopologyRepairOptions,
 } from './edgeFinalEndpointTopologyCandidateAcceptance';
 import {
@@ -432,6 +433,11 @@ export const repairFinalTerminalMicroDoglegs = (
     if (baselineMicroDoglegs === 0) break;
     const baselineOrder = auditFinalSameSideEndpointOrder(current, nodes);
     const baselinePassage = auditFinalSameSidePassageOrder(current, nodes);
+    const baselineEvaluation = createFinalEndpointTopologyBaselineEvaluation(
+      current,
+      nodes,
+      baselineOrder,
+    );
     let accepted: Edge[] | null = null;
     for (let edgeIndex = 0; edgeIndex < current.length; edgeIndex += 1) {
       const edge = current[edgeIndex];
@@ -483,6 +489,8 @@ export const repairFinalTerminalMicroDoglegs = (
                 auditFinalSameSidePassageOrder(candidateEdges, nodes),
               )
             ),
+            0,
+            baselineEvaluation,
           );
           if (accepted) break;
         }

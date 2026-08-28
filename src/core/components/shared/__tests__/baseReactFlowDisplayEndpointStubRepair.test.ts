@@ -192,7 +192,7 @@ describe('baseReactFlowDisplayEndpointStubRepair', () => {
     expect(repaired).not.toBe(edges);
     expect(countRenderUnsafeEndpointStubs(repaired)).toBe(0);
     expect(clearanceSpy).toHaveBeenCalledTimes(1);
-    expect(qualityContextSpy).toHaveBeenCalledTimes(2);
+    expect(qualityContextSpy).toHaveBeenCalledTimes(1);
     expect(obstacleContextSpy).toHaveBeenCalledTimes(2);
   });
 });
