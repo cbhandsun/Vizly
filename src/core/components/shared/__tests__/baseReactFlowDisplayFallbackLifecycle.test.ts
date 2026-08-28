@@ -17,7 +17,10 @@ import {
   canCommitBaseReactFlowDisplayResult,
   shouldRepairBaseReactFlowDisplayResult,
 } from '../baseReactFlowDisplayCommitPolicy';
-import { resolveDisplayRoutingCommittedReuseTiming } from '../baseReactFlowDisplayRoutingDebug';
+import {
+  resolveDisplayRoutingCommittedReuseTiming,
+  resolveDisplayRoutingCommittedReuseTransactionEvidence,
+} from '../baseReactFlowDisplayRoutingDebug';
 
 describe('baseReactFlow display fallback lifecycle', () => {
   it('uses lightweight built-in paths for smart edges during interactive fallback', () => {
@@ -224,6 +227,29 @@ describe('baseReactFlow display fallback lifecycle', () => {
       phaseTrace: undefined,
       workerResolution: undefined,
       hardGateDiagnostics: undefined,
+    });
+  });
+
+  it('retains layout request evidence only for a trusted staged handoff', () => {
+    const trace = {
+      phase: 'candidate-validation' as const,
+      durationMs: 12,
+      candidateCount: 1,
+      changedEdgeCount: 0,
+      resolution: 'hit' as const,
+    };
+    const current = {
+      requestId: 'layout:7',
+      lastPhaseTrace: trace,
+      phaseProgressTrace: [trace],
+    };
+
+    expect(resolveDisplayRoutingCommittedReuseTransactionEvidence(current, true))
+      .toEqual(current);
+    expect(resolveDisplayRoutingCommittedReuseTransactionEvidence(current, false)).toEqual({
+      requestId: undefined,
+      lastPhaseTrace: undefined,
+      phaseProgressTrace: undefined,
     });
   });
 });

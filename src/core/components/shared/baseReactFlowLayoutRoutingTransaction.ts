@@ -33,6 +33,7 @@ import {
 import { recordBaseReactFlowRejectedDisplayDiagnostics } from './baseReactFlowDisplayRejectedDiagnostics';
 import { repairAxisMismatchedTerminalsWithBoundedPortRoles } from './baseReactFlowDisplayTerminalPortRepair';
 import { buildLayoutFacingTerminalShortcutCandidates } from './baseReactFlowDisplayCommercialTerminalShortcut';
+import { baseReactFlowDisplayCommercialQualityIsClean } from './baseReactFlowDisplayCommercialQuality';
 import { repairResidualHairpinBridges } from '../../strategies/shared/edgeHairpinBridgeWidenRepair';
 import { clearBaseReactFlowLayoutEdgeRoutingData } from './baseReactFlowLayoutEdgeRoutingData';
 import { updateDisplayRoutingDebugState } from './baseReactFlowDisplayRoutingDebug';
@@ -163,6 +164,7 @@ export const commitBaseReactFlowStagedLayoutRoutingResult = ({
   enableSmartEdges = true,
   smartEdgePadding = 20,
   isLargeGraph = false,
+  retainWorkerSession = true,
 }: {
   sourceEdges: Edge[];
   sourceNodes: Node[];
@@ -170,6 +172,13 @@ export const commitBaseReactFlowStagedLayoutRoutingResult = ({
   enableSmartEdges?: boolean;
   smartEdgePadding?: number;
   isLargeGraph?: boolean;
+  /**
+   * A bounded layout repair is evaluated from seeded edges. Its receipt proves
+   * the canonical identity and final quality, but its Worker-private session
+   * still records the seeded graph as the source. Omitting that session keeps
+   * incremental routing on the portable canonical snapshot instead.
+   */
+  retainWorkerSession?: boolean;
 }): BaseReactFlowLayoutRoutingCommit | null => {
   if (!Array.isArray(workerResult.routingPatches) || !workerResult.commitReceipt) return null;
   const workerInputRoutingPatches = createBaseReactFlowDisplayEdgePatches(
@@ -207,6 +216,7 @@ export const commitBaseReactFlowStagedLayoutRoutingResult = ({
       smartEdgePadding,
       isLargeGraph,
       commitReceipt: workerResult.commitReceipt,
+      retainCommitReceiptSession: retainWorkerSession,
     }),
   };
 };
@@ -223,6 +233,7 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
   hardReport,
   hardReportDigest,
   workerSessionRef,
+  retainCommitReceiptSession = true,
 }: {
   runtime: BaseReactFlowRoutingSessionRuntime;
   sourceEdges: Edge[];
@@ -235,6 +246,7 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
   hardReport?: RoutingCommittedSnapshot['hardReport'];
   hardReportDigest?: RoutingCommittedSnapshot['hardReportDigest'];
   workerSessionRef?: RoutingCommittedSnapshot['workerSessionRef'];
+  retainCommitReceiptSession?: boolean;
 }): boolean => {
   const hardReportIdentity = commitReceipt
     ? { hardReport: commitReceipt.hardReport }
@@ -268,7 +280,9 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
       || commitReceipt.outputRouteSignature !== outputRouteSignature
     ) return false;
   }
-  const safeWorkerSessionRef = commitReceipt?.sessionRef ?? workerSessionRef;
+  const safeWorkerSessionRef = retainCommitReceiptSession
+    ? (commitReceipt?.sessionRef ?? workerSessionRef)
+    : workerSessionRef;
   const writeSnapshot = (
     edges: Edge[],
     patches: RoutingPatch[],
@@ -399,6 +413,24 @@ export const stageBaseReactFlowLayoutRouting = async ({
     inputSignature: projectedIdentity.cacheSignature,
     inputGeometryDigest: projectedIdentity.geometryDigest,
   });
+  if (
+    candidateRepairResult.hardClean
+    && baseReactFlowDisplayCommercialQualityIsClean(candidateRepairResult.edges)
+  ) {
+    const boundedCommit = commitBaseReactFlowStagedLayoutRoutingResult({
+      sourceEdges: unseededSourceEdges,
+      sourceNodes: projectedSource.nodes,
+      workerResult: candidateRepairResult,
+      enableSmartEdges,
+      smartEdgePadding,
+      isLargeGraph,
+      // The repair session is seeded-edge-relative. The committed snapshot
+      // remains canonical and portable, but must not advertise that session
+      // as an incremental baseline for the unseeded source graph.
+      retainWorkerSession: false,
+    });
+    if (boundedCommit) return boundedCommit;
+  }
   // The bounded repair uses seeded paths as its working source. Promote its
   // result through a canonical source-edge request before committing so the
   // Worker-private session stores source -> final patches under the same

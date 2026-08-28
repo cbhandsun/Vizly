@@ -15,6 +15,7 @@ import {
 import {
   readDisplayRoutingDebugState,
   resolveDisplayRoutingCommittedReuseTiming,
+  resolveDisplayRoutingCommittedReuseTransactionEvidence,
   updateDisplayRoutingDebugState,
   updateDisplayRoutingFinalAppliedState,
   updateDisplayRoutingLifecycleState,
@@ -256,6 +257,10 @@ export const useBaseReactFlowDisplayRouting = ({
         nodeCount,
         edgeCount,
         ...committedReuseTiming,
+        ...resolveDisplayRoutingCommittedReuseTransactionEvidence(
+          previousDebugState,
+          reusableCommittedFinalDisplayEntry?.trustedTransactionHandoff === true,
+        ),
         workerStartCount: displayEdgeWorkerStartCountRef.current,
         workerAbortCount: displayEdgeWorkerAbortCountRef.current,
       });

@@ -169,6 +169,29 @@ export const resolveDisplayRoutingCommittedReuseTiming = ({
   };
 };
 
+/**
+ * Only an atomic staged-layout handoff may retain the Worker request evidence
+ * that immediately preceded committed-snapshot reuse. Ordinary cache reuse
+ * must clear it, otherwise a failed layout can make the previous canvas look
+ * as though it committed the newer layout request.
+ */
+export const resolveDisplayRoutingCommittedReuseTransactionEvidence = (
+  current: DisplayRoutingDebugState | undefined,
+  trustedTransactionHandoff: boolean,
+): Pick<DisplayRoutingDebugState, 'requestId' | 'lastPhaseTrace' | 'phaseProgressTrace'> => (
+  trustedTransactionHandoff
+    ? {
+      requestId: current?.requestId,
+      lastPhaseTrace: current?.lastPhaseTrace,
+      phaseProgressTrace: current?.phaseProgressTrace,
+    }
+    : {
+      requestId: undefined,
+      lastPhaseTrace: undefined,
+      phaseProgressTrace: undefined,
+    }
+);
+
 export const readDisplayRoutingDebugState = (): DisplayRoutingDebugState | undefined => (
   readDisplayRoutingDebugWindow()?.__vizlyBaseReactFlowDisplayRouting
 );

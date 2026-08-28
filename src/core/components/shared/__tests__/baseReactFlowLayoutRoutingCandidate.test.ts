@@ -17,7 +17,10 @@ vi.mock('../baseReactFlowDisplayWorkerClient', async importOriginal => {
   };
 });
 
-import { clearBaseReactFlowDisplayCommittedSnapshots } from '../baseReactFlowDisplayCommittedSnapshot';
+import {
+  clearBaseReactFlowDisplayCommittedSnapshots,
+  readBaseReactFlowDisplayCommittedSnapshot,
+} from '../baseReactFlowDisplayCommittedSnapshot';
 import {
   seedBaseReactFlowStagedLayoutEdges,
   stageBaseReactFlowLayoutRouting,
@@ -29,6 +32,8 @@ import { createBaseReactFlowDisplayEdgePatches } from '../baseReactFlowDisplayWo
 import { computeBaseReactFlowDisplayOutputRouteSignature } from '../baseReactFlowDisplayCache';
 import { createDisplayRoutingWorkerCommitReceipt } from '../baseReactFlowDisplayWorkerCommitReceipt';
 import { createDisplayRoutingIdentity } from '../baseReactFlowDisplayRoutingSession';
+import { computeBaseReactFlowDisplayInputIdentityBundle } from '../baseReactFlowDisplayInputIdentity';
+import { projectBaseReactFlowDisplayWorkerInput } from '../baseReactFlowDisplayWorkerProjection';
 import { createTestDisplayHardReport } from './baseReactFlowDisplayWorkerTestFixtures';
 
 const nodes: Node[] = [
@@ -117,7 +122,7 @@ describe('baseReactFlow layout routing candidate sequence', () => {
     workerMocks.repair.mockReset();
   });
 
-  it('promotes a hard-clean bounded candidate through the canonical source request', async () => {
+  it('commits a hard-clean bounded candidate without a second canonical Worker request', async () => {
     workerMocks.repair.mockImplementation(async (request: {
       edges: Edge[];
       inputSignature: string;
@@ -141,14 +146,31 @@ describe('baseReactFlow layout routing candidate sequence', () => {
       requireHardClean: false,
       timeoutMs: 12_000,
     });
-    expect(workerMocks.compute).toHaveBeenCalledOnce();
-    expect(workerMocks.compute.mock.calls[0][0]).toMatchObject({
-      requestId: 'layout:1',
-      edges,
-      cachedCandidateEdges: result.routedEdges,
-      candidateSource: 'persistent',
-      qualityMode: 'full',
+    expect(workerMocks.compute).not.toHaveBeenCalled();
+
+    const projected = projectBaseReactFlowDisplayWorkerInput({
+      edges: result.committedSourceEdges,
+      nodes,
     });
+    const identity = computeBaseReactFlowDisplayInputIdentityBundle({
+      nodes: projected.nodes,
+      edges: projected.edges,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+    });
+    const replay = readBaseReactFlowDisplayCommittedSnapshot({
+      inputSignature: identity.cacheSignature,
+      inputGeometryDigest: identity.geometryDigest,
+      sourceEdges: result.committedSourceEdges,
+    });
+    expect(replay?.edges[0]).toMatchObject({
+      id: result.routedEdges[0].id,
+      type: result.routedEdges[0].type,
+      data: { computedPath: result.routedEdges[0].data?.computedPath },
+    });
+    expect(replay?.baseline.workerSessionRef).toBeUndefined();
+    expect(replay?.baseline.projectedSourceGeometry).toEqual(projected);
   });
 
   it('repairs terminal-axis and hairpin defects before the hidden Worker pass', () => {
@@ -235,7 +257,46 @@ describe('baseReactFlow layout routing candidate sequence', () => {
       },
     });
     expect(workerMocks.repair).toHaveBeenCalledTimes(2);
-    expect(workerMocks.compute).toHaveBeenCalledTimes(2);
+    expect(workerMocks.compute).not.toHaveBeenCalled();
+  });
+
+  it('keeps a structurally dirty hard-clean repair on the canonical fallback path', async () => {
+    workerMocks.repair.mockImplementation(async (request: {
+      edges: Edge[];
+      inputSignature: string;
+      inputGeometryDigest: string;
+    }) => {
+      const candidate = request.edges.map(edge => ({
+        ...edge,
+        data: {
+          ...edge.data,
+          computedPath: [
+            { x: 100, y: 30 }, { x: 120, y: 30 }, { x: 120, y: 60 },
+            { x: 140, y: 60 }, { x: 140, y: 90 }, { x: 160, y: 90 },
+            { x: 160, y: 60 }, { x: 180, y: 60 }, { x: 180, y: 30 },
+            { x: 240, y: 30 },
+          ],
+        },
+      }));
+      return successfulResult(candidate, request, request.edges);
+    });
+    workerMocks.compute.mockImplementation(successfulCanonicalResult);
+
+    await stageBaseReactFlowLayoutRouting({
+      workerRef: { current: null },
+      requestId: 'layout:commercial-fallback',
+      sourceEdges: edges,
+      sourceNodes: nodes,
+      isLargeGraph: false,
+    });
+
+    expect(workerMocks.repair).toHaveBeenCalledOnce();
+    expect(workerMocks.compute).toHaveBeenCalledOnce();
+    expect(workerMocks.compute.mock.calls[0][0]).toMatchObject({
+      requestId: 'layout:commercial-fallback',
+      candidateSource: 'persistent',
+      qualityMode: 'full',
+    });
   });
 
   it('falls through to the unchanged full-quality route when the bounded candidate is rejected', async () => {

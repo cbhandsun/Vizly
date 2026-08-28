@@ -472,14 +472,13 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
   if (candidateHardReport && candidateHardReport.hardClean !== true) {
     onBoundedCandidate?.(candidateHardReport);
   }
+  let candidateValidationFinished = false;
   if (
     candidateEdges
     && candidateMatchesSource
     && candidateRepairNodes
     && candidateHardReport?.hardClean === true
-    && baseReactFlowDisplayCommercialQualityIsClean(candidateEdges)
   ) {
-    candidateTimer.finish('hit');
     const validatedCandidateResponse: DisplayEdgesWorkerResponse = {
       requestId: request.requestId,
       edges: candidateEdges,
@@ -487,62 +486,103 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
       routeResolution: 'validated-candidate',
       phaseTrace,
     };
-    const lockedCandidateEdges = lockFinalDisplayComputedPaths(candidateEdges, request.nodes);
-    const {
-      renderContractIsLocked,
-      lockedRouteMatches,
-    } = analyzeFinalDisplayRenderContract(
-      candidateEdges,
-      lockedCandidateEdges,
-    );
-    const exceedsCommercialPromotionBudget = candidateEdges.length > 80
-      || candidateRepairNodes.length > 120;
-    const persistentBoundaryCandidate = candidateSource === 'persistent'
-      ? repairDisplayContainerBoundaryClearanceRisks(candidateEdges, candidateRepairNodes, {
-        maxEdges: request.isLargeGraph ? 4 : 8,
-        maxQualityEvaluations: request.isLargeGraph ? 16 : 32,
-      })
-      : candidateEdges;
-    const persistentBoundaryIsClean = persistentBoundaryCandidate === candidateEdges
-      || doBaseReactFlowDisplayRoutesMatchExactly(candidateEdges, persistentBoundaryCandidate);
-    if (
-      (
-        exceedsCommercialPromotionBudget
-        || displayBusinessNodeCommercialClearanceIsClean(candidateEdges, candidateRepairNodes)
-      )
-      && persistentBoundaryIsClean
-      && lockedRouteMatches
-    ) {
-      if (candidateSource !== 'precompiled') {
-        for (const phase of ['final-clearance', 'final-hard-safety'] as const) {
-          startDisplayRoutingPhaseTrace({
-            phase,
-            candidateCount: candidateEdges.length,
-            onTrace: recordPhaseTrace,
-          }).finish('skip');
-        }
-      }
-      return completeResponse(withExactDisplayHardReport(
-        candidateSource === 'precompiled' || renderContractIsLocked
-        ? validatedCandidateResponse
-        : {
-          ...validatedCandidateResponse,
-          edges: lockedCandidateEdges,
-          routeResolution: 'repaired-candidate',
-        },
+    if (!baseReactFlowDisplayCommercialQualityIsClean(candidateEdges)) {
+      const exactValidatedCandidateResponse = withExactDisplayHardReport(
+        validatedCandidateResponse,
         candidateRepairNodes,
-      ));
+      );
+      if (exactValidatedCandidateResponse.hardClean !== true) {
+        if (exactValidatedCandidateResponse.hardReport) {
+          onBoundedCandidate?.(exactValidatedCandidateResponse.hardReport);
+        }
+      } else {
+        // Exact hard safety and structural commercial quality are independent
+        // promotion contracts. Give a hard-clean candidate the same bounded
+        // commercial closure used by final responses before discarding it and
+        // recomputing the complete route. The provisional repaired resolution
+        // deliberately bypasses the validated-candidate idempotence shortcut,
+        // which is only sound after commercial quality has already passed.
+        candidateTimer.finish('fallback');
+        candidateValidationFinished = true;
+        const commerciallyFinalizedResponse = finalizeContainerClearanceResponse({
+          ...exactValidatedCandidateResponse,
+          routeResolution: 'repaired-candidate',
+        }, request.nodes, {
+          isLargeGraph: request.isLargeGraph,
+          onPhaseTrace: recordPhaseTrace,
+          preferredEdges: candidateEdges,
+        });
+        const exactCommerciallyFinalizedResponse = withExactDisplayHardReport(
+          commerciallyFinalizedResponse,
+          candidateRepairNodes,
+        );
+        if (
+          exactCommerciallyFinalizedResponse.edges
+          && exactCommerciallyFinalizedResponse.hardClean === true
+          && baseReactFlowDisplayCommercialQualityIsClean(exactCommerciallyFinalizedResponse.edges)
+        ) return completeResponse(exactCommerciallyFinalizedResponse);
+      }
+    } else {
+      candidateTimer.finish('hit');
+      const lockedCandidateEdges = lockFinalDisplayComputedPaths(candidateEdges, request.nodes);
+      const {
+        renderContractIsLocked,
+        lockedRouteMatches,
+      } = analyzeFinalDisplayRenderContract(
+        candidateEdges,
+        lockedCandidateEdges,
+      );
+      const exceedsCommercialPromotionBudget = candidateEdges.length > 80
+        || candidateRepairNodes.length > 120;
+      const persistentBoundaryCandidate = candidateSource === 'persistent'
+        ? repairDisplayContainerBoundaryClearanceRisks(candidateEdges, candidateRepairNodes, {
+          maxEdges: request.isLargeGraph ? 4 : 8,
+          maxQualityEvaluations: request.isLargeGraph ? 16 : 32,
+        })
+        : candidateEdges;
+      const persistentBoundaryIsClean = persistentBoundaryCandidate === candidateEdges
+        || doBaseReactFlowDisplayRoutesMatchExactly(candidateEdges, persistentBoundaryCandidate);
+      if (
+        (
+          exceedsCommercialPromotionBudget
+          || displayBusinessNodeCommercialClearanceIsClean(candidateEdges, candidateRepairNodes)
+        )
+        && persistentBoundaryIsClean
+        && lockedRouteMatches
+      ) {
+        if (candidateSource !== 'precompiled') {
+          for (const phase of ['final-clearance', 'final-hard-safety'] as const) {
+            startDisplayRoutingPhaseTrace({
+              phase,
+              candidateCount: candidateEdges.length,
+              onTrace: recordPhaseTrace,
+            }).finish('skip');
+          }
+        }
+        return completeResponse(withExactDisplayHardReport(
+          candidateSource === 'precompiled' || renderContractIsLocked
+          ? validatedCandidateResponse
+          : {
+            ...validatedCandidateResponse,
+            edges: lockedCandidateEdges,
+            routeResolution: 'repaired-candidate',
+          },
+          candidateRepairNodes,
+        ));
+      }
+      return completeResponse(finalizeContainerClearanceResponse(validatedCandidateResponse, request.nodes, {
+        isLargeGraph: request.isLargeGraph,
+        onPhaseTrace: recordPhaseTrace,
+        // The candidate already passed exact hard/commercial validation.  Using
+        // the source graph as the terminal preference can resurrect a stale
+        // preset-computed path after a precompiled artifact was regenerated.
+        preferredEdges: candidateEdges,
+      }));
     }
-    return completeResponse(finalizeContainerClearanceResponse(validatedCandidateResponse, request.nodes, {
-      isLargeGraph: request.isLargeGraph,
-      onPhaseTrace: recordPhaseTrace,
-      // The candidate already passed exact hard/commercial validation.  Using
-      // the source graph as the terminal preference can resurrect a stale
-      // preset-computed path after a precompiled artifact was regenerated.
-      preferredEdges: candidateEdges,
-    }));
   }
-  candidateTimer.finish(candidateEdges ? 'rejected' : 'skip');
+  if (!candidateValidationFinished) {
+    candidateTimer.finish(candidateEdges ? 'rejected' : 'skip');
+  }
   const commonInput = {
     edges: request.edges,
     nodes: request.nodes,

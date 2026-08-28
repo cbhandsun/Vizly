@@ -115,40 +115,6 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
     });
   });
 
-  it('commits a clean cache candidate without entering the full-route pipeline', () => {
-    const fullRouteSpy = vi.spyOn(fullRoutePipeline, 'createBaseReactFlowFullRouteEdges');
-    const response = computeBaseReactFlowDisplayEdgesWorkerResponse({
-      operation: 'validate-or-route',
-      requestId: 'validate-clean-cache',
-      edges,
-      candidatePatches: edges,
-      candidateSource: 'persistent',
-      nodes,
-      enableSmartEdges: true,
-      smartEdgePadding: 20,
-      isLargeGraph: false,
-      displayEdgeEpoch: 1,
-      qualityMode: 'full',
-    });
-
-    expect(response).toMatchObject({
-      requestId: 'validate-clean-cache',
-      edges,
-      hardClean: true,
-      routeResolution: 'validated-candidate',
-    });
-    expect(response.phaseTrace).toEqual([
-      expect.objectContaining({
-        phase: 'candidate-validation',
-        resolution: 'hit',
-      }),
-      expect.objectContaining({ phase: 'final-clearance', resolution: 'skip' }),
-      expect.objectContaining({ phase: 'final-hard-safety', resolution: 'skip' }),
-      expect.objectContaining({ phase: 'session-commit', resolution: 'skip' }),
-    ]);
-    expect(fullRouteSpy).not.toHaveBeenCalled();
-  });
-
   it('keeps an exact validated route without repeating the final safety closure', () => {
     const closureSpy = vi.spyOn(
       finalSafetyClosure,
