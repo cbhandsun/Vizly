@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { computeBaseReactFlowDisplayEdgesWorkerResponse } from '../baseReactFlowDisplayEdges.worker';
 import * as measuredDisplayRepair from '../baseReactFlowDisplayMeasuredRepair';
+import { DISPLAY_FINAL_OVERLAP_OBSTACLE_REPAIR_OPTIONS } from '../baseReactFlowDisplayRenderPipeline';
 import { getDisplayComputedPath } from '../baseReactFlowDisplayGeometry';
 import { COMMERCIAL_BUSINESS_NODE_CLEARANCE } from '../../../strategies/shared/edgeBusinessNodeClearanceRepair';
 import { scoreNodeClearanceRisk } from '../../../strategies/shared/edgeWaypointCandidateRepair';
@@ -33,6 +34,21 @@ afterEach(() => {
 });
 
 describe('baseReactFlowDisplayEdges worker repair mode', () => {
+  it('uses a hard bounded obstacle budget when the result will be discarded on obstacle failure', () => {
+    expect(measuredDisplayRepair.resolveMeasuredObstacleRepairOptions(true, 'TB')).toEqual({
+      maxEdges: 2,
+      maxCandidatesPerEdge: 16,
+      maxQualityEvaluations: 18,
+      skipOuterFallback: true,
+    });
+    expect(measuredDisplayRepair.resolveMeasuredObstacleRepairOptions(false, 'TB')).toBe(
+      DISPLAY_FINAL_OVERLAP_OBSTACLE_REPAIR_OPTIONS,
+    );
+    expect(measuredDisplayRepair.resolveMeasuredObstacleRepairOptions(true, 'LR')).toBe(
+      DISPLAY_FINAL_OVERLAP_OBSTACLE_REPAIR_OPTIONS,
+    );
+  });
+
   it('dispatches bounded repair through the measured repair pipeline', () => {
     const repairSpy = vi.spyOn(
       measuredDisplayRepair,

@@ -17,6 +17,7 @@ import { repairFastDisplayHardSafety } from './baseReactFlowFastEdgeSafety';
 import {
   chooseFinalObstacleAwarePolishCandidate,
   type BaseDisplayBoundedCandidateReport,
+  type DisplaySoftQualityOptions,
 } from './baseReactFlowDisplayEvaluation';
 import { repairTerminalBoundaryStairs } from '../../strategies/shared/edgeTerminalBoundaryStairRepair';
 import {
@@ -47,6 +48,20 @@ import {
   type DisplayRoutingPhaseName,
   type DisplayRoutingPhaseTrace,
 } from './baseReactFlowDisplayRoutingTrace';
+
+const DISPLAY_STOP_AFTER_OBSTACLE_FAILURE_REPAIR_OPTIONS: DisplaySoftQualityOptions = {
+  maxEdges: 2,
+  maxCandidatesPerEdge: 16,
+  maxQualityEvaluations: 18,
+  skipOuterFallback: true,
+};
+
+export const resolveMeasuredObstacleRepairOptions = (
+  stopAfterObstacleFailure: boolean,
+  layoutDirection: string,
+): DisplaySoftQualityOptions => stopAfterObstacleFailure && layoutDirection !== 'LR'
+  ? DISPLAY_STOP_AFTER_OBSTACLE_FAILURE_REPAIR_OPTIONS
+  : DISPLAY_FINAL_OVERLAP_OBSTACLE_REPAIR_OPTIONS;
 
 export type BaseReactFlowMeasuredDisplayInitialEvaluation = Readonly<{
   edges: Edge[];
@@ -246,7 +261,7 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
       current,
       repairNodes,
       layoutDirection,
-      DISPLAY_FINAL_OVERLAP_OBSTACLE_REPAIR_OPTIONS,
+      resolveMeasuredObstacleRepairOptions(stopAfterObstacleFailure, layoutDirection),
     ));
     if (obstacleHardClean) return outcomeFor(current, current, currentReport);
     if (stopAfterObstacleFailure && currentReport.obstacleHits > 0) {
