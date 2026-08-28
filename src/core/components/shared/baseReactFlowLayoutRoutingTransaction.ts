@@ -47,6 +47,11 @@ import {
   displayRoutingIdentitiesMatch,
 } from './baseReactFlowDisplayRoutingSession';
 import type { BaseReactFlowRoutingSessionRuntime } from './baseReactFlowRoutingSessionRuntime';
+import {
+  loadBaseReactFlowPrecompiledRouteCandidate,
+  type BaseReactFlowPrecompiledRouteLookupInput,
+} from './baseReactFlowPrecompiledRouteRegistry';
+import type { BaseReactFlowPrecompiledLayoutRegeneration } from './baseReactFlowPrecompiledCaptureMode';
 
 export { clearBaseReactFlowLayoutEdgeRoutingData } from './baseReactFlowLayoutEdgeRoutingData';
 
@@ -54,6 +59,14 @@ export type BaseReactFlowLayoutRoutingCommit = Readonly<{
   committedSourceEdges: Edge[];
   routedEdges: Edge[];
   commitSnapshot: (runtime: BaseReactFlowRoutingSessionRuntime) => boolean;
+}>;
+
+export type BaseReactFlowLayoutPrecompiledCandidateLoader = (
+  input: BaseReactFlowPrecompiledRouteLookupInput,
+) => Promise<Edge[] | null>;
+
+type BaseReactFlowLayoutPrecompiledCapture = BaseReactFlowPrecompiledLayoutRegeneration & Readonly<{
+  provenance: 'fresh-layout-repair-validated' | 'fresh-full-route';
 }>;
 
 type LayoutRuntimeNode = Node & Readonly<{
@@ -169,6 +182,7 @@ export const commitBaseReactFlowStagedLayoutRoutingResult = ({
   smartEdgePadding = 20,
   isLargeGraph = false,
   retainWorkerSession = true,
+  precompiledLayoutCapture,
 }: {
   sourceEdges: Edge[];
   sourceNodes: Node[];
@@ -183,6 +197,7 @@ export const commitBaseReactFlowStagedLayoutRoutingResult = ({
    * incremental routing on the portable canonical snapshot instead.
    */
   retainWorkerSession?: boolean;
+  precompiledLayoutCapture?: BaseReactFlowLayoutPrecompiledCapture;
 }): BaseReactFlowLayoutRoutingCommit | null => {
   if (!Array.isArray(workerResult.routingPatches) || !workerResult.commitReceipt) return null;
   const workerInputRoutingPatches = createBaseReactFlowDisplayEdgePatches(
@@ -221,6 +236,7 @@ export const commitBaseReactFlowStagedLayoutRoutingResult = ({
       isLargeGraph,
       commitReceipt: workerResult.commitReceipt,
       retainCommitReceiptSession: retainWorkerSession,
+      precompiledLayoutCapture,
     }),
   };
 };
@@ -238,6 +254,7 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
   hardReportDigest,
   workerSessionRef,
   retainCommitReceiptSession = true,
+  precompiledLayoutCapture,
 }: {
   runtime: BaseReactFlowRoutingSessionRuntime;
   sourceEdges: Edge[];
@@ -251,6 +268,7 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
   hardReportDigest?: RoutingCommittedSnapshot['hardReportDigest'];
   workerSessionRef?: RoutingCommittedSnapshot['workerSessionRef'];
   retainCommitReceiptSession?: boolean;
+  precompiledLayoutCapture?: BaseReactFlowLayoutPrecompiledCapture;
 }): boolean => {
   const hardReportIdentity = commitReceipt
     ? { hardReport: commitReceipt.hardReport }
@@ -291,6 +309,7 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
     edges: Edge[],
     patches: RoutingPatch[],
     snapshotWorkerSessionRef: RoutingCommittedSnapshot['workerSessionRef'],
+    snapshotPrecompiledLayoutCapture?: BaseReactFlowLayoutPrecompiledCapture,
   ): ReturnType<typeof computeBaseReactFlowDisplayInputIdentityBundle> | null => {
     // Layout strategies keep child coordinates relative to their domain. The
     // display router identifies the same nodes by their projected absolute
@@ -314,6 +333,7 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
       displayPatches: patches,
       outputRouteSignature,
       workerSessionRef: snapshotWorkerSessionRef,
+      precompiledLayoutCapture: snapshotPrecompiledLayoutCapture,
       ...hardReportIdentity,
     });
     return committed ? identity : null;
@@ -321,7 +341,12 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
   const primaryIdentity = writeSnapshot(routedEdges, displayPatches, undefined);
   const sourcePatches = createBaseReactFlowDisplayEdgePatches(sourceEdges, routedEdges);
   const sourceIdentity = sourcePatches
-    ? writeSnapshot(sourceEdges, sourcePatches, safeWorkerSessionRef)
+    ? writeSnapshot(
+      sourceEdges,
+      sourcePatches,
+      safeWorkerSessionRef,
+      precompiledLayoutCapture,
+    )
     : null;
   if (sourceIdentity) markBaseReactFlowStagedLayoutSnapshotHandoff(sourceEdges);
   updateDisplayRoutingDebugState({
@@ -343,6 +368,10 @@ export const stageBaseReactFlowLayoutRouting = async ({
   smartEdgePadding = 20,
   isLargeGraph,
   signal,
+  forceFreshFullRoute = false,
+  loadPrecompiledCandidate = loadBaseReactFlowPrecompiledRouteCandidate,
+  fullRouteTimeoutMs = LAYOUT_FULL_DISPLAY_WORKER_TIMEOUT_MS,
+  precompiledLayoutRegeneration,
 }: {
   workerRef: MutableRefObject<Worker | null>;
   requestId: string;
@@ -352,6 +381,10 @@ export const stageBaseReactFlowLayoutRouting = async ({
   smartEdgePadding?: number;
   isLargeGraph: boolean;
   signal?: AbortSignal;
+  forceFreshFullRoute?: boolean;
+  loadPrecompiledCandidate?: BaseReactFlowLayoutPrecompiledCandidateLoader;
+  fullRouteTimeoutMs?: number;
+  precompiledLayoutRegeneration?: BaseReactFlowPrecompiledLayoutRegeneration | null;
 }): Promise<BaseReactFlowLayoutRoutingCommit> => {
   const unseededSourceEdges = sourceEdges.map(edge => ({
     ...edge,
@@ -368,11 +401,13 @@ export const stageBaseReactFlowLayoutRouting = async ({
     smartEdgePadding,
     isLargeGraph,
   });
-  const cached = readBaseReactFlowDisplayCommittedSnapshot({
-    inputSignature: projectedIdentity.cacheSignature,
-    inputGeometryDigest: projectedIdentity.geometryDigest,
-    sourceEdges: unseededSourceEdges,
-  });
+  const cached = forceFreshFullRoute
+    ? null
+    : readBaseReactFlowDisplayCommittedSnapshot({
+      inputSignature: projectedIdentity.cacheSignature,
+      inputGeometryDigest: projectedIdentity.geometryDigest,
+      sourceEdges: unseededSourceEdges,
+    });
   const cachedEdges = cached
     ? lockFinalDisplayComputedPaths(cached.edges, projectedSource.nodes)
     : null;
@@ -397,23 +432,39 @@ export const stageBaseReactFlowLayoutRouting = async ({
       }),
     };
   }
-  const stagedSeedEdges = seedBaseReactFlowStagedLayoutEdges({
-    sourceEdges,
-    sourceNodes,
-  });
-  const seedAudit = auditBaseReactFlowLayoutCandidateSeed(
-    stagedSeedEdges,
-    projectedSource.nodes,
-  );
-  updateDisplayRoutingDebugState({
-    layoutSeedTerminalsAttached: seedAudit.terminalsAttached,
-    layoutSeedTerminalsAnchored: seedAudit.terminalsAnchored,
-    layoutSeedObstacleHits: seedAudit.obstacleHits,
-    layoutSeedStrictCrossings: seedAudit.strictCrossings,
-  });
-  const skipBoundedCandidateRepair = shouldSkipBaseReactFlowLayoutCandidateRepair(
-    stagedSeedEdges.length,
-    seedAudit,
+  const precompiledCandidateEdges = forceFreshFullRoute
+    ? null
+    : await loadPrecompiledCandidate({
+      inputSignature: projectedIdentity.cacheSignature,
+      inputGeometryDigest: projectedIdentity.geometryDigest,
+      nodes: projectedSource.nodes,
+      edges: unseededSourceEdges,
+      enableSmartEdges,
+      smartEdgePadding,
+      isLargeGraph,
+    });
+  if (signal?.aborted) throw new Error('layout-routing-cancelled');
+  const stagedSeedEdges = precompiledCandidateEdges
+    ? null
+    : seedBaseReactFlowStagedLayoutEdges({
+      sourceEdges,
+      sourceNodes,
+    });
+  const seedAudit = stagedSeedEdges
+    ? auditBaseReactFlowLayoutCandidateSeed(stagedSeedEdges, projectedSource.nodes)
+    : null;
+  if (seedAudit) {
+    updateDisplayRoutingDebugState({
+      layoutSeedTerminalsAttached: seedAudit.terminalsAttached,
+      layoutSeedTerminalsAnchored: seedAudit.terminalsAnchored,
+      layoutSeedObstacleHits: seedAudit.obstacleHits,
+      layoutSeedStrictCrossings: seedAudit.strictCrossings,
+    });
+  }
+  const skipBoundedCandidateRepair = Boolean(
+    stagedSeedEdges
+    && seedAudit
+    && shouldSkipBaseReactFlowLayoutCandidateRepair(stagedSeedEdges.length, seedAudit),
   );
   // ELK and the geometry-anchored fallback already provide a complete hidden
   // candidate. Near-clean seeds retain the bounded measured repair and can
@@ -421,12 +472,12 @@ export const stageBaseReactFlowLayoutRouting = async ({
   // crossing per edge is already compound-dirty; send it directly through the
   // canonical exact audit and unchanged full-route fallback instead of paying
   // for a measured pass known not to reduce that defect class.
-  const candidateRepairResult = skipBoundedCandidateRepair
+  const candidateRepairResult = precompiledCandidateEdges || skipBoundedCandidateRepair
     ? null
     : await repairBaseReactFlowDisplayEdgesInWorker({
       workerRef,
       requestId: `${requestId}:candidate-repair`,
-      edges: stagedSeedEdges,
+      edges: stagedSeedEdges ?? [],
       nodes: sourceNodes,
       timeoutMs: LAYOUT_DISPLAY_WORKER_TIMEOUT_MS,
       signal,
@@ -438,6 +489,7 @@ export const stageBaseReactFlowLayoutRouting = async ({
   if (
     candidateRepairResult?.hardClean
     && baseReactFlowDisplayCommercialQualityIsClean(candidateRepairResult.edges)
+    && !precompiledLayoutRegeneration
   ) {
     const boundedCommit = commitBaseReactFlowStagedLayoutRoutingResult({
       sourceEdges: unseededSourceEdges,
@@ -457,14 +509,19 @@ export const stageBaseReactFlowLayoutRouting = async ({
   // result through a canonical source-edge request before committing so the
   // Worker-private session stores source -> final patches under the same
   // identity exposed to the incremental client.
-  const canonicalCandidateEdges = candidateRepairResult?.hardClean
-    ? candidateRepairResult.edges
-    : skipBoundedCandidateRepair
-      ? stagedSeedEdges
-      : seedBaseReactFlowStagedLayoutEdges({
-        sourceEdges: unseededSourceEdges,
-        sourceNodes,
-      });
+  let canonicalCandidateEdges: Edge[];
+  if (candidateRepairResult?.hardClean) {
+    canonicalCandidateEdges = candidateRepairResult.edges;
+  } else if (precompiledCandidateEdges) {
+    canonicalCandidateEdges = precompiledCandidateEdges;
+  } else if (skipBoundedCandidateRepair) {
+    canonicalCandidateEdges = stagedSeedEdges ?? [];
+  } else {
+    canonicalCandidateEdges = seedBaseReactFlowStagedLayoutEdges({
+      sourceEdges: unseededSourceEdges,
+      sourceNodes,
+    });
+  }
   const initialResult = await computeBaseReactFlowDisplayEdgesInWorker({
     workerRef,
     requestId,
@@ -477,12 +534,21 @@ export const stageBaseReactFlowLayoutRouting = async ({
     inputSignature: projectedIdentity.cacheSignature,
     inputGeometryDigest: projectedIdentity.geometryDigest,
     cachedCandidateEdges: canonicalCandidateEdges,
-    candidateSource: 'persistent',
+    candidateSource: precompiledCandidateEdges ? 'precompiled' : 'persistent',
     qualityMode: 'full',
-    timeoutMs: LAYOUT_FULL_DISPLAY_WORKER_TIMEOUT_MS,
+    timeoutMs: fullRouteTimeoutMs,
     signal,
   });
   const workerResult = initialResult;
+  const precompiledLayoutCapture = precompiledLayoutRegeneration
+    ? {
+      ...precompiledLayoutRegeneration,
+      provenance: workerResult.routeResolution === 'full-route'
+        || workerResult.routeResolution === 'full-route-repaired'
+        ? 'fresh-full-route' as const
+        : 'fresh-layout-repair-validated' as const,
+    }
+    : undefined;
   const committed = commitBaseReactFlowStagedLayoutRoutingResult({
     sourceEdges: unseededSourceEdges,
     sourceNodes: projectedSource.nodes,
@@ -490,6 +556,7 @@ export const stageBaseReactFlowLayoutRouting = async ({
     enableSmartEdges,
     smartEdgePadding,
     isLargeGraph,
+    precompiledLayoutCapture,
   });
   if (!committed) {
     if (import.meta.env.DEV) {

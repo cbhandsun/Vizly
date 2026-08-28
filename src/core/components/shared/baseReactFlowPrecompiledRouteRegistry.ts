@@ -28,19 +28,38 @@ export type BaseReactFlowPrecompiledRouteLookupInput = BaseReactFlowDisplayInput
   inputGeometryDigest?: string;
 };
 
+type BaseReactFlowPrecompiledRouteLoaderBucket =
+  | GeneratedBaseReactFlowPrecompiledRouteDescriptor
+  | readonly GeneratedBaseReactFlowPrecompiledRouteDescriptor[];
+
 export type BaseReactFlowPrecompiledRouteLoaderRegistry = Record<
   string,
-  GeneratedBaseReactFlowPrecompiledRouteDescriptor
+  BaseReactFlowPrecompiledRouteLoaderBucket
 >;
+
+const findExactPrecompiledRouteDescriptor = (
+  inputSignature: string,
+  inputGeometryDigest: string,
+  registry: BaseReactFlowPrecompiledRouteLoaderRegistry,
+): GeneratedBaseReactFlowPrecompiledRouteDescriptor | null => {
+  if (!Object.prototype.hasOwnProperty.call(registry, inputSignature)) return null;
+  const entry = registry[inputSignature];
+  const descriptors = Array.isArray(entry) ? entry : [entry];
+  return descriptors.find(descriptor => (
+    descriptor?.geometryDigest === inputGeometryDigest
+  )) ?? null;
+};
 
 export const hasBaseReactFlowPrecompiledRouteCandidateInRegistry = (
   inputSignature: string,
   inputGeometryDigest: string,
   registry: BaseReactFlowPrecompiledRouteLoaderRegistry,
 ): boolean => {
-  if (!Object.prototype.hasOwnProperty.call(registry, inputSignature)) return false;
-  const descriptor = registry[inputSignature];
-  return Boolean(descriptor && descriptor.geometryDigest === inputGeometryDigest);
+  return findExactPrecompiledRouteDescriptor(
+    inputSignature,
+    inputGeometryDigest,
+    registry,
+  ) !== null;
 };
 
 export const hasBaseReactFlowPrecompiledRouteCandidate = (
@@ -110,15 +129,18 @@ export const loadBaseReactFlowPrecompiledRouteCandidateFromRegistry = async (
   input: BaseReactFlowPrecompiledRouteLookupInput,
   registry: BaseReactFlowPrecompiledRouteLoaderRegistry,
 ): Promise<Edge[] | null> => {
-  const descriptor = registry[input.inputSignature];
-  if (!descriptor) return null;
   const inputGeometryDigest = typeof input.inputGeometryDigest === 'undefined'
     ? computeBaseReactFlowDisplayGeometryDigest(input)
     : (isBaseReactFlowDisplayGeometryDigest(input.inputGeometryDigest)
       ? input.inputGeometryDigest
       : null);
   if (!inputGeometryDigest) return null;
-  if (descriptor.geometryDigest !== inputGeometryDigest) return null;
+  const descriptor = findExactPrecompiledRouteDescriptor(
+    input.inputSignature,
+    inputGeometryDigest,
+    registry,
+  );
+  if (!descriptor) return null;
   try {
     const artifact = await descriptor.load();
     const entry = parseBaseReactFlowPrecompiledRouteArtifact(artifact, {

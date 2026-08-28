@@ -35,7 +35,10 @@ import {
   type RoutingWorkerSessionRef,
   type RoutingIdentity,
 } from './baseReactFlowDisplayRoutingSession';
-import { publishBaseReactFlowPrecompiledCommittedRoute } from './baseReactFlowPrecompiledCaptureMode';
+import {
+  publishBaseReactFlowPrecompiledCommittedRoute,
+  type BaseReactFlowPrecompiledLayoutRegeneration,
+} from './baseReactFlowPrecompiledCaptureMode';
 
 const MAX_COMMITTED_DISPLAY_SNAPSHOTS = 16;
 const INPUT_SIGNATURE_PATTERN = /^\d{1,10}$/;
@@ -321,6 +324,9 @@ export type BaseReactFlowDisplaySnapshotCommitOptions = {
   outputRouteSignature: string | null;
   workerSessionRef?: RoutingWorkerSessionRef;
   precompiledCapturePresetId?: string | null;
+  precompiledLayoutCapture?: BaseReactFlowPrecompiledLayoutRegeneration & Readonly<{
+    provenance: 'fresh-layout-repair-validated' | 'fresh-full-route';
+  }>;
 } & CommittedHardReportIdentity;
 
 /** Internal mutation primitive; production callers commit through the Canvas runtime. */
@@ -339,6 +345,16 @@ export const commitBaseReactFlowDisplaySnapshot = (
   if (options.precompiledCapturePresetId) {
     publishBaseReactFlowPrecompiledCommittedRoute({
       presetId: options.precompiledCapturePresetId,
+      inputSignature: options.inputSignature,
+      inputGeometryDigest: options.inputGeometryDigest,
+      outputRouteSignature: snapshot.outputRouteSignature,
+      sourceEdges: options.sourceEdges,
+      displayPatches: options.displayPatches,
+    });
+  }
+  if (options.precompiledLayoutCapture) {
+    publishBaseReactFlowPrecompiledCommittedRoute({
+      ...options.precompiledLayoutCapture,
       inputSignature: options.inputSignature,
       inputGeometryDigest: options.inputGeometryDigest,
       outputRouteSignature: snapshot.outputRouteSignature,

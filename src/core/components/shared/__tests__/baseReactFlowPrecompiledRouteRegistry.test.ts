@@ -157,6 +157,76 @@ describe('baseReactFlowPrecompiledRouteRegistry', () => {
     expect(load).toHaveBeenCalledOnce();
   });
 
+  it('selects an exact geometry digest from a colliding signature bucket', async () => {
+    const wrongLoad = vi.fn(async () => ({
+      ...artifact,
+      inputGeometryDigest: 'geometry-v1:00000000000000000000000000000000',
+    }));
+    const exactLoad = vi.fn(async () => artifact);
+    const registry = {
+      [inputSignature]: [
+        {
+          sourceHash: SOURCE_HASH,
+          geometryDigest: 'geometry-v1:00000000000000000000000000000000',
+          load: wrongLoad,
+        },
+        {
+          sourceHash: SOURCE_HASH,
+          geometryDigest: inputGeometryDigest,
+          load: exactLoad,
+        },
+      ],
+    };
+
+    expect(hasBaseReactFlowPrecompiledRouteCandidateInRegistry(
+      inputSignature,
+      inputGeometryDigest,
+      registry,
+    )).toBe(true);
+    await expect(loadBaseReactFlowPrecompiledRouteCandidateFromRegistry(
+      { ...identityInput, inputSignature, inputGeometryDigest },
+      registry,
+    )).resolves.toEqual(routedEdges);
+    expect(wrongLoad).not.toHaveBeenCalled();
+    expect(exactLoad).toHaveBeenCalledOnce();
+  });
+
+  it('does not load any descriptor when a signature bucket misses the exact digest', async () => {
+    const firstLoad = vi.fn(async () => artifact);
+    const secondLoad = vi.fn(async () => artifact);
+    const registry = {
+      [inputSignature]: [
+        {
+          sourceHash: SOURCE_HASH,
+          geometryDigest: 'geometry-v1:00000000000000000000000000000000',
+          load: firstLoad,
+        },
+        {
+          sourceHash: SOURCE_HASH,
+          geometryDigest: 'geometry-v1:11111111111111111111111111111111',
+          load: secondLoad,
+        },
+      ],
+    };
+    const missingDigest = 'geometry-v1:22222222222222222222222222222222';
+
+    expect(hasBaseReactFlowPrecompiledRouteCandidateInRegistry(
+      inputSignature,
+      missingDigest,
+      registry,
+    )).toBe(false);
+    await expect(loadBaseReactFlowPrecompiledRouteCandidateFromRegistry(
+      {
+        ...identityInput,
+        inputSignature,
+        inputGeometryDigest: missingDigest,
+      },
+      registry,
+    )).resolves.toBeNull();
+    expect(firstLoad).not.toHaveBeenCalled();
+    expect(secondLoad).not.toHaveBeenCalled();
+  });
+
   it('prefetches a known preset once without treating the preset id as route identity', async () => {
     const load = vi.fn(async () => artifact);
     const cache = new Map<string, Promise<boolean>>();

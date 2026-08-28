@@ -77,8 +77,41 @@ export const resolveBaseReactFlowPrecompiledRegenerationPresetIdFromWindow = ():
     })
 );
 
+export type BaseReactFlowPrecompiledLayoutRegeneration = Readonly<{
+  presetId: string;
+  variantId: string;
+}>;
+
+export const resolveBaseReactFlowPrecompiledLayoutRegeneration = ({
+  search,
+  hash,
+}: {
+  search: unknown;
+  hash: unknown;
+}): BaseReactFlowPrecompiledLayoutRegeneration | null => {
+  const presetId = readSingleParameter(search, 'precompiledLayoutRegenerate');
+  const variantId = readSingleParameter(search, 'precompiledLayoutVariant');
+  if (!presetId || !variantId || typeof hash !== 'string') return null;
+  const queryIndex = hash.indexOf('?');
+  if (queryIndex < 0) return null;
+  const activePresetId = readSingleParameter(hash.slice(queryIndex + 1), 'diagram');
+  return activePresetId === presetId ? { presetId, variantId } : null;
+};
+
+export const resolveBaseReactFlowPrecompiledLayoutRegenerationFromWindow = (
+): BaseReactFlowPrecompiledLayoutRegeneration | null => (
+  typeof window === 'undefined'
+    ? null
+    : resolveBaseReactFlowPrecompiledLayoutRegeneration({
+      search: window.location.search,
+      hash: window.location.hash,
+    })
+);
+
 export type BaseReactFlowPrecompiledCommittedRouteCapture = Readonly<{
   presetId: string;
+  variantId?: string;
+  provenance?: 'fresh-layout-repair-validated' | 'fresh-full-route';
   inputSignature: string;
   inputGeometryDigest: string;
   outputRouteSignature: string;
@@ -106,7 +139,17 @@ export const publishBaseReactFlowPrecompiledCommittedRoute = (
     search: window.location.search,
     hash: window.location.hash,
   });
-  if (activePresetId !== capture.presetId) return false;
+  const activeLayout = resolveBaseReactFlowPrecompiledLayoutRegeneration({
+    search: window.location.search,
+    hash: window.location.hash,
+  });
+  const canonicalCaptureMatches = !capture.variantId && activePresetId === capture.presetId;
+  const layoutCaptureMatches = Boolean(
+    capture.variantId
+    && activeLayout?.presetId === capture.presetId
+    && activeLayout.variantId === capture.variantId,
+  );
+  if (!canonicalCaptureMatches && !layoutCaptureMatches) return false;
   try {
     (window as PrecompiledCaptureWindow).__vizlyPrecompiledCommittedRoute = structuredClone(capture);
     return true;

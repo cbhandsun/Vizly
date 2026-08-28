@@ -11,6 +11,8 @@ import type {
   BaseReactFlowRoutingSessionJob,
   BaseReactFlowRoutingSessionRuntime,
 } from '../../shared/baseReactFlowRoutingSessionRuntime';
+import { resolveBaseReactFlowPrecompiledLayoutRegenerationFromWindow } from '../../shared/baseReactFlowPrecompiledCaptureMode';
+import { PRECOMPILED_CAPTURE_WORKER_TIMEOUT_MS } from '../../shared/baseReactFlowDisplayWorkerTimeout';
 
 type LayoutRoutingTransactionRequest = Readonly<{
   nodes: Node[];
@@ -89,6 +91,8 @@ export const useLayoutRoutingTransaction = ({
           edgeCount: edges.length,
           performanceConfig,
         });
+        const precompiledLayoutRegeneration =
+          resolveBaseReactFlowPrecompiledLayoutRegenerationFromWindow();
         const staged = await stageBaseReactFlowLayoutRouting({
           workerRef: routingSessionRuntime.workerRef,
           requestId: `layout:${routingJob.id}`,
@@ -96,6 +100,11 @@ export const useLayoutRoutingTransaction = ({
           sourceNodes: targetNodes,
           isLargeGraph,
           signal: routingJob.signal,
+          forceFreshFullRoute: precompiledLayoutRegeneration !== null,
+          fullRouteTimeoutMs: precompiledLayoutRegeneration
+            ? PRECOMPILED_CAPTURE_WORKER_TIMEOUT_MS
+            : undefined,
+          precompiledLayoutRegeneration,
         });
         if (!routingSessionRuntime.isCurrentJob(routingJob)) {
           throw new Error('layout-routing-cancelled');

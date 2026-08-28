@@ -184,6 +184,114 @@ describe('baseReactFlow layout routing candidate sequence', () => {
     seedAuditSpy.mockRestore();
   });
 
+  it('validates an exact precompiled layout candidate without measured seed repair', async () => {
+    const precompiledCandidate = seedBaseReactFlowStagedLayoutEdges({
+      sourceEdges: edges,
+      sourceNodes: nodes,
+    });
+    const loadPrecompiledCandidate = vi.fn().mockResolvedValue(precompiledCandidate);
+    workerMocks.compute.mockImplementation(successfulCanonicalResult);
+
+    await stageBaseReactFlowLayoutRouting({
+      workerRef: { current: null },
+      requestId: 'layout:precompiled',
+      sourceEdges: edges,
+      sourceNodes: nodes,
+      isLargeGraph: false,
+      loadPrecompiledCandidate,
+    });
+
+    expect(loadPrecompiledCandidate).toHaveBeenCalledOnce();
+    expect(workerMocks.repair).not.toHaveBeenCalled();
+    expect(workerMocks.compute).toHaveBeenCalledOnce();
+    expect(workerMocks.compute.mock.calls[0][0]).toMatchObject({
+      requestId: 'layout:precompiled',
+      cachedCandidateEdges: precompiledCandidate,
+      candidateSource: 'precompiled',
+      qualityMode: 'full',
+    });
+  });
+
+  it('bypasses precompiled layout assets during fresh route generation', async () => {
+    const loadPrecompiledCandidate = vi.fn().mockResolvedValue([]);
+    workerMocks.repair.mockImplementation(async (request: {
+      edges: Edge[];
+      inputSignature: string;
+      inputGeometryDigest: string;
+    }) => successfulResult(request.edges, request));
+    workerMocks.compute.mockImplementation(successfulCanonicalResult);
+
+    await stageBaseReactFlowLayoutRouting({
+      workerRef: { current: null },
+      requestId: 'layout:fresh-generation',
+      sourceEdges: edges,
+      sourceNodes: nodes,
+      isLargeGraph: false,
+      forceFreshFullRoute: true,
+      loadPrecompiledCandidate,
+    });
+
+    expect(loadPrecompiledCandidate).not.toHaveBeenCalled();
+    expect(workerMocks.repair).toHaveBeenCalledOnce();
+  });
+
+  it('canonically validates and publishes a fresh layout artifact with the capture timeout', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      '/?precompiledLayoutRegenerate=wms-process-flow-v1&precompiledLayoutVariant=domain-compound-elk-lr#/?diagram=wms-process-flow-v1',
+    );
+    const loadPrecompiledCandidate = vi.fn().mockResolvedValue([]);
+    workerMocks.repair.mockImplementation(async (request: {
+      edges: Edge[];
+      inputSignature: string;
+      inputGeometryDigest: string;
+    }) => successfulResult(request.edges, request));
+    workerMocks.compute.mockImplementation((request: {
+      edges: Edge[];
+      cachedCandidateEdges?: Edge[];
+      inputSignature: string;
+      inputGeometryDigest: string;
+    }) => ({
+      ...successfulCanonicalResult(request),
+      routeResolution: 'validated-candidate' as const,
+    }));
+
+    const result = await stageBaseReactFlowLayoutRouting({
+      workerRef: { current: null },
+      requestId: 'layout:fresh-capture',
+      sourceEdges: edges,
+      sourceNodes: nodes,
+      isLargeGraph: false,
+      forceFreshFullRoute: true,
+      fullRouteTimeoutMs: 120_000,
+      precompiledLayoutRegeneration: {
+        presetId: 'wms-process-flow-v1',
+        variantId: 'domain-compound-elk-lr',
+      },
+      loadPrecompiledCandidate,
+    });
+
+    expect(workerMocks.repair).toHaveBeenCalledOnce();
+    expect(workerMocks.compute).toHaveBeenCalledOnce();
+    expect(workerMocks.compute.mock.calls[0][0]).toMatchObject({
+      candidateSource: 'persistent',
+      timeoutMs: 120_000,
+    });
+    expect(commitLayoutSnapshot(result)).toBe(true);
+    expect((window as Window & {
+      __vizlyPrecompiledCommittedRoute?: {
+        presetId: string;
+        variantId?: string;
+        provenance?: string;
+      };
+    }).__vizlyPrecompiledCommittedRoute).toMatchObject({
+      presetId: 'wms-process-flow-v1',
+      variantId: 'domain-compound-elk-lr',
+      provenance: 'fresh-layout-repair-validated',
+    });
+  });
+
   it('commits a hard-clean bounded candidate without a second canonical Worker request', async () => {
     workerMocks.repair.mockImplementation(async (request: {
       edges: Edge[];
