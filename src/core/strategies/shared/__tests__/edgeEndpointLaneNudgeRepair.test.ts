@@ -29,6 +29,31 @@ describe('repairEndpointLaneCrossings', () => {
     });
   });
 
+  it('preserves the input array identity when no endpoint lane changes', () => {
+    const edges: Edge[] = [
+      {
+        id: 'upper',
+        source: 'source-upper',
+        target: 'target-upper',
+        data: { computedPath: [{ x: 80, y: 20 }, { x: 320, y: 20 }] },
+      },
+      {
+        id: 'lower',
+        source: 'source-lower',
+        target: 'target-lower',
+        data: { computedPath: [{ x: 80, y: 140 }, { x: 320, y: 140 }] },
+      },
+    ];
+    const nodes = [
+      node('source-upper', 0, 0, 80, 40),
+      node('target-upper', 320, 0, 80, 40),
+      node('source-lower', 0, 120, 80, 40),
+      node('target-lower', 320, 120, 80, 40),
+    ];
+
+    expect(repairEndpointLaneCrossings(edges, nodes)).toBe(edges);
+  });
+
   it('nudges a source point along the same node side when the first branch crosses an unrelated lane', () => {
     const tmsToBms: Edge = {
       id: 'edge-tms-bms',

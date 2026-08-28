@@ -686,12 +686,14 @@ export function repairEndpointLaneCrossings(
     scannedSegmentCount += interactionMetrics.scannedSegmentCount;
   }
 
+  let changed = false;
   const result = edges.map(edge => {
     const original = paths.get(edge.id);
     const path = repaired.get(edge.id);
     if (!original || !path || pathEquals(original, path)) return edge;
+    changed = true;
     return withComputedPath(edge, path);
   });
   reportMetrics();
-  return result;
+  return changed ? result : edges;
 }
