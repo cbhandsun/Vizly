@@ -218,6 +218,7 @@ describe('createBaseReactFlowFinalEndpointEvaluation', () => {
 
     expect(evaluation.endpointOrder(candidate)).not.toBe(evaluation.endpointOrder(edges));
     expect(evaluation.passageOrder(candidate)).not.toBe(evaluation.passageOrder(edges));
+    expect(evaluation.hardReport(candidate)).not.toBe(evaluation.hardReport(edges));
     expect(evaluation.endpointOrder(candidate).movableEndpointCount)
       .toBeLessThan(evaluation.endpointOrder(edges).movableEndpointCount);
   });

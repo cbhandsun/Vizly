@@ -68,7 +68,7 @@ export const createDisplayRoutingSegmentSpatialIndex = (
   expectedOutputRouteSignature?: string,
 ): DisplayRoutingSegmentSpatialIndex | null => {
   if (edges.length > MAX_INDEXED_EDGES) return null;
-  const outputRouteSignature = computeBaseReactFlowDisplayOutputRouteSignature([...edges]);
+  const outputRouteSignature = computeBaseReactFlowDisplayOutputRouteSignature(edges);
   if (
     !outputRouteSignature
     || (

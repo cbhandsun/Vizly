@@ -36,7 +36,7 @@ export const resolveBaseReactFlowCommittedRenderAuthority = (
   if (!baseline.hardReport) {
     return { authority: null, issue: 'missing-hard-report' };
   }
-  if (computeBaseReactFlowDisplayOutputRouteSignature([...edges])
+  if (computeBaseReactFlowDisplayOutputRouteSignature(edges)
       !== baseline.outputRouteSignature) {
     return { authority: null, issue: 'output-signature-mismatch' };
   }

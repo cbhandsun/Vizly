@@ -91,7 +91,7 @@ const routeHandleToken = (value: unknown): string | null => {
  * merged onto the newest source edge without invalidating an otherwise identical route.
  */
 export const computeBaseReactFlowDisplayOutputRouteSignature = (
-  edges: Edge[],
+  edges: readonly Edge[],
 ): string | null => {
   if (!Array.isArray(edges) || edges.length === 0 || edges.length > BASE_DISPLAY_CACHE_MAX_EDGES) {
     return null;

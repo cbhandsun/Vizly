@@ -78,6 +78,78 @@ describe('baseReactFlowDisplayHardGateMemo', () => {
     expect(polished).toEqual({ ...terminalLane, candidate: 'polished' });
   });
 
+  it('skips signature and policy parsing for the same immutable route array', () => {
+    const evaluate = createEvaluator();
+    const memo = createBaseDisplayHardGateMemo(nodes, terminalSnapshot, evaluate);
+    const edge = routedEdge();
+    const data = edge.data;
+    let dataReadCount = 0;
+    Object.defineProperty(edge, 'data', {
+      configurable: true,
+      get: () => {
+        dataReadCount += 1;
+        return data;
+      },
+    });
+    const immutableRoute = [edge] as readonly Edge[];
+
+    const first = memo.getImmutableReport(immutableRoute, 'terminal-lane');
+    const readsAfterFirstEvaluation = dataReadCount;
+    const second = memo.getImmutableReport(immutableRoute, 'polished');
+
+    expect(evaluate).toHaveBeenCalledTimes(1);
+    expect(dataReadCount).toBe(readsAfterFirstEvaluation);
+    expect(second).toEqual({ ...first, candidate: 'polished' });
+    expect(memo.readMetrics().cacheHitCount).toBe(1);
+  });
+
+  it('keeps mutable callers sensitive to in-place route changes', () => {
+    const evaluate = createEvaluator();
+    const memo = createBaseDisplayHardGateMemo(nodes, terminalSnapshot, evaluate);
+    const route = [routedEdge()];
+
+    memo.getReport(route, nodes, 'polished');
+    route[0].data = {
+      ...route[0].data,
+      computedPath: [{ x: 0, y: 0 }, { x: 140, y: 0 }, { x: 140, y: 100 }],
+    };
+    memo.getReport(route, nodes, 'polished');
+
+    expect(evaluate).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not reuse immutable hard reports after path, handle, or policy changes', () => {
+    const evaluate = createEvaluator();
+    const memo = createBaseDisplayHardGateMemo(nodes, terminalSnapshot, evaluate);
+    const baseline = [routedEdge()] as readonly Edge[];
+    const changedPath = [{
+      ...baseline[0],
+      data: {
+        ...baseline[0].data,
+        computedPath: [{ x: 0, y: 0 }, { x: 120, y: 0 }, { x: 120, y: 100 }],
+      },
+    }] as readonly Edge[];
+    const changedHandle = [{
+      ...baseline[0],
+      targetHandle: 'right',
+    }] as readonly Edge[];
+    const constrainedPolicy = [{
+      ...baseline[0],
+      data: {
+        ...baseline[0].data,
+        sourcePortPolicy: 'fixed-pos',
+      },
+    }] as readonly Edge[];
+
+    memo.getImmutableReport(baseline, 'polished');
+    memo.getImmutableReport(changedPath, 'polished');
+    memo.getImmutableReport(changedHandle, 'polished');
+    memo.getImmutableReport(constrainedPolicy, 'polished');
+
+    expect(evaluate).toHaveBeenCalledTimes(4);
+    expect(memo.readMetrics().cacheHitCount).toBe(0);
+  });
+
   it('invalidates the cached report when route geometry changes', () => {
     const evaluate = createEvaluator();
     const memo = createBaseDisplayHardGateMemo(nodes, terminalSnapshot, evaluate);
@@ -108,6 +180,10 @@ describe('baseReactFlowDisplayHardGateMemo', () => {
       scannedNodeCount: 0,
       scannedEdgePairCount: 0,
     });
+
+    memo.getImmutableReport([], 'polished');
+    memo.getImmutableReport([], 'polished');
+    expect(evaluate).toHaveBeenCalledTimes(4);
   });
 
   it('accepts Worker-private signed evidence without repeating its evaluation', () => {
@@ -136,6 +212,19 @@ describe('baseReactFlowDisplayHardGateMemo', () => {
     memo.getReport([routedEdge(120)], nodes, 'polished');
     expect(evaluate).toHaveBeenCalledTimes(1);
     expect(memo.rememberReport([], report)).toBe(false);
+  });
+
+  it('bounds request-local hard reports without weakening exact identity hits', () => {
+    const evaluate = createEvaluator();
+    const memo = createBaseDisplayHardGateMemo(nodes, terminalSnapshot, evaluate);
+    const routes = Array.from({ length: 257 }, (_, index) => [routedEdge(100 + index)]);
+
+    routes.forEach(route => memo.getImmutableReport(route, 'polished'));
+    memo.getImmutableReport(routes[0], 'polished');
+    expect(evaluate).toHaveBeenCalledTimes(257);
+
+    memo.getImmutableReport([routedEdge(100)], 'polished');
+    expect(evaluate).toHaveBeenCalledTimes(258);
   });
 
   it('reports actual scans while a route cache hit adds no scan work', () => {
