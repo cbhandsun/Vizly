@@ -10,6 +10,7 @@ describe('display routing matrix wait-state summary', () => {
     const summary = summarizeDisplayRoutingWaitState({
       stage: 'worker-response',
       requestId: 'layout:2',
+      renderAuthorityStatus: 'accepted',
       stagedLayoutPrimarySignature: '123456',
       stagedLayoutPrimaryGeometryDigest: 'geometry-v1:0123456789abcdef0123456789abcdef',
       layoutSeedTerminalsAttached: false,
@@ -52,6 +53,8 @@ describe('display routing matrix wait-state summary', () => {
     expect(summary).toMatchObject({
       routing: {
         stage: 'worker-response',
+        requestId: 'layout:2',
+        renderAuthorityStatus: 'accepted',
         requestKind: 'layout',
         stagedLayoutPrimarySignature: '123456',
         stagedLayoutPrimaryGeometryDigest: 'geometry-v1:0123456789abcdef0123456789abcdef',
@@ -64,6 +67,7 @@ describe('display routing matrix wait-state summary', () => {
       },
       responseCount: 1,
       responseTrace: [{
+        requestId: 'route-v2:opaque:4',
         requestKind: 'display',
         routeResolution: 'full-route-repaired',
         hardClean: false,
@@ -71,6 +75,7 @@ describe('display routing matrix wait-state summary', () => {
         edgeObjectFingerprint: expect.stringMatching(/^\d+$/),
       }],
       requestTrace: [{
+        requestId: 'layout:2',
         requestKind: 'layout',
         inputSignature: '123456',
         inputGeometryDigest: 'geometry-v1:0123456789abcdef0123456789abcdef',
@@ -82,6 +87,7 @@ describe('display routing matrix wait-state summary', () => {
         edgeObjectFingerprint: expect.stringMatching(/^\d+$/),
       }],
       lastResponse: {
+        requestId: 'route-v2:opaque:4',
         requestKind: 'display',
         routeResolution: 'full-route-repaired',
         hardClean: false,

@@ -109,7 +109,9 @@ export const summarizeDisplayRoutingWaitState = (
   return {
     routing: {
       stage: token(routing.stage),
+      requestId: token(routing.requestId),
       requestKind: requestKind(routing.requestId),
+      renderAuthorityStatus: token(routing.renderAuthorityStatus),
       workerResolution: token(routing.workerResolution),
       nodeCount: integer(routing.nodeCount),
       edgeCount: integer(routing.edgeCount),
@@ -136,6 +138,7 @@ export const summarizeDisplayRoutingWaitState = (
       const candidate = record(value);
       const identity = record(candidate.nextIdentity ?? record(candidate.sessionRef).identity);
       return {
+        requestId: token(candidate.requestId),
         requestKind: requestKind(candidate.requestId),
         routeResolution: token(candidate.routeResolution),
         hardClean: typeof candidate.hardClean === 'boolean' ? candidate.hardClean : undefined,
@@ -150,6 +153,7 @@ export const summarizeDisplayRoutingWaitState = (
     requestTrace: requests.slice(-16).map((value) => {
       const request = record(value);
       return {
+        requestId: token(request.requestId),
         requestKind: requestKind(request.requestId),
         inputSignature: identityToken(request.inputSignature ?? request.nextInputSignature),
         inputGeometryDigest: identityToken(
@@ -168,6 +172,7 @@ export const summarizeDisplayRoutingWaitState = (
       };
     }),
     lastResponse: {
+      requestId: token(response.requestId),
       requestKind: requestKind(response.requestId),
       routeResolution: token(response.routeResolution),
       hardClean: typeof response.hardClean === 'boolean' ? response.hardClean : undefined,

@@ -32,7 +32,6 @@ import {
 } from './baseReactFlowDisplayWorkerTimeout';
 import { recordBaseReactFlowRejectedDisplayDiagnostics } from './baseReactFlowDisplayRejectedDiagnostics';
 import { repairAxisMismatchedTerminalsWithBoundedPortRoles } from './baseReactFlowDisplayTerminalPortRepair';
-import { baseReactFlowDisplayCommercialQualityIsClean } from './baseReactFlowDisplayCommercialQuality';
 import { repairResidualHairpinBridges } from '../../strategies/shared/edgeHairpinBridgeWidenRepair';
 import { clearBaseReactFlowLayoutEdgeRoutingData } from './baseReactFlowLayoutEdgeRoutingData';
 import { updateDisplayRoutingDebugState } from './baseReactFlowDisplayRoutingDebug';
@@ -519,25 +518,6 @@ export const stageBaseReactFlowLayoutRouting = async ({
       inputSignature: projectedIdentity.cacheSignature,
       inputGeometryDigest: projectedIdentity.geometryDigest,
     });
-  if (
-    candidateRepairResult?.hardClean
-    && baseReactFlowDisplayCommercialQualityIsClean(candidateRepairResult.edges)
-    && !precompiledLayoutRegeneration
-  ) {
-    const boundedCommit = commitBaseReactFlowStagedLayoutRoutingResult({
-      sourceEdges: unseededSourceEdges,
-      sourceNodes: projectedSource.nodes,
-      workerResult: candidateRepairResult,
-      enableSmartEdges,
-      smartEdgePadding,
-      isLargeGraph,
-      // The repair session is seeded-edge-relative. The committed snapshot
-      // remains canonical and portable, but must not advertise that session
-      // as an incremental baseline for the unseeded source graph.
-      retainWorkerSession: false,
-    });
-    if (boundedCommit) return boundedCommit;
-  }
   // The bounded repair uses seeded paths as its working source. Promote its
   // result through a canonical source-edge request before committing so the
   // Worker-private session stores source -> final patches under the same

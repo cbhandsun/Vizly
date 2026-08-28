@@ -349,7 +349,7 @@ describe('baseReactFlow layout routing candidate sequence', () => {
     });
   });
 
-  it('commits a hard-clean bounded candidate without a second canonical Worker request', async () => {
+  it('promotes a hard-clean bounded candidate through the canonical Worker identity', async () => {
     workerMocks.repair.mockImplementation(async (request: {
       edges: Edge[];
       inputSignature: string;
@@ -373,7 +373,12 @@ describe('baseReactFlow layout routing candidate sequence', () => {
       requireHardClean: false,
       timeoutMs: 12_000,
     });
-    expect(workerMocks.compute).not.toHaveBeenCalled();
+    expect(workerMocks.compute).toHaveBeenCalledOnce();
+    expect(workerMocks.compute.mock.calls[0][0]).toMatchObject({
+      requestId: 'layout:1',
+      cachedCandidateEdges: expect.any(Array),
+      candidateSource: 'persistent',
+    });
     expect(readDisplayRoutingDebugState()).toMatchObject({
       layoutSeedTerminalsAttached: true,
       layoutSeedTerminalsAnchored: true,
@@ -402,7 +407,13 @@ describe('baseReactFlow layout routing candidate sequence', () => {
       type: result.routedEdges[0].type,
       data: { computedPath: result.routedEdges[0].data?.computedPath },
     });
-    expect(replay?.baseline.workerSessionRef).toBeUndefined();
+    expect(replay?.baseline.workerSessionRef).toMatchObject({
+      identity: {
+        inputSignature: identity.cacheSignature,
+        inputGeometryDigest: identity.geometryDigest,
+      },
+      outputRouteSignature: replay?.outputRouteSignature,
+    });
     expect(replay?.baseline.projectedSourceGeometry).toEqual(projected);
   });
 
@@ -471,6 +482,7 @@ describe('baseReactFlow layout routing candidate sequence', () => {
       isLargeGraph: false,
     });
     expect(workerMocks.repair).toHaveBeenCalledOnce();
+    expect(workerMocks.compute).toHaveBeenCalledOnce();
     await stageBaseReactFlowLayoutRouting({
       workerRef: { current: null },
       requestId: 'layout:cached-shifted',
@@ -490,7 +502,7 @@ describe('baseReactFlow layout routing candidate sequence', () => {
       },
     });
     expect(workerMocks.repair).toHaveBeenCalledTimes(2);
-    expect(workerMocks.compute).not.toHaveBeenCalled();
+    expect(workerMocks.compute).toHaveBeenCalledTimes(2);
   });
 
   it('keeps a structurally dirty hard-clean repair on the canonical fallback path', async () => {
