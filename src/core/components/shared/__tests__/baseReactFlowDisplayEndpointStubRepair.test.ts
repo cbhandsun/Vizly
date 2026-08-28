@@ -5,6 +5,7 @@ import { calculateEdgePathQualityScore } from '../../../strategies/shared/edgeSt
 import * as edgeStrictCrossingGuard from '../../../strategies/shared/edgeStrictCrossingGuard';
 import * as waypointCandidateRepair from '../../../strategies/shared/edgeWaypointCandidateRepair';
 import * as displayEvaluation from '../baseReactFlowDisplayEvaluation';
+import * as terminalValidation from '../baseReactFlowTerminalValidation';
 import { buildSafeEndpointSideStepCandidates } from '../baseReactFlowDisplayEndpointStubCandidates';
 import {
   countRenderUnsafeEndpointStubs,
@@ -159,6 +160,37 @@ describe('baseReactFlowDisplayEndpointStubRepair', () => {
     expect((unsafeEdges[0].data as any).computedPath).toEqual(originalUnsafePath);
   });
 
+  it('does not initialize repair contexts for an already render-safe route', () => {
+    const clearanceSpy = vi.spyOn(
+      waypointCandidateRepair,
+      'createNodeClearanceGraphEvaluationContext',
+    );
+    const qualityContextSpy = vi.spyOn(
+      edgeStrictCrossingGuard,
+      'createEdgePathQualityEvaluationContext',
+    );
+    const obstacleContextSpy = vi.spyOn(
+      displayEvaluation,
+      'createDisplayObstacleEvaluationContext',
+    );
+    const terminalValidationSpy = vi.spyOn(
+      terminalValidation,
+      'createDisplayTerminalValidationSnapshot',
+    );
+    const cleanEdges = [edgeWithPath('safe-fast-path', [
+      { x: 0, y: 0 },
+      { x: 64, y: 0 },
+      { x: 64, y: 100 },
+      { x: 300, y: 100 },
+    ])];
+
+    expect(repairRenderSafeEndpointStubs(cleanEdges, [])).toBe(cleanEdges);
+    expect(clearanceSpy).not.toHaveBeenCalled();
+    expect(qualityContextSpy).not.toHaveBeenCalled();
+    expect(obstacleContextSpy).not.toHaveBeenCalled();
+    expect(terminalValidationSpy).not.toHaveBeenCalled();
+  });
+
   it('reuses transaction evaluation contexts across a multi-pass repair', () => {
     const clearanceSpy = vi.spyOn(
       waypointCandidateRepair,
@@ -171,6 +203,10 @@ describe('baseReactFlowDisplayEndpointStubRepair', () => {
     const obstacleContextSpy = vi.spyOn(
       displayEvaluation,
       'createDisplayObstacleEvaluationContext',
+    );
+    const terminalValidationSpy = vi.spyOn(
+      terminalValidation,
+      'createDisplayTerminalValidationSnapshot',
     );
     const edges = [
       edgeWithPath('first-short', [
@@ -194,5 +230,6 @@ describe('baseReactFlowDisplayEndpointStubRepair', () => {
     expect(clearanceSpy).toHaveBeenCalledTimes(1);
     expect(qualityContextSpy).toHaveBeenCalledTimes(1);
     expect(obstacleContextSpy).toHaveBeenCalledTimes(1);
+    expect(terminalValidationSpy).toHaveBeenCalledTimes(1);
   });
 });

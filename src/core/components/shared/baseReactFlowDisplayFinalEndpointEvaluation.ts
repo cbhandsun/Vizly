@@ -278,6 +278,7 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
         nodes,
         maxEvaluations,
         evaluateEndpointOrder,
+        terminalSnapshot,
       );
       if (edges.length <= MAX_REQUEST_LOCAL_STUB_REPAIR_EDGE_SLOTS) {
         while (

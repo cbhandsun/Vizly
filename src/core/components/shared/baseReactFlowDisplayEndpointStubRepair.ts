@@ -32,6 +32,8 @@ import {
 } from './baseReactFlowDisplayAtomicTransactionEvaluation';
 import { createDisplayDeclaredAxisMismatchCounter } from './baseReactFlowDisplayDeclaredAxisTransaction';
 import { eligibleCommercialClearanceDoesNotRegress } from './baseReactFlowDisplayBusinessNodeClearance';
+import { createDisplayTerminalValidationSnapshot } from './baseReactFlowTerminalValidation';
+import type { DisplayTerminalValidationSnapshot } from './baseReactFlowTerminalValidation';
 
 export const MIN_RENDER_SAFE_ENDPOINT_STUB = 56;
 const MAX_FINAL_ENDPOINT_STUB_REPAIR_EVALUATIONS = 8;
@@ -196,7 +198,9 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
   nodes: Node[],
   maxEvaluations = 64,
   endpointOrder?: AtomicEndpointOrderEvaluation,
+  reusableTerminalValidation?: DisplayTerminalValidationSnapshot,
 ): T => {
+  if (countRenderUnsafeEndpointStubs(edges) === 0) return edges;
   let current = edges;
   let evaluations = 0;
   const skippedEdgeIds = new Set<string>();
@@ -207,6 +211,8 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
   // rebuilding both for every candidate gate.
   const clearance = createNodeClearanceGraphEvaluationContext(nodes);
   const obstacleContext = createDisplayObstacleEvaluationContext(edges, nodes);
+  const terminalValidation = reusableTerminalValidation
+    ?? createDisplayTerminalValidationSnapshot(nodes);
   const obstacleChangedIndexes = new Set<number>();
   for (let pass = 0; pass < edges.length && evaluations < maxEvaluations; pass += 1) {
     const baselineIssues = countRenderUnsafeEndpointStubs(current);
@@ -234,6 +240,7 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
       baselineObstacleChangedIndexes,
       baselineObstacleHits,
       endpointOrder,
+      terminalValidation,
     });
     const countAxisMismatches = createDisplayDeclaredAxisMismatchCounter(nodes);
     const baselineAxisMismatches = current.map(countAxisMismatches);

@@ -13,6 +13,7 @@ import {
   visualPolishHardQualityDoesNotRegress,
 } from './baseReactFlowDisplayEvaluation';
 import { createDisplayTerminalValidationSnapshot } from './baseReactFlowTerminalAxisRepair';
+import type { DisplayTerminalValidationSnapshot } from './baseReactFlowTerminalValidation';
 import { preservesInitialTrueTrunksWithinClearanceMargin } from './baseReactFlowDisplayTrueTrunkContract';
 
 export type AtomicEndpointOrderEvaluation = (
@@ -36,13 +37,15 @@ export const createAtomicRouteTransactionEvaluation = <T extends Edge[]>(
     baselineObstacleChangedIndexes?: readonly number[];
     baselineObstacleHits: number;
     endpointOrder?: AtomicEndpointOrderEvaluation;
+    terminalValidation?: DisplayTerminalValidationSnapshot;
   }>,
 ) => {
   const qualityContext = reusable?.qualityContext
     ?? createEdgePathQualityEvaluationContext(baselineEdges);
   const obstacleContext = reusable?.obstacleContext
     ?? createDisplayObstacleEvaluationContext(baselineEdges, nodes);
-  const terminalValidation = createDisplayTerminalValidationSnapshot(nodes);
+  const terminalValidation = reusable?.terminalValidation
+    ?? createDisplayTerminalValidationSnapshot(nodes);
   const canValidateTerminals = nodes.length > 0;
   const baselineQuality = reusable?.baselineQuality ?? qualityContext.evaluate(baselineEdges);
   const baselineObstacleHits = reusable?.baselineObstacleHits
