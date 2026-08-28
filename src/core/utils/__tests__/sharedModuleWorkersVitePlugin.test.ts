@@ -296,6 +296,7 @@ const worker = new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', impor
 
   it('loads only the active locale on the initial application path', () => {
     const i18nSource = readFileSync(resolve(process.cwd(), 'src/i18n.ts'), 'utf8');
+    const mainSource = readFileSync(resolve(process.cwd(), 'src/main.tsx'), 'utf8');
 
     expect(i18nSource).toContain("import enLocaleUrl from './locales/en.json?url'");
     expect(i18nSource).toContain("import zhLocaleUrl from './locales/zh.json?url'");
@@ -306,6 +307,9 @@ const worker = new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', impor
     expect(i18nSource).toContain('loadLocaleResource(enLocaleUrl)');
     expect(i18nSource).toContain('loadLocaleResource(zhLocaleUrl)');
     expect(i18nSource).toContain('fallbackLng: false');
+    expect(i18nSource).toContain('export const i18nReady: Promise<void>');
+    expect(mainSource).toContain("import { i18nReady } from './i18n'");
+    expect(mainSource).toContain('void i18nReady.then(() =>');
   });
 
   it('keeps theme presets behind the asynchronous preset loader', () => {

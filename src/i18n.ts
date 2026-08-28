@@ -27,7 +27,7 @@ const localeBackend: BackendModule = {
     },
 };
 
-i18n
+export const i18nReady: Promise<void> = i18n
     // detect user language
     // learn more: https://github.com/i18next/i18next-browser-languagedetector
     .use(LanguageDetector)
@@ -46,7 +46,8 @@ i18n
         interpolation: {
             escapeValue: false, // not needed for react as it escapes by default
         },
-    });
+    })
+    .then(() => undefined, () => undefined);
 
 i18n.on('languageChanged', (language) => {
     syncDocumentLanguage(language, typeof document === 'undefined' ? null : document);

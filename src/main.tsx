@@ -9,11 +9,9 @@ import { initializeApplicationRuntime } from './main/bootstrapApplication';
 import { installVitePreloadErrorRecovery } from './main/preloadErrorRecovery';
 import { prewarmDisplayRoutingForLocation } from './main/prewarmDisplayRouting';
 import App from './App';
+import { i18nReady } from './i18n';
 import './index.css'; // Tailwind CSS
 import './main.css'; // 保留您项目全局的基础CSS
-
-// Initialize i18n
-import './i18n';
 
 installVitePreloadErrorRecovery();
 initializeApplicationRuntime();
@@ -24,8 +22,10 @@ void prewarmDisplayRoutingForLocation(window.location);
  * - 使用 ESM 命名导入（createRoot），避免默认导出在生产包中出现空对象的兼容问题
  * - 在 root 容器上挂载 React 严格模式包裹的应用
  */
-createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-);
+void i18nReady.then(() => {
+  createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>,
+  );
+});
