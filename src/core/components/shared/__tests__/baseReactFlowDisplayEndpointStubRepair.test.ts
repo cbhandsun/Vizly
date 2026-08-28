@@ -147,6 +147,34 @@ describe('baseReactFlowDisplayEndpointStubRepair', () => {
     expect(diagnostics.knownQualityStrictReuseCount).toBeGreaterThan(0);
   });
 
+  it('does not run strict fallback repairs after the evaluation budget is exhausted', () => {
+    const short = edgeWithPath('budgeted-short-source', [
+      { x: 0, y: 0 },
+      { x: 48, y: 0 },
+      { x: 48, y: 100 },
+      { x: 300, y: 100 },
+    ]);
+    const blocker = edgeWithPath('budgeted-blocker', [
+      { x: 52, y: -20 },
+      { x: 52, y: 20 },
+    ]);
+    const diagnostics = createStrictCrossingRepairDiagnostics();
+
+    const repaired = repairRenderSafeEndpointStubs(
+      [short, blocker],
+      [],
+      1,
+      undefined,
+      undefined,
+      diagnostics,
+    );
+
+    expect(repaired).toEqual([short, blocker]);
+    expect(diagnostics.strictFallbackInvocationCount).toBe(1);
+    expect(diagnostics.strictSweepInvocationCount).toBe(0);
+    expect(diagnostics.residualRepairInvocationCount).toBe(0);
+  });
+
   it('preserves identity for an unchanged path and never mutates a repaired input', () => {
     const cleanEdges = [edgeWithPath('already-safe', [
       { x: 0, y: 0 },

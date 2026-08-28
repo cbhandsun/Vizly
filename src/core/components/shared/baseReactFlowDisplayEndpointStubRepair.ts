@@ -285,11 +285,13 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
       ) {
         if (strictDiagnostics) strictDiagnostics.strictFallbackInvocationCount += 1;
         qualityContext.rememberState?.(candidate, initialQualityState);
-        variants.push(
-          ...buildStrictCrossingCompanionShiftVariants(candidate, edgeIndex),
-          finalStrictDisplaySweep(candidate, nodes, strictDiagnostics),
-          repairFinalResidualStrictCrossings(candidate, nodes, strictDiagnostics),
-        );
+        variants.push(...buildStrictCrossingCompanionShiftVariants(candidate, edgeIndex));
+        if (evaluations + variants.length < maxEvaluations) {
+          variants.push(finalStrictDisplaySweep(candidate, nodes, strictDiagnostics));
+        }
+        if (evaluations + variants.length < maxEvaluations) {
+          variants.push(repairFinalResidualStrictCrossings(candidate, nodes, strictDiagnostics));
+        }
       }
       const evaluatedVariantReferences = new Set<T>();
       for (const variant of variants) {

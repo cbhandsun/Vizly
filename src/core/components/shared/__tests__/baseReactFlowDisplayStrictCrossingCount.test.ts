@@ -47,6 +47,33 @@ describe('displayStrictCrossingsFromKnownQuality', () => {
     expect(metrics.knownQualityStrictReuseCount).toBe(0);
   });
 
+  it('keeps the render-normalization fallback for redundant collinear waypoints', () => {
+    const metrics = { knownQualityStrictReuseCount: 0 };
+    const splitVertical: Edge = {
+      id: 'split-vertical',
+      source: 'shared',
+      target: 'vertical-target',
+      data: { computedPath: [
+        { x: 40, y: 0 },
+        { x: 40, y: 60 },
+        { x: 40, y: 100 },
+      ] },
+    };
+    const horizontal: Edge = {
+      id: 'horizontal',
+      source: 'shared',
+      target: 'horizontal-target',
+      data: { computedPath: [{ x: 0, y: 60 }, { x: 80, y: 60 }] },
+    };
+
+    expect(displayStrictCrossingsFromKnownQuality(
+      [splitVertical, horizontal],
+      { strictCrossings: 0 },
+      metrics,
+    )).toBe(1);
+    expect(metrics.knownQualityStrictReuseCount).toBe(0);
+  });
+
   it('keeps the full-quality strict count equivalent to the strict-only evaluator', () => {
     const crossingEdges: Edge[] = [
       {
