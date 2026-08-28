@@ -97,12 +97,21 @@ export const repairFinalShortEndpointStubs = <T extends Edge[]>(edges: T, nodes:
           finalStrictDisplaySweep(candidateEdges, nodes),
         );
       }
+      const evaluatedVariantReferences = new Set<T>();
       for (const variantEdges of variants) {
         if (qualityEvaluations >= MAX_FINAL_ENDPOINT_STUB_REPAIR_EVALUATIONS) break;
         qualityEvaluations += 1;
-        const candidateQuality = evaluateDisplayQualityCandidate(qualityContext, edges, variantEdges);
-        const candidateObstacleHits = evaluateDisplayObstacleCandidate(obstacleContext, edges, variantEdges);
-        const candidateEndpointStubIssues = countDisplayShortEndpointStubs(variantEdges, MIN_DISPLAY_ENDPOINT_STUB);
+        if (evaluatedVariantReferences.has(variantEdges)) continue;
+        evaluatedVariantReferences.add(variantEdges);
+        const candidateQuality = variantEdges === candidateEdges
+          ? initialQuality
+          : evaluateDisplayQualityCandidate(qualityContext, edges, variantEdges);
+        const candidateObstacleHits = variantEdges === candidateEdges
+          ? initialObstacleHits
+          : evaluateDisplayObstacleCandidate(obstacleContext, edges, variantEdges);
+        const candidateEndpointStubIssues = variantEdges === candidateEdges
+          ? initialEndpointStubIssues
+          : countDisplayShortEndpointStubs(variantEdges, MIN_DISPLAY_ENDPOINT_STUB);
         const allowSevereStubExpansionHairpin = shortest <= 16
           && candidateEndpointStubIssues < bestEndpointStubIssues
           && candidateQuality.strictCrossings <= bestQuality.strictCrossings

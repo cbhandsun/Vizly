@@ -11,6 +11,7 @@ import { createStrictCrossingRepairDiagnostics } from '../baseReactFlowDisplaySt
 import { buildSafeEndpointSideStepCandidates } from '../baseReactFlowDisplayEndpointStubCandidates';
 import {
   countRenderUnsafeEndpointStubs,
+  repairFinalShortEndpointStubs,
   repairRenderSafeEndpointStubs,
 } from '../baseReactFlowDisplayEndpointStubRepair';
 
@@ -172,6 +173,24 @@ describe('baseReactFlowDisplayEndpointStubRepair', () => {
     const repaired = repairRenderSafeEndpointStubs(unsafeEdges, []);
     expect(repaired).not.toBe(unsafeEdges);
     expect((unsafeEdges[0].data as any).computedPath).toEqual(originalUnsafePath);
+  });
+
+  it('reuses initial short-stub evidence for the first bounded variant', () => {
+    const qualitySpy = vi.spyOn(displayEvaluation, 'evaluateDisplayQualityCandidate');
+    const obstacleSpy = vi.spyOn(displayEvaluation, 'evaluateDisplayObstacleCandidate');
+    const edges = [edgeWithPath('short-evidence', [
+      { x: 0, y: 0 },
+      { x: 16, y: 0 },
+      { x: 16, y: 100 },
+      { x: 300, y: 100 },
+    ])];
+
+    const repaired = repairFinalShortEndpointStubs(edges, []);
+
+    expect(repaired).not.toBe(edges);
+    expect(calculateEdgePathQualityScore(repaired).shortEndpointStubs).toBe(0);
+    expect(qualitySpy).toHaveBeenCalledTimes(8);
+    expect(obstacleSpy).toHaveBeenCalledTimes(8);
   });
 
   it('does not initialize repair contexts for an already render-safe route', () => {
