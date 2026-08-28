@@ -51,6 +51,26 @@ it('reconstructs a candidate-validation hit that commits without a Worker respon
 });
 
 describe('candidate-only completion is fail closed', () => {
+  it('does not pair a newer prefixed response with an older final-applied request', () => {
+    expect(resolveDisplayRoutingFinalRouteSnapshot({
+      routing: {
+        stage: 'final-applied',
+        requestId: 'layout:7',
+        renderAuthorityStatus: 'accepted',
+      },
+      requests: [request, { ...request, requestId: 'layout:8:candidate-repair' }],
+      responses: [{
+        requestId: 'layout:8:candidate-repair',
+        hardClean: true,
+        hardReport: { hardClean: true },
+        edges: [{ id: 'a-b' }],
+      }],
+      currentEdges: [{ id: 'a-b' }],
+      renderedEdgeCount: 1,
+      expectedRequestPrefix: 'layout:',
+    })).toBeNull();
+  });
+
   it.each([
     ['no validation hit', {
       stage: 'final-applied', requestId: 'layout:7', renderAuthorityStatus: 'accepted', phaseProgressTrace: [],

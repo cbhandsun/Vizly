@@ -36,9 +36,8 @@ export const resolveDisplayRoutingFinalRouteSnapshot = ({
   const response = [...safeResponses].reverse().find(item => (
     isRecord(item)
     && typeof item.requestId === 'string'
-    && (expectedRequestPrefix
-      ? item.requestId.startsWith(expectedRequestPrefix)
-      : item.requestId === routing.requestId)
+    && item.requestId === routing.requestId
+    && (!expectedRequestPrefix || item.requestId.startsWith(expectedRequestPrefix))
     && item.hardClean === true
     && Array.isArray(item.edges)
     && isRecord(item.hardReport)
