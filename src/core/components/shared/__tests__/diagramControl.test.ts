@@ -9,8 +9,16 @@ import {
   MIN_DIAGRAM_FULL_FIT_ZOOM,
   resolveDiagramFitLayout,
 } from '../diagramControlFit';
+import {
+  claimLayoutCommitFitRequest,
+  DIAGRAM_CONTROL_REQUEST_EVENT,
+  requestLayoutCommitFit,
+  resolveLayoutCommitFitRequest,
+} from '../diagramControlRequest';
 
-const logDiagramControlDispatchFailure = vi.fn();
+const { logDiagramControlDispatchFailure } = vi.hoisted(() => ({
+  logDiagramControlDispatchFailure: vi.fn(),
+}));
 
 vi.mock('../diagramControlLogging', () => ({
   logDiagramControlDispatchFailure,
@@ -18,6 +26,7 @@ vi.mock('../diagramControlLogging', () => ({
 
 describe('diagramControl', () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     logDiagramControlDispatchFailure.mockReset();
   });
@@ -70,6 +79,50 @@ describe('diagramControl', () => {
       y: expect.any(Number),
       zoom: expect.any(Number),
     }));
+  });
+
+  it('returns unhandled when no bridge claims a layout commit fit', async () => {
+    const controller = new AbortController();
+    await expect(requestLayoutCommitFit({ signal: controller.signal })).resolves.toBe('unhandled');
+  });
+
+  it('keeps request capabilities private and resolves a claimed request once', async () => {
+    const controller = new AbortController();
+    let claimedEvent: Event | null = null;
+    const listener = (event: Event) => {
+      claimedEvent = event;
+      const request = claimLayoutCommitFitRequest(event);
+      expect(request).toEqual(expect.objectContaining({ signal: expect.any(AbortSignal) }));
+      expect((event as CustomEvent).detail).not.toHaveProperty('resolve');
+    };
+    window.addEventListener(DIAGRAM_CONTROL_REQUEST_EVENT, listener);
+
+    const result = requestLayoutCommitFit({ diagramId: 'diagram-1', signal: controller.signal });
+    expect(claimedEvent).not.toBeNull();
+    expect(resolveLayoutCommitFitRequest(claimedEvent!, 'applied')).toBe(true);
+    expect(resolveLayoutCommitFitRequest(claimedEvent!, 'failed')).toBe(false);
+    await expect(result).resolves.toBe('applied');
+
+    window.removeEventListener(DIAGRAM_CONTROL_REQUEST_EVENT, listener);
+  });
+
+  it('rejects forged events and cancels or times out claimed requests', async () => {
+    expect(claimLayoutCommitFitRequest(new CustomEvent(DIAGRAM_CONTROL_REQUEST_EVENT, {
+      detail: { schema: 'vizly-diagram-control-request-v1', action: 'fit', mode: 'layout-commit' },
+    }))).toBeNull();
+
+    const preAborted = new AbortController();
+    preAborted.abort();
+    await expect(requestLayoutCommitFit({ signal: preAborted.signal })).resolves.toBe('cancelled');
+
+    vi.useFakeTimers();
+    const controller = new AbortController();
+    const listener = (event: Event) => { claimLayoutCommitFitRequest(event); };
+    window.addEventListener(DIAGRAM_CONTROL_REQUEST_EVENT, listener);
+    const timedOut = requestLayoutCommitFit({ signal: controller.signal });
+    await vi.advanceTimersByTimeAsync(500);
+    await expect(timedOut).resolves.toBe('timed-out');
+    window.removeEventListener(DIAGRAM_CONTROL_REQUEST_EVENT, listener);
   });
 
   it('reserves mobile chrome and quick-action space when fitting content', () => {

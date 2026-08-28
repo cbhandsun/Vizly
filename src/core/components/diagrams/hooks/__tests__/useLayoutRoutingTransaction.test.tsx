@@ -163,6 +163,56 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
     await act(async () => layoutPromise);
   });
 
+  it('keeps the preview barrier until the committed viewport is painted', async () => {
+    let releaseViewport: (() => void) | undefined;
+    const beforePreviewRelease = vi.fn(() => new Promise<void>(resolve => {
+      releaseViewport = resolve;
+    }));
+    const options = createOptions();
+    const routingJob = options.routingSessionRuntime.beginJob('layout');
+    const { result } = renderHook(() => useLayoutRoutingTransaction(options));
+    let layoutPromise: Promise<void> | undefined;
+
+    act(() => {
+      layoutPromise = result.current({
+        nodes,
+        edges,
+        routingJob,
+        beforePreviewRelease,
+      });
+    });
+
+    await waitFor(() => expect(beforePreviewRelease).toHaveBeenCalledOnce());
+    expect(options.setNodes).toHaveBeenCalledWith(nodes);
+    expect(options.setEdges).toHaveBeenCalledWith(edges);
+    expect(options.clearLayoutPreview).not.toHaveBeenCalled();
+    expect(options.setLayoutStable).not.toHaveBeenLastCalledWith(true);
+
+    releaseViewport?.();
+    await act(async () => layoutPromise);
+
+    expect(options.clearLayoutPreview).toHaveBeenCalledWith(routingJob);
+    expect(options.setLayoutStable).toHaveBeenLastCalledWith(true);
+  });
+
+  it('fails open for the current preview when viewport painting fails', async () => {
+    const options = createOptions();
+    const routingJob = options.routingSessionRuntime.beginJob('layout');
+    const { result } = renderHook(() => useLayoutRoutingTransaction(options));
+
+    await act(async () => {
+      await expect(result.current({
+        nodes,
+        edges,
+        routingJob,
+        beforePreviewRelease: () => Promise.reject(new Error('fit failed')),
+      })).rejects.toThrow('fit failed');
+    });
+
+    expect(options.clearLayoutPreview).toHaveBeenCalledWith(routingJob);
+    expect(options.setLayoutStable).toHaveBeenLastCalledWith(true);
+  });
+
   it('restores the old graph when current-job routing fails', async () => {
     mocks.stageLayoutRouting.mockRejectedValueOnce(new Error('routing failed'));
     const options = createOptions();

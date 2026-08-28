@@ -5,12 +5,26 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   createBaseReactFlowExportStateHandlers,
   isUsableBaseReactFlowViewport,
+  resolveBaseReactFlowContainerClassName,
   resolveBaseReactFlowInitialFitMode,
   restoreBaseReactFlowViewportOnInit,
   syncBaseReactFlowZoomClass,
 } from '../baseReactFlowViewport';
 
 describe('baseReactFlowViewport', () => {
+  it('preserves semantic zoom when the layout committing class is released', () => {
+    expect(resolveBaseReactFlowContainerClassName({
+      baseClassName: 'diagram-preview-root',
+      isLayoutStable: true,
+      zoomedOut: true,
+    })).toBe('diagram-preview-root diagram-zoomed-out');
+    expect(resolveBaseReactFlowContainerClassName({
+      baseClassName: 'diagram-preview-root',
+      isLayoutStable: false,
+      zoomedOut: true,
+    })).toBe('diagram-preview-root diagram-zoomed-out vizly-layout-committing');
+  });
+
   it('toggles the zoomed-out class based on viewport zoom', () => {
     const container = document.createElement('div');
 

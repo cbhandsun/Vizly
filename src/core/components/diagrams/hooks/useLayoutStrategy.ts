@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { Node, Edge, ReactFlowInstance } from '@xyflow/react';
-import { dispatchDiagramControl } from '../../shared/diagramControl';
+import { requestLayoutCommitFit } from '../../shared/diagramControlRequest';
 import { applyLayout, forceDirectedLayout, treeLayout } from '../../../utils/LayoutAlgorithms';
 import { getQueryOrHashParamFromLocation } from '../../../utils/inputBoundary';
 import {
@@ -107,11 +107,14 @@ export function useLayoutStrategy({
     // Remember the domain-internal arrangement across temporary global modes.
     const [lastNodeLayout, setLastNodeLayout] = useState<string>('dagre');
     const elkLayoutExecutorRef = useRef<ElkLayoutExecutor | null>(null);
+    const layoutFitControllerRef = useRef<AbortController | null>(null);
 
     useEffect(() => {
         const executor = createLazyElkLayoutExecutor();
         elkLayoutExecutorRef.current = executor;
         return () => {
+            layoutFitControllerRef.current?.abort();
+            layoutFitControllerRef.current = null;
             if (elkLayoutExecutorRef.current === executor) {
                 elkLayoutExecutorRef.current = null;
             }
@@ -119,12 +122,6 @@ export function useLayoutStrategy({
         };
     }, []);
 
-    // [FIX] 精准两步 fitView：调用统一的 diagramControl 'fit' 逻辑，自适应侧边栏和最小缩放比例
-    const twoStepFitView = useCallback(() => {
-        requestAnimationFrame(() => {
-            dispatchDiagramControl('fit', diagramId);
-        });
-    }, [diagramId]);
     const commitLayout = useLayoutRoutingTransaction({
         setNodes,
         setEdges,
@@ -152,6 +149,13 @@ export function useLayoutStrategy({
         // asynchronous strategy/ELK work starts. Otherwise a stale layout
         // result could open a fresh epoch after a newer display commit.
         const routingJob = routingSessionRuntime.beginJob('layout');
+        layoutFitControllerRef.current?.abort();
+        const layoutFitController = new AbortController();
+        layoutFitControllerRef.current = layoutFitController;
+        const beforePreviewRelease = () => requestLayoutCommitFit({
+            diagramId,
+            signal: layoutFitController.signal,
+        });
         // Capture the Canvas-owned runner once for the whole job. If unmount
         // disposes it while an async continuation is pending, that continuation
         // must fail against the disposed owner instead of creating a one-shot
@@ -265,7 +269,7 @@ export function useLayoutStrategy({
                     nodes: treeResult,
                     edges: treeEdges,
                     routingJob,
-                    onCommitted: twoStepFitView,
+                    beforePreviewRelease,
                 });
             } else if (strategyName === 'force') {
                 // ── 扁平力导向布局（对齐 SVG 版：不检测域） ──
@@ -322,7 +326,7 @@ export function useLayoutStrategy({
                     nodes: forceResult,
                     edges: forceEdges,
                     routingJob,
-                    onCommitted: twoStepFitView,
+                    beforePreviewRelease,
                 });
             } else {
                 // ── 域感知策略布局 ──
@@ -575,7 +579,7 @@ export function useLayoutStrategy({
                             nodes: finalNodes,
                             edges: finalEdges,
                             routingJob,
-                            onCommitted: twoStepFitView,
+                            beforePreviewRelease,
                             rejectObstacleDirtyBoundedCandidate: isDomainLane,
                             candidateRepairPolicy:
                                 candidateUsesElk && !candidateUsesCompoundElk
@@ -626,6 +630,10 @@ export function useLayoutStrategy({
             logLayoutStrategyFailure(strategyName, err);
             return false;
         } finally {
+            if (layoutFitControllerRef.current === layoutFitController) {
+                layoutFitControllerRef.current = null;
+            }
+            layoutFitController.abort();
             routingSessionRuntime.cancelJob(routingJob);
         }
     }, [
@@ -636,7 +644,6 @@ export function useLayoutStrategy({
         nodesRef,
         edgesRef,
         routingSessionRuntime,
-        twoStepFitView,
     ]);
 
     return {

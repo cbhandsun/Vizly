@@ -8,6 +8,14 @@ import {
 } from './diagramControlFit';
 import { computeDiagramNodeBounds } from './diagramNodeBounds';
 import { logDiagramControlBridgeFailure } from './diagramControlLogging';
+import {
+  claimLayoutCommitFitRequest,
+  DIAGRAM_CONTROL_REQUEST_EVENT,
+  inspectLayoutCommitFitRequest,
+  resolveLayoutCommitFitRequest,
+} from './diagramControlRequest';
+import { waitForDiagramControlViewportPaint } from './diagramControlPaint';
+import { useBaseReactFlowViewportSemanticSync } from './baseReactFlowViewportSemanticContext';
 
 interface DiagramControlBridgeProps {
   diagramId?: string;
@@ -16,6 +24,7 @@ interface DiagramControlBridgeProps {
 // 统一桥接：监听标题栏/外层触发的视图控制事件，并作用于当前图的 ReactFlow 实例
 const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }) => {
   const rf = useReactFlow();
+  const syncViewportSemanticState = useBaseReactFlowViewportSemanticSync();
   const markerRef = useRef<HTMLSpanElement | null>(null);
 
   const resolveSelfDiagramId = useCallback((): string | undefined => {
@@ -33,6 +42,29 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
     }
     return undefined;
   }, [diagramId]);
+
+  const resolveContainer = useCallback((): HTMLElement | null => {
+    const id = resolveSelfDiagramId();
+    if (id) {
+      const byId = document.getElementById(`diagram-${id}`);
+      if (byId) {
+        const containerAncestor = byId.closest('.diagram-container');
+        if (containerAncestor) return containerAncestor as HTMLElement;
+        const previewAncestor = byId.closest('.diagram-preview-container');
+        if (previewAncestor) return previewAncestor as HTMLElement;
+        return byId;
+      }
+    }
+    let cur = markerRef.current?.parentElement || null;
+    let depth = 0;
+    while (cur && depth < 10) {
+      if (cur.id?.startsWith('diagram-')) return cur;
+      if (cur.classList?.contains('react-flow')) return cur;
+      cur = cur.parentElement;
+      depth++;
+    }
+    return null;
+  }, [resolveSelfDiagramId]);
 
   // 将React Flow实例暴露到window对象，方便调试
   useEffect(() => {
@@ -56,31 +88,6 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
       if (!action) return;
       if (idToMatch && targetId !== idToMatch) return;
       if (!idToMatch && targetId) return;
-
-      const resolveContainer = (): HTMLElement | null => {
-        const id = resolveSelfDiagramId();
-        if (id) {
-          const byId = document.getElementById(`diagram-${id}`);
-          if (byId) {
-            // 优先选择最外层图表容器，以便全屏包含覆盖的按钮等元素
-            const containerAncestor = byId.closest('.diagram-container');
-            if (containerAncestor) return containerAncestor as HTMLElement;
-            const previewAncestor = byId.closest('.diagram-preview-container');
-            if (previewAncestor) return previewAncestor as HTMLElement;
-            return byId;
-          }
-        }
-        // 兜底：向上寻找最近的 react-flow 根元素
-        let cur = markerRef.current?.parentElement || null;
-        let depth = 0;
-        while (cur && depth < 10) {
-          if (cur.id?.startsWith('diagram-')) return cur;
-          if (cur.classList?.contains('react-flow')) return cur;
-          cur = cur.parentElement;
-          depth++;
-        }
-        return null;
-      };
 
       if (action === 'fit') {
         try {
@@ -206,7 +213,97 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
       pendingTimeouts.forEach(timeoutId => window.clearTimeout(timeoutId));
       pendingTimeouts.clear();
     };
-  }, [diagramId, rf, resolveSelfDiagramId]);
+  }, [diagramId, resolveContainer, rf, resolveSelfDiagramId]);
+
+  useEffect(() => {
+    const onLayoutCommitFitRequest = (event: Event) => {
+      // Only the bridge mounted inside BaseReactFlow owns the exact semantic
+      // zoom container. A page-level compatibility bridge must not claim this
+      // awaited request before the canvas bridge sees it.
+      const syncSemanticViewport = syncViewportSemanticState;
+      if (!syncSemanticViewport) return;
+      const inspected = inspectLayoutCommitFitRequest(event);
+      if (!inspected) return;
+      const idToMatch = resolveSelfDiagramId();
+      if (idToMatch && inspected.diagramId !== idToMatch) return;
+      if (!idToMatch && inspected.diagramId) return;
+      const request = claimLayoutCommitFitRequest(event);
+      if (!request) return;
+
+      void (async () => {
+        const container = resolveContainer();
+        const applyFallback = async () => {
+          const applied = await rf.fitView({
+            padding: 24,
+            includeHiddenNodes: false,
+            duration: 0,
+            minZoom: MIN_DIAGRAM_FULL_FIT_ZOOM,
+            maxZoom: 1.0,
+          });
+          if (!applied) throw new Error('layout-fit-not-applied');
+        };
+
+        try {
+          const bounds = computeDiagramNodeBounds(rf.getNodes());
+          const viewportEl = container
+            ? (container.querySelector('.react-flow__renderer')
+              ?? container.querySelector('.react-flow')
+              ?? container) as HTMLElement
+            : null;
+          if (!bounds || !viewportEl) {
+            await applyFallback();
+          } else {
+            const rootStyle = getComputedStyle(document.documentElement);
+            const fitLayout = resolveDiagramFitLayout({
+              viewportWidth: viewportEl.clientWidth,
+              leftSidebarOffset: rootStyle.getPropertyValue('--left-sidebar-offset'),
+              rightSidebarOffset: rootStyle.getPropertyValue('--right-sidebar-offset'),
+            });
+            const viewport = computeDiagramFitViewport({
+              bounds,
+              viewportWidth: viewportEl.clientWidth,
+              viewportHeight: viewportEl.clientHeight,
+              safeArea: fitLayout.safeArea,
+              padding: fitLayout.padding,
+            });
+            if (!viewport) {
+              await applyFallback();
+            } else {
+              syncSemanticViewport(viewport);
+              const applied = await rf.setViewport(viewport);
+              if (!applied) throw new Error('layout-viewport-not-applied');
+            }
+          }
+          syncSemanticViewport(rf.getViewport());
+          const painted = await waitForDiagramControlViewportPaint({ signal: request.signal });
+          if (painted) {
+            // React Flow may emit a stale onViewportChange during the same
+            // commit and temporarily restore the previous zoom class. Reapply
+            // from the authoritative viewport at the paint barrier boundary.
+            syncSemanticViewport(rf.getViewport());
+            resolveLayoutCommitFitRequest(event, 'applied');
+          }
+        } catch (error) {
+          logDiagramControlBridgeFailure('fitFallback', error);
+          try {
+            await applyFallback();
+            syncSemanticViewport(rf.getViewport());
+            const painted = await waitForDiagramControlViewportPaint({ signal: request.signal });
+            if (painted) syncSemanticViewport(rf.getViewport());
+            resolveLayoutCommitFitRequest(event, painted ? 'applied' : 'failed');
+          } catch (fallbackError) {
+            logDiagramControlBridgeFailure('fitFallback', fallbackError);
+            resolveLayoutCommitFitRequest(event, 'failed');
+          }
+        }
+      })();
+    };
+
+    window.addEventListener(DIAGRAM_CONTROL_REQUEST_EVENT, onLayoutCommitFitRequest);
+    return () => {
+      window.removeEventListener(DIAGRAM_CONTROL_REQUEST_EVENT, onLayoutCommitFitRequest);
+    };
+  }, [resolveContainer, resolveSelfDiagramId, rf, syncViewportSemanticState]);
 
   return <span ref={markerRef} style={{ display: 'none' }} />;
 };

@@ -18,7 +18,7 @@ type LayoutRoutingTransactionRequest = Readonly<{
   nodes: Node[];
   edges: Edge[];
   routingJob: BaseReactFlowRoutingSessionJob;
-  onCommitted?: () => void;
+  beforePreviewRelease?: () => Promise<unknown>;
   rejectObstacleDirtyBoundedCandidate?: boolean;
   candidateRepairPolicy?: 'default' | 'skip-exact-clean';
 }>;
@@ -61,7 +61,7 @@ export const useLayoutRoutingTransaction = ({
     nodes,
     edges,
     routingJob,
-    onCommitted,
+    beforePreviewRelease,
     rejectObstacleDirtyBoundedCandidate,
     candidateRepairPolicy,
   }: LayoutRoutingTransactionRequest): Promise<void> => {
@@ -142,8 +142,8 @@ export const useLayoutRoutingTransaction = ({
       committed = true;
       await runAfterLayoutRenderFrames(() => {
         flushObstacles();
-        onCommitted?.();
       });
+      await beforePreviewRelease?.();
     } finally {
       if (committed || routingSessionRuntime.isCurrentJob(routingJob)) {
         const released = clearLayoutPreview?.(routingJob) ?? true;

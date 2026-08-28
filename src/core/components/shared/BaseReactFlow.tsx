@@ -32,7 +32,6 @@ import {
   createBaseReactFlowExportStateHandlers,
   resolveBaseReactFlowInitialFitMode,
   restoreBaseReactFlowViewportOnInit,
-  syncBaseReactFlowZoomClass,
 } from './baseReactFlowViewport';
 import {
   hasBaseReactFlowRenderableSize,
@@ -83,6 +82,8 @@ import { applyBaseReactFlowEdgePresentation } from './baseReactFlowEdgePresentat
 import { useLayoutStability } from '../../context/LayoutStabilityContext';
 import { useBaseReactFlowNodeDragState } from './useBaseReactFlowNodeDragState';
 import { BASE_REACT_FLOW_DEFAULT_SNAP_GRID, BASE_REACT_FLOW_DEFAULT_STYLE, BASE_REACT_FLOW_DEFAULT_VIEWPORT } from './baseReactFlowDefaults';
+import { BaseReactFlowViewportSemanticContext } from './baseReactFlowViewportSemanticContext';
+import { useBaseReactFlowViewportSemanticState } from './useBaseReactFlowViewportSemanticState';
 
 const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   nodes = [],
@@ -227,6 +228,10 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   // 新增：容器就绪防抖状态
   const [isContainerReady, setIsContainerReady] = useState(false);
   const readyTimeoutRef = useRef<number | null>(null);
+  const {
+    resolveContainerClassName,
+    syncViewportSemanticState,
+  } = useBaseReactFlowViewportSemanticState(containerRef);
 
   const runtimeConfig = useMemo(() => {
     return {
@@ -495,16 +500,12 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     // 始终广播最新视口，以驱动 minimap 可视区域矩形实时更新
     schedulePersistLastViewport(viewport, viewportPersistenceKey);
 
-    // Semantic Zoom Feature: 动态追加 CSS 类名以进行子树 DOM 降级
-    syncBaseReactFlowZoomClass({
-      container: containerRef.current,
-      viewport,
-    });
+    syncViewportSemanticState(viewport);
 
     if (onViewportChange) {
       onViewportChange(viewport);
     }
-  }, [onViewportChange, viewportPersistenceKey]);
+  }, [onViewportChange, syncViewportSemanticState, viewportPersistenceKey]);
 
   /**
    * 计算并更新容器就绪状态（防抖 & 不可逆门限）
@@ -565,7 +566,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     <div
       ref={containerRef}
       style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', ...style }}
-      className={`${className} ${isLayoutStable ? '' : 'vizly-layout-committing'}`.trim()}
+      className={resolveContainerClassName(className, isLayoutStable)}
     >
       <div style={counterZoom !== 1 ? {
         zoom: counterZoom,
@@ -573,6 +574,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
         height: '100%',
         position: 'relative',
       } : { width: '100%', height: '100%', position: 'relative' }}>
+        <BaseReactFlowViewportSemanticContext.Provider value={syncViewportSemanticState}>
         <EdgeLabelObstacleContext.Provider value={edgeLabelObstacles}>
         <RoutingSessionEdgeRenderProvider authority={displayRenderAuthority}>
         <ReactFlow
@@ -675,6 +677,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
         </ReactFlow>
         </RoutingSessionEdgeRenderProvider>
         </EdgeLabelObstacleContext.Provider>
+        </BaseReactFlowViewportSemanticContext.Provider>
       </div>
       {!isContainerReady && <BaseReactFlowInitializationOverlay />}
     </div>

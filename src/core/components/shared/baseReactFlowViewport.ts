@@ -11,6 +11,24 @@ export type BaseReactFlowInitialFitMode = 'fitWidthTop' | 'fitAll' | 'none' | 'r
 const MIN_READABLE_EDGE_LABEL_ZOOM = 0.72;
 const MAX_EDGE_LABEL_SCALE = 2.4;
 
+export const isBaseReactFlowZoomedOut = (viewport: Viewport): boolean => (
+  Number.isFinite(viewport.zoom) && viewport.zoom < 0.4
+);
+
+export const resolveBaseReactFlowContainerClassName = ({
+  baseClassName,
+  isLayoutStable,
+  zoomedOut,
+}: {
+  baseClassName: string;
+  isLayoutStable: boolean;
+  zoomedOut: boolean;
+}): string => [
+  baseClassName,
+  zoomedOut ? 'diagram-zoomed-out' : '',
+  isLayoutStable ? '' : 'vizly-layout-committing',
+].filter(Boolean).join(' ');
+
 const edgeLabelScaleForZoom = (zoom: number): number => {
   if (!Number.isFinite(zoom) || zoom <= 0) return 1;
   return Math.min(MAX_EDGE_LABEL_SCALE, Math.max(1, MIN_READABLE_EDGE_LABEL_ZOOM / zoom));
@@ -32,7 +50,7 @@ export const syncBaseReactFlowZoomClass = ({
     edgeLabelScaleForZoom(viewport.zoom).toFixed(3),
   );
 
-  if (viewport.zoom < 0.4) {
+  if (isBaseReactFlowZoomedOut(viewport)) {
     if (!container.classList.contains(zoomedOutClassName)) {
       container.classList.add(zoomedOutClassName);
     }
