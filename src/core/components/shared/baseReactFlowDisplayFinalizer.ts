@@ -4,6 +4,7 @@ import {
   computeBaseReactFlowDisplayOutputRouteSignature,
   withDisplayAbsolutePositions,
 } from './baseReactFlowDisplayEdgeCore';
+import { computeBaseDisplayHardGateEvidenceSignature } from './baseReactFlowDisplayHardGateMemo';
 import {
   countRenderUnsafeEndpointStubs,
   repairRenderSafeEndpointStubs,
@@ -19,6 +20,7 @@ import { repairRenderSafeTerminalAxes } from './baseReactFlowRenderTerminalSafet
 import { repairSharedPortAndTinyTerminalLanes } from './baseReactFlowDisplaySharedPortLaneRepair';
 import { repairFinalResidualStrictCrossings } from './baseReactFlowDisplayStrictResidualRepair';
 import type { BaseReactFlowFinalEndpointEvaluation } from './baseReactFlowDisplayFinalEndpointEvaluation';
+import { doBaseReactFlowDisplayRoutesMatchExactly } from './baseReactFlowDisplayRoutingTransaction';
 import {
   startDisplayRoutingPhaseTrace,
   type DisplayRoutingPhaseTrace,
@@ -33,6 +35,7 @@ export type BaseReactFlowDisplayExactReport = Readonly<{
 
 export type BaseReactFlowDisplayFinalizerOutcome<T extends Edge[] = Edge[]> = Readonly<{
   edges: T;
+  measuredRepairReachedFixedPoint?: boolean;
   report: BaseDisplayBoundedCandidateReport;
 }>;
 
@@ -130,6 +133,20 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
   let routedEdges = fullRouteEdges;
   let routedReport = trustedEvaluation?.report ?? hardReportFor(routedEdges);
   let hasAtomicOuterPortHardBaseline = false;
+  let measuredRepairFixedPointEdges: T | undefined;
+  const createOutcome = (
+    edges: T,
+    report: BaseDisplayBoundedCandidateReport,
+  ): BaseReactFlowDisplayFinalizerOutcome<T> => ({
+    edges,
+    measuredRepairReachedFixedPoint: Boolean(
+      measuredRepairFixedPointEdges
+      && doBaseReactFlowDisplayRoutesMatchExactly(measuredRepairFixedPointEdges, edges)
+      && computeBaseDisplayHardGateEvidenceSignature(measuredRepairFixedPointEdges)
+        === computeBaseDisplayHardGateEvidenceSignature(edges)
+    ),
+    report,
+  });
 
   // A candidate that is already geometrically clean should not enter the
   // broader measured-repair pipeline merely because one declared port axis is
@@ -155,7 +172,7 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
   }
 
   if (deferStrictOnlyMeasuredRepair && canDeferStrictOnlyMeasuredRepair(routedReport)) {
-    return { edges: routedEdges, report: routedReport };
+    return createOutcome(routedEdges, routedReport);
   }
 
   if (!routedReport.hardClean) {
@@ -165,6 +182,9 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
       onTrace: onPhaseTrace,
     });
     const measuredSeed = routedEdges;
+    const measuredInputEvidenceSignature = computeBaseDisplayHardGateEvidenceSignature(
+      measuredSeed,
+    );
     const measuredOutcome = repairBaseReactFlowMeasuredDisplayEdgesWithReport(
       routedEdges,
       nodes,
@@ -181,6 +201,14 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
     );
     routedEdges = measuredOutcome.edges as T;
     routedReport = measuredOutcome.report;
+    const measuredOutputEvidenceSignature = computeBaseDisplayHardGateEvidenceSignature(
+      routedEdges,
+    );
+    if (
+      measuredInputEvidenceSignature !== null
+      && measuredInputEvidenceSignature === measuredOutputEvidenceSignature
+      && doBaseReactFlowDisplayRoutesMatchExactly(measuredSeed, routedEdges)
+    ) measuredRepairFixedPointEdges = routedEdges;
     measuredTimer.finish(routedReport.hardClean ? 'accepted' : 'fallback', routedEdges.length);
   }
 
@@ -259,12 +287,12 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
   if (
     renderSafeEndpointReport.hardClean
     && countRenderUnsafeEndpointStubs(renderSafeEdges) === 0
-  ) return { edges: renderSafeEdges, report: renderSafeEndpointReport };
+  ) return createOutcome(renderSafeEdges, renderSafeEndpointReport);
   if (hasAtomicOuterPortHardBaseline) {
-    return { edges: routedEdges, report: routedReport };
+    return createOutcome(routedEdges, routedReport);
   }
   if (!renderSafeEndpointReport.terminalsAttached) {
-    return { edges: routedEdges, report: routedReport };
+    return createOutcome(routedEdges, routedReport);
   }
 
   const renderSafeAxisEdges = repairRenderSafeEndpointStubs(
@@ -277,9 +305,9 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
   if (
     renderSafeReport.hardClean
     && countRenderUnsafeEndpointStubs(renderSafeAxisEdges) === 0
-  ) return { edges: renderSafeAxisEdges, report: renderSafeReport };
+  ) return createOutcome(renderSafeAxisEdges, renderSafeReport);
   if (!renderSafeReport.terminalsAttached) {
-    return { edges: routedEdges, report: routedReport };
+    return createOutcome(routedEdges, routedReport);
   }
 
   const outerPortSafeEdges = needsOuterPortTransaction(renderSafeReport)
@@ -304,12 +332,16 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
       const preferredOuterPortReport = preferredOuterPortEdges === outerPortSafeEdges
         ? outerPortSafeReport
         : hardReportFor(preferredOuterPortEdges);
-      return (
+      return createOutcome(
         preferredOuterPortReport.hardClean
         && countRenderUnsafeEndpointStubs(preferredOuterPortEdges) === 0
-      )
-        ? { edges: preferredOuterPortEdges, report: preferredOuterPortReport }
-        : { edges: outerPortSafeEdges, report: outerPortSafeReport };
+          ? preferredOuterPortEdges
+          : outerPortSafeEdges,
+        preferredOuterPortReport.hardClean
+        && countRenderUnsafeEndpointStubs(preferredOuterPortEdges) === 0
+          ? preferredOuterPortReport
+          : outerPortSafeReport,
+      );
     }
   }
 
@@ -339,12 +371,16 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
   const axisSafeReport = axisSafeEdges === renderSafeAxisEdges
     ? renderSafeReport
     : hardReportFor(axisSafeEdges);
-  return (
+  return createOutcome(
     countRenderUnsafeEndpointStubs(axisSafeEdges) === 0
     && axisSafeReport.hardClean
-  )
-    ? { edges: axisSafeEdges, report: axisSafeReport }
-    : { edges: routedEdges, report: routedReport };
+      ? axisSafeEdges
+      : routedEdges,
+    countRenderUnsafeEndpointStubs(axisSafeEdges) === 0
+    && axisSafeReport.hardClean
+      ? axisSafeReport
+      : routedReport,
+  );
 };
 
 export const finalizeBaseReactFlowDisplayEdges = <T extends Edge[]>(

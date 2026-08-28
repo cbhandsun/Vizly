@@ -146,26 +146,44 @@ export const runBaseReactFlowDisplayWorkerFullRoute = ({
   );
   fullRouteEvaluation.rememberHardReport(finalized.edges, finalized.report);
   if (!finalized.report.hardClean) {
-    const repairTimer = startDisplayRoutingPhaseTrace({
-      phase: 'measured-repair',
-      candidateCount: finalized.edges.length,
-      onTrace: onPhaseTrace,
-    });
-    const repaired = repairBaseReactFlowMeasuredDisplayEdgesWithReport(
-      finalized.edges,
-      request.nodes,
-      {
-        edges: finalized.edges,
-        inputNodes: request.nodes,
-        repairNodes,
-        report: finalized.report,
-        evaluation: fullRouteEvaluation,
-      },
-      false,
-      onPhaseTrace,
-      false,
-    );
-    repairTimer.finish(repaired.report.hardClean ? 'accepted' : 'rejected', repaired.edges.length);
+    const repaired = finalized.measuredRepairReachedFixedPoint
+      ? (() => {
+        startDisplayRoutingPhaseTrace({
+          phase: 'measured-repair',
+          candidateCount: finalized.edges.length,
+          onTrace: onPhaseTrace,
+        }).finish('hit', 0, {
+          cacheHitCount: 1,
+          evaluationCount: 0,
+          scannedEdgePairCount: 0,
+          scannedNodeCount: 0,
+          scannedSegmentCount: 0,
+        });
+        return finalized;
+      })()
+      : (() => {
+        const repairTimer = startDisplayRoutingPhaseTrace({
+          phase: 'measured-repair',
+          candidateCount: finalized.edges.length,
+          onTrace: onPhaseTrace,
+        });
+        const outcome = repairBaseReactFlowMeasuredDisplayEdgesWithReport(
+          finalized.edges,
+          request.nodes,
+          {
+            edges: finalized.edges,
+            inputNodes: request.nodes,
+            repairNodes,
+            report: finalized.report,
+            evaluation: fullRouteEvaluation,
+          },
+          false,
+          onPhaseTrace,
+          false,
+        );
+        repairTimer.finish(outcome.report.hardClean ? 'accepted' : 'rejected', outcome.edges.length);
+        return outcome;
+      })();
     fullRouteEvaluation.rememberHardReport(repaired.edges, repaired.report);
     const repairedResponse = finalizeResponse({
       requestId: request.requestId,
