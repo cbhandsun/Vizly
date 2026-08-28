@@ -6,6 +6,10 @@ import {
 } from './edgeBusinessNodeClearanceCandidateRanking';
 import { createBusinessNodeClearanceCandidateRankCache } from './edgeBusinessNodeClearanceCandidateRankCache';
 import {
+  createBusinessNodeClearanceGeometryContext,
+  type BusinessNodeClearanceGeometryContext,
+} from './edgeBusinessNodeClearanceGeometryContext';
+import {
   createBusinessNodeClearanceCandidateCache,
   resetBusinessNodeClearanceRepairDiagnostics,
   type BusinessNodeClearanceRepairDiagnostics,
@@ -13,15 +17,9 @@ import {
 import {
   createBusinessNodeClearanceCandidateCollection,
 } from './edgeBusinessNodeClearanceCandidateCollection';
-import { createBusinessNodeClearanceRectContext } from './edgeBusinessNodeClearanceRectContext';
 import {
   createEdgePathQualityEvaluationContext,
 } from './edgeStrictCrossingGuard';
-import {
-  createNodeClearanceGraphEvaluationContext,
-  createRoutingObstacleEvaluationContext,
-} from './edgeWaypointCandidateRepair';
-
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
 
@@ -41,6 +39,8 @@ export interface BusinessNodeClearanceRepairOptions {
   validateCandidate?: (context: BusinessNodeClearanceCandidateValidation) => boolean;
   /** Aggregate-only counters; never contains path, node, or user content. */
   diagnostics?: BusinessNodeClearanceRepairDiagnostics;
+  /** Reuse only within one synchronous request over the same immutable node-array snapshot. */
+  geometryContext?: BusinessNodeClearanceGeometryContext;
 }
 
 const EPS = 0.5;
@@ -647,13 +647,11 @@ export const repairBusinessNodeClearanceRisks = (
       Math.min(256, options.minimumClearance ?? COMMERCIAL_BUSINESS_NODE_ROUTING_CLEARANCE),
     )
     : COMMERCIAL_BUSINESS_NODE_ROUTING_CLEARANCE;
-  const rectContext = createBusinessNodeClearanceRectContext(nodes);
-  const obstacles = new Map(rectContext.obstacles);
-  const clearanceContext = createNodeClearanceGraphEvaluationContext(nodes);
-  const obstacleContextByEdgeId = new Map(edges.map(edge => [
-    edge.id,
-    createRoutingObstacleEvaluationContext(edge, obstacles),
-  ] as const));
+  const geometryContext = options.geometryContext?.matchesNodes(nodes)
+    ? options.geometryContext
+    : createBusinessNodeClearanceGeometryContext(nodes);
+  const rectContext = geometryContext.rects;
+  const clearanceContext = geometryContext.clearance;
   const candidateCollectionCache = createBusinessNodeClearanceCandidateCache<
     ReturnType<typeof clearanceCandidates>
   >();
@@ -699,8 +697,7 @@ export const repairBusinessNodeClearanceRisks = (
       const edge = current[edgeIndex];
       if (!edge) continue;
       const path = edgePath(edge);
-      const obstacleContext = obstacleContextByEdgeId.get(edge.id)
-        ?? createRoutingObstacleEvaluationContext(edge, obstacles);
+      const obstacleContext = geometryContext.obstacleFor(edge);
       const qualityBaseline = getQualityBaseline();
       const [baselineRisk, baselineCommercialRisk] = clearanceContext.scorePair(
         path,

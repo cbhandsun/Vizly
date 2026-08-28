@@ -5,6 +5,7 @@ import {
   MINIMUM_BUSINESS_NODE_CLEARANCE,
   repairBusinessNodeClearanceRisks,
 } from '../../strategies/shared/edgeBusinessNodeClearanceRepair';
+import { createBusinessNodeClearanceGeometryContext } from '../../strategies/shared/edgeBusinessNodeClearanceGeometryContext';
 import {
   createNodeClearanceGraphEvaluationContext,
   scoreNodeClearanceRisk,
@@ -89,18 +90,21 @@ export const repairBaseReactFlowDisplayBusinessNodeClearance = (
   options: DisplayBusinessNodeClearanceOptions = {},
 ): Edge[] => {
   if (displayBusinessNodeCommercialClearanceIsClean(edges, nodes)) return edges;
+  const geometryContext = createBusinessNodeClearanceGeometryContext(nodes);
   const minimumEdges = repairBusinessNodeClearanceRisks(edges, nodes, {
     ...options,
+    geometryContext,
     minimumClearance: MINIMUM_BUSINESS_NODE_CLEARANCE,
   });
   const commercialEdges = repairBusinessNodeClearanceRisks(minimumEdges, nodes, {
     ...options,
+    geometryContext,
     minimumClearance: COMMERCIAL_BUSINESS_NODE_CLEARANCE,
   });
   const commercialMinimumClosedEdges = repairBusinessNodeClearanceRisks(
     commercialEdges,
     nodes,
-    { ...options, minimumClearance: MINIMUM_BUSINESS_NODE_CLEARANCE },
+    { ...options, geometryContext, minimumClearance: MINIMUM_BUSINESS_NODE_CLEARANCE },
   );
   return eligibleMinimumClearanceIsClean(
     commercialMinimumClosedEdges,

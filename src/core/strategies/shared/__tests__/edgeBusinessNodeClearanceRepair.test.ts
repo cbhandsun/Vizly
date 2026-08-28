@@ -7,6 +7,7 @@ import {
   repairBusinessNodeClearanceRisks,
   uniqueBusinessNodeClearancePaths,
 } from '../edgeBusinessNodeClearanceRepair';
+import { createBusinessNodeClearanceGeometryContext } from '../edgeBusinessNodeClearanceGeometryContext';
 import { createBusinessNodeClearanceCandidateCollection } from '../edgeBusinessNodeClearanceCandidateCollection';
 import { selectBusinessNodeClearanceCandidatesWithinHitBudget } from '../edgeBusinessNodeClearanceCandidateRanking';
 import { calculateEdgePathQualityScore } from '../edgeStrictCrossingGuard';
@@ -770,5 +771,79 @@ describe('repairBusinessNodeClearanceRisks', () => {
     expect(diagnostics.clearanceScoreCacheHitCount).toBeGreaterThan(0);
     expect(diagnostics.clearanceScannedNodeCount).toBeGreaterThan(0);
     expect(new Set(globallyValidatedEdgeIds)).toEqual(new Set(['first', 'second']));
+  });
+
+  it('reuses request geometry without leaking candidate validation decisions', () => {
+    const nodes: Node[] = [
+      { id: 'source', position: { x: 0, y: 0 }, data: {}, measured: { width: 80, height: 60 } },
+      { id: 'blocker', position: { x: 180, y: 10 }, data: {}, measured: { width: 80, height: 80 } },
+      { id: 'target', position: { x: 400, y: 0 }, data: {}, measured: { width: 80, height: 60 } },
+    ];
+    const edges: Edge[] = [{
+      id: 'edge',
+      source: 'source',
+      target: 'target',
+      data: { computedPath: [{ x: 80, y: 30 }, { x: 400, y: 30 }] },
+    }];
+    const geometryContext = createBusinessNodeClearanceGeometryContext(nodes);
+
+    const rejected = repairBusinessNodeClearanceRisks(edges, nodes, {
+      geometryContext,
+      minimumClearance: COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+      validateCandidate: () => false,
+    });
+    const metricsBeforeReuse = geometryContext.clearance.readMetrics();
+    const shared = repairBusinessNodeClearanceRisks(edges, nodes, {
+      geometryContext,
+      minimumClearance: COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+    });
+    const freshContext = createBusinessNodeClearanceGeometryContext(nodes);
+    const fresh = repairBusinessNodeClearanceRisks(edges, nodes, {
+      geometryContext: freshContext,
+      minimumClearance: COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+    });
+    const metricsAfterReuse = geometryContext.clearance.readMetrics();
+    const freshMetrics = freshContext.clearance.readMetrics();
+
+    expect(rejected).toBe(edges);
+    expect(shared).toEqual(fresh);
+    expect(shared).not.toBe(edges);
+    expect(metricsAfterReuse.cacheHitCount).toBeGreaterThan(metricsBeforeReuse.cacheHitCount);
+    expect(
+      metricsAfterReuse.scannedNodeCount - metricsBeforeReuse.scannedNodeCount,
+    ).toBeLessThan(freshMetrics.scannedNodeCount);
+    expect(geometryContext.readMetrics()).toEqual({
+      obstacleContextBuildCount: 1,
+      obstacleContextCacheHitCount: 1,
+    });
+  });
+
+  it('rejects a geometry context from a different node-array snapshot', () => {
+    const originalNodes: Node[] = [
+      { id: 'source', position: { x: 0, y: 0 }, data: {}, measured: { width: 80, height: 60 } },
+      { id: 'blocker', position: { x: 180, y: 10 }, data: {}, measured: { width: 80, height: 80 } },
+      { id: 'target', position: { x: 400, y: 0 }, data: {}, measured: { width: 80, height: 60 } },
+    ];
+    const movedNodes = originalNodes.map(node => (
+      node.id === 'blocker' ? { ...node, position: { x: 180, y: 300 } } : node
+    ));
+    const edges: Edge[] = [{
+      id: 'edge',
+      source: 'source',
+      target: 'target',
+      data: { computedPath: [{ x: 80, y: 30 }, { x: 400, y: 30 }] },
+    }];
+    const staleContext = createBusinessNodeClearanceGeometryContext(originalNodes);
+
+    expect(repairBusinessNodeClearanceRisks(edges, movedNodes, {
+      geometryContext: staleContext,
+      minimumClearance: COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+    })).toEqual(repairBusinessNodeClearanceRisks(edges, movedNodes, {
+      minimumClearance: COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+    }));
+    expect(staleContext.readMetrics()).toEqual({
+      obstacleContextBuildCount: 0,
+      obstacleContextCacheHitCount: 0,
+    });
   });
 });
