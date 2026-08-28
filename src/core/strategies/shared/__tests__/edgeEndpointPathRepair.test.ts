@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 import { repairEndpointOrthogonalPaths } from '../edgeEndpointPathRepair';
+import { createEndpointBridgeScoringDiagnostics } from '../edgeEndpointBridgeScoring';
 import {
   endpointNodeRect,
   inferEndpointSide,
@@ -579,6 +580,42 @@ describe('repairEndpointOrthogonalPaths', () => {
       node('source', 0, 0),
       node('target', 300, 0),
     ])).toBe(edges);
+  });
+
+  it('reports aggregate bridge candidate-pair diagnostics through the repair boundary', () => {
+    const diagnostics = createEndpointBridgeScoringDiagnostics();
+    const edges: Edge[] = [
+      {
+        id: 'candidate',
+        source: 'source',
+        target: 'target',
+        sourceHandle: 'bottom',
+        targetHandle: 'top',
+        data: {
+          computedPath: [
+            { x: 50, y: 50 },
+            { x: 150, y: 50 },
+            { x: 150, y: 200 },
+          ],
+        },
+      },
+      {
+        id: 'peer',
+        source: 'peer-source',
+        target: 'peer-target',
+        data: { computedPath: [{ x: 100, y: 60 }, { x: 100, y: 100 }] },
+      },
+    ];
+
+    repairEndpointOrthogonalPaths(edges, [
+      node('source', 0, 0),
+      node('target', 100, 200),
+    ], { diagnostics });
+
+    expect(diagnostics.evaluationCount).toBeGreaterThan(0);
+    expect(diagnostics.fullScanCandidatePairCount).toBeGreaterThan(0);
+    expect(diagnostics.indexedCandidatePairCount)
+      .toBeLessThanOrEqual(diagnostics.fullScanCandidatePairCount);
   });
 });
 

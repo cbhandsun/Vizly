@@ -14,6 +14,12 @@ import {
   endpointSegmentHitsUnrelatedNode,
   pathHitsUnrelatedNode,
 } from './edgeEndpointPathObstacle';
+import {
+  createEndpointBridgeScoringContext,
+  endpointBridgeSegmentsStrictlyCross as strictSegmentCross,
+  type EndpointBridgeScoringContext,
+  type EndpointBridgeScoringDiagnostics,
+} from './edgeEndpointBridgeScoring';
 
 const EPS = 0.5;
 const MIN_CONSTRAINED_STUB = 18;
@@ -260,62 +266,12 @@ function bridgeSegmentsForLength(
   ));
 }
 
-function strictSegmentCross(
-  first: { a: Point; b: Point; axis: 'h' | 'v' | 'other' },
-  second: { a: Point; b: Point; axis: 'h' | 'v' | 'other' },
-): boolean {
-  if (first.axis === second.axis || first.axis === 'other' || second.axis === 'other') return false;
-  const horizontal = first.axis === 'h' ? first : second;
-  const vertical = first.axis === 'v' ? first : second;
-  const hx1 = Math.min(horizontal.a.x, horizontal.b.x);
-  const hx2 = Math.max(horizontal.a.x, horizontal.b.x);
-  const vy1 = Math.min(vertical.a.y, vertical.b.y);
-  const vy2 = Math.max(vertical.a.y, vertical.b.y);
-  const x = vertical.a.x;
-  const y = horizontal.a.y;
-  return x > hx1 + EPS && x < hx2 - EPS && y > vy1 + EPS && y < vy2 - EPS;
-}
-
-function nearParallelOverlap(
-  first: { a: Point; b: Point; axis: 'h' | 'v' | 'other' },
-  second: { a: Point; b: Point; axis: 'h' | 'v' | 'other' },
-): number {
-  if (first.axis !== second.axis || first.axis === 'other') return 0;
-  if (first.axis === 'h') {
-    const distance = Math.abs(first.a.y - second.a.y);
-    if (distance > 10) return 0;
-    const weight = (10 - distance) / 10;
-    return Math.max(0, Math.min(Math.max(first.a.x, first.b.x), Math.max(second.a.x, second.b.x))
-      - Math.max(Math.min(first.a.x, first.b.x), Math.min(second.a.x, second.b.x))) * weight;
-  }
-  const distance = Math.abs(first.a.x - second.a.x);
-  if (distance > 10) return 0;
-  const weight = (10 - distance) / 10;
-  return Math.max(0, Math.min(Math.max(first.a.y, first.b.y), Math.max(second.a.y, second.b.y))
-    - Math.max(Math.min(first.a.y, first.b.y), Math.min(second.a.y, second.b.y))) * weight;
-}
-
 function scoreBridgeLength(
   context: EndpointRepairContext,
   length: number,
-  edgePaths: EdgePathContext[],
+  scoringContext: EndpointBridgeScoringContext,
 ): number {
-  const bridgeSegments = bridgeSegmentsForLength(context, length);
-  if (bridgeSegments.length === 0) return 0;
-  let score = 0;
-  for (const other of edgePaths) {
-    if (other.edgeKey === context.edgeKey) continue;
-    if (context.endpoint === 'source' && other.edge.source === context.source) continue;
-    if (context.endpoint === 'target' && other.edge.target === context.target) continue;
-    for (const candidate of bridgeSegments) {
-      for (const existing of other.segments) {
-        if (strictSegmentCross(candidate, existing)) score += 10000;
-        const overlap = nearParallelOverlap(candidate, existing);
-        if (overlap > 12) score += overlap * 2;
-      }
-    }
-  }
-  return score;
+  return scoringContext.score(context, bridgeSegmentsForLength(context, length));
 }
 
 function chooseBridgeAwareLength(
@@ -323,12 +279,12 @@ function chooseBridgeAwareLength(
   currentLength: number,
   minLength: number,
   maxLength: number,
-  edgePaths: EdgePathContext[],
+  scoringContext: EndpointBridgeScoringContext,
 ): number {
   if (!context.bridgeTarget || maxLength <= currentLength + EPS) return currentLength;
   let bestLength = currentLength;
   const scoreLength = (length: number): number => (
-    scoreBridgeLength(context, length, edgePaths)
+    scoreBridgeLength(context, length, scoringContext)
     + Math.abs(context.desiredLength - length) * 0.05
     + length * 0.001
   );
@@ -357,6 +313,7 @@ function resolveAdaptiveStubLength(
   context: EndpointRepairContext,
   edgePaths: EdgePathContext[],
   endpointContexts: EndpointRepairContext[],
+  scoringContext: EndpointBridgeScoringContext,
 ): number {
   let length = context.desiredLength;
   let constrained = false;
@@ -391,7 +348,7 @@ function resolveAdaptiveStubLength(
   const minLength = Math.max(constrained ? MIN_CONSTRAINED_STUB : MIN_STUB, context.minLength ?? 0);
   const maxLength = context.maxLength ?? MAX_STUB;
   const clampedLength = clamp(length, minLength, maxLength);
-  return Math.round(chooseBridgeAwareLength(context, clampedLength, minLength, maxLength, edgePaths));
+  return Math.round(chooseBridgeAwareLength(context, clampedLength, minLength, maxLength, scoringContext));
 }
 
 function bridgePoints(from: Point, to: Point, preferVerticalFirst: boolean): Point[] {
@@ -635,6 +592,8 @@ export type EndpointOrthogonalPathRepairOptions = Readonly<{
    * exact crossing sweep may disable the quadratic peer-lane scan.
    */
   detectExistingBridgeCrossings?: boolean;
+  /** Aggregate-only bridge scoring counters; never contains paths, nodes, or edge ids. */
+  diagnostics?: EndpointBridgeScoringDiagnostics;
 }>;
 
 export function repairEndpointOrthogonalPaths(
@@ -652,6 +611,12 @@ export function repairEndpointOrthogonalPaths(
       segments: pathSegments(normalized.path),
     };
   });
+  const bridgeScoringContext = createEndpointBridgeScoringContext(edgePaths.map(context => ({
+    edgeKey: context.edgeKey,
+    source: context.edge.source,
+    target: context.edge.target,
+    segments: context.segments,
+  })), options.diagnostics);
   const endpointContexts = new Map<string, EndpointRepairContext>();
 
   for (const { edge, edgeKey, path, detachedSourceEndpoint, detachedTargetEndpoint } of edgePaths) {
@@ -673,7 +638,12 @@ export function repairEndpointOrthogonalPaths(
       const sourceBridgeCrosses = options.detectExistingBridgeCrossings !== false
         && !!sourceSide
         && !!sourceBridgeTarget
-        && scoreBridgeLength({
+        && bridgeScoringContext.hasPenalty({
+          edgeKey,
+          endpoint: 'source',
+          source: edge.source,
+          target: edge.target,
+        }, bridgeSegmentsForLength({
           edgeKey,
           endpoint: 'source',
           source: edge.source,
@@ -682,7 +652,7 @@ export function repairEndpointOrthogonalPaths(
           side: sourceSide,
           desiredLength,
           bridgeTarget: sourceBridgeTarget,
-        }, Math.max(sourceStubLength, MIN_STUB), edgePaths) > 0;
+        }, Math.max(sourceStubLength, MIN_STUB)));
       if (
         sourceSide
         && (forceShorten || sourceBridgeCrosses || shouldAdjustEndpoint(path[0], path[1], sourceSide, desiredLength))
@@ -719,7 +689,12 @@ export function repairEndpointOrthogonalPaths(
       const targetBridgeCrosses = options.detectExistingBridgeCrossings !== false
         && !!targetSide
         && !!targetBridgeTarget
-        && scoreBridgeLength({
+        && bridgeScoringContext.hasPenalty({
+          edgeKey,
+          endpoint: 'target',
+          source: edge.source,
+          target: edge.target,
+        }, bridgeSegmentsForLength({
           edgeKey,
           endpoint: 'target',
           source: edge.source,
@@ -728,7 +703,7 @@ export function repairEndpointOrthogonalPaths(
           side: targetSide,
           desiredLength,
           bridgeTarget: targetBridgeTarget,
-        }, Math.max(targetStubLength, MIN_STUB), edgePaths) > 0;
+        }, Math.max(targetStubLength, MIN_STUB)));
       if (
         targetSide
         && (forceShorten || targetBridgeCrosses || shouldAdjustEndpoint(end, previous, targetSide, desiredLength))
@@ -760,12 +735,22 @@ export function repairEndpointOrthogonalPaths(
     let repaired = path;
     const sourceContext = endpointContexts.get(`${edgeKey}:source`);
     if (sourceContext) {
-      const stubLength = resolveAdaptiveStubLength(sourceContext, edgePaths, endpointContextList);
+      const stubLength = resolveAdaptiveStubLength(
+        sourceContext,
+        edgePaths,
+        endpointContextList,
+        bridgeScoringContext,
+      );
       repaired = repairStartWithContext(repaired, sourceContext.side, stubLength, sourceContext.forceShorten === true);
     }
     const targetContext = endpointContexts.get(`${edgeKey}:target`);
     if (targetContext) {
-      const stubLength = resolveAdaptiveStubLength(targetContext, edgePaths, endpointContextList);
+      const stubLength = resolveAdaptiveStubLength(
+        targetContext,
+        edgePaths,
+        endpointContextList,
+        bridgeScoringContext,
+      );
       repaired = repairEndWithContext(repaired, targetContext.side, stubLength, targetContext.forceShorten === true);
     }
     repaired = straightenNearlyAlignedEndpointPath(repaired, edge, edgeKey, nodeById, edgePaths) ?? repaired;
