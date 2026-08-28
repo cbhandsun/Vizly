@@ -19,6 +19,7 @@ import {
   repairBaseReactFlowFinalEndpointOrder,
 } from '../baseReactFlowDisplayFinalEndpointOrder';
 import { createBaseReactFlowFinalEndpointEvaluation } from '../baseReactFlowDisplayFinalEndpointEvaluation';
+import { resolveBaseReactFlowEvaluationNodes } from '../baseReactFlowDisplayEvaluationNodes';
 import { passesBaseReactFlowFinalDisplayGate } from '../baseReactFlowDisplayFinalEndpointGate';
 import {
   findDisplayStrictCrossingHits,
@@ -97,6 +98,35 @@ const fixture = (): { nodes: Node[]; edges: Edge[] } => ({
 });
 
 describe('base React Flow final endpoint order transaction', () => {
+  it('reuses only the supplied evaluation node snapshot', () => {
+    const rawNodes: Node[] = [{
+      id: 'source',
+      position: { x: 10, y: 20 },
+      width: 100,
+      height: 60,
+      data: {},
+    }];
+    const sessionNodes: Node[] = [{
+      ...rawNodes[0],
+      position: { x: 110, y: 220 },
+    }];
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation(sessionNodes);
+
+    expect(resolveBaseReactFlowEvaluationNodes(rawNodes, evaluation))
+      .toBe(sessionNodes);
+    const independentlyProjected = resolveBaseReactFlowEvaluationNodes(rawNodes);
+    expect(independentlyProjected).not.toBe(rawNodes);
+    expect(independentlyProjected).not.toBe(sessionNodes);
+
+    const nextSessionNodes = sessionNodes.map(node => ({
+      ...node,
+      position: { x: node.position.x + 1, y: node.position.y },
+    }));
+    const nextEvaluation = createBaseReactFlowFinalEndpointEvaluation(nextSessionNodes);
+    expect(resolveBaseReactFlowEvaluationNodes(rawNodes, nextEvaluation))
+      .toBe(nextSessionNodes);
+  });
+
   it('exposes reusable final evidence for a closure-ready commercial route', () => {
     const nodes = [
       node('hub', 0, 0, 100, 100),

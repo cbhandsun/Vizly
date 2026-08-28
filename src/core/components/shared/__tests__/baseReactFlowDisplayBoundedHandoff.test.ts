@@ -8,6 +8,7 @@ import {
 import { prepareBaseReactFlowFullRouteSeed } from '../baseReactFlowDisplayFullRouteSeedPhase';
 import { computeBaseReactFlowDisplayEdgeEpoch } from '../baseReactFlowDisplayEdgeCore';
 import type { BaseDisplayBoundedCandidateReport } from '../baseReactFlowDisplayEvaluation';
+import { createBaseReactFlowFinalEndpointEvaluation } from '../baseReactFlowDisplayFinalEndpointEvaluation';
 import { baseNodes } from './baseReactFlowDisplayEdges.testUtils';
 
 const hardCleanReport: BaseDisplayBoundedCandidateReport = {
@@ -34,6 +35,35 @@ const hardCleanReport: BaseDisplayBoundedCandidateReport = {
 };
 
 describe('bounded pre-display handoff', () => {
+  it('preserves the supplied evaluation node identity through full-route preparation', () => {
+    const edges: Edge[] = [{
+      id: 'session-seed',
+      source: 'source',
+      target: 'target',
+      data: {
+        computedPath: [{ x: 100, y: 230 }, { x: 300, y: 30 }],
+      },
+    }];
+    const evaluationSession = createBaseReactFlowFinalEndpointEvaluation(baseNodes);
+    const result = prepareBaseReactFlowFullRouteSeed({
+      edges,
+      nodes: baseNodes,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+      forceFullQuality: true,
+      skipBoundedAttempt: true,
+      skipFinalizedReuse: true,
+      displayEdgeEpoch: 1,
+      evaluationSession,
+    });
+
+    expect(result.kind).toBe('continue');
+    if (result.kind !== 'continue') return;
+    expect(result.context.repairNodes).toBe(evaluationSession.nodes);
+    expect(result.context.evaluationSession).toBe(evaluationSession);
+  });
+
   it('builds the topology plan before the full-quality candidate phases run', () => {
     const edges: Edge[] = [{
       id: 'topology-seed',

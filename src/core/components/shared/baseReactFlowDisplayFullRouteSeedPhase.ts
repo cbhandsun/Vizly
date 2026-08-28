@@ -6,7 +6,6 @@ import {
   markBaseDisplayFinalized,
   normalizeBaseEdge,
   synthesizeStableFallbackPath,
-  withDisplayAbsolutePositions,
 } from './baseReactFlowDisplayEdgeCore';
 import {
   displayHardQualityGatesAreClean,
@@ -30,6 +29,7 @@ import {
   createBaseReactFlowFinalEndpointEvaluation,
   diffBaseReactFlowEvaluationMetrics,
 } from './baseReactFlowDisplayFinalEndpointEvaluation';
+import { resolveBaseReactFlowEvaluationNodes } from './baseReactFlowDisplayEvaluationNodes';
 import { auditBaseReactFlowFinalSafetyClosure } from './baseReactFlowDisplayFinalSafetyAudit';
 import {
   startDisplayRoutingPhaseTrace,
@@ -74,6 +74,7 @@ export const prepareBaseReactFlowFullRouteSeed = ({
     return { kind: 'finalized', edges };
   }
 
+  const repairNodes = resolveBaseReactFlowEvaluationNodes(nodes, providedEvaluationSession);
   let preparedBoundedEdges: Edge[] | null = null;
   if (
     createPreDisplayFinalEdges
@@ -99,7 +100,7 @@ export const prepareBaseReactFlowFullRouteSeed = ({
     });
     const boundedHardClean = boundedReport?.hardClean ?? displayHardQualityGatesAreClean(
       boundedFinal,
-      withDisplayAbsolutePositions(nodes, new Map(nodes.map((node) => [node.id, node]))),
+      repairNodes,
     );
     if (boundedHardClean) {
       return {
@@ -111,7 +112,6 @@ export const prepareBaseReactFlowFullRouteSeed = ({
   }
 
   const nodeById = new Map(nodes.map((node) => [node.id, node]));
-  const repairNodes = withDisplayAbsolutePositions(nodes, nodeById);
   const evaluationSession = providedEvaluationSession
     ?? createBaseReactFlowFinalEndpointEvaluation(repairNodes);
   // Keep the prepared seed paired with normalized routes through render finalization;

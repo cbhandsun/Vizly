@@ -25,7 +25,6 @@ import {
   repairFinalTerminalMicroDoglegs,
   type FinalEndpointTopologyCandidateValidation,
 } from '../../strategies/shared/edgeFinalEndpointTopologyRepair';
-import { withDisplayAbsolutePositions } from './baseReactFlowDisplayEdgeCore';
 import { createBaseReactFlowFinalEndpointResidualRepair } from './baseReactFlowDisplayFinalEndpointResidualRepair';
 import { buildSharedEndpointTrunkSynthesisCandidates } from './baseReactFlowDisplayEndpointTrunkCandidates';
 import { repairDisplayLoopShortcuts } from './baseReactFlowDisplayLoopShortcutRepair';
@@ -34,6 +33,7 @@ import {
   diffBaseReactFlowEvaluationMetrics,
   type BaseReactFlowFinalEndpointEvaluation,
 } from './baseReactFlowDisplayFinalEndpointEvaluation';
+import { resolveBaseReactFlowEvaluationNodes } from './baseReactFlowDisplayEvaluationNodes';
 import {
   passesBaseReactFlowFinalDisplayGate as passesFinalDisplayGate,
   type BaseReactFlowFinalEndpointOrderOptions,
@@ -296,9 +296,9 @@ export const repairBaseReactFlowFinalEndpointOrder = <T extends Edge[]>(
   options: BaseReactFlowFinalEndpointOrderOptions = {},
 ): T => {
   if (edges.length < 2 || nodes.length === 0) return edges;
-  const repairNodes = withDisplayAbsolutePositions(
+  const repairNodes = resolveBaseReactFlowEvaluationNodes(
     nodes,
-    new Map(nodes.map(node => [node.id, node] as const)),
+    options.evaluation,
   );
   const evaluation = options.evaluation
     ?? createBaseReactFlowFinalEndpointEvaluation(repairNodes);
