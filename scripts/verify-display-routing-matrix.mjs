@@ -22,6 +22,7 @@ import {
   DISPLAY_ROUTING_TOPOLOGY_CASE_ID,
   findDisplayRoutingMenuElementByKey,
   parseDisplayRoutingMatrixCase,
+  parseDisplayRoutingMatrixPreset,
 } from './lib/display-routing-matrix-cases.mjs';
 import {
   displayRoutingWaitStateHasTerminalFailure,
@@ -47,6 +48,11 @@ const MATRIX_CASE_IDS = createDisplayRoutingMatrixCaseIds(
 const REQUESTED_CASE = parseDisplayRoutingMatrixCase(
   process.env.DISPLAY_ROUTING_MATRIX_CASE,
   MATRIX_CASE_IDS,
+);
+const LAYOUT_PRESET_ID = parseDisplayRoutingMatrixPreset(
+  process.env.DISPLAY_ROUTING_MATRIX_PRESET,
+  new Set(PRECOMPILED_DISPLAY_ROUTE_TARGETS.map(target => target.presetId)),
+  'wms-demand-allocation-strategy-v2',
 );
 
 const assertProductionPreview = async () => {
@@ -378,7 +384,7 @@ const clickLayout = async (session, layoutCase) => {
 
 const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => {
   await prepareSession(session);
-  const presetId = 'wms-demand-allocation-strategy-v2';
+  const presetId = LAYOUT_PRESET_ID;
   const target = PRECOMPILED_DISPLAY_ROUTE_TARGETS.find(candidate => candidate.presetId === presetId);
   if (!target) throw new Error(`Canonical layout preset target is missing: ${presetId}`);
   const identity = parseCanonicalPresetIdentity(

@@ -105,6 +105,33 @@ describe('display routing matrix wait-state summary', () => {
     expect(summary.renderedEdgeCount).toBeUndefined();
   });
 
+  it('summarizes the latest completed response when progress follows it', () => {
+    const summary = summarizeDisplayRoutingWaitState({}, [{
+      requestId: 'layout:7',
+      hardClean: false,
+      hardReport: {
+        hardClean: false,
+        obstacleHits: 3,
+        terminalsAnchored: false,
+        quality: { strictCrossings: 2 },
+      },
+    }, {
+      requestId: 'layout:7',
+      phaseProgress: { phase: 'finalizer', durationMs: 10 },
+    }], 4);
+
+    expect(summary.lastResponse).toMatchObject({
+      requestKind: 'layout',
+      hardClean: false,
+      hardReport: {
+        hardClean: false,
+        obstacleHits: 3,
+        terminalsAnchored: false,
+        quality: { strictCrossings: 2 },
+      },
+    });
+  });
+
   it('recognizes only fail-fast terminal routing states', () => {
     expect(displayRoutingWaitStateHasTerminalFailure({
       routing: { stage: 'worker-timeout' },

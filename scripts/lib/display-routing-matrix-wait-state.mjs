@@ -26,7 +26,9 @@ export const summarizeDisplayRoutingWaitState = (
   const routing = record(routingValue);
   const responses = Array.isArray(responseValue) ? responseValue : [];
   const requests = Array.isArray(requestValue) ? requestValue : [];
-  const response = record(responses.at(-1));
+  const response = record([...responses].reverse().find(value => (
+    typeof record(value).hardClean === 'boolean'
+  )) ?? responses.at(-1));
   const report = record(response.hardReport);
   const quality = record(report.quality);
   const traces = Array.isArray(response.phaseTrace) ? response.phaseTrace.slice(-24) : [];

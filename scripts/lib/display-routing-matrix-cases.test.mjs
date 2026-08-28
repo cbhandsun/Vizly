@@ -6,6 +6,7 @@ import {
   DISPLAY_ROUTING_TOPOLOGY_CASE_ID,
   findDisplayRoutingMenuElementByKey,
   parseDisplayRoutingMatrixCase,
+  parseDisplayRoutingMatrixPreset,
 } from './display-routing-matrix-cases.mjs';
 
 describe('display routing matrix cases', () => {
@@ -52,6 +53,19 @@ describe('display routing matrix cases', () => {
       .toThrowError('Unknown DISPLAY_ROUTING_MATRIX_CASE');
     expect(() => parseDisplayRoutingMatrixCase('x'.repeat(10_000), knownCaseIds))
       .toThrowError('Unknown DISPLAY_ROUTING_MATRIX_CASE');
+  });
+
+  it('selects a validated layout preset and preserves the default', () => {
+    const knownPresetIds = new Set(['small-preset', 'large-preset']);
+
+    expect(parseDisplayRoutingMatrixPreset(undefined, knownPresetIds, 'small-preset'))
+      .toBe('small-preset');
+    expect(parseDisplayRoutingMatrixPreset(' large-preset ', knownPresetIds, 'small-preset'))
+      .toBe('large-preset');
+    expect(() => parseDisplayRoutingMatrixPreset('unknown', knownPresetIds, 'small-preset'))
+      .toThrowError('Unknown DISPLAY_ROUTING_MATRIX_PRESET');
+    expect(() => parseDisplayRoutingMatrixPreset('x'.repeat(10_000), knownPresetIds, 'small-preset'))
+      .toThrowError('Unknown DISPLAY_ROUTING_MATRIX_PRESET');
   });
 
   it('finds Ant menu actions by stable key without depending on translated text', () => {

@@ -37,6 +37,20 @@ export const parseDisplayRoutingMatrixCase = (rawValue, knownCaseIds) => {
   return candidate;
 };
 
+export const parseDisplayRoutingMatrixPreset = (rawValue, knownPresetIds, fallbackPresetId) => {
+  const candidate = typeof rawValue === 'string' ? rawValue.trim() : '';
+  const selected = candidate || fallbackPresetId;
+  if (
+    typeof selected !== 'string'
+    || selected.length === 0
+    || selected.length > MAX_MATRIX_CASE_ID_LENGTH
+    || !knownPresetIds.has(selected)
+  ) {
+    throw new Error('Unknown DISPLAY_ROUTING_MATRIX_PRESET');
+  }
+  return selected;
+};
+
 export const findDisplayRoutingMenuElementByKey = (elements, rawKey) => {
   if (typeof rawKey !== 'string' || rawKey.length === 0 || rawKey.length > 128) {
     return null;
