@@ -158,6 +158,8 @@ export const projectDisplayRoutingTopologyDiagnostics = ({
     workerAbortCount: routing?.workerAbortCount,
     workerResolution: routing?.workerResolution,
     fallbackLevel: routing?.fallbackLevel,
+    renderAuthorityStatus: routing?.renderAuthorityStatus,
+    renderAuthorityIssue: routing?.renderAuthorityIssue,
     hasRequestId: typeof routing?.requestId === 'string',
     hasOutputRouteSignature: typeof routing?.outputRouteSignature === 'string',
   },
@@ -197,8 +199,15 @@ export const projectDisplayRoutingTopologyDiagnostics = ({
   renderedEdgeCount,
 });
 
+export const displayRoutingTopologyRenderIsCommitted = routing => (
+  routing?.stage === 'final-applied'
+  && routing?.renderAuthorityStatus === 'accepted'
+  && typeof routing?.outputRouteSignature === 'string'
+);
+
 const readOperationResultExpression = operationCase => `(() => {
   const committedEdgesMatchWorkerPatches = ${displayRoutingCommittedEdgesMatchWorkerPatches.toString()};
+  const renderIsCommitted = ${displayRoutingTopologyRenderIsCommitted.toString()};
   const requests = window.__vizlyRoutingRequests || [];
   const responses = window.__vizlyRoutingResponses || [];
   const request = [...requests].reverse().find(item => (
@@ -213,7 +222,7 @@ const readOperationResultExpression = operationCase => `(() => {
   if (
     !request
     || !response
-    || routing.stage !== 'final-applied'
+    || !renderIsCommitted(routing)
     || routing.requestId !== request.requestId
     || response.hardClean !== true
     || response.hardReport?.hardClean !== true

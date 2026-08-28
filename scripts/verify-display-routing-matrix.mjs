@@ -29,6 +29,7 @@ import {
 } from './lib/display-routing-matrix-wait-state.mjs';
 import { assertDisplayRoutingVisualScaleAudit } from './lib/display-routing-browser-visual-audit.mjs';
 import {
+  displayRoutingCommittedEdgesMatchWorkerPatches,
   verifyDisplayRoutingTopologyMatrix,
 } from './lib/display-routing-browser-topology-matrix.mjs';
 import {
@@ -120,6 +121,7 @@ const readFinalRouteExpression = expectedRequestPrefix => `(() => {
 })()`;
 
 const readLatestCompletedRouteExpression = `(() => {
+  const committedEdgesMatchWorkerPatches = ${displayRoutingCommittedEdgesMatchWorkerPatches.toString()};
   const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
   const requests = window.__vizlyRoutingRequests || [];
   const responses = window.__vizlyRoutingResponses || [];
@@ -127,7 +129,13 @@ const readLatestCompletedRouteExpression = `(() => {
   const request = [...requests].reverse().find(item => item?.requestId === response?.requestId)
     ?? requests.at(-1);
   const currentEdges = window.reactFlowInstance?.getEdges?.() || [];
-  return routing.stage === 'final-applied' && request && response && currentEdges.length > 0
+  const responsePatches = response?.routingPatches ?? response?.edges;
+  return routing.stage === 'final-applied'
+    && routing.renderAuthorityStatus === 'accepted'
+    && routing.requestId === response?.requestId
+    && request?.requestId === response?.requestId
+    && currentEdges.length > 0
+    && committedEdgesMatchWorkerPatches(currentEdges, responsePatches)
     ? {
       routing,
       request,

@@ -14,21 +14,33 @@ import {
 } from './baseReactFlowDisplayCommittedSnapshot';
 import {
   updateDisplayRoutingDebugState,
+  type BaseReactFlowRenderAuthorityIssue,
   type BaseReactFlowRenderAuthorityStatus,
 } from './baseReactFlowDisplayRoutingDebug';
 
-export const createBaseReactFlowCommittedRenderAuthority = (
+export type BaseReactFlowCommittedRenderAuthorityResolution = Readonly<{
+  authority: DisplayRoutingRenderAuthority | null;
+  issue?: BaseReactFlowRenderAuthorityIssue;
+}>;
+
+export const resolveBaseReactFlowCommittedRenderAuthority = (
   baseline: BaseReactFlowDisplayCommittedSnapshotBaseline,
   edges: readonly Edge[],
-): DisplayRoutingRenderAuthority | null => {
-  if (
-    !isBaseReactFlowDisplayCommittedSnapshotBaselineTrusted(baseline)
-    || !baseline.workerSessionRef
-    || !baseline.hardReport
-    || computeBaseReactFlowDisplayOutputRouteSignature([...edges])
-      !== baseline.outputRouteSignature
-  ) return null;
-  return createDisplayRoutingRenderAuthority({
+): BaseReactFlowCommittedRenderAuthorityResolution => {
+  if (!isBaseReactFlowDisplayCommittedSnapshotBaselineTrusted(baseline)) {
+    return { authority: null, issue: 'untrusted-baseline' };
+  }
+  if (!baseline.workerSessionRef) {
+    return { authority: null, issue: 'missing-worker-session' };
+  }
+  if (!baseline.hardReport) {
+    return { authority: null, issue: 'missing-hard-report' };
+  }
+  if (computeBaseReactFlowDisplayOutputRouteSignature([...edges])
+      !== baseline.outputRouteSignature) {
+    return { authority: null, issue: 'output-signature-mismatch' };
+  }
+  const authority = createDisplayRoutingRenderAuthority({
     inputSignature: baseline.identity.inputSignature,
     inputGeometryDigest: baseline.identity.inputGeometryDigest,
     outputRouteSignature: baseline.outputRouteSignature,
@@ -51,6 +63,16 @@ export const createBaseReactFlowCommittedRenderAuthority = (
     }),
     workerSessionRef: baseline.workerSessionRef,
   });
+  return authority
+    ? { authority }
+    : { authority: null, issue: 'invalid-authority-payload' };
+};
+
+export const createBaseReactFlowCommittedRenderAuthority = (
+  baseline: BaseReactFlowDisplayCommittedSnapshotBaseline,
+  edges: readonly Edge[],
+): DisplayRoutingRenderAuthority | null => {
+  return resolveBaseReactFlowCommittedRenderAuthority(baseline, edges).authority;
 };
 
 export const useBaseReactFlowCommittedRenderAuthority = (): Readonly<{
@@ -67,7 +89,9 @@ export const useBaseReactFlowCommittedRenderAuthority = (): Readonly<{
     baseline: BaseReactFlowDisplayCommittedSnapshotBaseline,
     edges: readonly Edge[],
   ): void => {
-    setCommittedRenderAuthority(createBaseReactFlowCommittedRenderAuthority(baseline, edges));
+    const resolution = resolveBaseReactFlowCommittedRenderAuthority(baseline, edges);
+    updateDisplayRoutingDebugState({ renderAuthorityIssue: resolution.issue });
+    setCommittedRenderAuthority(resolution.authority);
   }, []);
   return { committedRenderAuthority, rememberCommittedRenderAuthority };
 };

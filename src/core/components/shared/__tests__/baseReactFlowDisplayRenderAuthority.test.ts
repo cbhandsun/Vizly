@@ -11,6 +11,7 @@ import {
   readBaseReactFlowDisplayCommittedSnapshot,
 } from '../baseReactFlowDisplayCommittedSnapshot';
 import { computeBaseReactFlowDisplayInputIdentityBundle } from '../baseReactFlowDisplayInputIdentity';
+import { resolveBaseReactFlowDisplayCommittedReuse } from '../baseReactFlowDisplayCommittedReuse';
 import { createBaseReactFlowDisplayEdgePatches } from '../baseReactFlowDisplayRoutingTransaction';
 import { projectBaseReactFlowDisplayWorkerInput } from '../baseReactFlowDisplayWorkerProjection';
 import {
@@ -142,6 +143,24 @@ describe('BaseReactFlow committed render authority', () => {
       label: 'latest business label',
       selected: true,
     })))).not.toBeNull();
+  });
+
+  it('does not overwrite a fresh authority with retained input geometry before replay refreshes', () => {
+    const baseline = commitSnapshot();
+    if (!baseline) throw new Error('expected committed snapshot');
+
+    const retainedOnly = resolveBaseReactFlowDisplayCommittedReuse({
+      forceFreshFullRoute: false,
+      retainedBaseline: baseline,
+      committedEntry: null,
+      inputSignature: baseline.inputSignature,
+      inputGeometryDigest: baseline.inputGeometryDigest,
+    });
+
+    expect(retainedOnly.retainedEntry).toBe(baseline);
+    expect(retainedOnly.reusableEntry).toBeNull();
+    expect(retainedOnly.authorityBaseline).toBeNull();
+    expect(retainedOnly.authorityEdges).toEqual([]);
   });
 
   it('reports the exact boundary that rejects an active render authority', () => {

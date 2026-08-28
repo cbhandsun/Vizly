@@ -49,7 +49,15 @@ export type DisplayRoutingDebugState = {
   incrementalBaselineSignature?: string;
   incrementalPlanStatus?: 'ready' | 'missing-baseline' | 'rejected';
   renderAuthorityStatus?: BaseReactFlowRenderAuthorityStatus;
+  renderAuthorityIssue?: BaseReactFlowRenderAuthorityIssue;
 };
+
+export type BaseReactFlowRenderAuthorityIssue =
+  | 'untrusted-baseline'
+  | 'missing-worker-session'
+  | 'missing-hard-report'
+  | 'output-signature-mismatch'
+  | 'invalid-authority-payload';
 
 export type BaseReactFlowRenderAuthorityStatus =
   | 'accepted'

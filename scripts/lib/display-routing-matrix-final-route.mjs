@@ -25,7 +25,12 @@ export const resolveDisplayRoutingFinalRouteSnapshot = ({
       && phase.phase === 'candidate-validation'
       && phase.resolution === 'hit'
     ));
-  if (!isRecord(routing) || routing.stage !== 'final-applied') return null;
+  if (
+    !isRecord(routing)
+    || routing.stage !== 'final-applied'
+    || routing.renderAuthorityStatus !== 'accepted'
+    || typeof routing.requestId !== 'string'
+  ) return null;
   const safeRequests = Array.isArray(requests) ? requests : [];
   const safeResponses = Array.isArray(responses) ? responses : [];
   const response = [...safeResponses].reverse().find(item => (

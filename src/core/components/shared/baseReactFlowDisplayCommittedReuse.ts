@@ -40,12 +40,15 @@ export const resolveBaseReactFlowDisplayCommittedReuse = ({
     inputSignature,
     inputGeometryDigest,
   ) ? committedEntry : null;
-  const authorityBaseline = reusableEntry?.baseline ?? retainedEntry;
+  // A retained baseline owns the original input projection, not replayed final
+  // edges. It can suppress duplicate routing for the active identity, but only
+  // a complete committed entry may re-issue the exact final render authority.
+  const authorityBaseline = reusableEntry?.baseline ?? null;
   return {
     retainedEntry,
     reusableEntry,
     authorityBaseline,
-    authorityEdges: reusableEntry?.edges ?? authorityBaseline?.sourceEdges ?? [],
+    authorityEdges: reusableEntry?.edges ?? [],
     outputRouteSignature: reusableEntry?.outputRouteSignature
       ?? retainedEntry?.outputRouteSignature,
   };

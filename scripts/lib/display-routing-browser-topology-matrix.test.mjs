@@ -4,6 +4,7 @@ import {
   assertDisplayRoutingTopologyOperationGroupResult,
   assertDisplayRoutingTopologyOperationResult,
   displayRoutingCommittedEdgesMatchWorkerPatches,
+  displayRoutingTopologyRenderIsCommitted,
   projectDisplayRoutingTopologyAssertionDiagnostics,
   projectDisplayRoutingTopologyDiagnostics,
 } from './display-routing-browser-topology-matrix.mjs';
@@ -45,6 +46,24 @@ const assertValid = result => assertDisplayRoutingTopologyOperationResult({
 });
 
 describe('display routing browser topology matrix', () => {
+  it('waits for the committed render authority after the final routing state is published', () => {
+    expect(displayRoutingTopologyRenderIsCommitted({
+      stage: 'final-applied',
+      renderAuthorityStatus: 'missing-commit',
+      outputRouteSignature: 'route-v2:14:64:abcd',
+    })).toBe(false);
+    expect(displayRoutingTopologyRenderIsCommitted({
+      stage: 'final-applied',
+      renderAuthorityStatus: 'accepted',
+      outputRouteSignature: 'route-v2:14:64:abcd',
+    })).toBe(true);
+    expect(displayRoutingTopologyRenderIsCommitted({
+      stage: 'worker-response',
+      renderAuthorityStatus: 'accepted',
+      outputRouteSignature: 'route-v2:14:64:abcd',
+    })).toBe(false);
+  });
+
   it('waits until React Flow has applied routing handles and paths from the Worker patch', () => {
     const edge = {
       id: 'edge', source: 'source', target: 'target', type: 'stablePath',
@@ -70,6 +89,7 @@ describe('display routing browser topology matrix', () => {
     const projected = projectDisplayRoutingTopologyDiagnostics({
       routing: {
         stage: 'final-quality-rejected',
+        renderAuthorityStatus: 'missing-commit',
         requestId: 'secret-request-id',
         outputRouteSignature: 'secret-route-signature',
       },
@@ -103,6 +123,7 @@ describe('display routing browser topology matrix', () => {
       edgeCount: 1,
       hasRequestId: true,
     });
+    expect(projected.routing.renderAuthorityStatus).toBe('missing-commit');
     expect(projected.responses[0]).toMatchObject({
       hardClean: false,
       patchCount: 1,

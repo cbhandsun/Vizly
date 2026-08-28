@@ -15,7 +15,9 @@ it('accepts a hard-clean Worker response for the expected layout request', () =>
     edges: [{ id: 'a-b', data: { computedPath: [[0, 0], [10, 0]] } }],
   };
   expect(resolveDisplayRoutingFinalRouteSnapshot({
-    routing: { stage: 'final-applied', requestId: 'layout:7' },
+    routing: {
+      stage: 'final-applied', requestId: 'layout:7', renderAuthorityStatus: 'accepted',
+    },
     requests: [request],
     responses: [response],
     currentEdges: [],
@@ -29,6 +31,8 @@ it('reconstructs a candidate-validation hit that commits without a Worker respon
   const result = resolveDisplayRoutingFinalRouteSnapshot({
     routing: {
       stage: 'final-applied',
+      requestId: 'layout:7',
+      renderAuthorityStatus: 'accepted',
       workerResolution: 'repaired-candidate',
       phaseProgressTrace: [{ phase: 'candidate-validation', resolution: 'hit' }],
     },
@@ -48,13 +52,19 @@ it('reconstructs a candidate-validation hit that commits without a Worker respon
 
 describe('candidate-only completion is fail closed', () => {
   it.each([
-    ['no validation hit', { stage: 'final-applied', phaseProgressTrace: [] }, 1],
+    ['no validation hit', {
+      stage: 'final-applied', requestId: 'layout:7', renderAuthorityStatus: 'accepted', phaseProgressTrace: [],
+    }, 1],
     ['edge count mismatch', {
       stage: 'final-applied',
+      requestId: 'layout:7',
+      renderAuthorityStatus: 'accepted',
       phaseProgressTrace: [{ phase: 'candidate-validation', resolution: 'hit' }],
     }, 0],
     ['not final', {
       stage: 'worker-routing',
+      requestId: 'layout:7',
+      renderAuthorityStatus: 'accepted',
       phaseProgressTrace: [{ phase: 'candidate-validation', resolution: 'hit' }],
     }, 1],
   ])('rejects %s', (_label, routing, renderedEdgeCount) => {
