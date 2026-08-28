@@ -73,6 +73,7 @@ import {
   finalizeBoundedDisplayWorkerRepairResponse,
   type DisplayWorkerFinalizationOptions,
 } from './baseReactFlowDisplayWorkerFinalEvaluation';
+import { finalizeBaseReactFlowExactCommercialClearance } from './baseReactFlowDisplayFinalCommercialClearanceTransaction';
 
 const finalizeContainerClearanceResponse = (
   response: DisplayEdgesWorkerResponse,
@@ -91,6 +92,18 @@ const finalizeContainerClearanceResponse = (
     hardQualityIsClean: finalHardQualityIsClean,
     withExactHardReport,
   } = finalEvaluationScope;
+  const finalizeExactCommercialResponse = (
+    exactCandidate: DisplayEdgesWorkerResponse,
+  ): DisplayEdgesWorkerResponse => (
+    (options.commercialStabilizationPass ?? 0) > 0
+      ? exactCandidate
+      : finalizeBaseReactFlowExactCommercialClearance({
+        exactBaseline: exactCandidate,
+        repairNodes,
+        eligibleEdgeIds: options.eligibleEdgeIds,
+        exactReport: candidate => withExactHardReport(candidate),
+      })
+  );
   const clearanceTimer = startDisplayRoutingPhaseTrace({
     phase: 'final-clearance',
     candidateCount: response.edges.length,
@@ -343,7 +356,7 @@ const finalizeContainerClearanceResponse = (
     // must outrank the soft detour guard when the baseline is commercially
     // dirty; otherwise stabilization resurrects the near-node route it was
     // invoked to replace. It must also replace an exact hard-dirty baseline.
-    return stabilizedEdges
+    const selectedResponse = stabilizedEdges
       && stabilizedResponse.hardClean === true
       && (
         exactFinalizedResponse.hardClean !== true
@@ -356,8 +369,9 @@ const finalizeContainerClearanceResponse = (
       )
       ? stabilizedResponse
       : exactFinalizedResponse;
+    return finalizeExactCommercialResponse(selectedResponse);
   }
-  return withExactHardReport(finalizedResponse);
+  return finalizeExactCommercialResponse(withExactHardReport(finalizedResponse));
 };
 
 export const computeBaseReactFlowDisplayEdgesWorkerResponse = (

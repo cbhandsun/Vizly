@@ -9,6 +9,7 @@ import {
   repairBaseReactFlowDisplayBusinessNodeClearance,
 } from '../baseReactFlowDisplayBusinessNodeClearance';
 import { withExactDisplayHardReport } from '../baseReactFlowDisplayWorkerResponse';
+import { finalizeBaseReactFlowExactCommercialClearance } from '../baseReactFlowDisplayFinalCommercialClearanceTransaction';
 
 describe('final display business-node clearance', () => {
   const nodes: Node[] = [
@@ -151,5 +152,89 @@ describe('final display business-node clearance', () => {
     expect(countDisplayBusinessNodeCommercialClearanceViolations(repaired, fixtureNodes)).toBe(0);
     expect(quality.strictCrossings).toBe(0);
     expect(quality.unexplainedRelatedOverlap).toBe(0);
+  });
+
+  it('preserves anchored terminal stubs while closing a corner clearance risk', () => {
+    const fixtureNodes: Node[] = [
+      { id: 'source', position: { x: 0, y: 0 }, data: {}, measured: { width: 80, height: 60 } },
+      { id: 'obstacle', position: { x: 220, y: 68 }, data: {}, measured: { width: 80, height: 60 } },
+      { id: 'target', position: { x: 300, y: 200 }, data: {}, measured: { width: 80, height: 60 } },
+    ];
+    const fixtureEdges: Edge[] = [{
+      id: 'edge',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'right',
+      targetHandle: 'left',
+      data: { computedPath: [
+        { x: 80, y: 30 },
+        { x: 200, y: 30 },
+        { x: 200, y: 230 },
+        { x: 300, y: 230 },
+      ] },
+    }];
+    const baseline = withExactDisplayHardReport({
+      requestId: 'corner-clearance-baseline',
+      edges: fixtureEdges,
+      hardClean: false,
+      routeResolution: 'full-route',
+    }, fixtureNodes);
+    const repairedEdges = repairBaseReactFlowDisplayBusinessNodeClearance(
+      fixtureEdges,
+      fixtureNodes,
+    );
+    const repaired = withExactDisplayHardReport({
+      ...baseline,
+      edges: repairedEdges,
+    }, fixtureNodes);
+
+    expect(baseline.hardReport).toMatchObject({
+      terminalsAnchored: true,
+      commercialClearanceViolations: 1,
+    });
+    expect(repaired.hardReport).toMatchObject({
+      hardClean: true,
+      terminalsAnchored: true,
+      commercialClearanceViolations: 0,
+    });
+
+    const finalized = finalizeBaseReactFlowExactCommercialClearance({
+      exactBaseline: baseline,
+      repairNodes: fixtureNodes,
+    });
+    expect(finalized.hardReport).toMatchObject({
+      hardClean: true,
+      terminalsAnchored: true,
+      commercialClearanceViolations: 0,
+    });
+  });
+
+  it('rolls back when commercial repair cannot preserve the exact terminal contract', () => {
+    const edges: Edge[] = [{
+      id: 'edge',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'right',
+      targetHandle: 'left',
+      data: { computedPath: [{ x: 80, y: 30 }, { x: 300, y: 30 }] },
+    }];
+    const exactBaseline = withExactDisplayHardReport({
+      requestId: 'commercial-final-rollback',
+      edges,
+      hardClean: false,
+      routeResolution: 'full-route',
+    }, nodes);
+
+    const finalized = finalizeBaseReactFlowExactCommercialClearance({
+      exactBaseline,
+      repairNodes: nodes,
+    });
+
+    expect(finalized).toBe(exactBaseline);
+    expect(finalized.hardReport).toMatchObject({
+      hardClean: false,
+      terminalsAnchored: true,
+      commercialClearanceViolations: 1,
+    });
   });
 });
