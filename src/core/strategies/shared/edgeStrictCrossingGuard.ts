@@ -37,6 +37,10 @@ import {
   calculateEdgePathQualityDecomposition,
   type EdgePathQualityDecomposition,
 } from './edgePathQualityFullScan';
+import {
+  shouldUseIncrementalEdgePathQualityEvaluation,
+  shouldUseIncrementalEdgePathQualityState,
+} from './edgePathQualityIncrementalPolicy';
 import { countIndexedStrictSegmentCrossings } from './edgeStrictCrossingIndex';
 import { readSignatureValue, rememberBoundedSignatureValue } from './boundedSignatureCache';
 
@@ -209,7 +213,6 @@ export type EdgePathQualityEvaluationInitializationMetrics = {
   scannedSegmentCount: number;
 };
 
-const MAX_INCREMENTAL_QUALITY_EDGE_CHANGES = 8;
 const qualityEvaluationContextCache = new WeakMap<Edge[], {
   signature: string;
   context: EdgePathQualityEvaluationContext;
@@ -355,7 +358,7 @@ export function createEdgePathQualityEvaluationContext(
 
     const edgeSignatures = parent.edgeSignatures.slice();
     const changedSnapshots = new Map<number, QualityEdgeInputSnapshot>();
-    if (uniqueIndexes.length > MAX_INCREMENTAL_QUALITY_EDGE_CHANGES) {
+    if (!shouldUseIncrementalEdgePathQualityState(uniqueIndexes.length)) {
       uniqueIndexes = [];
       for (let index = 0; index < parent.edgeCount; index += 1) {
         const snapshot = buildQualityEdgeInputSnapshot(candidate[index]);
@@ -363,7 +366,7 @@ export function createEdgePathQualityEvaluationContext(
         if (snapshot.signature === parent.edgeSignatures[index]) continue;
         uniqueIndexes.push(index);
         changedSnapshots.set(index, snapshot);
-        if (uniqueIndexes.length > MAX_INCREMENTAL_QUALITY_EDGE_CHANGES) {
+        if (!shouldUseIncrementalEdgePathQualityState(uniqueIndexes.length)) {
           return fullState(candidate);
         }
       }
@@ -590,7 +593,10 @@ export function createEdgePathQualityEvaluationContext(
       for (let index = 0; index < edgeCount; index += 1) {
         if (candidateSnapshot.edgeSignatures[index] !== baselineSnapshot.edgeSignatures[index]) {
           changedIndexes.push(index);
-          if (changedIndexes.length > MAX_INCREMENTAL_QUALITY_EDGE_CHANGES) {
+          if (!shouldUseIncrementalEdgePathQualityEvaluation(
+            edgeCount,
+            changedIndexes.length,
+          )) {
             return calculateEdgePathQualityScore(candidate);
           }
         }
@@ -623,7 +629,7 @@ export function createEdgePathQualityEvaluationContext(
         .sort((first, second) => first - second);
       if (
         uniqueIndexes.length !== changedIndexes.length
-        || uniqueIndexes.length > MAX_INCREMENTAL_QUALITY_EDGE_CHANGES
+        || !shouldUseIncrementalEdgePathQualityEvaluation(edgeCount, uniqueIndexes.length)
       ) {
         // Repair stages sometimes recreate every Edge object even when only a
         // few routing inputs changed. Revalidate the broad reference-based hint

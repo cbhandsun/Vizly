@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { calculateEdgePathQualityScoreExact } from '../../../strategies/shared/edgePathQualityFullScan';
 import { createBaseReactFlowFinalEndpointEvaluation } from '../baseReactFlowDisplayFinalEndpointEvaluation';
 import { startBaseReactFlowObstacleClosureTrace } from '../baseReactFlowDisplayObstacleClosureTrace';
 import type { DisplayRoutingPhaseTrace } from '../baseReactFlowDisplayRoutingTrace';
@@ -261,6 +262,58 @@ describe('createBaseReactFlowFinalEndpointEvaluation', () => {
       .toBe(incremental.hardReportChanged(edges, candidate, [0]));
     expect(incremental.readMetrics().evaluationCount).toBeGreaterThan(0);
   });
+
+  it.each([9, 21])(
+    'keeps a bounded %i-edge hard report incremental on a large route',
+    (changedEdgeCount) => {
+      const baseline = Array.from({ length: 45 }, (_, index): Edge => ({
+        id: `dense-${index}`,
+        source: `source-${index}`,
+        target: `target-${index}`,
+        data: {
+          computedPath: [
+            { x: 0, y: index % 3 },
+            { x: 400, y: index % 3 },
+          ],
+        },
+      }));
+      const changedIndexes = Array.from({ length: changedEdgeCount }, (_, index) => index);
+      const candidate = baseline.map((edge, index) => changedIndexes.includes(index) ? {
+        ...edge,
+        data: {
+          ...edge.data,
+          computedPath: [
+            { x: 0, y: 20 + index },
+            { x: 400, y: 20 + index },
+          ],
+        },
+      } : edge);
+      const incremental = createBaseReactFlowFinalEndpointEvaluation([]);
+      incremental.hardReport(baseline);
+      const before = incremental.readMetrics();
+
+      const report = incremental.hardReportChanged(baseline, candidate, changedIndexes);
+      const after = incremental.readMetrics();
+      const exactScanMetrics = { scannedEdgePairCount: 0 };
+      const exactQuality = calculateEdgePathQualityScoreExact(candidate, exactScanMetrics);
+      const fullReport = createBaseReactFlowFinalEndpointEvaluation([]).hardReport(
+        candidate.map(edge => ({ ...edge, data: { ...edge.data } })),
+      );
+
+      expect(report).toEqual(fullReport);
+      expect(report.quality).toEqual(exactQuality);
+      expect(after.scannedEdgePairCount - before.scannedEdgePairCount).toBeGreaterThan(0);
+      expect(after.scannedEdgePairCount - before.scannedEdgePairCount).toBeLessThan(
+        exactScanMetrics.scannedEdgePairCount,
+      );
+      const beforeReuse = incremental.readMetrics();
+      expect(incremental.hardReport(candidate)).toBe(report);
+      expect(incremental.readMetrics()).toMatchObject({
+        scannedEdgePairCount: beforeReuse.scannedEdgePairCount,
+        cacheHitCount: beforeReuse.cacheHitCount + 1,
+      });
+    },
+  );
 
   it('falls back to a full hard report when immutable changes are not fully declared', () => {
     const candidate = edges.map(edge => ({

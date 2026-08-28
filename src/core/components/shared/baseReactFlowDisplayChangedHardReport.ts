@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import { MINIMUM_BUSINESS_NODE_CLEARANCE } from '../../strategies/shared/edgeBusinessNodeClearanceRepair';
+import { shouldUseIncrementalEdgePathQualityEvaluation } from '../../strategies/shared/edgePathQualityIncrementalPolicy';
 import { createEdgePathQualityEvaluationContext } from '../../strategies/shared/edgeStrictCrossingGuard';
 import { createNodeClearanceGraphEvaluationContext } from '../../strategies/shared/edgeWaypointCandidateRepair';
 import {
@@ -13,8 +14,6 @@ import { compactDisplayEdgePaths, getDisplayComputedPath } from './baseReactFlow
 import { createDisplayObstacleHitContext } from './baseReactFlowDisplayObstacleHitCache';
 import { evaluateDisplayTerminalHardGates } from './baseReactFlowDisplayQualityGates';
 import type { DisplayTerminalValidationSnapshot } from './baseReactFlowTerminalAxisRepair';
-
-const MAX_INCREMENTAL_HARD_REPORT_EDGE_CHANGES = 8;
 
 export type BaseReactFlowChangedHardReportEvaluation = Readonly<{
   evaluate: (
@@ -41,7 +40,7 @@ const exactDeclaredChanges = (
   if (
     indexes.length !== changedEdgeIndexes.length
     || indexes.length === 0
-    || indexes.length > MAX_INCREMENTAL_HARD_REPORT_EDGE_CHANGES
+    || !shouldUseIncrementalEdgePathQualityEvaluation(baseline.length, indexes.length)
   ) return null;
   const changed = new Set(indexes);
   for (let index = 0; index < baseline.length; index += 1) {
