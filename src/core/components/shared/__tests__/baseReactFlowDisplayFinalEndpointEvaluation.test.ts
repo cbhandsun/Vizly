@@ -106,6 +106,43 @@ describe('createBaseReactFlowFinalEndpointEvaluation', () => {
     expect(repairStrict).not.toHaveBeenCalled();
   });
 
+  it('evaluates a residual strict candidate from its exact changed indexes', () => {
+    const baseline: Edge[] = [
+      {
+        id: 'horizontal',
+        source: 'left',
+        target: 'right',
+        data: { computedPath: [{ x: 0, y: 50 }, { x: 100, y: 50 }] },
+      },
+      {
+        id: 'vertical',
+        source: 'top',
+        target: 'bottom',
+        data: { computedPath: [{ x: 50, y: 0 }, { x: 50, y: 100 }] },
+      },
+    ];
+    const candidate: Edge[] = [
+      baseline[0],
+      {
+        ...baseline[1],
+        data: { computedPath: [{ x: 150, y: 0 }, { x: 150, y: 100 }] },
+      },
+    ];
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation([]);
+    const changedReportSpy = vi.spyOn(evaluation, 'hardReportChanged');
+    const validate = vi.fn(() => true);
+    const residualRepair = createBaseReactFlowFinalEndpointResidualRepair({
+      nodes: [],
+      evaluation,
+      validate,
+      repairStrict: () => candidate,
+    });
+
+    expect(residualRepair.strict(baseline)).toBe(candidate);
+    expect(changedReportSpy).toHaveBeenCalledWith(baseline, candidate, [1]);
+    expect(validate).toHaveBeenCalledWith(baseline, candidate, [1]);
+  });
+
   it('reuses an exact residual overlap score for the same immutable route', () => {
     const scoreResidualOverlap = vi.fn(() => 0);
     const residualRepair = createBaseReactFlowFinalEndpointResidualRepair({

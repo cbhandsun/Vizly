@@ -17,6 +17,7 @@ import {
 } from '../../strategies/shared/edgeBusinessNodeClearanceRepair';
 import { repairDisplayMicroArtifacts } from '../../strategies/shared/edgeDisplayMicroCleanup';
 import { createBaseReactFlowDisplayMicroSafetyContext } from './baseReactFlowDisplayMicroSafety';
+import { evaluateBaseReactFlowChangedCandidateReport } from './baseReactFlowDisplayChangedCandidateReport';
 import {
   repairFinalSharedSourceTerminalTrunks,
   repairFinalSharedTargetTerminalTrunks,
@@ -111,18 +112,16 @@ const commitSiblingTerminalObstacleCandidate = (
     baseline,
     repairNodes,
   )) {
-    const candidateReport = evaluation.hardReport(candidate);
+    const changed = evaluateBaseReactFlowChangedCandidateReport(baseline, candidate, evaluation);
+    if (!changed) continue;
+    const { changedEdgeIndexes, report: candidateReport } = changed;
     if (
       candidateReport.obstacleHits >= bestReport.obstacleHits
       || !candidateReport.terminalsAttached
       || !candidateReport.terminalsAnchored
     ) continue;
-    const changedEdgeIndexes = candidate.flatMap((edge, index) => (
-      edge !== baseline[index] ? [index] : []
-    ));
     if (
-      changedEdgeIndexes.length === 0
-      || !passesFinalDisplayGate(
+      !passesFinalDisplayGate(
         baseline,
         candidate,
         changedEdgeIndexes,
@@ -154,23 +153,25 @@ const commitPostObstacleMicroCandidate = (
     ? repairBaseReactFlowConnectedSourceMicroArtifacts(baseline, evaluation.nodes)
     : candidate;
   if (connectedSourceCandidate === baseline) return baseline;
-  const candidateReport = evaluation.hardReport(connectedSourceCandidate);
+  const changed = evaluateBaseReactFlowChangedCandidateReport(
+    baseline,
+    connectedSourceCandidate,
+    evaluation,
+  );
+  if (!changed) return baseline;
+  const { changedEdgeIndexes, report: candidateReport } = changed;
   if (
     candidateReport.quality.tinyInteriorDoglegs
     >= baselineReport.quality.tinyInteriorDoglegs
   ) return baseline;
-  const changedEdgeIndexes = connectedSourceCandidate.flatMap((edge, index) => (
-    edge !== baseline[index] ? [index] : []
-  ));
-  return changedEdgeIndexes.length > 0
-    && passesFinalDisplayGate(
-      baseline,
-      connectedSourceCandidate,
-      changedEdgeIndexes,
-      options,
-      evaluation,
-      true,
-    )
+  return passesFinalDisplayGate(
+    baseline,
+    connectedSourceCandidate,
+    changedEdgeIndexes,
+    options,
+    evaluation,
+    true,
+  )
     ? connectedSourceCandidate
     : baseline;
 };
@@ -216,23 +217,21 @@ const commitExcessiveDetourCandidate = (
     16,
   );
   if (candidate === baseline) return baseline;
-  const candidateReport = evaluation.hardReport(candidate);
+  const changed = evaluateBaseReactFlowChangedCandidateReport(baseline, candidate, evaluation);
+  if (!changed) return baseline;
+  const { changedEdgeIndexes, report: candidateReport } = changed;
   if (
     !candidateReport.hardClean
     || candidateReport.quality.detourPenalty >= baselineReport.quality.detourPenalty
     || candidateReport.quality.totalLength >= baselineReport.quality.totalLength
   ) return baseline;
-  const changedEdgeIndexes = candidate.flatMap((edge, index) => (
-    edge !== baseline[index] ? [index] : []
-  ));
-  return changedEdgeIndexes.length > 0
-    && passesFinalDisplayGate(
-      baseline,
-      candidate,
-      changedEdgeIndexes,
-      options,
-      evaluation,
-    )
+  return passesFinalDisplayGate(
+    baseline,
+    candidate,
+    changedEdgeIndexes,
+    options,
+    evaluation,
+  )
     ? candidate
     : baseline;
 };

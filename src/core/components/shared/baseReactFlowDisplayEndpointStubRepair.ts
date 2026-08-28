@@ -359,5 +359,6 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
     qualityState = acceptedQualityState
       ?? qualityContext.createState(accepted);
   }
+  if (current !== edges) qualityContext.rememberState?.(current, qualityState);
   return current;
 };

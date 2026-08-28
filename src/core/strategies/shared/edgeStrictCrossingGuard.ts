@@ -193,6 +193,10 @@ export type EdgePathQualityEvaluationContext = {
   createState: (candidate: Edge[]) => EdgePathQualityEvaluationState;
   evaluate: (candidate: Edge[]) => EdgePathQualityScore;
   evaluateChanged: (candidate: Edge[], changedIndexes: readonly number[]) => EdgePathQualityScore;
+  rememberState?: (
+    candidate: Edge[],
+    state: EdgePathQualityEvaluationState,
+  ) => boolean;
   edgeHasPairRepairOpportunity?: (edgeIndex: number) => boolean;
   readMetrics?: () => Readonly<{
     pairCacheHitCount: number;
@@ -572,6 +576,16 @@ export function createEdgePathQualityEvaluationContext(
 
   const context: EdgePathQualityEvaluationContext = {
     readMetrics: () => ({ ...metrics }),
+    rememberState(candidate, state): boolean {
+      const numericState = readNumericState(state);
+      if (!numericState || candidate.length !== numericState.edgeCount) return false;
+      const snapshot = buildQualityInputSnapshot(candidate);
+      if (snapshot.edgeSignatures.some((signature, index) => (
+        signature !== numericState.edgeSignatures[index]
+      ))) return false;
+      rememberQualityScore(candidate, snapshot, { ...numericState.score });
+      return true;
+    },
     edgeHasPairRepairOpportunity(edgeIndex: number): boolean {
       return Number.isSafeInteger(edgeIndex)
         && edgeIndex >= 0

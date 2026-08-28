@@ -62,13 +62,14 @@ export const createBaseReactFlowFinalEndpointResidualRepair = ({
     if (baselineReport.quality.strictCrossings === 0) return remember(baseline);
     const candidate = repairStrict(baseline, nodes);
     if (candidate === baseline) return remember(baseline);
-    const candidateReport = evaluation.hardReport(candidate);
+    const indexes = changedIndexes(baseline, candidate);
+    if (indexes.length === 0) return remember(baseline);
+    const candidateReport = evaluation.hardReportChanged(baseline, candidate, indexes);
     if (
       candidateReport.quality.strictCrossings
       >= baselineReport.quality.strictCrossings
     ) return remember(baseline);
-    const indexes = changedIndexes(baseline, candidate);
-    return remember(indexes.length > 0 && validate(baseline, candidate, indexes)
+    return remember(validate(baseline, candidate, indexes)
       ? candidate
       : baseline);
   };
