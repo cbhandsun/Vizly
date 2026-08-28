@@ -39,6 +39,7 @@ import {
   readDisplayRoutingCommittedReuseSnapshot,
 } from './lib/display-routing-browser-diagnostics.mjs';
 import { resolveDisplayRoutingFinalRouteSnapshot } from './lib/display-routing-matrix-final-route.mjs';
+import { waitForStableDisplayRoutingLayoutVisual } from './lib/display-routing-layout-visual-settle.mjs';
 
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '').trim().replace(/\/$/, '');
 const WAIT_TIMEOUT_MS = parseDisplayRoutingMatrixTimeoutMs(
@@ -366,8 +367,9 @@ const clickLayout = async (session, layoutCase) => {
       document.querySelectorAll('.flowchart-layout-menu [data-menu-id]'),
       ${JSON.stringify(layoutCase.id)},
     );
+    const clickedAt = Date.now();
     item?.click();
-    return item ? Date.now() : null;
+    return item ? clickedAt : null;
   })()`);
   let clicked = await clickVisibleItem();
   if (!clicked) {
@@ -423,6 +425,12 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
     readFinalRouteExpression('layout:'),
     `${layoutCase.id} layout route`,
   );
+  const visualSettle = await waitForStableDisplayRoutingLayoutVisual({
+    session,
+    expectedRequestId: route.routing.requestId,
+    expectedNodeCount: route.request?.nodes?.length,
+    expectedEdgeCount: route.response?.edges?.length,
+  });
   const totalRouteMs = Number.isFinite(route.routing.finalAppliedAt)
     ? route.routing.finalAppliedAt - clickedAt
     : route.routing.totalRouteMs;
@@ -481,6 +489,9 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
       };
     });
     return {
+      inputToFirstWorkerMs: Number.isFinite(firstRequestAt)
+        ? firstRequestAt - clickedAtEpoch
+        : null,
       layoutStartDelayMs: Number.isFinite(firstRequestAt)
         ? firstRequestAt - clickedAtEpoch
         : null,
@@ -493,6 +504,13 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
   if (!Number.isFinite(totalRouteMs) || totalRouteMs > MAX_LAYOUT_ROUTE_MS) {
     throw new Error(`${layoutCase.id} exceeded ${MAX_LAYOUT_ROUTE_MS}ms: ${totalRouteMs}`);
   }
+  const inputToRoutingCommitMs = Number.isFinite(route.routing.finalAppliedAt)
+    ? route.routing.finalAppliedAt - clickedAt
+    : null;
+  const routingCommitToVisualStableMs = Number.isFinite(route.routing.finalAppliedAt)
+    ? visualSettle.stableSinceAt - route.routing.finalAppliedAt
+    : null;
+  const inputToVisualStableMs = visualSettle.stableSinceAt - clickedAt;
   if (route.routing.workerStartCount !== initialRoute.routing.workerStartCount) {
     throw new Error(`${layoutCase.id} started a duplicate Canvas display Worker: ${JSON.stringify({
       before: initialRoute.routing.workerStartCount,
@@ -588,6 +606,10 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
       ? route.response.__browserCapturedAt - route.request.__browserCapturedAt
       : route.routing.routeMs,
     totalRouteMs,
+    inputToRoutingCommitMs,
+    routingCommitToVisualStableMs,
+    inputToVisualStableMs,
+    visualStableConfirmedAt: visualSettle.confirmedAt,
     ...layoutTiming,
     slowestPhases: summarizeSlowestDisplayRoutingPhases(route.response.phaseTrace),
     canonicalMount,
