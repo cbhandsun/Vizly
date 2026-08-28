@@ -248,6 +248,8 @@ describe('outer port transaction', () => {
     const evaluation = createBaseReactFlowFinalEndpointEvaluation(graphNodes);
     const initialReport = evaluation.hardReport(edges);
     const traces: DisplayRoutingPhaseTrace[] = [];
+    const shortStubSpy = vi.spyOn(endpointStubRepair, 'repairFinalShortEndpointStubs');
+    const renderStubSpy = vi.spyOn(endpointStubRepair, 'repairRenderSafeEndpointStubs');
 
     const repaired = repairResidualOuterPortTransactionWithHardGate(
       edges,
@@ -269,6 +271,45 @@ describe('outer port transaction', () => {
     }));
     expect(traces[0]?.candidateCount).toBeGreaterThan(0);
     expect(traces[0]?.evaluationCount).toBeGreaterThan(0);
+    expect(shortStubSpy).toHaveBeenCalledOnce();
+    expect(renderStubSpy).toHaveBeenCalledOnce();
+  });
+
+  it('falls back to full normalization when a bounded edit has an unsafe stub', () => {
+    const edges = overlappingEdges();
+    const unsafeEdges = edges.map((edge, index) => index === 0
+      ? {
+        ...edge,
+        data: { ...edge.data, computedPath: [
+          { x: 40, y: 40 },
+          { x: 40, y: 48 },
+          { x: 360, y: 48 },
+          { x: 360, y: 200 },
+        ] },
+      }
+      : edge);
+    vi.spyOn(
+      outerPortCandidates,
+      'buildBoundedOuterPortTransactionCandidates',
+    ).mockReturnValueOnce([{
+      edges: unsafeEdges,
+      movingEdgeIndex: 0,
+      ringAxis: 'y',
+      ringLane: 48,
+      transitionLane: 360,
+      quickScore: 0,
+    }]);
+    const shortStubSpy = vi.spyOn(endpointStubRepair, 'repairFinalShortEndpointStubs');
+    const renderStubSpy = vi.spyOn(endpointStubRepair, 'repairRenderSafeEndpointStubs');
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation(graphNodes);
+
+    repairResidualOuterPortTransactionWithHardGate(edges, graphNodes, 64, {
+      evaluation,
+      initialReport: { edges, report: evaluation.hardReport(edges) },
+    });
+
+    expect(shortStubSpy).toHaveBeenCalledTimes(2);
+    expect(renderStubSpy).toHaveBeenCalledTimes(2);
   });
 
   it('repairs subpixel-short stubs in the same atomic outer transaction', () => {

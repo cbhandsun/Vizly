@@ -3,6 +3,7 @@ import type { Edge, Node } from '@xyflow/react';
 import { repairDeclaredTerminalRolesWithHardGateWithOutcome } from './baseReactFlowDeclaredTerminalRoleRepair';
 import { anchorComputedDisplayEdgeEndpoints } from './baseReactFlowDisplayEdgeCore';
 import {
+  countRenderUnsafeEndpointStubs,
   MIN_RENDER_SAFE_ENDPOINT_STUB,
   repairFinalShortEndpointStubs,
   repairRenderSafeEndpointStubs,
@@ -62,6 +63,37 @@ const normalizeOuterPortTerminalCandidate = <T extends Edge[]>(
   MIN_RENDER_SAFE_ENDPOINT_STUB,
 ) as T;
 
+const mergeNormalizedOuterPortCandidate = <T extends Edge[]>(
+  sourceEdges: T,
+  normalizedReference: T,
+  candidateEdges: T,
+  nodes: Node[],
+): T => {
+  const changedEdgeIndexes = getChangedBaseReactFlowDisplayRoutingIndexes(
+    sourceEdges,
+    candidateEdges,
+  );
+  if (changedEdgeIndexes.length === 0) return normalizedReference;
+
+  const changedIndexSet = new Set(changedEdgeIndexes);
+  const changedEdges = candidateEdges.filter((_, index) => changedIndexSet.has(index));
+  const normalizedChangedEdges = repairSubpixelEndpointStubPrecision(
+    anchorComputedDisplayEdgeEndpoints(changedEdges, nodes),
+    MIN_RENDER_SAFE_ENDPOINT_STUB,
+  );
+  if (countRenderUnsafeEndpointStubs(normalizedChangedEdges) > 0) {
+    return normalizeOuterPortTerminalCandidate(candidateEdges, nodes);
+  }
+
+  let changedOffset = 0;
+  return normalizedReference.map((edge, index) => {
+    if (!changedIndexSet.has(index)) return edge;
+    const replacement = normalizedChangedEdges[changedOffset];
+    changedOffset += 1;
+    return replacement ?? candidateEdges[index];
+  }) as T;
+};
+
 /**
  * Resolves the final detached overlap/strict interlock by changing both port
  * roles and one bounded double-axis outer path as a single hard-gated
@@ -97,6 +129,7 @@ export const repairResidualOuterPortTransactionWithHardGate = <T extends Edge[]>
 
   const candidates = buildBoundedOuterPortTransactionCandidates(edges, nodes, {
     includeStrictCrossings: true,
+    minStub: MIN_RENDER_SAFE_ENDPOINT_STUB,
     maxCandidates: Math.min(64, maxExactEvaluations),
   });
   let remainingEvaluations = Math.min(64, Math.max(1, maxExactEvaluations));
@@ -125,7 +158,14 @@ export const repairResidualOuterPortTransactionWithHardGate = <T extends Edge[]>
     : edges;
   for (const candidate of candidates) {
     if (remainingEvaluations <= 0) break;
-    const terminalBase = normalizeOuterPortTerminalCandidate(candidate.edges, nodes);
+    const terminalBase = options.evaluation
+      ? mergeNormalizedOuterPortCandidate(
+        edges,
+        normalizedReference,
+        candidate.edges,
+        nodes,
+      )
+      : normalizeOuterPortTerminalCandidate(candidate.edges, nodes);
     const changedEdgeIndexes = getChangedBaseReactFlowDisplayRoutingIndexes(
       normalizedReference,
       terminalBase,
