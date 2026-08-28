@@ -7,6 +7,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   calculateLayeredLayoutWithReverse: vi.fn(),
+  createLazyElkLayoutExecutor: vi.fn(),
+  disposeElkLayoutExecutor: vi.fn(),
   disposeWorker: vi.fn(),
   flushObstacles: vi.fn(),
   loadDomainCompoundElkStrategy: vi.fn(),
@@ -39,6 +41,7 @@ vi.mock('../../../custom-edges/obstacleContext', () => ({
 }));
 
 vi.mock('../layoutStrategyRuntime', () => ({
+  createLazyElkLayoutExecutor: mocks.createLazyElkLayoutExecutor,
   LAYERED_TREE_ROUTING_SPACING: { levelSpacing: 120, nodeSpacing: 120 },
   loadDomainCompoundElkStrategy: mocks.loadDomainCompoundElkStrategy,
   loadDomainElkStrategy: mocks.loadDomainElkStrategy,
@@ -80,12 +83,18 @@ const createOptions = () => {
 describe('useLayoutRoutingTransaction shared routing runtime', () => {
   beforeEach(() => {
     mocks.disposeWorker.mockReset();
+    mocks.createLazyElkLayoutExecutor.mockReset();
+    mocks.disposeElkLayoutExecutor.mockReset();
     mocks.flushObstacles.mockReset();
     mocks.calculateLayeredLayoutWithReverse.mockReset();
     mocks.loadDomainCompoundElkStrategy.mockReset();
     mocks.loadDomainElkStrategy.mockReset();
     mocks.stageLayoutRouting.mockReset();
     const elkStrategy = { getName: () => 'elk-layered' };
+    mocks.createLazyElkLayoutExecutor.mockReturnValue({
+      run: vi.fn(),
+      dispose: mocks.disposeElkLayoutExecutor,
+    });
     mocks.loadDomainCompoundElkStrategy.mockResolvedValue(elkStrategy);
     mocks.loadDomainElkStrategy.mockResolvedValue(elkStrategy);
     mocks.stageLayoutRouting.mockResolvedValue({
@@ -220,7 +229,7 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
       resolveLayout = resolve;
     }));
     const options = createOptions();
-    const { result } = renderHook(() => useLayoutStrategy({
+    const { result, unmount } = renderHook(() => useLayoutStrategy({
       ...options,
       reactFlowInstance: null,
     }));
@@ -232,6 +241,19 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
     await waitFor(
       () => expect(mocks.calculateLayeredLayoutWithReverse).toHaveBeenCalled(),
       { timeout: 3_000 },
+    );
+    const elkLayoutRunner = mocks.createLazyElkLayoutExecutor.mock.results[0]?.value;
+    expect(mocks.calculateLayeredLayoutWithReverse).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.any(Array),
+      expect.any(Array),
+      expect.any(Object),
+      expect.any(String),
+      expect.any(Boolean),
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+        elkLayoutRunner,
+      }),
     );
 
     options.nodesRef.current = nodes.map(node => ({
@@ -251,5 +273,7 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
     expect(options.setNodes).not.toHaveBeenCalled();
     expect(options.setEdges).not.toHaveBeenCalled();
     expect(options.routingSessionRuntime.isCurrentJob(displayJob)).toBe(true);
+    unmount();
+    expect(mocks.disposeElkLayoutExecutor).toHaveBeenCalledOnce();
   });
 });

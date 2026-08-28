@@ -135,7 +135,10 @@ export class DomainElkLayoutStrategy implements ILayoutStrategy {
           children: layoutCandidates.map(n => ({ id: n.id, width: getW(n), height: getH(n) })),
           edges: scopedEdges.map(e => ({ id: e.id || `${e.source}->${e.target}`, sources: [e.source], targets: [e.target] })),
         }
-        const res = await runElkLayout(graph, { signal: context?.signal })
+        const requestOptions = { signal: context?.signal }
+        const res = context?.elkLayoutRunner
+          ? await context.elkLayoutRunner.run(graph, requestOptions)
+          : await runElkLayout(graph, requestOptions)
         const routedPaths = collectDomainElkLayoutRoutes(res.edges, { x: left, y: top })
         const idToPos: Record<string, { x: number; y: number }> = {}
         for (const c of (res.children || [])) idToPos[c.id] = { x: Math.round((c.x || 0) + left), y: Math.round((c.y || 0) + top) }

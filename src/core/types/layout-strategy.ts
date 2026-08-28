@@ -1,7 +1,9 @@
 import type { Edge, Node } from '@xyflow/react';
+import type { ElkLayoutRunner } from '../ports/elkLayoutExecutor';
 import type { LayoutOptions } from './layout';
 
 export interface LayoutCalculationContext {
+  elkLayoutRunner?: ElkLayoutRunner;
   signal?: AbortSignal;
 }
 

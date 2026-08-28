@@ -1,4 +1,4 @@
-import { useCallback, useState, MutableRefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { Node, Edge, ReactFlowInstance } from '@xyflow/react';
 import { dispatchDiagramControl } from '../../shared/diagramControl';
 import { applyLayout, forceDirectedLayout, treeLayout } from '../../../utils/LayoutAlgorithms';
@@ -22,6 +22,7 @@ import {
 } from './layeredLayoutEdgePreparation';
 import type { ILayoutStrategy } from '../../../types/layout-strategy';
 import type { LayoutOptions } from '../../../types/layout';
+import type { ElkLayoutExecutor } from '../../../ports/elkLayoutExecutor';
 import {
     logLayoutNoLayoutableNodes,
     logLayoutStrategyDomainPreservingFallback,
@@ -38,6 +39,7 @@ import {
     type FlowchartLayoutDirection,
 } from '../flowchartLayoutStrategyMode';
 import {
+    createLazyElkLayoutExecutor,
     LAYERED_TREE_ROUTING_SPACING,
     loadDomainCompoundElkStrategy,
     loadDomainElkStrategy,
@@ -104,6 +106,18 @@ export function useLayoutStrategy({
     const [lastDomainDirection, setLastDomainDirection] = useState<FlowchartLayoutDirection>('TB');
     // Remember the domain-internal arrangement across temporary global modes.
     const [lastNodeLayout, setLastNodeLayout] = useState<string>('dagre');
+    const elkLayoutExecutorRef = useRef<ElkLayoutExecutor | null>(null);
+
+    useEffect(() => {
+        const executor = createLazyElkLayoutExecutor();
+        elkLayoutExecutorRef.current = executor;
+        return () => {
+            if (elkLayoutExecutorRef.current === executor) {
+                elkLayoutExecutorRef.current = null;
+            }
+            executor.dispose();
+        };
+    }, []);
 
     // [FIX] 精准两步 fitView：调用统一的 diagramControl 'fit' 逻辑，自适应侧边栏和最小缩放比例
     const twoStepFitView = useCallback(() => {
@@ -138,6 +152,14 @@ export function useLayoutStrategy({
         // asynchronous strategy/ELK work starts. Otherwise a stale layout
         // result could open a fresh epoch after a newer display commit.
         const routingJob = routingSessionRuntime.beginJob('layout');
+        // Capture the Canvas-owned runner once for the whole job. If unmount
+        // disposes it while an async continuation is pending, that continuation
+        // must fail against the disposed owner instead of creating a one-shot
+        // worker outside the Canvas lifecycle.
+        const layoutContext = {
+            signal: routingJob.signal,
+            elkLayoutRunner: elkLayoutExecutorRef.current ?? undefined,
+        };
         const dir = direction || 'TB';
         const appliedDirection = dir;
         const axisDirection = dir === 'LR' || dir === 'RL' ? 'LR' : 'TB';
@@ -216,7 +238,7 @@ export function useLayoutStrategy({
                             edgeRouting: 'ORTHOGONAL',
                             padding: { top: 40, right: 20, bottom: 20, left: 20 },
                         },
-                        { signal: routingJob.signal },
+                        layoutContext,
                     );
                     newNodes = layered.nodes;
                     treeSourceEdges = layered.edges;
@@ -269,7 +291,7 @@ export function useLayoutStrategy({
                             edgeRouting: 'ORTHOGONAL',
                             padding: { top: 40, right: 20, bottom: 20, left: 20 },
                         },
-                        { signal: routingJob.signal },
+                        layoutContext,
                     );
                     newNodes = layered.nodes;
                     forceSourceEdges = layered.edges;
@@ -426,7 +448,7 @@ export function useLayoutStrategy({
                         },
                         fallbackDirection,
                         true,
-                        { signal: routingJob.signal },
+                        layoutContext,
                     );
                     usedDomainCompoundElk = true;
                     usedDomainDagre = false;
@@ -472,7 +494,7 @@ export function useLayoutStrategy({
                     effectiveLayoutOptions,
                     dir,
                     isDomainLane || usedDomainCompoundElk,
-                    { signal: routingJob.signal },
+                    layoutContext,
                 );
                 if (!usedDomainElk && !usedDomainCompoundElk && !isDomainLane) {
                     const qualityFallback = legacyFallback.resolveLegacyDomainQualityFallback(
@@ -489,7 +511,7 @@ export function useLayoutStrategy({
                             nodeLayout: 'elk-layered' as LayoutOptions['nodeLayout'],
                             spacing: { horizontal: 120, vertical: 120 },
                             edgeRouting: 'ORTHOGONAL',
-                        }, { signal: routingJob.signal });
+                        }, layoutContext);
                         usedDomainElk = true;
                         usedDomainDagre = false;
                         appliedStrategyName = 'domain-elk';

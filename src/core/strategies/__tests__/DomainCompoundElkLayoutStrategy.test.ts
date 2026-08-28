@@ -1,10 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Edge, Node } from '@xyflow/react';
 import type { ElkNode } from 'elkjs';
 
+import type { ElkLayoutRunner } from '../../ports/elkLayoutExecutor';
 import { LayoutType, type LayoutOptions } from '../../types/layout';
+import type { LayoutCalculationContext } from '../../types/layout-strategy';
 import { applyElkResultNodeGeometry } from '../AbstractElkLayoutStrategy';
 import { DomainCompoundElkLayoutStrategy } from '../DomainCompoundElkLayoutStrategy';
+import { DomainElkLayoutStrategy } from '../DomainElkLayoutStrategy';
 
 const elkMocks = vi.hoisted(() => ({
   runElkLayout: vi.fn(),
@@ -17,6 +20,8 @@ vi.mock('../../workers/elkLayoutClient', () => ({
 vi.mock('../../components/layout/LayoutOptimizer', () => ({
   LayoutOptimizer: {
     getInstance: () => ({
+      calculateNodeWidth: () => 180,
+      calculateNodeHeight: () => 80,
       calculateNodeWidthWithOverrides: () => 180,
       calculateNodeHeightWithOverrides: () => 80,
     }),
@@ -28,8 +33,8 @@ class InspectableDomainCompoundElkLayoutStrategy extends DomainCompoundElkLayout
     return this.buildElkGraph(nodes, edges, options);
   }
 
-  runGraph(graph: ElkNode, nodes: Node[], edges: Edge[], signal: AbortSignal) {
-    return this.runWorkerLayout(graph, nodes, edges, { x: 0, y: 0 }, { signal });
+  runGraph(graph: ElkNode, nodes: Node[], edges: Edge[], context: LayoutCalculationContext) {
+    return this.runWorkerLayout(graph, nodes, edges, { x: 0, y: 0 }, context);
   }
 }
 
@@ -44,6 +49,10 @@ const node = (
   position: { x: 0, y: 0 },
   width: 180,
   height: 80,
+});
+
+beforeEach(() => {
+  elkMocks.runElkLayout.mockReset();
 });
 
 describe('DomainCompoundElkLayoutStrategy', () => {
@@ -65,13 +74,45 @@ describe('DomainCompoundElkLayoutStrategy', () => {
       graph,
       nodes,
       edges,
-      controller.signal,
+      { signal: controller.signal },
     )).rejects.toBe(failure);
 
     expect(elkMocks.runElkLayout).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'domain-compound-elk-root' }),
       { timeoutMs: 30_000, signal: controller.signal },
     );
+  });
+
+  it('prefers the injected runner and forwards its cancellation context', async () => {
+    const controller = new AbortController();
+    const run = vi.fn().mockResolvedValue({
+      id: 'domain-compound-elk-root',
+      children: [
+        { id: 'source', x: 10, y: 20, width: 180, height: 80 },
+        { id: 'target', x: 300, y: 20, width: 180, height: 80 },
+      ],
+      edges: [],
+    });
+    const runner: ElkLayoutRunner = { run };
+    const strategy = new InspectableDomainCompoundElkLayoutStrategy();
+    const nodes = [node('source', 'custom', {}), node('target', 'custom', {})];
+    const edges = [{ id: 'edge', source: 'source', target: 'target' }];
+    const graph = strategy.buildGraph(
+      nodes,
+      edges,
+      { type: LayoutType.ELK_LAYERED, direction: 'LR' },
+    );
+
+    await expect(strategy.runGraph(graph, nodes, edges, {
+      elkLayoutRunner: runner,
+      signal: controller.signal,
+    })).resolves.toMatchObject({ nodes });
+
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'domain-compound-elk-root' }),
+      { timeoutMs: 30_000, signal: controller.signal },
+    );
+    expect(elkMocks.runElkLayout).not.toHaveBeenCalled();
   });
 
   it('keeps compound child coordinates relative while applying padding to roots', () => {
@@ -162,5 +203,47 @@ describe('DomainCompoundElkLayoutStrategy', () => {
     );
 
     expect(graph.layoutOptions?.['elk.direction']).toBe(expected);
+  });
+});
+
+describe('DomainElkLayoutStrategy runner injection', () => {
+  const resultFor = (rootId: string) => ({
+    id: 'elk-domain-layout',
+    children: [{ id: rootId, x: 100, y: 50, width: 180, height: 80 }],
+    edges: [],
+  });
+
+  it('prefers an injected runner while retaining the one-shot fallback', async () => {
+    const controller = new AbortController();
+    const run = vi.fn().mockResolvedValue(resultFor('injected-node'));
+    const runner: ElkLayoutRunner = { run };
+    const strategy = new DomainElkLayoutStrategy();
+    const options: LayoutOptions = { type: LayoutType.ELK_LAYERED, direction: 'TB' };
+
+    await strategy.calculateLayout(
+      [node('injected-node', 'custom', {})],
+      [],
+      options,
+      { elkLayoutRunner: runner, signal: controller.signal },
+    );
+
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'elk-domain-layout' }),
+      { signal: controller.signal },
+    );
+    expect(elkMocks.runElkLayout).not.toHaveBeenCalled();
+
+    elkMocks.runElkLayout.mockResolvedValueOnce(resultFor('fallback-node'));
+    await strategy.calculateLayout(
+      [node('fallback-node', 'custom', {})],
+      [],
+      options,
+      { signal: controller.signal },
+    );
+
+    expect(elkMocks.runElkLayout).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'elk-domain-layout' }),
+      { signal: controller.signal },
+    );
   });
 });

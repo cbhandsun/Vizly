@@ -163,10 +163,13 @@ export abstract class AbstractElkLayoutStrategy implements ILayoutStrategy {
     // 构建 ID 映射表，用于快速回填
     const idMap = new Map<string, ReactFlowNode>(updatedNodes.map(n => [n.id, n] as const));
     try {
-      const result = await runElkLayout(elkGraph, {
+      const requestOptions = {
         timeoutMs: 30_000,
         signal: context?.signal,
-      });
+      };
+      const result = context?.elkLayoutRunner
+        ? await context.elkLayoutRunner.run(elkGraph, requestOptions)
+        : await runElkLayout(elkGraph, requestOptions);
       applyElkResultNodeGeometry(result.children, idMap, padding);
 
       const routes = collectDomainElkLayoutRoutes(
