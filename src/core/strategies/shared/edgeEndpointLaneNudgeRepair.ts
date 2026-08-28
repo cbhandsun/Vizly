@@ -223,6 +223,7 @@ function outerBypassCandidates(
   path: Point[],
   edge: Edge,
   paths: Map<string, Point[]>,
+  segmentsByEdgeId: Map<string, Segment[]>,
   edgesById: Map<string, Edge>,
   obstacles: Map<string, Rect>,
 ): Point[][] {
@@ -260,8 +261,10 @@ function outerBypassCandidates(
     const sameSourceHandlePair = other.source === edge.source && Boolean(edge.sourceHandle && other.sourceHandle);
     if (path.length < 5 && !sameSourceHandlePair) continue;
 
-    for (const segment of toSegments(path)) {
-      for (const otherSegment of toSegments(otherPath)) {
+    const pathSegments = segmentsByEdgeId.get(edge.id) ?? toSegments(path);
+    const otherSegments = segmentsByEdgeId.get(otherId) ?? toSegments(otherPath);
+    for (const segment of pathSegments) {
+      for (const otherSegment of otherSegments) {
         const crossing = strictCrossingPoint(segment, otherSegment);
         if (!crossing) continue;
         if (firstAxis === 'v') {
@@ -285,7 +288,7 @@ function outerBypassCandidates(
           const yMax = Math.max(laneY, beforeTarget.y);
           for (const [candidateOtherId, candidateOtherPath] of paths) {
             if (candidateOtherId === edge.id) continue;
-            for (const segmentRef of toSegments(candidateOtherPath)) {
+            for (const segmentRef of segmentsByEdgeId.get(candidateOtherId) ?? toSegments(candidateOtherPath)) {
               if (axisOf(segmentRef.a, segmentRef.b) !== 'v') continue;
               if (Math.max(segmentRef.a.y, segmentRef.b.y) < yMin || Math.min(segmentRef.a.y, segmentRef.b.y) > yMax) continue;
               xCandidates.add(segmentRef.a.x - OUTER_BYPASS_EDGE_CLEARANCE);
@@ -324,7 +327,7 @@ function outerBypassCandidates(
           const xMax = Math.max(laneX, beforeTarget.x);
           for (const [candidateOtherId, candidateOtherPath] of paths) {
             if (candidateOtherId === edge.id) continue;
-            for (const segmentRef of toSegments(candidateOtherPath)) {
+            for (const segmentRef of segmentsByEdgeId.get(candidateOtherId) ?? toSegments(candidateOtherPath)) {
               if (axisOf(segmentRef.a, segmentRef.b) !== 'h') continue;
               if (Math.max(segmentRef.a.x, segmentRef.b.x) < xMin || Math.min(segmentRef.a.x, segmentRef.b.x) > xMax) continue;
               yCandidates.add(segmentRef.a.y - OUTER_BYPASS_EDGE_CLEARANCE);
@@ -347,19 +350,14 @@ function outerBypassCandidates(
     }
   }
 
-  const seen = new Set<string>();
-  return candidates.filter(candidate => {
-    const key = candidate.map(point => `${point.x},${point.y}`).join(';');
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return !pathHitsObstacle(candidate, edge, obstacles);
-  });
+  return candidates;
 }
 
 function outerBypassOverlapCandidates(
   path: Point[],
   edge: Edge,
   paths: Map<string, Point[]>,
+  segmentsByEdgeId: Map<string, Segment[]>,
   edgesById: Map<string, Edge>,
   obstacles: Map<string, Rect>,
 ): Point[][] {
@@ -393,8 +391,10 @@ function outerBypassOverlapCandidates(
     if (otherId === edge.id) continue;
     const other = edgesById.get(otherId);
     if (!other || other.source === edge.source || other.target === edge.target) continue;
-    for (const segment of toSegments(path)) {
-      for (const otherSegment of toSegments(otherPath)) {
+    const pathSegments = segmentsByEdgeId.get(edge.id) ?? toSegments(path);
+    const otherSegments = segmentsByEdgeId.get(otherId) ?? toSegments(otherPath);
+    for (const segment of pathSegments) {
+      for (const otherSegment of otherSegments) {
         if (segmentDirection(segment) * segmentDirection(otherSegment) >= 0) continue;
         if (parallelOverlapLength(segment, otherSegment) <= OUTER_BYPASS_EDGE_CLEARANCE) continue;
         const segmentAxis = axisOf(segment.a, segment.b);
@@ -408,7 +408,7 @@ function outerBypassOverlapCandidates(
           const yMax = Math.max(...yValues, beforeTarget.y);
           for (const [candidateOtherId, candidateOtherPath] of paths) {
             if (candidateOtherId === edge.id) continue;
-            for (const segmentRef of toSegments(candidateOtherPath)) {
+            for (const segmentRef of segmentsByEdgeId.get(candidateOtherId) ?? toSegments(candidateOtherPath)) {
               if (axisOf(segmentRef.a, segmentRef.b) !== 'v') continue;
               if (Math.max(segmentRef.a.y, segmentRef.b.y) < yMin || Math.min(segmentRef.a.y, segmentRef.b.y) > yMax) continue;
               xCandidates.add(segmentRef.a.x - OUTER_BYPASS_EDGE_CLEARANCE);
@@ -448,7 +448,7 @@ function outerBypassOverlapCandidates(
           for (const [candidateOtherId, candidateOtherPath] of paths) {
             if (candidateOtherId === edge.id) continue;
             const candidateOther = edgesById.get(candidateOtherId);
-            for (const segmentRef of toSegments(candidateOtherPath)) {
+            for (const segmentRef of segmentsByEdgeId.get(candidateOtherId) ?? toSegments(candidateOtherPath)) {
               if (axisOf(segmentRef.a, segmentRef.b) !== 'h') continue;
               const y = segmentRef.a.y;
               const withinSourceRun = y > Math.min(path[0].y, path[1].y) + EPS
@@ -484,7 +484,7 @@ function outerBypassOverlapCandidates(
           const xMax = Math.max(...xValues, beforeTarget.x);
           for (const [candidateOtherId, candidateOtherPath] of paths) {
             if (candidateOtherId === edge.id) continue;
-            for (const segmentRef of toSegments(candidateOtherPath)) {
+            for (const segmentRef of segmentsByEdgeId.get(candidateOtherId) ?? toSegments(candidateOtherPath)) {
               if (axisOf(segmentRef.a, segmentRef.b) !== 'h') continue;
               if (Math.max(segmentRef.a.x, segmentRef.b.x) < xMin || Math.min(segmentRef.a.x, segmentRef.b.x) > xMax) continue;
               yCandidates.add(segmentRef.a.y - OUTER_BYPASS_EDGE_CLEARANCE);
@@ -524,7 +524,7 @@ function outerBypassOverlapCandidates(
           for (const [candidateOtherId, candidateOtherPath] of paths) {
             if (candidateOtherId === edge.id) continue;
             const candidateOther = edgesById.get(candidateOtherId);
-            for (const segmentRef of toSegments(candidateOtherPath)) {
+            for (const segmentRef of segmentsByEdgeId.get(candidateOtherId) ?? toSegments(candidateOtherPath)) {
               if (axisOf(segmentRef.a, segmentRef.b) !== 'v') continue;
               const x = segmentRef.a.x;
               const withinSourceRun = x > Math.min(path[0].x, path[1].x) + EPS
@@ -554,13 +554,7 @@ function outerBypassOverlapCandidates(
     }
   }
 
-  const seen = new Set<string>();
-  return candidates.filter(candidate => {
-    const key = candidate.map(point => `${point.x},${point.y}`).join(';');
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return !pathHitsObstacle(candidate, edge, obstacles);
-  });
+  return candidates;
 }
 
 function withComputedPath(edge: Edge, path: Point[]): Edge {
@@ -618,6 +612,9 @@ export function repairEndpointLaneCrossings(
   const obstacles = getRoutingObstacles(nodes);
   const edgesById = new Map(edges.map(edge => [edge.id, edge] as const));
   const repaired = new Map(paths);
+  const segmentsByEdgeId = new Map(
+    [...repaired].map(([edgeId, path]) => [edgeId, toSegments(path)] as const),
+  );
 
   for (const edge of edges) {
     const path = repaired.get(edge.id);
@@ -642,8 +639,8 @@ export function repairEndpointLaneCrossings(
       : 160;
     const candidatePaths = uniqueEndpointLaneCandidates([
       ...sourceNudgeCandidates(path, sourceRect),
-      ...outerBypassCandidates(path, edge, repaired, edgesById, obstacles),
-      ...outerBypassOverlapCandidates(path, edge, repaired, edgesById, obstacles),
+      ...outerBypassCandidates(path, edge, repaired, segmentsByEdgeId, edgesById, obstacles),
+      ...outerBypassOverlapCandidates(path, edge, repaired, segmentsByEdgeId, edgesById, obstacles),
     ])
       .filter(candidate => !pathHitsObstacle(candidate, edge, obstacles))
       .map(candidate => ({ path: candidate, length: pathLength(candidate) }))
@@ -680,7 +677,10 @@ export function repairEndpointLaneCrossings(
       ))
       .sort((a, b) => a.score - b.score);
 
-    if (candidates[0]) repaired.set(edge.id, candidates[0].path);
+    if (candidates[0]) {
+      repaired.set(edge.id, candidates[0].path);
+      segmentsByEdgeId.set(edge.id, toSegments(candidates[0].path));
+    }
     const interactionMetrics = interactionContext.readMetrics();
     evaluationCount += interactionMetrics.evaluationCount;
     scannedSegmentCount += interactionMetrics.scannedSegmentCount;
