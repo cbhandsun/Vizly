@@ -577,6 +577,10 @@ export function useLayoutStrategy({
                             routingJob,
                             onCommitted: twoStepFitView,
                             rejectObstacleDirtyBoundedCandidate: isDomainLane,
+                            candidateRepairPolicy:
+                                candidateUsesElk && !candidateUsesCompoundElk
+                                    ? 'skip-exact-clean'
+                                    : 'default',
                         });
                     };
 

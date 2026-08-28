@@ -110,12 +110,18 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
     const routingJob = options.routingSessionRuntime.beginJob('layout');
     const { result } = renderHook(() => useLayoutRoutingTransaction(options));
 
-    await act(async () => result.current({ nodes, edges, routingJob }));
+    await act(async () => result.current({
+      nodes,
+      edges,
+      routingJob,
+      candidateRepairPolicy: 'skip-exact-clean',
+    }));
 
     expect(displayJob.signal.aborted).toBe(true);
     expect(mocks.stageLayoutRouting).toHaveBeenCalledWith(expect.objectContaining({
       workerRef: options.routingSessionRuntime.workerRef,
       signal: expect.any(AbortSignal),
+      candidateRepairPolicy: 'skip-exact-clean',
     }));
     expect(options.takeSnapshot).toHaveBeenCalledWith(nodes, edges);
     expect(options.setNodes).toHaveBeenCalledWith(nodes);

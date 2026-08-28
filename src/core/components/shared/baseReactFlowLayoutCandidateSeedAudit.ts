@@ -17,10 +17,21 @@ export type BaseReactFlowLayoutCandidateSeedAudit = Readonly<{
 export const shouldSkipBaseReactFlowLayoutCandidateRepair = (
   edgeCount: number,
   audit: BaseReactFlowLayoutCandidateSeedAudit,
-): boolean => edgeCount > 0
-  && !audit.terminalsAttached
-  && !audit.terminalsAnchored
-  && audit.strictCrossings >= edgeCount;
+  allowExactCleanSeed = false,
+): boolean => edgeCount > 0 && (
+  (
+    allowExactCleanSeed
+    && audit.terminalsAttached
+    && audit.terminalsAnchored
+    && audit.obstacleHits === 0
+    && audit.strictCrossings === 0
+  )
+  || (
+    !audit.terminalsAttached
+    && !audit.terminalsAnchored
+    && audit.strictCrossings >= edgeCount
+  )
+);
 
 /**
  * Produces bounded aggregate evidence for deciding whether a staged layout

@@ -20,6 +20,7 @@ type LayoutRoutingTransactionRequest = Readonly<{
   routingJob: BaseReactFlowRoutingSessionJob;
   onCommitted?: () => void;
   rejectObstacleDirtyBoundedCandidate?: boolean;
+  candidateRepairPolicy?: 'default' | 'skip-exact-clean';
 }>;
 
 export type LayoutPresentationPreviewRequest = Readonly<{
@@ -62,6 +63,7 @@ export const useLayoutRoutingTransaction = ({
     routingJob,
     onCommitted,
     rejectObstacleDirtyBoundedCandidate,
+    candidateRepairPolicy,
   }: LayoutRoutingTransactionRequest): Promise<void> => {
     if (routingJob.owner !== 'layout' || !routingSessionRuntime.isCurrentJob(routingJob)) {
       throw new Error('layout-routing-cancelled');
@@ -119,6 +121,7 @@ export const useLayoutRoutingTransaction = ({
             : undefined,
           precompiledLayoutRegeneration,
           rejectObstacleDirtyBoundedCandidate,
+          candidateRepairPolicy,
         });
         if (!routingSessionRuntime.isCurrentJob(routingJob)) {
           throw new Error('layout-routing-cancelled');

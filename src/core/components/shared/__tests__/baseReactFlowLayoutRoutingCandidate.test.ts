@@ -203,6 +203,19 @@ describe('baseReactFlow layout routing candidate sequence', () => {
     },
   );
 
+  it('only skips an exact-clean seed when the caller identifies a flat full-graph layout', () => {
+    const exactCleanAudit: BaseReactFlowLayoutCandidateSeedAudit = {
+      terminalsAttached: true,
+      terminalsAnchored: true,
+      obstacleHits: 0,
+      strictCrossings: 0,
+    };
+
+    expect(shouldSkipBaseReactFlowLayoutCandidateRepair(44, exactCleanAudit)).toBe(false);
+    expect(shouldSkipBaseReactFlowLayoutCandidateRepair(44, exactCleanAudit, true)).toBe(true);
+    expect(shouldSkipBaseReactFlowLayoutCandidateRepair(0, exactCleanAudit, true)).toBe(false);
+  });
+
   it('sends a compound-dirty seed directly through the canonical exact request', async () => {
     const seedAuditSpy = vi.spyOn(
       layoutCandidateSeedAudit,
@@ -503,6 +516,34 @@ describe('baseReactFlow layout routing candidate sequence', () => {
     });
     expect(workerMocks.repair).toHaveBeenCalledTimes(2);
     expect(workerMocks.compute).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends an opted-in exact-clean flat ELK seed directly to the canonical Worker', async () => {
+    workerMocks.compute.mockImplementation(successfulCanonicalResult);
+
+    const result = await stageBaseReactFlowLayoutRouting({
+      workerRef: { current: null },
+      requestId: 'layout:flat-elk',
+      sourceEdges: edges,
+      sourceNodes: nodes,
+      isLargeGraph: false,
+      candidateRepairPolicy: 'skip-exact-clean',
+    });
+
+    expect(result.routedEdges[0].type).toBe('stablePath');
+    expect(workerMocks.repair).not.toHaveBeenCalled();
+    expect(workerMocks.compute).toHaveBeenCalledOnce();
+    expect(workerMocks.compute.mock.calls[0][0]).toMatchObject({
+      requestId: 'layout:flat-elk',
+      cachedCandidateEdges: expect.any(Array),
+      candidateSource: 'persistent',
+    });
+    expect(readDisplayRoutingDebugState()).toMatchObject({
+      layoutSeedTerminalsAttached: true,
+      layoutSeedTerminalsAnchored: true,
+      layoutSeedObstacleHits: 0,
+      layoutSeedStrictCrossings: 0,
+    });
   });
 
   it('keeps a structurally dirty hard-clean repair on the canonical fallback path', async () => {

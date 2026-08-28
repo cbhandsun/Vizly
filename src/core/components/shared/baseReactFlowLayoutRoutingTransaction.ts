@@ -405,6 +405,7 @@ export const stageBaseReactFlowLayoutRouting = async ({
   fullRouteTimeoutMs = LAYOUT_FULL_DISPLAY_WORKER_TIMEOUT_MS,
   precompiledLayoutRegeneration,
   rejectObstacleDirtyBoundedCandidate = false,
+  candidateRepairPolicy = 'default',
 }: {
   workerRef: MutableRefObject<Worker | null>;
   requestId: string;
@@ -419,6 +420,7 @@ export const stageBaseReactFlowLayoutRouting = async ({
   fullRouteTimeoutMs?: number;
   precompiledLayoutRegeneration?: BaseReactFlowPrecompiledLayoutRegeneration | null;
   rejectObstacleDirtyBoundedCandidate?: boolean;
+  candidateRepairPolicy?: 'default' | 'skip-exact-clean';
 }): Promise<BaseReactFlowLayoutRoutingCommit> => {
   const unseededSourceEdges = sourceEdges.map(edge => ({
     ...edge,
@@ -498,11 +500,17 @@ export const stageBaseReactFlowLayoutRouting = async ({
   const skipBoundedCandidateRepair = Boolean(
     stagedSeedEdges
     && seedAudit
-    && shouldSkipBaseReactFlowLayoutCandidateRepair(stagedSeedEdges.length, seedAudit),
+    && shouldSkipBaseReactFlowLayoutCandidateRepair(
+      stagedSeedEdges.length,
+      seedAudit,
+      candidateRepairPolicy === 'skip-exact-clean',
+    ),
   );
   // ELK and the geometry-anchored fallback already provide a complete hidden
-  // candidate. Near-clean seeds retain the bounded measured repair and can
-  // commit in one short pass. A detached seed with at least one strict
+  // candidate. Flat full-graph ELK can opt to send an exact-clean seed directly
+  // through the canonical audit; other near-clean seeds retain the bounded
+  // measured repair because it materially improves compound candidates. A
+  // detached seed with at least one strict
   // crossing per edge is already compound-dirty; send it directly through the
   // canonical exact audit and unchanged full-route fallback instead of paying
   // for a measured pass known not to reduce that defect class.
