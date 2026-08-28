@@ -41,6 +41,13 @@ import {
   PRECOMPILED_CAPTURE_WORKER_TIMEOUT_MS,
   resolveBaseReactFlowDisplayWorkerTimeoutMs,
 } from './baseReactFlowDisplayWorkerTimeout';
+import {
+  doesBaseReactFlowDisplayWorkerResolutionMatchOperation,
+  runBaseReactFlowLayoutRepairAndRouteInWorker,
+  type BaseReactFlowLayoutRepairWorkerOptions,
+} from './baseReactFlowDisplayWorkerLayoutClient';
+
+export { doesBaseReactFlowDisplayWorkerResolutionMatchOperation } from './baseReactFlowDisplayWorkerLayoutClient';
 
 export type { DisplayQualityMode } from './baseReactFlowDisplayWorkerProtocol';
 export { projectBaseReactFlowDisplayWorkerInput } from './baseReactFlowDisplayWorkerProjection';
@@ -309,25 +316,6 @@ export const disposeBaseReactFlowDisplayWorker = (
   const worker = workerRef.current;
   if (!worker) return;
   terminateBaseReactFlowDisplayWorker(worker, workerRef);
-};
-
-export const doesBaseReactFlowDisplayWorkerResolutionMatchOperation = (
-  operation: DisplayEdgesWorkerRequest['operation'],
-  routeResolution: DisplayEdgesWorkerRouteResolution,
-): boolean => {
-  if (operation === 'route') {
-    return routeResolution === 'full-route' || routeResolution === 'full-route-repaired';
-  }
-  if (operation === 'repair') return routeResolution === 'repair';
-  if (operation === 'incremental-route') {
-    return routeResolution === 'incremental-route'
-      || routeResolution === 'full-route'
-      || routeResolution === 'full-route-repaired';
-  }
-  return routeResolution === 'validated-candidate'
-    || routeResolution === 'repaired-candidate'
-    || routeResolution === 'full-route'
-    || routeResolution === 'full-route-repaired';
 };
 
 export const requestBaseReactFlowDisplayEdgesWorker = ({
@@ -631,6 +619,15 @@ export const computeBaseReactFlowDisplayEdgesInWorker = async ({
   rememberDisplayWorkerSession(workerRef.current, result.sessionRef);
   return { ...result, projectedEdges: projectedInput.edges };
 };
+
+export const computeBaseReactFlowLayoutRepairAndRouteInWorker = (
+  options: BaseReactFlowLayoutRepairWorkerOptions,
+): Promise<BaseReactFlowDisplayWorkerResult> => (
+  runBaseReactFlowLayoutRepairAndRouteInWorker(
+    options,
+    requestBaseReactFlowDisplayEdgesWorker,
+  )
+);
 
 export const repairBaseReactFlowDisplayEdgesInWorker = async ({
   workerRef,

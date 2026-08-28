@@ -22,12 +22,11 @@ import {
 } from './baseReactFlowDisplayRoutingTransaction';
 import {
   computeBaseReactFlowDisplayEdgesInWorker,
+  computeBaseReactFlowLayoutRepairAndRouteInWorker,
   projectBaseReactFlowDisplayWorkerInput,
-  repairBaseReactFlowDisplayEdgesInWorker,
   type BaseReactFlowDisplayWorkerResult,
 } from './baseReactFlowDisplayWorkerClient';
 import {
-  LAYOUT_DISPLAY_WORKER_TIMEOUT_MS,
   LAYOUT_FULL_DISPLAY_WORKER_TIMEOUT_MS,
 } from './baseReactFlowDisplayWorkerTimeout';
 import { recordBaseReactFlowRejectedDisplayDiagnostics } from './baseReactFlowDisplayRejectedDiagnostics';
@@ -514,66 +513,61 @@ export const stageBaseReactFlowLayoutRouting = async ({
   // crossing per edge is already compound-dirty; send it directly through the
   // canonical exact audit and unchanged full-route fallback instead of paying
   // for a measured pass known not to reduce that defect class.
-  const candidateRepairResult = precompiledCandidateEdges || skipBoundedCandidateRepair
-    ? null
-    : await repairBaseReactFlowDisplayEdgesInWorker({
+  const useFusedCandidateRepair = Boolean(
+    !precompiledCandidateEdges
+    && !skipBoundedCandidateRepair
+    && stagedSeedEdges,
+  );
+  // The fallback candidate must remain byte-equivalent to the second request
+  // of the legacy transaction: when measured repair stays dirty it is rebuilt
+  // from canonical, routing-free source edges rather than the ELK seed.
+  const canonicalCandidateEdges = precompiledCandidateEdges
+    ?? (skipBoundedCandidateRepair
+      ? stagedSeedEdges ?? []
+      : seedBaseReactFlowStagedLayoutEdges({
+        sourceEdges: unseededSourceEdges,
+        sourceNodes,
+      }));
+  const initialResult = useFusedCandidateRepair
+    ? await computeBaseReactFlowLayoutRepairAndRouteInWorker({
       workerRef,
-      requestId: `${requestId}:candidate-repair`,
-      edges: stagedSeedEdges ?? [],
+      requestId,
+      edges: unseededSourceEdges,
       nodes: sourceNodes,
-      timeoutMs: LAYOUT_DISPLAY_WORKER_TIMEOUT_MS,
-      signal,
-      requireHardClean: false,
-      repairMode: 'bounded',
-      stopAfterObstacleFailure: rejectObstacleDirtyBoundedCandidate,
+      stagedCandidateEdges: stagedSeedEdges ?? [],
+      fallbackCandidateEdges: canonicalCandidateEdges,
+      enableSmartEdges,
+      smartEdgePadding,
+      isLargeGraph,
       inputSignature: projectedIdentity.cacheSignature,
       inputGeometryDigest: projectedIdentity.geometryDigest,
+      stopAfterObstacleFailure: rejectObstacleDirtyBoundedCandidate,
+      timeoutMs: fullRouteTimeoutMs,
+      signal,
+    })
+    : await computeBaseReactFlowDisplayEdgesInWorker({
+      workerRef,
+      requestId,
+      edges: unseededSourceEdges,
+      nodes: sourceNodes,
+      enableSmartEdges,
+      smartEdgePadding,
+      isLargeGraph,
+      displayEdgeEpoch: 0,
+      inputSignature: projectedIdentity.cacheSignature,
+      inputGeometryDigest: projectedIdentity.geometryDigest,
+      cachedCandidateEdges: canonicalCandidateEdges,
+      candidateSource: precompiledCandidateEdges ? 'precompiled' : 'persistent',
+      qualityMode: 'full',
+      timeoutMs: fullRouteTimeoutMs,
+      signal,
     });
   if (
     rejectObstacleDirtyBoundedCandidate
-    && candidateRepairResult?.hardClean === false
-    && (candidateRepairResult.hardReport?.obstacleHits ?? 0) > 0
-  ) {
-    // Ordered-lane seeds that still cross a business node after measured
-    // repair have repeatedly failed the much more expensive canonical pass.
-    // Let the caller use its existing domain-preserving safety layout while
-    // candidates whose obstacle defect was cleared retain that full pass.
-    throw new Error('layout-routing-hard-quality-rejected');
-  }
-  // The bounded repair uses seeded paths as its working source. Promote its
-  // result through a canonical source-edge request before committing so the
-  // Worker-private session stores source -> final patches under the same
-  // identity exposed to the incremental client.
-  let canonicalCandidateEdges: Edge[];
-  if (candidateRepairResult?.hardClean) {
-    canonicalCandidateEdges = candidateRepairResult.edges;
-  } else if (precompiledCandidateEdges) {
-    canonicalCandidateEdges = precompiledCandidateEdges;
-  } else if (skipBoundedCandidateRepair) {
-    canonicalCandidateEdges = stagedSeedEdges ?? [];
-  } else {
-    canonicalCandidateEdges = seedBaseReactFlowStagedLayoutEdges({
-      sourceEdges: unseededSourceEdges,
-      sourceNodes,
-    });
-  }
-  const initialResult = await computeBaseReactFlowDisplayEdgesInWorker({
-    workerRef,
-    requestId,
-    edges: unseededSourceEdges,
-    nodes: sourceNodes,
-    enableSmartEdges,
-    smartEdgePadding,
-    isLargeGraph,
-    displayEdgeEpoch: 0,
-    inputSignature: projectedIdentity.cacheSignature,
-    inputGeometryDigest: projectedIdentity.geometryDigest,
-    cachedCandidateEdges: canonicalCandidateEdges,
-    candidateSource: precompiledCandidateEdges ? 'precompiled' : 'persistent',
-    qualityMode: 'full',
-    timeoutMs: fullRouteTimeoutMs,
-    signal,
-  });
+    && initialResult.routeResolution === 'repair'
+    && initialResult.hardClean === false
+    && (initialResult.hardReport?.obstacleHits ?? 0) > 0
+  ) throw new Error('layout-routing-hard-quality-rejected');
   const workerResult = initialResult;
   const precompiledLayoutCapture = precompiledLayoutRegeneration
     ? {

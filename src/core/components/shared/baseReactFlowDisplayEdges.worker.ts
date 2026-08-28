@@ -74,6 +74,7 @@ import {
   type DisplayWorkerFinalizationOptions,
 } from './baseReactFlowDisplayWorkerFinalEvaluation';
 import { finalizeBaseReactFlowExactCommercialClearance } from './baseReactFlowDisplayFinalCommercialClearanceTransaction';
+import { runDisplayWorkerLayoutRepairTransaction } from './baseReactFlowDisplayWorkerLayoutTransaction';
 
 const finalizeContainerClearanceResponse = (
   response: DisplayEdgesWorkerResponse,
@@ -378,6 +379,15 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
   request: DisplayEdgesWorkerRequest,
   onBoundedCandidate?: (report: BaseDisplayBoundedCandidateReport) => void,
 ): DisplayEdgesWorkerResponse => {
+  if (request.operation === 'repair-validate-or-route') {
+    return runDisplayWorkerLayoutRepairTransaction(
+      request,
+      nestedRequest => computeBaseReactFlowDisplayEdgesWorkerResponse(
+        nestedRequest,
+        onBoundedCandidate,
+      ),
+    );
+  }
   const phaseTrace: DisplayRoutingPhaseTrace[] = [];
   const recordPhaseTrace = createDisplayRoutingPhaseRecorder({
     requestId: request.requestId,

@@ -6,7 +6,14 @@ const safeProbeDigest = value => (
 const projectDriftProbeSide = value => {
   if (!value || value.schema !== 'routing-drift-v1') return null;
   return {
-    operation: ['route', 'validate-or-route', 'incremental-route', 'repair', 'invalid']
+    operation: [
+      'route',
+      'validate-or-route',
+      'repair-validate-or-route',
+      'incremental-route',
+      'repair',
+      'invalid',
+    ]
       .includes(value.operation) ? value.operation : 'invalid',
     baseline: {
       sessionRefPresent: value?.baseline?.sessionRefPresent === true,

@@ -25,6 +25,18 @@ import type {
 } from './baseReactFlowDisplayWorkerResponseProtocol';
 import { parseDisplayRoutingWorkerCommitReceipt } from './baseReactFlowDisplayWorkerCommitReceipt';
 import { computeDisplayRoutingHardReportDigest } from './baseReactFlowDisplayHardReportDigest';
+import {
+  parseDisplayWorkerLayoutRepairRequest,
+  type DisplayEdgesWorkerRepairRequest,
+  type DisplayEdgesWorkerRepairValidateOrRouteRequest,
+  type DisplayEdgesWorkerValidatedRepairRequest,
+  type DisplayEdgesWorkerValidatedRepairValidateRequest,
+} from './baseReactFlowDisplayWorkerLayoutProtocol';
+
+export type {
+  DisplayEdgesWorkerRepairRequest,
+  DisplayEdgesWorkerRepairValidateOrRouteRequest,
+} from './baseReactFlowDisplayWorkerLayoutProtocol';
 
 export type {
   DisplayEdgesWorkerResponse,
@@ -103,22 +115,6 @@ export type DisplayEdgesWorkerValidateOrRouteRequest = Omit<
   candidateSource: DisplayEdgesWorkerCandidateSource;
 };
 
-export type DisplayEdgesWorkerRepairRequest = {
-  operation: 'repair';
-  requestId: string;
-  edges: Edge[];
-  nodes: Node[];
-  inputIdentity?: RoutingIdentity;
-  /**
-   * Bounded repair performs only the measured, local repair pass. Finalized
-   * repair additionally runs the commercial safety closure and is reserved for
-   * callers that have not already paid for a full route/finalization pass.
-   */
-  repairMode: 'bounded' | 'finalized';
-  /** Ends a disposable candidate pass once its obstacle stage remains dirty. */
-  stopAfterObstacleFailure?: boolean;
-};
-
 export type DisplayEdgesWorkerIncrementalRouteRequest = Omit<
   DisplayEdgesWorkerRouteRequest,
   'operation'
@@ -147,6 +143,7 @@ export type DisplayEdgesWorkerResolvedIncrementalRouteRequest =
 export type DisplayEdgesWorkerRequest =
   | DisplayEdgesWorkerRouteRequest
   | DisplayEdgesWorkerValidateOrRouteRequest
+  | DisplayEdgesWorkerRepairValidateOrRouteRequest
   | DisplayEdgesWorkerIncrementalRouteRequest
   | DisplayEdgesWorkerRepairRequest;
 
@@ -167,13 +164,10 @@ type DisplayEdgesWorkerValidatedIncrementalRequest = Omit<
   DisplayEdgesWorkerIncrementalRouteRequest,
   'inputIdentity'
 > & { inputIdentity: RoutingIdentity };
-type DisplayEdgesWorkerValidatedRepairRequest = Omit<
-  DisplayEdgesWorkerRepairRequest,
-  'inputIdentity'
-> & { inputIdentity: RoutingIdentity };
 export type DisplayEdgesWorkerValidatedRequest =
   | DisplayEdgesWorkerValidatedRouteRequest
   | DisplayEdgesWorkerValidatedValidateRequest
+  | DisplayEdgesWorkerValidatedRepairValidateRequest
   | DisplayEdgesWorkerValidatedIncrementalRequest
   | DisplayEdgesWorkerValidatedRepairRequest;
 
@@ -418,6 +412,7 @@ export const parseDisplayEdgesWorkerRequest = (
   if (
     value.operation !== 'route'
     && value.operation !== 'validate-or-route'
+    && value.operation !== 'repair-validate-or-route'
     && value.operation !== 'incremental-route'
   ) return null;
   if (typeof value.enableSmartEdges !== 'boolean') return null;
@@ -444,6 +439,13 @@ export const parseDisplayEdgesWorkerRequest = (
     qualityMode: value.qualityMode,
     inputIdentity: value.inputIdentity,
   };
+  if (value.operation === 'repair-validate-or-route') {
+    return parseDisplayWorkerLayoutRepairRequest({
+      value,
+      routeFields: routeRequest,
+      isEdgeList: isDisplayEdgesWorkerEdgeList,
+    });
+  }
   if (value.operation === 'incremental-route') {
     const changeSet = parseDisplayRoutingChangeSet(value.changeSet);
     const mutableEdgeIds = parseDisplayRoutingIdentifierList(value.mutableEdgeIds);

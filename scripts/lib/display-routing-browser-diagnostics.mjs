@@ -86,7 +86,7 @@ export const readDisplayRoutingRequestDriftProbe = request => {
     ? request.changeSet
     : {};
   const allowedOperation = new Set([
-    'route', 'validate-or-route', 'incremental-route', 'repair',
+    'route', 'validate-or-route', 'repair-validate-or-route', 'incremental-route', 'repair',
   ]);
   const allowedReason = new Set([
     'node-drag', 'node-resize', 'node-add', 'node-remove', 'edge-add',
