@@ -297,10 +297,14 @@ const worker = new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', impor
   it('loads only the active locale on the initial application path', () => {
     const i18nSource = readFileSync(resolve(process.cwd(), 'src/i18n.ts'), 'utf8');
 
-    expect(i18nSource).toContain("import('./locales/en.json')");
-    expect(i18nSource).toContain("import('./locales/zh.json')");
+    expect(i18nSource).toContain("import enLocaleUrl from './locales/en.json?url'");
+    expect(i18nSource).toContain("import zhLocaleUrl from './locales/zh.json?url'");
     expect(i18nSource).not.toContain("import en from './locales/en.json'");
     expect(i18nSource).not.toContain("import zh from './locales/zh.json'");
+    expect(i18nSource).not.toContain("import('./locales/en.json')");
+    expect(i18nSource).not.toContain("import('./locales/zh.json')");
+    expect(i18nSource).toContain('loadLocaleResource(enLocaleUrl)');
+    expect(i18nSource).toContain('loadLocaleResource(zhLocaleUrl)');
     expect(i18nSource).toContain('fallbackLng: false');
   });
 

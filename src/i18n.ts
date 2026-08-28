@@ -1,15 +1,18 @@
 import i18n, { type BackendModule } from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
+import enLocaleUrl from './locales/en.json?url';
+import zhLocaleUrl from './locales/zh.json?url';
 import {
     coerceSupportedLanguage,
     syncDocumentLanguage,
     type SupportedLanguageCode,
 } from './core/utils/languagePreference';
+import { loadLocaleResource } from './services/localeResourceBoundary';
 
 const localeLoaders: Record<SupportedLanguageCode, () => Promise<Record<string, unknown>>> = {
-    en: () => import('./locales/en.json').then(module => module.default),
-    zh: () => import('./locales/zh.json').then(module => module.default),
+    en: () => loadLocaleResource(enLocaleUrl),
+    zh: () => loadLocaleResource(zhLocaleUrl),
 };
 
 const localeBackend: BackendModule = {
