@@ -10,8 +10,24 @@ export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
   window.__vizlyBoundedCandidates = [];
   window.__vizlyLongTasks = [];
   window.__vizlyRenderedRouteSamples = [];
+  window.__vizlyLayoutVisualEvents = [];
   window.__vizlyRouteSamplingEnabled = true;
   let previousRenderedRouteFingerprint = '';
+  let previousLayoutBusy = null;
+  let previousLayoutCommitting = null;
+  let previousViewportFingerprint = '';
+  let pendingDiagnosticCloneTasks = 0;
+  const recordLayoutVisualEvent = (type, value) => {
+    const sampledAt = performance.timeOrigin + performance.now();
+    if (!Number.isFinite(sampledAt)) return;
+    window.__vizlyLayoutVisualEvents.push({ type, value, sampledAt });
+    window.__vizlyLayoutVisualEvents = window.__vizlyLayoutVisualEvents.slice(-128);
+  };
+  window.addEventListener?.('diagramControl', event => {
+    if (event?.detail?.action !== 'fit') return;
+    recordLayoutVisualEvent('fit-dispatched', true);
+    queueMicrotask(() => recordLayoutVisualEvent('fit-handler-returned', true));
+  }, true);
   try {
     const longTaskObserver = new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
@@ -39,12 +55,39 @@ export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
       const fingerprint = paths.join('||');
       if (fingerprint !== previousRenderedRouteFingerprint) {
         previousRenderedRouteFingerprint = fingerprint;
+        recordLayoutVisualEvent('route-path-change', paths.length);
         window.__vizlyRenderedRouteSamples.push({
           at: performance.now(),
           pathCount: paths.length,
           fingerprint,
         });
         window.__vizlyRenderedRouteSamples = window.__vizlyRenderedRouteSamples.slice(-16);
+      }
+    }
+    const layoutTrigger = [...document.querySelectorAll('button')]
+      .find(button => /\u81ea\u52a8\u5e03\u5c40|layout/i.test(button.getAttribute?.('aria-label') || ''));
+    const layoutBusy = layoutTrigger?.getAttribute?.('aria-busy') === 'true';
+    if (layoutBusy !== previousLayoutBusy) {
+      previousLayoutBusy = layoutBusy;
+      recordLayoutVisualEvent('layout-busy', layoutBusy);
+    }
+    const layoutCommitting = Boolean(document.querySelector?.('.vizly-layout-committing'));
+    if (layoutCommitting !== previousLayoutCommitting) {
+      previousLayoutCommitting = layoutCommitting;
+      recordLayoutVisualEvent('layout-committing', layoutCommitting);
+    }
+    const viewport = window.reactFlowInstance?.getViewport?.();
+    if (
+      Number.isFinite(viewport?.x)
+      && Number.isFinite(viewport?.y)
+      && Number.isFinite(viewport?.zoom)
+    ) {
+      const viewportFingerprint = [viewport.x, viewport.y, viewport.zoom]
+        .map(value => Math.round(value * 10_000) / 10_000)
+        .join(':');
+      if (viewportFingerprint !== previousViewportFingerprint) {
+        previousViewportFingerprint = viewportFingerprint;
+        recordLayoutVisualEvent('viewport-change', true);
       }
     }
     requestAnimationFrame(sampleRenderedRoutes);
@@ -61,6 +104,7 @@ export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
         // diagnostic cloning to the next task so both the other listeners and
         // their Promise continuations can commit first. A microtask is too early:
         // it would be queued before the application resolves its Worker promise.
+        pendingDiagnosticCloneTasks += 1;
         setTimeout(() => {
           const cloneStartedAt = performance.now();
           try {
@@ -86,6 +130,10 @@ export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
             )).slice(-64);
             window.__vizlyRoutingResponses = [...completed, ...progress];
           } catch {}
+          pendingDiagnosticCloneTasks = Math.max(0, pendingDiagnosticCloneTasks - 1);
+          if (pendingDiagnosticCloneTasks === 0) {
+            recordLayoutVisualEvent('diagnostic-clone-backlog-drained', true);
+          }
         }, 0);
       });
     }

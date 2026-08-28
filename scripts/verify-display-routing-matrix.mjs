@@ -40,6 +40,7 @@ import {
 } from './lib/display-routing-browser-diagnostics.mjs';
 import { resolveDisplayRoutingFinalRouteSnapshot } from './lib/display-routing-matrix-final-route.mjs';
 import { waitForStableDisplayRoutingLayoutVisual } from './lib/display-routing-layout-visual-settle.mjs';
+import { summarizeDisplayRoutingLayoutVisualTimeline } from './lib/display-routing-layout-visual-timeline.mjs';
 
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '').trim().replace(/\/$/, '');
 const WAIT_TIMEOUT_MS = parseDisplayRoutingMatrixTimeoutMs(
@@ -520,6 +521,12 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
     ? visualSettle.stableSinceAt - route.routing.finalAppliedAt
     : null;
   const inputToVisualStableMs = visualSettle.stableSinceAt - clickedAt;
+  const visualTimeline = summarizeDisplayRoutingLayoutVisualTimeline({
+    events: await session.evaluate('window.__vizlyLayoutVisualEvents || []'),
+    inputAt: clickedAt,
+    routingCommitAt: route.routing.finalAppliedAt,
+    visualStableAt: visualSettle.stableSinceAt,
+  });
   if (route.routing.workerStartCount !== initialRoute.routing.workerStartCount) {
     throw new Error(`${layoutCase.id} started a duplicate Canvas display Worker: ${JSON.stringify({
       before: initialRoute.routing.workerStartCount,
@@ -592,6 +599,12 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
         ? warmVisualSettle.stableSinceAt - warmRoute.routing.finalAppliedAt
         : null,
       inputToVisualStableMs: warmVisualSettle.stableSinceAt - warmClickedAt,
+      visualTimeline: summarizeDisplayRoutingLayoutVisualTimeline({
+        events: await session.evaluate('window.__vizlyLayoutVisualEvents || []'),
+        inputAt: warmClickedAt,
+        routingCommitAt: warmRoute.routing.finalAppliedAt,
+        visualStableAt: warmVisualSettle.stableSinceAt,
+      }),
       ...(await auditFinalSvg(
         session,
         warmRoute,
@@ -680,6 +693,7 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
     routingCommitToVisualStableMs,
     inputToVisualStableMs,
     visualStableConfirmedAt: visualSettle.confirmedAt,
+    visualTimeline,
     ...layoutTiming,
     slowestPhases: summarizeSlowestDisplayRoutingPhases(route.response.phaseTrace),
     canonicalMount,
