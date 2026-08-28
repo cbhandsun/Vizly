@@ -26,7 +26,10 @@ import {
 } from './baseReactFlowDisplayTerminalPortRepair';
 import { finalStrictDisplaySweep } from './baseReactFlowDisplayStrictSweepRepair';
 import { repairFinalResidualStrictCrossings } from './baseReactFlowDisplayStrictResidualRepair';
-import { createAtomicRouteTransactionEvaluation } from './baseReactFlowDisplayAtomicTransactionEvaluation';
+import {
+  createAtomicRouteTransactionEvaluation,
+  type AtomicEndpointOrderEvaluation,
+} from './baseReactFlowDisplayAtomicTransactionEvaluation';
 import { createDisplayDeclaredAxisMismatchCounter } from './baseReactFlowDisplayDeclaredAxisTransaction';
 import { eligibleCommercialClearanceDoesNotRegress } from './baseReactFlowDisplayBusinessNodeClearance';
 
@@ -192,10 +195,15 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
   edges: T,
   nodes: Node[],
   maxEvaluations = 64,
+  endpointOrder?: AtomicEndpointOrderEvaluation,
 ): T => {
   let current = edges;
   let evaluations = 0;
   const skippedEdgeIds = new Set<string>();
+  // Nodes are immutable for the whole repair transaction. Reuse the spatial
+  // index and its per-edge segment memo across accepted candidates instead of
+  // rebuilding both for every candidate gate.
+  const clearance = createNodeClearanceGraphEvaluationContext(nodes);
   for (let pass = 0; pass < edges.length && evaluations < maxEvaluations; pass += 1) {
     const baselineIssues = countRenderUnsafeEndpointStubs(current);
     if (baselineIssues === 0) break;
@@ -212,20 +220,17 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
     const baselineQuality = qualityContext.evaluate(current);
     const obstacleContext = createDisplayObstacleEvaluationContext(current, nodes);
     const baselineObstacleHits = obstacleContext.evaluate(current);
-    const atomic = createAtomicRouteTransactionEvaluation(current, nodes);
+    const atomic = createAtomicRouteTransactionEvaluation(current, nodes, {
+      qualityContext,
+      obstacleContext,
+      baselineQuality,
+      baselineObstacleHits,
+      endpointOrder,
+    });
     const countAxisMismatches = createDisplayDeclaredAxisMismatchCounter(nodes);
     const baselineAxisMismatches = current.map(countAxisMismatches);
-    const clearance = createNodeClearanceGraphEvaluationContext(nodes);
-    const totalCommercialRisk = (candidateEdges: Edge[]): number => candidateEdges.reduce(
-      (total, edge) => total + clearance.score(
-        getDisplayComputedPath(edge),
-        edge,
-        COMMERCIAL_BUSINESS_NODE_CLEARANCE,
-      ),
-      0,
-    );
     let accepted: T | null = null;
-    let acceptedCommercialRisk = Number.POSITIVE_INFINITY;
+    let acceptedCommercialRiskDelta = Number.POSITIVE_INFINITY;
     for (const candidatePath of buildRenderSafeEndpointStubPaths(getDisplayComputedPath(current[edgeIndex]))) {
       if (evaluations >= maxEvaluations) break;
       const candidate = current.map((edge, index) => (
@@ -275,6 +280,7 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
           variant,
           nodes,
           changedEdgeIds,
+          clearance,
         )) continue;
         const transaction = atomic.evaluate(variant, changedIndexes);
         if (
@@ -283,10 +289,25 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
           || !transaction.terminalsAnchored
           || !transaction.trunksPreserved
         ) continue;
-        const candidateCommercialRisk = totalCommercialRisk(variant);
-        if (candidateCommercialRisk >= acceptedCommercialRisk - 1e-6) continue;
+        // Every variant is compared with the same current baseline, so total
+        // commercial risk ordering is exactly equivalent to ordering the risk
+        // delta over only the immutable changed indexes.
+        const candidateCommercialRiskDelta = changedIndexes.reduce((delta, index) => (
+          delta
+          + clearance.score(
+            getDisplayComputedPath(variant[index]),
+            variant[index],
+            COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+          )
+          - clearance.score(
+            getDisplayComputedPath(current[index]),
+            current[index],
+            COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+          )
+        ), 0);
+        if (candidateCommercialRiskDelta >= acceptedCommercialRiskDelta - 1e-6) continue;
         accepted = variant;
-        acceptedCommercialRisk = candidateCommercialRisk;
+        acceptedCommercialRiskDelta = candidateCommercialRiskDelta;
       }
       if (accepted) break;
     }

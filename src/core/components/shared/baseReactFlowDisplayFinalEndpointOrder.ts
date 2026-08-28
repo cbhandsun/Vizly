@@ -183,7 +183,12 @@ const commitRenderSafeStubCandidate = (
 ): Edge[] => {
   const baselineIssues = evaluation.unsafeEndpointStubs(baseline);
   if (baselineIssues === 0) return baseline;
-  const candidate = repairRenderSafeEndpointStubs(baseline, repairNodes, 32);
+  const candidate = repairRenderSafeEndpointStubs(
+    baseline,
+    repairNodes,
+    32,
+    evaluation.endpointOrder,
+  );
   if (
     candidate === baseline
     || evaluation.unsafeEndpointStubs(candidate) >= baselineIssues

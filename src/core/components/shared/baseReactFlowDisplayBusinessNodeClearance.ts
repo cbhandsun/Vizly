@@ -8,6 +8,7 @@ import {
 import {
   createNodeClearanceGraphEvaluationContext,
   scoreNodeClearanceRisk,
+  type NodeClearanceGraphEvaluationContext,
 } from '../../strategies/shared/edgeWaypointCandidateRepair';
 import { getDisplayComputedPath } from './baseReactFlowDisplayGeometry';
 
@@ -43,19 +44,20 @@ export const eligibleCommercialClearanceDoesNotRegress = (
   candidateEdges: Edge[],
   nodes: Node[],
   eligibleEdgeIds: ReadonlySet<string> | undefined,
+  evaluation?: NodeClearanceGraphEvaluationContext,
 ): boolean => {
   if (eligibleEdgeIds?.size === 0) return true;
+  const clearanceEvaluation = evaluation ?? createNodeClearanceGraphEvaluationContext(nodes);
   const candidateById = new Map(candidateEdges.map(edge => [edge.id, edge] as const));
-  const evaluation = createNodeClearanceGraphEvaluationContext(nodes);
   return baselineEdges.every((edge) => {
     if (eligibleEdgeIds && !eligibleEdgeIds.has(edge.id)) return true;
     const candidate = candidateById.get(edge.id);
     if (!candidate) return false;
-    return evaluation.score(
+    return clearanceEvaluation.score(
       getDisplayComputedPath(candidate),
       candidate,
       COMMERCIAL_BUSINESS_NODE_CLEARANCE,
-    ) <= evaluation.score(
+    ) <= clearanceEvaluation.score(
       getDisplayComputedPath(edge),
       edge,
       COMMERCIAL_BUSINESS_NODE_CLEARANCE,

@@ -1,7 +1,10 @@
 import type { Edge } from '@xyflow/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { calculateEdgePathQualityScore } from '../../../strategies/shared/edgeStrictCrossingGuard';
+import * as edgeStrictCrossingGuard from '../../../strategies/shared/edgeStrictCrossingGuard';
+import * as waypointCandidateRepair from '../../../strategies/shared/edgeWaypointCandidateRepair';
+import * as displayEvaluation from '../baseReactFlowDisplayEvaluation';
 import { buildSafeEndpointSideStepCandidates } from '../baseReactFlowDisplayEndpointStubCandidates';
 import {
   countRenderUnsafeEndpointStubs,
@@ -19,6 +22,10 @@ const edgeWithPath = (
 });
 
 describe('baseReactFlowDisplayEndpointStubRepair', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('preserves candidate order and does not mutate the input path', () => {
     const path = [
       { x: 0, y: 0 },
@@ -150,5 +157,42 @@ describe('baseReactFlowDisplayEndpointStubRepair', () => {
     const repaired = repairRenderSafeEndpointStubs(unsafeEdges, []);
     expect(repaired).not.toBe(unsafeEdges);
     expect((unsafeEdges[0].data as any).computedPath).toEqual(originalUnsafePath);
+  });
+
+  it('reuses transaction evaluation contexts across a multi-pass repair', () => {
+    const clearanceSpy = vi.spyOn(
+      waypointCandidateRepair,
+      'createNodeClearanceGraphEvaluationContext',
+    );
+    const qualityContextSpy = vi.spyOn(
+      edgeStrictCrossingGuard,
+      'createEdgePathQualityEvaluationContext',
+    );
+    const obstacleContextSpy = vi.spyOn(
+      displayEvaluation,
+      'createDisplayObstacleEvaluationContext',
+    );
+    const edges = [
+      edgeWithPath('first-short', [
+        { x: 0, y: 0 },
+        { x: 48, y: 0 },
+        { x: 48, y: 100 },
+        { x: 300, y: 100 },
+      ]),
+      edgeWithPath('second-short', [
+        { x: 0, y: 200 },
+        { x: 48, y: 200 },
+        { x: 48, y: 300 },
+        { x: 300, y: 300 },
+      ]),
+    ];
+
+    const repaired = repairRenderSafeEndpointStubs(edges, []);
+
+    expect(repaired).not.toBe(edges);
+    expect(countRenderUnsafeEndpointStubs(repaired)).toBe(0);
+    expect(clearanceSpy).toHaveBeenCalledTimes(1);
+    expect(qualityContextSpy).toHaveBeenCalledTimes(2);
+    expect(obstacleContextSpy).toHaveBeenCalledTimes(2);
   });
 });
