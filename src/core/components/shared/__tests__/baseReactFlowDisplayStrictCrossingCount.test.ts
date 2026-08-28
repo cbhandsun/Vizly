@@ -21,13 +21,17 @@ const edgeWithPath = (id: string): Edge => ({
 
 describe('displayStrictCrossingsFromKnownQuality', () => {
   it('reuses the evaluated strict count when every edge has a complete computed path', () => {
+    const metrics = { knownQualityStrictReuseCount: 0 };
     expect(displayStrictCrossingsFromKnownQuality(
       [edgeWithPath('complete')],
       { strictCrossings: 7 },
+      metrics,
     )).toBe(7);
+    expect(metrics.knownQualityStrictReuseCount).toBe(1);
   });
 
   it('keeps the display compatibility fallback when a computed path is missing', () => {
+    const metrics = { knownQualityStrictReuseCount: 0 };
     const incomplete: Edge = {
       id: 'incomplete',
       source: 'source',
@@ -38,7 +42,9 @@ describe('displayStrictCrossingsFromKnownQuality', () => {
     expect(displayStrictCrossingsFromKnownQuality(
       [edgeWithPath('complete'), incomplete],
       { strictCrossings: 7 },
+      metrics,
     )).toBe(0);
+    expect(metrics.knownQualityStrictReuseCount).toBe(0);
   });
 
   it('keeps the full-quality strict count equivalent to the strict-only evaluator', () => {

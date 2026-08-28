@@ -33,7 +33,6 @@ import {
 import {
   chooseDisplayStrictPolishCandidate,
   countDisplayObstacleHits,
-  countDisplayStrictCrossings,
   createDisplayObstacleEvaluationContext,
   displayStrictRepairHardQualityIsAcceptable,
   evaluateDisplayObstacleCandidate,
@@ -189,7 +188,11 @@ export const repairTerminalStrictCrossingsWithEndpointLanes = <T extends Edge[]>
     const qualityContext = createTrackedStrictQualityContext(current, diagnostics);
     const obstacleContext = createDisplayObstacleEvaluationContext(current, nodes);
     const baselineQuality = qualityContext.evaluate(current);
-    const baselineDisplayStrictCrossings = displayStrictCrossingsFromKnownQuality(current, baselineQuality);
+    const baselineDisplayStrictCrossings = displayStrictCrossingsFromKnownQuality(
+      current,
+      baselineQuality,
+      diagnostics,
+    );
     if (baselineQuality.strictCrossings === 0 && baselineDisplayStrictCrossings === 0) break;
     const baselineObstacleHits = obstacleContext.evaluate(current);
     const paths = current.map(edge => getDisplayComputedPath(edge));
@@ -256,6 +259,7 @@ export const repairTerminalStrictCrossingsWithEndpointLanes = <T extends Edge[]>
           const candidateDisplayStrictCrossings = displayStrictCrossingsFromKnownQuality(
             candidateEdges,
             candidateQuality,
+            diagnostics,
           );
           if (candidateDisplayStrictCrossings >= baselineDisplayStrictCrossings) continue;
           const candidateObstacleHits = obstacleContext.evaluateKnownChanges(candidateEdges, [segment.edgeIndex]);
@@ -318,7 +322,14 @@ export const finalStrictDisplaySweep = <T extends Edge[]>(
   const scanMetrics = { scannedSegmentCount: 0 };
   const strictCrossings = countStrictEdgeCrossings(edges, scanMetrics);
   if (diagnostics) diagnostics.scannedSegmentCount += scanMetrics.scannedSegmentCount;
-  if (strictCrossings === 0 && countDisplayStrictCrossings(edges) === 0) return edges;
+  if (
+    strictCrossings === 0
+    && displayStrictCrossingsFromKnownQuality(
+      edges,
+      { strictCrossings },
+      diagnostics,
+    ) === 0
+  ) return edges;
   if (diagnostics) diagnostics.strictSweepInvocationCount += 1;
   const strictBypassRaw = repairDetachedStrictCrossingBypasses(edges, nodes) as T;
   const strictBypassOrthogonal = repairEndpointOrthogonalPaths(strictBypassRaw, nodes) as T;

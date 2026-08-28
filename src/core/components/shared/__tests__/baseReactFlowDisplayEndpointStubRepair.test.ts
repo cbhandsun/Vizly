@@ -143,6 +143,7 @@ describe('baseReactFlowDisplayEndpointStubRepair', () => {
     expect(diagnostics.strictFallbackInvocationCount).toBeGreaterThan(0);
     expect(diagnostics.residualRepairInvocationCount).toBeGreaterThan(0);
     expect(diagnostics.duplicateVariantReferenceCount).toBeGreaterThan(0);
+    expect(diagnostics.knownQualityStrictReuseCount).toBeGreaterThan(0);
   });
 
   it('preserves identity for an unchanged path and never mutates a repaired input', () => {

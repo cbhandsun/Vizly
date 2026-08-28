@@ -28,7 +28,6 @@ import {
 } from './baseReactFlowDisplayObstacleRepair';
 import {
   DISPLAY_STRICT_REPAIR_OVERLAP_SLACK,
-  countDisplayStrictCrossings,
   createDisplayObstacleEvaluationContext,
   displayStrictRepairHardQualityIsAcceptable,
   evaluateDisplayObstacleCandidate,
@@ -36,7 +35,7 @@ import {
   obstacleRepairScore,
   visualPolishHardQualityDoesNotRegress,
 } from './baseReactFlowDisplayEvaluation';
-import { displayStrictCrossingsFromKnownQuality } from './baseReactFlowDisplayStrictCrossingCount';
+import { createDisplayStrictCrossingCounter } from './baseReactFlowDisplayStrictCrossingCount';
 import { buildCrossingCompanionOuterPortVariants } from './baseReactFlowDisplayTerminalPortRepair';
 import {
   buildTerminalStrictStubPaths,
@@ -73,11 +72,12 @@ export const repairInternalStrictCrossingLanes = <T extends Edge[]>(
   nodes: Node[],
   diagnostics?: StrictCrossingRepairDiagnostics,
 ): T => {
+  const countKnownDisplayStrict = createDisplayStrictCrossingCounter(diagnostics);
   let current = edges;
   let terminalValidation: DisplayTerminalValidationSnapshot | null = null;
   for (let pass = 0; pass < 2; pass += 1) {
     const baselineStrict = countTrackedStrictCrossings(current, diagnostics);
-    const baselineDisplayStrict = displayStrictCrossingsFromKnownQuality(
+    const baselineDisplayStrict = countKnownDisplayStrict(
       current,
       { strictCrossings: baselineStrict },
     );
@@ -203,11 +203,12 @@ export const repairFinalResidualStrictCrossings = <T extends Edge[]>(
   diagnostics?: StrictCrossingRepairDiagnostics,
 ): T => {
   if (diagnostics) diagnostics.residualRepairInvocationCount += 1;
+  const countKnownDisplayStrict = createDisplayStrictCrossingCounter(diagnostics);
   let current = edges;
   let terminalValidation: DisplayTerminalValidationSnapshot | null = null;
   for (let pass = 0; pass < 4; pass += 1) {
     const baselineStrict = countTrackedStrictCrossings(current, diagnostics);
-    const baselineDisplayStrict = displayStrictCrossingsFromKnownQuality(
+    const baselineDisplayStrict = countKnownDisplayStrict(
       current,
       { strictCrossings: baselineStrict },
     );
@@ -228,7 +229,10 @@ export const repairFinalResidualStrictCrossings = <T extends Edge[]>(
       && changedDisplayTerminalsRemainAnchored(current, terminalStubCleaned, terminalValidation)
     ) {
       const terminalQuality = evaluateDisplayQualityCandidate(qualityContext, current, terminalStubCleaned);
-      const terminalDisplayStrict = countDisplayStrictCrossings(terminalStubCleaned);
+      const terminalDisplayStrict = countKnownDisplayStrict(
+        terminalStubCleaned,
+        terminalQuality,
+      );
       const terminalObstacleHits = evaluateDisplayObstacleCandidate(obstacleContext, current, terminalStubCleaned);
       if (
         terminalObstacleHits <= baselineObstacleHits
@@ -293,7 +297,7 @@ export const repairFinalResidualStrictCrossings = <T extends Edge[]>(
           )) as T;
           if (!changedDisplayTerminalsRemainAnchored(current, candidateEdges, terminalValidation)) continue;
           const candidateQuality = qualityContext.evaluateChanged(candidateEdges, [segment.edgeIndex]);
-          const candidateDisplayStrict = displayStrictCrossingsFromKnownQuality(
+          const candidateDisplayStrict = countKnownDisplayStrict(
             candidateEdges,
             candidateQuality,
           );
@@ -331,7 +335,10 @@ export const repairFinalResidualStrictCrossings = <T extends Edge[]>(
       for (const candidateEdges of pairedCandidates) {
         if (!changedDisplayTerminalsRemainAnchored(current, candidateEdges, terminalValidation)) continue;
         const candidateQuality = evaluateDisplayQualityCandidate(qualityContext, current, candidateEdges);
-        const candidateDisplayStrict = countDisplayStrictCrossings(candidateEdges);
+        const candidateDisplayStrict = countKnownDisplayStrict(
+          candidateEdges,
+          candidateQuality,
+        );
         const candidateObstacleHits = evaluateDisplayObstacleCandidate(obstacleContext, current, candidateEdges);
         if (
           candidateQuality.strictCrossings >= bestQuality.strictCrossings
@@ -447,7 +454,7 @@ export const repairFinalResidualStrictCrossings = <T extends Edge[]>(
           )) as T;
           if (!changedDisplayTerminalsRemainAnchored(current, candidateEdges, terminalValidation)) continue;
           const candidateQuality = qualityContext.evaluateChanged(candidateEdges, [segment.edgeIndex]);
-          const candidateDisplayStrict = displayStrictCrossingsFromKnownQuality(
+          const candidateDisplayStrict = countKnownDisplayStrict(
             candidateEdges,
             candidateQuality,
           );
@@ -511,7 +518,7 @@ export const repairFinalResidualStrictCrossings = <T extends Edge[]>(
           )) as T;
           if (!changedDisplayTerminalsRemainAnchored(current, candidateEdges, terminalValidation)) continue;
           const candidateQuality = qualityContext.evaluateChanged(candidateEdges, [segment.edgeIndex]);
-          const candidateDisplayStrict = displayStrictCrossingsFromKnownQuality(
+          const candidateDisplayStrict = countKnownDisplayStrict(
             candidateEdges,
             candidateQuality,
           );
@@ -559,7 +566,7 @@ export const repairFinalResidualStrictCrossings = <T extends Edge[]>(
           )) as T;
           if (!changedDisplayTerminalsRemainAnchored(current, candidateEdges, terminalValidation)) continue;
           const candidateQuality = qualityContext.evaluateChanged(candidateEdges, [edgeIndex]);
-          const candidateDisplayStrict = displayStrictCrossingsFromKnownQuality(
+          const candidateDisplayStrict = countKnownDisplayStrict(
             candidateEdges,
             candidateQuality,
           );
@@ -618,7 +625,10 @@ export const repairFinalResidualStrictCrossings = <T extends Edge[]>(
           current,
           obstacleCleaned,
         );
-        const obstacleCleanedDisplayStrict = countDisplayStrictCrossings(obstacleCleaned);
+        const obstacleCleanedDisplayStrict = countKnownDisplayStrict(
+          obstacleCleaned,
+          obstacleCleanedQuality,
+        );
         const obstacleCleanedHits = evaluateDisplayObstacleCandidate(
           obstacleContext,
           current,
@@ -641,7 +651,10 @@ export const repairFinalResidualStrictCrossings = <T extends Edge[]>(
         nodes,
       ) as T;
       const strictBypassQuality = evaluateDisplayQualityCandidate(qualityContext, current, strictBypassCandidate);
-      const strictBypassDisplayStrict = countDisplayStrictCrossings(strictBypassCandidate);
+      const strictBypassDisplayStrict = countKnownDisplayStrict(
+        strictBypassCandidate,
+        strictBypassQuality,
+      );
       const strictBypassObstacleHits = evaluateDisplayObstacleCandidate(obstacleContext, current, strictBypassCandidate);
       if (
         changedDisplayTerminalsRemainAnchored(current, strictBypassCandidate, terminalValidation)

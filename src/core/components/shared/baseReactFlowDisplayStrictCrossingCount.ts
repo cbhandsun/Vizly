@@ -11,8 +11,18 @@ import { countDisplayStrictCrossings } from './baseReactFlowDisplayEvaluation';
 export const displayStrictCrossingsFromKnownQuality = (
   edges: Edge[],
   quality: { strictCrossings: number },
-): number => (
-  edges.every(edge => getDisplayComputedPath(edge).length >= 2)
-    ? quality.strictCrossings
-    : countDisplayStrictCrossings(edges)
-);
+  metrics?: { knownQualityStrictReuseCount: number },
+): number => {
+  if (edges.every(edge => getDisplayComputedPath(edge).length >= 2)) {
+    if (metrics) metrics.knownQualityStrictReuseCount += 1;
+    return quality.strictCrossings;
+  }
+  return countDisplayStrictCrossings(edges);
+};
+
+export const createDisplayStrictCrossingCounter = (
+  metrics?: { knownQualityStrictReuseCount: number },
+) => (
+  edges: Edge[],
+  quality: { strictCrossings: number },
+): number => displayStrictCrossingsFromKnownQuality(edges, quality, metrics);
