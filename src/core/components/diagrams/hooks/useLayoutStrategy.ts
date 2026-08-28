@@ -205,6 +205,7 @@ export function useLayoutStrategy({
                             edgeRouting: 'ORTHOGONAL',
                             padding: { top: 40, right: 20, bottom: 20, left: 20 },
                         },
+                        { signal: routingJob.signal },
                     );
                     newNodes = layered.nodes;
                     treeSourceEdges = layered.edges;
@@ -257,6 +258,7 @@ export function useLayoutStrategy({
                             edgeRouting: 'ORTHOGONAL',
                             padding: { top: 40, right: 20, bottom: 20, left: 20 },
                         },
+                        { signal: routingJob.signal },
                     );
                     newNodes = layered.nodes;
                     forceSourceEdges = layered.edges;
@@ -413,6 +415,7 @@ export function useLayoutStrategy({
                         },
                         fallbackDirection,
                         true,
+                        { signal: routingJob.signal },
                     );
                     usedDomainCompoundElk = true;
                     usedDomainDagre = false;
@@ -458,6 +461,7 @@ export function useLayoutStrategy({
                     effectiveLayoutOptions,
                     dir,
                     isDomainLane || usedDomainCompoundElk,
+                    { signal: routingJob.signal },
                 );
                 if (!usedDomainElk && !usedDomainCompoundElk && !isDomainLane) {
                     const qualityFallback = legacyFallback.resolveLegacyDomainQualityFallback(
@@ -474,7 +478,7 @@ export function useLayoutStrategy({
                             nodeLayout: 'elk-layered' as LayoutOptions['nodeLayout'],
                             spacing: { horizontal: 120, vertical: 120 },
                             edgeRouting: 'ORTHOGONAL',
-                        });
+                        }, { signal: routingJob.signal });
                         usedDomainElk = true;
                         usedDomainDagre = false;
                         appliedStrategyName = 'domain-elk';

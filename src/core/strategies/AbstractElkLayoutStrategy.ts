@@ -1,6 +1,7 @@
 import type { Node as ReactFlowNode, Edge } from '@xyflow/react';
 import type { ElkNode } from 'elkjs';
 import type { LayoutOptions } from '../types/layout';
+import type { LayoutCalculationContext } from '../types/layout-strategy';
 import { ILayoutStrategy } from './LayoutStrategyManager';
 import { diagramConfigManager } from '../config/DiagramConfig';
 import {
@@ -156,12 +157,16 @@ export abstract class AbstractElkLayoutStrategy implements ILayoutStrategy {
     elkGraph: ElkNode,
     updatedNodes: ReactFlowNode[],
     edges: Edge[],
-    padding: { x: number, y: number }
+    padding: { x: number, y: number },
+    context?: LayoutCalculationContext,
   ): Promise<ElkLayoutResult> {
     // 构建 ID 映射表，用于快速回填
     const idMap = new Map<string, ReactFlowNode>(updatedNodes.map(n => [n.id, n] as const));
     try {
-      const result = await runElkLayout(elkGraph, { timeoutMs: 30_000 });
+      const result = await runElkLayout(elkGraph, {
+        timeoutMs: 30_000,
+        signal: context?.signal,
+      });
       applyElkResultNodeGeometry(result.children, idMap, padding);
 
       const routes = collectDomainElkLayoutRoutes(
@@ -173,12 +178,15 @@ export abstract class AbstractElkLayoutStrategy implements ILayoutStrategy {
         edges: applyDomainElkLayoutRoutes(edges, routes),
       };
     } catch (error) {
+      if (context?.signal?.aborted || (error instanceof Error && error.name === 'AbortError')) {
+        throw error;
+      }
       if (error instanceof Error && error.message.includes('timed out')) {
         logLayoutWorkerTimeout(this.getName());
       } else {
         logWorkerLayoutFailure(this.getName(), error instanceof Error ? error.message : error);
       }
-      return { nodes: updatedNodes, edges };
+      throw error;
     }
   }
 
@@ -194,10 +202,15 @@ export abstract class AbstractElkLayoutStrategy implements ILayoutStrategy {
   /**
    * 主入口
    */
-  async calculateLayout(nodes: ReactFlowNode[], edges: Edge[], options: LayoutOptions): Promise<ElkLayoutResult> {
+  async calculateLayout(
+    nodes: ReactFlowNode[],
+    edges: Edge[],
+    options: LayoutOptions,
+    context?: LayoutCalculationContext,
+  ): Promise<ElkLayoutResult> {
     const { updatedNodes, padding } = this.prepareData(nodes, options);
     const elkGraph = this.buildElkGraph(updatedNodes, edges, options);
-    return this.runWorkerLayout(elkGraph, updatedNodes, edges, padding);
+    return this.runWorkerLayout(elkGraph, updatedNodes, edges, padding, context);
   }
 
   // 辅助工具：从 DiagramConfig 获取安全数值

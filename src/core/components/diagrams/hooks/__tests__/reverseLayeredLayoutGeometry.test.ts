@@ -117,6 +117,7 @@ describe('reverseLayeredLayoutGeometry', () => {
     ] as Node[];
     const edges = [{ id: 'edge', source: 'source', target: 'target' }] as Edge[];
     const calculateLayout = vi.fn(async () => ({ nodes, edges }));
+    const controller = new AbortController();
 
     const result = await calculateLayeredLayoutWithReverse(
       { calculateLayout },
@@ -131,6 +132,7 @@ describe('reverseLayeredLayoutGeometry', () => {
       },
       'BT',
       true,
+      { signal: controller.signal },
     );
 
     expect(calculateLayout).toHaveBeenCalledWith(nodes, edges, expect.objectContaining({
@@ -138,7 +140,7 @@ describe('reverseLayeredLayoutGeometry', () => {
       directionOverrides: undefined,
       domainSubGroupDirection: 'TB',
       subDomainNodeDirection: 'TB',
-    }));
+    }), { signal: controller.signal });
     expect(result.nodes.map(node => node.position.y)).toEqual([200, 0]);
   });
 });

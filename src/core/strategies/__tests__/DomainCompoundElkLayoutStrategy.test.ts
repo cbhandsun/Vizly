@@ -6,6 +6,14 @@ import { LayoutType, type LayoutOptions } from '../../types/layout';
 import { applyElkResultNodeGeometry } from '../AbstractElkLayoutStrategy';
 import { DomainCompoundElkLayoutStrategy } from '../DomainCompoundElkLayoutStrategy';
 
+const elkMocks = vi.hoisted(() => ({
+  runElkLayout: vi.fn(),
+}));
+
+vi.mock('../../workers/elkLayoutClient', () => ({
+  runElkLayout: elkMocks.runElkLayout,
+}));
+
 vi.mock('../../components/layout/LayoutOptimizer', () => ({
   LayoutOptimizer: {
     getInstance: () => ({
@@ -18,6 +26,10 @@ vi.mock('../../components/layout/LayoutOptimizer', () => ({
 class InspectableDomainCompoundElkLayoutStrategy extends DomainCompoundElkLayoutStrategy {
   buildGraph(nodes: Node[], edges: Edge[], options: LayoutOptions): ElkNode {
     return this.buildElkGraph(nodes, edges, options);
+  }
+
+  runGraph(graph: ElkNode, nodes: Node[], edges: Edge[], signal: AbortSignal) {
+    return this.runWorkerLayout(graph, nodes, edges, { x: 0, y: 0 }, { signal });
   }
 }
 
@@ -35,6 +47,33 @@ const node = (
 });
 
 describe('DomainCompoundElkLayoutStrategy', () => {
+  it('forwards cancellation and does not route unchanged geometry after an ELK failure', async () => {
+    const controller = new AbortController();
+    const failure = new Error('ELK layout timed out after 30000ms');
+    elkMocks.runElkLayout.mockRejectedValueOnce(failure);
+
+    const strategy = new InspectableDomainCompoundElkLayoutStrategy();
+    const nodes = [node('source', 'custom', {}), node('target', 'custom', {})];
+    const edges = [{ id: 'edge', source: 'source', target: 'target' }];
+    const graph = strategy.buildGraph(
+      nodes,
+      edges,
+      { type: LayoutType.ELK_LAYERED, direction: 'LR' },
+    );
+
+    await expect(strategy.runGraph(
+      graph,
+      nodes,
+      edges,
+      controller.signal,
+    )).rejects.toBe(failure);
+
+    expect(elkMocks.runElkLayout).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'domain-compound-elk-root' }),
+      { timeoutMs: 30_000, signal: controller.signal },
+    );
+  });
+
   it('keeps compound child coordinates relative while applying padding to roots', () => {
     const domain = node('domain-a', 'titleGroup', { domain: 'A' });
     const subDomain = {

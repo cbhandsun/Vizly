@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import type { ILayoutStrategy } from '../../../types/layout-strategy';
+import type { LayoutCalculationContext } from '../../../types/layout-strategy';
 import type { LayoutOptions } from '../../../types/layout';
 import type { FlowchartLayoutDirection } from '../flowchartLayoutStrategyMode';
 
@@ -189,6 +190,7 @@ export const calculateLayeredLayoutWithReverse = async (
     options: LayeredLayoutOptions,
     requestedDirection: FlowchartLayoutDirection,
     reverseRanking: boolean,
+    context?: LayoutCalculationContext,
 ): Promise<{ nodes: Node[]; edges: Edge[] }> => {
     const reverseDirection = reverseRanking
         && (requestedDirection === 'BT' || requestedDirection === 'RL')
@@ -206,7 +208,7 @@ export const calculateLayeredLayoutWithReverse = async (
         subDomainNodeDirection: calculationDirection,
         directionOverrides: reverseDirection ? undefined : options.directionOverrides,
     };
-    const calculated = await strategy.calculateLayout(nodes, edges, calculationOptions);
+    const calculated = await strategy.calculateLayout(nodes, edges, calculationOptions, context);
     return reverseDirection
         ? reverseLayeredLayoutGeometry(calculated, reverseDirection)
         : calculated;

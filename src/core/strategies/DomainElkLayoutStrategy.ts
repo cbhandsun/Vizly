@@ -1,6 +1,7 @@
 import type { Node as ReactFlowNode, Edge, XYPosition } from '@xyflow/react'
 import type { ElkNode } from 'elkjs'
 import type { LayoutOptions } from '../types/layout'
+import type { LayoutCalculationContext } from '../types/layout-strategy'
 import { diagramConfigManager } from '../config/DiagramConfig'
 import { LayeredConfigManager } from '../config/LayeredConfigManager';
 import { ILayoutStrategy } from './LayoutStrategyManager'
@@ -56,7 +57,12 @@ export class DomainElkLayoutStrategy implements ILayoutStrategy {
    * - 4) 若存在域容器：严格包含、统一域宽/高投影、子域居中与钳制；
    * - 5) 域容器间重叠消解，确保“统一域宽/严格包含/不重叠”。
    */
-  async calculateLayout(nodes: LayoutNode[], edges: Edge[], options: LayoutOptions): Promise<{ nodes: LayoutNode[]; edges: Edge[] }> {
+  async calculateLayout(
+    nodes: LayoutNode[],
+    edges: Edge[],
+    options: LayoutOptions,
+    context?: LayoutCalculationContext,
+  ): Promise<{ nodes: LayoutNode[]; edges: Edge[] }> {
     let updatedNodes: LayoutNode[] = ensureMeasuredForNodes(nodes)
 
     const EXCLUDE_TYPES = new Set(['subGroup', 'titleGroup', 'group', 'domain'])
@@ -129,7 +135,7 @@ export class DomainElkLayoutStrategy implements ILayoutStrategy {
           children: layoutCandidates.map(n => ({ id: n.id, width: getW(n), height: getH(n) })),
           edges: scopedEdges.map(e => ({ id: e.id || `${e.source}->${e.target}`, sources: [e.source], targets: [e.target] })),
         }
-        const res = await runElkLayout(graph)
+        const res = await runElkLayout(graph, { signal: context?.signal })
         const routedPaths = collectDomainElkLayoutRoutes(res.edges, { x: left, y: top })
         const idToPos: Record<string, { x: number; y: number }> = {}
         for (const c of (res.children || [])) idToPos[c.id] = { x: Math.round((c.x || 0) + left), y: Math.round((c.y || 0) + top) }

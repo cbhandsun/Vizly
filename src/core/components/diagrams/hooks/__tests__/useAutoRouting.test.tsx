@@ -137,25 +137,33 @@ describe('useAutoRouting layout preference coordination', () => {
         expect(result.current.isLayoutBusy).toBe(false);
     });
 
-    it('ignores overlapping layout requests until the active layout completes', async () => {
-        const deferred = createDeferred();
-        mocks.handleStrategyLayout.mockReturnValueOnce(deferred.promise);
+    it('starts the latest layout request and keeps busy state owned by it', async () => {
+        const firstDeferred = createDeferred();
+        const secondDeferred = createDeferred();
+        mocks.handleStrategyLayout
+            .mockReturnValueOnce(firstDeferred.promise)
+            .mockReturnValueOnce(secondDeferred.promise);
         const { result } = renderHook(() => useAutoRouting(createOptions()));
         let firstLayout = Promise.resolve();
+        let secondLayout = Promise.resolve();
 
         act(() => {
             firstLayout = result.current.handleStrategyLayout('domain-dagre', 'dagre', 'LR');
         });
-        await act(async () => {
-            await result.current.handleStrategyLayout('domain-vertical', 'grid', 'TB');
+        act(() => {
+            secondLayout = result.current.handleStrategyLayout('domain-vertical', 'grid', 'TB');
         });
 
-        expect(mocks.handleStrategyLayout).toHaveBeenCalledTimes(1);
+        expect(mocks.handleStrategyLayout).toHaveBeenCalledTimes(2);
         expect(result.current.isLayoutStable).toBe(true);
         expect(result.current.isLayoutBusy).toBe(true);
 
-        deferred.resolve();
+        firstDeferred.resolve();
         await act(async () => firstLayout);
+        expect(result.current.isLayoutBusy).toBe(true);
+
+        secondDeferred.resolve();
+        await act(async () => secondLayout);
         expect(result.current.isLayoutStable).toBe(true);
         expect(result.current.isLayoutBusy).toBe(false);
     });

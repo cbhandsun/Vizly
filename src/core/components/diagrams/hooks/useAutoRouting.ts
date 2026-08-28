@@ -45,7 +45,7 @@ export function useAutoRouting({
     const [isLayoutStable, setIsLayoutStable] = useState(true);
     const [isLayoutBusy, setIsLayoutBusy] = useState(false);
     const routingPreferenceVersionRef = useRef(0);
-    const layoutInFlightRef = useRef(false);
+    const layoutGenerationRef = useRef(0);
     const routingSessionRuntime = useBaseReactFlowRoutingSessionRuntime();
 
     const setAutoRoutingEnabled = useCallback<React.Dispatch<React.SetStateAction<boolean>>>((nextValue) => {
@@ -69,8 +69,8 @@ export function useAutoRouting({
 
     // 布局时自动启用 autoRouting + 管理稳定性标记
     const handleStrategyLayout = useCallback(async (...args: Parameters<typeof _handleStrategyLayout>) => {
-        if (layoutInFlightRef.current) return;
-        layoutInFlightRef.current = true;
+        const layoutGeneration = layoutGenerationRef.current + 1;
+        layoutGenerationRef.current = layoutGeneration;
         const routingPreferenceVersion = routingPreferenceVersionRef.current;
         setIsLayoutBusy(true);
         try {
@@ -81,9 +81,10 @@ export function useAutoRouting({
                 setAutoRoutingEnabledState(true);
             }
         } finally {
-            layoutInFlightRef.current = false;
-            setIsLayoutBusy(false);
-            setIsLayoutStable(true);
+            if (layoutGenerationRef.current === layoutGeneration) {
+                setIsLayoutBusy(false);
+                setIsLayoutStable(true);
+            }
         }
     }, [_handleStrategyLayout]);
 
