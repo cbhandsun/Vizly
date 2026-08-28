@@ -50,6 +50,15 @@ export type DisplayRoutingDebugState = {
   layoutSeedTerminalsAnchored?: boolean;
   layoutSeedObstacleHits?: number;
   layoutSeedStrictCrossings?: number;
+  layoutSeedStageAudits?: Partial<Record<
+    'raw' | 'anchored' | 'detached-fallback' | 'axis-repaired' | 'geometry-normalized' | 'final',
+    Readonly<{
+      terminalsAttached: boolean;
+      terminalsAnchored: boolean;
+      obstacleHits: number;
+      strictCrossings: number;
+    }>
+  >>;
   incrementalBaselineSignature?: string;
   incrementalPlanStatus?: 'ready' | 'missing-baseline' | 'rejected';
   renderAuthorityStatus?: BaseReactFlowRenderAuthorityStatus;

@@ -74,8 +74,12 @@ export class DomainCompoundElkLayoutStrategy extends AbstractElkLayoutStrategy {
       'elk.algorithm': 'org.eclipse.elk.layered',
       'elk.direction': direction,
       'elk.edgeRouting': 'ORTHOGONAL',
+      // Compound edge sections otherwise use their lowest common container as
+      // the coordinate origin. Downstream routes are projected in root space.
+      'elk.json.edgeCoords': 'ROOT',
       'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
       'elk.spacing.nodeNode': String(horizontalSpacing),
+      'elk.spacing.edgeNode': '64',
       'elk.layered.spacing.nodeNodeBetweenLayers': String(verticalSpacing),
       'elk.layered.spacing.edgeNodeBetweenLayers': '40',
       'elk.layered.mergeEdges': 'true',

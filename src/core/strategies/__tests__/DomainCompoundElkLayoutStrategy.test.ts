@@ -124,6 +124,8 @@ describe('DomainCompoundElkLayoutStrategy', () => {
     const rootChildren = graph.children ?? [];
     expect(graph.layoutOptions).toMatchObject({
       'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
+      'elk.json.edgeCoords': 'ROOT',
+      'elk.spacing.edgeNode': '64',
       'elk.layered.mergeHierarchyEdges': 'true',
       'elk.layered.crossingMinimization.hierarchicalSweepiness': '1.0',
       'elk.layered.crossingMinimization.greedySwitchHierarchical.type': 'TWO_SIDED',

@@ -126,6 +126,63 @@ describe('baseReactFlow layout routing candidate sequence', () => {
     clearBaseReactFlowDisplayCommittedSnapshots();
     workerMocks.compute.mockReset();
     workerMocks.repair.mockReset();
+    (window as Window & { __vizlyDisplayRoutingDiagnosticsEnabled?: boolean })
+      .__vizlyDisplayRoutingDiagnosticsEnabled = false;
+  });
+
+  it('records bounded seed-stage audits only when diagnostics are enabled', () => {
+    (window as Window & { __vizlyDisplayRoutingDiagnosticsEnabled?: boolean })
+      .__vizlyDisplayRoutingDiagnosticsEnabled = true;
+
+    seedBaseReactFlowStagedLayoutEdges({ sourceEdges: edges, sourceNodes: nodes });
+
+    expect(readDisplayRoutingDebugState()?.layoutSeedStageAudits).toEqual({
+      raw: expect.objectContaining({ terminalsAttached: true, terminalsAnchored: true }),
+      anchored: expect.objectContaining({ terminalsAttached: true, terminalsAnchored: true }),
+      'detached-fallback': expect.objectContaining({
+        terminalsAttached: true,
+        terminalsAnchored: true,
+      }),
+      'axis-repaired': expect.objectContaining({ terminalsAttached: true, terminalsAnchored: true }),
+      'geometry-normalized': expect.objectContaining({ terminalsAttached: true, terminalsAnchored: true }),
+      final: expect.objectContaining({ terminalsAttached: true, terminalsAnchored: true }),
+    });
+  });
+
+  it('replaces a detached compound ELK path with a node-anchored fallback', () => {
+    const [seeded] = seedBaseReactFlowStagedLayoutEdges({
+      sourceNodes: nodes,
+      sourceEdges: [{
+        ...edges[0],
+        data: {
+          layoutRoutingCandidate: true,
+          elkPath: [
+            { x: 1_000, y: 1_000 },
+            { x: 1_200, y: 1_000 },
+          ],
+        },
+      }],
+    });
+
+    expect(seeded).toMatchObject({
+      type: 'stablePath',
+      data: {
+        algorithm: 'display-stable-fallback',
+        layoutPathLocked: true,
+      },
+    });
+    const projected = projectBaseReactFlowDisplayWorkerInput({
+      edges: [seeded],
+      nodes,
+    });
+    expect(getDisplayHardQualityGateReport(
+      projected.edges,
+      projected.nodes,
+      'polished',
+    )).toMatchObject({
+      terminalsAttached: true,
+      terminalsAnchored: true,
+    });
   });
 
   it.each([

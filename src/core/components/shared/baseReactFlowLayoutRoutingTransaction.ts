@@ -32,7 +32,6 @@ import {
 } from './baseReactFlowDisplayWorkerTimeout';
 import { recordBaseReactFlowRejectedDisplayDiagnostics } from './baseReactFlowDisplayRejectedDiagnostics';
 import { repairAxisMismatchedTerminalsWithBoundedPortRoles } from './baseReactFlowDisplayTerminalPortRepair';
-import { buildLayoutFacingTerminalShortcutCandidates } from './baseReactFlowDisplayCommercialTerminalShortcut';
 import { baseReactFlowDisplayCommercialQualityIsClean } from './baseReactFlowDisplayCommercialQuality';
 import { repairResidualHairpinBridges } from '../../strategies/shared/edgeHairpinBridgeWidenRepair';
 import { clearBaseReactFlowLayoutEdgeRoutingData } from './baseReactFlowLayoutEdgeRoutingData';
@@ -52,6 +51,8 @@ import {
   type BaseReactFlowPrecompiledRouteLookupInput,
 } from './baseReactFlowPrecompiledRouteRegistry';
 import type { BaseReactFlowPrecompiledLayoutRegeneration } from './baseReactFlowPrecompiledCaptureMode';
+import { isBaseReactFlowDisplayDiagnosticsEnabled } from './baseReactFlowDisplayDiagnostics';
+import { createDisplayTerminalValidationSnapshot } from './baseReactFlowTerminalValidation';
 
 export { clearBaseReactFlowLayoutEdgeRoutingData } from './baseReactFlowLayoutEdgeRoutingData';
 
@@ -146,27 +147,59 @@ export const seedBaseReactFlowStagedLayoutEdges = ({
     });
   });
   const anchoredEdges = anchorComputedDisplayEdgeEndpoints(seededEdges, projected.nodes);
+  const terminalSnapshot = createDisplayTerminalValidationSnapshot(projected.nodes);
+  const recoveredEdges = anchoredEdges.map((edge) => {
+    const data = edge.data && typeof edge.data === 'object'
+      ? edge.data as Record<string, unknown>
+      : {};
+    if (
+      data.algorithm !== 'elk-layout-candidate'
+      || terminalSnapshot.validateEdge(edge).attached
+    ) return edge;
+
+    return synthesizeStableFallbackPath({
+      edge: {
+        ...edge,
+        data: clearBaseReactFlowLayoutEdgeRoutingData(edge.data),
+      },
+      nodeById,
+    });
+  });
   const axisRepairedEdges = repairAxisMismatchedTerminalsWithBoundedPortRoles(
-    anchoredEdges,
+    recoveredEdges,
     projected.nodes,
-    Math.min(128, Math.max(32, anchoredEdges.length * 4)),
+    Math.min(128, Math.max(32, recoveredEdges.length * 4)),
   );
   const geometryNormalizedEdges = repairResidualHairpinBridges(
     axisRepairedEdges,
     projected.nodes,
   );
-  // ELK owns node placement, but its terminal choice is only a candidate.
-  // Normalize attachment/axis defects first because those repairs can expose a
-  // compact same-side U that was not present in raw ELK waypoints. Negotiating
-  // after normalization but before the Worker lets the whole graph assess the
-  // new port role atomically, before topology/trunk ownership is established.
-  return geometryNormalizedEdges.map((edge) => {
-    const data = edge.data && typeof edge.data === 'object'
-      ? edge.data as Record<string, unknown>
-      : {};
-    if (data.algorithm !== 'elk-layout-candidate') return edge;
-    return buildLayoutFacingTerminalShortcutCandidates(edge, projected.nodes)[0] ?? edge;
-  });
+  // The Worker owns graph-wide shortcut acceptance. Applying the shortest
+  // per-edge candidate here can reduce one route while increasing crossings
+  // and obstacle hits across the staged graph.
+  const finalEdges = geometryNormalizedEdges;
+  if (isBaseReactFlowDisplayDiagnosticsEnabled()) {
+    updateDisplayRoutingDebugState({
+      layoutSeedStageAudits: {
+        raw: auditBaseReactFlowLayoutCandidateSeed(seededEdges, projected.nodes),
+        anchored: auditBaseReactFlowLayoutCandidateSeed(anchoredEdges, projected.nodes),
+        'detached-fallback': auditBaseReactFlowLayoutCandidateSeed(
+          recoveredEdges,
+          projected.nodes,
+        ),
+        'axis-repaired': auditBaseReactFlowLayoutCandidateSeed(
+          axisRepairedEdges,
+          projected.nodes,
+        ),
+        'geometry-normalized': auditBaseReactFlowLayoutCandidateSeed(
+          geometryNormalizedEdges,
+          projected.nodes,
+        ),
+        final: auditBaseReactFlowLayoutCandidateSeed(finalEdges, projected.nodes),
+      },
+    });
+  }
+  return finalEdges;
 };
 
 /**

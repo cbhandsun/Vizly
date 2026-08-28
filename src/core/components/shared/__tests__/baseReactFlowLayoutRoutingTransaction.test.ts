@@ -215,7 +215,7 @@ describe('baseReactFlowLayoutRoutingTransaction', () => {
     expect(sourceEdges[0].data).toEqual({});
   });
 
-  it('negotiates an automatic same-row ELK U route to facing terminals before Worker routing', () => {
+  it('preserves an automatic same-row ELK U route for graph-wide Worker negotiation', () => {
     const elkPath = [
       { x: 50, y: 60 },
       { x: 50, y: 130 },
@@ -233,11 +233,11 @@ describe('baseReactFlowLayoutRoutingTransaction', () => {
     });
 
     expect(seed).toMatchObject({
-      sourceHandle: 'right',
-      targetHandle: 'left',
+      sourceHandle: 'bottom',
+      targetHandle: 'bottom',
       data: {
-        computedPath: [{ x: 100, y: 30 }, { x: 240, y: 30 }],
-        terminalPortBridgeRepaired: true,
+        computedPath: elkPath,
+        algorithm: 'elk-layout-candidate',
       },
     });
   });
@@ -271,7 +271,7 @@ describe('baseReactFlowLayoutRoutingTransaction', () => {
     });
   });
 
-  it('negotiates the production mixed-side Pool A detour after geometry normalization', () => {
+  it('preserves the production mixed-side detour for graph-wide Worker negotiation', () => {
     const productionNodes: Node[] = [
       {
         id: 'check-limit', position: { x: 2232, y: 479 },
@@ -297,12 +297,12 @@ describe('baseReactFlowLayoutRoutingTransaction', () => {
     });
 
     expect(seed).toMatchObject({
-      sourceHandle: 'right',
-      targetHandle: 'left',
-      data: { computedPath: [
-        { x: 2481, y: 527 }, { x: 2541, y: 527 },
-        { x: 2541, y: 743 }, { x: 2601, y: 743 },
-      ] },
+      sourceHandle: 'left',
+      targetHandle: 'bottom',
+      data: {
+        computedPath: elkPath,
+        algorithm: 'elk-layout-candidate',
+      },
     });
   });
 
