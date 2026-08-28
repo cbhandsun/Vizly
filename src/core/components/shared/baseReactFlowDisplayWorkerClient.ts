@@ -641,6 +641,7 @@ export const repairBaseReactFlowDisplayEdgesInWorker = async ({
   signal,
   requireHardClean = true,
   repairMode = 'finalized',
+  stopAfterObstacleFailure = false,
   inputSignature,
   inputGeometryDigest,
 }: {
@@ -652,6 +653,7 @@ export const repairBaseReactFlowDisplayEdgesInWorker = async ({
   signal?: AbortSignal;
   requireHardClean?: boolean;
   repairMode?: 'bounded' | 'finalized';
+  stopAfterObstacleFailure?: boolean;
   inputSignature: string;
   inputGeometryDigest: string;
 }): Promise<BaseReactFlowDisplayWorkerResult> => {
@@ -665,6 +667,7 @@ export const repairBaseReactFlowDisplayEdgesInWorker = async ({
       nodes: projectedInput.nodes,
       inputIdentity: createDisplayRoutingIdentity(inputSignature, inputGeometryDigest),
       repairMode,
+      stopAfterObstacleFailure,
     },
     qualityMode: 'full',
     timeoutMs,

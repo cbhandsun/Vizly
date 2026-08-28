@@ -517,6 +517,7 @@ export const stageBaseReactFlowLayoutRouting = async ({
       signal,
       requireHardClean: false,
       repairMode: 'bounded',
+      stopAfterObstacleFailure: rejectObstacleDirtyBoundedCandidate,
       inputSignature: projectedIdentity.cacheSignature,
       inputGeometryDigest: projectedIdentity.geometryDigest,
     });

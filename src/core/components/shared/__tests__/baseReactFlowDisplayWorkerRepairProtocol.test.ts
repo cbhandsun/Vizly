@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { parseDisplayEdgesWorkerRequest } from '../baseReactFlowDisplayWorkerProtocol';
+import { createDisplayRoutingIdentity } from '../baseReactFlowDisplayRoutingSession';
 
 const validRepairRequest = {
   operation: 'repair',
@@ -25,6 +26,33 @@ describe('baseReactFlowDisplayWorker repair protocol', () => {
     expect(parseDisplayEdgesWorkerRequest({
       ...validRepairRequest,
       repairMode: 'unbounded',
+    })).toBeNull();
+  });
+
+  it('coerces only the optional boolean obstacle-failure boundary', () => {
+    const inputIdentity = createDisplayRoutingIdentity(
+      '1234',
+      `geometry-v1:${'a'.repeat(32)}`,
+    );
+    expect(parseDisplayEdgesWorkerRequest({
+      ...validRepairRequest,
+      inputIdentity,
+      stopAfterObstacleFailure: true,
+    })).toMatchObject({ stopAfterObstacleFailure: true });
+    expect(parseDisplayEdgesWorkerRequest({
+      ...validRepairRequest,
+      inputIdentity,
+    })).toMatchObject({ stopAfterObstacleFailure: false });
+    expect(parseDisplayEdgesWorkerRequest({
+      ...validRepairRequest,
+      inputIdentity,
+      stopAfterObstacleFailure: 'true',
+    })).toBeNull();
+    expect(parseDisplayEdgesWorkerRequest({
+      ...validRepairRequest,
+      inputIdentity,
+      repairMode: 'finalized',
+      stopAfterObstacleFailure: true,
     })).toBeNull();
   });
 });

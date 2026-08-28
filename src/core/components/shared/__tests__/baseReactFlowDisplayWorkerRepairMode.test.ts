@@ -45,13 +45,20 @@ describe('baseReactFlowDisplayEdges worker repair mode', () => {
       nodes,
       inputIdentity,
       repairMode: 'bounded',
+      stopAfterObstacleFailure: true,
     });
 
     expect(repairSpy).toHaveBeenCalledTimes(1);
+    expect(repairSpy.mock.calls[0]?.[4]).toEqual(expect.any(Function));
+    expect(repairSpy.mock.calls[0]?.[6]).toBe(true);
     expect(response.requestId).toBe('repair-only');
     expect(Array.isArray(response.edges)).toBe(true);
     expect(typeof response.hardClean).toBe('boolean');
     expect(response.routeResolution).toBe('repair');
+    expect(response.phaseTrace).toContainEqual(expect.objectContaining({
+      phase: 'measured-repair-normalize',
+      parentPhase: 'measured-repair',
+    }));
   });
 
   it('closes a bounded repair route that passes within the 16px visual floor', () => {

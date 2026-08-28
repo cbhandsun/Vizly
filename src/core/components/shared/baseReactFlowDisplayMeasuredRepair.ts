@@ -86,6 +86,7 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
   deferStrictDominatedResult = false,
   onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void,
   allowCompoundResidualClosure = true,
+  stopAfterObstacleFailure = false,
 ): BaseReactFlowMeasuredDisplayRepairOutcome => {
   const trustedInitialEvaluation = initialEvaluation?.edges === edges
     && initialEvaluation.inputNodes === nodes
@@ -248,6 +249,9 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
       DISPLAY_FINAL_OVERLAP_OBSTACLE_REPAIR_OPTIONS,
     ));
     if (obstacleHardClean) return outcomeFor(current, current, currentReport);
+    if (stopAfterObstacleFailure && currentReport.obstacleHits > 0) {
+      return outcomeFor(current, current, currentReport);
+    }
     if (deferStrictDominatedResult && isStrictDominatedMeasuredReport(currentReport)) {
       return outcomeFor(current, current, currentReport);
     }

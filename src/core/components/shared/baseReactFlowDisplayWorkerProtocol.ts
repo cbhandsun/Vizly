@@ -115,6 +115,8 @@ export type DisplayEdgesWorkerRepairRequest = {
    * callers that have not already paid for a full route/finalization pass.
    */
   repairMode: 'bounded' | 'finalized';
+  /** Ends a disposable candidate pass once its obstacle stage remains dirty. */
+  stopAfterObstacleFailure?: boolean;
 };
 
 export type DisplayEdgesWorkerIncrementalRouteRequest = Omit<
@@ -396,6 +398,11 @@ export const parseDisplayEdgesWorkerRequest = (
   if (value.operation === 'repair') {
     if (
       (value.repairMode !== 'bounded' && value.repairMode !== 'finalized')
+      || (
+        value.stopAfterObstacleFailure !== undefined
+        && typeof value.stopAfterObstacleFailure !== 'boolean'
+      )
+      || (value.stopAfterObstacleFailure === true && value.repairMode !== 'bounded')
       || !isDisplayRoutingIdentity(value.inputIdentity)
     ) return null;
     return {
@@ -405,6 +412,7 @@ export const parseDisplayEdgesWorkerRequest = (
       nodes,
       inputIdentity: value.inputIdentity,
       repairMode: value.repairMode,
+      stopAfterObstacleFailure: value.stopAfterObstacleFailure === true,
     };
   }
   if (
