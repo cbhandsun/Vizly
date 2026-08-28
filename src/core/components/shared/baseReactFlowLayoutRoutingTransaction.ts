@@ -37,6 +37,10 @@ import { baseReactFlowDisplayCommercialQualityIsClean } from './baseReactFlowDis
 import { repairResidualHairpinBridges } from '../../strategies/shared/edgeHairpinBridgeWidenRepair';
 import { clearBaseReactFlowLayoutEdgeRoutingData } from './baseReactFlowLayoutEdgeRoutingData';
 import { updateDisplayRoutingDebugState } from './baseReactFlowDisplayRoutingDebug';
+import {
+  auditBaseReactFlowLayoutCandidateSeed,
+  shouldSkipBaseReactFlowLayoutCandidateRepair,
+} from './baseReactFlowLayoutCandidateSeedAudit';
 import type { DisplayRoutingWorkerCommitReceipt } from './baseReactFlowDisplayWorkerCommitReceipt';
 import {
   createDisplayRoutingIdentity,
@@ -397,24 +401,42 @@ export const stageBaseReactFlowLayoutRouting = async ({
     sourceEdges,
     sourceNodes,
   });
-  // ELK and the geometry-anchored fallback already provide a complete hidden
-  // candidate. Run the bounded measured repair first: clean candidates commit
-  // in one short pass, while rejected candidates still fall through to the
-  // unchanged full-quality route and hard gate.
-  const candidateRepairResult = await repairBaseReactFlowDisplayEdgesInWorker({
-    workerRef,
-    requestId: `${requestId}:candidate-repair`,
-    edges: stagedSeedEdges,
-    nodes: sourceNodes,
-    timeoutMs: LAYOUT_DISPLAY_WORKER_TIMEOUT_MS,
-    signal,
-    requireHardClean: false,
-    repairMode: 'bounded',
-    inputSignature: projectedIdentity.cacheSignature,
-    inputGeometryDigest: projectedIdentity.geometryDigest,
+  const seedAudit = auditBaseReactFlowLayoutCandidateSeed(
+    stagedSeedEdges,
+    projectedSource.nodes,
+  );
+  updateDisplayRoutingDebugState({
+    layoutSeedTerminalsAttached: seedAudit.terminalsAttached,
+    layoutSeedTerminalsAnchored: seedAudit.terminalsAnchored,
+    layoutSeedObstacleHits: seedAudit.obstacleHits,
+    layoutSeedStrictCrossings: seedAudit.strictCrossings,
   });
+  const skipBoundedCandidateRepair = shouldSkipBaseReactFlowLayoutCandidateRepair(
+    stagedSeedEdges.length,
+    seedAudit,
+  );
+  // ELK and the geometry-anchored fallback already provide a complete hidden
+  // candidate. Near-clean seeds retain the bounded measured repair and can
+  // commit in one short pass. A detached seed with at least one strict
+  // crossing per edge is already compound-dirty; send it directly through the
+  // canonical exact audit and unchanged full-route fallback instead of paying
+  // for a measured pass known not to reduce that defect class.
+  const candidateRepairResult = skipBoundedCandidateRepair
+    ? null
+    : await repairBaseReactFlowDisplayEdgesInWorker({
+      workerRef,
+      requestId: `${requestId}:candidate-repair`,
+      edges: stagedSeedEdges,
+      nodes: sourceNodes,
+      timeoutMs: LAYOUT_DISPLAY_WORKER_TIMEOUT_MS,
+      signal,
+      requireHardClean: false,
+      repairMode: 'bounded',
+      inputSignature: projectedIdentity.cacheSignature,
+      inputGeometryDigest: projectedIdentity.geometryDigest,
+    });
   if (
-    candidateRepairResult.hardClean
+    candidateRepairResult?.hardClean
     && baseReactFlowDisplayCommercialQualityIsClean(candidateRepairResult.edges)
   ) {
     const boundedCommit = commitBaseReactFlowStagedLayoutRoutingResult({
@@ -435,12 +457,14 @@ export const stageBaseReactFlowLayoutRouting = async ({
   // result through a canonical source-edge request before committing so the
   // Worker-private session stores source -> final patches under the same
   // identity exposed to the incremental client.
-  const canonicalCandidateEdges = candidateRepairResult.hardClean
+  const canonicalCandidateEdges = candidateRepairResult?.hardClean
     ? candidateRepairResult.edges
-    : seedBaseReactFlowStagedLayoutEdges({
-      sourceEdges: unseededSourceEdges,
-      sourceNodes,
-    });
+    : skipBoundedCandidateRepair
+      ? stagedSeedEdges
+      : seedBaseReactFlowStagedLayoutEdges({
+        sourceEdges: unseededSourceEdges,
+        sourceNodes,
+      });
   const initialResult = await computeBaseReactFlowDisplayEdgesInWorker({
     workerRef,
     requestId,

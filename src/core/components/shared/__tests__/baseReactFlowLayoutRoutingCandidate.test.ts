@@ -35,6 +35,12 @@ import { createDisplayRoutingIdentity } from '../baseReactFlowDisplayRoutingSess
 import { computeBaseReactFlowDisplayInputIdentityBundle } from '../baseReactFlowDisplayInputIdentity';
 import { projectBaseReactFlowDisplayWorkerInput } from '../baseReactFlowDisplayWorkerProjection';
 import { createTestDisplayHardReport } from './baseReactFlowDisplayWorkerTestFixtures';
+import { readDisplayRoutingDebugState } from '../baseReactFlowDisplayRoutingDebug';
+import {
+  shouldSkipBaseReactFlowLayoutCandidateRepair,
+  type BaseReactFlowLayoutCandidateSeedAudit,
+} from '../baseReactFlowLayoutCandidateSeedAudit';
+import * as layoutCandidateSeedAudit from '../baseReactFlowLayoutCandidateSeedAudit';
 
 const nodes: Node[] = [
   {
@@ -122,6 +128,62 @@ describe('baseReactFlow layout routing candidate sequence', () => {
     workerMocks.repair.mockReset();
   });
 
+  it.each([
+    ['equal strict count', false, false, 44, true],
+    ['one fewer crossing', false, false, 43, false],
+    ['attached terminal', true, false, 59, false],
+    ['anchored terminal', false, true, 59, false],
+  ] as const)(
+    'classifies the compound seed boundary: %s',
+    (_label, terminalsAttached, terminalsAnchored, strictCrossings, expected) => {
+      const audit: BaseReactFlowLayoutCandidateSeedAudit = {
+        terminalsAttached,
+        terminalsAnchored,
+        obstacleHits: 13,
+        strictCrossings,
+      };
+      expect(shouldSkipBaseReactFlowLayoutCandidateRepair(44, audit)).toBe(expected);
+    },
+  );
+
+  it('sends a compound-dirty seed directly through the canonical exact request', async () => {
+    const seedAuditSpy = vi.spyOn(
+      layoutCandidateSeedAudit,
+      'auditBaseReactFlowLayoutCandidateSeed',
+    ).mockReturnValue({
+      terminalsAttached: false,
+      terminalsAnchored: false,
+      obstacleHits: 13,
+      strictCrossings: edges.length,
+    });
+    workerMocks.compute.mockImplementation(successfulCanonicalResult);
+
+    await stageBaseReactFlowLayoutRouting({
+      workerRef: { current: null },
+      requestId: 'layout:compound-seed',
+      sourceEdges: edges,
+      sourceNodes: nodes,
+      isLargeGraph: true,
+    });
+
+    expect(seedAuditSpy).toHaveBeenCalledOnce();
+    expect(workerMocks.repair).not.toHaveBeenCalled();
+    expect(workerMocks.compute).toHaveBeenCalledOnce();
+    expect(workerMocks.compute.mock.calls[0][0]).toMatchObject({
+      requestId: 'layout:compound-seed',
+      cachedCandidateEdges: expect.any(Array),
+      candidateSource: 'persistent',
+      qualityMode: 'full',
+    });
+    expect(workerMocks.compute.mock.calls[0][0].cachedCandidateEdges)
+      .toBe(seedAuditSpy.mock.calls[0][0]);
+    expect(workerMocks.compute.mock.calls[0][0].cachedCandidateEdges[0]).toMatchObject({
+      type: 'stablePath',
+      data: { algorithm: 'display-stable-fallback' },
+    });
+    seedAuditSpy.mockRestore();
+  });
+
   it('commits a hard-clean bounded candidate without a second canonical Worker request', async () => {
     workerMocks.repair.mockImplementation(async (request: {
       edges: Edge[];
@@ -147,6 +209,12 @@ describe('baseReactFlow layout routing candidate sequence', () => {
       timeoutMs: 12_000,
     });
     expect(workerMocks.compute).not.toHaveBeenCalled();
+    expect(readDisplayRoutingDebugState()).toMatchObject({
+      layoutSeedTerminalsAttached: true,
+      layoutSeedTerminalsAnchored: true,
+      layoutSeedObstacleHits: 0,
+      layoutSeedStrictCrossings: 0,
+    });
 
     const projected = projectBaseReactFlowDisplayWorkerInput({
       edges: result.committedSourceEdges,

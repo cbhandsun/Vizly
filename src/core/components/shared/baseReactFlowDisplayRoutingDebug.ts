@@ -46,6 +46,10 @@ export type DisplayRoutingDebugState = {
   stagedLayoutPrimaryGeometryDigest?: string;
   stagedLayoutSourceSignature?: string;
   stagedLayoutSourceGeometryDigest?: string;
+  layoutSeedTerminalsAttached?: boolean;
+  layoutSeedTerminalsAnchored?: boolean;
+  layoutSeedObstacleHits?: number;
+  layoutSeedStrictCrossings?: number;
   incrementalBaselineSignature?: string;
   incrementalPlanStatus?: 'ready' | 'missing-baseline' | 'rejected';
   renderAuthorityStatus?: BaseReactFlowRenderAuthorityStatus;
