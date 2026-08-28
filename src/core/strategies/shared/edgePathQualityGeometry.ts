@@ -34,6 +34,31 @@ export type EdgePathQualityScore = {
   totalLength: number;
 };
 
+export const compareEdgePathQualityScores = (
+  first: EdgePathQualityScore,
+  second: EdgePathQualityScore,
+): number => {
+  const keys: Array<keyof EdgePathQualityScore> = [
+    'nonOrthogonalSegments',
+    'strictCrossings',
+    'reverseOverlap',
+    'unrelatedOverlap',
+    'unexplainedRelatedOverlap',
+    'shortEndpointStubs',
+    'tinyInteriorDoglegs',
+    'hairpins',
+    'backtrackPenalty',
+    'detourPenalty',
+    'bends',
+    'totalLength',
+  ];
+  for (const key of keys) {
+    const delta = first[key] - second[key];
+    if (delta !== 0) return delta;
+  }
+  return 0;
+};
+
 const EPS = 0.5;
 export const MIN_EDGE_PATH_PENALIZED_OVERLAP = 24;
 const BOUNDED_CROSSING_JUNCTION_LENGTH = 24;

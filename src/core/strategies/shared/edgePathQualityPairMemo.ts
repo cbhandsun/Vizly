@@ -17,6 +17,11 @@ type PairMemoMetrics = Readonly<{
   pairCount: number;
 }>;
 
+export type PairMemoCalculationMetrics = {
+  cacheHitCount: number;
+  calculatedPairCount: number;
+};
+
 const validLimit = (value: number, fallback: number): number => (
   Number.isSafeInteger(value) && value > 0 ? value : fallback
 );
@@ -226,9 +231,14 @@ export const calculateMemoizedEdgePairQuality = (
   secondSegments: Segment[],
   firstSignature: string,
   secondSignature: string,
+  metrics?: PairMemoCalculationMetrics,
 ): PairQualityContribution => {
   const cached = sharedEdgePairQualityMemo.get(firstSignature, secondSignature);
-  if (cached) return cached;
+  if (cached) {
+    if (metrics) metrics.cacheHitCount += 1;
+    return cached;
+  }
+  if (metrics) metrics.calculatedPairCount += 1;
   const contribution = calculateEdgePairQuality(
     firstEdge,
     secondEdge,

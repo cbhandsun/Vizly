@@ -13,6 +13,7 @@ import {
   buildEdgeSegments,
   calculateEdgePairQuality,
   calculateSingleEdgeQuality,
+  compareEdgePathQualityScores,
   countNonOrthogonalSegments,
   getEdgePath,
   getSegments,
@@ -20,6 +21,7 @@ import {
 } from './edgePathQualityGeometry';
 import {
   buildQualityEdgeInputSnapshot,
+  buildQualityInputSignature,
   buildQualityInputSnapshot,
   type QualityEdgeInputSnapshot,
   type QualityInputSnapshot,
@@ -34,7 +36,7 @@ import {
   createReusableEdgePathQualitySegmentIndex,
 } from './edgePathQualitySegmentIndex';
 import {
-  calculateEdgePathQualityDecomposition,
+  calculateMemoizedEdgePathQualityDecomposition,
   type EdgePathQualityDecomposition,
 } from './edgePathQualityFullScan';
 import {
@@ -98,7 +100,7 @@ function getEdgePathQualityDecomposition(
   const cached = qualityDecompositionCache.get(snapshot.signature);
   if (cached) return cached;
 
-  const decomposition = calculateEdgePathQualityDecomposition(edges, snapshot, scanMetrics);
+  const decomposition = calculateMemoizedEdgePathQualityDecomposition(edges, snapshot, scanMetrics);
   qualityDecompositionCache.set(snapshot.signature, decomposition, {
     edges: edges.length,
     segments: decomposition.edgeSegments.reduce(
@@ -672,7 +674,7 @@ export function createEdgePathQualityEvaluationContext(
         candidatePaths[index] = snapshot.path;
       }
       const candidateSnapshot: QualityInputSnapshot = {
-        signature: candidateEdgeSignatures.join('\u001e'),
+        signature: buildQualityInputSignature(candidateEdgeSignatures),
         paths: candidatePaths,
         edgeSignatures: candidateEdgeSignatures,
       };
@@ -709,28 +711,6 @@ export function createEdgePathQualityEvaluationContext(
     initializationMetrics.scannedSegmentCount = metrics.scannedSegmentCount;
   }
   return context;
-}
-
-function compareScores(first: EdgePathQualityScore, second: EdgePathQualityScore): number {
-  const keys: Array<keyof EdgePathQualityScore> = [
-    'nonOrthogonalSegments',
-    'strictCrossings',
-    'reverseOverlap',
-    'unrelatedOverlap',
-    'unexplainedRelatedOverlap',
-    'shortEndpointStubs',
-    'tinyInteriorDoglegs',
-    'hairpins',
-    'backtrackPenalty',
-    'detourPenalty',
-    'bends',
-    'totalLength',
-  ];
-  for (const key of keys) {
-    const delta = first[key] - second[key];
-    if (delta !== 0) return delta;
-  }
-  return 0;
 }
 
 export function keepIfNoNewStrictCrossings<T extends Edge[]>(baseline: T, candidate: T): T {
@@ -788,7 +768,7 @@ export function chooseFewestStrictCrossings<T extends Edge[]>(...candidates: T[]
       candidateScore.strictCrossings < bestScore.strictCrossings
       || (
         candidateScore.strictCrossings === bestScore.strictCrossings
-        && compareScores(candidateScore, bestScore) < 0
+        && compareEdgePathQualityScores(candidateScore, bestScore) < 0
       )
     ) {
       best = candidate;

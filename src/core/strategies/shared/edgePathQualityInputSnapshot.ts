@@ -1,7 +1,7 @@
 import type { Edge } from '@xyflow/react';
 
 import { getEdgePath, type Point } from './edgePathQualityGeometry';
-import { edgeRoutingQualityIntentToken } from './edgeRoutingQualityIntent';
+import { edgeRoutingExactQualityIntentToken } from './edgeRoutingQualityIntent';
 
 export type QualityInputSnapshot = Readonly<{
   signature: string;
@@ -14,10 +14,18 @@ export type QualityEdgeInputSnapshot = Readonly<{
   signature: string;
 }>;
 
+const encodeSignatureField = (value: string): string => `${value.length}:${value}`;
+
+export const buildQualityInputSignature = (edgeSignatures: readonly string[]): string => (
+  edgeSignatures.map(signature => encodeSignatureField(signature)).join('')
+);
+
 export const buildQualityEdgeInputSnapshot = (edge: Edge): QualityEdgeInputSnapshot => {
   const path = getEdgePath(edge);
-  const intent = edgeRoutingQualityIntentToken(edge);
-  const pathSignature = path.map(point => `${point.x},${point.y}`).join(';');
+  const intent = edgeRoutingExactQualityIntentToken(edge);
+  const pathSignature = path
+    .map(point => encodeSignatureField(`${point.x},${point.y}`))
+    .join('');
   return {
     path,
     signature: [
@@ -27,14 +35,14 @@ export const buildQualityEdgeInputSnapshot = (edge: Edge): QualityEdgeInputSnaps
       edge.targetHandle ?? '',
       intent,
       pathSignature,
-    ].join('\u001f'),
+    ].map(value => encodeSignatureField(String(value))).join(''),
   };
 };
 
 export const buildQualityInputSnapshot = (edges: Edge[]): QualityInputSnapshot => {
   const edgeSnapshots = edges.map(buildQualityEdgeInputSnapshot);
   return {
-    signature: edgeSnapshots.map(snapshot => snapshot.signature).join('\u001e'),
+    signature: buildQualityInputSignature(edgeSnapshots.map(snapshot => snapshot.signature)),
     paths: edgeSnapshots.map(snapshot => snapshot.path),
     edgeSignatures: edgeSnapshots.map(snapshot => snapshot.signature),
   };
