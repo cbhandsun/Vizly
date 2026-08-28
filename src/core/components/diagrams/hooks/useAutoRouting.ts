@@ -58,6 +58,7 @@ export function useAutoRouting({
         useState<LayoutPresentationPreview | null>(null);
     const routingPreferenceVersionRef = useRef(0);
     const layoutGenerationRef = useRef(0);
+    const layoutEdgeRefreshSkipGenerationRef = useRef<number | null>(null);
     const layoutPreviewOwnerRef = useRef<{ jobId: number; generation: number } | null>(null);
     const routingSessionRuntime = useBaseReactFlowRoutingSessionRuntime();
     const layoutScope = diagramId || 'flowchart-designer';
@@ -118,6 +119,12 @@ export function useAutoRouting({
             // 用户可能在异步布局执行期间手动关闭自动布线。布局完成只能在
             // 用户偏好未变化时应用默认开启值，避免迟到响应覆盖最新操作。
             if (committed && routingPreferenceVersionRef.current === routingPreferenceVersion) {
+                if (!autoRoutingEnabled) {
+                    // The layout transaction just committed fresh routed edge
+                    // objects. Mark only this false -> true transition so the
+                    // preference effect does not clone the same edges again.
+                    layoutEdgeRefreshSkipGenerationRef.current = layoutGeneration;
+                }
                 setAutoRoutingEnabledState(true);
             }
         } finally {
@@ -130,7 +137,7 @@ export function useAutoRouting({
                 setIsLayoutStable(true);
             }
         }
-    }, [_handleStrategyLayout]);
+    }, [_handleStrategyLayout, autoRoutingEnabled]);
 
     // 统一路由配置同步（共享模块）
     useEffect(() => {
@@ -147,9 +154,16 @@ export function useAutoRouting({
             return;
         }
 
+        const skipGeneration = layoutEdgeRefreshSkipGenerationRef.current;
+        layoutEdgeRefreshSkipGenerationRef.current = null;
+
         if (autoRoutingEnabled) {
             applyRoutingProfile(DESIGNER_ROUTING_PROFILE);
         }
+        if (
+            autoRoutingEnabled
+            && skipGeneration === layoutGenerationRef.current
+        ) return;
         // 强刷 Edge 引用，触发 React Flow 和自定义 Edge 组件的全量重绘
         // 这是必要的，因为如果不修改 edge 对象的引用，React Flow 内部可能因为
         // graphVersion 未变而跳过渲染，导致开启/关闭“自动布线”后画面没有立刻反映变化。

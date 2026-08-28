@@ -66,7 +66,7 @@ const createDeferred = () => {
 
 const createOptions = () => {
     const setNodes: React.Dispatch<React.SetStateAction<Node[]>> = () => undefined;
-    const setEdges: React.Dispatch<React.SetStateAction<Edge[]>> = () => undefined;
+    const setEdges = vi.fn() as unknown as React.Dispatch<React.SetStateAction<Edge[]>>;
     return {
         setNodes,
         setEdges,
@@ -130,13 +130,39 @@ describe('useAutoRouting layout preference coordination', () => {
 
     it('enables routing after layout when the user preference did not change', async () => {
         mocks.autoPathSelection = false;
-        const { result } = renderHook(() => useAutoRouting(createOptions()));
+        const options = createOptions();
+        const { result } = renderHook(() => useAutoRouting(options));
 
         await act(async () => result.current.handleStrategyLayout('tree'));
 
         expect(result.current.autoRoutingEnabled).toBe(true);
         expect(result.current.isLayoutStable).toBe(true);
         expect(result.current.isLayoutBusy).toBe(false);
+        expect(options.setEdges).not.toHaveBeenCalled();
+    });
+
+    it('keeps the full edge refresh for an explicit routing toggle', async () => {
+        mocks.autoPathSelection = false;
+        const options = createOptions();
+        const { result } = renderHook(() => useAutoRouting(options));
+
+        act(() => result.current.setAutoRoutingEnabled(true));
+
+        await waitFor(() => expect(options.setEdges).toHaveBeenCalledTimes(1));
+        expect(mocks.applyRoutingProfile).toHaveBeenCalledWith(expect.anything());
+    });
+
+    it('does not leak a layout refresh skip into the next manual toggle', async () => {
+        mocks.autoPathSelection = false;
+        const options = createOptions();
+        const { result } = renderHook(() => useAutoRouting(options));
+
+        await act(async () => result.current.handleStrategyLayout('tree'));
+        expect(options.setEdges).not.toHaveBeenCalled();
+
+        act(() => result.current.setAutoRoutingEnabled(false));
+
+        await waitFor(() => expect(options.setEdges).toHaveBeenCalledTimes(1));
     });
 
     it('restores the stable flag when layout execution rejects', async () => {
