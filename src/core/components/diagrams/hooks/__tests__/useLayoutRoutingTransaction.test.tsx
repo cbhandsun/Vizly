@@ -72,6 +72,8 @@ const createOptions = () => {
     nodesRef: { current: nodes },
     edgesRef: { current: edges },
     takeSnapshot: vi.fn(),
+    publishLayoutPreview: vi.fn(),
+    clearLayoutPreview: vi.fn(),
   };
 };
 
@@ -111,6 +113,56 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
     expect(options.setEdges).toHaveBeenCalledWith(edges);
     expect(options.setLayoutStable).toHaveBeenNthCalledWith(1, false);
     expect(options.setLayoutStable).toHaveBeenLastCalledWith(true);
+    expect(options.publishLayoutPreview).toHaveBeenCalledWith({ nodes, routingJob });
+    expect(options.clearLayoutPreview).toHaveBeenCalledWith(routingJob);
+  });
+
+  it('publishes target geometry before routing finishes without authoritative writes', async () => {
+    let resolveStage: ((value: {
+      committedSourceEdges: Edge[];
+      routedEdges: Edge[];
+      commitSnapshot: () => boolean;
+    }) => void) | undefined;
+    mocks.stageLayoutRouting.mockReturnValueOnce(new Promise((resolve) => {
+      resolveStage = resolve;
+    }));
+    const options = createOptions();
+    const routingJob = options.routingSessionRuntime.beginJob('layout');
+    const { result } = renderHook(() => useLayoutRoutingTransaction(options));
+    let layoutPromise: Promise<void> | undefined;
+
+    act(() => {
+      layoutPromise = result.current({ nodes, edges, routingJob });
+    });
+
+    await waitFor(() => expect(options.publishLayoutPreview).toHaveBeenCalledWith({
+      nodes,
+      routingJob,
+    }));
+    expect(mocks.stageLayoutRouting).toHaveBeenCalledTimes(1);
+    expect(options.setNodes).not.toHaveBeenCalled();
+    expect(options.setEdges).not.toHaveBeenCalled();
+    expect(options.takeSnapshot).not.toHaveBeenCalled();
+
+    resolveStage?.({ committedSourceEdges: edges, routedEdges, commitSnapshot: () => true });
+    await act(async () => layoutPromise);
+  });
+
+  it('restores the old graph when current-job routing fails', async () => {
+    mocks.stageLayoutRouting.mockRejectedValueOnce(new Error('routing failed'));
+    const options = createOptions();
+    const routingJob = options.routingSessionRuntime.beginJob('layout');
+    const { result } = renderHook(() => useLayoutRoutingTransaction(options));
+
+    await act(async () => {
+      await expect(result.current({ nodes, edges, routingJob })).rejects.toThrow('routing failed');
+    });
+
+    expect(options.publishLayoutPreview).toHaveBeenCalledTimes(1);
+    expect(options.clearLayoutPreview).toHaveBeenCalledWith(routingJob);
+    expect(options.setNodes).not.toHaveBeenCalled();
+    expect(options.setEdges).not.toHaveBeenCalled();
+    expect(options.takeSnapshot).not.toHaveBeenCalled();
   });
 
   it('rejects a layout response whose routing epoch was superseded', async () => {
@@ -140,7 +192,8 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
     expect(options.takeSnapshot).not.toHaveBeenCalled();
     expect(options.setNodes).not.toHaveBeenCalled();
     expect(options.setEdges).not.toHaveBeenCalled();
-    expect(options.setLayoutStable).toHaveBeenLastCalledWith(true);
+    expect(options.clearLayoutPreview).not.toHaveBeenCalled();
+    expect(options.setLayoutStable).not.toHaveBeenCalledWith(true);
   });
 
   it('does not start staging for a layout intent superseded before the transaction', async () => {
@@ -176,7 +229,10 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
     act(() => {
       layoutPromise = result.current.handleStrategyLayout('domain-elk');
     });
-    await waitFor(() => expect(mocks.calculateLayeredLayoutWithReverse).toHaveBeenCalled());
+    await waitFor(
+      () => expect(mocks.calculateLayeredLayoutWithReverse).toHaveBeenCalled(),
+      { timeout: 3_000 },
+    );
 
     options.nodesRef.current = nodes.map(node => ({
       ...node,

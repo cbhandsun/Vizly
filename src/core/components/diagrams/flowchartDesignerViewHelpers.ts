@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import type { Node } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 
 import {
     CONTAINER_COLLAPSE_REQUEST_EVENT,
@@ -11,6 +11,24 @@ export interface NodePositionUpdate {
     id: string;
     position: { x: number; y: number };
 }
+
+export const resolveFlowchartLayoutPresentation = ({
+    nodes,
+    displayEdges,
+    editingEnabled,
+    previewNodes,
+}: Readonly<{
+    nodes: Node[];
+    displayEdges: Edge[];
+    editingEnabled: boolean;
+    previewNodes: Node[] | null;
+}>): Readonly<{
+    nodes: Node[];
+    displayEdges: Edge[];
+    editingEnabled: boolean;
+}> => previewNodes
+    ? { nodes: previewNodes, displayEdges: [], editingEnabled: false }
+    : { nodes, displayEdges, editingEnabled };
 
 export const applyFlowchartNodePositionUpdates = (
     nodes: Node[],

@@ -7,7 +7,10 @@ import {
     preserveEdgesOnEmptyLayoutResult,
     resolveLayoutSourceEdges,
 } from './layoutEdgeBoundary';
-import { useLayoutRoutingTransaction } from './useLayoutRoutingTransaction';
+import {
+    useLayoutRoutingTransaction,
+    type LayoutPresentationPreviewRequest,
+} from './useLayoutRoutingTransaction';
 import { clearBaseReactFlowLayoutEdgeRoutingData } from '../../shared/baseReactFlowLayoutEdgeRoutingData';
 import type { BaseReactFlowRoutingSessionRuntime } from '../../shared/baseReactFlowRoutingSessionRuntime';
 import { normalizeLayoutVisibilityNodes } from './layoutVisibilityNodes';
@@ -75,6 +78,10 @@ interface UseLayoutStrategyParams {
     loadLayoutPresetMap?: () => Promise<Record<string, unknown>>;
     setLayoutStable?: React.Dispatch<React.SetStateAction<boolean>>;
     routingSessionRuntime: BaseReactFlowRoutingSessionRuntime;
+    publishLayoutPreview?: (request: LayoutPresentationPreviewRequest) => void;
+    clearLayoutPreview?: (
+        routingJob: LayoutPresentationPreviewRequest['routingJob'],
+    ) => boolean | undefined;
 }
 
 export function useLayoutStrategy({
@@ -88,6 +95,8 @@ export function useLayoutStrategy({
     loadLayoutPresetMap,
     setLayoutStable,
     routingSessionRuntime,
+    publishLayoutPreview,
+    clearLayoutPreview,
 }: UseLayoutStrategyParams) {
     // lastDomainStrategy is retained as a public compatibility name, but it
     // represents the active top-level layout strategy (domain-aware or global).
@@ -110,6 +119,8 @@ export function useLayoutStrategy({
         edgesRef,
         takeSnapshot,
         routingSessionRuntime,
+        publishLayoutPreview,
+        clearLayoutPreview,
     });
 
     /** ═══════════════════════════════════════════════════════════════

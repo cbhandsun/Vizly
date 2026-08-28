@@ -7,7 +7,9 @@ import { useContainerCollapseRequests } from './flowchartDesignerViewHelpers';
 
 export const useFlowchartDesignerViewSetup = (model: FlowchartDesignerViewModel) => {
     useContainerCollapseRequests(model.toggleGroupCollapse);
-    const editingEnabled = !model.isReadonly && !model.presentationActive;
+    const editingEnabled = !model.isReadonly
+        && !model.presentationActive
+        && model.layoutPresentationPreview === null;
     const fileDrop = useFlowchartFileDrop({
         importFile: model.handleImport,
         requestImport: model.handleRequestImport,

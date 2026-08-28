@@ -42,6 +42,7 @@ export type { FlowchartDesignerViewModel } from './flowchartDesignerViewModel';
 import {
     applyFlowchartNodePositionUpdates,
     dismissFlowchartOnboarding,
+    resolveFlowchartLayoutPresentation,
     type NodePositionUpdate,
 } from './flowchartDesignerViewHelpers';
 
@@ -154,6 +155,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         lastDomainStrategy,
         lastNodeLayout,
         layerSyncedNodes,
+        layoutPresentationPreview,
         leftDrawerOpen,
         messageContextHolder,
         multiPage,
@@ -260,6 +262,16 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         isDragging,
         isDraggingNode,
         performanceMode,
+    });
+    const layoutPresentation = resolveFlowchartLayoutPresentation({
+        nodes: isInitialDiagramLoading
+            ? []
+            : dragRenderPolicy.usePerformanceNodes
+                ? nodes
+                : layerSyncedNodes,
+        displayEdges: isInitialDiagramLoading ? [] : visibleEdges,
+        editingEnabled,
+        previewNodes: layoutPresentationPreview?.nodes ?? null,
     });
 
     return (
@@ -491,7 +503,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                             />
                         )}
 
-                        <DiagramEditingProvider value={editingEnabled}>
+                        <DiagramEditingProvider value={layoutPresentation.editingEnabled}>
                         <LayoutStabilityContext.Provider value={isLayoutStable}>
                             <div
                                 className="canvas-touch-wrapper"
@@ -502,12 +514,8 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                 <GestureOverlay zoom={currentZoom} visible={showOverlay} />
                                 <FlowchartCanvasShell
                                     viewportPersistenceKey={viewportPersistenceKey}
-                                    nodes={isInitialDiagramLoading
-                                        ? []
-                                        : dragRenderPolicy.usePerformanceNodes
-                                            ? nodes
-                                            : layerSyncedNodes}
-                                    displayEdges={isInitialDiagramLoading ? [] : visibleEdges}
+                                    nodes={layoutPresentation.nodes}
+                                    displayEdges={layoutPresentation.displayEdges}
                                     nodeTypes={dynamicNodeTypes}
                                     edgeTypes={dynamicEdgeTypes}
                                     onInit={handleReactFlowInit}
@@ -551,7 +559,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                     isValidConnection={isValidConnection}
                                     snapEnabled={snapEnabled}
                                     isDragging={dragRenderPolicy.canvasDragActive}
-                                    editingEnabled={editingEnabled}
+                                    editingEnabled={layoutPresentation.editingEnabled}
                                     defaultCanvasHiddenFromAssistiveTech={activePlugin?.replacesDefaultCanvas === true}
                                 >
                                     <RemoteCursors />

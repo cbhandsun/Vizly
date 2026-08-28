@@ -21,6 +21,11 @@ type LayoutRoutingTransactionRequest = Readonly<{
   onCommitted?: () => void;
 }>;
 
+export type LayoutPresentationPreviewRequest = Readonly<{
+  nodes: Node[];
+  routingJob: BaseReactFlowRoutingSessionJob;
+}>;
+
 type UseLayoutRoutingTransactionOptions = Readonly<{
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
   setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
@@ -29,6 +34,8 @@ type UseLayoutRoutingTransactionOptions = Readonly<{
   edgesRef: React.MutableRefObject<Edge[]>;
   takeSnapshot: (nodes: Node[], edges: Edge[]) => void;
   routingSessionRuntime: BaseReactFlowRoutingSessionRuntime;
+  publishLayoutPreview?: (request: LayoutPresentationPreviewRequest) => void;
+  clearLayoutPreview?: (routingJob: BaseReactFlowRoutingSessionJob) => boolean | undefined;
 }>;
 
 /**
@@ -45,6 +52,8 @@ export const useLayoutRoutingTransaction = ({
   edgesRef,
   takeSnapshot,
   routingSessionRuntime,
+  publishLayoutPreview,
+  clearLayoutPreview,
 }: UseLayoutRoutingTransactionOptions) => {
   return useCallback(async ({
     nodes,
@@ -55,7 +64,7 @@ export const useLayoutRoutingTransaction = ({
     if (routingJob.owner !== 'layout' || !routingSessionRuntime.isCurrentJob(routingJob)) {
       throw new Error('layout-routing-cancelled');
     }
-    setLayoutStable?.(false);
+    let committed = false;
     try {
       // Layout routing is an explicit interaction. Defer its worker and
       // full-quality transaction until that interaction instead of charging
@@ -80,6 +89,8 @@ export const useLayoutRoutingTransaction = ({
       }
 
       const targetNodes = clearBaseReactFlowLayoutNodeRuntimeGeometry(nodes);
+      setLayoutStable?.(false);
+      publishLayoutPreview?.({ nodes: targetNodes, routingJob });
       let committedEdges = edges;
       let commitLayoutSnapshot = (_runtime: BaseReactFlowRoutingSessionRuntime): boolean => true;
       if (edges.length > 0) {
@@ -122,16 +133,22 @@ export const useLayoutRoutingTransaction = ({
         setEdges(committedEdges);
       });
       if (!commitResult.committed) throw new Error('layout-routing-cancelled');
+      committed = true;
       await runAfterLayoutRenderFrames(() => {
         flushObstacles();
         onCommitted?.();
       });
     } finally {
-      setLayoutStable?.(true);
+      if (committed || routingSessionRuntime.isCurrentJob(routingJob)) {
+        const released = clearLayoutPreview?.(routingJob) ?? true;
+        if (released) setLayoutStable?.(true);
+      }
     }
   }, [
     edgesRef,
     nodesRef,
+    clearLayoutPreview,
+    publishLayoutPreview,
     routingSessionRuntime,
     setEdges,
     setLayoutStable,

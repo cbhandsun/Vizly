@@ -37,6 +37,18 @@ vi.mock('../useSmartRoutingConfig', () => ({
 }));
 
 import { useAutoRouting } from '../useAutoRouting';
+import type { BaseReactFlowRoutingSessionJob } from '../../../shared/baseReactFlowRoutingSessionRuntime';
+
+type LayoutPreviewCallbacks = Readonly<{
+    publishLayoutPreview: (request: {
+        nodes: Node[];
+        routingJob: BaseReactFlowRoutingSessionJob;
+    }) => void;
+    clearLayoutPreview: (routingJob: BaseReactFlowRoutingSessionJob) => void;
+}>;
+
+const getLayoutPreviewCallbacks = (): LayoutPreviewCallbacks =>
+    mocks.layoutOptions as LayoutPreviewCallbacks;
 
 const createDeferred = () => {
     let resolvePromise: (() => void) | undefined;
@@ -64,6 +76,8 @@ const createOptions = () => {
         reactFlowInstance: null,
     };
 };
+
+const nodes: Node[] = [{ id: 'preview-node', position: { x: 40, y: 80 }, data: {} }];
 
 describe('useAutoRouting layout preference coordination', () => {
     beforeEach(() => {
@@ -166,5 +180,68 @@ describe('useAutoRouting layout preference coordination', () => {
         await act(async () => secondLayout);
         expect(result.current.isLayoutStable).toBe(true);
         expect(result.current.isLayoutBusy).toBe(false);
+    });
+
+    it('keeps preview cleanup owned by the latest job and generation', async () => {
+        const firstDeferred = createDeferred();
+        const secondDeferred = createDeferred();
+        mocks.handleStrategyLayout
+            .mockReturnValueOnce(firstDeferred.promise)
+            .mockReturnValueOnce(secondDeferred.promise);
+        const { result } = renderHook(() => useAutoRouting({
+            ...createOptions(),
+            diagramId: 'diagram-a',
+        }));
+        let firstLayout = Promise.resolve();
+        let secondLayout = Promise.resolve();
+
+        act(() => {
+            firstLayout = result.current.handleStrategyLayout('tree');
+        });
+        const firstJob = result.current.routingSessionRuntime.beginJob('layout');
+        act(() => getLayoutPreviewCallbacks().publishLayoutPreview({ nodes, routingJob: firstJob }));
+        expect(result.current.layoutPresentationPreview).toMatchObject({
+            jobId: firstJob.id,
+            generation: 1,
+            scope: 'diagram-a',
+            nodes,
+        });
+
+        act(() => {
+            secondLayout = result.current.handleStrategyLayout('domain-elk');
+        });
+        const secondJob = result.current.routingSessionRuntime.beginJob('layout');
+        act(() => getLayoutPreviewCallbacks().publishLayoutPreview({ nodes: [], routingJob: secondJob }));
+        act(() => getLayoutPreviewCallbacks().clearLayoutPreview(firstJob));
+
+        expect(result.current.layoutPresentationPreview).toMatchObject({
+            jobId: secondJob.id,
+            generation: 2,
+            nodes: [],
+        });
+        firstDeferred.resolve();
+        await act(async () => firstLayout);
+        expect(result.current.layoutPresentationPreview?.jobId).toBe(secondJob.id);
+
+        secondDeferred.resolve();
+        await act(async () => secondLayout);
+        expect(result.current.layoutPresentationPreview).toBeNull();
+    });
+
+    it('does not expose a preview after the diagram scope changes', () => {
+        const { result, rerender } = renderHook(
+            ({ diagramId }: { diagramId: string }) => useAutoRouting({
+                ...createOptions(),
+                diagramId,
+            }),
+            { initialProps: { diagramId: 'diagram-a' } },
+        );
+        const routingJob = result.current.routingSessionRuntime.beginJob('layout');
+
+        act(() => getLayoutPreviewCallbacks().publishLayoutPreview({ nodes, routingJob }));
+        expect(result.current.layoutPresentationPreview?.scope).toBe('diagram-a');
+
+        rerender({ diagramId: 'diagram-b' });
+        expect(result.current.layoutPresentationPreview).toBeNull();
     });
 });

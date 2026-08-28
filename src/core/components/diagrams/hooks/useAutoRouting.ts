@@ -3,7 +3,10 @@ import { Edge, Node, ReactFlowInstance } from '@xyflow/react';
 import { diagramConfigManager, EdgeConfig } from '@/core/config/DiagramConfig';
 import { useLayoutStrategy } from './useLayoutStrategy';
 import { syncAutoPathSelection, applyRoutingProfile, DESIGNER_ROUTING_PROFILE } from './useSmartRoutingConfig';
-import { useBaseReactFlowRoutingSessionRuntime } from '../../shared/baseReactFlowRoutingSessionRuntime';
+import {
+    useBaseReactFlowRoutingSessionRuntime,
+    type BaseReactFlowRoutingSessionJob,
+} from '../../shared/baseReactFlowRoutingSessionRuntime';
 
 interface UseAutoRoutingOptions {
     setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
@@ -15,6 +18,13 @@ interface UseAutoRoutingOptions {
     diagramId?: string;
     loadLayoutPresetMap?: () => Promise<Record<string, unknown>>;
 }
+
+export type LayoutPresentationPreview = Readonly<{
+    jobId: number;
+    generation: number;
+    scope: string;
+    nodes: Node[];
+}>;
 
 /**
  * 自动布线管理：状态控制、布局策略包装、DiagramConfig 同步
@@ -44,9 +54,34 @@ export function useAutoRouting({
     });
     const [isLayoutStable, setIsLayoutStable] = useState(true);
     const [isLayoutBusy, setIsLayoutBusy] = useState(false);
+    const [layoutPresentationPreview, setLayoutPresentationPreview] =
+        useState<LayoutPresentationPreview | null>(null);
     const routingPreferenceVersionRef = useRef(0);
     const layoutGenerationRef = useRef(0);
+    const layoutPreviewOwnerRef = useRef<{ jobId: number; generation: number } | null>(null);
     const routingSessionRuntime = useBaseReactFlowRoutingSessionRuntime();
+    const layoutScope = diagramId || 'flowchart-designer';
+
+    const publishLayoutPreview = useCallback((request: {
+        nodes: Node[];
+        routingJob: BaseReactFlowRoutingSessionJob;
+    }) => {
+        if (!routingSessionRuntime.isCurrentJob(request.routingJob)) return;
+        const generation = layoutGenerationRef.current;
+        layoutPreviewOwnerRef.current = { jobId: request.routingJob.id, generation };
+        setLayoutPresentationPreview({
+            jobId: request.routingJob.id,
+            generation,
+            scope: layoutScope,
+            nodes: request.nodes,
+        });
+    }, [layoutScope, routingSessionRuntime]);
+    const clearLayoutPreview = useCallback((routingJob: BaseReactFlowRoutingSessionJob) => {
+        if (layoutPreviewOwnerRef.current?.jobId !== routingJob.id) return false;
+        layoutPreviewOwnerRef.current = null;
+        setLayoutPresentationPreview(null);
+        return true;
+    }, []);
 
     const setAutoRoutingEnabled = useCallback<React.Dispatch<React.SetStateAction<boolean>>>((nextValue) => {
         routingPreferenceVersionRef.current += 1;
@@ -65,6 +100,8 @@ export function useAutoRouting({
         loadLayoutPresetMap,
         setLayoutStable: setIsLayoutStable,
         routingSessionRuntime,
+        publishLayoutPreview,
+        clearLayoutPreview,
     });
 
     // 布局时自动启用 autoRouting + 管理稳定性标记
@@ -72,6 +109,9 @@ export function useAutoRouting({
         const layoutGeneration = layoutGenerationRef.current + 1;
         layoutGenerationRef.current = layoutGeneration;
         const routingPreferenceVersion = routingPreferenceVersionRef.current;
+        layoutPreviewOwnerRef.current = null;
+        setLayoutPresentationPreview(null);
+        setIsLayoutStable(true);
         setIsLayoutBusy(true);
         try {
             const committed = await _handleStrategyLayout(...args);
@@ -82,6 +122,10 @@ export function useAutoRouting({
             }
         } finally {
             if (layoutGenerationRef.current === layoutGeneration) {
+                layoutPreviewOwnerRef.current = null;
+                setLayoutPresentationPreview(previous => (
+                    previous?.generation === layoutGeneration ? null : previous
+                ));
                 setIsLayoutBusy(false);
                 setIsLayoutStable(true);
             }
@@ -113,11 +157,17 @@ export function useAutoRouting({
 
     }, [autoRoutingEnabled, setEdges]);
 
+    const activeLayoutPresentationPreview =
+        layoutPresentationPreview?.scope === layoutScope
+            ? layoutPresentationPreview
+            : null;
+
     return {
         autoRoutingEnabled,
         setAutoRoutingEnabled,
         isLayoutStable,
         isLayoutBusy,
+        layoutPresentationPreview: activeLayoutPresentationPreview,
         handleStrategyLayout,
         lastDomainStrategy,
         lastDomainDirection,
