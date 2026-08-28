@@ -58,6 +58,15 @@ const LAYOUT_PRESET_ID = parseDisplayRoutingMatrixPreset(
   new Set(PRECOMPILED_DISPLAY_ROUTE_TARGETS.map(target => target.presetId)),
   'wms-demand-allocation-strategy-v2',
 );
+const WARM_LAYOUT_CASE_ID = String(
+  process.env.DISPLAY_ROUTING_MATRIX_WARM_CASE || '',
+).trim();
+const WARM_LAYOUT_CASE = WARM_LAYOUT_CASE_ID
+  ? DISPLAY_ROUTING_LAYOUT_CASES.find(candidate => candidate.id === WARM_LAYOUT_CASE_ID)
+  : null;
+if (WARM_LAYOUT_CASE_ID && !WARM_LAYOUT_CASE) {
+  throw new Error('Unknown DISPLAY_ROUTING_MATRIX_WARM_CASE');
+}
 
 const assertProductionPreview = async () => {
   if (!BASE_URL) throw new Error('PRECOMPILED_ROUTE_BASE_URL must point to a production preview');
@@ -529,6 +538,57 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
     mountedEdges: mounted.edges,
   });
   const layoutAudit = await auditFinalSvg(session, route, layoutCase.id);
+  let warmLayoutSwitch = null;
+  if (WARM_LAYOUT_CASE) {
+    await session.evaluate(`(() => {
+      window.__vizlyRoutingRequests = [];
+      window.__vizlyRoutingResponses = [];
+      return true;
+    })()`);
+    const warmClickedAt = await clickLayout(session, WARM_LAYOUT_CASE);
+    const warmRoute = await waitForValue(
+      session,
+      readFinalRouteExpression('layout:'),
+      `${layoutCase.id} to ${WARM_LAYOUT_CASE.id} warm layout route`,
+    );
+    const warmVisualSettle = await waitForStableDisplayRoutingLayoutVisual({
+      session,
+      expectedRequestId: warmRoute.routing.requestId,
+      expectedNodeCount: warmRoute.request?.nodes?.length,
+      expectedEdgeCount: warmRoute.response?.edges?.length,
+    });
+    const warmTotalRouteMs = Number.isFinite(warmRoute.routing.finalAppliedAt)
+      ? warmRoute.routing.finalAppliedAt - warmClickedAt
+      : warmRoute.routing.totalRouteMs;
+    if (!Number.isFinite(warmTotalRouteMs) || warmTotalRouteMs > MAX_LAYOUT_ROUTE_MS) {
+      throw new Error(
+        `${layoutCase.id} warm repeat exceeded ${MAX_LAYOUT_ROUTE_MS}ms: ${warmTotalRouteMs}`,
+      );
+    }
+    if (warmRoute.routing.workerStartCount !== initialRoute.routing.workerStartCount) {
+      throw new Error(`${layoutCase.id} warm repeat started a duplicate Canvas display Worker`);
+    }
+    warmLayoutSwitch = {
+      id: WARM_LAYOUT_CASE.id,
+      routeMs: Number.isFinite(warmRoute.request?.__browserCapturedAt)
+        && Number.isFinite(warmRoute.response?.__browserCapturedAt)
+        ? warmRoute.response.__browserCapturedAt - warmRoute.request.__browserCapturedAt
+        : warmRoute.routing.routeMs,
+      totalRouteMs: warmTotalRouteMs,
+      inputToRoutingCommitMs: Number.isFinite(warmRoute.routing.finalAppliedAt)
+        ? warmRoute.routing.finalAppliedAt - warmClickedAt
+        : null,
+      routingCommitToVisualStableMs: Number.isFinite(warmRoute.routing.finalAppliedAt)
+        ? warmVisualSettle.stableSinceAt - warmRoute.routing.finalAppliedAt
+        : null,
+      inputToVisualStableMs: warmVisualSettle.stableSinceAt - warmClickedAt,
+      ...(await auditFinalSvg(
+        session,
+        warmRoute,
+        `${layoutCase.id} to ${WARM_LAYOUT_CASE.id} warm layout`,
+      )),
+    };
+  }
   let postLayoutMove = null;
   if (layoutCase.id === 'domain-compound-elk-lr') {
     const dragNodeId = await session.evaluate(`(() => {
@@ -613,6 +673,7 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
     ...layoutTiming,
     slowestPhases: summarizeSlowestDisplayRoutingPhases(route.response.phaseTrace),
     canonicalMount,
+    warmLayoutSwitch,
     postLayoutMove,
     ...layoutAudit,
   };
