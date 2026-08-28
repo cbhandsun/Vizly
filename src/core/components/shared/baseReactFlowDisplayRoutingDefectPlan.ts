@@ -33,6 +33,10 @@ export const displayRoutingDefectStageIsScheduled = (
   decision.stage === stage && decision.scheduled
 ));
 
+export const displayRoutingDefectPlanNeedsStrictPrimaryCrossing = (
+  plan: RoutingDefectPlan,
+): boolean => plan.needsStrictCrossingRepair || plan.needsOverlapRepair;
+
 export const createDisplayRoutingDefectStagePlan = (
   quality: DisplayRoutingDefectQuality,
 ): RoutingDefectStagePlan => {

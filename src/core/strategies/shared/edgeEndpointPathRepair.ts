@@ -31,6 +31,7 @@ type EdgePathContext = {
   edge: Edge;
   edgeKey: string;
   path: Point[];
+  segments: ReturnType<typeof pathSegments>;
   detachedSourceEndpoint?: boolean;
   detachedTargetEndpoint?: boolean;
 };
@@ -307,7 +308,7 @@ function scoreBridgeLength(
     if (context.endpoint === 'source' && other.edge.source === context.source) continue;
     if (context.endpoint === 'target' && other.edge.target === context.target) continue;
     for (const candidate of bridgeSegments) {
-      for (const existing of pathSegments(other.path)) {
+      for (const existing of other.segments) {
         if (strictSegmentCross(candidate, existing)) score += 10000;
         const overlap = nearParallelOverlap(candidate, existing);
         if (overlap > 12) score += overlap * 2;
@@ -540,7 +541,7 @@ function countPathCrossingsAgainstOthers(path: Point[], edgeKey: string, edgePat
   for (const other of edgePaths) {
     if (other.edgeKey === edgeKey) continue;
     for (const candidate of candidateSegments) {
-      for (const existing of pathSegments(other.path)) {
+      for (const existing of other.segments) {
         if (strictSegmentCross(candidate, existing)) total += 1;
       }
     }
@@ -648,6 +649,7 @@ export function repairEndpointOrthogonalPaths(
       edge,
       edgeKey: edge.id || `edge-${index}`,
       ...normalized,
+      segments: pathSegments(normalized.path),
     };
   });
   const endpointContexts = new Map<string, EndpointRepairContext>();

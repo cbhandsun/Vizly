@@ -15,7 +15,7 @@ const displayTransactionEdgeSignature = (edge: Edge): string => (
 export const chooseSmallestAcceptedDisplayTransaction = <T extends Edge[]>(
   baseline: T,
   candidate: T,
-  isAccepted: (transaction: T) => boolean,
+  isAccepted: (transaction: T, changedIndexes: readonly number[]) => boolean,
   maxEvaluations = 32,
 ): T | null => {
   if (baseline.length !== candidate.length || maxEvaluations <= 0) return null;
@@ -37,7 +37,7 @@ export const chooseSmallestAcceptedDisplayTransaction = <T extends Edge[]>(
     const transaction = compactDisplayEdgePaths(baseline.map((edge, index) => (
       indexSet.has(index) ? candidate[index] : edge
     )) as T);
-    return isAccepted(transaction) ? transaction : null;
+    return isAccepted(transaction, indexes) ? transaction : null;
   };
 
   for (const index of changedIndexes) {

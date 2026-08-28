@@ -41,6 +41,7 @@ import {
 import { shouldEscalateInteractiveDisplayRoute } from '../baseReactFlowDisplayWorkerFallback';
 import { mergeBaseReactFlowDisplayEdgePatches } from '../baseReactFlowDisplayRoutingTransaction';
 import { getExactDisplayHardReport } from '../baseReactFlowDisplayWorkerResponse';
+import { resolveBaseReactFlowFullRouteClosureSeed } from '../baseReactFlowDisplayWorkerFullRoute';
 
 const nodes: Node[] = [
   {
@@ -85,6 +86,19 @@ afterEach(() => {
 });
 
 describe('baseReactFlowDisplayEdges worker pipeline', () => {
+  it('continues final hard-contract closure from the latest repaired edges', () => {
+    const repairedEdges = edges.map(edge => ({ ...edge, label: 'repaired' }));
+
+    expect(resolveBaseReactFlowFullRouteClosureSeed(
+      { edges: repairedEdges },
+      edges,
+    )).toBe(repairedEdges);
+    expect(resolveBaseReactFlowFullRouteClosureSeed(
+      { edges: [] },
+      edges,
+    )).toBe(edges);
+  });
+
   it('rejects malformed worker messages before they reach routing code', () => {
     expect(handleBaseReactFlowDisplayWorkerMessage(null)).toEqual({
       requestId: 'invalid-request',

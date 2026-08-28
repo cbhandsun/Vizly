@@ -55,6 +55,7 @@ import {
 import type { BaseReactFlowFullRouteContext } from './baseReactFlowDisplayFullRouteTypes';
 import {
   createDisplayRoutingDefectPlan,
+  displayRoutingDefectPlanNeedsStrictPrimaryCrossing,
   displayRoutingDefectStageIsScheduled,
   type RoutingDefectPlan,
 } from './baseReactFlowDisplayRoutingDefectPlan';
@@ -191,53 +192,74 @@ export const runBaseReactFlowFullRouteStrictPhase = (
     candidateCount: finalPostTargetObstacleCandidate.length,
     onTrace: recordPrimaryPhaseTrace,
   });
-  const finalDirectionalStrictCandidate = chooseFinalObstacleAwarePolishCandidate(
-    repairNodes,
-    finalPostTargetObstacleCandidate,
-    repairEndpointOrthogonalPaths(
-      repairStrictCrossingsWithDirectionalOuterLanes(finalPostTargetObstacleCandidate, repairNodes),
+  const crossingScheduled = displayRoutingDefectPlanNeedsStrictPrimaryCrossing(defectPlan);
+  const finalDirectionalStrictCandidate = crossingScheduled
+    ? chooseFinalObstacleAwarePolishCandidate(
       repairNodes,
-    ),
-  );
-  const finalExactResidualRawCandidate = repairExactThresholdResidualOverlaps(
-    finalDirectionalStrictCandidate,
-    repairNodes,
-    useBoundedLargeRepair ? 16 : 64,
-  );
-  const finalExactResidualCandidate = keepDisplayTerminalValidationNonRegressing(
-    finalDirectionalStrictCandidate,
-    finalExactResidualRawCandidate,
-    terminalSnapshot,
-  );
-  const finalExactStrictSweepCandidate = finalStrictDisplaySweep(
-    finalExactResidualCandidate,
-    repairNodes,
-  );
-  const finalPostResidualStrictCandidate = chooseDisplayStrictPolishCandidate(
-    repairNodes,
-    finalExactResidualCandidate,
-    finalExactStrictSweepCandidate,
-    repairEndpointOrthogonalPaths(
-      repairStrictBypassesIfNeeded(finalExactResidualCandidate, repairNodes),
-      repairNodes,
-    ),
-  );
-  const finalDirectionalAfterResidualCandidate = keepTerminalSafe(
-    finalPostResidualStrictCandidate,
-    chooseDirectionalOuterLaneCandidate(
-      repairNodes,
-      finalPostResidualStrictCandidate,
+      finalPostTargetObstacleCandidate,
       repairEndpointOrthogonalPaths(
-        repairStrictCrossingsWithDirectionalOuterLanes(finalPostResidualStrictCandidate, repairNodes),
+        repairStrictCrossingsWithDirectionalOuterLanes(finalPostTargetObstacleCandidate, repairNodes),
         repairNodes,
       ),
-    ),
-  );
+    )
+    : finalPostTargetObstacleCandidate;
+  const finalExactResidualRawCandidate = crossingScheduled
+    ? repairExactThresholdResidualOverlaps(
+      finalDirectionalStrictCandidate,
+      repairNodes,
+      useBoundedLargeRepair ? 16 : 64,
+    )
+    : finalDirectionalStrictCandidate;
+  const finalExactResidualCandidate = crossingScheduled
+    ? keepDisplayTerminalValidationNonRegressing(
+      finalDirectionalStrictCandidate,
+      finalExactResidualRawCandidate,
+      terminalSnapshot,
+    )
+    : finalExactResidualRawCandidate;
+  const finalExactStrictSweepCandidate = crossingScheduled
+    ? finalStrictDisplaySweep(
+      finalExactResidualCandidate,
+      repairNodes,
+    )
+    : finalExactResidualCandidate;
+  const finalPostResidualStrictCandidate = crossingScheduled
+    ? chooseDisplayStrictPolishCandidate(
+      repairNodes,
+      finalExactResidualCandidate,
+      finalExactStrictSweepCandidate,
+      repairEndpointOrthogonalPaths(
+        repairStrictBypassesIfNeeded(finalExactResidualCandidate, repairNodes),
+        repairNodes,
+      ),
+    )
+    : finalExactStrictSweepCandidate;
+  const finalDirectionalAfterResidualCandidate = crossingScheduled
+    ? keepTerminalSafe(
+      finalPostResidualStrictCandidate,
+      chooseDirectionalOuterLaneCandidate(
+        repairNodes,
+        finalPostResidualStrictCandidate,
+        repairEndpointOrthogonalPaths(
+          repairStrictCrossingsWithDirectionalOuterLanes(finalPostResidualStrictCandidate, repairNodes),
+          repairNodes,
+        ),
+      ),
+    )
+    : finalPostResidualStrictCandidate;
   crossingTimer.finish(
     finalDirectionalAfterResidualCandidate === finalPostTargetObstacleCandidate ? 'skip' : 'accepted',
     finalDirectionalAfterResidualCandidate === finalPostTargetObstacleCandidate
       ? 0
       : finalDirectionalAfterResidualCandidate.length,
+    crossingScheduled ? undefined : {
+      evaluationCount: 0,
+      cacheHitCount: 0,
+      scannedNodeCount: 0,
+      scannedSegmentCount: 0,
+      scannedEdgePairCount: 0,
+      workItemCount: 0,
+    },
   );
   const cleanupSelectionTimer = startDisplayRoutingPhaseTrace({
     phase: 'strict-primary-cleanup-selection',

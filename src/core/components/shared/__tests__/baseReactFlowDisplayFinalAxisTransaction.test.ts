@@ -2,6 +2,7 @@ import type { Edge } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
 import type { BaseDisplayBoundedCandidateReport } from '../baseReactFlowDisplayEvaluation';
+import { createBaseReactFlowFinalEndpointEvaluation } from '../baseReactFlowDisplayFinalEndpointEvaluation';
 import { runFinalAxisTransaction } from '../baseReactFlowDisplayFinalAxisTransaction';
 
 describe('runFinalAxisTransaction', () => {
@@ -18,6 +19,7 @@ describe('runFinalAxisTransaction', () => {
         ...terminalState,
         hardClean: false,
       } as BaseDisplayBoundedCandidateReport,
+      evaluationSession: createBaseReactFlowFinalEndpointEvaluation([]),
       repairNodes: [],
       inputSignature: 'signature',
     });

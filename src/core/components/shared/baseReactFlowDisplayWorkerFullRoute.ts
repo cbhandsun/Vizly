@@ -43,6 +43,13 @@ type WorkerFullRouteInput = Readonly<{
   ) => DisplayEdgesWorkerResponse;
 }>;
 
+export const resolveBaseReactFlowFullRouteClosureSeed = (
+  response: Pick<DisplayEdgesWorkerResponse, 'edges'>,
+  fullRouteEdges: BaseReactFlowDisplayEdgesArgs['edges'],
+): BaseReactFlowDisplayEdgesArgs['edges'] => (
+  response.edges?.length ? response.edges : fullRouteEdges
+);
+
 /** Owns the expensive full-route branch of one Worker transaction. */
 export const runBaseReactFlowDisplayWorkerFullRoute = ({
   request,
@@ -101,16 +108,17 @@ export const runBaseReactFlowDisplayWorkerFullRoute = ({
   });
   const closeFinalContract = (response: DisplayEdgesWorkerResponse): DisplayEdgesWorkerResponse => {
     if (response.hardClean === true) return response;
+    const closureSeed = resolveBaseReactFlowFullRouteClosureSeed(response, fullRouteEdges);
     const closedEdges = closeBaseReactFlowFinalDisplayRoute({
       args: {
         ...commonInput,
         evaluationSession: fullRouteEvaluation,
         onPhaseTrace,
       },
-      routedEdges: fullRouteEdges,
+      routedEdges: closureSeed,
       repairNodes,
       inputSignature,
-      exactReport: fullRouteExactReport,
+      exactReport: closureSeed === fullRouteEdges ? fullRouteExactReport : undefined,
     });
     const endpointClosedEdges = closeBaseReactFlowDisplayWorkerEndpointContract(
       closedEdges,

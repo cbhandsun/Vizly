@@ -230,6 +230,7 @@ export const runBaseReactFlowFullRouteTerminalPhase = (
     attachedCandidate: finalAttachedTransactionCandidate,
     orthogonalCandidate: finalOrthogonalTransactionCandidate,
     attachedReport: finalAttachedTransactionReport,
+    evaluationSession,
     repairNodes,
     inputSignature,
   });

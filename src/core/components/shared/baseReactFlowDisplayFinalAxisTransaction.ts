@@ -6,8 +6,8 @@ import { repairBoundedPortAndInternalStrictCrossings } from './baseReactFlowDisp
 import { markBaseDisplayFinalized } from './baseReactFlowDisplayEdgeCore';
 import { countRenderUnsafeEndpointStubs, repairRenderSafeEndpointStubs } from './baseReactFlowDisplayEndpointStubRepair';
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
+import type { BaseReactFlowFinalEndpointEvaluation } from './baseReactFlowDisplayFinalEndpointEvaluation';
 import { compactDisplayEdgePaths } from './baseReactFlowDisplayGeometry';
-import { getDisplayHardQualityGateReport } from './baseReactFlowDisplayQualityGates';
 import { repairFinalResidualStrictCrossings } from './baseReactFlowDisplayStrictResidualRepair';
 import { finalStrictDisplaySweep } from './baseReactFlowDisplayStrictSweepRepair';
 import { repairAxisMismatchedTerminalsWithBoundedPortRoles } from './baseReactFlowDisplayTerminalPortRepair';
@@ -21,12 +21,14 @@ export type FinalAxisTransactionResult<T extends Edge[]> = {
 export const runFinalAxisTransaction = <T extends Edge[]>({
   orthogonalCandidate,
   attachedReport,
+  evaluationSession,
   repairNodes,
   inputSignature,
 }: {
   attachedCandidate: T;
   orthogonalCandidate: T;
   attachedReport: BaseDisplayBoundedCandidateReport;
+  evaluationSession: BaseReactFlowFinalEndpointEvaluation;
   repairNodes: Node[];
   inputSignature: string;
 }): FinalAxisTransactionResult<T> => {
@@ -44,11 +46,7 @@ export const runFinalAxisTransaction = <T extends Edge[]>({
   if (axisCandidate === orthogonalCandidate) {
     return { finalized: null, anchoredFallback: null };
   }
-  const axisReport = getDisplayHardQualityGateReport(
-    axisCandidate,
-    repairNodes,
-    'polished',
-  );
+  const axisReport = evaluationSession.hardReport(axisCandidate);
   if (axisReport.hardClean) {
     return {
       finalized: markBaseDisplayFinalized(axisCandidate, inputSignature),
@@ -69,11 +67,7 @@ export const runFinalAxisTransaction = <T extends Edge[]>({
   const strictCandidate = compactDisplayEdgePaths(
     repairEndpointOrthogonalPaths(strictSweepCandidate, repairNodes) as T,
   );
-  const strictReport = getDisplayHardQualityGateReport(
-    strictCandidate,
-    repairNodes,
-    'polished',
-  );
+  const strictReport = evaluationSession.hardReport(strictCandidate);
   const reanchoredCandidate = strictReport.terminalsAnchored
     ? strictCandidate
     : compactDisplayEdgePaths(
@@ -98,11 +92,7 @@ export const runFinalAxisTransaction = <T extends Edge[]>({
   const committedCandidate = compactDisplayEdgePaths(
     repairEndpointOrthogonalPaths(reanchoredStrictSweepCandidate, repairNodes) as T,
   );
-  const committedReport = getDisplayHardQualityGateReport(
-    committedCandidate,
-    repairNodes,
-    'polished',
-  );
+  const committedReport = evaluationSession.hardReport(committedCandidate);
   const anchoredFallback = committedReport.terminalsAnchored ? committedCandidate : null;
   if (committedReport.hardClean) {
     return {
@@ -114,10 +104,10 @@ export const runFinalAxisTransaction = <T extends Edge[]>({
   const minimalCandidate = chooseSmallestAcceptedDisplayTransaction(
     axisCandidate,
     committedCandidate,
-    transaction => getDisplayHardQualityGateReport(
+    (transaction, changedIndexes) => evaluationSession.hardReportChanged(
+      axisCandidate,
       transaction,
-      repairNodes,
-      'polished',
+      changedIndexes,
     ).hardClean,
     32,
   );
@@ -125,7 +115,7 @@ export const runFinalAxisTransaction = <T extends Edge[]>({
     const renderSafeCandidate = repairRenderSafeEndpointStubs(minimalCandidate, repairNodes) as T;
     if (
       countRenderUnsafeEndpointStubs(renderSafeCandidate) === 0
-      && getDisplayHardQualityGateReport(renderSafeCandidate, repairNodes, 'polished').hardClean
+      && evaluationSession.hardReport(renderSafeCandidate).hardClean
     ) {
       return {
         finalized: markBaseDisplayFinalized(renderSafeCandidate, inputSignature),

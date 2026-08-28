@@ -35,6 +35,7 @@ import {
 import {
   createDisplayRoutingDefectPlan,
   createDisplayRoutingDefectStagePlan,
+  displayRoutingDefectPlanNeedsStrictPrimaryCrossing,
   displayRoutingDefectStageIsScheduled,
   displayRoutingQualityNeedsMicroRepair,
   displayRoutingQualityNeedsTerminalRepair,
@@ -223,6 +224,7 @@ describe('baseReactFlowDisplayEvaluation', () => {
       cleanOverlapPlan.orderedStages,
       'strict-primary-overlap',
     )).toBe(false);
+    expect(displayRoutingDefectPlanNeedsStrictPrimaryCrossing(cleanOverlapPlan)).toBe(true);
     expect(displayRoutingDefectStageIsScheduled(
       createDisplayRoutingDefectStagePlan(quality),
       'post-render-residual',
@@ -248,7 +250,18 @@ describe('baseReactFlowDisplayEvaluation', () => {
         overlapPlan.orderedStages,
         'post-render-residual',
       )).toBe(true);
+      expect(displayRoutingDefectPlanNeedsStrictPrimaryCrossing(overlapPlan)).toBe(true);
     }
+    expect(displayRoutingDefectPlanNeedsStrictPrimaryCrossing(
+      createDisplayRoutingDefectPlan({
+        candidate: 'polished',
+        hardClean: false,
+        terminalsAttached: true,
+        terminalsAnchored: false,
+        obstacleHits: 0,
+        quality,
+      }),
+    )).toBe(false);
   });
   it('bounds post-render residual repair for large routes or hard-overlap handoff', () => {
     expect(shouldUseBoundedPostRenderResidualRepair(false, false)).toBe(false);
