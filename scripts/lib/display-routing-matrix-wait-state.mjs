@@ -16,6 +16,7 @@ export const summarizeDisplayRoutingWaitState = (
   const token = value => (
     typeof value === 'string' && /^[a-z0-9:-]{1,64}$/i.test(value) ? value : undefined
   );
+  const boolean = value => (typeof value === 'boolean' ? value : undefined);
   const requestKind = value => (
     typeof value !== 'string'
       ? undefined
@@ -35,6 +36,11 @@ export const summarizeDisplayRoutingWaitState = (
   const progressTraces = Array.isArray(routing.phaseProgressTrace)
     ? routing.phaseProgressTrace.slice(-24)
     : [];
+  const completedResponses = responses.filter(value => {
+    const candidate = record(value);
+    return typeof candidate.hardClean === 'boolean'
+      || typeof candidate.routeResolution === 'string';
+  });
   const metric = key => finite(quality[key]);
   const identityToken = value => (
     typeof value === 'string'
@@ -119,10 +125,14 @@ export const summarizeDisplayRoutingWaitState = (
       stagedLayoutSourceGeometryDigest: identityToken(
         routing.stagedLayoutSourceGeometryDigest,
       ),
+      layoutSeedTerminalsAttached: boolean(routing.layoutSeedTerminalsAttached),
+      layoutSeedTerminalsAnchored: boolean(routing.layoutSeedTerminalsAnchored),
+      layoutSeedObstacleHits: integer(routing.layoutSeedObstacleHits),
+      layoutSeedStrictCrossings: integer(routing.layoutSeedStrictCrossings),
       phaseProgressTrace: progressTraces.map(projectTrace),
     },
     responseCount: responses.length,
-    responseTrace: responses.slice(-16).map((value) => {
+    responseTrace: completedResponses.slice(-16).map((value) => {
       const candidate = record(value);
       const identity = record(candidate.nextIdentity ?? record(candidate.sessionRef).identity);
       return {

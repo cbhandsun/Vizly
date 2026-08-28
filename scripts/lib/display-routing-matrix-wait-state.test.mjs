@@ -12,6 +12,10 @@ describe('display routing matrix wait-state summary', () => {
       requestId: 'layout:2',
       stagedLayoutPrimarySignature: '123456',
       stagedLayoutPrimaryGeometryDigest: 'geometry-v1:0123456789abcdef0123456789abcdef',
+      layoutSeedTerminalsAttached: false,
+      layoutSeedTerminalsAnchored: false,
+      layoutSeedObstacleHits: 11,
+      layoutSeedStrictCrossings: 59,
       workerStartCount: 1,
       userLabel: 'private node name',
       phaseProgressTrace: [{
@@ -51,6 +55,10 @@ describe('display routing matrix wait-state summary', () => {
         requestKind: 'layout',
         stagedLayoutPrimarySignature: '123456',
         stagedLayoutPrimaryGeometryDigest: 'geometry-v1:0123456789abcdef0123456789abcdef',
+        layoutSeedTerminalsAttached: false,
+        layoutSeedTerminalsAnchored: false,
+        layoutSeedObstacleHits: 11,
+        layoutSeedStrictCrossings: 59,
         workerStartCount: 1,
         phaseProgressTrace: [{ phase: 'quality', durationMs: 18 }],
       },
@@ -130,6 +138,10 @@ describe('display routing matrix wait-state summary', () => {
         quality: { strictCrossings: 2 },
       },
     });
+    expect(summary.responseTrace).toEqual([expect.objectContaining({
+      requestKind: 'layout',
+      hardClean: false,
+    })]);
   });
 
   it('recognizes only fail-fast terminal routing states', () => {

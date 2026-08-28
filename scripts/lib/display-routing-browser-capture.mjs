@@ -72,7 +72,19 @@ export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
             capturedResponse.__browserCapturedAt = receivedAt;
             capturedResponse.__browserCloneMs = performance.now() - cloneStartedAt;
             window.__vizlyRoutingResponses.push(capturedResponse);
-            window.__vizlyRoutingResponses = window.__vizlyRoutingResponses.slice(-16);
+            // Full-route progress can emit dozens of aggregate responses after
+            // a bounded layout repair completes. Preserve completed responses
+            // separately from the rolling progress tail so the decisive
+            // candidate result cannot be evicted before timeout diagnostics.
+            const completed = window.__vizlyRoutingResponses.filter(item => (
+              typeof item?.hardClean === 'boolean'
+              || typeof item?.routeResolution === 'string'
+            )).slice(-16);
+            const progress = window.__vizlyRoutingResponses.filter(item => (
+              typeof item?.hardClean !== 'boolean'
+              && typeof item?.routeResolution !== 'string'
+            )).slice(-64);
+            window.__vizlyRoutingResponses = [...completed, ...progress];
           } catch {}
         }, 0);
       });

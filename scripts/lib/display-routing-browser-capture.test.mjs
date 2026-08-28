@@ -68,5 +68,23 @@ describe('display routing browser capture', () => {
       __browserCapturedAt: 1234,
       __browserCloneMs: 0,
     });
+
+    worker.emit({
+      requestId: 'completed-repair',
+      hardClean: false,
+      routeResolution: 'repair',
+      edges: [],
+    });
+    for (let index = 0; index < 80; index += 1) {
+      worker.emit({ requestId: `progress-${index}`, phaseProgress: {} });
+    }
+    queuedTasks.slice(1).forEach(task => task());
+
+    expect(window.__vizlyRoutingResponses).toHaveLength(65);
+    expect(window.__vizlyRoutingResponses[0]).toMatchObject({
+      requestId: 'completed-repair',
+      hardClean: false,
+      routeResolution: 'repair',
+    });
   });
 });
