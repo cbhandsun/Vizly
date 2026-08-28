@@ -618,7 +618,9 @@ export const repairBaseReactFlowFinalSafetyClosure = <T extends Edge[]>(
   );
 
   const stubStage = startRepairStage('final-safety-repair-stubs');
-  const renderSafe = repairRenderSafeEndpointStubs(microClosed, nodes, 32);
+  const renderSafe = options.evaluation
+    ? options.evaluation.repairRenderSafeEndpointStubs(microClosed, 32)
+    : repairRenderSafeEndpointStubs(microClosed, nodes, 32);
   if (
     !sameEdgeReferences(microClosed, renderSafe)
     && candidateIsAccepted(renderSafe)
@@ -659,11 +661,10 @@ export const repairBaseReactFlowFinalSafetyClosure = <T extends Edge[]>(
     orderedStrictClosed,
   );
   const orderFinishStage = startRepairStage('final-safety-repair-order-finish');
-  const orderedRenderSafe = repairRenderSafeEndpointStubs(
-    repairDisplayMicroArtifacts(orderedStrictClosed),
-    nodes,
-    32,
-  );
+  const orderedMicroClosed = repairDisplayMicroArtifacts(orderedStrictClosed);
+  const orderedRenderSafe = options.evaluation
+    ? options.evaluation.repairRenderSafeEndpointStubs(orderedMicroClosed, 32)
+    : repairRenderSafeEndpointStubs(orderedMicroClosed, nodes, 32);
   orderFinishStage.finish(
     sameEdgeReferences(orderedStrictClosed, orderedRenderSafe) ? 'skip' : 'accepted',
     1,

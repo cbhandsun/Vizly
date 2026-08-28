@@ -26,14 +26,12 @@ import {
   type FinalEndpointTopologyCandidateValidation,
 } from '../../strategies/shared/edgeFinalEndpointTopologyRepair';
 import { withDisplayAbsolutePositions } from './baseReactFlowDisplayEdgeCore';
-import {
-  repairRenderSafeEndpointStubs,
-} from './baseReactFlowDisplayEndpointStubRepair';
 import { createBaseReactFlowFinalEndpointResidualRepair } from './baseReactFlowDisplayFinalEndpointResidualRepair';
 import { buildSharedEndpointTrunkSynthesisCandidates } from './baseReactFlowDisplayEndpointTrunkCandidates';
 import { repairDisplayLoopShortcuts } from './baseReactFlowDisplayLoopShortcutRepair';
 import {
   createBaseReactFlowFinalEndpointEvaluation,
+  diffBaseReactFlowEvaluationMetrics,
   type BaseReactFlowFinalEndpointEvaluation,
 } from './baseReactFlowDisplayFinalEndpointEvaluation';
 import {
@@ -178,18 +176,12 @@ const commitPostObstacleMicroCandidate = (
 
 const commitRenderSafeStubCandidate = (
   baseline: Edge[],
-  repairNodes: Node[],
   options: BaseReactFlowFinalEndpointOrderOptions,
   evaluation: BaseReactFlowFinalEndpointEvaluation,
 ): Edge[] => {
   const baselineIssues = evaluation.unsafeEndpointStubs(baseline);
   if (baselineIssues === 0) return baseline;
-  const candidate = repairRenderSafeEndpointStubs(
-    baseline,
-    repairNodes,
-    32,
-    evaluation.endpointOrder,
-  );
+  const candidate = evaluation.repairRenderSafeEndpointStubs(baseline, 32);
   if (
     candidate === baseline
     || evaluation.unsafeEndpointStubs(candidate) >= baselineIssues
@@ -631,10 +623,12 @@ export const repairBaseReactFlowFinalEndpointOrder = <T extends Edge[]>(
     'final-endpoint-closure-terminal-stubs', repaired.length, options.onPhaseTrace,
   );
   const beforeStubClosure = repaired;
-  repaired = commitRenderSafeStubCandidate(repaired, repairNodes, options, evaluation);
+  const stubMetricsBefore = evaluation.readMetrics();
+  repaired = commitRenderSafeStubCandidate(repaired, options, evaluation);
   stubClosureTimer.finish(
     repaired === beforeStubClosure ? 'skip' : 'accepted',
     countChangedRoutingItems(beforeStubClosure, repaired),
+    diffBaseReactFlowEvaluationMetrics(stubMetricsBefore, evaluation.readMetrics()),
   );
   const microClosureTimer = startFinalEndpointTerminalClosureTrace(
     'final-endpoint-closure-terminal-micro', repaired.length, options.onPhaseTrace,

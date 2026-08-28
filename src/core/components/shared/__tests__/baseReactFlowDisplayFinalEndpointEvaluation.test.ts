@@ -148,6 +148,47 @@ describe('createBaseReactFlowFinalEndpointEvaluation', () => {
     });
   });
 
+  it('reuses an exact render-safe stub repair for copied arrays of the same edges', () => {
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
+    const unsafeEdges: Edge[] = [{
+      ...edges[1],
+      data: {
+        ...edges[1].data,
+        computedPath: [
+          { x: 50, y: 60 },
+          { x: 50, y: 108 },
+          { x: 230, y: 108 },
+          { x: 230, y: 220 },
+        ],
+      },
+    }];
+
+    const repaired = evaluation.repairRenderSafeEndpointStubs(unsafeEdges, 32);
+    const metricsBeforeReuse = evaluation.readMetrics();
+    const copiedArray = [...unsafeEdges];
+
+    expect(repaired).not.toBe(unsafeEdges);
+    expect(evaluation.repairRenderSafeEndpointStubs(copiedArray, 32)).toBe(repaired);
+    expect(evaluation.readMetrics()).toMatchObject({
+      evaluationCount: metricsBeforeReuse.evaluationCount,
+      cacheHitCount: metricsBeforeReuse.cacheHitCount + 1,
+    });
+
+    const copiedEdge = unsafeEdges.map(edge => ({
+      ...edge,
+      data: edge.data ? { ...edge.data } : undefined,
+    }));
+    expect(evaluation.repairRenderSafeEndpointStubs(copiedEdge, 32)).not.toBe(repaired);
+  });
+
+  it('preserves the caller array identity when a cached stub repair is a no-op', () => {
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
+    expect(evaluation.repairRenderSafeEndpointStubs(edges, 32)).toBe(edges);
+
+    const copiedArray = [...edges];
+    expect(evaluation.repairRenderSafeEndpointStubs(copiedArray, 32)).toBe(copiedArray);
+  });
+
   it('reuses exact request-local evidence for a copied immutable route', () => {
     const evaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
     const candidate = edges.map(edge => ({

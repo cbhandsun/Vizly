@@ -7,7 +7,10 @@ import {
 import {
   auditFinalSameSidePassageOrder,
 } from '../../strategies/shared/edgeFinalSameSidePassageOrderRepair';
-import { countRenderUnsafeEndpointStubs } from './baseReactFlowDisplayEndpointStubRepair';
+import {
+  countRenderUnsafeEndpointStubs,
+  repairRenderSafeEndpointStubs,
+} from './baseReactFlowDisplayEndpointStubRepair';
 import { createBaseDisplayHardGateMemo } from './baseReactFlowDisplayHardGateMemo';
 import { createDisplayTerminalValidationSnapshot } from './baseReactFlowTerminalValidation';
 import { getDisplayTerminalValidationReport } from './baseReactFlowTerminalValidation';
@@ -29,6 +32,10 @@ export type BaseReactFlowFinalEndpointEvaluation = Readonly<{
     changedEdgeIndexes: readonly number[],
   ) => ReturnType<ReturnType<typeof createBaseDisplayHardGateMemo>['getReport']>;
   passageOrder: (edges: readonly Edge[]) => ReturnType<typeof auditFinalSameSidePassageOrder>;
+  repairRenderSafeEndpointStubs: (
+    edges: Edge[],
+    maxEvaluations?: number,
+  ) => Edge[];
   rememberHardReport: (
     edges: readonly Edge[],
     report: ReturnType<ReturnType<typeof createBaseDisplayHardGateMemo>['getReport']>,
@@ -46,6 +53,20 @@ export type BaseReactFlowEvaluationMetrics = Readonly<{
 }>;
 
 const MAX_REQUEST_LOCAL_ROUTE_EVIDENCE = 256;
+const MAX_REQUEST_LOCAL_STUB_REPAIR_EVIDENCE = 64;
+const MAX_REQUEST_LOCAL_STUB_REPAIR_EDGE_SLOTS = 4_096;
+
+type RenderSafeStubRepairEvidence = Readonly<{
+  baselineEdges: readonly Edge[];
+  maxEvaluations: number;
+  repairedEdges: Edge[];
+}>;
+
+const sameEdgeReferenceVector = (
+  first: readonly Edge[],
+  second: readonly Edge[],
+): boolean => first.length === second.length
+  && first.every((edge, index) => edge === second[index]);
 
 const terminalPolicyToken = (edge: Edge): string => (
   (['source', 'target'] as const).map((role) => {
@@ -151,29 +172,34 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
   let changedHardReportEvaluationCount = 0;
   let changedHardReportScannedNodeCount = 0;
   let changedHardReportScannedEdgePairCount = 0;
+  const renderSafeStubRepairs: RenderSafeStubRepairEvidence[] = [];
+  let renderSafeStubRepairEdgeSlots = 0;
+  const evaluateEndpointOrder = (
+    edges: readonly Edge[],
+  ): ReturnType<typeof auditFinalSameSideEndpointOrder> => {
+    const cached = endpointOrderByEdges.get(edges);
+    if (cached) {
+      cacheHitCount += 1;
+      return cached;
+    }
+    const signature = endpointAuditSignature(edges);
+    const routeCached = signature ? endpointOrderBySignature.get(signature) : undefined;
+    if (routeCached) {
+      cacheHitCount += 1;
+      endpointOrderByEdges.set(edges, routeCached);
+      return routeCached;
+    }
+    evaluationCount += 1;
+    const audit = auditFinalSameSideEndpointOrder(edges, nodes);
+    endpointOrderByEdges.set(edges, audit);
+    rememberBoundedRouteEvidence(endpointOrderBySignature, signature, audit);
+    return audit;
+  };
 
   return {
     nodes,
     rememberHardReport: (edges, report) => hardGateMemo.rememberReport(edges, report),
-    endpointOrder(edges) {
-      const cached = endpointOrderByEdges.get(edges);
-      if (cached) {
-        cacheHitCount += 1;
-        return cached;
-      }
-      const signature = endpointAuditSignature(edges);
-      const routeCached = signature ? endpointOrderBySignature.get(signature) : undefined;
-      if (routeCached) {
-        cacheHitCount += 1;
-        endpointOrderByEdges.set(edges, routeCached);
-        return routeCached;
-      }
-      evaluationCount += 1;
-      const audit = auditFinalSameSideEndpointOrder(edges, nodes);
-      endpointOrderByEdges.set(edges, audit);
-      rememberBoundedRouteEvidence(endpointOrderBySignature, signature, audit);
-      return audit;
-    },
+    endpointOrder: evaluateEndpointOrder,
     hardReport(edges) {
       return hardGateMemo.getReport(edges.slice(), nodes, 'polished');
     },
@@ -237,6 +263,44 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
       passageOrderByEdges.set(edges, audit);
       rememberBoundedRouteEvidence(passageOrderBySignature, signature, audit);
       return audit;
+    },
+    repairRenderSafeEndpointStubs(edges, maxEvaluations = 64) {
+      const cachedIndex = renderSafeStubRepairs.findIndex(entry => (
+        entry.maxEvaluations === maxEvaluations
+        && sameEdgeReferenceVector(entry.baselineEdges, edges)
+      ));
+      if (cachedIndex >= 0) {
+        cacheHitCount += 1;
+        const [cached] = renderSafeStubRepairs.splice(cachedIndex, 1);
+        renderSafeStubRepairs.push(cached);
+        return sameEdgeReferenceVector(cached.baselineEdges, cached.repairedEdges)
+          ? edges
+          : cached.repairedEdges;
+      }
+      const repairedEdges = repairRenderSafeEndpointStubs(
+        edges,
+        nodes,
+        maxEvaluations,
+        evaluateEndpointOrder,
+      );
+      if (edges.length <= MAX_REQUEST_LOCAL_STUB_REPAIR_EDGE_SLOTS) {
+        while (
+          renderSafeStubRepairs.length >= MAX_REQUEST_LOCAL_STUB_REPAIR_EVIDENCE
+          || renderSafeStubRepairEdgeSlots + edges.length
+            > MAX_REQUEST_LOCAL_STUB_REPAIR_EDGE_SLOTS
+        ) {
+          const evicted = renderSafeStubRepairs.shift();
+          if (!evicted) break;
+          renderSafeStubRepairEdgeSlots -= evicted.baselineEdges.length;
+        }
+        renderSafeStubRepairs.push({
+          baselineEdges: edges,
+          maxEvaluations,
+          repairedEdges,
+        });
+        renderSafeStubRepairEdgeSlots += edges.length;
+      }
+      return repairedEdges;
     },
     terminalReport(edges) {
       const cached = terminalReportByEdges.get(edges);
