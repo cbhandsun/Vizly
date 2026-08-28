@@ -2,10 +2,6 @@ import type { Edge, Node } from '@xyflow/react';
 
 import { findStrictCrossings } from '../../strategies/shared/edgeDetachedOverlapRepair';
 import { repairEndpointOrthogonalPaths } from '../../strategies/shared/edgeEndpointPathRepair';
-import {
-  countStrictEdgeCrossings,
-  createEdgePathQualityEvaluationContext,
-} from '../../strategies/shared/edgeStrictCrossingGuard';
 import { isFinitePoint } from './baseReactFlowDisplayEdgeCore';
 import {
   candidateStrictCrossingsForEdge,
@@ -51,18 +47,18 @@ import {
   createDisplayTerminalValidationSnapshot,
   type DisplayTerminalValidationSnapshot,
 } from './baseReactFlowTerminalAxisRepair';
+import {
+  countTrackedStrictCrossings,
+  createTrackedStrictQualityContext,
+  type StrictCrossingRepairDiagnostics,
+} from './baseReactFlowDisplayStrictDiagnostics';
+
+export {
+  createStrictCrossingRepairDiagnostics,
+  type StrictCrossingRepairDiagnostics,
+} from './baseReactFlowDisplayStrictDiagnostics';
 
 const MIN_DISPLAY_ENDPOINT_STUB = 48;
-
-export type StrictCrossingRepairDiagnostics = {
-  qualityEvaluationCount: number;
-  nodeContextBuildCount: number;
-};
-
-export const createStrictCrossingRepairDiagnostics = (): StrictCrossingRepairDiagnostics => ({
-  qualityEvaluationCount: 0,
-  nodeContextBuildCount: 0,
-});
 
 const changedDisplayTerminalsRemainAnchored = (
   baseline: readonly Edge[],
@@ -80,14 +76,14 @@ export const repairInternalStrictCrossingLanes = <T extends Edge[]>(
   let current = edges;
   let terminalValidation: DisplayTerminalValidationSnapshot | null = null;
   for (let pass = 0; pass < 2; pass += 1) {
-    const baselineStrict = countStrictEdgeCrossings(current);
+    const baselineStrict = countTrackedStrictCrossings(current, diagnostics);
     const baselineDisplayStrict = displayStrictCrossingsFromKnownQuality(
       current,
       { strictCrossings: baselineStrict },
     );
     if (baselineStrict === 0 && baselineDisplayStrict === 0) break;
     if (diagnostics) diagnostics.qualityEvaluationCount += 1;
-    const qualityContext = createEdgePathQualityEvaluationContext(current);
+    const qualityContext = createTrackedStrictQualityContext(current, diagnostics);
     const baselineQuality = qualityContext.evaluate(current);
     if (!terminalValidation) {
       if (diagnostics) diagnostics.nodeContextBuildCount += 1;
@@ -206,17 +202,18 @@ export const repairFinalResidualStrictCrossings = <T extends Edge[]>(
   nodes: Node[],
   diagnostics?: StrictCrossingRepairDiagnostics,
 ): T => {
+  if (diagnostics) diagnostics.residualRepairInvocationCount += 1;
   let current = edges;
   let terminalValidation: DisplayTerminalValidationSnapshot | null = null;
   for (let pass = 0; pass < 4; pass += 1) {
-    const baselineStrict = countStrictEdgeCrossings(current);
+    const baselineStrict = countTrackedStrictCrossings(current, diagnostics);
     const baselineDisplayStrict = displayStrictCrossingsFromKnownQuality(
       current,
       { strictCrossings: baselineStrict },
     );
     if (baselineDisplayStrict === 0 && baselineStrict === 0) break;
     if (diagnostics) diagnostics.qualityEvaluationCount += 1;
-    const qualityContext = createEdgePathQualityEvaluationContext(current);
+    const qualityContext = createTrackedStrictQualityContext(current, diagnostics);
     const baselineQuality = qualityContext.evaluate(current);
     if (!terminalValidation) {
       if (diagnostics) diagnostics.nodeContextBuildCount += 1;

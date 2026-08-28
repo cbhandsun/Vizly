@@ -5,7 +5,6 @@ import { repairEndpointOrthogonalPaths } from '../../strategies/shared/edgeEndpo
 import { countUnrelatedObstacleHits } from '../../strategies/shared/edgeWaypointCandidateRepair';
 import {
   countStrictEdgeCrossings,
-  createEdgePathQualityEvaluationContext,
 } from '../../strategies/shared/edgeStrictCrossingGuard';
 import {
   buildDisplayRoutingObstacles,
@@ -44,6 +43,10 @@ import {
   visualPolishHardQualityDoesNotRegress,
   visualPolishHardQualityWithoutStrictDoesNotRegress,
 } from './baseReactFlowDisplayEvaluation';
+import {
+  createTrackedStrictQualityContext,
+  type StrictCrossingRepairDiagnostics,
+} from './baseReactFlowDisplayStrictDiagnostics';
 import { repairInternalStrictCrossingLanes } from './baseReactFlowDisplayStrictResidualRepair';
 import { displayStrictCrossingsFromKnownQuality } from './baseReactFlowDisplayStrictCrossingCount';
 
@@ -146,8 +149,9 @@ export const chooseDirectionalOuterLaneCandidate = <T extends Edge[]>(
   nodes: Node[],
   baseline: T,
   candidate: T,
+  diagnostics?: StrictCrossingRepairDiagnostics,
 ): T => {
-  const qualityContext = createEdgePathQualityEvaluationContext(baseline);
+  const qualityContext = createTrackedStrictQualityContext(baseline, diagnostics);
   const obstacleContext = createDisplayObstacleEvaluationContext(baseline, nodes);
   const baselineQuality = qualityContext.evaluate(baseline);
   const candidateQuality = evaluateDisplayQualityCandidate(qualityContext, baseline, candidate);
@@ -178,10 +182,11 @@ export const chooseDirectionalOuterLaneCandidate = <T extends Edge[]>(
 export const repairTerminalStrictCrossingsWithEndpointLanes = <T extends Edge[]>(
   edges: T,
   nodes: Node[],
+  diagnostics?: StrictCrossingRepairDiagnostics,
 ): T => {
   let current = edges;
   for (let pass = 0; pass < 3; pass += 1) {
-    const qualityContext = createEdgePathQualityEvaluationContext(current);
+    const qualityContext = createTrackedStrictQualityContext(current, diagnostics);
     const obstacleContext = createDisplayObstacleEvaluationContext(current, nodes);
     const baselineQuality = qualityContext.evaluate(current);
     const baselineDisplayStrictCrossings = displayStrictCrossingsFromKnownQuality(current, baselineQuality);
@@ -305,13 +310,29 @@ export const repairTerminalStrictCrossingsWithEndpointLanes = <T extends Edge[]>
   return current;
 };
 
-export const finalStrictDisplaySweep = <T extends Edge[]>(edges: T, nodes: Node[]): T => {
-  if (countStrictEdgeCrossings(edges) === 0 && countDisplayStrictCrossings(edges) === 0) return edges;
+export const finalStrictDisplaySweep = <T extends Edge[]>(
+  edges: T,
+  nodes: Node[],
+  diagnostics?: StrictCrossingRepairDiagnostics,
+): T => {
+  const scanMetrics = { scannedSegmentCount: 0 };
+  const strictCrossings = countStrictEdgeCrossings(edges, scanMetrics);
+  if (diagnostics) diagnostics.scannedSegmentCount += scanMetrics.scannedSegmentCount;
+  if (strictCrossings === 0 && countDisplayStrictCrossings(edges) === 0) return edges;
+  if (diagnostics) diagnostics.strictSweepInvocationCount += 1;
   const strictBypassRaw = repairDetachedStrictCrossingBypasses(edges, nodes) as T;
   const strictBypassOrthogonal = repairEndpointOrthogonalPaths(strictBypassRaw, nodes) as T;
-  const terminalLaneRaw = repairTerminalStrictCrossingsWithEndpointLanes(strictBypassOrthogonal, nodes);
+  const terminalLaneRaw = repairTerminalStrictCrossingsWithEndpointLanes(
+    strictBypassOrthogonal,
+    nodes,
+    diagnostics,
+  );
   const terminalLaneOrthogonal = repairEndpointOrthogonalPaths(terminalLaneRaw, nodes) as T;
-  const internalLaneRaw = repairInternalStrictCrossingLanes(terminalLaneOrthogonal, nodes);
+  const internalLaneRaw = repairInternalStrictCrossingLanes(
+    terminalLaneOrthogonal,
+    nodes,
+    diagnostics,
+  );
   const internalLaneOrthogonal = repairEndpointOrthogonalPaths(internalLaneRaw, nodes) as T;
   return chooseDisplayStrictPolishCandidate(
     nodes,
@@ -328,6 +349,7 @@ export const finalStrictDisplaySweep = <T extends Edge[]>(edges: T, nodes: Node[
 export const repairStrictCrossingsWithDirectionalOuterLanes = <T extends Edge[]>(
   edges: T,
   nodes: Node[],
+  diagnostics?: StrictCrossingRepairDiagnostics,
 ): T => {
   let current = edges;
   for (let pass = 0; pass < 2; pass += 1) {
@@ -408,7 +430,7 @@ export const repairStrictCrossingsWithDirectionalOuterLanes = <T extends Edge[]>
         && latestEndpointHalfPenalty === 0
       ) continue;
 
-      const qualityContext = createEdgePathQualityEvaluationContext(current);
+      const qualityContext = createTrackedStrictQualityContext(current, diagnostics);
       const obstacleContext = createDisplayObstacleEvaluationContext(current, nodes);
       const baselineQuality = qualityContext.evaluate(current);
       const latestGlobalObstacleHits = obstacleContext.evaluate(current);

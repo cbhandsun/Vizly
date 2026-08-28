@@ -25,6 +25,7 @@ import {
   createBaseReactFlowChangedHardReportEvaluation,
   type BaseReactFlowChangedHardReportEvaluation,
 } from './baseReactFlowDisplayChangedHardReport';
+import { createStrictCrossingRepairDiagnostics } from './baseReactFlowDisplayStrictResidualRepair';
 
 export type BaseReactFlowFinalEndpointEvaluation = Readonly<{
   nodes: Node[];
@@ -56,7 +57,9 @@ export type BaseReactFlowEvaluationMetrics = Readonly<{
   evaluationCount: number;
   cacheHitCount: number;
   scannedNodeCount: number;
+  scannedSegmentCount?: number;
   scannedEdgePairCount: number;
+  workItemCount?: number;
 }>;
 
 const MAX_REQUEST_LOCAL_ROUTE_EVIDENCE = 256;
@@ -106,9 +109,17 @@ export const diffBaseReactFlowEvaluationMetrics = (
   evaluationCount: Math.max(0, after.evaluationCount - before.evaluationCount),
   cacheHitCount: Math.max(0, after.cacheHitCount - before.cacheHitCount),
   scannedNodeCount: Math.max(0, after.scannedNodeCount - before.scannedNodeCount),
+  scannedSegmentCount: Math.max(
+    0,
+    (after.scannedSegmentCount ?? 0) - (before.scannedSegmentCount ?? 0),
+  ),
   scannedEdgePairCount: Math.max(
     0,
     after.scannedEdgePairCount - before.scannedEdgePairCount,
+  ),
+  workItemCount: Math.max(
+    0,
+    (after.workItemCount ?? 0) - (before.workItemCount ?? 0),
   ),
 });
 
@@ -164,6 +175,11 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
   let changedHardReportEvaluationCount = 0;
   let changedHardReportScannedNodeCount = 0;
   let changedHardReportScannedEdgePairCount = 0;
+  let stubStrictEvaluationCount = 0;
+  let stubStrictCacheHitCount = 0;
+  let stubStrictScannedSegmentCount = 0;
+  let stubStrictScannedEdgePairCount = 0;
+  let stubStrictWorkItemCount = 0;
   const renderSafeStubRepairs: RenderSafeStubRepairEvidence[] = [];
   let renderSafeStubRepairEdgeSlots = 0;
   const evaluateEndpointOrder = (
@@ -273,13 +289,22 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
           ? edges
           : cached.repairedEdges;
       }
+      const strictDiagnostics = createStrictCrossingRepairDiagnostics();
       const repairedEdges = repairRenderSafeEndpointStubs(
         edges,
         nodes,
         maxEvaluations,
         evaluateEndpointOrder,
         terminalSnapshot,
+        strictDiagnostics,
       );
+      stubStrictEvaluationCount += strictDiagnostics.qualityEvaluationCount;
+      stubStrictCacheHitCount += strictDiagnostics.qualityContextCacheHitCount;
+      stubStrictCacheHitCount += strictDiagnostics.pairCacheHitCount
+        + strictDiagnostics.segmentQueryCacheHitCount;
+      stubStrictScannedSegmentCount += strictDiagnostics.scannedSegmentCount;
+      stubStrictScannedEdgePairCount += strictDiagnostics.scannedEdgePairCount;
+      stubStrictWorkItemCount += strictDiagnostics.strictFallbackInvocationCount;
       if (edges.length <= MAX_REQUEST_LOCAL_STUB_REPAIR_EDGE_SLOTS) {
         while (
           renderSafeStubRepairs.length >= MAX_REQUEST_LOCAL_STUB_REPAIR_EVIDENCE
@@ -342,12 +367,18 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
       return {
         evaluationCount: evaluationCount
           + hardGateMetrics.evaluationCount
-          + changedHardReportEvaluationCount,
-        cacheHitCount: cacheHitCount + hardGateMetrics.cacheHitCount,
+          + changedHardReportEvaluationCount
+          + stubStrictEvaluationCount,
+        cacheHitCount: cacheHitCount
+          + hardGateMetrics.cacheHitCount
+          + stubStrictCacheHitCount,
         scannedNodeCount: hardGateMetrics.scannedNodeCount
           + changedHardReportScannedNodeCount,
+        scannedSegmentCount: stubStrictScannedSegmentCount,
         scannedEdgePairCount: hardGateMetrics.scannedEdgePairCount
-          + changedHardReportScannedEdgePairCount,
+          + changedHardReportScannedEdgePairCount
+          + stubStrictScannedEdgePairCount,
+        workItemCount: stubStrictWorkItemCount,
       };
     },
   };

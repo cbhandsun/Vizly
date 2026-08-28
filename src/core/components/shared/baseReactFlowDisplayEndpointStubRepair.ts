@@ -25,7 +25,10 @@ import {
   buildStrictCrossingCompanionShiftVariants,
 } from './baseReactFlowDisplayTerminalPortRepair';
 import { finalStrictDisplaySweep } from './baseReactFlowDisplayStrictSweepRepair';
-import { repairFinalResidualStrictCrossings } from './baseReactFlowDisplayStrictResidualRepair';
+import {
+  repairFinalResidualStrictCrossings,
+  type StrictCrossingRepairDiagnostics,
+} from './baseReactFlowDisplayStrictResidualRepair';
 import {
   createAtomicRouteTransactionEvaluation,
   type AtomicEndpointOrderEvaluation,
@@ -199,6 +202,7 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
   maxEvaluations = 64,
   endpointOrder?: AtomicEndpointOrderEvaluation,
   reusableTerminalValidation?: DisplayTerminalValidationSnapshot,
+  strictDiagnostics?: StrictCrossingRepairDiagnostics,
 ): T => {
   if (countRenderUnsafeEndpointStubs(edges) === 0) return edges;
   let current = edges;
@@ -253,11 +257,12 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
         index === edgeIndex ? withDisplayComputedPath(edge, candidatePath) : edge
       )) as T;
       const initialIssues = countRenderUnsafeEndpointStubs(candidate);
-      const initialQuality = qualityContext.evaluateStateChanged(
+      const initialQualityState = qualityContext.evaluateStateChanged(
         qualityState,
         candidate,
         [edgeIndex],
-      ).score;
+      );
+      const initialQuality = initialQualityState.score;
       const initialObstacleHits = obstacleContext.evaluateKnownChanges(
         candidate,
         [...new Set([...baselineObstacleChangedIndexes, edgeIndex])],
@@ -269,10 +274,12 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
         && initialQuality.strictCrossings > baselineQuality.strictCrossings
         && initialQuality.strictCrossings <= baselineQuality.strictCrossings + 2
       ) {
+        if (strictDiagnostics) strictDiagnostics.strictFallbackInvocationCount += 1;
+        qualityContext.rememberState?.(candidate, initialQualityState);
         variants.push(
           ...buildStrictCrossingCompanionShiftVariants(candidate, edgeIndex),
-          finalStrictDisplaySweep(candidate, nodes),
-          repairFinalResidualStrictCrossings(candidate, nodes),
+          finalStrictDisplaySweep(candidate, nodes, strictDiagnostics),
+          repairFinalResidualStrictCrossings(candidate, nodes, strictDiagnostics),
         );
       }
       for (const variant of variants) {
@@ -284,11 +291,9 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
           edge === current[index] ? [] : [index]
         ));
         const changedEdgeIds = new Set(changedIndexes.map(index => current[index].id));
-        const candidateQualityState = qualityContext.evaluateStateChanged(
-          qualityState,
-          variant,
-          changedIndexes,
-        );
+        const candidateQualityState = variant === candidate
+          ? initialQualityState
+          : qualityContext.evaluateStateChanged(qualityState, variant, changedIndexes);
         const candidateQuality = candidateQualityState.score;
         if (
           candidateQuality.nonOrthogonalSegments > baselineQuality.nonOrthogonalSegments

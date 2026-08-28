@@ -41,7 +41,10 @@ import {
   shouldUseIncrementalEdgePathQualityEvaluation,
   shouldUseIncrementalEdgePathQualityState,
 } from './edgePathQualityIncrementalPolicy';
-import { countIndexedStrictSegmentCrossings } from './edgeStrictCrossingIndex';
+import {
+  countIndexedStrictSegmentCrossings,
+  type StrictCrossingIndexDiagnostics,
+} from './edgeStrictCrossingIndex';
 import { readSignatureValue, rememberBoundedSignatureValue } from './boundedSignatureCache';
 
 export { MIN_EDGE_PATH_PENALIZED_OVERLAP } from './edgePathQualityGeometry';
@@ -143,7 +146,10 @@ function readQualityScore(
   return signatureCached;
 }
 
-export function countStrictEdgeCrossings(edges: Edge[]): number {
+export function countStrictEdgeCrossings(
+  edges: Edge[],
+  diagnostics?: StrictCrossingIndexDiagnostics,
+): number {
   const snapshot = buildQualityInputSnapshot(edges);
   const cached = strictCrossingCache.get(edges);
   if (cached?.signature === snapshot.signature) return cached.count;
@@ -165,7 +171,7 @@ export function countStrictEdgeCrossings(edges: Edge[]): number {
     strictCrossingCache.set(edges, { signature: snapshot.signature, count: signatureCached });
     return signatureCached;
   }
-  const total = countIndexedStrictSegmentCrossings(getSegments(snapshot.paths));
+  const total = countIndexedStrictSegmentCrossings(getSegments(snapshot.paths), diagnostics);
   strictCrossingCache.set(edges, { signature: snapshot.signature, count: total });
   rememberBoundedSignatureValue(
     strictCrossingSignatureCache,

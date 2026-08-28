@@ -79,8 +79,16 @@ describe('final residual strict-crossing repair', () => {
       unreadableNodes,
       finalDiagnostics,
     )).toBe(cleanEdges);
-    expect(internalDiagnostics).toEqual({ qualityEvaluationCount: 0, nodeContextBuildCount: 0 });
-    expect(finalDiagnostics).toEqual({ qualityEvaluationCount: 0, nodeContextBuildCount: 0 });
+    expect(internalDiagnostics).toMatchObject({
+      qualityEvaluationCount: 0,
+      nodeContextBuildCount: 0,
+      scannedEdgePairCount: 0,
+    });
+    expect(finalDiagnostics).toMatchObject({
+      qualityEvaluationCount: 0,
+      nodeContextBuildCount: 0,
+      scannedEdgePairCount: 0,
+    });
   });
 
   it('skirts a crossed fan-in bundle outside its aggregate boundary', () => {

@@ -6,6 +6,7 @@ import * as edgeStrictCrossingGuard from '../../../strategies/shared/edgeStrictC
 import * as waypointCandidateRepair from '../../../strategies/shared/edgeWaypointCandidateRepair';
 import * as displayEvaluation from '../baseReactFlowDisplayEvaluation';
 import * as terminalValidation from '../baseReactFlowTerminalValidation';
+import { createStrictCrossingRepairDiagnostics } from '../baseReactFlowDisplayStrictResidualRepair';
 import { buildSafeEndpointSideStepCandidates } from '../baseReactFlowDisplayEndpointStubCandidates';
 import {
   countRenderUnsafeEndpointStubs,
@@ -125,11 +126,21 @@ describe('baseReactFlowDisplayEndpointStubRepair', () => {
     ]);
     const edges = [short, blocker];
 
-    const repaired = repairRenderSafeEndpointStubs(edges, []);
+    const diagnostics = createStrictCrossingRepairDiagnostics();
+    const repaired = repairRenderSafeEndpointStubs(
+      edges,
+      [],
+      64,
+      undefined,
+      undefined,
+      diagnostics,
+    );
 
     expect(repaired).toBe(edges);
     expect(countRenderUnsafeEndpointStubs(repaired)).toBe(1);
     expect(calculateEdgePathQualityScore(repaired).strictCrossings).toBe(0);
+    expect(diagnostics.strictFallbackInvocationCount).toBeGreaterThan(0);
+    expect(diagnostics.residualRepairInvocationCount).toBeGreaterThan(0);
   });
 
   it('preserves identity for an unchanged path and never mutates a repaired input', () => {

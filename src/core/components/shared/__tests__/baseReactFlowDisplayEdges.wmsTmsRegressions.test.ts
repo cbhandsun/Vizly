@@ -252,6 +252,17 @@ describe('baseReactFlowDisplayEdges WMS and TMS regressions', () => {
       )),
       JSON.stringify({ durationMs, phaseTrace }, null, 2),
     ).toBe(true);
+    const strictFallbackTrace = phaseTrace.find(trace => (
+      trace.phase === 'final-endpoint-closure-terminal-stubs'
+      && (trace.workItemCount ?? 0) > 0
+    ));
+    expect(strictFallbackTrace, JSON.stringify({ durationMs, phaseTrace }, null, 2))
+      .toMatchObject({ resolution: 'accepted', workItemCount: 1 });
+    expect(
+      (strictFallbackTrace?.scannedSegmentCount ?? 0)
+        + (strictFallbackTrace?.scannedEdgePairCount ?? 0),
+      JSON.stringify({ durationMs, strictFallbackTrace }, null, 2),
+    ).toBeGreaterThan(0);
     expect(
       durationMs,
       JSON.stringify({ durationMs, phaseTrace, quality }, null, 2),
