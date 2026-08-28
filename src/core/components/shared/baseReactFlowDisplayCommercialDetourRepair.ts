@@ -485,6 +485,7 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
           : []
       )));
     const regularCandidate = repairBusinessNodeClearanceRisks(candidateEdges, nodes, {
+      geometryContext: evaluation.businessNodeClearanceGeometry,
       eligibleEdgeIds: regularEligibleEdgeIds,
       minimumClearance: COMMERCIAL_BUSINESS_NODE_CLEARANCE,
       validateCandidate: context => passesBaseReactFlowFinalDisplayGate(
@@ -510,6 +511,7 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
     if (commerciallyUnsafeEdgeIds.size === 0) return regularCandidate;
 
     return repairBusinessNodeClearanceRisks(regularCandidate, nodes, {
+      geometryContext: evaluation.businessNodeClearanceGeometry,
       eligibleEdgeIds: commerciallyUnsafeEdgeIds,
       minimumClearance: COMMERCIAL_BUSINESS_NODE_CLEARANCE,
     }) as T;

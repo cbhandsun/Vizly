@@ -403,7 +403,9 @@ export const repairBaseReactFlowFinalSafetyClosure = <T extends Edge[]>(
   // useful only when the signed baseline proves an actual node obstacle hit.
   const needsBusinessObstacleRepair = baselineReport.obstacleHits > 0;
   const businessNodeSafe = needsBusinessObstacleRepair
-    ? repairBusinessNodeClearanceRisks(edges, nodes)
+    ? repairBusinessNodeClearanceRisks(edges, nodes, {
+      geometryContext: options.evaluation?.businessNodeClearanceGeometry,
+    })
     : edges;
   if (
     !sameEdgeReferences(edges, businessNodeSafe)

@@ -1,6 +1,10 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import {
+  createBusinessNodeClearanceGeometryContext,
+  type BusinessNodeClearanceGeometryContext,
+} from '../../strategies/shared/edgeBusinessNodeClearanceGeometryContext';
+import {
   auditFinalSameSideEndpointOrder,
 } from '../../strategies/shared/edgeFinalSameSideEndpointOrderRepair';
 import {
@@ -24,6 +28,7 @@ import {
 
 export type BaseReactFlowFinalEndpointEvaluation = Readonly<{
   nodes: Node[];
+  businessNodeClearanceGeometry: BusinessNodeClearanceGeometryContext;
   endpointOrder: (edges: readonly Edge[]) => ReturnType<typeof auditFinalSameSideEndpointOrder>;
   hardReport: (edges: readonly Edge[]) => ReturnType<
     ReturnType<typeof createBaseDisplayHardGateMemo>['getReport']
@@ -119,6 +124,7 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
   nodes: Node[],
 ): BaseReactFlowFinalEndpointEvaluation => {
   const terminalSnapshot = createDisplayTerminalValidationSnapshot(nodes);
+  const businessNodeClearanceGeometry = createBusinessNodeClearanceGeometryContext(nodes);
   const hardGateMemo = createBaseDisplayHardGateMemo(nodes, terminalSnapshot);
   let evaluationCount = 0;
   let cacheHitCount = 0;
@@ -184,6 +190,7 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
 
   return {
     nodes,
+    businessNodeClearanceGeometry,
     rememberHardReport: (edges, report) => hardGateMemo.rememberImmutableReport(edges, report),
     endpointOrder: evaluateEndpointOrder,
     hardReport(edges) {

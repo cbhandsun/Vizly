@@ -68,6 +68,7 @@ const commitPostTrunkBranchObstacleCandidate = (
 ): Edge[] => {
   if (evaluation.hardReport(baseline).obstacleHits === 0) return baseline;
   return repairBusinessNodeClearanceRisks(baseline, repairNodes, {
+    geometryContext: evaluation.businessNodeClearanceGeometry,
     eligibleEdgeIds: options.eligibleEdgeIds,
     validateCandidate: context => passesFinalDisplayGate(
       context.baselineEdges,
