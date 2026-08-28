@@ -11,11 +11,36 @@ import {
   getDisplayComputedPath,
   withDisplayComputedPath,
 } from '../baseReactFlowDisplayGeometry';
-import { repairDisplayObstacleHits } from '../baseReactFlowDisplayObstacleRepair';
+import {
+  repairDisplayObstacleHits,
+  resolveDisplayObstacleRepairBudget,
+} from '../baseReactFlowDisplayObstacleRepair';
 import { DISPLAY_FINAL_OVERLAP_OBSTACLE_REPAIR_OPTIONS } from '../baseReactFlowDisplayRenderPipeline';
 import { createDisplayTerminalValidationSnapshot } from '../baseReactFlowTerminalValidation';
 
 describe('display obstacle candidates', () => {
+  it('does not expand an explicit bounded quality budget on a medium graph', () => {
+    expect(resolveDisplayObstacleRepairBudget(26, 30, {
+      maxEdges: 2,
+      maxCandidatesPerEdge: 16,
+      maxQualityEvaluations: 18,
+    })).toEqual({
+      maxEdges: 2,
+      maxCandidatesPerEdge: 16,
+      maxQualityEvaluations: 18,
+    });
+
+    expect(resolveDisplayObstacleRepairBudget(26, 30, {
+      maxEdges: 4,
+      maxCandidatesPerEdge: 40,
+      maxQualityEvaluations: 56,
+    })).toEqual({
+      maxEdges: 4,
+      maxCandidatesPerEdge: 40,
+      maxQualityEvaluations: 64,
+    });
+  });
+
   it('offers a full-span commercial-clearance lane before falling back to an outer ring', () => {
     const edge: Edge = {
       id: 'terminal-preserving-skirt',

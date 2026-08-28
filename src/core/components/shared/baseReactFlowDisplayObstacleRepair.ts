@@ -53,6 +53,10 @@ import {
   displayEdgeTerminalValidationDoesNotRegress,
   displayTerminalValidationDoesNotRegress,
 } from './baseReactFlowTerminalValidation';
+import {
+  startDisplayRoutingPhaseTrace,
+  type DisplayRoutingPhaseTrace,
+} from './baseReactFlowDisplayRoutingTrace';
 
 const DISPLAY_RESIDUAL_OVERLAP_REPAIR_OPTIONS = {
   maxIterations: 2,
@@ -60,6 +64,38 @@ const DISPLAY_RESIDUAL_OVERLAP_REPAIR_OPTIONS = {
   maxQualityEvaluations: 320,
   maxResidualPasses: 1,
   qualityOnly: true,
+};
+
+export type ResolvedDisplayObstacleRepairBudget = Readonly<{
+  maxEdges: number;
+  maxCandidatesPerEdge: number;
+  maxQualityEvaluations: number;
+}>;
+
+/** Keeps explicit bounded latency budgets as caps instead of graph-size floors. */
+export const resolveDisplayObstacleRepairBudget = (
+  edgeCount: number,
+  nodeCount: number,
+  options: DisplaySoftQualityOptions,
+): ResolvedDisplayObstacleRepairBudget => {
+  const preserveCallerBudget = options.maxCandidatesPerEdge <= 16
+    && options.maxQualityEvaluations <= 18;
+  const boundedGraph = edgeCount > 16 || nodeCount > 24;
+  return {
+    maxEdges: preserveCallerBudget
+      ? options.maxEdges
+      : (boundedGraph ? Math.max(options.maxEdges, 4) : Math.max(options.maxEdges, 8)),
+    maxCandidatesPerEdge: preserveCallerBudget
+      ? options.maxCandidatesPerEdge
+      : (boundedGraph
+        ? Math.max(options.maxCandidatesPerEdge, 32)
+        : Math.max(options.maxCandidatesPerEdge, 240)),
+    maxQualityEvaluations: preserveCallerBudget
+      ? options.maxQualityEvaluations
+      : (boundedGraph
+        ? Math.max(options.maxQualityEvaluations, 64)
+        : Math.max(options.maxQualityEvaluations, 360)),
+  };
 };
 
 const repairRemainingObstacleHitsWithOuterLanes = <T extends Edge[]>(
@@ -84,14 +120,41 @@ const repairRemainingObstacleHitsWithOuterLanes = <T extends Edge[]>(
       .sort((first, second) => second.hits - first.hits);
     if (entries.length === 0) break;
 
+    let contextBaseline: T | null = null;
+    let cachedQualityContext: EdgePathQualityEvaluationContext | null = null;
+    let cachedObstacleContext: DisplayObstacleEvaluationContext | null = null;
+    let cachedBaselineQuality: EdgePathQualityScore | null = null;
+    let cachedBaselineObstacleHits = 0;
+    const contextsForCurrent = () => {
+      if (
+        contextBaseline !== current
+        || !cachedQualityContext
+        || !cachedObstacleContext
+        || !cachedBaselineQuality
+      ) {
+        contextBaseline = current;
+        cachedQualityContext = createEdgePathQualityEvaluationContext(current);
+        cachedObstacleContext = createDisplayObstacleEvaluationContext(current, nodes);
+        cachedBaselineQuality = cachedQualityContext.evaluate(current);
+        cachedBaselineObstacleHits = cachedObstacleContext.evaluate(current);
+      }
+      return {
+        qualityContext: cachedQualityContext,
+        obstacleContext: cachedObstacleContext,
+        baselineQuality: cachedBaselineQuality,
+        baselineObstacleHits: cachedBaselineObstacleHits,
+      };
+    };
     let changed = false;
     for (const entry of entries) {
       const edge = current[entry.edgeIndex];
       if (!edge) continue;
-      const qualityContext = createEdgePathQualityEvaluationContext(current);
-      const obstacleContext = createDisplayObstacleEvaluationContext(current, nodes);
-      const baselineObstacleHits = obstacleContext.evaluate(current);
-      const baselineQuality = qualityContext.evaluate(current);
+      const {
+        qualityContext,
+        obstacleContext,
+        baselineQuality,
+        baselineObstacleHits,
+      } = contextsForCurrent();
       const baselineStrictCrossings = baselineQuality.strictCrossings;
       const baselinePathHits = hitContext.countUnrelated(entry.path, edge);
       const includeOuterRingCandidates = current.length <= 20 && nodes.length <= 40 && baselinePathHits >= 1;
@@ -150,7 +213,7 @@ const repairRemainingObstacleHitsWithOuterLanes = <T extends Edge[]>(
         let acceptedEdges = candidateEdges;
         let acceptedQuality = qualityContext.evaluateChanged(acceptedEdges, [entry.edgeIndex]);
         let acceptedStrictCrossings = acceptedQuality.strictCrossings;
-        let acceptedObstacleHits = obstacleContext.evaluateKnownChanges(acceptedEdges, [entry.edgeIndex]);
+        let acceptedObstacleHits = baselineObstacleHits - baselinePathHits + candidate.hits;
         if (acceptedObstacleHits >= baselineObstacleHits) continue;
         if (acceptedStrictCrossings > baselineStrictCrossings) {
           if (candidate.hits > 0 || strictRepairAttempts >= 3) continue;
@@ -206,17 +269,11 @@ export const repairDisplayObstacleHits = <T extends Edge[]>(
   let current = edges;
   const terminalSnapshot = createDisplayTerminalValidationSnapshot(nodes);
   let qualityEvaluations = 0;
-  const fastBudget = options.maxCandidatesPerEdge <= 8 && options.maxQualityEvaluations <= 8;
-  const boundedBudget = edges.length > 16 || nodes.length > 24;
-  const maxEdges = fastBudget
-    ? options.maxEdges
-    : (boundedBudget ? Math.max(options.maxEdges, 4) : Math.max(options.maxEdges, 8));
-  const maxCandidatesPerEdge = fastBudget
-    ? options.maxCandidatesPerEdge
-    : (boundedBudget ? Math.max(options.maxCandidatesPerEdge, 32) : Math.max(options.maxCandidatesPerEdge, 240));
-  const maxQualityEvaluations = fastBudget
-    ? options.maxQualityEvaluations
-    : (boundedBudget ? Math.max(options.maxQualityEvaluations, 64) : Math.max(options.maxQualityEvaluations, 360));
+  const {
+    maxEdges,
+    maxCandidatesPerEdge,
+    maxQualityEvaluations,
+  } = resolveDisplayObstacleRepairBudget(edges.length, nodes.length, options);
 
   for (let pass = 0; pass < 2; pass += 1) {
     type ObstacleCandidatePool = {
@@ -486,6 +543,7 @@ export const finishDisplaySoftQuality = <T extends Edge[]>(
   repairNodes: Node[],
   layoutDirection: string,
   options: DisplaySoftQualityOptions,
+  onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void,
 ): T => {
   const quality = calculateEdgePathQualityScore(edges);
   const obstacleHits = countDisplayObstacleHits(edges, repairNodes);
@@ -505,6 +563,11 @@ export const finishDisplaySoftQuality = <T extends Edge[]>(
     return chooseFinalObstacleAwarePolishCandidate(repairNodes, edges, microCleaned);
   }
 
+  const riskTimer = startDisplayRoutingPhaseTrace({
+    phase: 'post-render-soft-risk',
+    candidateCount: edges.length,
+    onTrace: onPhaseTrace,
+  });
   const conservativeSoft = repairDisplaySoftQualityRisks(edges, repairNodes, layoutDirection, {
     maxEdges: options.maxEdges,
     maxCandidatesPerEdge: options.maxCandidatesPerEdge,
@@ -517,12 +580,26 @@ export const finishDisplaySoftQuality = <T extends Edge[]>(
     conservativeSoft,
     conservativeMicroClean,
   );
+  riskTimer.finish(
+    selected === edges ? 'skip' : 'accepted',
+    selected === edges ? 0 : selected.length,
+  );
+  const obstacleTimer = startDisplayRoutingPhaseTrace({
+    phase: 'post-render-soft-obstacle',
+    candidateCount: selected.length,
+    onTrace: onPhaseTrace,
+  });
   const obstacleCleaned = repairDisplayObstacleHits(selected, repairNodes, layoutDirection, options);
   const obstacleMicroCleaned = repairDisplayMicroArtifacts(obstacleCleaned) as T;
-  return chooseFinalObstacleAwarePolishCandidate(
+  const finalCandidate = chooseFinalObstacleAwarePolishCandidate(
     repairNodes,
     selected,
     obstacleCleaned,
     obstacleMicroCleaned,
   );
+  obstacleTimer.finish(
+    finalCandidate === selected ? 'skip' : 'accepted',
+    finalCandidate === selected ? 0 : finalCandidate.length,
+  );
+  return finalCandidate;
 };

@@ -243,6 +243,7 @@ export const runBaseReactFlowFullRoutePostRenderPhase = (
       repairNodes,
       layoutDirection,
       qualityBudget.finalSoft,
+      recordSoftClosurePhaseTrace,
     );
   softQualityTimer.finish(
     postFinalizeObstacleCleaned === postFinalizeResidualCleaned ? 'skip' : 'accepted',
