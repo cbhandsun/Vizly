@@ -166,7 +166,40 @@ describe('final same-side passage order repair', () => {
     ];
     const before = auditFinalSameSidePassageOrder(edges, nodes);
 
-    const result = repairFinalSameSidePassageOrder(edges, nodes);
+    const expected = repairFinalSameSidePassageOrder(edges, nodes);
+    const passageAudits = new WeakMap<readonly Edge[], ReturnType<
+      typeof auditFinalSameSidePassageOrder
+    >>();
+    const endpointAudits = new WeakMap<readonly Edge[], ReturnType<
+      typeof auditFinalSameSideEndpointOrder
+    >>();
+    let passageFullAuditCount = 0;
+    let endpointFullAuditCount = 0;
+    let passageEvaluationCount = 0;
+    let endpointEvaluationCount = 0;
+    const evaluatePassageOrder = (route: readonly Edge[]) => {
+      passageEvaluationCount += 1;
+      const cached = passageAudits.get(route);
+      if (cached) return cached;
+      passageFullAuditCount += 1;
+      const audit = auditFinalSameSidePassageOrder(route, nodes);
+      passageAudits.set(route, audit);
+      return audit;
+    };
+    const evaluateEndpointOrder = (route: readonly Edge[]) => {
+      endpointEvaluationCount += 1;
+      const cached = endpointAudits.get(route);
+      if (cached) return cached;
+      endpointFullAuditCount += 1;
+      const audit = auditFinalSameSideEndpointOrder(route, nodes);
+      endpointAudits.set(route, audit);
+      return audit;
+    };
+
+    const result = repairFinalSameSidePassageOrder(edges, nodes, {
+      evaluateEndpointOrder,
+      evaluatePassageOrder,
+    });
     const after = auditFinalSameSidePassageOrder(result, nodes);
     const wcs = pathOf(result.find(item => item.id === 'wcs'));
     const bms = pathOf(result.find(item => item.id === 'bms'));
@@ -174,6 +207,10 @@ describe('final same-side passage order repair', () => {
     const trunkIds = auditFinalSameSideEndpointOrder(result, nodes).legalSharedTrunks
       .map(trunk => trunk.id);
 
+    expect(result).toEqual(expected);
+    expect(passageFullAuditCount).toBeLessThan(passageEvaluationCount);
+    expect(endpointFullAuditCount).toBeGreaterThan(0);
+    expect(endpointFullAuditCount).toBeLessThanOrEqual(endpointEvaluationCount);
     expect(before.reversePassageDefects).toBe(1);
     expect(before.parallelChildOverlaps).toBe(1);
     expect(after.reversePassageDefects).toBe(0);

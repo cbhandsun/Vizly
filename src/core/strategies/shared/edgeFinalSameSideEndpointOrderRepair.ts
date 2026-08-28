@@ -107,6 +107,10 @@ export type SameSideEndpointOrderCandidateValidation = Readonly<{
 }>;
 
 export type SameSideEndpointOrderRepairOptions = Readonly<{
+  /** Reuses exact immutable-route audit evidence without caching acceptance. */
+  evaluateEndpointOrder?: (
+    edges: readonly Edge[],
+  ) => SameSideEndpointOrderMetrics;
   /**
    * Optional final-layer gate. A display pipeline can use this to enforce
    * additional render-specific invariants without creating a core -> UI
@@ -712,8 +716,10 @@ function acceptCandidateIfSafe(
   options: SameSideEndpointOrderRepairOptions,
 ): Edge[] | null {
   if (!candidate) return null;
-  const baselineOrder = auditFinalSameSideEndpointOrder(current, nodes);
-  const candidateOrder = auditFinalSameSideEndpointOrder(candidate.edges, nodes);
+  const evaluateEndpointOrder = options.evaluateEndpointOrder
+    ?? ((route: readonly Edge[]) => auditFinalSameSideEndpointOrder(route, nodes));
+  const baselineOrder = evaluateEndpointOrder(current);
+  const candidateOrder = evaluateEndpointOrder(candidate.edges);
   if (!endpointOrderImproves(baselineOrder, candidateOrder)) return null;
   if (!preservesLegalSharedTrunks(baselineOrder, candidateOrder)) return null;
 

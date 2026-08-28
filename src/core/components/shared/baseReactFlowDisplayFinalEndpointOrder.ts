@@ -452,6 +452,12 @@ export const repairBaseReactFlowFinalEndpointOrder = <T extends Edge[]>(
     options,
     evaluation,
   );
+  const repairEndpointOrder = (baseline: Edge[]): Edge[] => (
+    repairFinalSameSideEndpointOrder(baseline, repairNodes, {
+      evaluateEndpointOrder: evaluation.endpointOrder,
+      validateCandidate: validateTopologyCandidate,
+    })
+  );
   const validatePassageCandidate = (context: SameSidePassageCandidateValidation): boolean => (
     preservesDistinctParallelChildLanes(context, evaluation)
     && passesFinalDisplayGate(
@@ -479,15 +485,7 @@ export const repairBaseReactFlowFinalEndpointOrder = <T extends Edge[]>(
     validateCandidate: validateTopologyCandidate,
     groupFilter: group => group.fixedEndpointCount > 0 && group.inversions > 0,
   });
-  repaired = repairFinalSameSideEndpointOrder(repaired, repairNodes, {
-    validateCandidate: context => passesFinalDisplayGate(
-      context.baselineEdges,
-      context.candidateEdges,
-      context.changedEdgeIndexes,
-      options,
-      evaluation,
-    ),
-  });
+  repaired = repairEndpointOrder(repaired);
   topologyTimer.finish(
     repaired === preferredSourceTrunkCandidate ? 'skip' : 'accepted',
     repaired === preferredSourceTrunkCandidate ? 0 : repaired.length,
@@ -509,23 +507,19 @@ export const repairBaseReactFlowFinalEndpointOrder = <T extends Edge[]>(
     validateCandidate: validateTopologyCandidate,
   });
   repaired = repairFinalSameSidePassageOrder(repaired, repairNodes, {
+    evaluateEndpointOrder: evaluation.endpointOrder,
+    evaluatePassageOrder: evaluation.passageOrder,
     validateCandidate: validatePassageCandidate,
   });
   repaired = repairFinalSameSideAdjacentTerminalEscape(repaired, repairNodes, {
     validateCandidate: validateTopologyCandidate,
   });
   repaired = repairFinalSameSidePassageOrder(repaired, repairNodes, {
+    evaluateEndpointOrder: evaluation.endpointOrder,
+    evaluatePassageOrder: evaluation.passageOrder,
     validateCandidate: validatePassageCandidate,
   });
-  repaired = repairFinalSameSideEndpointOrder(repaired, repairNodes, {
-    validateCandidate: context => passesFinalDisplayGate(
-      context.baselineEdges,
-      context.candidateEdges,
-      context.changedEdgeIndexes,
-      options,
-      evaluation,
-    ),
-  });
+  repaired = repairEndpointOrder(repaired);
   orderTimer.finish(
     repaired === beforeOrder ? 'skip' : 'accepted',
     repaired === beforeOrder ? 0 : repaired.length,
@@ -654,15 +648,7 @@ export const repairBaseReactFlowFinalEndpointOrder = <T extends Edge[]>(
     // inside the visual port-gap floor. Revalidate the endpoint contract after
     // restoration; true trunk blocks stay atomic, so only the independent
     // branch moves when that is the safe minimal correction.
-    repaired = repairFinalSameSideEndpointOrder(repaired, repairNodes, {
-      validateCandidate: context => passesFinalDisplayGate(
-        context.baselineEdges,
-        context.candidateEdges,
-        context.changedEdgeIndexes,
-        options,
-        evaluation,
-      ),
-    });
+    repaired = repairEndpointOrder(repaired);
     repaired = separatePreferredSourceBranches(repaired);
   }
   commercialClosureTimer.finish(

@@ -53,6 +53,10 @@ export type SameSidePassageCandidateValidation = Readonly<{
 }>;
 
 export type SameSidePassageRepairOptions = Readonly<{
+  evaluatePassageOrder?: (edges: readonly Edge[]) => SameSidePassageAudit;
+  evaluateEndpointOrder?: (
+    edges: readonly Edge[],
+  ) => ReturnType<typeof auditFinalSameSideEndpointOrder>;
   validateCandidate?: (context: SameSidePassageCandidateValidation) => boolean;
 }>;
 
@@ -329,14 +333,14 @@ function buildParallelChildLaneEscapeCandidates(
 
 function buildNearTrunkCandidates(
   edges: readonly Edge[],
-  nodes: ReactFlowNode[],
   group: LegGroup,
+  evaluatePassageOrder: (edges: readonly Edge[]) => SameSidePassageAudit,
 ): Candidate[] {
   return buildRankedNearTrunkCandidates(
     group.blocks,
     block => block.movable && block.legs.every(leg => stemLength(leg) >= MIN_TRUE_TRUNK_STEM - EPS),
     (winner, loser) => materialize(edges, [{ block: loser, terminalCoordinate: winner.terminalCoordinate }]),
-    (candidate) => auditFinalSameSidePassageOrder(candidate.edges, nodes),
+    candidate => evaluatePassageOrder(candidate.edges),
   );
 }
 
@@ -452,11 +456,15 @@ function accept(
   options: SameSidePassageRepairOptions,
 ): Edge[] | null {
   if (!candidate) return null;
-  const baselineAudit = auditFinalSameSidePassageOrder(current, nodes);
-  const candidateAudit = auditFinalSameSidePassageOrder(candidate.edges, nodes);
+  const evaluatePassageOrder = options.evaluatePassageOrder
+    ?? ((route: readonly Edge[]) => auditFinalSameSidePassageOrder(route, nodes));
+  const evaluateEndpointOrder = options.evaluateEndpointOrder
+    ?? ((route: readonly Edge[]) => auditFinalSameSideEndpointOrder(route, nodes));
+  const baselineAudit = evaluatePassageOrder(current);
+  const candidateAudit = evaluatePassageOrder(candidate.edges);
   if (!auditImproves(baselineAudit, candidateAudit)) return null;
-  const baselineTrunks = auditFinalSameSideEndpointOrder(current, nodes).legalSharedTrunks;
-  const candidateTrunks = auditFinalSameSideEndpointOrder(candidate.edges, nodes).legalSharedTrunks;
+  const baselineTrunks = evaluateEndpointOrder(current).legalSharedTrunks;
+  const candidateTrunks = evaluateEndpointOrder(candidate.edges).legalSharedTrunks;
   if (!preservesTrunks(baselineTrunks, candidateTrunks)) return null;
   const quality = createEdgePathQualityEvaluationContext(current);
   const baselineQuality = quality.evaluate(current);
@@ -488,11 +496,13 @@ export function repairFinalSameSidePassageOrder(
 ): Edge[] {
   if (edges.length < 2 || nodes.length === 0) return edges;
   let current = edges;
+  const evaluatePassageOrder = options.evaluatePassageOrder
+    ?? ((route: readonly Edge[]) => auditFinalSameSidePassageOrder(route, nodes));
   const groupKeys = buildPassageGroups(current, nodes).groups.map(group => group.key);
   for (const groupKey of groupKeys) {
     let group = buildPassageGroups(current, nodes).groups.find(item => item.key === groupKey);
     if (!group) continue;
-    for (const candidate of buildNearTrunkCandidates(current, nodes, group)) {
+    for (const candidate of buildNearTrunkCandidates(current, group, evaluatePassageOrder)) {
       const accepted = accept(current, candidate, nodes, options);
       if (!accepted) continue;
       current = accepted;
@@ -501,19 +511,19 @@ export function repairFinalSameSidePassageOrder(
     group = buildPassageGroups(current, nodes).groups.find(item => item.key === groupKey);
     if (!group) continue;
     current = acceptFirstRankedPassageCandidate(buildChildOverlapTrunkCandidates(current, group),
-      candidate => auditFinalSameSidePassageOrder(candidate.edges, nodes),
+      candidate => evaluatePassageOrder(candidate.edges),
       candidate => accept(current, candidate, nodes, options)) ?? current;
     group = buildPassageGroups(current, nodes).groups.find(item => item.key === groupKey);
     if (!group) continue;
     current = acceptFirstRankedPassageCandidate(buildOppositeChildTrunkCandidates(current, group),
-      candidate => auditFinalSameSidePassageOrder(candidate.edges, nodes),
+      candidate => evaluatePassageOrder(candidate.edges),
       candidate => accept(current, candidate, nodes, options)) ?? current;
     group = buildPassageGroups(current, nodes).groups.find(item => item.key === groupKey);
     if (!group) continue;
     for (let pass = 0; pass < 4; pass += 1) {
       const accepted = acceptFirstRankedPassageCandidate(
         buildParallelChildLaneEscapeCandidates(current, group),
-        candidate => auditFinalSameSidePassageOrder(candidate.edges, nodes),
+        candidate => evaluatePassageOrder(candidate.edges),
         candidate => accept(current, candidate, nodes, options),
       );
       if (!accepted) break;

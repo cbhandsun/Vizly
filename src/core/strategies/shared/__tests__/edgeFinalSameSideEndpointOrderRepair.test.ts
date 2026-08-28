@@ -73,6 +73,25 @@ const sourceFanoutFixture = (): { nodes: ReactFlowNode[]; edges: Edge[] } => {
 };
 
 describe('final same-side endpoint order repair', () => {
+  it('uses a supplied exact audit evaluator without changing candidate acceptance', () => {
+    const fixture = sourceFanoutFixture();
+    const expected = repairFinalSameSideEndpointOrder(fixture.edges, fixture.nodes);
+    const evaluateEndpointOrder = vi.fn((edges: readonly Edge[]) => (
+      auditFinalSameSideEndpointOrder(edges, fixture.nodes)
+    ));
+    const validateCandidate = vi.fn(() => true);
+
+    const result = repairFinalSameSideEndpointOrder(fixture.edges, fixture.nodes, {
+      evaluateEndpointOrder,
+      validateCandidate,
+    });
+
+    expect(result).toEqual(expected);
+    expect(evaluateEndpointOrder).toHaveBeenCalledTimes(2);
+    expect(evaluateEndpointOrder.mock.calls[0]?.[0]).toBe(fixture.edges);
+    expect(validateCandidate).toHaveBeenCalledTimes(1);
+  });
+
   it('sorts a source fan-out using only its existing endpoint-coordinate multiset', () => {
     const fixture = sourceFanoutFixture();
     const before = auditFinalSameSideEndpointOrder(fixture.edges, fixture.nodes);
