@@ -13,6 +13,7 @@ export type StrictCrossingRepairDiagnostics = {
   nodeContextBuildCount: number;
   scannedEdgePairCount: number;
   scannedSegmentCount: number;
+  duplicateVariantReferenceCount: number;
   residualRepairInvocationCount: number;
   strictFallbackInvocationCount: number;
   strictSweepInvocationCount: number;
@@ -26,6 +27,7 @@ export const createStrictCrossingRepairDiagnostics = (): StrictCrossingRepairDia
   nodeContextBuildCount: 0,
   scannedEdgePairCount: 0,
   scannedSegmentCount: 0,
+  duplicateVariantReferenceCount: 0,
   residualRepairInvocationCount: 0,
   strictFallbackInvocationCount: 0,
   strictSweepInvocationCount: 0,

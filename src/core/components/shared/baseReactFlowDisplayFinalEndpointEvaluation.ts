@@ -301,7 +301,8 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
       stubStrictEvaluationCount += strictDiagnostics.qualityEvaluationCount;
       stubStrictCacheHitCount += strictDiagnostics.qualityContextCacheHitCount;
       stubStrictCacheHitCount += strictDiagnostics.pairCacheHitCount
-        + strictDiagnostics.segmentQueryCacheHitCount;
+        + strictDiagnostics.segmentQueryCacheHitCount
+        + strictDiagnostics.duplicateVariantReferenceCount;
       stubStrictScannedSegmentCount += strictDiagnostics.scannedSegmentCount;
       stubStrictScannedEdgePairCount += strictDiagnostics.scannedEdgePairCount;
       stubStrictWorkItemCount += strictDiagnostics.strictFallbackInvocationCount;

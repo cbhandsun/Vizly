@@ -282,9 +282,15 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
           repairFinalResidualStrictCrossings(candidate, nodes, strictDiagnostics),
         );
       }
+      const evaluatedVariantReferences = new Set<T>();
       for (const variant of variants) {
         if (evaluations >= maxEvaluations) break;
         evaluations += 1;
+        if (evaluatedVariantReferences.has(variant)) {
+          if (strictDiagnostics) strictDiagnostics.duplicateVariantReferenceCount += 1;
+          continue;
+        }
+        evaluatedVariantReferences.add(variant);
         const candidateIssues = countRenderUnsafeEndpointStubs(variant);
         if (candidateIssues >= baselineIssues) continue;
         const changedIndexes = variant.flatMap((edge, index) => (
@@ -323,7 +329,11 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
           changedEdgeIds,
           clearance,
         )) continue;
-        const transaction = atomic.evaluate(variant, changedIndexes);
+        const transaction = atomic.evaluate(
+          variant,
+          changedIndexes,
+          candidateQualityState,
+        );
         if (
           !transaction.hardQualityDoesNotRegress
           || !transaction.obstacleHitsDoNotRegress

@@ -30,12 +30,12 @@ export const createAtomicRouteTransactionEvaluation = <T extends Edge[]>(
   baselineEdges: T,
   nodes: Node[],
   reusable?: Readonly<{
-    qualityContext: EdgePathQualityEvaluationContext;
-    obstacleContext: DisplayObstacleEvaluationContext;
-    baselineQuality: EdgePathQualityScore;
+    qualityContext?: EdgePathQualityEvaluationContext;
+    obstacleContext?: DisplayObstacleEvaluationContext;
+    baselineQuality?: EdgePathQualityScore;
     baselineQualityState?: EdgePathQualityEvaluationState;
     baselineObstacleChangedIndexes?: readonly number[];
-    baselineObstacleHits: number;
+    baselineObstacleHits?: number;
     endpointOrder?: AtomicEndpointOrderEvaluation;
     terminalValidation?: DisplayTerminalValidationSnapshot;
   }>,
@@ -57,8 +57,18 @@ export const createAtomicRouteTransactionEvaluation = <T extends Edge[]>(
   return {
     baselineQuality,
     baselineObstacleHits,
-    evaluate(candidate: T, changedIndexes: number[]) {
-      const quality = reusable?.baselineQualityState
+    evaluate(
+      candidate: T,
+      changedIndexes: number[],
+      knownQualityState?: EdgePathQualityEvaluationState,
+    ) {
+      const knownQualityIsCurrent = Boolean(
+        knownQualityState
+        && qualityContext.rememberState?.(candidate, knownQualityState),
+      );
+      const quality = knownQualityIsCurrent && knownQualityState
+        ? knownQualityState.score
+        : reusable?.baselineQualityState
         ? qualityContext.evaluateStateChanged(
             reusable.baselineQualityState,
             candidate,

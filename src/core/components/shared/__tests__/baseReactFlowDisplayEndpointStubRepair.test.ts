@@ -6,6 +6,7 @@ import * as edgeStrictCrossingGuard from '../../../strategies/shared/edgeStrictC
 import * as waypointCandidateRepair from '../../../strategies/shared/edgeWaypointCandidateRepair';
 import * as displayEvaluation from '../baseReactFlowDisplayEvaluation';
 import * as terminalValidation from '../baseReactFlowTerminalValidation';
+import { createAtomicRouteTransactionEvaluation } from '../baseReactFlowDisplayAtomicTransactionEvaluation';
 import { createStrictCrossingRepairDiagnostics } from '../baseReactFlowDisplayStrictResidualRepair';
 import { buildSafeEndpointSideStepCandidates } from '../baseReactFlowDisplayEndpointStubCandidates';
 import {
@@ -141,6 +142,7 @@ describe('baseReactFlowDisplayEndpointStubRepair', () => {
     expect(calculateEdgePathQualityScore(repaired).strictCrossings).toBe(0);
     expect(diagnostics.strictFallbackInvocationCount).toBeGreaterThan(0);
     expect(diagnostics.residualRepairInvocationCount).toBeGreaterThan(0);
+    expect(diagnostics.duplicateVariantReferenceCount).toBeGreaterThan(0);
   });
 
   it('preserves identity for an unchanged path and never mutates a repaired input', () => {
@@ -242,5 +244,66 @@ describe('baseReactFlowDisplayEndpointStubRepair', () => {
     expect(qualityContextSpy).toHaveBeenCalledTimes(1);
     expect(obstacleContextSpy).toHaveBeenCalledTimes(1);
     expect(terminalValidationSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('reuses only an exact current quality state in the atomic gate', () => {
+    const baseline = [edgeWithPath('atomic-state', [
+      { x: 0, y: 0 },
+      { x: 64, y: 0 },
+      { x: 64, y: 100 },
+    ])];
+    const candidate = [edgeWithPath('atomic-state', [
+      { x: 0, y: 0 },
+      { x: 72, y: 0 },
+      { x: 72, y: 100 },
+    ])];
+    const staleCandidate = [edgeWithPath('atomic-state', [
+      { x: 0, y: 0 },
+      { x: 80, y: 0 },
+      { x: 80, y: 100 },
+    ])];
+    const qualityContext = edgeStrictCrossingGuard
+      .createEdgePathQualityEvaluationContext(baseline);
+    const baselineState = qualityContext.createState(baseline);
+    const candidateState = qualityContext.evaluateStateChanged(
+      baselineState,
+      candidate,
+      [0],
+    );
+    const staleState = qualityContext.evaluateStateChanged(
+      baselineState,
+      staleCandidate,
+      [0],
+    );
+    const foreignBaseline = [edgeWithPath('atomic-state', [
+      { x: 0, y: 0 },
+      { x: 64, y: 0 },
+      { x: 64, y: 100 },
+    ])];
+    const foreignContext = edgeStrictCrossingGuard
+      .createEdgePathQualityEvaluationContext(foreignBaseline);
+    const foreignState = foreignContext.evaluateStateChanged(
+      foreignContext.createState(foreignBaseline),
+      candidate,
+      [0],
+    );
+    const evaluateStateChanged = vi.fn(qualityContext.evaluateStateChanged);
+    const atomic = createAtomicRouteTransactionEvaluation(baseline, [], {
+      qualityContext: { ...qualityContext, evaluateStateChanged },
+      baselineQuality: baselineState.score,
+      baselineQualityState: baselineState,
+    });
+
+    expect(atomic.evaluate(candidate, [0], candidateState).quality)
+      .toEqual(candidateState.score);
+    expect(evaluateStateChanged).not.toHaveBeenCalled();
+
+    expect(atomic.evaluate(candidate, [0], foreignState).quality)
+      .toEqual(candidateState.score);
+    expect(evaluateStateChanged).toHaveBeenCalledTimes(1);
+    expect(atomic.evaluate(candidate, [0], staleState).quality)
+      .toEqual(candidateState.score);
+    expect(atomic.evaluate(candidate, [0]).quality).toEqual(candidateState.score);
+    expect(evaluateStateChanged).toHaveBeenCalledTimes(3);
   });
 });
