@@ -100,16 +100,22 @@ export const computeBaseReactFlowDisplayOutputRouteSignature = (
   let primaryHash = 2166136261;
   let secondaryHash = 3339675911;
   let totalPoints = 0;
+  const feedCode = (code: number): void => {
+    primaryHash ^= code;
+    primaryHash = Math.imul(primaryHash, 16777619);
+    secondaryHash ^= code;
+    secondaryHash = Math.imul(secondaryHash, 2246822519);
+  };
+  const feedText = (text: string): void => {
+    for (let index = 0; index < text.length; index += 1) {
+      feedCode(text.charCodeAt(index));
+    }
+  };
   const feed = (value: unknown): void => {
     const text = String(value);
-    const framed = `${text.length}:${text}`;
-    for (let index = 0; index < framed.length; index += 1) {
-      const code = framed.charCodeAt(index);
-      primaryHash ^= code;
-      primaryHash = Math.imul(primaryHash, 16777619);
-      secondaryHash ^= code;
-      secondaryHash = Math.imul(secondaryHash, 2246822519);
-    }
+    feedText(String(text.length));
+    feedCode(58);
+    feedText(text);
   };
   const feedPath = (carrier: string, value: unknown, required: boolean): boolean => {
     if (typeof value === 'undefined') {

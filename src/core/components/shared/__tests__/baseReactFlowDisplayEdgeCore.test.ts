@@ -902,7 +902,9 @@ describe('baseReactFlowDisplayEdgeCore', () => {
     }];
     const signature = computeBaseReactFlowDisplayOutputRouteSignature(valid);
 
-    expect(signature).toMatch(/^route-v2:1:4:[0-9a-f]{16}$/);
+    // This signature is persisted in route artifacts. Keep the allocation-free
+    // framing implementation bit-for-bit compatible with the route-v2 format.
+    expect(signature).toBe('route-v2:1:4:576dc269b8a7e87b');
     expect(computeBaseReactFlowDisplayOutputRouteSignature(valid.map(edge => ({
       ...edge,
       data: JSON.parse(JSON.stringify(edge.data)),
