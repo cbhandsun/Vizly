@@ -33,6 +33,7 @@ export const createAtomicRouteTransactionEvaluation = <T extends Edge[]>(
     obstacleContext: DisplayObstacleEvaluationContext;
     baselineQuality: EdgePathQualityScore;
     baselineQualityState?: EdgePathQualityEvaluationState;
+    baselineObstacleChangedIndexes?: readonly number[];
     baselineObstacleHits: number;
     endpointOrder?: AtomicEndpointOrderEvaluation;
   }>,
@@ -61,7 +62,16 @@ export const createAtomicRouteTransactionEvaluation = <T extends Edge[]>(
             changedIndexes,
           ).score
         : qualityContext.evaluateChanged(candidate, changedIndexes);
-      const obstacleHits = obstacleContext.evaluateKnownChanges(candidate, changedIndexes);
+      const obstacleChangedIndexes = reusable?.baselineObstacleChangedIndexes
+        ? [...new Set([
+          ...reusable.baselineObstacleChangedIndexes,
+          ...changedIndexes,
+        ])]
+        : changedIndexes;
+      const obstacleHits = obstacleContext.evaluateKnownChanges(
+        candidate,
+        obstacleChangedIndexes,
+      );
       const terminalsAnchored = !canValidateTerminals || changedIndexes.every(index => {
         const edge = candidate[index];
         return Boolean(edge && terminalValidation.validateEdge(edge).anchored);

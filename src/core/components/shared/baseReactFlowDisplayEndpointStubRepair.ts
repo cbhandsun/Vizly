@@ -206,6 +206,8 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
   // index and its per-edge segment memo across accepted candidates instead of
   // rebuilding both for every candidate gate.
   const clearance = createNodeClearanceGraphEvaluationContext(nodes);
+  const obstacleContext = createDisplayObstacleEvaluationContext(edges, nodes);
+  const obstacleChangedIndexes = new Set<number>();
   for (let pass = 0; pass < edges.length && evaluations < maxEvaluations; pass += 1) {
     const baselineIssues = countRenderUnsafeEndpointStubs(current);
     if (baselineIssues === 0) break;
@@ -219,13 +221,17 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
     });
     if (edgeIndex < 0) break;
     const baselineQuality = qualityState.score;
-    const obstacleContext = createDisplayObstacleEvaluationContext(current, nodes);
-    const baselineObstacleHits = obstacleContext.evaluate(current);
+    const baselineObstacleChangedIndexes = [...obstacleChangedIndexes];
+    const baselineObstacleHits = obstacleContext.evaluateKnownChanges(
+      current,
+      baselineObstacleChangedIndexes,
+    );
     const atomic = createAtomicRouteTransactionEvaluation(current, nodes, {
       qualityContext,
       obstacleContext,
       baselineQuality,
       baselineQualityState: qualityState,
+      baselineObstacleChangedIndexes,
       baselineObstacleHits,
       endpointOrder,
     });
@@ -245,7 +251,10 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
         candidate,
         [edgeIndex],
       ).score;
-      const initialObstacleHits = obstacleContext.evaluate(candidate);
+      const initialObstacleHits = obstacleContext.evaluateKnownChanges(
+        candidate,
+        [...new Set([...baselineObstacleChangedIndexes, edgeIndex])],
+      );
       const variants: T[] = [candidate];
       if (
         initialIssues < baselineIssues
@@ -283,7 +292,15 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
           || candidateQuality.tinyInteriorDoglegs > baselineQuality.tinyInteriorDoglegs
           || candidateQuality.hairpins > baselineQuality.hairpins
         ) continue;
-        if (obstacleContext.evaluate(variant) > baselineObstacleHits) continue;
+        const candidateObstacleChangedIndexes = [
+          ...new Set([...baselineObstacleChangedIndexes, ...changedIndexes]),
+        ];
+        if (
+          obstacleContext.evaluateKnownChanges(
+            variant,
+            candidateObstacleChangedIndexes,
+          ) > baselineObstacleHits
+        ) continue;
         if (changedIndexes.some(index => (
           countAxisMismatches(variant[index]) > baselineAxisMismatches[index]
         ))) continue;
@@ -329,6 +346,9 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
       continue;
     }
     current = accepted;
+    current.forEach((edge, index) => {
+      if (edge !== edges[index]) obstacleChangedIndexes.add(index);
+    });
     qualityState = acceptedQualityState
       ?? qualityContext.createState(accepted);
   }
