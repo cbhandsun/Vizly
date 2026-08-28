@@ -568,8 +568,18 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
     if (warmRoute.routing.workerStartCount !== initialRoute.routing.workerStartCount) {
       throw new Error(`${layoutCase.id} warm repeat started a duplicate Canvas display Worker`);
     }
+    const warmFirstRequestAt = await session.evaluate(`Math.min(
+      ...(window.__vizlyRoutingRequests || [])
+        .filter(request => typeof request?.requestId === 'string'
+          && request.requestId.startsWith('layout:'))
+        .map(request => request.__browserCapturedAt)
+        .filter(Number.isFinite)
+    )`);
     warmLayoutSwitch = {
       id: WARM_LAYOUT_CASE.id,
+      inputToFirstWorkerMs: Number.isFinite(warmFirstRequestAt)
+        ? warmFirstRequestAt - warmClickedAt
+        : null,
       routeMs: Number.isFinite(warmRoute.request?.__browserCapturedAt)
         && Number.isFinite(warmRoute.response?.__browserCapturedAt)
         ? warmRoute.response.__browserCapturedAt - warmRoute.request.__browserCapturedAt
