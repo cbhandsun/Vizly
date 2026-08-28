@@ -331,19 +331,43 @@ export const findDisplayStrictCrossingHits = (
   edges: Edge[],
 ): Array<{ a: DisplaySegment; b: DisplaySegment }> => {
   const segments = extractDisplaySegments(edges);
-  const hits: Array<{ a: DisplaySegment; b: DisplaySegment }> = [];
-  for (let firstIndex = 0; firstIndex < segments.length; firstIndex += 1) {
-    for (let secondIndex = firstIndex + 1; secondIndex < segments.length; secondIndex += 1) {
-      const first = segments[firstIndex];
-      const second = segments[secondIndex];
-      if (first.edgeIndex === second.edgeIndex || first.axis === second.axis) continue;
-      const crosses = first.axis === 'h'
-        ? displayStrictCrossesHorizontal(first.a, first.b, second)
-        : displayStrictCrossesVertical(first.a, first.b, second);
-      if (crosses) hits.push({ a: first, b: second });
+  const verticalByX = segments
+    .map((segment, order) => ({ order, segment }))
+    .filter(entry => entry.segment.axis === 'v')
+    .sort((first, second) => first.segment.a.x - second.segment.a.x || first.order - second.order);
+  const firstVerticalAfter = (x: number): number => {
+    let lower = 0;
+    let upper = verticalByX.length;
+    while (lower < upper) {
+      const middle = lower + Math.floor((upper - lower) / 2);
+      if (verticalByX[middle].segment.a.x <= x) lower = middle + 1;
+      else upper = middle;
     }
-  }
-  return hits;
+    return lower;
+  };
+  const hitOrders: Array<{ first: number; second: number }> = [];
+  segments.forEach((horizontal, horizontalOrder) => {
+    if (horizontal.axis !== 'h') return;
+    const minX = Math.min(horizontal.a.x, horizontal.b.x) + STRICT_CROSSING_INTERIOR_EPS;
+    const maxX = Math.max(horizontal.a.x, horizontal.b.x) - STRICT_CROSSING_INTERIOR_EPS;
+    for (
+      let index = firstVerticalAfter(minX);
+      index < verticalByX.length && verticalByX[index].segment.a.x < maxX;
+      index += 1
+    ) {
+      const vertical = verticalByX[index];
+      if (
+        horizontal.edgeIndex === vertical.segment.edgeIndex
+        || !displayStrictCrossesHorizontal(horizontal.a, horizontal.b, vertical.segment)
+      ) continue;
+      hitOrders.push({
+        first: Math.min(horizontalOrder, vertical.order),
+        second: Math.max(horizontalOrder, vertical.order),
+      });
+    }
+  });
+  hitOrders.sort((first, second) => first.first - second.first || first.second - second.second);
+  return hitOrders.map(({ first, second }) => ({ a: segments[first], b: segments[second] }));
 };
 
 export const candidateUnrelatedOverlapForEdge = (

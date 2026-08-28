@@ -19,6 +19,8 @@ import {
   candidateUnrelatedOverlapForEdge,
   createDisplayCandidateInteractionContext,
   displayAxisOf,
+  displayStrictCrossesHorizontal,
+  displayStrictCrossesVertical,
   extractDisplaySegments,
   findDisplayStrictCrossingHits,
   getDisplayComputedPath,
@@ -62,6 +64,46 @@ const segment = (
     a,
     b,
   };
+};
+
+const referenceDisplayStrictCrossingHits = (
+  edges: Edge[],
+): Array<{ a: DisplaySegment; b: DisplaySegment }> => {
+  const segments = extractDisplaySegments(edges);
+  const hits: Array<{ a: DisplaySegment; b: DisplaySegment }> = [];
+  for (let firstIndex = 0; firstIndex < segments.length; firstIndex += 1) {
+    for (let secondIndex = firstIndex + 1; secondIndex < segments.length; secondIndex += 1) {
+      const first = segments[firstIndex];
+      const second = segments[secondIndex];
+      if (first.edgeIndex === second.edgeIndex || first.axis === second.axis) continue;
+      const crosses = first.axis === 'h'
+        ? displayStrictCrossesHorizontal(first.a, first.b, second)
+        : displayStrictCrossesVertical(first.a, first.b, second);
+      if (crosses) hits.push({ a: first, b: second });
+    }
+  }
+  return hits;
+};
+
+const deterministicOrthogonalEdges = (seed: number): Edge[] => {
+  let state = seed >>> 0;
+  const next = (): number => {
+    state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0;
+    return state;
+  };
+  const coordinate = (): number => (next() % 25) * 8 - 96;
+  return Array.from({ length: 12 + (next() % 12) }, (_, edgeIndex) => {
+    const points: DisplayPoint[] = [{ x: coordinate(), y: coordinate() }];
+    const segmentCount = 1 + (next() % 6);
+    for (let segmentIndex = 0; segmentIndex < segmentCount; segmentIndex += 1) {
+      const previous = points[points.length - 1];
+      const distance = (1 + (next() % 16)) * (next() % 2 === 0 ? 8 : -8);
+      points.push(next() % 2 === 0
+        ? { x: previous.x + distance, y: previous.y }
+        : { x: previous.x, y: previous.y + distance });
+    }
+    return edge(`random-${seed}-${edgeIndex}`, `s-${edgeIndex}`, `t-${edgeIndex}`, points);
+  });
 };
 
 describe('bounded display crossing cluster repair', () => {
@@ -235,6 +277,41 @@ describe('alternate display hard closure', () => {
       repairNodes: [],
       primaryCandidate: oversizedEdges,
     })).toBeNull();
+  });
+});
+
+describe('display strict crossing hit index', () => {
+  it('matches the legacy pair scan at strict boundaries, repeated lines, reversals, and self crossings', () => {
+    const edges: Edge[] = [
+      edge('horizontal', 'h-source', 'h-target', [{ x: 0, y: 0 }, { x: 100, y: 0 }]),
+      edge('left-boundary', 'lb-source', 'lb-target', [{ x: 0.5, y: -20 }, { x: 0.5, y: 20 }]),
+      edge('left-interior', 'li-source', 'li-target', [{ x: 0.500001, y: 20 }, { x: 0.500001, y: -20 }]),
+      edge('right-boundary', 'rb-source', 'rb-target', [{ x: 99.5, y: -20 }, { x: 99.5, y: 20 }]),
+      edge('right-interior', 'ri-source', 'ri-target', [{ x: 99.499999, y: -20 }, { x: 99.499999, y: 20 }]),
+      edge('same-line-first', 'sl1-source', 'sl1-target', [{ x: 40, y: -20 }, { x: 40, y: 20 }]),
+      edge('same-line-second', 'sl2-source', 'sl2-target', [{ x: 40, y: 20 }, { x: 40, y: -20 }]),
+      edge('reverse-horizontal', 'rh-source', 'rh-target', [{ x: 100, y: 10 }, { x: 0, y: 10 }]),
+      edge('self-crossing', 'self-source', 'self-target', [
+        { x: 0, y: 30 },
+        { x: 100, y: 30 },
+        { x: 100, y: -10 },
+        { x: 50, y: -10 },
+        { x: 50, y: 50 },
+      ]),
+    ];
+
+    expect(findDisplayStrictCrossingHits(edges)).toEqual(
+      referenceDisplayStrictCrossingHits(edges),
+    );
+  });
+
+  it('matches the legacy pair scan across deterministic multi-segment layouts', () => {
+    for (let seed = 1; seed <= 64; seed += 1) {
+      const edges = deterministicOrthogonalEdges(seed);
+      expect(findDisplayStrictCrossingHits(edges)).toEqual(
+        referenceDisplayStrictCrossingHits(edges),
+      );
+    }
   });
 });
 
