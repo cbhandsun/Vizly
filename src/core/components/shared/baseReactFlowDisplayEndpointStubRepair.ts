@@ -308,10 +308,23 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
           edge === current[index] ? [] : [index]
         ));
         const changedEdgeIds = new Set(changedIndexes.map(index => current[index].id));
-        const candidateQualityState = variant === candidate
-          ? initialQualityState
-          : qualityContext.evaluateStateChanged(qualityState, variant, changedIndexes);
-        const candidateQuality = candidateQualityState.score;
+        let candidateQualityState = variant === candidate ? initialQualityState : null;
+        const cachedCandidateQuality = candidateQualityState
+          ? undefined
+          : qualityContext.readCached?.(variant);
+        if (cachedCandidateQuality && strictDiagnostics) {
+          strictDiagnostics.qualityScoreCacheHitCount += 1;
+        }
+        const candidateQuality = candidateQualityState?.score
+          ?? cachedCandidateQuality
+          ?? (() => {
+            candidateQualityState = qualityContext.evaluateStateChanged(
+              qualityState,
+              variant,
+              changedIndexes,
+            );
+            return candidateQualityState.score;
+          })();
         if (
           candidateQuality.nonOrthogonalSegments > baselineQuality.nonOrthogonalSegments
           || candidateQuality.strictCrossings > baselineQuality.strictCrossings
@@ -340,6 +353,11 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
           changedEdgeIds,
           clearance,
         )) continue;
+        candidateQualityState ??= qualityContext.evaluateStateChanged(
+          qualityState,
+          variant,
+          changedIndexes,
+        );
         const transaction = atomic.evaluate(
           variant,
           changedIndexes,

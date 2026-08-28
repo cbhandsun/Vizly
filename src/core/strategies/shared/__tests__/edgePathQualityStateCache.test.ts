@@ -33,6 +33,7 @@ describe('edgePathQualityStateCache', () => {
     expect(cached).toEqual(exact);
     expect(cachedMetrics.scannedEdgePairCount).toBe(0);
     expect(exactMetrics.scannedEdgePairCount).toBe(66);
+    expect(context.readCached?.(candidate)).toEqual(exact);
   });
 
   it('rejects foreign states and invalidates an in-place path mutation', () => {
@@ -51,5 +52,22 @@ describe('edgePathQualityStateCache', () => {
     const mutated = calculateEdgePathQualityScore(candidate);
     expect(mutated).not.toBe(state.score);
     expect(mutated).toEqual(calculateEdgePathQualityScoreExact(candidate));
+    expect(context.readCached?.(candidate)).toEqual(mutated);
+  });
+
+  it('does not manufacture a score while probing an uncached candidate', () => {
+    const baseline = Array.from({ length: 12 }, (_, index) => edge(index));
+    const context = createEdgePathQualityEvaluationContext(baseline);
+    const candidate = baseline.map((current, index) => index === 0
+      ? edge(index, 40)
+      : current);
+
+    expect(context.readCached?.(candidate)).toBeUndefined();
+    expect(context.evaluateChanged(candidate, [0])).toEqual(
+      calculateEdgePathQualityScoreExact(candidate),
+    );
+    expect(context.readCached?.(candidate)).toEqual(
+      calculateEdgePathQualityScoreExact(candidate),
+    );
   });
 });

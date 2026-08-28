@@ -197,6 +197,7 @@ export function calculateEdgePathQualityScore(
 
 export type EdgePathQualityEvaluationContext = {
   createState: (candidate: Edge[]) => EdgePathQualityEvaluationState;
+  readCached?: (candidate: Edge[]) => EdgePathQualityScore | undefined;
   evaluate: (candidate: Edge[]) => EdgePathQualityScore;
   evaluateChanged: (candidate: Edge[], changedIndexes: readonly number[]) => EdgePathQualityScore;
   rememberState?: (
@@ -582,6 +583,10 @@ export function createEdgePathQualityEvaluationContext(
 
   const context: EdgePathQualityEvaluationContext = {
     readMetrics: () => ({ ...metrics }),
+    readCached(candidate): EdgePathQualityScore | undefined {
+      const snapshot = buildQualityInputSnapshot(candidate);
+      return readQualityScore(candidate, snapshot);
+    },
     rememberState(candidate, state): boolean {
       const numericState = readNumericState(state);
       if (!numericState || candidate.length !== numericState.edgeCount) return false;

@@ -8,6 +8,7 @@ import {
 export type StrictCrossingRepairDiagnostics = {
   qualityEvaluationCount: number;
   qualityContextCacheHitCount: number;
+  qualityScoreCacheHitCount: number;
   pairCacheHitCount: number;
   segmentQueryCacheHitCount: number;
   nodeContextBuildCount: number;
@@ -23,6 +24,7 @@ export type StrictCrossingRepairDiagnostics = {
 export const createStrictCrossingRepairDiagnostics = (): StrictCrossingRepairDiagnostics => ({
   qualityEvaluationCount: 0,
   qualityContextCacheHitCount: 0,
+  qualityScoreCacheHitCount: 0,
   pairCacheHitCount: 0,
   segmentQueryCacheHitCount: 0,
   nodeContextBuildCount: 0,
@@ -84,6 +86,11 @@ export const createTrackedStrictQualityContext = (
   };
   return {
     ...context,
+    readCached(candidate: Edge[]) {
+      const result = context.readCached?.(candidate);
+      if (result && diagnostics) diagnostics.qualityScoreCacheHitCount += 1;
+      return result;
+    },
     createState(candidate: Edge[]) {
       const result = context.createState(candidate);
       syncMetrics();
