@@ -426,6 +426,70 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
   const totalRouteMs = Number.isFinite(route.routing.finalAppliedAt)
     ? route.routing.finalAppliedAt - clickedAt
     : route.routing.totalRouteMs;
+  const layoutTiming = await session.evaluate(`(() => {
+    const clickedAtEpoch = ${JSON.stringify(clickedAt)};
+    const layoutRequests = (window.__vizlyRoutingRequests || []).filter(request => (
+      typeof request?.requestId === 'string' && request.requestId.startsWith('layout:')
+    ));
+    const firstRequestAt = Math.min(
+      ...layoutRequests.map(request => request.__browserCapturedAt).filter(Number.isFinite),
+    );
+    const finalAppliedAt = window.__vizlyBaseReactFlowDisplayRouting?.finalAppliedAt;
+    const longTasks = (window.__vizlyLongTasks || []).filter(task => (
+      Number.isFinite(task?.startedAt)
+      && Number.isFinite(task?.durationMs)
+      && task.startedAt >= clickedAtEpoch
+      && (!Number.isFinite(finalAppliedAt) || task.startedAt <= finalAppliedAt)
+    ));
+    const usedRequestIndexes = new Set();
+    const attempts = (window.__vizlyRoutingResponses || []).filter(response => (
+      typeof response?.requestId === 'string'
+      && response.requestId.startsWith('layout:')
+      && typeof response.hardClean === 'boolean'
+    )).map(response => {
+      const requestIndex = layoutRequests.findIndex((candidate, index) => (
+        !usedRequestIndexes.has(index)
+        && candidate.requestId === response.requestId
+        && (
+          !Number.isFinite(candidate.__browserCapturedAt)
+          || !Number.isFinite(response.__browserCapturedAt)
+          || candidate.__browserCapturedAt <= response.__browserCapturedAt
+        )
+      ));
+      if (requestIndex >= 0) usedRequestIndexes.add(requestIndex);
+      const request = requestIndex >= 0 ? layoutRequests[requestIndex] : undefined;
+      const summarize = ${summarizeSlowestDisplayRoutingPhases.toString()};
+      return {
+        requestId: response.requestId,
+        operation: request?.operation,
+        resolution: response.routeResolution,
+        hardClean: response.hardClean,
+        workerDurationMs: response.workerDurationMs,
+        hardReport: response.hardReport && {
+          obstacleHits: response.hardReport.obstacleHits,
+          terminalsAttached: response.hardReport.terminalsAttached,
+          terminalsAnchored: response.hardReport.terminalsAnchored,
+          minimumClearanceViolations: response.hardReport.minimumClearanceViolations,
+          commercialClearanceViolations: response.hardReport.commercialClearanceViolations,
+          quality: response.hardReport.quality,
+        },
+        requestResponseMs: Number.isFinite(request?.__browserCapturedAt)
+          && Number.isFinite(response.__browserCapturedAt)
+          ? response.__browserCapturedAt - request.__browserCapturedAt
+          : null,
+        slowestPhases: summarize(response.phaseTrace),
+      };
+    });
+    return {
+      layoutStartDelayMs: Number.isFinite(firstRequestAt)
+        ? firstRequestAt - clickedAtEpoch
+        : null,
+      longTaskCount: longTasks.length,
+      longTaskTotalMs: longTasks.reduce((sum, task) => sum + task.durationMs, 0),
+      longTaskMaxMs: Math.max(0, ...longTasks.map(task => task.durationMs)),
+      attempts,
+    };
+  })()`);
   if (!Number.isFinite(totalRouteMs) || totalRouteMs > MAX_LAYOUT_ROUTE_MS) {
     throw new Error(`${layoutCase.id} exceeded ${MAX_LAYOUT_ROUTE_MS}ms: ${totalRouteMs}`);
   }
@@ -524,6 +588,7 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
       ? route.response.__browserCapturedAt - route.request.__browserCapturedAt
       : route.routing.routeMs,
     totalRouteMs,
+    ...layoutTiming,
     slowestPhases: summarizeSlowestDisplayRoutingPhases(route.response.phaseTrace),
     canonicalMount,
     postLayoutMove,

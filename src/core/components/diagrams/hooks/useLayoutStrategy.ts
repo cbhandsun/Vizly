@@ -554,6 +554,7 @@ export function useLayoutStrategy({
                             edges: finalEdges,
                             routingJob,
                             onCommitted: twoStepFitView,
+                            rejectObstacleDirtyBoundedCandidate: isDomainLane,
                         });
                     };
 

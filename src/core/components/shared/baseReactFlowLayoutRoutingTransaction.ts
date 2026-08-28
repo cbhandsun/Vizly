@@ -404,6 +404,7 @@ export const stageBaseReactFlowLayoutRouting = async ({
   loadPrecompiledCandidate = loadBaseReactFlowPrecompiledRouteCandidate,
   fullRouteTimeoutMs = LAYOUT_FULL_DISPLAY_WORKER_TIMEOUT_MS,
   precompiledLayoutRegeneration,
+  rejectObstacleDirtyBoundedCandidate = false,
 }: {
   workerRef: MutableRefObject<Worker | null>;
   requestId: string;
@@ -417,6 +418,7 @@ export const stageBaseReactFlowLayoutRouting = async ({
   loadPrecompiledCandidate?: BaseReactFlowLayoutPrecompiledCandidateLoader;
   fullRouteTimeoutMs?: number;
   precompiledLayoutRegeneration?: BaseReactFlowPrecompiledLayoutRegeneration | null;
+  rejectObstacleDirtyBoundedCandidate?: boolean;
 }): Promise<BaseReactFlowLayoutRoutingCommit> => {
   const unseededSourceEdges = sourceEdges.map(edge => ({
     ...edge,
@@ -518,6 +520,17 @@ export const stageBaseReactFlowLayoutRouting = async ({
       inputSignature: projectedIdentity.cacheSignature,
       inputGeometryDigest: projectedIdentity.geometryDigest,
     });
+  if (
+    rejectObstacleDirtyBoundedCandidate
+    && candidateRepairResult?.hardClean === false
+    && (candidateRepairResult.hardReport?.obstacleHits ?? 0) > 0
+  ) {
+    // Ordered-lane seeds that still cross a business node after measured
+    // repair have repeatedly failed the much more expensive canonical pass.
+    // Let the caller use its existing domain-preserving safety layout while
+    // candidates whose obstacle defect was cleared retain that full pass.
+    throw new Error('layout-routing-hard-quality-rejected');
+  }
   // The bounded repair uses seeded paths as its working source. Promote its
   // result through a canonical source-edge request before committing so the
   // Worker-private session stores source -> final patches under the same

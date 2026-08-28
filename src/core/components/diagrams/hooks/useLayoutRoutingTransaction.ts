@@ -19,6 +19,7 @@ type LayoutRoutingTransactionRequest = Readonly<{
   edges: Edge[];
   routingJob: BaseReactFlowRoutingSessionJob;
   onCommitted?: () => void;
+  rejectObstacleDirtyBoundedCandidate?: boolean;
 }>;
 
 export type LayoutPresentationPreviewRequest = Readonly<{
@@ -60,6 +61,7 @@ export const useLayoutRoutingTransaction = ({
     edges,
     routingJob,
     onCommitted,
+    rejectObstacleDirtyBoundedCandidate,
   }: LayoutRoutingTransactionRequest): Promise<void> => {
     if (routingJob.owner !== 'layout' || !routingSessionRuntime.isCurrentJob(routingJob)) {
       throw new Error('layout-routing-cancelled');
@@ -116,6 +118,7 @@ export const useLayoutRoutingTransaction = ({
             ? PRECOMPILED_CAPTURE_WORKER_TIMEOUT_MS
             : undefined,
           precompiledLayoutRegeneration,
+          rejectObstacleDirtyBoundedCandidate,
         });
         if (!routingSessionRuntime.isCurrentJob(routingJob)) {
           throw new Error('layout-routing-cancelled');

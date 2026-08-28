@@ -607,6 +607,64 @@ describe('baseReactFlow layout routing candidate sequence', () => {
     });
   });
 
+  it('rejects an obstacle-dirty bounded lane candidate before the expensive full route', async () => {
+    workerMocks.repair.mockImplementationOnce(async (request: {
+      edges: Edge[];
+      inputSignature: string;
+      inputGeometryDigest: string;
+    }) => ({
+      ...successfulResult(request.edges, request),
+      hardClean: false,
+      hardReport: {
+        ...createTestDisplayHardReport(false),
+        obstacleHits: 1,
+      },
+      commitReceipt: undefined,
+    }));
+
+    await expect(stageBaseReactFlowLayoutRouting({
+      workerRef: { current: null },
+      requestId: 'layout:lane-obstacle-failure',
+      sourceEdges: edges,
+      sourceNodes: nodes,
+      isLargeGraph: false,
+      rejectObstacleDirtyBoundedCandidate: true,
+    })).rejects.toThrow('layout-routing-hard-quality-rejected');
+
+    expect(workerMocks.repair).toHaveBeenCalledOnce();
+    expect(workerMocks.compute).not.toHaveBeenCalled();
+  });
+
+  it('keeps the canonical lane route when bounded repair cleared every obstacle', async () => {
+    workerMocks.repair.mockImplementationOnce(async (request: {
+      edges: Edge[];
+      inputSignature: string;
+      inputGeometryDigest: string;
+    }) => ({
+      ...successfulResult(request.edges, request),
+      hardClean: false,
+      hardReport: {
+        ...createTestDisplayHardReport(false),
+        obstacleHits: 0,
+        commercialClearanceViolations: 1,
+      },
+      commitReceipt: undefined,
+    }));
+    workerMocks.compute.mockImplementation(successfulCanonicalResult);
+
+    await stageBaseReactFlowLayoutRouting({
+      workerRef: { current: null },
+      requestId: 'layout:lane-obstacle-clean',
+      sourceEdges: edges,
+      sourceNodes: nodes,
+      isLargeGraph: false,
+      rejectObstacleDirtyBoundedCandidate: true,
+    });
+
+    expect(workerMocks.repair).toHaveBeenCalledOnce();
+    expect(workerMocks.compute).toHaveBeenCalledOnce();
+  });
+
   it('rejects a failed full route without starting a second expensive repair pass', async () => {
     workerMocks.repair.mockImplementationOnce(async (request: {
       edges: Edge[];
