@@ -141,4 +141,15 @@ describe('fixed minimap keyboard navigation', () => {
         expect(source).toContain('onKeyDown={nav.handleMiniMapKeyDown}');
         expect(styles).toMatch(/\[role="application"\]:focus-visible[\s\S]*?outline:/);
     });
+
+    it('does not synchronously reread UI scale while rendering viewport frames', () => {
+        const source = readFileSync(
+            resolve(process.cwd(), 'src/core/components/shared/FixedMiniMap.tsx'),
+            'utf8',
+        );
+
+        expect(source).toContain('const uiScale = useMemo(getUiScale, []);');
+        expect(source).toContain('useMinimapNavigation(anchorRef, minimapRef, viewportForRender, readUiScale)');
+        expect(source).not.toContain('const renderUiScale = getUiScale();');
+    });
 });

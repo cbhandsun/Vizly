@@ -18,6 +18,7 @@ import { useMinimapOverlay } from './hooks/useMinimapOverlay';
 import { useMinimapNavigation } from './hooks/useMinimapNavigation';
 import type { Theme } from '../../themes/types/ThemeTypes';
 import { logFixedMiniMapFailure } from './fixedMiniMapLogging';
+import { createFixedMiniMapViewportThrottle } from './fixedMiniMapViewportThrottle';
 import {
   resolveFixedMiniMapMessage,
   shouldFreezeFixedMiniMapDuringNodeDrag,
@@ -122,6 +123,11 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
     setMinimapElement(node);
   }, []);
   const anchorRef = useRef<HTMLDivElement>(null);
+  // DiagramLayout resolves UI scale once for the page lifetime. Reading the
+  // computed style again on every animated viewport frame forces synchronous
+  // style/layout work while the minimap is repainting.
+  const uiScale = useMemo(getUiScale, []);
+  const readUiScale = useCallback(() => uiScale, [uiScale]);
 
   const reactFlowInstance = useReactFlow<MinimapNode>();
   const renderMiniMapMessage = (message: Exclude<FixedMiniMapMessage, null>) => (
@@ -167,8 +173,12 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
   // 订阅视口变化以驱动 minimap 缩略图矩形的实时更新
   const [viewportForRender, setViewportForRender] = useState<Viewport>(reactFlowInstance.getViewport());
   useEffect(() => {
-    const unsubscribe = subscribeViewport((vp) => setViewportForRender(vp));
-    return () => { if (unsubscribe) unsubscribe(); };
+    const throttle = createFixedMiniMapViewportThrottle(setViewportForRender);
+    const unsubscribe = subscribeViewport(throttle.push);
+    return () => {
+      unsubscribe?.();
+      throttle.dispose();
+    };
   }, []); // 移除 reactFlowInstance 依赖
 
   // MiniMap 渲染就绪状态
@@ -189,7 +199,7 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
   }, [nodes]);
 
   // Navigation controller
-  const nav = useMinimapNavigation(anchorRef, minimapRef, viewportForRender, getUiScale);
+  const nav = useMinimapNavigation(anchorRef, minimapRef, viewportForRender, readUiScale);
   const setOverlayOffset = overlay.setOffset;
 
   // 全局鼠标移动处理 - Container overlay
@@ -401,9 +411,8 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
                       return renderMiniMapMessage(message);
                     }
                     const viewport = viewportForRender;
-                    const renderUiScale = getUiScale();
-                    const visiblePixelWidth = Math.max(1, canvasPixelSize.width / renderUiScale);
-                    const visiblePixelHeight = Math.max(1, canvasPixelSize.height / renderUiScale);
+                    const visiblePixelWidth = Math.max(1, canvasPixelSize.width / uiScale);
+                    const visiblePixelHeight = Math.max(1, canvasPixelSize.height / uiScale);
                     const zoom = safeNumber(viewport.zoom, 1);
                     const vxWorld = -safeNumber(viewport.x, 0) / zoom;
                     const vyWorld = -safeNumber(viewport.y, 0) / zoom;
