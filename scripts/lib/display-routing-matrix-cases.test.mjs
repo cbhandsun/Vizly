@@ -7,6 +7,7 @@ import {
   findDisplayRoutingMenuElementByKey,
   parseDisplayRoutingMatrixCase,
   parseDisplayRoutingMatrixPreset,
+  parseDisplayRoutingMatrixTimeoutMs,
 } from './display-routing-matrix-cases.mjs';
 
 describe('display routing matrix cases', () => {
@@ -66,6 +67,17 @@ describe('display routing matrix cases', () => {
       .toThrowError('Unknown DISPLAY_ROUTING_MATRIX_PRESET');
     expect(() => parseDisplayRoutingMatrixPreset('x'.repeat(10_000), knownPresetIds, 'small-preset'))
       .toThrowError('Unknown DISPLAY_ROUTING_MATRIX_PRESET');
+  });
+
+  it('parses a bounded matrix wait timeout', () => {
+    expect(parseDisplayRoutingMatrixTimeoutMs(undefined)).toBe(120_000);
+    expect(parseDisplayRoutingMatrixTimeoutMs(' 45000 ')).toBe(45_000);
+    expect(() => parseDisplayRoutingMatrixTimeoutMs('999'))
+      .toThrowError('Invalid DISPLAY_ROUTING_MATRIX_WAIT_TIMEOUT_MS');
+    expect(() => parseDisplayRoutingMatrixTimeoutMs('Infinity'))
+      .toThrowError('Invalid DISPLAY_ROUTING_MATRIX_WAIT_TIMEOUT_MS');
+    expect(() => parseDisplayRoutingMatrixTimeoutMs('120001'))
+      .toThrowError('Invalid DISPLAY_ROUTING_MATRIX_WAIT_TIMEOUT_MS');
   });
 
   it('finds Ant menu actions by stable key without depending on translated text', () => {

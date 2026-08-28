@@ -51,6 +51,15 @@ export const parseDisplayRoutingMatrixPreset = (rawValue, knownPresetIds, fallba
   return selected;
 };
 
+export const parseDisplayRoutingMatrixTimeoutMs = (rawValue, fallbackMs = 120_000) => {
+  if (rawValue === undefined || rawValue === null || rawValue === '') return fallbackMs;
+  const candidate = typeof rawValue === 'number' ? rawValue : Number(String(rawValue).trim());
+  if (!Number.isSafeInteger(candidate) || candidate < 1_000 || candidate > 120_000) {
+    throw new Error('Invalid DISPLAY_ROUTING_MATRIX_WAIT_TIMEOUT_MS');
+  }
+  return candidate;
+};
+
 export const findDisplayRoutingMenuElementByKey = (elements, rawKey) => {
   if (typeof rawKey !== 'string' || rawKey.length === 0 || rawKey.length > 128) {
     return null;

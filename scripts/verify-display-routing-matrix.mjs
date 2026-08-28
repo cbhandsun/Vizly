@@ -23,6 +23,7 @@ import {
   findDisplayRoutingMenuElementByKey,
   parseDisplayRoutingMatrixCase,
   parseDisplayRoutingMatrixPreset,
+  parseDisplayRoutingMatrixTimeoutMs,
 } from './lib/display-routing-matrix-cases.mjs';
 import {
   displayRoutingWaitStateHasTerminalFailure,
@@ -40,7 +41,9 @@ import {
 import { resolveDisplayRoutingFinalRouteSnapshot } from './lib/display-routing-matrix-final-route.mjs';
 
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '').trim().replace(/\/$/, '');
-const WAIT_TIMEOUT_MS = 120_000;
+const WAIT_TIMEOUT_MS = parseDisplayRoutingMatrixTimeoutMs(
+  process.env.DISPLAY_ROUTING_MATRIX_WAIT_TIMEOUT_MS,
+);
 const MAX_LAYOUT_ROUTE_MS = 30_000;
 const MATRIX_CASE_IDS = createDisplayRoutingMatrixCaseIds(
   PRECOMPILED_DISPLAY_ROUTE_TARGETS.map(target => target.presetId),
@@ -151,8 +154,29 @@ const readLatestCompletedRouteExpression = `(() => {
     : null;
 })()`;
 
+const waitForNodeGeometryParity = async (session, rawNodes, label) => {
+  const expression = `(${readDisplayRoutingNodeGeometryParity.toString()})(${JSON.stringify(rawNodes)})`;
+  const deadline = Date.now() + 5_000;
+  let latest = null;
+  while (Date.now() < deadline) {
+    latest = await session.evaluate(expression);
+    if (
+      latest
+      && latest.comparedNodeCount > 0
+      && latest.positionMismatchCount === 0
+      && latest.sizeMismatchCount === 0
+    ) return latest;
+    await delay(100);
+  }
+  throw new Error(`Worker/DOM node geometry parity failed for ${label}: ${JSON.stringify(latest)}`);
+};
+
 const auditFinalSvg = async (session, route, label) => {
-  await delay(500);
+  const nodeGeometryParity = await waitForNodeGeometryParity(
+    session,
+    route.request?.nodes,
+    label,
+  );
   const audit = await session.evaluate(
     `(${readRenderedDisplayEdgeNodeIntersections.toString()})(${JSON.stringify(route.response.edges)}, 16)`,
   );
@@ -162,20 +186,9 @@ const auditFinalSvg = async (session, route, label) => {
   const hardAudit = await session.evaluate(
     `(${readRenderedDisplayEdgeHardGeometryAudit.toString()})(${JSON.stringify(route.response.edges)}, ${JSON.stringify(route.request?.nodes)})`,
   );
-  const nodeGeometryParity = await session.evaluate(
-    `(${readDisplayRoutingNodeGeometryParity.toString()})(${JSON.stringify(route.request?.nodes)})`,
-  );
   const visualAudit = await session.evaluate(
     `(${readDisplayRoutingVisualScaleAudit.toString()})()`,
   );
-  if (
-    !nodeGeometryParity
-    || nodeGeometryParity.comparedNodeCount < 1
-    || nodeGeometryParity.positionMismatchCount !== 0
-    || nodeGeometryParity.sizeMismatchCount !== 0
-  ) {
-    throw new Error(`Worker/DOM node geometry parity failed for ${label}: ${JSON.stringify(nodeGeometryParity)}`);
-  }
   if (!displayRoutingFinalSvgGeometryIsClean({
     audit,
     commercialAudit,
@@ -391,6 +404,7 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
     JSON.parse(await readFile(target.sourcePath, 'utf8')),
     presetId,
   );
+  const initialStartedAt = Date.now();
   await session.send('Page.navigate', {
     url: `${BASE_URL}/?canonicalPreset=${encodeURIComponent(presetId)}`
       + `&routingMatrix=${layoutCase.id}-${Date.now()}`
@@ -401,6 +415,7 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
     readFinalRouteExpression(''),
     `${layoutCase.id} initial route`,
   );
+  const initialRouteMs = Date.now() - initialStartedAt;
   await session.evaluate('window.__vizlyRoutingResponses = []');
   const clickedAt = await clickLayout(session, layoutCase);
   const route = await waitForValue(
@@ -499,6 +514,11 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
   return {
     id: layoutCase.id,
     resolution: route.response.routeResolution,
+    initialRouteMs,
+    initialWorkerRouteMs: Number.isFinite(initialRoute.request?.__browserCapturedAt)
+      && Number.isFinite(initialRoute.response?.__browserCapturedAt)
+      ? initialRoute.response.__browserCapturedAt - initialRoute.request.__browserCapturedAt
+      : initialRoute.routing.routeMs,
     routeMs: Number.isFinite(route.request?.__browserCapturedAt)
       && Number.isFinite(route.response.__browserCapturedAt)
       ? route.response.__browserCapturedAt - route.request.__browserCapturedAt

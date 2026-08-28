@@ -19,6 +19,15 @@ export const resolveDisplayRoutingFinalRouteSnapshot = ({
       ? request.requestId.startsWith(expectedRequestPrefix)
       : true)
   );
+  const requestMatchesCommittedShape = request => (
+    isRecord(request)
+    && Array.isArray(request.nodes)
+    && Array.isArray(request.edges)
+    && Number.isSafeInteger(routing?.nodeCount)
+    && Number.isSafeInteger(routing?.edgeCount)
+    && routing.nodeCount === request.nodes.length
+    && routing.edgeCount === request.edges.length
+  );
   const candidateValidationHit = Array.isArray(routing?.phaseProgressTrace)
     && routing.phaseProgressTrace.some(phase => (
       isRecord(phase)
@@ -47,7 +56,8 @@ export const resolveDisplayRoutingFinalRouteSnapshot = ({
     const request = [...safeRequests].reverse().find(item => (
       isRecord(item) && item.requestId === response.requestId
     ));
-    return renderedEdgeCount === response.edges.length
+    return requestMatchesCommittedShape(request)
+      && renderedEdgeCount === response.edges.length
       ? { routing, request, response, renderedEdgeCount }
       : null;
   }
@@ -55,6 +65,7 @@ export const resolveDisplayRoutingFinalRouteSnapshot = ({
   const request = [...safeRequests].reverse().find(requestMatchesPrefix);
   if (
     !request
+    || !requestMatchesCommittedShape(request)
     || !candidateValidationHit
     || !Array.isArray(request.edges)
     || !Array.isArray(currentEdges)

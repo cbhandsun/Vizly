@@ -6,6 +6,7 @@ const request = {
   nodes: [{ id: 'a' }, { id: 'b' }],
   edges: [{ id: 'a-b' }],
 };
+const committedShape = { nodeCount: 2, edgeCount: 1 };
 
 it('accepts a hard-clean Worker response for the expected layout request', () => {
   const response = {
@@ -17,6 +18,7 @@ it('accepts a hard-clean Worker response for the expected layout request', () =>
   expect(resolveDisplayRoutingFinalRouteSnapshot({
     routing: {
       stage: 'final-applied', requestId: 'layout:7', renderAuthorityStatus: 'accepted',
+      ...committedShape,
     },
     requests: [request],
     responses: [response],
@@ -35,6 +37,7 @@ it('reconstructs a candidate-validation hit that commits without a Worker respon
       renderAuthorityStatus: 'accepted',
       workerResolution: 'repaired-candidate',
       phaseProgressTrace: [{ phase: 'candidate-validation', resolution: 'hit' }],
+      ...committedShape,
     },
     requests: [request],
     responses: [],
@@ -51,6 +54,33 @@ it('reconstructs a candidate-validation hit that commits without a Worker respon
 });
 
 describe('candidate-only completion is fail closed', () => {
+  it('does not pair a target-layout response with an older committed node shape', () => {
+    expect(resolveDisplayRoutingFinalRouteSnapshot({
+      routing: {
+        stage: 'final-applied',
+        requestId: 'layout:7',
+        renderAuthorityStatus: 'accepted',
+        ...committedShape,
+        nodeCount: 1,
+        edgeCount: 1,
+      },
+      requests: [{
+        ...request,
+        requestId: 'layout:7',
+        nodes: [{ id: 'source' }, { id: 'target' }],
+      }],
+      responses: [{
+        requestId: 'layout:7',
+        hardClean: true,
+        hardReport: { hardClean: true },
+        edges: [{ id: 'a-b' }],
+      }],
+      currentEdges: [{ id: 'a-b' }],
+      renderedEdgeCount: 1,
+      expectedRequestPrefix: 'layout:',
+    })).toBeNull();
+  });
+
   it('does not pair a newer prefixed response with an older final-applied request', () => {
     expect(resolveDisplayRoutingFinalRouteSnapshot({
       routing: {
