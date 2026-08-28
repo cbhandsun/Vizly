@@ -107,20 +107,11 @@ const rangeOverlap = (
 ): number => Math.max(0, Math.min(firstMax, secondMax) - Math.max(firstMin, secondMin));
 
 const segmentQuerySignature = (
-  segments: readonly Segment[],
-  excludedEdgeIndexes: ReadonlySet<number>,
+  segment: Segment,
 ): string | null => {
-  if (segments.length > REUSABLE_SEGMENT_INDEX_MAX_SEGMENTS) return null;
-  const parts: string[] = [];
-  for (const segment of segments) {
-    if (!finiteSegment(segment)) return null;
-    const range = segmentRange(segment);
-    parts.push(`${segment.axis}:${range.line}:${range.rangeMin}:${range.rangeMax}`);
-  }
-  const excluded = [...excludedEdgeIndexes];
-  if (excluded.some(index => !Number.isSafeInteger(index) || index < 0)) return null;
-  excluded.sort((first, second) => first - second);
-  return `${parts.join(';')}|${excluded.join(',')}`;
+  if (!finiteSegment(segment)) return null;
+  const range = segmentRange(segment);
+  return `${segment.axis}:${range.line}:${range.rangeMin}:${range.rangeMax}`;
 };
 
 const reusableSegmentIndexSignature = (
@@ -227,30 +218,28 @@ export const createEdgePathQualitySegmentIndex = (
 
   return {
     queryPotentialEdgeIndexes(segments, excludedEdgeIndexes = new Set()) {
-      const querySignature = segmentQuerySignature(segments, excludedEdgeIndexes);
-      if (querySignature) {
-        const cached = queryCache.get(querySignature);
-        if (cached) {
-          queryCache.delete(querySignature);
-          queryCache.set(querySignature, cached);
-          return {
-            cacheHit: true,
-            edgeIndexes: new Set(cached.edgeIndexes),
-            scannedSegmentCount: 0,
-          };
-        }
-      }
       const edgeIndexes = new Set<number>();
       let scannedSegmentCount = 0;
-      const add = (entry: IndexedSegment): void => {
-        if (!excludedEdgeIndexes.has(entry.edgeIndex)) edgeIndexes.add(entry.edgeIndex);
-      };
+      let allSegmentsCached = segments.length > 0;
+      const mayCacheSegments = segments.length <= REUSABLE_SEGMENT_INDEX_MAX_SEGMENTS;
 
       for (const segment of segments) {
+        const querySignature = mayCacheSegments ? segmentQuerySignature(segment) : null;
+        const cached = querySignature ? queryCache.get(querySignature) : undefined;
+        if (querySignature && cached) {
+          queryCache.delete(querySignature);
+          queryCache.set(querySignature, cached);
+          for (const edgeIndex of cached.edgeIndexes) edgeIndexes.add(edgeIndex);
+          continue;
+        }
+        allSegmentsCached = false;
+        const segmentEdgeIndexes = new Set<number>();
+        const add = (entry: IndexedSegment): void => {
+          segmentEdgeIndexes.add(entry.edgeIndex);
+        };
         if (!finiteSegment(segment)) {
-          for (const edgeIndex of allEdgeIndexes) {
-            if (!excludedEdgeIndexes.has(edgeIndex)) edgeIndexes.add(edgeIndex);
-          }
+          for (const edgeIndex of allEdgeIndexes) segmentEdgeIndexes.add(edgeIndex);
+          for (const edgeIndex of segmentEdgeIndexes) edgeIndexes.add(edgeIndex);
           continue;
         }
         const { line, rangeMin, rangeMax } = segmentRange(segment);
@@ -280,9 +269,17 @@ export const createEdgePathQualitySegmentIndex = (
           scannedSegmentCount += 1;
           if (line >= entry.rangeMin && line <= entry.rangeMax) add(entry);
         }
+        if (querySignature) rememberQuery(querySignature, segmentEdgeIndexes);
+        for (const edgeIndex of segmentEdgeIndexes) edgeIndexes.add(edgeIndex);
       }
-      if (querySignature) rememberQuery(querySignature, edgeIndexes);
-      return { cacheHit: false, edgeIndexes, scannedSegmentCount };
+      if (excludedEdgeIndexes.size > 0) {
+        for (const edgeIndex of excludedEdgeIndexes) edgeIndexes.delete(edgeIndex);
+      }
+      return {
+        cacheHit: allSegmentsCached,
+        edgeIndexes,
+        scannedSegmentCount,
+      };
     },
   };
 };

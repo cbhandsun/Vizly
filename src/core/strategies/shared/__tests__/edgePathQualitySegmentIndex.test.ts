@@ -59,6 +59,7 @@ describe('edgePathQualitySegmentIndex', () => {
 
     const result = index.queryPotentialEdgeIndexes([invalid], new Set([1]));
 
+    expect(result.cacheHit).toBe(false);
     expect([...result.edgeIndexes]).toEqual([0]);
   });
 
@@ -81,6 +82,7 @@ describe('edgePathQualitySegmentIndex', () => {
   it('returns an empty result for empty geometry', () => {
     const result = createEdgePathQualitySegmentIndex([]).queryPotentialEdgeIndexes([]);
     expect([...result.edgeIndexes]).toEqual([]);
+    expect(result.cacheHit).toBe(false);
     expect(result.scannedSegmentCount).toBe(0);
   });
 
@@ -112,7 +114,7 @@ describe('edgePathQualitySegmentIndex', () => {
     expect([...repeated.edgeIndexes]).toEqual([...first.edgeIndexes]);
   });
 
-  it('returns an isolated set on cache hits and keeps exclusion keys distinct', () => {
+  it('returns isolated cache results and applies exclusions after geometry reuse', () => {
     const index = createEdgePathQualitySegmentIndex([
       segments(0, [{ x: 30_010, y: -20 }, { x: 30_010, y: 120 }]),
       segments(1, [{ x: 30_020, y: -20 }, { x: 30_020, y: 120 }]),
@@ -126,8 +128,74 @@ describe('edgePathQualitySegmentIndex', () => {
 
     expect(repeated.cacheHit).toBe(true);
     expect([...repeated.edgeIndexes]).toEqual([0, 1]);
-    expect(excluded.cacheHit).toBe(false);
+    expect(excluded.cacheHit).toBe(true);
+    expect(excluded.scannedSegmentCount).toBe(0);
     expect([...excluded.edgeIndexes]).toEqual([0]);
+    expect([...index.queryPotentialEdgeIndexes(candidate).edgeIndexes]).toEqual([0, 1]);
+  });
+
+  it('reuses unchanged segment queries across locally edited paths', () => {
+    const index = createEdgePathQualitySegmentIndex([
+      segments(0, [{ x: 40_010, y: -20 }, { x: 40_010, y: 120 }]),
+      segments(1, [{ x: 40_020, y: 80 }, { x: 40_200, y: 80 }]),
+    ]);
+    const shared = { x: 40_100, y: 0 };
+    const first = segments(9, [
+      { x: 39_900, y: 0 },
+      shared,
+      { x: 40_100, y: 100 },
+    ]);
+    const locallyEdited = segments(9, [
+      { x: 39_900, y: 0 },
+      shared,
+      { x: 40_100, y: 120 },
+    ]);
+
+    const initial = index.queryPotentialEdgeIndexes(first, new Set([9]));
+    const partial = index.queryPotentialEdgeIndexes(locallyEdited, new Set([9]));
+    const repeated = index.queryPotentialEdgeIndexes(locallyEdited, new Set([9]));
+    const reference = createEdgePathQualitySegmentIndex([
+      segments(0, [{ x: 40_010, y: -20 }, { x: 40_010, y: 120 }]),
+      segments(1, [{ x: 40_020, y: 80 }, { x: 40_200, y: 80 }]),
+    ]).queryPotentialEdgeIndexes(locallyEdited, new Set([9]));
+
+    expect(initial.cacheHit).toBe(false);
+    expect(partial.cacheHit).toBe(false);
+    expect(partial.scannedSegmentCount).toBeLessThan(initial.scannedSegmentCount);
+    expect(repeated.cacheHit).toBe(true);
+    expect(repeated.scannedSegmentCount).toBe(0);
+    expect([...partial.edgeIndexes]).toEqual([...reference.edgeIndexes]);
+    expect([...partial.edgeIndexes]).toEqual([...repeated.edgeIndexes]);
+  });
+
+  it('reuses canonical geometry across direction and edge identity changes', () => {
+    const index = createEdgePathQualitySegmentIndex([
+      segments(0, [{ x: 50_000, y: -20 }, { x: 50_000, y: 120 }]),
+    ]);
+    const forward = segments(8, [{ x: 49_900, y: 0 }, { x: 50_100, y: 0 }]);
+    const reversed = segments(9, [{ x: 50_100, y: 0 }, { x: 49_900, y: 0 }]);
+
+    const first = index.queryPotentialEdgeIndexes(forward, new Set([8]));
+    const reused = index.queryPotentialEdgeIndexes(reversed, new Set([9]));
+
+    expect(first.cacheHit).toBe(false);
+    expect(reused.cacheHit).toBe(true);
+    expect(reused.scannedSegmentCount).toBe(0);
+    expect([...reused.edgeIndexes]).toEqual([...first.edgeIndexes]);
+  });
+
+  it('bypasses caching for extreme query paths without changing results', () => {
+    const baseline = [segments(0, [{ x: 60_000, y: -20 }, { x: 60_000, y: 120 }])];
+    const segment = segments(9, [{ x: 59_900, y: 0 }, { x: 60_100, y: 0 }])[0];
+    const extremePath = Array.from({ length: 32_769 }, () => segment);
+    const index = createEdgePathQualitySegmentIndex(baseline);
+
+    const first = index.queryPotentialEdgeIndexes(extremePath, new Set([9]));
+    const repeated = index.queryPotentialEdgeIndexes(extremePath, new Set([9]));
+
+    expect(first.cacheHit).toBe(false);
+    expect(repeated.cacheHit).toBe(false);
+    expect([...repeated.edgeIndexes]).toEqual([...first.edgeIndexes]);
   });
 
 });
