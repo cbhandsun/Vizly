@@ -341,6 +341,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    setupFiles: ['./src/test/setupLocaleAssetFetch.ts'],
     // Workspace audit snapshots are complete repository mirrors. Vitest's
     // positional filters use substring matching, so a shard scoped to src/
     // would otherwise execute the mirrored tests with a second React runtime.

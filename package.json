@@ -96,7 +96,7 @@
     "test:ci:routing-quality": "vitest run --environment=node --pool=threads --maxWorkers=3 src/core/strategies/shared/__tests__ --exclude src/core/strategies/shared/__tests__/edgeSharedEndpointPortOrderRepair.test.ts",
     "test:ci:routing-services-performance": "vitest run --environment=node --pool=threads --maxWorkers=1 src/core/strategies/shared/__tests__/edgeSharedEndpointPortOrderRepair.test.ts",
     "test:ci:routing-layout": "npm run test:ci:routing-layout-strategies && npm run test:ci:routing-layout-utils",
-    "test:ci:routing-layout-strategies": "vitest run --environment=node --pool=threads --maxWorkers=2 src/core/strategies/__tests__",
+    "test:ci:routing-layout-strategies": "vitest run --environment=node --pool=threads --maxWorkers=1 src/core/strategies/__tests__",
     "test:ci:routing-layout-utils": "vitest run --environment=node --pool=threads --maxWorkers=2 src/core/utils/layout/__tests__",
     "test:all:lowcpu": "vitest run --maxWorkers=2",
     "test:coverage": "node scripts/run-test-coverage.mjs",

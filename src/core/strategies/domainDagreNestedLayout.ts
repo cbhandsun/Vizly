@@ -28,6 +28,7 @@ export interface DomainDagreNestedLayoutContext {
   subDomainNodeIsHorizontal: boolean;
   nodeArrangement: DomainDagreNodeArrangement;
   domainSubGroupIsHorizontal: boolean;
+  packVerticalSubDomains: boolean;
   nodeGapH: number;
   nodeGapV: number;
   subDomainPaddingH: number;
@@ -171,7 +172,7 @@ export const runDomainDagreNestedLayout = (
         }
         cursorX += context.getNodeDimensions(subGroup).width + context.nodeGapH;
       }
-    } else if (domainSubGroups.length > 1) {
+    } else if (context.packVerticalSubDomains && domainSubGroups.length > 1) {
       const columnX = Math.min(...domainSubGroups.map(subGroup => subGroup.position.x));
       let cursorY = Math.min(...domainSubGroups.map(subGroup => subGroup.position.y));
       for (const subGroup of domainSubGroups) {

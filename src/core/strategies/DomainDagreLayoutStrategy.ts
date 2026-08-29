@@ -266,6 +266,8 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         };
 
         const packDomainSubGroupsByDirection = () => {
+            if (!domainSubGroupIsHorizontal && domainPlacement !== 'ordered-lanes') return;
+
             const currentDomains = updatedNodes.filter(n => String(n.type || '') === 'titleGroup' && !isHidden(n));
             currentDomains.forEach(domain => {
                 const dk = domainOf(domain);
@@ -375,6 +377,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             subDomainNodeIsHorizontal,
             nodeArrangement,
             domainSubGroupIsHorizontal,
+            packVerticalSubDomains: domainPlacement === 'ordered-lanes',
             nodeGapH,
             nodeGapV,
             subDomainPaddingH: sdPadHEffective,
