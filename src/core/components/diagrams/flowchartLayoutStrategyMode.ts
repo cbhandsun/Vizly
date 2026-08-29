@@ -71,6 +71,7 @@ export const isGlobalFullGraphLayoutStrategy = (strategyName?: string): boolean 
 export const usesSelectableDomainNodeArrangement = (strategyName?: string): boolean => (
     strategyName === 'domain-vertical'
     || strategyName === 'domain-horizontal'
+    || strategyName === 'domain-lanes'
 );
 
 export const isOrderedDomainLaneLayoutStrategy = (strategyName?: string): boolean => (

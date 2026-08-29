@@ -2,6 +2,7 @@ import React from 'react';
 import type { MenuProps } from 'antd';
 import { FaMagic, FaObjectGroup, FaRegObjectGroup, FaSitemap, FaSlidersH } from 'react-icons/fa';
 import {
+    coerceFlowchartDomainNodeArrangement,
     createCustomDomainLayoutCommand,
     resolveCustomDomainLayoutDirection,
     usesSelectableDomainNodeArrangement,
@@ -68,10 +69,14 @@ export const resolveActiveDomainLayoutKey = (
 export const resolveNodeLayoutHostStrategy = (
     lastDomainStrategy?: string,
     lastDomainDirection?: FlowchartLayoutDirection,
-): 'domain-vertical' | 'domain-horizontal' => createCustomDomainLayoutCommand(
-    resolveCustomDomainLayoutDirection(lastDomainStrategy, lastDomainDirection),
-    undefined,
-).strategyName;
+): 'domain-vertical' | 'domain-horizontal' | 'domain-lanes' => (
+    lastDomainStrategy === 'domain-lanes'
+        ? 'domain-lanes'
+        : createCustomDomainLayoutCommand(
+            resolveCustomDomainLayoutDirection(lastDomainStrategy, lastDomainDirection),
+            undefined,
+        ).strategyName
+);
 
 export const buildFlowchartLayoutMenuModel = ({
     customDomainLayoutAvailable = true,
@@ -98,10 +103,10 @@ export const buildFlowchartLayoutMenuModel = ({
     const labels = {
         recommendedGroup: translate('designer.flowchart.layout.recommendedGroup', '常用场景'),
         smart: translate('designer.flowchart.layout.smartRecommendation', '智能推荐'),
-        customCombination: translate('designer.flowchart.layout.customCombination', '自定义组合'),
+        customCombination: translate('designer.flowchart.layout.customCombination', '布局组合'),
         customCombinationGroup: translate(
             'designer.flowchart.layout.customCombinationGroup',
-            '自定义组合（适合简单树形图）',
+            '布局组合',
         ),
         customUnavailable: translate(
             'designer.flowchart.layout.customUnavailable',
@@ -138,19 +143,19 @@ export const buildFlowchartLayoutMenuModel = ({
         ),
         domainLanesTb: translate(
             'designer.flowchart.layout.cyclicLanesTB',
-            '循环流程泳道（上→下）',
+            '纵向泳道（域横排·上→下）',
         ),
         domainLanesBt: translate(
             'designer.flowchart.layout.cyclicLanesBT',
-            '循环流程泳道（下→上）',
+            '纵向泳道（域横排·下→上）',
         ),
         domainLanesLr: translate(
             'designer.flowchart.layout.cyclicLanesLR',
-            '循环流程泳道（左→右）',
+            '横向泳道（域纵排·左→右）',
         ),
         domainLanesRl: translate(
             'designer.flowchart.layout.cyclicLanesRL',
-            '循环流程泳道（右→左）',
+            '横向泳道（域纵排·右→左）',
         ),
         domainElkTb: translate('designer.flowchart.layout.globalOrthogonalTB', '全图正交分层（上→下）'),
         domainElkBt: translate('designer.flowchart.layout.globalOrthogonalBT', '全图正交分层（下→上）'),
@@ -192,7 +197,12 @@ export const buildFlowchartLayoutMenuModel = ({
         key,
         label,
         onClick: () => {
-            const command = createCustomDomainLayoutCommand(customDomainDirection, nodeLayout);
+            const normalizedNodeLayout = coerceFlowchartDomainNodeArrangement(nodeLayout);
+            if (lastDomainStrategy === 'domain-lanes') {
+                onStrategyLayout?.('domain-lanes', normalizedNodeLayout, lastDomainDirection ?? 'LR');
+                return;
+            }
+            const command = createCustomDomainLayoutCommand(customDomainDirection, normalizedNodeLayout);
             onStrategyLayout?.(command.strategyName, command.nodeLayout, command.direction);
         },
         role: 'menuitemradio',
@@ -306,21 +316,15 @@ export const buildFlowchartLayoutMenuModel = ({
                     <FaObjectGroup style={{ transform: 'rotate(90deg)' }} />,
                 ),
                 domainItem(
-                    'domain-lanes-tb',
-                    labels.domainLanesTb,
-                    () => onStrategyLayout('domain-lanes', undefined, 'TB'),
-                    <FaRegObjectGroup />,
-                ),
-                domainItem(
                     'domain-lanes-bt',
                     labels.domainLanesBt,
-                    () => onStrategyLayout('domain-lanes', undefined, 'BT'),
+                    () => onStrategyLayout('domain-lanes', coerceFlowchartDomainNodeArrangement(lastNodeLayout), 'BT'),
                     <FaRegObjectGroup style={{ transform: 'rotate(180deg)' }} />,
                 ),
                 domainItem(
                     'domain-lanes-rl',
                     labels.domainLanesRl,
-                    () => onStrategyLayout('domain-lanes', undefined, 'RL'),
+                    () => onStrategyLayout('domain-lanes', coerceFlowchartDomainNodeArrangement(lastNodeLayout), 'RL'),
                     <FaRegObjectGroup style={{ transform: 'rotate(90deg)' }} />,
                 ),
             ],
@@ -403,9 +407,15 @@ export const buildFlowchartLayoutMenuModel = ({
                     <FaObjectGroup style={{ transform: 'rotate(-90deg)' }} />,
                 ),
                 domainItem(
+                    'domain-lanes-tb',
+                    labels.domainLanesTb,
+                    () => onStrategyLayout?.('domain-lanes', coerceFlowchartDomainNodeArrangement(lastNodeLayout), 'TB'),
+                    <FaRegObjectGroup />,
+                ),
+                domainItem(
                     'domain-lanes-lr',
                     labels.domainLanesLr,
-                    () => onStrategyLayout?.('domain-lanes', undefined, 'LR'),
+                    () => onStrategyLayout?.('domain-lanes', coerceFlowchartDomainNodeArrangement(lastNodeLayout), 'LR'),
                     <FaRegObjectGroup style={{ transform: 'rotate(-90deg)' }} />,
                 ),
             ],
@@ -413,7 +423,7 @@ export const buildFlowchartLayoutMenuModel = ({
         { type: 'divider' as const },
         {
             key: 'group-custom-combination',
-            label: customDomainLayoutAvailable
+            label: customDomainLayoutAvailable || lastDomainStrategy === 'domain-lanes'
                 ? labels.customCombinationGroup
                 : `${labels.customCombinationGroup} · ${labels.customUnavailable}`,
             type: 'group' as const,
@@ -429,7 +439,7 @@ export const buildFlowchartLayoutMenuModel = ({
                     key: 'custom-node-arrangement',
                     label: labels.nodeGroup,
                     icon: <FaSlidersH />,
-                    disabled: !customDomainLayoutAvailable,
+                    disabled: !customDomainLayoutAvailable && lastDomainStrategy !== 'domain-lanes',
                     children: customNodeItems,
                 },
             ],

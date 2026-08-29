@@ -75,6 +75,98 @@ const absolutePositionOf = (node: ReactFlowNode, nodes: ReactFlowNode[]) => {
 };
 
 describe('DomainDagreLayoutStrategy', () => {
+    it('composes horizontal swimlanes with selectable vertical node layout and equal domain widths', async () => {
+        const nodes: ReactFlowNode[] = [
+            makeNode('a-1', 'domain-a', 'sub-a1'),
+            makeNode('a-2', 'domain-a', 'sub-a1'),
+            makeNode('a-3', 'domain-a', 'sub-a2'),
+            makeNode('b-1', 'domain-b', 'sub-b1'),
+        ];
+        const edges: Edge[] = [
+            { id: 'a-b', source: 'a-2', target: 'b-1' },
+            { id: 'b-a', source: 'b-1', target: 'a-1' },
+        ];
+
+        const result = await new DomainDagreLayoutStrategy().calculateLayout(nodes, edges, {
+            type: LayoutType.SWIMLANE,
+            direction: 'LR',
+            nodeLayout: LayoutType.VERTICAL,
+            domainPlacement: 'ordered-lanes',
+            generateDomainGroups: true,
+            generateSubDomainGroups: true,
+            domainSubGroupDirection: 'LR',
+            subDomainNodeDirection: 'LR',
+        });
+        const domains = result.nodes
+            .filter(node => node.type === 'titleGroup')
+            .sort((left, right) => left.position.y - right.position.y);
+        expect(domains).toHaveLength(2);
+        expect(domains[0].position.x).toBeCloseTo(domains[1].position.x);
+        expect(domains[1].position.y).toBeGreaterThan(
+            domains[0].position.y + sizeOf(domains[0]).height,
+        );
+        expect(sizeOf(domains[0]).width).toBe(sizeOf(domains[1]).width);
+
+        const domainASubGroups = result.nodes
+            .filter(node => node.type === 'subGroup' && node.data.domain === 'domain-a')
+            .sort((left, right) => left.position.x - right.position.x);
+        expect(domainASubGroups).toHaveLength(2);
+        expect(domainASubGroups[0].position.y).toBeCloseTo(domainASubGroups[1].position.y);
+
+        const a1 = result.nodes.find(node => node.id === 'a-1');
+        const a2 = result.nodes.find(node => node.id === 'a-2');
+        expect(a1).toBeTruthy();
+        expect(a2).toBeTruthy();
+        expect(a1!.position.x).toBeCloseTo(a2!.position.x);
+        expect(a2!.position.y).toBeGreaterThan(a1!.position.y + sizeOf(a1!).height);
+    });
+
+    it('composes vertical swimlanes with selectable horizontal node layout and equal domain heights', async () => {
+        const nodes: ReactFlowNode[] = [
+            makeNode('a-1', 'domain-a', 'sub-a1'),
+            makeNode('a-2', 'domain-a', 'sub-a1'),
+            makeNode('a-3', 'domain-a', 'sub-a2'),
+            makeNode('b-1', 'domain-b', 'sub-b1'),
+        ];
+        const edges: Edge[] = [
+            { id: 'a-b', source: 'a-2', target: 'b-1' },
+            { id: 'b-a', source: 'b-1', target: 'a-1' },
+        ];
+
+        const result = await new DomainDagreLayoutStrategy().calculateLayout(nodes, edges, {
+            type: LayoutType.SWIMLANE,
+            direction: 'TB',
+            nodeLayout: LayoutType.HORIZONTAL,
+            domainPlacement: 'ordered-lanes',
+            generateDomainGroups: true,
+            generateSubDomainGroups: true,
+            domainSubGroupDirection: 'TB',
+            subDomainNodeDirection: 'TB',
+        });
+        const domains = result.nodes
+            .filter(node => node.type === 'titleGroup')
+            .sort((left, right) => left.position.x - right.position.x);
+        expect(domains).toHaveLength(2);
+        expect(domains[0].position.y).toBeCloseTo(domains[1].position.y);
+        expect(domains[1].position.x).toBeGreaterThan(
+            domains[0].position.x + sizeOf(domains[0]).width,
+        );
+        expect(sizeOf(domains[0]).height).toBe(sizeOf(domains[1]).height);
+
+        const domainASubGroups = result.nodes
+            .filter(node => node.type === 'subGroup' && node.data.domain === 'domain-a')
+            .sort((left, right) => left.position.y - right.position.y);
+        expect(domainASubGroups).toHaveLength(2);
+        expect(domainASubGroups[0].position.x).toBeCloseTo(domainASubGroups[1].position.x);
+
+        const a1 = result.nodes.find(node => node.id === 'a-1');
+        const a2 = result.nodes.find(node => node.id === 'a-2');
+        expect(a1).toBeTruthy();
+        expect(a2).toBeTruthy();
+        expect(a1!.position.y).toBeCloseTo(a2!.position.y);
+        expect(a2!.position.x).toBeGreaterThan(a1!.position.x + sizeOf(a1!).width);
+    });
+
     it('orders shared port anchors without parsing structured node ids', () => {
         const nodes: ReactFlowNode[] = [
             {

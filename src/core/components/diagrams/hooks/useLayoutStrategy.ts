@@ -353,9 +353,9 @@ export function useLayoutStrategy({
                 const isDomainDagre = strategyName === 'domain-dagre' || strategyName === 'domain-dagre-sub-horizontal' || strategyName === 'dagre' || isDomainLane;
                 const isDomainElk = strategyName === 'domain-elk' || strategyName === 'elk';
                 const isDomainCompoundElk = strategyName === 'domain-compound-elk';
-                const finalNodeLayout = isDomainDagre
+                const finalNodeLayout = isDomainDagre && !isDomainLane
                     ? 'dagre'
-                    : (nodeLayout || 'flow');
+                    : (nodeLayout || 'dagre');
                 // Explicit semantic order wins. Ordinary domain layouts retain
                 // the legacy scan-order fallback; cyclic swimlanes leave an
                 // absent order unset so their bounded net-flow sweep can run.
@@ -421,10 +421,7 @@ export function useLayoutStrategy({
                     strategy = new (await import('../../../strategies/DomainVerticalLayoutStrategy')).DomainVerticalLayoutStrategy();
                 }
 
-                const layoutOptions: LayoutOptions & {
-                    domainSubGroupDirection: FlowchartLayoutDirection;
-                    subDomainNodeDirection: FlowchartLayoutDirection;
-                } = {
+                const layoutOptions: LayoutOptions = {
                     type: strategy.getName() as LayoutOptions['type'],
                     direction: dir,
                     nodeLayout: finalNodeLayout as LayoutOptions['nodeLayout'],

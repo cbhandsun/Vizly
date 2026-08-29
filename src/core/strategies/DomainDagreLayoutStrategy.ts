@@ -12,7 +12,6 @@ import {
 } from '../utils/layoutUtils';
 import {
     calculateBounds,
-    layoutWithDagre,
 } from './DomainDagreLayoutHelpers';
 import {
     prepareDomainDagreEdges,
@@ -37,6 +36,11 @@ import {
     runDomainDagreTopLevelLayout,
 } from './domainDagreTopLevelLayout';
 import { runDomainDagreNestedLayout } from './domainDagreNestedLayout';
+import { arrangeDomainDagreChildren } from './domainDagreChildArrangement';
+import {
+    unifyContainerHeightsByMaximum,
+    unifyContainerWidthsByMaximum,
+} from './shared/domainContainerSizeNormalization';
 /**
  * 域级 Dagre 布局策略
  * 
@@ -96,6 +100,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             subDomainTitleH: sdTitleH,
             domainTitleH: dTitleH,
             domainPlacement,
+            nodeArrangement,
             defaultNodeWidth: defaultNodeW,
             defaultNodeHeight: defaultNodeH,
             domainWhitelist,
@@ -260,9 +265,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             }
         };
 
-        const packDomainSubGroupsHorizontally = () => {
-            if (!domainSubGroupIsHorizontal) return;
-
+        const packDomainSubGroupsByDirection = () => {
             const currentDomains = updatedNodes.filter(n => String(n.type || '') === 'titleGroup' && !isHidden(n));
             currentDomains.forEach(domain => {
                 const dk = domainOf(domain);
@@ -283,18 +286,27 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                     return;
                 }
 
+                const targetX = Math.min(
+                    ...domainSubGroups.map(sg => num(sg.position.x, domain.position.x + dPadHEffective))
+                );
                 const targetY = Math.min(
                     ...domainSubGroups.map(sg => num(sg.position.y, domain.position.y + dTitleH + titleSafe + dPadV))
                 );
-                let cursorX = domain.position.x + dPadHEffective;
+                let cursor = domainSubGroupIsHorizontal
+                    ? domain.position.x + dPadHEffective
+                    : domain.position.y + dTitleH + titleSafe + dPadV;
 
                 for (const sg of domainSubGroups) {
-                    const deltaX = cursorX - num(sg.position.x, cursorX);
-                    const deltaY = targetY - num(sg.position.y, targetY);
+                    const nextX = domainSubGroupIsHorizontal ? cursor : targetX;
+                    const nextY = domainSubGroupIsHorizontal ? targetY : cursor;
+                    const deltaX = nextX - num(sg.position.x, nextX);
+                    const deltaY = nextY - num(sg.position.y, nextY);
                     moveSubGroupWithChildren(sg, deltaX, deltaY);
 
-                    const sgWidth = num(sg.style?.width ?? sg.measured?.width, 0);
-                    cursorX += sgWidth + nodeGapH;
+                    const dimension = domainSubGroupIsHorizontal
+                        ? num(sg.style?.width ?? sg.measured?.width, 0)
+                        : num(sg.style?.height ?? sg.measured?.height, 0);
+                    cursor += dimension + (domainSubGroupIsHorizontal ? nodeGapH : nodeGapV);
                 }
 
                 expandDomainToContainFinalChildren(domain);
@@ -318,12 +330,13 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                     sgChildren.some(n => n.id === e.target)
                 );
 
-                const result = layoutWithDagre(
+                const result = arrangeDomainDagreChildren(
                     sgChildren,
                     sgEdges,
-                    subDomainNodeIsHorizontal ? 'LR' : 'TB',
-                    subDomainNodeIsHorizontal ? nodeGapV : nodeGapH,
-                    subDomainNodeIsHorizontal ? nodeGapH : nodeGapV,
+                    nodeArrangement,
+                    subDomainNodeIsHorizontal,
+                    nodeGapH,
+                    nodeGapV,
                     getNodeDimensions
                 );
 
@@ -360,6 +373,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             nodeToSubGroup,
             subDomainOrder: subDomainOrderOpt,
             subDomainNodeIsHorizontal,
+            nodeArrangement,
             domainSubGroupIsHorizontal,
             nodeGapH,
             nodeGapV,
@@ -416,7 +430,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         idMap.clear();
         updatedNodes.forEach(n => idMap.set(n.id, n));
         reflowSubGroupChildrenAtCurrentPositions();
-        packDomainSubGroupsHorizontally();
+        packDomainSubGroupsByDirection();
 
         // [FIX] 居中后域尺寸回收：确保域容器严格包含所有成员
         // 居中可能导致子域的右缘超出域容器，此步骤检测并扩展域尺寸
@@ -474,6 +488,14 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             nodeById: routingNodeById,
             leafNodes,
         });
+        // Normalizing semantic container sizes cannot change business-node
+        // endpoints. Keep it after routing so expanded lane backgrounds never
+        // enlarge the route search space.
+        if (domainPlacement === 'ordered-lanes') {
+            updatedNodes = isHorizontal
+                ? unifyContainerWidthsByMaximum(updatedNodes, new Set(['titleGroup']), dTitleH)
+                : unifyContainerHeightsByMaximum(updatedNodes, new Set(['titleGroup']), 360);
+        }
         updatedNodes = sortDomainDagreHierarchy(
             convertDomainDagreToHierarchy(updatedNodes, nodeToSubGroup),
         );

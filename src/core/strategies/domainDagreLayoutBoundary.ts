@@ -1,4 +1,5 @@
 import type { Node } from '@xyflow/react';
+import type { DomainDagreNodeArrangement } from './domainDagreChildArrangement';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -26,6 +27,7 @@ export interface DomainDagreLayoutBoundary {
   subDomainTitleH: number;
   domainTitleH: number;
   domainPlacement: DomainDagrePlacement;
+  nodeArrangement: DomainDagreNodeArrangement;
   defaultNodeWidth: number;
   defaultNodeHeight: number;
   domainWhitelist?: string[];
@@ -113,6 +115,19 @@ export const coerceDomainDagrePlacement = (value: unknown): DomainDagrePlacement
     : 'topology'
 );
 
+export const coerceDomainDagreNodeArrangement = (
+  value: unknown,
+): DomainDagreNodeArrangement => {
+  const normalized = boundedString(value, 32)?.toLowerCase();
+  return normalized === 'flow'
+    || normalized === 'grid'
+    || normalized === 'horizontal'
+    || normalized === 'vertical'
+    || normalized === 'dagre'
+    ? normalized
+    : 'dagre';
+};
+
 const normalizeSemanticKey = (value: unknown): string => (
   boundedString(value)?.toLowerCase()
     .replace(/\u3000|\u00a0/g, '')
@@ -176,6 +191,7 @@ export const resolveDomainDagreLayoutBoundary = (
     subDomainTitleH: boundedDomainDagreNumber(readPath(config, ['subDomain', 'title', 'height']), 48),
     domainTitleH: boundedDomainDagreNumber(readPath(config, ['domain', 'title', 'height']), 48),
     domainPlacement: coerceDomainDagrePlacement(optionRecord?.domainPlacement),
+    nodeArrangement: coerceDomainDagreNodeArrangement(optionRecord?.nodeLayout),
     defaultNodeWidth: boundedDomainDagreNumber(readPath(config, ['node', 'width']), 200, 1, 10_000),
     defaultNodeHeight: boundedDomainDagreNumber(readPath(config, ['node', 'height']), 80, 1, 10_000),
     domainWhitelist: boundedStringArray(optionRecord?.domainWhitelist),

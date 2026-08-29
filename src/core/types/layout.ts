@@ -164,6 +164,10 @@ export interface LayoutOptions {
    * - ordered-lanes：忽略域级环，按显式/扫描顺序稳定排列为泳道。
    */
   domainPlacement?: 'topology' | 'ordered-lanes';
+  /** 域内子域的排列方向。 */
+  domainSubGroupDirection?: 'TB' | 'BT' | 'LR' | 'RL';
+  /** 子域内 Dagre 节点流向；非 Dagre 节点布局由 nodeLayout 决定。 */
+  subDomainNodeDirection?: 'TB' | 'BT' | 'LR' | 'RL';
   /** 显式域顺序（优先级最高） */
   domainOrder?: string[];
   /** 显式子域顺序（优先级最高，按域分组） */

@@ -649,13 +649,13 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
             name: /标准流程.*上→下/,
         });
         const inactiveLayout = screen.getByRole('menuitemradio', {
-            name: /循环流程泳道.*左→右/,
+            name: /横向泳道.*左→右/,
         });
 
         expect(domainLayout.getAttribute('aria-checked')).toBe('true');
         expect(inactiveLayout.getAttribute('aria-checked')).toBe('false');
         expect(domainLayout.className).toContain('ant-dropdown-menu-item-selected');
-        expect(screen.getByText(/自定义组合/)).toBeDefined();
+        expect(screen.getByText(/^布局组合$/)).toBeDefined();
         expect(screen.getByRole('menuitem', { name: /域排列方向/ })).toBeDefined();
         expect(screen.getByRole('menuitem', { name: /域／子域内节点排布/ })).toBeDefined();
         expect(screen.getByRole('menuitem', { name: /更多布局引擎/ })).toBeDefined();

@@ -43,6 +43,7 @@ describe('flowchartToolbarLayoutMenu', () => {
     expect(isGlobalFullGraphLayoutStrategy('domain-dagre')).toBe(false);
     expect(usesSelectableDomainNodeArrangement('domain-vertical')).toBe(true);
     expect(usesSelectableDomainNodeArrangement('domain-horizontal')).toBe(true);
+    expect(usesSelectableDomainNodeArrangement('domain-lanes')).toBe(true);
     expect(usesSelectableDomainNodeArrangement('domain-dagre')).toBe(false);
     expect(usesSelectableDomainNodeArrangement('domain-dagre-sub-horizontal')).toBe(false);
     expect(usesSelectableDomainNodeArrangement('domain-compound-elk')).toBe(false);
@@ -184,6 +185,7 @@ describe('flowchartToolbarLayoutMenu', () => {
     expect(resolveNodeLayoutHostStrategy('tree', 'TB')).toBe('domain-vertical');
     expect(resolveNodeLayoutHostStrategy('domain-elk', 'LR')).toBe('domain-horizontal');
     expect(resolveNodeLayoutHostStrategy('domain-horizontal', 'TB')).toBe('domain-horizontal');
+    expect(resolveNodeLayoutHostStrategy('domain-lanes', 'TB')).toBe('domain-lanes');
 
     const dagreModel = buildFlowchartLayoutMenuModel({
       lastDomainStrategy: 'domain-dagre',
@@ -213,7 +215,7 @@ describe('flowchartToolbarLayoutMenu', () => {
     const nodeVertical = items.find(item => item.key === 'node-vertical');
 
     expect(model.selectedKeys).toEqual(['custom-domain-lr', 'node-grid']);
-    expect(model.statusText).toBe('自定义组合：域横向排列（左→右） + 网格排列');
+    expect(model.statusText).toBe('布局组合：域横向排列（左→右） + 网格排列');
     expect(resolveActiveDomainLayoutKey('domain-vertical', 'TB')).toBe('custom-domain-tb');
 
     if (typeof directionTb?.onClick === 'function') directionTb.onClick();
@@ -250,7 +252,7 @@ describe('flowchartToolbarLayoutMenu', () => {
     expect(onStrategyLayout).toHaveBeenCalledWith('domain-compound-elk', undefined, 'RL');
   });
 
-  it('exposes ordered domain lanes without claiming a selectable node arrangement', () => {
+  it('exposes ordered domain lanes as a selectable node-layout composition', () => {
     const onStrategyLayout = vi.fn();
     const model = buildFlowchartLayoutMenuModel({
       lastDomainStrategy: 'domain-lanes',
@@ -267,14 +269,18 @@ describe('flowchartToolbarLayoutMenu', () => {
     expect(lanesLr).toBeDefined();
     expect(lanesBt).toBeDefined();
     expect(lanesRl).toBeDefined();
-    expect(model.selectedKeys).toEqual(['domain-lanes-lr']);
-    expect(model.statusText).toBe('循环流程泳道（左→右）');
+    expect(model.selectedKeys).toEqual(['domain-lanes-lr', 'node-flow']);
+    expect(model.statusText).toBe('布局组合：横向泳道（域纵排·左→右） + 流式换行');
     if (typeof lanesLr?.onClick === 'function') lanesLr.onClick();
-    expect(onStrategyLayout).toHaveBeenCalledWith('domain-lanes', undefined, 'LR');
+    expect(onStrategyLayout).toHaveBeenCalledWith('domain-lanes', 'flow', 'LR');
     if (typeof lanesBt?.onClick === 'function') lanesBt.onClick();
     if (typeof lanesRl?.onClick === 'function') lanesRl.onClick();
-    expect(onStrategyLayout).toHaveBeenCalledWith('domain-lanes', undefined, 'BT');
-    expect(onStrategyLayout).toHaveBeenCalledWith('domain-lanes', undefined, 'RL');
+    expect(onStrategyLayout).toHaveBeenCalledWith('domain-lanes', 'flow', 'BT');
+    expect(onStrategyLayout).toHaveBeenCalledWith('domain-lanes', 'flow', 'RL');
+
+    const nodeVertical = items.find(item => item.key === 'node-vertical');
+    if (typeof nodeVertical?.onClick === 'function') nodeVertical.onClick();
+    expect(onStrategyLayout).toHaveBeenLastCalledWith('domain-lanes', 'vertical', 'LR');
   });
 
   it('keeps common scenarios visible and separates custom combinations from layout engines', () => {
@@ -296,6 +302,7 @@ describe('flowchartToolbarLayoutMenu', () => {
       'smart-recommendation',
       'domain-dagre-tb',
       'domain-compound-elk-lr',
+      'domain-lanes-tb',
       'domain-lanes-lr',
     ]);
     expect(customCombination.key).toBe('group-custom-combination');
@@ -340,6 +347,7 @@ describe('flowchartToolbarLayoutMenu', () => {
     expect(recommended.map(item => item.key)).toEqual([
       'domain-compound-elk-tb',
       'domain-compound-elk-lr',
+      'domain-lanes-tb',
       'domain-lanes-lr',
     ]);
     expect(moreEngines.map(item => item.key)).not.toContain('domain-compound-elk-tb');

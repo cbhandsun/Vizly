@@ -9,6 +9,10 @@ import {
   sortDomainDagreSubGroups,
 } from './domainDagreHierarchy';
 import type { DomainDagreSubDomainOrder } from './domainDagreLayoutBoundary';
+import {
+  arrangeDomainDagreChildren,
+  type DomainDagreNodeArrangement,
+} from './domainDagreChildArrangement';
 
 type NodeDimensions = (node: Node) => { width: number; height: number };
 
@@ -22,6 +26,7 @@ export interface DomainDagreNestedLayoutContext {
   nodeToSubGroup: Map<string, string>;
   subDomainOrder?: DomainDagreSubDomainOrder;
   subDomainNodeIsHorizontal: boolean;
+  nodeArrangement: DomainDagreNodeArrangement;
   domainSubGroupIsHorizontal: boolean;
   nodeGapH: number;
   nodeGapV: number;
@@ -78,12 +83,13 @@ const layoutSubGroupChildren = (
 ): void => {
   const children = childrenFor(subGroup, context.childrenBySubGroup, context.nodeById);
   if (children.length === 0) return;
-  const positions = layoutWithDagre(
+  const positions = arrangeDomainDagreChildren(
     children,
     edgesWithin(context.edges, children),
-    context.subDomainNodeIsHorizontal ? 'LR' : 'TB',
-    context.subDomainNodeIsHorizontal ? context.nodeGapV : context.nodeGapH,
-    context.subDomainNodeIsHorizontal ? context.nodeGapH : context.nodeGapV,
+    context.nodeArrangement,
+    context.subDomainNodeIsHorizontal,
+    context.nodeGapH,
+    context.nodeGapV,
     context.getNodeDimensions,
   );
   for (const position of positions) {
@@ -164,6 +170,18 @@ export const runDomainDagreNestedLayout = (
           subGroup.position = { x: cursorX, y: rowY };
         }
         cursorX += context.getNodeDimensions(subGroup).width + context.nodeGapH;
+      }
+    } else if (domainSubGroups.length > 1) {
+      const columnX = Math.min(...domainSubGroups.map(subGroup => subGroup.position.x));
+      let cursorY = Math.min(...domainSubGroups.map(subGroup => subGroup.position.y));
+      for (const subGroup of domainSubGroups) {
+        const deltaX = columnX - subGroup.position.x;
+        const deltaY = cursorY - subGroup.position.y;
+        if (Math.abs(deltaX) > 0.5 || Math.abs(deltaY) > 0.5) {
+          moveSubGroupChildren(subGroup, deltaX, deltaY, context);
+          subGroup.position = { x: columnX, y: cursorY };
+        }
+        cursorY += context.getNodeDimensions(subGroup).height + context.nodeGapV;
       }
     }
 
