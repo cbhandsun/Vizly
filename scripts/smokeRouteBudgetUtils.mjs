@@ -88,6 +88,28 @@ export const isFinalWmsDisplayRoutingReady = (value) => (
   && /^route-v2:\d{1,3}:\d{1,6}:[0-9a-f]{16}$/.test(value.outputRouteSignature)
 );
 
+/**
+ * Enterprise architecture currently has no precompiled candidate. Its smoke
+ * contract permits the existing bounded timeout fallback, but stability must
+ * start only after either that fallback or a clean route reaches a terminal
+ * state so active routing work is never counted as post-ready churn.
+ */
+export const isEnterpriseDisplayRoutingSettled = (
+  value,
+  isFinalReady = isFinalWmsDisplayRoutingReady,
+) => (
+  (typeof isFinalReady === 'function' && isFinalReady(value))
+  || (
+    Boolean(value)
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && value.stage === 'worker-rejected'
+    && value.error === 'display-edge-worker-timeout'
+    && value.workerStartCount === 1
+    && value.workerAbortCount === 0
+  )
+);
+
 export const collectRouteStabilityViolations = (report, budget) => {
   if (!report || !budget) return [];
   const checks = [

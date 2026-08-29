@@ -1,4 +1,7 @@
-import { isFinalWmsDisplayRoutingReady } from '../smokeRouteBudgetUtils.mjs';
+import {
+  isEnterpriseDisplayRoutingSettled,
+  isFinalWmsDisplayRoutingReady,
+} from '../smokeRouteBudgetUtils.mjs';
 
 export const isManagementTemplatesReady = ({ hasRoot, activeTab, body }) => {
   if (!hasRoot || typeof activeTab !== 'string' || typeof body !== 'string') return false;
@@ -194,6 +197,28 @@ export const createSmokeRouteCatalog = (BASE_URL, { includeDevRoutes = false } =
         maxActiveWorkers: 0,
         maxQueuedTasks: 0,
       },
+      stabilityTimeoutMs: 25000,
+      stabilityExpression: `(() => {
+        const displayRouting = window.__vizlyBaseReactFlowDisplayRouting;
+        const displayRoutingReady = (${isEnterpriseDisplayRoutingSettled.toString()})(
+          displayRouting,
+          ${isFinalWmsDisplayRoutingReady.toString()},
+        );
+        return {
+          ready: displayRoutingReady,
+          errorBoundary: false,
+          displayRouting: displayRouting && {
+            stage: displayRouting.stage,
+            error: displayRouting.error,
+            workerStartCount: displayRouting.workerStartCount,
+            workerAbortCount: displayRouting.workerAbortCount,
+            workerResolution: displayRouting.workerResolution,
+            routeMs: displayRouting.routeMs,
+            finalAppliedAt: displayRouting.finalAppliedAt,
+            outputRouteSignature: displayRouting.outputRouteSignature,
+          },
+        };
+      })()`,
       expression: `(() => {
         const body = document.body?.textContent || '';
         const renderedNodeCount = document.querySelectorAll('.react-flow__node').length;

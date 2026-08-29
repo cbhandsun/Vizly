@@ -12,8 +12,29 @@ import {
   dedupeRouteAssets,
   getUnexpectedLogs,
 } from './smoke-route-reporting.mjs';
+import { isEnterpriseDisplayRoutingSettled } from '../smokeRouteBudgetUtils.mjs';
 
 describe('smoke route modules', () => {
+  it('waits for the enterprise route to settle before measuring stability', () => {
+    expect(isEnterpriseDisplayRoutingSettled({
+      stage: 'worker-rejected',
+      error: 'display-edge-worker-timeout',
+      workerStartCount: 1,
+      workerAbortCount: 0,
+    })).toBe(true);
+    expect(isEnterpriseDisplayRoutingSettled({
+      stage: 'worker-rejected',
+      error: 'display-edge-worker-invalid-response',
+      workerStartCount: 1,
+      workerAbortCount: 0,
+    })).toBe(false);
+    expect(isEnterpriseDisplayRoutingSettled({
+      stage: 'worker-phase',
+      workerStartCount: 1,
+      workerAbortCount: 0,
+    })).toBe(false);
+  });
+
   it('disconnects long-task observation before forcing heap-accounting GC', () => {
     const smokeSource = readFileSync(new URL('../smoke-routes.mjs', import.meta.url), 'utf8');
     const endObservation = smokeSource.indexOf('state.observer?.disconnect();');
@@ -23,6 +44,17 @@ describe('smoke route modules', () => {
 
     expect(endObservation).toBeGreaterThan(0);
     expect(finalGarbageCollection).toBeGreaterThan(endObservation);
+  });
+
+  it('waits for a route stability boundary before starting observation', () => {
+    const smokeSource = readFileSync(new URL('../smoke-routes.mjs', import.meta.url), 'utf8');
+    const stabilityWait = smokeSource.indexOf('if (route.stabilityExpression)');
+    const startObservation = smokeSource.indexOf(
+      'const stabilityReport = await collectRouteStabilityReport',
+    );
+
+    expect(stabilityWait).toBeGreaterThan(0);
+    expect(startObservation).toBeGreaterThan(stabilityWait);
   });
 
   it('keeps self-contained docs and 3D routes outside the Ant Design shell', () => {
@@ -57,8 +89,15 @@ describe('smoke route modules', () => {
     expect(new Set(names).size).toBe(routes.length);
     expect(routes.every((route) => route.url.startsWith('http://127.0.0.1:5373'))).toBe(true);
     expect(routes.every((route) => route.timeoutMs > 0 && route.expression.length > 0)).toBe(true);
-    expect(routes.find((route) => route.name === 'enterprise-architecture-large-diagram')?.stabilityBudget)
+    const enterpriseRoute = routes.find(
+      (route) => route.name === 'enterprise-architecture-large-diagram',
+    );
+    expect(enterpriseRoute?.stabilityBudget)
       .toMatchObject({ durationMs: 15000, maxActiveWorkers: 0 });
+    expect(enterpriseRoute?.stabilityTimeoutMs).toBeGreaterThan(10000);
+    expect(enterpriseRoute?.stabilityExpression)
+      .toContain('displayRoutingReady');
+    expect(enterpriseRoute?.expression).not.toContain('displayRoutingReady');
   });
 
   it('keeps development-only visual routes out of production preview smoke', () => {

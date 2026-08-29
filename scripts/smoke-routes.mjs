@@ -576,6 +576,14 @@ const runRouteSample = async (route, sampleIndex = 0) => {
     log(`Waiting for route readiness: ${route.name}${sampleSuffix}`);
     const state = await waitForRouteReadiness(session, route);
     const viewportState = await assertViewportState(session, route.name);
+    if (route.stabilityExpression) {
+      log(`Waiting for route stability boundary: ${route.name}${sampleSuffix}`);
+      await waitForRouteReadiness(session, {
+        name: `${route.name} stability boundary`,
+        expression: route.stabilityExpression,
+        timeoutMs: route.stabilityTimeoutMs ?? route.timeoutMs,
+      });
+    }
     const stabilityReport = await collectRouteStabilityReport(session, route.stabilityBudget);
     const assetReport = attachInitiators(session, await getRouteAssetReport(session, state.readyAt));
     const routeLogs = session.logs;
