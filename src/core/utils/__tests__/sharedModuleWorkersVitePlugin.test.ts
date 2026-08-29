@@ -15,6 +15,7 @@ import {
   matchesFlowchartRuntimeModule,
   productionChunkFileNames,
 } from '../../../../vite-plugins/buildChunkGroups';
+import { minifyLocaleJsonAsset } from '../../../../vite-plugins/minifyLocaleAssets';
 import {
   classifyDisplayRoutingChunkGraph,
   createDisplayRoutingChunkClassifier,
@@ -40,24 +41,34 @@ describe('display routing chunk classifier', () => {
     const workerPrivate = 'C:/repo/src/core/routing/workerPrivate.ts';
     const workerDynamic = 'C:/repo/src/core/routing/workerDynamic.ts';
     const safeLog = 'C:/repo/src/core/utils/logSecurity.ts';
-    const appRoute = 'C:/repo/src/routes/DiagramRoute.tsx';
+    const appRoute = 'C:/repo/src/core/components/diagrams/FlowchartDesigner.tsx';
     const appOnly = 'C:/repo/src/core/appOnly.ts';
+    const initialShared = 'C:/repo/src/core/routing/initialShared.ts';
+    const lightweightShared = 'C:/repo/src/core/routing/lightweightShared.ts';
+    const lightweightRoute = 'C:/repo/src/pages/DiagramManagementPage.tsx';
     const missing = 'C:/repo/src/core/routing/missing.ts';
     const vendor = 'C:/repo/node_modules/vendor/index.js';
     const graph = new Map<string, ChunkGraphModuleInfo | null>([
       [displayWorkerId, {
         isEntry: true,
-        importedIds: [shared, workerPrivate, safeLog, missing, vendor],
+        importedIds: [shared, initialShared, lightweightShared, workerPrivate, safeLog, missing, vendor],
         dynamicallyImportedIds: [workerDynamic],
       }],
-      [appEntryId, { isEntry: true, importedIds: [appOnly], dynamicallyImportedIds: [appRoute] }],
+      [appEntryId, {
+        isEntry: true,
+        importedIds: [appOnly, initialShared],
+        dynamicallyImportedIds: [appRoute, lightweightRoute],
+      }],
       [appRoute, { importedIds: [shared, safeLog, missing, vendor] }],
+      [lightweightRoute, { importedIds: [lightweightShared] }],
       [shared, { importedIds: [sharedCycle] }],
       [sharedCycle, { importedIds: [shared] }],
       [workerPrivate, {}],
       [workerDynamic, {}],
       [safeLog, {}],
       [appOnly, {}],
+      [initialShared, {}],
+      [lightweightShared, {}],
       [missing, null],
       [vendor, {}],
     ]);
@@ -73,6 +84,8 @@ describe('display routing chunk classifier', () => {
     expect(result.sharedModuleIds).not.toContain(vendor);
     expect(result.sharedModuleIds).not.toContain(missing);
     expect(result.sharedModuleIds).not.toContain(workerDynamic);
+    expect(result.sharedModuleIds).not.toContain(initialShared);
+    expect(result.sharedModuleIds).not.toContain(lightweightShared);
     expect(result.workerPrivateModuleIds).not.toContain(workerDynamic);
   });
 
@@ -97,9 +110,11 @@ describe('display routing chunk classifier', () => {
     const classifier = createDisplayRoutingChunkClassifier();
     const firstShared = 'C:/repo/src/core/routing/firstShared.ts';
     const secondShared = 'C:/repo/src/core/routing/secondShared.ts';
+    const lazyRoute = 'C:/repo/src/core/components/diagrams/FlowchartDesigner.tsx';
     const graphFor = (shared: string) => new Map<string, ChunkGraphModuleInfo | null>([
       [displayWorkerId, { isEntry: true, importedIds: [shared] }],
-      [appEntryId, { isEntry: true, importedIds: [shared] }],
+      [appEntryId, { isEntry: true, dynamicallyImportedIds: [lazyRoute] }],
+      [lazyRoute, { importedIds: [shared] }],
       [shared, {}],
     ]);
     const runBuildEnd = (
@@ -163,6 +178,7 @@ describe('sharedModuleWorkers Vite plugin', () => {
       'C:/repo/src/core/routing/routingVersion.ts',
       'C:/repo/src/core/routing/utils/handleUtils.ts',
       'C:/repo/src/core/types/flow.ts',
+      'C:/repo/src/core/utils/boundedResponse.ts',
       'C:/repo/src/core/components/shared/baseReactFlowAbsolutePositions.ts',
       'C:/repo/src/core/components/shared/baseReactFlowLayoutEdgeRoutingData.ts',
       'C:/repo/src/core/strategies/layoutLogging.ts',
@@ -250,6 +266,18 @@ const worker = new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', impor
     expect(workerSource).toContain("request.operation === 'repair'");
   });
 
+  it('starts the display worker from the canvas lifecycle instead of module evaluation', () => {
+    const clientSource = readFileSync(resolve(
+      process.cwd(),
+      'src/core/components/shared/baseReactFlowDisplayWorkerClient.ts',
+    ), 'utf8');
+
+    expect(clientSource).not.toContain('eagerDisplayWorkerRef');
+    expect(clientSource).toContain(
+      'prewarmBaseReactFlowDisplayWorker =',
+    );
+  });
+
   it('recognizes only the measured diagram editor startup set', () => {
     expect(matchesFlowchartDesignerStartupModule(
       'C:/repo/src/core/components/diagrams/NodeTemplatePanel.tsx',
@@ -264,8 +292,35 @@ const worker = new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', impor
       'C:/repo/src/core/components/diagrams/commentPageScope.ts',
     )).toBe(true);
     expect(matchesFlowchartDesignerMicroModule(
+      'C:/repo/src/core/components/diagrams/pageCanvasMetadata.ts',
+    )).toBe(true);
+    expect(matchesFlowchartDesignerMicroModule(
       'C:/repo/src/core/components/diagrams/FlowchartDesigner.tsx',
     )).toBe(false);
+    expect(matchesFlowchartDesignerMicroModule(
+      'C:/repo/src/core/utils/boundedResponse.ts',
+    )).toBe(false);
+  });
+
+  it('minifies emitted locale JSON without touching unrelated assets', () => {
+    expect(minifyLocaleJsonAsset('assets/zh-hash.json', '{\n  "a": 1\n}'))
+      .toBe('{"a":1}');
+    const unrelated = new Uint8Array([1, 2, 3]);
+    expect(minifyLocaleJsonAsset('assets/route-hash.json', unrelated)).toBe(unrelated);
+  });
+
+  it.each([
+    ['', 'Invalid locale JSON'],
+    ['[]', 'Locale root must be an object'],
+    ['{"broken":', 'Invalid locale JSON'],
+  ])('rejects malformed locale asset input %j', (source, message) => {
+    expect(() => minifyLocaleJsonAsset('assets/en-hash.json', source)).toThrow(message);
+  });
+
+  it('rejects an oversized emitted locale asset', () => {
+    const oversized = `{"value":"${'x'.repeat(2 * 1024 * 1024)}"}`;
+    expect(() => minifyLocaleJsonAsset('assets/zh-hash.json', oversized))
+      .toThrow('Locale asset exceeds 2 MiB');
   });
 
   it('keeps diagram hooks on the Canvas Routing Session without a legacy coordinator', () => {

@@ -18,6 +18,7 @@ import {
   productionChunkFileNames,
 } from './vite-plugins/buildChunkGroups'
 import { createDisplayRoutingChunkClassifier } from './vite-plugins/displayRoutingChunkClassifier'
+import { minifyLocaleAssetsPlugin } from './vite-plugins/minifyLocaleAssets'
 import coverageThresholds from './scripts/coverage-thresholds.json'
 
 const projectRoot = dirname(fileURLToPath(import.meta.url))
@@ -326,6 +327,7 @@ export default defineConfig({
     elkWorkerAssetPlugin(projectRoot),
     sharedModuleWorkersPlugin(projectRoot),
     displayRoutingChunks.plugin,
+    minifyLocaleAssetsPlugin(projectRoot),
     react(),
     tailwindcss(),
   ],
@@ -416,6 +418,8 @@ export default defineConfig({
               test: displayRoutingChunks.matchesSharedModule,
               priority: 80,
               minSize: 0,
+              entriesAware: false,
+              includeDependenciesRecursively: false,
             },
             {
               name: 'flowchart-designer-startup',

@@ -21,6 +21,14 @@ export type DisplayRoutingChunkClassification = {
 
 const DISPLAY_WORKER_ENTRY_SUFFIX =
   '/src/core/components/shared/baseReactFlowDisplayEdges.worker.ts';
+const DISPLAY_ROUTE_ROOT_SUFFIX =
+  '/src/core/components/diagrams/FlowchartDesigner.tsx';
+const LIGHTWEIGHT_ROUTE_SUFFIXES = [
+  '/src/pages/DiagramManagementPage.tsx',
+  '/src/pages/DocsPreview.tsx',
+  '/src/pages/StorageConfigPage.tsx',
+  '/src/pages/Warehouse3DPage.tsx',
+] as const;
 const NON_APP_WORKER_ENTRY_SUFFIXES = [DISPLAY_WORKER_ENTRY_SUFFIX] as const;
 
 const normalizeForMatch = (id: string): string => (
@@ -58,9 +66,11 @@ const walkModuleGraph = (
 
 /**
  * Classifies the loaded Rollup graph by actual reachability. Only project-core
- * modules statically reached by the display worker and reached anywhere in the
- * client graph are shared. Worker dynamic imports stay outside the critical
- * worker closure, and worker-private repair stages remain in the worker entry.
+ * modules statically reached by both the display worker and FlowchartDesigner
+ * are shared. Starting from the concrete editor root avoids promoting modules
+ * that are only reachable through unrelated lazy routes or optional dialogs.
+ * Synchronous app-entry dependencies stay out so the routing chunk cannot
+ * become a dependency of every route.
  */
 export const classifyDisplayRoutingChunkGraph = ({
   moduleIds,
@@ -86,17 +96,30 @@ export const classifyDisplayRoutingChunkGraph = ({
 
   const displayWorkerEntryId = workerEntries[0];
   const workerReach = walkModuleGraph([displayWorkerEntryId], getModuleInfo, false);
-  const appReach = walkModuleGraph(appEntryIds, getModuleInfo, true);
+  const appInitialReach = walkModuleGraph(appEntryIds, getModuleInfo, false);
+  const displayRouteRootIds = ids.filter(id => hasSuffix(id, DISPLAY_ROUTE_ROOT_SUFFIX));
+  if (displayRouteRootIds.length !== 1) {
+    throw new Error(
+      `[vizly:display-routing-chunks] Expected exactly one display route root; found ${displayRouteRootIds.length}`,
+    );
+  }
+  const displayRouteReach = walkModuleGraph(displayRouteRootIds, getModuleInfo, false);
+  const lightweightRouteIds = ids.filter(id => (
+    LIGHTWEIGHT_ROUTE_SUFFIXES.some(suffix => hasSuffix(id, suffix))
+  ));
+  const lightweightReach = walkModuleGraph(lightweightRouteIds, getModuleInfo, true);
   const sharedModuleIds = new Set<string>();
   const workerPrivateModuleIds = new Set<string>();
   for (const id of workerReach) {
-    if (!appReach.has(id)) {
+    if (!displayRouteReach.has(id)) {
       workerPrivateModuleIds.add(id);
       continue;
     }
     if (
       getModuleInfo(id)
       && normalizeForMatch(id).includes('/src/core/')
+      && !appInitialReach.has(id)
+      && !lightweightReach.has(id)
       && !excludeSharedModule(id)
     ) {
       sharedModuleIds.add(id);
