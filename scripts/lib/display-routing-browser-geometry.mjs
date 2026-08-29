@@ -29,6 +29,46 @@ export const replayDisplayRoutingResponseEdges = (response, request) => {
     : null;
 };
 
+export const selectDisplayRoutingAuditRoute = (
+  rawResponses,
+  rawRequests,
+  requestId,
+  replayResponseEdges = replayDisplayRoutingResponseEdges,
+  expectedEdgeCount = 14,
+) => {
+  const hasRequestedId = typeof requestId === 'string' && requestId.length > 0;
+  if (
+    (hasRequestedId && requestId.length > 500)
+    || typeof replayResponseEdges !== 'function'
+    || !Number.isSafeInteger(expectedEdgeCount)
+    || expectedEdgeCount <= 0
+    || expectedEdgeCount > 5_000
+  ) return null;
+  const responses = Array.isArray(rawResponses) ? rawResponses.slice(-256) : [];
+  const requests = Array.isArray(rawRequests) ? rawRequests.slice(-256) : [];
+  for (let index = responses.length - 1; index >= 0; index -= 1) {
+    const response = responses[index];
+    const responseRequestId = response?.requestId;
+    if (
+      typeof responseRequestId !== 'string'
+      || responseRequestId.length === 0
+      || responseRequestId.length > 500
+      || (hasRequestedId && responseRequestId !== requestId)
+    ) continue;
+    const request = [...requests].reverse().find(
+      item => item?.requestId === responseRequestId,
+    );
+    const edges = replayResponseEdges(response, request);
+    // A Worker request may emit progress after its decisive route. Some progress
+    // payloads intentionally carry `edges: []`; they must not hide the route
+    // that the canvas actually committed.
+    if (Array.isArray(edges) && edges.length === expectedEdgeCount) {
+      return { response, request, edges };
+    }
+  }
+  return null;
+};
+
 export const displayRoutingFinalSvgGeometryIsClean = ({
   audit,
   commercialAudit,

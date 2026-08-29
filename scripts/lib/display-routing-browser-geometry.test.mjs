@@ -10,6 +10,7 @@ import {
   readRenderedDisplayEdgeNodeIntersections,
   replayDisplayRoutingResponseEdges,
   readVisibleDisplayRoutingNodeRect,
+  selectDisplayRoutingAuditRoute,
 } from './display-routing-browser-geometry.mjs';
 import {
   displayRoutingViewportSamplesAreStable,
@@ -230,6 +231,47 @@ describe('display routing browser geometry', () => {
       routingPatches: [{ ...routingPatches[0], id: 'forged' }],
     }, { edges })).toBeNull();
     expect(replayDisplayRoutingResponseEdges({ routingPatches: [] }, { edges })).toBeNull();
+  });
+
+  it('selects the decisive route when a newer progress response has empty edges', () => {
+    const edges = [{ id: 'edge', source: 'source', target: 'target', data: {} }];
+    const routingPatches = [{
+      id: 'edge', source: 'source', target: 'target',
+      data: { computedPath: [{ x: 0, y: 0 }, { x: 10, y: 0 }] },
+    }];
+    const request = { requestId: 'request-1', edges };
+    const decisive = { requestId: 'request-1', routingPatches };
+    const progress = { requestId: 'request-1', edges: [], phaseProgress: { phase: 'done' } };
+
+    expect(selectDisplayRoutingAuditRoute(
+      [decisive, progress],
+      [request],
+      'request-1',
+      replayDisplayRoutingResponseEdges,
+      1,
+    )).toEqual({
+      response: decisive,
+      request,
+      edges: [{ ...edges[0], data: routingPatches[0].data }],
+    });
+    expect(selectDisplayRoutingAuditRoute(
+      [decisive, progress],
+      [request],
+      undefined,
+      replayDisplayRoutingResponseEdges,
+      1,
+    )).toEqual({
+      response: decisive,
+      request,
+      edges: [{ ...edges[0], data: routingPatches[0].data }],
+    });
+    expect(selectDisplayRoutingAuditRoute(
+      [progress],
+      [request],
+      'request-1',
+      replayDisplayRoutingResponseEdges,
+      1,
+    )).toBeNull();
   });
 
   it('bounds the viewport zoom used to normalize drag distance', () => {

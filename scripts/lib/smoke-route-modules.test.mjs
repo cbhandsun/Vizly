@@ -14,6 +14,17 @@ import {
 } from './smoke-route-reporting.mjs';
 
 describe('smoke route modules', () => {
+  it('disconnects long-task observation before forcing heap-accounting GC', () => {
+    const smokeSource = readFileSync(new URL('../smoke-routes.mjs', import.meta.url), 'utf8');
+    const endObservation = smokeSource.indexOf('state.observer?.disconnect();');
+    const finalGarbageCollection = smokeSource.lastIndexOf(
+      "session.send('HeapProfiler.collectGarbage')",
+    );
+
+    expect(endObservation).toBeGreaterThan(0);
+    expect(finalGarbageCollection).toBeGreaterThan(endObservation);
+  });
+
   it('keeps self-contained docs and 3D routes outside the Ant Design shell', () => {
     const routeSource = readFileSync(new URL('../../src/app/routes.tsx', import.meta.url), 'utf8');
     const routeErrorSource = readFileSync(new URL('../../src/app/AppRouteError.tsx', import.meta.url), 'utf8');

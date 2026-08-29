@@ -180,6 +180,7 @@ export const readDisplayRoutingIncrementalFailureStatus = (session, nodeId) => (
       const value = window.__vizlyBaseReactFlowDisplayRouting || {};
       return {
         stage: value.stage,
+        requestIdPresent: typeof value.requestId === 'string',
         workerStartCount: value.workerStartCount,
         workerAbortCount: value.workerAbortCount,
         workerResolution: value.workerResolution,
@@ -189,11 +190,15 @@ export const readDisplayRoutingIncrementalFailureStatus = (session, nodeId) => (
     requests: (window.__vizlyRoutingRequests || []).map(item => ({
       operation: item?.operation,
       mutableEdgeCount: item?.mutableEdgeIds?.length,
+      matchesRoutingRequest: item?.requestId
+        === window.__vizlyBaseReactFlowDisplayRouting?.requestId,
     })),
     responses: (window.__vizlyRoutingResponses || []).map(item => ({
       routeResolution: item?.routeResolution,
       hardClean: item?.hardClean,
       fallbackLevel: item?.fallbackLevel,
+      matchesRoutingRequest: item?.requestId
+        === window.__vizlyBaseReactFlowDisplayRouting?.requestId,
     })),
     targetNodePresent: Boolean(document.querySelector(
       '.react-flow__node[data-id=${JSON.stringify(nodeId)}]',

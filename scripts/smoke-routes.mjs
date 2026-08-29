@@ -405,15 +405,25 @@ const collectRouteStabilityReport = async (session, budget) => {
     }
   })()`);
   await delay(budget.durationMs);
+  // Stop observing before the harness forces a final GC for heap accounting.
+  // Otherwise the smoke test can count its own HeapProfiler work as an
+  // application long task, which makes hosted-runner contention fail the app.
+  await session.evaluate(`(() => {
+    const state = window.__smokeStability;
+    if (!state) return;
+    state.endedAt = performance.now();
+    state.observer?.disconnect();
+    delete state.observer;
+  })()`);
   await session.send('HeapProfiler.collectGarbage').catch(() => {});
   return session.evaluate(`(() => {
     const state = window.__smokeStability || { longTasks: [] };
-    state.observer?.disconnect();
     const durations = state.longTasks.map((entry) => entry.duration).filter(Number.isFinite);
     const heapEnd = Number(performance.memory?.usedJSHeapSize) || 0;
     const parallel = window.__vizly_coordinator__?.getOptimizationStats?.()?.parallel || null;
     const report = {
-      durationMs: Math.round(performance.now() - (state.startedAt || performance.now())),
+      durationMs: Math.round((state.endedAt || performance.now())
+        - (state.startedAt || performance.now())),
       longTaskCount: durations.length,
       maxLongTaskMs: durations.length ? Math.round(Math.max(...durations)) : 0,
       heapGrowthKB: state.heapStart && heapEnd

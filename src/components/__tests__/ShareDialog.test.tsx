@@ -2,7 +2,8 @@
 
 import React from 'react';
 import { readFileSync } from 'node:fs';
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
+import { useTranslation } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.stubGlobal('ResizeObserver', class ResizeObserverStub {
@@ -189,6 +190,7 @@ vi.mock('react-i18next', () => ({
 import ShareDialog from '../diagrams/ShareDialog';
 import { createShareDialogOperationGate } from '@/components/shareDialogOperationGate';
 import { createShareDialogItemMutationGate } from '@/components/shareDialogItemMutationGate';
+import { useShareDialogItemMutations } from '@/components/diagrams/useShareDialogItemMutations';
 import {
   getShareExpiresAt,
   isCloudDiagramId,
@@ -611,38 +613,44 @@ describe('ShareDialog commercial failure handling', () => {
   });
 
   it('coalesces repeated revoke confirmations while the first request is pending', async () => {
-    authMocks.user = { id: USER_ID };
     let finishRevoke: (() => void) | undefined;
-    serviceMocks.listSharesForDiagram.mockResolvedValue([shareRecord]);
     serviceMocks.revokeShare.mockImplementationOnce(() => new Promise<void>((resolve) => {
       finishRevoke = resolve;
     }));
-    render(
-      <ShareDialog
-        open
-        onClose={vi.fn()}
-        diagramId={DIAGRAM_ID}
-        onEnsureSaved={vi.fn(async () => savedDiagram())}
-      />,
-    );
+    const setShares = vi.fn();
+    const setCollaborators = vi.fn();
+    const pendingCreatedSharesRef = { current: [shareRecord] };
+    const { result } = renderHook(() => {
+      const { t } = useTranslation();
+      return useShareDialogItemMutations({
+        collaborators: setCollaborators,
+        effectiveDiagramId: DIAGRAM_ID,
+        open: true,
+        pendingCreatedSharesRef,
+        scopeKey: DIAGRAM_ID,
+        shares: setShares,
+        t,
+      });
+    });
 
-    fireEvent.click(await screen.findByText('公开链接'));
-    const revokeButton = await screen.findByRole('button', { name: '撤销分享' });
-    fireEvent.click(revokeButton);
-    expect(await screen.findByText('确认撤销此分享链接？')).toBeTruthy();
-    const confirmationButtons = document.querySelector('.ant-popconfirm-buttons') as HTMLElement | null;
-    expect(confirmationButtons).toBeTruthy();
-    if (!confirmationButtons) return;
-    const confirm = within(confirmationButtons).getByRole('button', { name: /撤\s*销\s*分\s*享/ });
-    fireEvent.click(confirm);
-    fireEvent.click(confirm);
+    let firstRequest: Promise<void> | undefined;
+    let duplicateRequest: Promise<void> | undefined;
+    await act(async () => {
+      firstRequest = result.current.handleRevokeShare(shareRecord.id);
+      duplicateRequest = result.current.handleRevokeShare(shareRecord.id);
+      await Promise.resolve();
+    });
 
     expect(serviceMocks.revokeShare).toHaveBeenCalledTimes(1);
     await act(async () => {
       finishRevoke?.();
+      await Promise.all([firstRequest, duplicateRequest]);
     });
-    await waitFor(() => expect(screen.queryByRole('button', { name: '撤销分享' })).toBeNull());
-  }, 15_000);
+    expect(messageMocks.success).toHaveBeenCalledWith('已撤销分享链接');
+    expect(pendingCreatedSharesRef.current).toEqual([]);
+    expect(setShares).toHaveBeenCalledTimes(1);
+    expect(setCollaborators).not.toHaveBeenCalled();
+  });
 
   it('shows a stable error and never renders a raw provider failure', async () => {
     authMocks.user = { id: USER_ID };

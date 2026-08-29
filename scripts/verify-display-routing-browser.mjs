@@ -6,6 +6,7 @@ import {
   readDisplayRoutingVisualScaleAudit,
   readRenderedDisplayEdgeNodeIntersections,
   replayDisplayRoutingResponseEdges,
+  selectDisplayRoutingAuditRoute,
 } from './lib/display-routing-browser-geometry.mjs';
 import {
   displayRoutingDragSnapshotExpression,
@@ -77,15 +78,25 @@ if (INTERACTION_ONLY && COLLECT_PERFORMANCE_SAMPLES) {
 }
 
 const initialReadyExpression = `(() => {
+  const replayResponseEdges = ${replayDisplayRoutingResponseEdges.toString()};
+  const selectAuditRoute = ${selectDisplayRoutingAuditRoute.toString()};
   const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
   const requests = window.__vizlyRoutingRequests || [];
   const responses = window.__vizlyRoutingResponses || [];
-  const request = [...requests].reverse().find(item => item?.requestId === routing.requestId);
-  const response = [...responses].reverse().find(item => item?.requestId === routing.requestId);
+  const route = selectAuditRoute(
+    responses,
+    requests,
+    routing.requestId,
+    replayResponseEdges,
+    14,
+  );
+  const request = route?.request;
+  const response = route?.response;
   return routing.stage === 'final-applied'
     && routing.workerAbortCount === 0
     && request
     && response
+    && routing.workerResolution === response.routeResolution
     && document.querySelectorAll('.react-flow__edge').length === 14
     && typeof routing.outputRouteSignature === 'string'
     ? {
@@ -230,11 +241,20 @@ const dragNode = async (session, nodeId, beforeRelease = null) => {
 
 const finalIncrementalExpression = nodeId => `(() => {
   const readRequestDriftProbe = ${readDisplayRoutingRequestDriftProbe.toString()};
+  const replayResponseEdges = ${replayDisplayRoutingResponseEdges.toString()};
+  const selectAuditRoute = ${selectDisplayRoutingAuditRoute.toString()};
   const requests = window.__vizlyRoutingRequests || [];
   const responses = window.__vizlyRoutingResponses || [];
   const request = [...requests].reverse().find(item => item?.operation === 'incremental-route');
   if (!request) return null;
-  const response = [...responses].reverse().find(item => item?.requestId === request.requestId);
+  const route = selectAuditRoute(
+    responses,
+    requests,
+    request.requestId,
+    replayResponseEdges,
+    14,
+  );
+  const response = route?.response;
   const longTasks = (window.__vizlyLongTasks || []).filter(task => (
     Number.isFinite(task?.startedAt)
     && Number.isFinite(task?.durationMs)
@@ -246,7 +266,7 @@ const finalIncrementalExpression = nodeId => `(() => {
   if (
     !response
     || routing.stage !== 'final-applied'
-    || routing.requestId !== response.requestId
+    || routing.workerResolution !== response.routeResolution
   ) return null;
   const node = document.querySelector(
     '.react-flow__node[data-id=${JSON.stringify(nodeId)}]',
@@ -339,15 +359,18 @@ const normalReadyExpression = `(() => {
 const renderedObstacleAuditExpression = requiredClearance => `(() => {
   const auditRenderedEdges = ${readRenderedDisplayEdgeNodeIntersections.toString()};
   const replayResponseEdges = ${replayDisplayRoutingResponseEdges.toString()};
+  const selectAuditRoute = ${selectDisplayRoutingAuditRoute.toString()};
   const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
   const responses = window.__vizlyRoutingResponses || [];
   const requests = window.__vizlyRoutingRequests || [];
-  const response = [...responses].reverse().find(item => (
-    routing.requestId ? item?.requestId === routing.requestId : Array.isArray(item?.edges)
-  ));
-  const request = [...requests].reverse().find(item => item?.requestId === response?.requestId);
-  const edges = replayResponseEdges(response, request);
-  return auditRenderedEdges(edges, ${JSON.stringify(requiredClearance)});
+  const route = selectAuditRoute(
+    responses,
+    requests,
+    routing.requestId,
+    replayResponseEdges,
+    14,
+  );
+  return auditRenderedEdges(route?.edges, ${JSON.stringify(requiredClearance)});
 })()`;
 
 const assertRenderedObstacleAudit = (stage, audit) => {
