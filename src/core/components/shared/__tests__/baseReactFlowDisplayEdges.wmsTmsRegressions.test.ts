@@ -14,15 +14,9 @@ import {
 import { computeBaseReactFlowDisplayEdgesWorkerResponse } from '../baseReactFlowDisplayEdges.worker';
 import {
   computeBaseReactFlowDisplayEdgeEpoch,
-  computeBaseReactFlowDisplayOutputRouteSignature,
 } from '../baseReactFlowDisplayEdgeCore';
 import type { DisplayRoutingPhaseTrace } from '../baseReactFlowDisplayRoutingTrace';
 import { getDisplayHardQualityGateReport } from '../baseReactFlowDisplayQualityGates';
-import {
-  createBaseReactFlowDisplayEdgePatches,
-  mergeBaseReactFlowDisplayRoutingTransactions,
-  resolveBaseReactFlowDisplayCacheReplaySignature,
-} from '../baseReactFlowDisplayRoutingTransaction';
 import { projectBaseReactFlowDisplayWorkerInput } from '../baseReactFlowDisplayWorkerClient';
 import {
   createDisplayTerminalValidationSnapshot,
@@ -37,7 +31,6 @@ import {
 } from './baseReactFlowDisplayEdges.testUtils';
 import {
   finiteDisplayPointPath as finitePointPath,
-  unexplainedRelatedOverlapPairs,
 } from './fixtures/displayEdgeQualityDiagnostics';
 
 const absoluteNodeX = (nodeItem: Node): number => {
@@ -124,150 +117,6 @@ describe('baseReactFlowDisplayEdges WMS and TMS regressions', () => {
     ).toEqual([]);
     expect(durationMs, diagnostics).toBeLessThan(15_000);
   }, 30_000);
-
-  it('builds the WMS process final candidate within the cold quality budget', async () => {
-    const preset = coerceCustomPreset(wmsProcessFlowStandardData, {
-      id: 'WmsProcessFlowProbe',
-      title: 'WmsProcessFlowProbe',
-    });
-    if (!preset) throw new Error('expected the WMS process preset to be valid');
-    const canvas = await standardDataToCanvas(preset);
-    const projected = projectBaseReactFlowDisplayWorkerInput(canvas);
-    const startedAt = performance.now();
-    const phaseTrace: DisplayRoutingPhaseTrace[] = [];
-    const result = createBaseReactFlowDisplayEdges({
-      edges: projected.edges,
-      nodes: projected.nodes,
-      enableSmartEdges: true,
-      smartEdgePadding: 20,
-      isLargeGraph: false,
-      displayEdgeEpoch: computeBaseReactFlowDisplayEdgeEpoch(projected),
-      onPhaseTrace: trace => phaseTrace.push(trace),
-    });
-    const durationMs = performance.now() - startedAt;
-    const absoluteNodes = withAbsoluteNodePositions(projected.nodes);
-    const quality = calculateEdgePathQualityScore(result);
-    const paths = result.map(edge => ({
-      id: edge.id,
-      sourceHandle: edge.sourceHandle,
-      targetHandle: edge.targetHandle,
-      path: finitePointPath(edge.data?.computedPath),
-    }));
-    const nonOrthogonalPaths = paths.flatMap(route => (
-      route.path.some((point, index) => {
-        const next = route.path[index + 1];
-        if (!next) return false;
-        const deltaX = Math.abs(point.x - next.x);
-        const deltaY = Math.abs(point.y - next.y);
-        return !(
-          (deltaX <= 0.5 && deltaY > 0.5)
-          || (deltaY <= 0.5 && deltaX > 0.5)
-        );
-      }) ? [route] : []
-    ));
-    const tinyInteriorPaths = paths.flatMap(route => {
-      const tinySegments = route.path.slice(1, -2).flatMap((point, index) => {
-        const next = route.path[index + 2];
-        const length = next
-          ? Math.abs(point.x - next.x) + Math.abs(point.y - next.y)
-          : Number.POSITIVE_INFINITY;
-        return length < 24 ? [{ from: point, to: next, length }] : [];
-      });
-      return tinySegments.length > 0 ? [{ ...route, tinySegments }] : [];
-    });
-    const workerRoutingPatches = createBaseReactFlowDisplayEdgePatches(projected.edges, result);
-    const mergedTransactions = workerRoutingPatches
-      ? mergeBaseReactFlowDisplayRoutingTransactions({
-        latestSourceEdges: projected.edges,
-        workerRoutingPatches,
-        repairRoutingPatches: createBaseReactFlowDisplayEdgePatches(result, result)!,
-      })
-      : null;
-    const finalOutputRouteSignature = mergedTransactions
-      ? computeBaseReactFlowDisplayOutputRouteSignature(mergedTransactions.edges)
-      : null;
-    const terminalValidation = createDisplayTerminalValidationSnapshot(absoluteNodes);
-    const terminalDiagnostics = JSON.stringify({
-      durationMs,
-      unanchoredEdges: result.flatMap(edge => {
-        const validation = terminalValidation.validateEdge(edge);
-        return validation.anchored ? [] : [{
-          id: edge.id,
-          sourceHandle: edge.sourceHandle,
-          targetHandle: edge.targetHandle,
-          path: finitePointPath(edge.data?.computedPath),
-          validation,
-        }];
-      }),
-      phaseTrace,
-    }, null, 2);
-
-    expect(
-      quality.nonOrthogonalSegments,
-      JSON.stringify({ quality, nonOrthogonalPaths }, null, 2),
-    ).toBe(0);
-    expect(
-      quality.strictCrossings,
-      JSON.stringify({ strictCrossings: strictPathCrossings(paths), paths }, null, 2),
-    ).toBe(0);
-    expect(quality.reverseOverlap, JSON.stringify(edgeOverlapProblems(result), null, 2)).toBe(0);
-    expect(quality.unrelatedOverlap).toBe(0);
-    expect(
-      quality.unexplainedRelatedOverlap,
-      JSON.stringify(unexplainedRelatedOverlapPairs(result), null, 2),
-    ).toBe(0);
-    expect(quality.shortEndpointStubs).toBe(0);
-    expect(
-      quality.tinyInteriorDoglegs,
-      JSON.stringify({ quality, tinyInteriorPaths }, null, 2),
-    ).toBe(0);
-    expect(quality.hairpins).toBe(0);
-    expect(edgeNodeObstacleHits(result, absoluteNodes), JSON.stringify(paths, null, 2)).toEqual([]);
-    expect(displayEdgesHaveNodeAttachedTerminals(result, absoluteNodes), terminalDiagnostics).toBe(true);
-    expect(displayEdgesHaveNodeAnchoredTerminals(result, absoluteNodes), terminalDiagnostics).toBe(true);
-    expect(finalOutputRouteSignature).not.toBeNull();
-    expect(result.some(edge => (
-      edge.data?.sharedTrunkAware === true || edge.data?.sharedTrunkSynthesized === true
-    ))).toBe(true);
-    expect(resolveBaseReactFlowDisplayCacheReplaySignature({
-      sourceEdges: projected.edges,
-      finalEdges: mergedTransactions?.edges ?? [],
-      cachePatches: mergedTransactions?.cachePatches ?? [],
-      finalOutputRouteSignature,
-    })).toBeNull();
-    expect(
-      phaseTrace.some(trace => trace.phase === 'quality'),
-      JSON.stringify({ durationMs, phaseTrace }, null, 2),
-    ).toBe(true);
-    expect(
-      phaseTrace.some(trace => (
-        trace.phase === 'final-safety-closure'
-        && (trace.parentPhase === 'quality' || trace.parentPhase === 'post-render')
-      )),
-      JSON.stringify({ durationMs, phaseTrace }, null, 2),
-    ).toBe(true);
-    expect(
-      phaseTrace.some(trace => (
-        (trace.evaluationCount ?? 0) > 0 || (trace.cacheHitCount ?? 0) > 0
-      )),
-      JSON.stringify({ durationMs, phaseTrace }, null, 2),
-    ).toBe(true);
-    const strictFallbackTrace = phaseTrace.find(trace => (
-      trace.phase === 'final-endpoint-closure-terminal-stubs'
-      && (trace.workItemCount ?? 0) > 0
-    ));
-    expect(strictFallbackTrace, JSON.stringify({ durationMs, phaseTrace }, null, 2))
-      .toMatchObject({ resolution: 'accepted', workItemCount: 1 });
-    expect(
-      (strictFallbackTrace?.scannedSegmentCount ?? 0)
-        + (strictFallbackTrace?.scannedEdgePairCount ?? 0),
-      JSON.stringify({ durationMs, strictFallbackTrace }, null, 2),
-    ).toBeGreaterThan(0);
-    expect(
-      durationMs,
-      JSON.stringify({ durationMs, phaseTrace, quality }, null, 2),
-    ).toBeLessThan(25_000);
-  }, 60_000);
 
   it('keeps the large-graph WMS worker response hard-clean at the browser boundary', async () => {
     const preset = coerceCustomPreset(wmsProcessFlowStandardData, {

@@ -63,6 +63,7 @@ export const TEST_CI_SHARD_GROUPS = Object.freeze({
 export const TEST_CI_SHARDS = Object.freeze(Object.values(TEST_CI_SHARD_GROUPS).flat());
 export const TEST_CI_GROUP_NAMES = Object.freeze(Object.keys(TEST_CI_SHARD_GROUPS));
 export const TEST_CI_SLOW_SHARDS = Object.freeze([
+  'test:ci:core-components-shared-cold-performance',
   'test:ci:core-components-shared-flow-quality',
   'test:ci:core-components-shared-flow-logistics',
   'test:ci:routing-services-performance',

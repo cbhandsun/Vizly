@@ -41,6 +41,7 @@ describe('test:ci shard catalog', () => {
 
   it('exempts only isolated timing-sensitive shards from instrumentation', () => {
     expect(TEST_CI_COVERAGE_EXEMPT_SHARDS).toEqual([
+      'test:ci:core-components-shared-cold-performance',
       'test:ci:core-components-shared-flow-quality',
       'test:ci:core-components-shared-flow-logistics',
       'test:ci:routing-services-performance',
