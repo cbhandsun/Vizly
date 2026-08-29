@@ -562,8 +562,22 @@ describe('DomainDagreLayoutStrategy', () => {
             domainOrder: presetLayout.domainOrder,
             subDomainOrder: presetLayout.subDomainOrder,
         } as unknown as import('../../types/layout').LayoutOptions);
+        // Exercise the cyclic cross-domain lane cluster here; the adjacent
+        // standard-conversion regression covers the complete fixture render.
+        const cyclicLaneIds = new Set([
+            'edge-loms-wms',
+            'edge-loms-tms',
+            'edge-loms-customs',
+            'edge-tms-bms',
+            'edge-tms-yms',
+            'edge-tms-carrier',
+            'edge-loms-visibility',
+            'edge-wms-visibility',
+            'edge-tms-visibility',
+            'edge-tms-downstream',
+        ]);
         const displayEdges = createBaseReactFlowDisplayEdges({
-            edges: result.edges,
+            edges: result.edges.filter(edge => cyclicLaneIds.has(edge.id)),
             nodes: result.nodes,
             enableSmartEdges: true,
             smartEdgePadding: 20,
