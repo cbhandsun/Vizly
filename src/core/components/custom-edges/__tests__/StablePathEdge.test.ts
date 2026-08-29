@@ -74,7 +74,86 @@ describe('edge label avoidance', () => {
         );
 
         expect(Math.abs(offset.y)).toBeGreaterThan(10);
-        expect(Math.abs(offset.x)).toBeLessThanOrEqual(32);
+        expect(Math.abs(offset.x)).toBeLessThanOrEqual(96);
+    });
+
+    it('retreats farther along an edge when near offsets cannot clear an endpoint node', () => {
+        const labelPoint = { x: 180, y: 100 };
+        const labelText = 'carrier';
+        const obstacle = { x: 140, y: 70, width: 100, height: 60 };
+        const offset = getEdgeLabelAutoOffset(
+            [{ x: 0, y: 100 }, { x: 220, y: 100 }],
+            labelPoint,
+            labelText,
+            [],
+            [obstacle],
+        );
+        const rect = estimateEdgeLabelRect({
+            x: labelPoint.x + offset.x,
+            y: labelPoint.y + offset.y,
+        }, labelText);
+
+        expect(Math.abs(offset.x)).toBeGreaterThan(32);
+        expect(
+            rect.x + rect.width <= obstacle.x
+            || rect.x >= obstacle.x + obstacle.width
+            || rect.y + rect.height <= obstacle.y
+            || rect.y >= obstacle.y + obstacle.height,
+        ).toBe(true);
+    });
+
+    it('prioritizes clearing nodes when the clear label position is close to a peer edge', () => {
+        const labelPoint = { x: 180, y: 100 };
+        const labelText = 'carrier';
+        const obstacle = { x: 140, y: 70, width: 100, height: 60 };
+        const offset = getEdgeLabelAutoOffset(
+            [{ x: 0, y: 100 }, { x: 220, y: 100 }],
+            labelPoint,
+            labelText,
+            [[{ x: 80, y: 40 }, { x: 80, y: 160 }]],
+            [obstacle],
+        );
+        const rect = estimateEdgeLabelRect({
+            x: labelPoint.x + offset.x,
+            y: labelPoint.y + offset.y,
+        }, labelText);
+
+        expect(
+            rect.x + rect.width <= obstacle.x
+            || rect.x >= obstacle.x + obstacle.width
+            || rect.y + rect.height <= obstacle.y
+            || rect.y >= obstacle.y + obstacle.height,
+        ).toBe(true);
+    });
+
+    it('uses a medium retreat to fit a label between adjacent endpoint nodes', () => {
+        const labelPoint = { x: 1139, y: 349 };
+        const labelText = '承运商协同';
+        const obstacles = [
+            { x: 761, y: 290, width: 282, height: 118 },
+            { x: 1163, y: 290, width: 211, height: 118 },
+        ];
+        const offset = getEdgeLabelAutoOffset(
+            [{ x: 1043, y: 349 }, { x: 1163, y: 349 }],
+            labelPoint,
+            labelText,
+            [],
+            obstacles,
+        );
+        const rect = estimateEdgeLabelRect({
+            x: labelPoint.x + offset.x,
+            y: labelPoint.y + offset.y,
+        }, labelText);
+
+        expect(offset.x).toBe(-32);
+        for (const obstacle of obstacles) {
+            expect(
+                rect.x + rect.width <= obstacle.x
+                || rect.x >= obstacle.x + obstacle.width
+                || rect.y + rect.height <= obstacle.y
+                || rect.y >= obstacle.y + obstacle.height,
+            ).toBe(true);
+        }
     });
 
     it('ignores invalid peer paths and obstacle rectangles', () => {

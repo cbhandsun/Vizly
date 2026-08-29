@@ -24,10 +24,16 @@ export interface DomainDagreInteractiveEdgePreparationInput {
   nodeById: Map<string, RoutingNode>;
 }
 
+// Ordered-lane candidates are promoted into the display-routing transaction.
+// Seed them at the render-safe preference so the canonical finalizer does not
+// have to expand every otherwise valid cross-lane terminal again.
+const INTERACTIVE_ENDPOINT_STUB = 56;
+
 const pickInteractiveHandles = (
   source: RoutingNode,
   target: RoutingNode,
   layoutDirection: string,
+  preferEndpointGeometry = false,
 ): { sourceHandle: string; targetHandle: string } => {
   const sourcePos = routingNodeAbsolutePosition(source);
   const targetPos = routingNodeAbsolutePosition(target);
@@ -35,7 +41,10 @@ const pickInteractiveHandles = (
   const targetSize = routingNodeSize(target);
   const dx = (targetPos.x + targetSize.width / 2) - (sourcePos.x + sourceSize.width / 2);
   const dy = (targetPos.y + targetSize.height / 2) - (sourcePos.y + sourceSize.height / 2);
-  if (layoutDirection === 'LR' || layoutDirection === 'RL' || Math.abs(dx) > Math.abs(dy) * 1.35) {
+  if (
+    (!preferEndpointGeometry && (layoutDirection === 'LR' || layoutDirection === 'RL'))
+    || Math.abs(dx) > Math.abs(dy) * 1.35
+  ) {
     return dx >= 0
       ? { sourceHandle: 'right', targetHandle: 'left' }
       : { sourceHandle: 'left', targetHandle: 'right' };
@@ -52,6 +61,7 @@ export function prepareDomainDagreInteractiveEdges({
   nodeById,
 }: DomainDagreInteractiveEdgePreparationInput): Edge[] {
   const layoutDirection = String(options.direction || 'TB').toUpperCase();
+  const orderedLanes = options.domainPlacement === 'ordered-lanes';
   const interactiveEdges = edges.map(edge => {
     const source = nodeById.get(edge.source);
     const target = nodeById.get(edge.target);
@@ -68,7 +78,17 @@ export function prepareDomainDagreInteractiveEdges({
       };
     }
 
-    const handles = pickInteractiveHandles(source, target, layoutDirection);
+    const sourceDomain = String(source.data.domain ?? '').trim();
+    const targetDomain = String(target.data.domain ?? '').trim();
+    const handles = pickInteractiveHandles(
+      source,
+      target,
+      layoutDirection,
+      orderedLanes
+        && sourceDomain.length > 0
+        && targetDomain.length > 0
+        && sourceDomain !== targetDomain,
+    );
     const manualHandleLocks = readManualHandleLocks(asRoutingRecord(edge.data));
     const sourceHandle = manualHandleLocks.source && edge.sourceHandle
       ? edge.sourceHandle
@@ -98,7 +118,7 @@ export function prepareDomainDagreInteractiveEdges({
       sourceHandle: nextEdge.sourceHandle,
       targetHandle: nextEdge.targetHandle,
       nodeById,
-      stubLength: 40,
+      stubLength: orderedLanes ? INTERACTIVE_ENDPOINT_STUB : 40,
     }));
     return nextEdge;
   });

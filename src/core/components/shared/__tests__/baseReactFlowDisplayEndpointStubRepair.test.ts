@@ -10,6 +10,7 @@ import { createAtomicRouteTransactionEvaluation } from '../baseReactFlowDisplayA
 import { createStrictCrossingRepairDiagnostics } from '../baseReactFlowDisplayStrictResidualRepair';
 import { buildSafeEndpointSideStepCandidates } from '../baseReactFlowDisplayEndpointStubCandidates';
 import {
+  commercialClearanceRiskIsGloballyMinimal,
   countRenderUnsafeEndpointStubs,
   repairFinalShortEndpointStubs,
   repairRenderSafeEndpointStubs,
@@ -28,6 +29,15 @@ const edgeWithPath = (
 describe('baseReactFlowDisplayEndpointStubRepair', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('recognizes only finite non-negative zero commercial risk as globally minimal', () => {
+    expect(commercialClearanceRiskIsGloballyMinimal(0)).toBe(true);
+    expect(commercialClearanceRiskIsGloballyMinimal(1e-6)).toBe(true);
+    expect(commercialClearanceRiskIsGloballyMinimal(1e-6 + Number.EPSILON)).toBe(false);
+    expect(commercialClearanceRiskIsGloballyMinimal(-Number.EPSILON)).toBe(false);
+    expect(commercialClearanceRiskIsGloballyMinimal(Number.NaN)).toBe(false);
+    expect(commercialClearanceRiskIsGloballyMinimal(Number.POSITIVE_INFINITY)).toBe(false);
   });
 
   it('preserves candidate order and does not mutate the input path', () => {
@@ -145,6 +155,39 @@ describe('baseReactFlowDisplayEndpointStubRepair', () => {
     expect(diagnostics.residualRepairInvocationCount).toBeGreaterThan(0);
     expect(diagnostics.duplicateVariantReferenceCount).toBeGreaterThan(0);
     expect(diagnostics.knownQualityStrictReuseCount).toBeGreaterThan(0);
+  });
+
+  it('skips expensive strict tiers after a zero-risk companion closes the crossing', () => {
+    const short = edgeWithPath('companion-short-source', [
+      { x: 0, y: 0 },
+      { x: 48, y: 0 },
+      { x: 48, y: 100 },
+      { x: 300, y: 100 },
+    ]);
+    const movableBlocker = edgeWithPath('movable-blocker', [
+      { x: 40, y: -20 },
+      { x: 52, y: -20 },
+      { x: 52, y: 20 },
+      { x: 64, y: 20 },
+    ]);
+    const edges = [short, movableBlocker];
+    const diagnostics = createStrictCrossingRepairDiagnostics();
+
+    const repaired = repairRenderSafeEndpointStubs(
+      edges,
+      [],
+      64,
+      undefined,
+      undefined,
+      diagnostics,
+    );
+
+    expect(repaired).not.toBe(edges);
+    expect(countRenderUnsafeEndpointStubs(repaired)).toBe(0);
+    expect(calculateEdgePathQualityScore(repaired).strictCrossings).toBe(0);
+    expect(diagnostics.strictFallbackInvocationCount).toBe(1);
+    expect(diagnostics.strictSweepInvocationCount).toBe(0);
+    expect(diagnostics.residualRepairInvocationCount).toBe(0);
   });
 
   it('does not run strict fallback repairs after the evaluation budget is exhausted', () => {

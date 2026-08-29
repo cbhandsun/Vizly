@@ -114,6 +114,15 @@ export const assertDisplayRoutingVisualScaleAudit = ({
       edgeAccessibleNameMissingCount: audit?.edgeAccessibleNameMissingCount,
       labelCount: audit?.labelCount,
       labelNodeOverlapCount: audit?.labelNodeOverlapCount,
+      labelNodeOverlaps: Array.isArray(audit?.labelNodeOverlaps)
+        ? audit.labelNodeOverlaps.slice(0, 8).map(item => ({
+          edgeId: typeof item?.edgeId === 'string' ? item.edgeId.slice(0, 128) : '<invalid>',
+          nodeId: typeof item?.nodeId === 'string' ? item.nodeId.slice(0, 128) : '<invalid>',
+          priority: item?.priority === 'primary' ? 'primary' : 'detail',
+          labelRect: item?.labelRect,
+          nodeRect: item?.nodeRect,
+        }))
+        : [],
       visibleLabelCount: audit?.visibleLabelCount,
       visiblePrimaryLabelCount: audit?.visiblePrimaryLabelCount,
       visibleDetailLabelCount: audit?.visibleDetailLabelCount,

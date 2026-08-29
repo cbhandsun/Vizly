@@ -278,7 +278,10 @@ export const precompiledDisplayRouteContractsMatch = (leftEdges, rightEdges) => 
   return true;
 };
 
-export const renderPrecompiledDisplayRouteCaptureExpression = targetId => `(async () => {
+export const renderPrecompiledDisplayRouteCaptureExpression = (
+  targetId,
+  variantId = 'initial',
+) => `(async () => {
   const isMatchingResponse = ${isMatchingHardCleanDisplayWorkerResponse.toString()};
   const isFreshRequestResponse = ${isFreshFullRouteRequestResponse.toString()};
   const createPatches = ${createPrecompiledDisplayRoutePatches.toString()};
@@ -293,13 +296,23 @@ export const renderPrecompiledDisplayRouteCaptureExpression = targetId => `(asyn
   const request = window.__vizlyPrecompiledRouteRequest;
   const response = window.__vizlyPrecompiledRouteResponse;
   const committed = window.__vizlyPrecompiledCommittedRoute;
+  const expectedVariantId = ${JSON.stringify(variantId)};
+  const isLayoutCapture = expectedVariantId !== 'initial';
+  const committedVariantMatches = expectedVariantId === 'initial'
+    ? typeof committed?.variantId === 'undefined'
+    : committed?.variantId === expectedVariantId
+      && (committed?.provenance === 'fresh-layout-repair-validated'
+        || committed?.provenance === 'fresh-full-route');
+  const currentWorkerMatches = isLayoutCapture || (
+    routing.requestId === request?.requestId
+    && isMatchingResponse(request, response)
+    && isFreshRequestResponse(request, response)
+    && routing.workerResolution === response.routeResolution
+  );
   if (activeTargetId !== ${JSON.stringify(targetId)}
     || routing.stage !== 'final-applied'
     || routing.workerAbortCount !== 0
-    || routing.requestId !== request?.requestId
-    || !isMatchingResponse(request, response)
-    || !isFreshRequestResponse(request, response)
-    || routing.workerResolution !== response.routeResolution
+    || !currentWorkerMatches
     || typeof routing.inputGeometryDigest !== 'string'
     || !/^geometry-v1:[0-9a-f]{32}$/.test(routing.inputGeometryDigest)
     || typeof routing.outputRouteSignature !== 'string'
@@ -307,12 +320,13 @@ export const renderPrecompiledDisplayRouteCaptureExpression = targetId => `(asyn
     || typeof routing.routingVersion !== 'string'
     || routing.routingVersion.length === 0
     || committed?.presetId !== ${JSON.stringify(targetId)}
+    || !committedVariantMatches
     || committed.inputSignature !== routing.signature
     || committed.inputGeometryDigest !== routing.inputGeometryDigest
     || committed.outputRouteSignature !== routing.outputRouteSignature
     || !Array.isArray(committed.sourceEdges)
     || !Array.isArray(committed.displayPatches)
-    || committed.sourceEdges.length !== request.edges.length) return null;
+    || (!isLayoutCapture && committed.sourceEdges.length !== request.edges.length)) return null;
   const committedEdges = replayTrustedPatches(committed.sourceEdges, committed.displayPatches);
   if (!committedEdges) return null;
   const patches = createPatches(committed.sourceEdges, committedEdges);
@@ -321,17 +335,21 @@ export const renderPrecompiledDisplayRouteCaptureExpression = targetId => `(asyn
   if (!replayedEdges || !routeContractsMatch(replayedEdges, committedEdges)) return null;
   return {
     targetId: ${JSON.stringify(targetId)},
+    variantId: expectedVariantId,
     routing,
     requestShape: {
-      operation: request.operation,
-      candidateEdges: Array.isArray(request.candidateEdges) ? request.candidateEdges.length : 0,
-      nodes: request.nodes.length,
-      edges: request.edges.length,
+      operation: isLayoutCapture ? 'layout-committed' : request.operation,
+      candidateEdges: isLayoutCapture
+        ? 0
+        : (Array.isArray(request.candidateEdges) ? request.candidateEdges.length : 0),
+      nodes: isLayoutCapture ? null : request.nodes.length,
+      edges: isLayoutCapture ? committed.sourceEdges.length : request.edges.length,
     },
     patches,
     inputGeometryDigest: routing.inputGeometryDigest,
     outputRouteSignature: routing.outputRouteSignature,
-    workerResolution: response.routeResolution,
-    workerDurationMs: response.workerDurationMs,
+    provenance: committed.provenance ?? 'fresh-full-route',
+    workerResolution: isLayoutCapture ? routing.workerResolution : response.routeResolution,
+    workerDurationMs: isLayoutCapture ? routing.routeMs : response.workerDurationMs,
   };
 })()`;

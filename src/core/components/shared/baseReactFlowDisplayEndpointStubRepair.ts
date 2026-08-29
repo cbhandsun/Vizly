@@ -40,6 +40,13 @@ import type { DisplayTerminalValidationSnapshot } from './baseReactFlowTerminalV
 
 export const MIN_RENDER_SAFE_ENDPOINT_STUB = 56;
 const MAX_FINAL_ENDPOINT_STUB_REPAIR_EVALUATIONS = 8;
+const COMMERCIAL_CLEARANCE_RISK_EPSILON = 1e-6;
+
+export const commercialClearanceRiskIsGloballyMinimal = (risk: number): boolean => (
+  Number.isFinite(risk)
+  && risk >= 0
+  && risk <= COMMERCIAL_CLEARANCE_RISK_EPSILON
+);
 
 export const countRenderUnsafeEndpointStubs = (edges: Edge[]): number => edges.reduce((total, edge) => {
   const path = getDisplayComputedPath(edge);
@@ -276,34 +283,29 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
         candidate,
         [...new Set([...baselineObstacleChangedIndexes, edgeIndex])],
       );
-      const variants: T[] = [candidate];
-      if (
+      const needsStrictFallback = (
         initialIssues < baselineIssues
         && initialObstacleHits <= baselineObstacleHits
         && initialQuality.strictCrossings > baselineQuality.strictCrossings
         && initialQuality.strictCrossings <= baselineQuality.strictCrossings + 2
-      ) {
+      );
+      const initialVariants: T[] = [candidate];
+      if (needsStrictFallback) {
         if (strictDiagnostics) strictDiagnostics.strictFallbackInvocationCount += 1;
         qualityContext.rememberState?.(candidate, initialQualityState);
-        variants.push(...buildStrictCrossingCompanionShiftVariants(candidate, edgeIndex));
-        if (evaluations + variants.length < maxEvaluations) {
-          variants.push(finalStrictDisplaySweep(candidate, nodes, strictDiagnostics));
-        }
-        if (evaluations + variants.length < maxEvaluations) {
-          variants.push(repairFinalResidualStrictCrossings(candidate, nodes, strictDiagnostics));
-        }
+        initialVariants.push(...buildStrictCrossingCompanionShiftVariants(candidate, edgeIndex));
       }
       const evaluatedVariantReferences = new Set<T>();
-      for (const variant of variants) {
-        if (evaluations >= maxEvaluations) break;
+      const considerVariant = (variant: T): void => {
+        if (evaluations >= maxEvaluations) return;
         evaluations += 1;
         if (evaluatedVariantReferences.has(variant)) {
           if (strictDiagnostics) strictDiagnostics.duplicateVariantReferenceCount += 1;
-          continue;
+          return;
         }
         evaluatedVariantReferences.add(variant);
         const candidateIssues = countRenderUnsafeEndpointStubs(variant);
-        if (candidateIssues >= baselineIssues) continue;
+        if (candidateIssues >= baselineIssues) return;
         const changedIndexes = variant.flatMap((edge, index) => (
           edge === current[index] ? [] : [index]
         ));
@@ -333,7 +335,7 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
           || candidateQuality.unexplainedRelatedOverlap > baselineQuality.unexplainedRelatedOverlap
           || candidateQuality.tinyInteriorDoglegs > baselineQuality.tinyInteriorDoglegs
           || candidateQuality.hairpins > baselineQuality.hairpins
-        ) continue;
+        ) return;
         const candidateObstacleChangedIndexes = [
           ...new Set([...baselineObstacleChangedIndexes, ...changedIndexes]),
         ];
@@ -342,17 +344,17 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
             variant,
             candidateObstacleChangedIndexes,
           ) > baselineObstacleHits
-        ) continue;
+        ) return;
         if (changedIndexes.some(index => (
           countAxisMismatches(variant[index]) > baselineAxisMismatches[index]
-        ))) continue;
+        ))) return;
         if (!eligibleCommercialClearanceDoesNotRegress(
           current,
           variant,
           nodes,
           changedEdgeIds,
           clearance,
-        )) continue;
+        )) return;
         candidateQualityState ??= qualityContext.evaluateStateChanged(
           qualityState,
           variant,
@@ -368,7 +370,7 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
           || !transaction.obstacleHitsDoNotRegress
           || !transaction.terminalsAnchored
           || !transaction.trunksPreserved
-        ) continue;
+        ) return;
         // Every variant is compared with the same current baseline, so total
         // commercial risk ordering is exactly equivalent to ordering the risk
         // delta over only the immutable changed indexes.
@@ -385,10 +387,48 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
             COMMERCIAL_BUSINESS_NODE_CLEARANCE,
           )
         ), 0);
-        if (candidateCommercialRiskDelta >= acceptedCommercialRiskDelta - 1e-6) continue;
+        if (
+          candidateCommercialRiskDelta
+          >= acceptedCommercialRiskDelta - COMMERCIAL_CLEARANCE_RISK_EPSILON
+        ) return;
         accepted = variant;
         acceptedQualityState = candidateQualityState;
         acceptedCommercialRiskDelta = candidateCommercialRiskDelta;
+      };
+      const acceptedCommercialRiskIsGloballyMinimal = (): boolean => {
+        const acceptedEdges = accepted;
+        if (!acceptedEdges) return false;
+        let totalRisk = 0;
+        for (const edge of acceptedEdges) {
+          const edgeRisk = clearance.score(
+            getDisplayComputedPath(edge),
+            edge,
+            COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+          );
+          if (!Number.isFinite(edgeRisk) || edgeRisk < 0) return false;
+          totalRisk += edgeRisk;
+          if (!Number.isFinite(totalRisk)) return false;
+        }
+        return commercialClearanceRiskIsGloballyMinimal(totalRisk);
+      };
+
+      for (const variant of initialVariants) {
+        if (evaluations >= maxEvaluations) break;
+        considerVariant(variant);
+      }
+      if (
+        needsStrictFallback
+        && evaluations < maxEvaluations
+        && !acceptedCommercialRiskIsGloballyMinimal()
+      ) {
+        considerVariant(finalStrictDisplaySweep(candidate, nodes, strictDiagnostics));
+      }
+      if (
+        needsStrictFallback
+        && evaluations < maxEvaluations
+        && !acceptedCommercialRiskIsGloballyMinimal()
+      ) {
+        considerVariant(repairFinalResidualStrictCrossings(candidate, nodes, strictDiagnostics));
       }
       if (accepted) break;
     }

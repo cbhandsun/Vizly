@@ -148,7 +148,7 @@ describe('fixed minimap keyboard navigation', () => {
             'utf8',
         );
 
-        expect(source).toContain('const uiScale = useMemo(getUiScale, []);');
+        expect(source).toContain('const uiScale = useMemo(() => getUiScale(), []);');
         expect(source).toContain('useMinimapNavigation(anchorRef, minimapRef, viewportForRender, readUiScale)');
         expect(source).not.toContain('const renderUiScale = getUiScale();');
     });

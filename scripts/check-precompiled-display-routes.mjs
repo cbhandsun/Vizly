@@ -6,7 +6,10 @@ import {
   renderPrecompiledRouteLoaders,
   renderPrecompiledRouteManifest,
 } from './lib/precompiled-display-route-render.mjs';
-import { PRECOMPILED_DISPLAY_ROUTE_TARGETS } from './lib/precompiled-display-route-targets.mjs';
+import {
+  PRECOMPILED_DISPLAY_ROUTE_GENERATION_TARGETS,
+  PRECOMPILED_DISPLAY_ROUTE_TARGETS,
+} from './lib/precompiled-display-route-targets.mjs';
 import { hashPrecompiledDisplayRouteSource } from './lib/precompiled-display-route-source-hash.mjs';
 import { computePrecompiledDisplayRoutingSourceHash } from './lib/precompiled-display-route-source-set.mjs';
 import { auditPrecompiledDisplayRouteCommercialQuality } from './lib/precompiled-display-route-commercial-quality.mjs';
@@ -24,6 +27,7 @@ const ARTIFACT_DIR = resolve(GENERATED_DIR, 'precompiledRoutes');
 const ARTIFACT_SCHEMA = 'vizly-precompiled-display-route-v1';
 const MANIFEST_SCHEMA = 'vizly-precompiled-display-route-manifest-v3';
 const MAX_ARTIFACT_BYTES = 2_000_000;
+const ARTIFACT_FILE_PATTERN = /^route-\d{1,10}(?:-[0-9a-f]{32})?\.json$/;
 
 const routingSource = await readFile(ROUTING_VERSION_PATH, 'utf8');
 const routingVersion = routingSource.match(/EDGE_ROUTING_CACHE_VERSION\s*=\s*['"]([^'"]+)['"]/)?.[1];
@@ -39,42 +43,56 @@ if (
   || manifest.identitySourceHash !== identitySourceHash
   || manifest.routingSourceHash !== routingSourceHash
   || !Array.isArray(manifest.entries)
-  || manifest.entries.length !== PRECOMPILED_DISPLAY_ROUTE_TARGETS.length
+  || manifest.entries.length < PRECOMPILED_DISPLAY_ROUTE_TARGETS.length
+  || manifest.entries.length > PRECOMPILED_DISPLAY_ROUTE_GENERATION_TARGETS.length
 ) throw new Error('Precompiled route manifest is stale or malformed');
 if (manifestSource !== renderPrecompiledRouteManifest(manifest)) {
   throw new Error('Precompiled route manifest is not canonical');
 }
 
-const expectedTargets = new Map(PRECOMPILED_DISPLAY_ROUTE_TARGETS.map(
-  target => [target.sourcePath, target.presetId],
+const targetKey = (sourcePath, variantId) => `${sourcePath}\u0000${variantId}`;
+const allowedTargets = new Map(PRECOMPILED_DISPLAY_ROUTE_GENERATION_TARGETS.map(
+  target => [targetKey(target.sourcePath, target.variantId), target.presetId],
 ));
-const signatures = new Set();
-const presetIds = new Set();
+const requiredInitialTargetKeys = new Set(PRECOMPILED_DISPLAY_ROUTE_TARGETS.map(
+  target => targetKey(target.sourcePath, target.variantId),
+));
+const foundTargetKeys = new Set();
+const exactIdentities = new Set();
+const variants = new Set();
 const artifactFiles = new Set();
-let previousSignature = '';
+let previousSortKey = '';
 for (const entry of manifest.entries) {
-  const expectedPresetId = expectedTargets.get(entry?.sourcePath);
+  const entryTargetKey = targetKey(entry?.sourcePath, entry?.variantId);
+  const expectedPresetId = allowedTargets.get(entryTargetKey);
+  const exactIdentity = `${entry?.inputSignature}\u0000${entry?.inputGeometryDigest}`;
+  const variantKey = `${entry?.presetId}\u0000${entry?.variantId}`;
+  const sortKey = `${entry?.inputSignature}\u0000${entry?.inputGeometryDigest}`
+    + `\u0000${entry?.presetId}\u0000${entry?.variantId}`;
   if (
     !entry
     || typeof entry !== 'object'
     || typeof expectedPresetId !== 'string'
     || entry.presetId !== expectedPresetId
-    || presetIds.has(entry.presetId)
-    || !expectedTargets.delete(entry.sourcePath)
+    || typeof entry.variantId !== 'string'
+    || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(entry.variantId)
+    || variants.has(variantKey)
+    || foundTargetKeys.has(entryTargetKey)
     || typeof entry.artifactFile !== 'string'
-    || !/^route-\d{1,10}\.json$/.test(entry.artifactFile)
+    || !ARTIFACT_FILE_PATTERN.test(entry.artifactFile)
     || artifactFiles.has(entry.artifactFile)
     || typeof entry.inputSignature !== 'string'
     || !/^\d{1,10}$/.test(entry.inputSignature)
-    || signatures.has(entry.inputSignature)
+    || exactIdentities.has(exactIdentity)
     || !/^geometry-v1:[0-9a-f]{32}$/.test(entry.inputGeometryDigest)
     || !/^route-v2:\d{1,3}:\d{1,6}:[0-9a-f]{16}$/.test(entry.outputRouteSignature)
-    || (previousSignature && previousSignature.localeCompare(entry.inputSignature) >= 0)
+    || (previousSortKey && previousSortKey.localeCompare(sortKey) >= 0)
   ) throw new Error('Precompiled route manifest entry is malformed');
-  presetIds.add(entry.presetId);
-  signatures.add(entry.inputSignature);
+  variants.add(variantKey);
+  foundTargetKeys.add(entryTargetKey);
+  exactIdentities.add(exactIdentity);
   artifactFiles.add(entry.artifactFile);
-  previousSignature = entry.inputSignature;
+  previousSortKey = sortKey;
   const source = await readFile(resolve(ROOT, entry.sourcePath), 'utf8');
   const sourcePreset = JSON.parse(source);
   if (sourcePreset?.id !== entry.presetId) {
@@ -122,10 +140,12 @@ for (const entry of manifest.entries) {
     throw new Error(`Precompiled route artifact ${entry.artifactFile} is not canonical`);
   }
 }
-if (expectedTargets.size > 0) throw new Error('Precompiled route manifest is missing a target');
+if ([...requiredInitialTargetKeys].some(key => !foundTargetKeys.has(key))) {
+  throw new Error('Precompiled route manifest is missing an initial target');
+}
 
 const existingArtifactFiles = (await readdir(ARTIFACT_DIR))
-  .filter(file => /^route-\d{1,10}\.json$/.test(file))
+  .filter(file => ARTIFACT_FILE_PATTERN.test(file))
   .sort();
 const expectedArtifactFiles = [...artifactFiles].sort();
 if (existingArtifactFiles.join('\n') !== expectedArtifactFiles.join('\n')) {

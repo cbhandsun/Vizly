@@ -34,7 +34,19 @@ const routed = [{
 describe('precompiled display route capture', () => {
   it('captures bounded worker compute duration for cold-route diagnostics', () => {
     expect(renderPrecompiledDisplayRouteCaptureExpression('safe-preset'))
-      .toContain('workerDurationMs: response.workerDurationMs');
+      .toContain('workerDurationMs: isLayoutCapture ? routing.routeMs : response.workerDurationMs');
+  });
+
+  it('binds layout capture to the exact committed variant and fresh provenance', () => {
+    const expression = renderPrecompiledDisplayRouteCaptureExpression(
+      'wms-process-flow-v1',
+      'domain-lanes-lr',
+    );
+    expect(expression).toContain('const expectedVariantId = "domain-lanes-lr"');
+    expect(expression).toContain("committed?.variantId === expectedVariantId");
+    expect(expression).toContain("committed?.provenance === 'fresh-full-route'");
+    expect(expression).toContain("operation: isLayoutCapture ? 'layout-committed'");
+    expect(expression).toContain('const currentWorkerMatches = isLayoutCapture || (');
   });
 
   it('treats an in-job final repair as a fresh full route', () => {

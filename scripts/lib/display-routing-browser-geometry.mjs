@@ -669,6 +669,18 @@ export const readDisplayRoutingVisualScaleAudit = () => {
         edgeId: label.getAttribute('data-edge-id') || '<missing>',
         nodeId: overlappingNode.id,
         priority: label.getAttribute('data-edge-label-priority') || 'detail',
+        labelRect: {
+          left: rect.left,
+          top: rect.top,
+          right: rect.right,
+          bottom: rect.bottom,
+        },
+        nodeRect: {
+          left: overlappingNode.rect.left,
+          top: overlappingNode.rect.top,
+          right: overlappingNode.rect.right,
+          bottom: overlappingNode.rect.bottom,
+        },
       });
     }
   }

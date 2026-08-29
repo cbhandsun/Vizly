@@ -232,6 +232,17 @@ export const summarizeSlowestDisplayRoutingPhases = (phaseTrace, limit = 5) => {
         : trace.durationMs,
       inclusiveDurationMs: trace.durationMs,
       resolution: typeof trace.resolution === 'string' ? trace.resolution : null,
+      evaluationCount: Number.isFinite(trace.evaluationCount) ? trace.evaluationCount : null,
+      cacheHitCount: Number.isFinite(trace.cacheHitCount) ? trace.cacheHitCount : null,
+      scannedNodeCount: Number.isFinite(trace.scannedNodeCount) ? trace.scannedNodeCount : null,
+      scannedSegmentCount: Number.isFinite(trace.scannedSegmentCount)
+        ? trace.scannedSegmentCount
+        : null,
+      scannedEdgePairCount: Number.isFinite(trace.scannedEdgePairCount)
+        ? trace.scannedEdgePairCount
+        : null,
+      workItemCount: Number.isFinite(trace.workItemCount) ? trace.workItemCount : null,
+      candidateCount: Number.isFinite(trace.candidateCount) ? trace.candidateCount : null,
     }));
 };
 

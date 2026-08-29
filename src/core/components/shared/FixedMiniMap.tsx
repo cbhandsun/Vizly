@@ -126,7 +126,7 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
   // DiagramLayout resolves UI scale once for the page lifetime. Reading the
   // computed style again on every animated viewport frame forces synchronous
   // style/layout work while the minimap is repainting.
-  const uiScale = useMemo(getUiScale, []);
+  const uiScale = useMemo(() => getUiScale(), []);
   const readUiScale = useCallback(() => uiScale, [uiScale]);
 
   const reactFlowInstance = useReactFlow<MinimapNode>();

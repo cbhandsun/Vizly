@@ -14,6 +14,28 @@ vi.mock('../baseReactFlowDisplayWorkerClient', async importOriginal => {
     ...original,
     computeBaseReactFlowDisplayEdgesInWorker: workerMocks.compute,
     repairBaseReactFlowDisplayEdgesInWorker: workerMocks.repair,
+    computeBaseReactFlowLayoutRepairAndRouteInWorker: async (
+      request: Parameters<typeof original.computeBaseReactFlowLayoutRepairAndRouteInWorker>[0],
+    ) => {
+      const repairResult = await workerMocks.repair({
+        ...request,
+        requestId: `${request.requestId}:candidate-repair`,
+        edges: request.stagedCandidateEdges,
+        requireHardClean: false,
+        timeoutMs: 12_000,
+      });
+      if (
+        request.stopAfterObstacleFailure
+        && repairResult?.hardClean === false
+        && (repairResult?.hardReport?.obstacleHits ?? 0) > 0
+      ) return repairResult;
+      return workerMocks.compute({
+        ...request,
+        cachedCandidateEdges: request.fallbackCandidateEdges,
+        candidateSource: 'persistent',
+        qualityMode: 'full',
+      });
+    },
   };
 });
 

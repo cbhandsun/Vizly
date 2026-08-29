@@ -227,6 +227,47 @@ describe('baseReactFlowPrecompiledRouteRegistry', () => {
     expect(secondLoad).not.toHaveBeenCalled();
   });
 
+  it('loads an exact layout variant but treats digest misses and tampering as fallbacks', async () => {
+    const exactLoad = vi.fn(async () => artifact);
+    const descriptor = {
+      presetId: 'wms-process-flow-v1',
+      variantId: 'domain-lanes-lr',
+      sourceHash: SOURCE_HASH,
+      geometryDigest: inputGeometryDigest,
+      load: exactLoad,
+    };
+    const registry = { [inputSignature]: descriptor };
+
+    await expect(loadBaseReactFlowPrecompiledRouteCandidateFromRegistry(
+      { ...identityInput, inputSignature, inputGeometryDigest },
+      registry,
+    )).resolves.toEqual(routedEdges);
+    await expect(loadBaseReactFlowPrecompiledRouteCandidateFromRegistry(
+      {
+        ...identityInput,
+        inputSignature,
+        inputGeometryDigest: 'geometry-v1:00000000000000000000000000000000',
+      },
+      registry,
+    )).resolves.toBeNull();
+    expect(exactLoad).toHaveBeenCalledOnce();
+
+    const tamperedLoad = vi.fn(async () => ({
+      ...artifact,
+      outputRouteSignature: 'route-v2:1:4:0000000000000000',
+    }));
+    await expect(loadBaseReactFlowPrecompiledRouteCandidateFromRegistry(
+      { ...identityInput, inputSignature, inputGeometryDigest },
+      {
+        [inputSignature]: {
+          ...descriptor,
+          load: tamperedLoad,
+        },
+      },
+    )).resolves.toBeNull();
+    expect(tamperedLoad).toHaveBeenCalledOnce();
+  });
+
   it('prefetches a known preset once without treating the preset id as route identity', async () => {
     const load = vi.fn(async () => artifact);
     const cache = new Map<string, Promise<boolean>>();

@@ -9,23 +9,38 @@ const isRecord = (value: unknown): value is Record<string, unknown> => (
   Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 );
 
-const artifactsByPresetId: Readonly<Record<string, unknown>> = Object.fromEntries(
+const artifactKey = (presetId: string, variantId: string): string => (
+  `${presetId}\u0000${variantId}`
+);
+
+const artifactsByVariant: Readonly<Record<string, unknown>> = Object.fromEntries(
   (Array.isArray(manifest.entries) ? manifest.entries : []).flatMap(entry => {
+    if (!isRecord(entry)) return [];
+    const entryRecord: Record<string, unknown> = entry;
     if (
-      !isRecord(entry)
-      || typeof entry.presetId !== 'string'
-      || typeof entry.artifactFile !== 'string'
-      || !/^route-\d{1,10}\.json$/.test(entry.artifactFile)
+      typeof entryRecord.presetId !== 'string'
+      || typeof entryRecord.artifactFile !== 'string'
+      || !/^route-\d{1,10}(?:-[0-9a-f]{32})?\.json$/.test(entryRecord.artifactFile)
     ) return [];
+    const variantId = typeof entryRecord.variantId === 'string'
+      ? entryRecord.variantId
+      : 'initial';
     const moduleEntry = Object.entries(artifactModules)
-      .find(([path]) => path.endsWith(`/${entry.artifactFile}`));
-    return moduleEntry ? [[entry.presetId, moduleEntry[1]]] : [];
+      .find(([path]) => path.endsWith(`/${entryRecord.artifactFile}`));
+    return moduleEntry
+      ? [[artifactKey(entryRecord.presetId, variantId), moduleEntry[1]]]
+      : [];
   }),
 );
 
 /** Static test boundary; production route loading remains same-origin fetch-only. */
-export const getGeneratedPrecompiledRouteArtifactForTest = (presetId: string): unknown => {
-  const artifact = artifactsByPresetId[presetId];
-  if (!artifact) throw new Error(`Missing generated precompiled test artifact: ${presetId}`);
+export const getGeneratedPrecompiledRouteArtifactForTest = (
+  presetId: string,
+  variantId = 'initial',
+): unknown => {
+  const artifact = artifactsByVariant[artifactKey(presetId, variantId)];
+  if (!artifact) {
+    throw new Error(`Missing generated precompiled test artifact: ${presetId}:${variantId}`);
+  }
   return artifact;
 };

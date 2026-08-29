@@ -2,6 +2,7 @@ import { loadBaseReactFlowPrecompiledRouteAsset } from '../baseReactFlowPrecompi
 
 export type GeneratedBaseReactFlowPrecompiledRouteDescriptor = {
   presetId?: string;
+  variantId?: string;
   sourceHash: string;
   geometryDigest: string;
   load: () => Promise<unknown>;
@@ -14,6 +15,7 @@ const generatedPrecompiledRouteAsset0 = new URL(
 
 const generatedPrecompiledRouteDescriptor0: GeneratedBaseReactFlowPrecompiledRouteDescriptor = {
   presetId: "wms-process-flow-v1",
+  variantId: "initial",
   sourceHash: "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
   geometryDigest: "geometry-v1:6933a4d0ae9ed2a8b4f4b14092ba34c4",
   load: () => loadBaseReactFlowPrecompiledRouteAsset(generatedPrecompiledRouteAsset0),
@@ -26,6 +28,7 @@ const generatedPrecompiledRouteAsset1 = new URL(
 
 const generatedPrecompiledRouteDescriptor1: GeneratedBaseReactFlowPrecompiledRouteDescriptor = {
   presetId: "logistics-architecture-v1",
+  variantId: "initial",
   sourceHash: "source-v1:da286fbefa1a0d0a3ba3bf5a6589d2edba849af0f477ddb910ecad4d91649986",
   geometryDigest: "geometry-v1:0cb0f24303d795fb7a123befd3e20fc7",
   load: () => loadBaseReactFlowPrecompiledRouteAsset(generatedPrecompiledRouteAsset1),
@@ -38,6 +41,7 @@ const generatedPrecompiledRouteAsset2 = new URL(
 
 const generatedPrecompiledRouteDescriptor2: GeneratedBaseReactFlowPrecompiledRouteDescriptor = {
   presetId: "wms-demand-allocation-strategy-v2",
+  variantId: "initial",
   sourceHash: "source-v1:ea82c502ab6535b5c8f8367c591861e540396a41955a15c6b5f94f922264b7de",
   geometryDigest: "geometry-v1:959447b9afedc5b100c74395ce889f05",
   load: () => loadBaseReactFlowPrecompiledRouteAsset(generatedPrecompiledRouteAsset2),

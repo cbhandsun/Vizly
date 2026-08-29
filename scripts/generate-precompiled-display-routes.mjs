@@ -3,6 +3,7 @@ import { basename, dirname, resolve, sep } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { withPrecompiledRouteBrowser } from './lib/precompiled-display-route-cdp.mjs';
+import { clickPrecompiledDisplayRouteLayoutVariant } from './lib/precompiled-display-route-layout-capture.mjs';
 import {
   isFreshFullRouteResolution,
   renderPrecompiledDisplayRouteCaptureExpression,
@@ -12,7 +13,10 @@ import {
   renderPrecompiledRouteLoaders,
   renderPrecompiledRouteManifest,
 } from './lib/precompiled-display-route-render.mjs';
-import { PRECOMPILED_DISPLAY_ROUTE_TARGETS } from './lib/precompiled-display-route-targets.mjs';
+import {
+  PRECOMPILED_DISPLAY_ROUTE_GENERATION_TARGETS,
+  PRECOMPILED_DISPLAY_ROUTE_TARGETS,
+} from './lib/precompiled-display-route-targets.mjs';
 import { hashPrecompiledDisplayRouteSource } from './lib/precompiled-display-route-source-hash.mjs';
 import { computePrecompiledDisplayRoutingSourceHash } from './lib/precompiled-display-route-source-set.mjs';
 import { auditPrecompiledDisplayRouteCommercialQuality } from './lib/precompiled-display-route-commercial-quality.mjs';
@@ -28,6 +32,7 @@ const CHECK_MODE = process.argv.includes('--check');
 const TRACE_ALL = process.argv.includes('--trace-all');
 const MACHINE_MODE = process.argv.includes('--machine');
 const MEASURE_ONLY = process.argv.includes('--measure-only');
+const INCLUDE_LAYOUT_VARIANTS = process.argv.includes('--include-layout-variants');
 const GENERATED_DIR = resolve(ROOT, 'src/core/components/shared/generated');
 const ARTIFACT_DIR = resolve(GENERATED_DIR, 'precompiledRoutes');
 const MANIFEST_PATH = resolve(GENERATED_DIR, 'baseReactFlowPrecompiledRouteManifest.json');
@@ -35,6 +40,7 @@ const LOADERS_PATH = resolve(GENERATED_DIR, 'baseReactFlowPrecompiledRouteLoader
 const SCHEMA = 'vizly-precompiled-display-route-v1';
 const MANIFEST_SCHEMA = 'vizly-precompiled-display-route-manifest-v3';
 const MAX_ARTIFACT_BYTES = 2_000_000;
+const ARTIFACT_FILE_PATTERN = /^route-\d{1,10}(?:-[0-9a-f]{32})?\.json$/;
 const ROUTING_VERSION_PATH = resolve(ROOT, 'src/core/routing/routingVersion.ts');
 const INPUT_IDENTITY_PATH = resolve(
   ROOT,
@@ -128,21 +134,52 @@ const captureTarget = async (session, target, source, routingVersion) => {
   if (preset.id !== target.presetId) {
     throw new Error(`${target.sourcePath} preset id does not match ${target.presetId}`);
   }
+  const variantId = target.variantId;
+  if (
+    typeof variantId !== 'string'
+    || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(variantId)
+  ) throw new Error(`Invalid precompiled route variant for ${preset.id}`);
   await session.evaluate(`(() => {
     window.__vizlyPrecompiledRouteRequest = null;
     window.__vizlyPrecompiledRouteResponse = null;
     window.__vizlyPrecompiledCommittedRoute = null;
     return true;
   })()`);
-  const url = `${BASE_URL}/?precompiledCapture=${encodeURIComponent(preset.id)}`
-    + `&precompiledRegenerate=${encodeURIComponent(preset.id)}`
-    + `#/?diagram=${encodeURIComponent(preset.id)}`;
+  const isLayoutVariant = variantId !== 'initial';
+  const url = isLayoutVariant
+    ? `${BASE_URL}/?precompiledLayoutRegenerate=${encodeURIComponent(preset.id)}`
+      + `&precompiledLayoutVariant=${encodeURIComponent(variantId)}`
+      + `#/?diagram=${encodeURIComponent(preset.id)}`
+    : `${BASE_URL}/?precompiledCapture=${encodeURIComponent(preset.id)}`
+      + `&precompiledRegenerate=${encodeURIComponent(preset.id)}`
+      + `#/?diagram=${encodeURIComponent(preset.id)}`;
   await session.send('Page.navigate', { url });
   const deadline = Date.now() + readGenerationTimeoutMs();
+  if (isLayoutVariant) {
+    let layoutReady = false;
+    while (Date.now() < deadline) {
+      layoutReady = await session.evaluate(`(() => (
+        document.readyState === 'complete'
+        && window.__vizlyBaseReactFlowDisplayRouting?.stage === 'final-applied'
+        && Array.from(document.querySelectorAll('button')).some(
+          button => /自动布局|layout/i.test(button.getAttribute('aria-label') || ''),
+        )
+      ))()`);
+      if (layoutReady) break;
+      await delay(250);
+    }
+    if (!layoutReady) {
+      throw new Error(`Timed out waiting to apply layout variant ${preset.id}:${variantId}`);
+    }
+    await clickPrecompiledDisplayRouteLayoutVariant(session, variantId);
+  }
   let captured = null;
   while (Date.now() < deadline) {
     try {
-      captured = await session.evaluate(renderPrecompiledDisplayRouteCaptureExpression(preset.id));
+      captured = await session.evaluate(renderPrecompiledDisplayRouteCaptureExpression(
+        preset.id,
+        variantId,
+      ));
     } catch {
       captured = null;
     }
@@ -191,6 +228,8 @@ const captureTarget = async (session, target, source, routingVersion) => {
         requestEdges: Array.isArray(request?.edges) ? request.edges.length : null,
         responseHardClean: response?.hardClean,
         responseRouteResolution: response?.routeResolution,
+        committedVariantId: window.__vizlyPrecompiledCommittedRoute?.variantId ?? null,
+        committedProvenance: window.__vizlyPrecompiledCommittedRoute?.provenance ?? null,
         responseError: response?.error,
         responsePhaseTrace: Array.isArray(response?.phaseTrace) ? response.phaseTrace : null,
         hardGateDiagnostics: routing.hardGateDiagnostics ?? null,
@@ -226,7 +265,7 @@ const captureTarget = async (session, target, source, routingVersion) => {
         bodyText: document.body?.innerText?.slice(0, 256) ?? null,
       };
     })()`);
-    throw new Error(`Timed out generating ${preset.id}: ${JSON.stringify(status)}`);
+    throw new Error(`Timed out generating ${preset.id}:${variantId}: ${JSON.stringify(status)}`);
   }
   const {
     routing,
@@ -235,25 +274,27 @@ const captureTarget = async (session, target, source, routingVersion) => {
     outputRouteSignature,
     workerResolution,
     workerDurationMs,
+    provenance,
   } = captured;
   if (
     routing.routingVersion !== routingVersion
+    || captured.variantId !== variantId
     || typeof routing.signature !== 'string'
     || routing.workerStartCount !== 1
     || routing.workerAbortCount !== 0
-    || captured.requestShape.operation !== 'route'
+    || captured.requestShape.operation !== (isLayoutVariant ? 'layout-committed' : 'route')
     || captured.requestShape.candidateEdges !== 0
     || patches.length !== captured.requestShape.edges
-  ) throw new Error(`Generated route identity mismatch for ${preset.id}`);
+  ) throw new Error(`Generated route identity mismatch for ${preset.id}:${variantId}`);
   const commercialIssues = auditPrecompiledDisplayRouteCommercialQuality(patches);
   if (commercialIssues.length > 0) {
     throw new Error(
-      `Generated route failed commercial quality for ${preset.id}: `
+      `Generated route failed commercial quality for ${preset.id}:${variantId}: `
       + JSON.stringify(commercialIssues),
     );
   }
   console.log(
-    `Captured ${preset.id}: ${workerResolution}, workerStart=${routing.workerStartCount}, routeMs=${routing.routeMs}.`,
+    `Captured ${preset.id}:${variantId}: ${workerResolution}, workerStart=${routing.workerStartCount}, routeMs=${routing.routeMs}.`,
   );
   const slowestPhases = Array.isArray(routing.phaseTrace)
     ? routing.phaseTrace.slice().sort((left, right) => right.durationMs - left.durationMs).slice(0, 10)
@@ -292,6 +333,7 @@ const captureTarget = async (session, target, source, routingVersion) => {
   }
   return {
     presetId: preset.id,
+    variantId,
     artifact: {
       schema: SCHEMA,
       routingVersion,
@@ -304,6 +346,7 @@ const captureTarget = async (session, target, source, routingVersion) => {
     },
     measurement: {
       workerResolution,
+      provenance,
       workerStartCount: routing.workerStartCount,
       workerAbortCount: routing.workerAbortCount,
       routeMs: routing.routeMs,
@@ -343,7 +386,7 @@ const assertProductionPreview = async () => {
 const listGeneratedArtifactFiles = async () => {
   try {
     return (await readdir(ARTIFACT_DIR))
-      .filter(file => /^route-\d{1,10}\.json$/.test(file))
+      .filter(file => ARTIFACT_FILE_PATTERN.test(file))
       .sort();
   } catch (error) {
     if (error && typeof error === 'object' && error.code === 'ENOENT') return [];
@@ -352,7 +395,7 @@ const listGeneratedArtifactFiles = async () => {
 };
 
 const resolveGeneratedArtifactPath = artifactFile => {
-  if (!/^route-\d{1,10}\.json$/.test(artifactFile)) {
+  if (!ARTIFACT_FILE_PATTERN.test(artifactFile)) {
     throw new Error(`Unsafe generated artifact filename ${artifactFile}`);
   }
   const absolutePath = resolve(ARTIFACT_DIR, artifactFile);
@@ -373,11 +416,16 @@ const assertFileContents = async (path, expected, label) => {
 };
 
 const main = async () => {
+  const availableTargets = MEASURE_ONLY
+    ? PRECOMPILED_DISPLAY_ROUTE_TARGETS
+    : (INCLUDE_LAYOUT_VARIANTS
+      ? PRECOMPILED_DISPLAY_ROUTE_GENERATION_TARGETS
+      : PRECOMPILED_DISPLAY_ROUTE_TARGETS);
   const captureTargets = selectPrecompiledDisplayRouteCaptureTargets({
     measureOnly: MEASURE_ONLY,
     checkMode: CHECK_MODE,
     presetId: process.env.PRECOMPILED_ROUTE_PRESET_ID,
-    targets: PRECOMPILED_DISPLAY_ROUTE_TARGETS,
+    targets: availableTargets,
   });
   await assertProductionPreview();
   const routingVersion = await readRoutingVersion();
@@ -393,10 +441,14 @@ const main = async () => {
     }
     return generated;
   });
+  const isFreshGenerationCapture = capture => (
+    capture.variantId === 'initial'
+      ? isFreshFullRouteResolution(capture.measurement.workerResolution)
+      : capture.measurement.provenance === 'fresh-layout-repair-validated'
+        || capture.measurement.provenance === 'fresh-full-route'
+  );
   if (MEASURE_ONLY) {
-    if (captures.some(capture => (
-      !isFreshFullRouteResolution(capture.measurement.workerResolution)
-    ))) {
+    if (captures.some(capture => !isFreshGenerationCapture(capture))) {
       throw new Error('Focused measurement did not compute a fresh full route');
     }
     console.log(`Measured ${captures.length} precompiled route preset without writing artifacts.`);
@@ -413,20 +465,31 @@ const main = async () => {
   await mkdir(ARTIFACT_DIR, { recursive: true });
   const entries = [];
   const artifactContents = new Map();
-  const signatures = new Set();
-  const presetIds = new Set();
+  const exactIdentities = new Set();
+  const variants = new Set();
+  const signatureCounts = new Map();
+  for (const capture of captures) {
+    const signature = capture.artifact.inputSignature;
+    signatureCounts.set(signature, (signatureCounts.get(signature) ?? 0) + 1);
+  }
   for (let index = 0; index < captures.length; index += 1) {
     const artifact = captures[index].artifact;
-    if (signatures.has(artifact.inputSignature)) {
-      throw new Error(`Duplicate precompiled route signature ${artifact.inputSignature}`);
+    const exactIdentity = `${artifact.inputSignature}\u0000${artifact.inputGeometryDigest}`;
+    if (exactIdentities.has(exactIdentity)) {
+      throw new Error(`Duplicate precompiled route identity ${artifact.inputSignature}`);
     }
-    signatures.add(artifact.inputSignature);
+    exactIdentities.add(exactIdentity);
     const presetId = captures[index].presetId;
-    if (presetIds.has(presetId)) {
-      throw new Error(`Duplicate precompiled route preset id ${presetId}`);
+    const variantId = captures[index].variantId;
+    const variantKey = `${presetId}\u0000${variantId}`;
+    if (variants.has(variantKey)) {
+      throw new Error(`Duplicate precompiled route variant ${presetId}:${variantId}`);
     }
-    presetIds.add(presetId);
-    const artifactFile = `route-${artifact.inputSignature}.json`;
+    variants.add(variantKey);
+    const digestSuffix = artifact.inputGeometryDigest.slice('geometry-v1:'.length);
+    const artifactFile = signatureCounts.get(artifact.inputSignature) === 1
+      ? `route-${artifact.inputSignature}.json`
+      : `route-${artifact.inputSignature}-${digestSuffix}.json`;
     const artifactSource = renderPrecompiledRouteArtifact(artifact);
     if (Buffer.byteLength(artifactSource, 'utf8') > MAX_ARTIFACT_BYTES) {
       throw new Error(`Generated artifact ${artifactFile} exceeds ${MAX_ARTIFACT_BYTES} bytes`);
@@ -434,7 +497,8 @@ const main = async () => {
     artifactContents.set(artifactFile, artifactSource);
     entries.push({
       presetId,
-      sourcePath: PRECOMPILED_DISPLAY_ROUTE_TARGETS[index].sourcePath,
+      variantId,
+      sourcePath: captureTargets[index].sourcePath,
       artifactFile,
       sourceHash: artifact.sourceHash,
       inputSignature: artifact.inputSignature,
@@ -442,7 +506,12 @@ const main = async () => {
       outputRouteSignature: artifact.outputRouteSignature,
     });
   }
-  entries.sort((first, second) => first.inputSignature.localeCompare(second.inputSignature));
+  entries.sort((first, second) => (
+    first.inputSignature.localeCompare(second.inputSignature)
+    || first.inputGeometryDigest.localeCompare(second.inputGeometryDigest)
+    || first.presetId.localeCompare(second.presetId)
+    || first.variantId.localeCompare(second.variantId)
+  ));
   const manifest = {
     schema: MANIFEST_SCHEMA,
     routingVersion,
@@ -455,9 +524,7 @@ const main = async () => {
   const expectedArtifactFiles = [...artifactContents.keys()].sort();
   const existingArtifactFiles = await listGeneratedArtifactFiles();
   if (CHECK_MODE) {
-    if (captures.some(capture => (
-      !isFreshFullRouteResolution(capture.measurement.workerResolution)
-    ))) {
+    if (captures.some(capture => !isFreshGenerationCapture(capture))) {
       throw new Error('Production reproducibility check did not compute a fresh full route');
     }
     if (existingArtifactFiles.join('\n') !== expectedArtifactFiles.join('\n')) {

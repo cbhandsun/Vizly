@@ -184,10 +184,15 @@ export const getEdgeLabelAutoOffset = (
     ? Math.max(16, estimated.width / 2 + desiredOwnClearance)
     : Math.max(16, estimated.height / 2 + desiredOwnClearance);
   const along = Math.max(14, Math.min(32, safeLabelText.length * 1.5 + 8));
+  const mediumAlong = Math.max(32, Math.min(48, estimated.width / 2));
+  const farAlong = Math.max(
+    48,
+    Math.min(96, estimated.width / 2 + desiredObstacleClearance + 40),
+  );
   const preferred = vertical
     ? (safeLabelPoint.x >= nearest.a.x ? 1 : -1)
     : (safeLabelPoint.y >= nearest.a.y ? 1 : -1);
-  const candidates = vertical
+  const nearCandidates = vertical
     ? [
       { x: 0, y: 0 },
       { x: preferred * perpendicular, y: 0 },
@@ -196,6 +201,10 @@ export const getEdgeLabelAutoOffset = (
       { x: preferred * perpendicular, y: -along },
       { x: -preferred * perpendicular, y: along },
       { x: -preferred * perpendicular, y: -along },
+      { x: preferred * perpendicular, y: mediumAlong },
+      { x: preferred * perpendicular, y: -mediumAlong },
+      { x: -preferred * perpendicular, y: mediumAlong },
+      { x: -preferred * perpendicular, y: -mediumAlong },
     ]
     : [
       { x: 0, y: 0 },
@@ -205,11 +214,31 @@ export const getEdgeLabelAutoOffset = (
       { x: -along, y: preferred * perpendicular },
       { x: along, y: -preferred * perpendicular },
       { x: -along, y: -preferred * perpendicular },
+      { x: mediumAlong, y: preferred * perpendicular },
+      { x: -mediumAlong, y: preferred * perpendicular },
+      { x: mediumAlong, y: -preferred * perpendicular },
+      { x: -mediumAlong, y: -preferred * perpendicular },
+    ];
+  const farCandidates = vertical
+    ? [
+      { x: preferred * perpendicular, y: farAlong },
+      { x: preferred * perpendicular, y: -farAlong },
+      { x: -preferred * perpendicular, y: farAlong },
+      { x: -preferred * perpendicular, y: -farAlong },
+    ]
+    : [
+      { x: farAlong, y: preferred * perpendicular },
+      { x: -farAlong, y: preferred * perpendicular },
+      { x: farAlong, y: -preferred * perpendicular },
+      { x: -farAlong, y: -preferred * perpendicular },
     ];
 
-  let best = candidates[0];
+  let best = nearCandidates[0];
   let bestScore = Number.NEGATIVE_INFINITY;
-  for (const candidate of candidates) {
+  let bestPeerClearance = Number.NEGATIVE_INFINITY;
+  let bestNodeClearance = Number.NEGATIVE_INFINITY;
+  const considerCandidates = (candidates: EdgeLabelPoint[]): void => {
+    for (const candidate of candidates) {
     const center = { x: safeLabelPoint.x + candidate.x, y: safeLabelPoint.y + candidate.y };
     const ownClearance = labelPathClearance(center, safeLabelText, safeOwnPath);
     const peerClearance = peerPathClearance(center, safeLabelText, safePeerPaths);
@@ -221,10 +250,19 @@ export const getEdgeLabelAutoOffset = (
       - Math.max(0, desiredPeerClearance - peerClearance) * 10
       - Math.max(0, desiredObstacleClearance - nodeClearance) * 10
       - displacement * 0.035;
-    if (score > bestScore) {
+    const candidateClearsNodes = nodeClearance >= desiredObstacleClearance;
+    const bestClearsNodes = bestNodeClearance >= desiredObstacleClearance;
+    if ((candidateClearsNodes && !bestClearsNodes) || (candidateClearsNodes === bestClearsNodes && score > bestScore)) {
       bestScore = score;
       best = candidate;
+      bestPeerClearance = peerClearance;
+      bestNodeClearance = nodeClearance;
     }
+  }
+  };
+  considerCandidates(nearCandidates);
+  if (bestPeerClearance < desiredPeerClearance || bestNodeClearance < desiredObstacleClearance) {
+    considerCandidates(farCandidates);
   }
   return best;
 };

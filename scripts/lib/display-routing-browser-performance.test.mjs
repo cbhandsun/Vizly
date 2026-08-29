@@ -202,7 +202,18 @@ describe('display routing browser performance budget', () => {
   it('summarizes valid slow phases without mutating the worker trace', () => {
     const trace = [
       { phase: 'seed', durationMs: 20, resolution: 'skip', sensitive: 'discarded' },
-      { phase: 'quality', durationMs: 50, resolution: 'accepted' },
+      {
+        phase: 'quality',
+        durationMs: 50,
+        resolution: 'accepted',
+        evaluationCount: 8,
+        cacheHitCount: 3,
+        scannedNodeCount: 51,
+        scannedSegmentCount: 144,
+        scannedEdgePairCount: 946,
+        workItemCount: 5,
+        candidateCount: 32,
+      },
       { phase: 'invalid', durationMs: Number.NaN },
     ];
 
@@ -213,6 +224,13 @@ describe('display routing browser performance budget', () => {
         durationMs: 50,
         inclusiveDurationMs: 50,
         resolution: 'accepted',
+        evaluationCount: 8,
+        cacheHitCount: 3,
+        scannedNodeCount: 51,
+        scannedSegmentCount: 144,
+        scannedEdgePairCount: 946,
+        workItemCount: 5,
+        candidateCount: 32,
       },
     ]);
     expect(trace[0].phase).toBe('seed');
@@ -238,6 +256,13 @@ describe('display routing browser performance budget', () => {
       durationMs: 30,
       inclusiveDurationMs: 60,
       resolution: 'accepted',
+      evaluationCount: null,
+      cacheHitCount: null,
+      scannedNodeCount: null,
+      scannedSegmentCount: null,
+      scannedEdgePairCount: null,
+      workItemCount: null,
+      candidateCount: null,
     }]);
     expect(summarizeDisplayRoutingSamples([30, 10, 20, 40, Number.NaN, -1])).toEqual({
       sampleCount: 4,
