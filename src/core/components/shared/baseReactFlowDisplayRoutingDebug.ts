@@ -63,7 +63,19 @@ export type DisplayRoutingDebugState = {
   incrementalPlanStatus?: 'ready' | 'missing-baseline' | 'rejected';
   renderAuthorityStatus?: BaseReactFlowRenderAuthorityStatus;
   renderAuthorityIssue?: BaseReactFlowRenderAuthorityIssue;
+  layoutTransactionJobId?: number;
+  layoutTransactionStatus?: DisplayLayoutTransactionStatus;
+  layoutTransactionAttemptCount?: number;
+  layoutTransactionErrorCode?: DisplayLayoutTransactionErrorCode;
 };
+
+export type DisplayLayoutTransactionStatus = 'running' | 'committed' | 'failed';
+
+export type DisplayLayoutTransactionErrorCode =
+  | 'cancelled'
+  | 'hard-quality-rejected'
+  | 'no-layoutable-nodes'
+  | 'strategy-failed';
 
 export type BaseReactFlowRenderAuthorityIssue =
   | 'untrusted-baseline'
@@ -117,6 +129,34 @@ export const updateDisplayRoutingLifecycleState = (
   nodeCount: number,
   edgeCount: number,
 ): void => updateDisplayRoutingDebugState({ stage, signature, nodeCount, edgeCount });
+
+export const updateDisplayLayoutTransactionState = ({
+  jobId,
+  status,
+  attemptCount,
+  errorCode,
+}: Readonly<{
+  jobId: number;
+  status: DisplayLayoutTransactionStatus;
+  attemptCount: number;
+  errorCode?: DisplayLayoutTransactionErrorCode;
+}>): void => updateDisplayRoutingDebugState({
+  layoutTransactionJobId: jobId,
+  layoutTransactionStatus: status,
+  layoutTransactionAttemptCount: attemptCount,
+  layoutTransactionErrorCode: errorCode,
+});
+
+export const classifyDisplayLayoutTransactionError = (
+  error: unknown,
+): DisplayLayoutTransactionErrorCode => {
+  if (!(error instanceof Error)) return 'strategy-failed';
+  if (error.message === 'layout-routing-cancelled') return 'cancelled';
+  if (error.message === 'layout-routing-hard-quality-rejected') {
+    return 'hard-quality-rejected';
+  }
+  return 'strategy-failed';
+};
 
 export const updateDisplayRoutingFinalAppliedState = (
   patch: DisplayRoutingDebugState,

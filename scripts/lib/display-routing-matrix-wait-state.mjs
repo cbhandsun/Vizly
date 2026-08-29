@@ -131,6 +131,10 @@ export const summarizeDisplayRoutingWaitState = (
       layoutSeedTerminalsAnchored: boolean(routing.layoutSeedTerminalsAnchored),
       layoutSeedObstacleHits: integer(routing.layoutSeedObstacleHits),
       layoutSeedStrictCrossings: integer(routing.layoutSeedStrictCrossings),
+      layoutTransactionJobId: integer(routing.layoutTransactionJobId),
+      layoutTransactionStatus: token(routing.layoutTransactionStatus),
+      layoutTransactionAttemptCount: integer(routing.layoutTransactionAttemptCount),
+      layoutTransactionErrorCode: token(routing.layoutTransactionErrorCode),
       phaseProgressTrace: progressTraces.map(projectTrace),
     },
     responseCount: responses.length,
@@ -214,4 +218,5 @@ const TERMINAL_FAILURE_STAGES = new Set([
 
 export const displayRoutingWaitStateHasTerminalFailure = state => (
   TERMINAL_FAILURE_STAGES.has(state?.routing?.stage)
+  || state?.routing?.layoutTransactionStatus === 'failed'
 );

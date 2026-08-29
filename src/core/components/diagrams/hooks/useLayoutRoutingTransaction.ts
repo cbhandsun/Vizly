@@ -21,6 +21,7 @@ type LayoutRoutingTransactionRequest = Readonly<{
   beforePreviewRelease?: () => Promise<unknown>;
   rejectObstacleDirtyBoundedCandidate?: boolean;
   candidateRepairPolicy?: 'default' | 'skip-exact-clean';
+  retainLayoutPreviewOnFailure?: boolean;
 }>;
 
 export type LayoutPresentationPreviewRequest = Readonly<{
@@ -64,6 +65,7 @@ export const useLayoutRoutingTransaction = ({
     beforePreviewRelease,
     rejectObstacleDirtyBoundedCandidate,
     candidateRepairPolicy,
+    retainLayoutPreviewOnFailure = false,
   }: LayoutRoutingTransactionRequest): Promise<void> => {
     if (routingJob.owner !== 'layout' || !routingSessionRuntime.isCurrentJob(routingJob)) {
       throw new Error('layout-routing-cancelled');
@@ -146,8 +148,15 @@ export const useLayoutRoutingTransaction = ({
       await beforePreviewRelease?.();
     } finally {
       if (committed || routingSessionRuntime.isCurrentJob(routingJob)) {
-        const released = clearLayoutPreview?.(routingJob) ?? true;
-        if (released) setLayoutStable?.(true);
+        // A job-level fallback owns the same preview and routing epoch. Keep
+        // the target hidden transaction active between attempts so the old
+        // committed display route cannot re-enter and immediately be paused
+        // again when the fallback starts.
+        const retainsPreviewForFallback = !committed && retainLayoutPreviewOnFailure;
+        if (!retainsPreviewForFallback) {
+          const released = clearLayoutPreview?.(routingJob) ?? true;
+          if (released) setLayoutStable?.(true);
+        }
       }
     }
   }, [

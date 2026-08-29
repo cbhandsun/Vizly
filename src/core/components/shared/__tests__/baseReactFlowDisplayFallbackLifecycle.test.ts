@@ -18,11 +18,26 @@ import {
   shouldRepairBaseReactFlowDisplayResult,
 } from '../baseReactFlowDisplayCommitPolicy';
 import {
+  classifyDisplayLayoutTransactionError,
   resolveDisplayRoutingCommittedReuseTiming,
   resolveDisplayRoutingCommittedReuseTransactionEvidence,
 } from '../baseReactFlowDisplayRoutingDebug';
 
 describe('baseReactFlow display fallback lifecycle', () => {
+  it('classifies layout transaction failures without exposing arbitrary error text', () => {
+    expect(classifyDisplayLayoutTransactionError(
+      new Error('layout-routing-cancelled'),
+    )).toBe('cancelled');
+    expect(classifyDisplayLayoutTransactionError(
+      new Error('layout-routing-hard-quality-rejected'),
+    )).toBe('hard-quality-rejected');
+    expect(classifyDisplayLayoutTransactionError(
+      new Error('private provider payload'),
+    )).toBe('strategy-failed');
+    expect(classifyDisplayLayoutTransactionError({ message: 'layout-routing-cancelled' }))
+      .toBe('strategy-failed');
+  });
+
   it('uses lightweight built-in paths for smart edges during interactive fallback', () => {
     const plain = { id: 'plain', source: 'source', target: 'target', type: 'straight' };
     const smart = { id: 'smart', source: 'source', target: 'target', type: 'advanced-smart-step' };

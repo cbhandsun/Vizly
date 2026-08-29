@@ -13,6 +13,7 @@ import {
 } from './useLayoutRoutingTransaction';
 import { clearBaseReactFlowLayoutEdgeRoutingData } from '../../shared/baseReactFlowLayoutEdgeRoutingData';
 import type { BaseReactFlowRoutingSessionRuntime } from '../../shared/baseReactFlowRoutingSessionRuntime';
+import { createLayoutRoutingTransactionDiagnostics } from './layoutRoutingTransactionDiagnostics';
 import { normalizeLayoutVisibilityNodes } from './layoutVisibilityNodes';
 import { isDirectedForestLayoutGraph } from './treeLayoutTopology';
 import { calculateLayeredLayoutWithReverse } from './reverseLayeredLayoutGeometry';
@@ -149,6 +150,7 @@ export function useLayoutStrategy({
         // asynchronous strategy/ELK work starts. Otherwise a stale layout
         // result could open a fresh epoch after a newer display commit.
         const routingJob = routingSessionRuntime.beginJob('layout');
+        const transactionDiagnostics = createLayoutRoutingTransactionDiagnostics(routingJob.id);
         layoutFitControllerRef.current?.abort();
         const layoutFitController = new AbortController();
         layoutFitControllerRef.current = layoutFitController;
@@ -209,7 +211,18 @@ export function useLayoutStrategy({
             }));
             const nodeIdSet = new Set(layoutNodes.map(n => n.id));
             const layoutEdges = allEdges.filter(e => nodeIdSet.has(e.source) && nodeIdSet.has(e.target));
-            if (layoutNodes.length === 0) { logLayoutNoLayoutableNodes(); return false; }
+            if (layoutNodes.length === 0) {
+                logLayoutNoLayoutableNodes();
+                transactionDiagnostics.noLayoutableNodes();
+                return false;
+            }
+
+            const commitLayoutAttempt = async (
+                request: Parameters<typeof commitLayout>[0],
+            ): Promise<void> => {
+                transactionDiagnostics.beginAttempt();
+                await commitLayout(request);
+            };
 
             if (strategyName === 'tree') {
                 // ── 扁平树形布局（对齐 SVG 版：不检测域） ──
@@ -265,7 +278,7 @@ export function useLayoutStrategy({
                 // used by commercial layered layout engines. Same-rank and
                 // return edges still follow their actual relative geometry.
                 const treeEdges = prepareLayeredLayoutEdges(treeResult, treeSourceEdges, dir);
-                await commitLayout({
+                await commitLayoutAttempt({
                     nodes: treeResult,
                     edges: treeEdges,
                     routingJob,
@@ -322,7 +335,7 @@ export function useLayoutStrategy({
                         data: clearBaseReactFlowLayoutEdgeRoutingData(e.data),
                     }))
                     : prepareLayeredLayoutEdges(forceResult, forceSourceEdges, dir);
-                await commitLayout({
+                await commitLayoutAttempt({
                     nodes: forceResult,
                     edges: forceEdges,
                     routingJob,
@@ -575,12 +588,19 @@ export function useLayoutStrategy({
                                 type: clearLayoutEdgeRoutingType(edge),
                                 data: clearBaseReactFlowLayoutEdgeRoutingData(edge.data),
                             }));
-                        await commitLayout({
+                        await commitLayoutAttempt({
                             nodes: finalNodes,
                             edges: finalEdges,
                             routingJob,
                             beforePreviewRelease,
                             rejectObstacleDirtyBoundedCandidate: isDomainLane,
+                            retainLayoutPreviewOnFailure:
+                                shouldRetryRejectedDomainLayoutWithCompoundElk({
+                                    usedDomainElk,
+                                    usedDomainCompoundElk,
+                                    canUseFlatElkFallback,
+                                    hardQualityRejected: true,
+                                }),
                             candidateRepairPolicy:
                                 candidateUsesElk && !candidateUsesCompoundElk
                                     ? 'skip-exact-clean'
@@ -625,11 +645,17 @@ export function useLayoutStrategy({
             if (appliedNodeLayout && !isGlobalFullGraphLayoutStrategy(appliedStrategyName)) {
                 setLastNodeLayout(appliedNodeLayout);
             }
+            transactionDiagnostics.committed();
             return true;
         } catch (err) {
+            transactionDiagnostics.failed(err);
             logLayoutStrategyFailure(strategyName, err);
             return false;
         } finally {
+            if (routingSessionRuntime.isCurrentJob(routingJob)) {
+                const released = clearLayoutPreview?.(routingJob) ?? true;
+                if (released) setLayoutStable?.(true);
+            }
             if (layoutFitControllerRef.current === layoutFitController) {
                 layoutFitControllerRef.current = null;
             }
@@ -637,6 +663,7 @@ export function useLayoutStrategy({
             routingSessionRuntime.cancelJob(routingJob);
         }
     }, [
+        clearLayoutPreview,
         commitLayout,
         diagramId,
         loadLayoutPresetMap,
@@ -644,6 +671,7 @@ export function useLayoutStrategy({
         nodesRef,
         edgesRef,
         routingSessionRuntime,
+        setLayoutStable,
     ]);
 
     return {

@@ -51,9 +51,16 @@ vi.mock('../reverseLayeredLayoutGeometry', () => ({
   calculateLayeredLayoutWithReverse: mocks.calculateLayeredLayoutWithReverse,
 }));
 
+vi.mock('../../../../strategies/DomainDagreLayoutStrategy', () => ({
+  DomainDagreLayoutStrategy: class {
+    getName = () => 'domain-dagre';
+  },
+}));
+
 import { useLayoutRoutingTransaction } from '../useLayoutRoutingTransaction';
 import { useLayoutStrategy } from '../useLayoutStrategy';
 import { createBaseReactFlowRoutingSessionRuntime } from '../../../shared/baseReactFlowRoutingSessionRuntime';
+import { readDisplayRoutingDebugState } from '../../../shared/baseReactFlowDisplayRoutingDebug';
 
 const nodes: Node[] = [
   { id: 'source', position: { x: 0, y: 0 }, data: {} },
@@ -101,6 +108,72 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
       committedSourceEdges: edges,
       routedEdges,
       commitSnapshot: vi.fn(() => true),
+    });
+    document.documentElement.removeAttribute('data-vizly-display-routing');
+    delete (window as Window & { __vizlyBaseReactFlowDisplayRouting?: unknown })
+      .__vizlyBaseReactFlowDisplayRouting;
+  });
+
+  it('publishes a committed job-level outcome after layout routing succeeds', async () => {
+    mocks.calculateLayeredLayoutWithReverse.mockResolvedValueOnce({ nodes, edges });
+    const options = createOptions();
+    const { result } = renderHook(() => useLayoutStrategy({
+      ...options,
+      reactFlowInstance: null,
+    }));
+
+    await act(async () => {
+      await expect(result.current.handleStrategyLayout('domain-elk')).resolves.toBe(true);
+    });
+
+    expect(readDisplayRoutingDebugState()).toMatchObject({
+      layoutTransactionJobId: 1,
+      layoutTransactionStatus: 'committed',
+      layoutTransactionAttemptCount: 1,
+      layoutTransactionErrorCode: undefined,
+    });
+  });
+
+  it('keeps layout stability paused across a rejected lane attempt and compound fallback', async () => {
+    const groupedNodes = nodes.map(node => ({
+      ...node,
+      data: { ...node.data, domain: 'operations' },
+    }));
+    mocks.calculateLayeredLayoutWithReverse
+      .mockResolvedValueOnce({ nodes: groupedNodes, edges })
+      .mockResolvedValueOnce({ nodes: groupedNodes, edges });
+    mocks.stageLayoutRouting
+      .mockRejectedValueOnce(new Error('layout-routing-hard-quality-rejected'))
+      .mockResolvedValueOnce({
+        committedSourceEdges: edges,
+        routedEdges,
+        commitSnapshot: vi.fn(() => true),
+      });
+    const options = createOptions();
+    options.nodesRef.current = groupedNodes;
+    options.clearLayoutPreview
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(false);
+    const { result } = renderHook(() => useLayoutStrategy({
+      ...options,
+      reactFlowInstance: null,
+    }));
+
+    await act(async () => {
+      await expect(result.current.handleStrategyLayout('domain-lanes', undefined, 'LR'))
+        .resolves.toBe(true);
+    });
+
+    expect(mocks.stageLayoutRouting).toHaveBeenCalledTimes(2);
+    expect(options.setLayoutStable).toHaveBeenCalledTimes(3);
+    expect(options.setLayoutStable).toHaveBeenNthCalledWith(1, false);
+    expect(options.setLayoutStable).toHaveBeenNthCalledWith(2, false);
+    expect(options.setLayoutStable).toHaveBeenNthCalledWith(3, true);
+    expect(readDisplayRoutingDebugState()).toMatchObject({
+      layoutTransactionJobId: 1,
+      layoutTransactionStatus: 'committed',
+      layoutTransactionAttemptCount: 2,
+      layoutTransactionErrorCode: undefined,
     });
   });
 
@@ -230,6 +303,29 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
     expect(options.takeSnapshot).not.toHaveBeenCalled();
   });
 
+  it('keeps one job preview paused while a fallback attempt is pending', async () => {
+    mocks.stageLayoutRouting.mockRejectedValueOnce(
+      new Error('layout-routing-hard-quality-rejected'),
+    );
+    const options = createOptions();
+    const routingJob = options.routingSessionRuntime.beginJob('layout');
+    const { result } = renderHook(() => useLayoutRoutingTransaction(options));
+
+    await act(async () => {
+      await expect(result.current({
+        nodes,
+        edges,
+        routingJob,
+        retainLayoutPreviewOnFailure: true,
+      })).rejects.toThrow('layout-routing-hard-quality-rejected');
+    });
+
+    expect(options.publishLayoutPreview).toHaveBeenCalledWith({ nodes, routingJob });
+    expect(options.clearLayoutPreview).not.toHaveBeenCalled();
+    expect(options.setLayoutStable).toHaveBeenCalledWith(false);
+    expect(options.setLayoutStable).not.toHaveBeenCalledWith(true);
+  });
+
   it('rejects a layout response whose routing epoch was superseded', async () => {
     let resolveStage: ((value: {
       committedSourceEdges: Edge[];
@@ -322,6 +418,13 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
 
     await act(async () => {
       await expect(layoutPromise).resolves.toBe(false);
+    });
+
+    expect(readDisplayRoutingDebugState()).toMatchObject({
+      layoutTransactionJobId: 1,
+      layoutTransactionStatus: 'failed',
+      layoutTransactionAttemptCount: 1,
+      layoutTransactionErrorCode: 'cancelled',
     });
 
     expect(mocks.stageLayoutRouting).not.toHaveBeenCalled();

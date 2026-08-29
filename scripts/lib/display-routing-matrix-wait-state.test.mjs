@@ -17,6 +17,9 @@ describe('display routing matrix wait-state summary', () => {
       layoutSeedTerminalsAnchored: false,
       layoutSeedObstacleHits: 11,
       layoutSeedStrictCrossings: 59,
+      layoutTransactionJobId: 7,
+      layoutTransactionStatus: 'running',
+      layoutTransactionAttemptCount: 1,
       workerStartCount: 1,
       userLabel: 'private node name',
       phaseProgressTrace: [{
@@ -62,6 +65,9 @@ describe('display routing matrix wait-state summary', () => {
         layoutSeedTerminalsAnchored: false,
         layoutSeedObstacleHits: 11,
         layoutSeedStrictCrossings: 59,
+        layoutTransactionJobId: 7,
+        layoutTransactionStatus: 'running',
+        layoutTransactionAttemptCount: 1,
         workerStartCount: 1,
         phaseProgressTrace: [{ phase: 'quality', durationMs: 18 }],
       },
@@ -159,6 +165,19 @@ describe('display routing matrix wait-state summary', () => {
     })).toBe(true);
     expect(displayRoutingWaitStateHasTerminalFailure({
       routing: { stage: 'worker-start' },
+    })).toBe(false);
+    expect(displayRoutingWaitStateHasTerminalFailure({
+      routing: {
+        stage: 'final-applied',
+        layoutTransactionStatus: 'failed',
+        layoutTransactionErrorCode: 'hard-quality-rejected',
+      },
+    })).toBe(true);
+    expect(displayRoutingWaitStateHasTerminalFailure({
+      routing: { stage: 'worker-response', layoutTransactionStatus: 'running' },
+    })).toBe(false);
+    expect(displayRoutingWaitStateHasTerminalFailure({
+      routing: { stage: 'final-applied', layoutTransactionStatus: 'committed' },
     })).toBe(false);
     expect(displayRoutingWaitStateHasTerminalFailure({})).toBe(false);
   });
