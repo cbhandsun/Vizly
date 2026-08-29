@@ -1,8 +1,9 @@
 import type { Edge, Node } from '@xyflow/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { calculateEdgePathQualityScore } from '../../../strategies/shared/edgeStrictCrossingGuard';
 import {
+  chooseDistinctQualitySeedCandidate,
   createBaseReactFlowInteractiveDisplayEdges,
   getInteractiveGlobalCandidateEdgeBudget,
 } from '../baseReactFlowDisplayQualitySeedPipeline';
@@ -21,6 +22,54 @@ import {
 } from './baseReactFlowDisplayEdges.testUtils';
 
 describe('baseReactFlowDisplayEdges local repairs', () => {
+  it('scores equivalent quality seed paths once and keeps the first candidate reference', () => {
+    const path = [
+      { x: 0, y: 0 },
+      { x: 0, y: 100 },
+    ];
+    const first: Edge[] = [lockedEdge('first', 'source', 'target', path)];
+    const equivalent: Edge[] = [lockedEdge(
+      'equivalent-copy',
+      'source',
+      'target',
+      path.map(point => ({ ...point })),
+    )];
+    const score = vi.fn((_candidate: Edge[]) => 0);
+    const choose = (...candidates: Edge[][]): Edge[] => {
+      candidates.forEach(candidate => score(candidate));
+      return candidates[0];
+    };
+
+    const result = chooseDistinctQualitySeedCandidate([first, equivalent], choose);
+
+    expect(score).toHaveBeenCalledTimes(1);
+    expect(score).toHaveBeenCalledWith(first);
+    expect(result).toBe(first);
+  });
+
+  it('does not merge equal paths whose complete quality inputs differ', () => {
+    const first: Edge[] = [{
+      ...lockedEdge('first', 'source', 'target', [
+        { x: 0, y: 0 },
+        { x: 0, y: 100 },
+      ]),
+      sourceHandle: 'right-source',
+    }];
+    const distinct: Edge[] = [{
+      ...first[0],
+      id: 'distinct-handle',
+      sourceHandle: 'left-source',
+    }];
+    const scoredCandidates: Edge[][] = [];
+
+    chooseDistinctQualitySeedCandidate([first, distinct], (...candidates) => {
+      scoredCandidates.push(...candidates);
+      return candidates[0];
+    });
+
+    expect(scoredCandidates).toEqual([first, distinct]);
+  });
+
   it('bounds deferred global seed work without reducing direct interactive quality', () => {
     expect(getInteractiveGlobalCandidateEdgeBudget(24, true)).toBeUndefined();
     expect(getInteractiveGlobalCandidateEdgeBudget(25, true)).toBe(12);

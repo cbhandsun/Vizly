@@ -42,7 +42,22 @@ export type StrictCrossingSegmentIndex = Readonly<{
   vertical: readonly PathSegmentRef[];
   horizontalByY: readonly PathSegmentRef[];
   verticalByX: readonly PathSegmentRef[];
+  horizontalYCoordinates: readonly number[];
+  verticalXCoordinates: readonly number[];
 }>;
+
+type StrictCrossingSegmentCacheState = {
+  cacheHitCount: number;
+  evaluationCount: number;
+  candidateVisitCount: number;
+  crossingCountBySegment: Map<string, number>;
+};
+
+const MAX_STRICT_CROSSING_SEGMENT_CACHE_ENTRIES = 32_768;
+const strictCrossingSegmentCacheByIndex = new WeakMap<
+  StrictCrossingSegmentIndex,
+  StrictCrossingSegmentCacheState
+>();
 
 export const EPS = 0.5;
 const VISUAL_PARALLEL_LANE_TOLERANCE = 4;
@@ -372,53 +387,89 @@ export function createStrictCrossingSegmentIndex(
   for (const segment of segments) {
     (segment.axis === 'h' ? horizontal : vertical).push(segment);
   }
+  const horizontalByY = [...horizontal].sort((first, second) => first.a.y - second.a.y);
+  const verticalByX = [...vertical].sort((first, second) => first.a.x - second.a.x);
   return {
     horizontal,
     vertical,
-    horizontalByY: [...horizontal].sort((first, second) => first.a.y - second.a.y),
-    verticalByX: [...vertical].sort((first, second) => first.a.x - second.a.x),
+    horizontalByY,
+    verticalByX,
+    horizontalYCoordinates: horizontalByY.map(segment => segment.a.y),
+    verticalXCoordinates: verticalByX.map(segment => segment.a.x),
   };
 }
 
+export const readStrictCrossingSegmentIndexMetrics = (
+  segmentIndex: StrictCrossingSegmentIndex,
+): Readonly<{
+  cacheHitCount: number;
+  evaluationCount: number;
+  candidateVisitCount: number;
+}> => {
+  const state = strictCrossingSegmentCacheByIndex.get(segmentIndex);
+  return {
+    cacheHitCount: state?.cacheHitCount ?? 0,
+    evaluationCount: state?.evaluationCount ?? 0,
+    candidateVisitCount: state?.candidateVisitCount ?? 0,
+  };
+};
+
 const firstCoordinateAbove = (
-  segments: readonly PathSegmentRef[],
+  coordinates: readonly number[],
   value: number,
-  coordinate: (segment: PathSegmentRef) => number,
 ): number => {
   let lower = 0;
-  let upper = segments.length;
+  let upper = coordinates.length;
   while (lower < upper) {
     const middle = lower + Math.floor((upper - lower) / 2);
-    if (coordinate(segments[middle]) <= value) lower = middle + 1;
+    if (coordinates[middle] <= value) lower = middle + 1;
     else upper = middle;
   }
   return lower;
 };
 
-const strictCrossingCandidates = (
+const firstCoordinateAtLeast = (
+  coordinates: readonly number[],
+  value: number,
+): number => {
+  let lower = 0;
+  let upper = coordinates.length;
+  while (lower < upper) {
+    const middle = lower + Math.floor((upper - lower) / 2);
+    if (coordinates[middle] < value) lower = middle + 1;
+    else upper = middle;
+  }
+  return lower;
+};
+
+const strictCrossingCandidateRange = (
   segment: PathSegmentRef,
   segmentIndex: StrictCrossingSegmentIndex,
-): readonly PathSegmentRef[] => {
+): Readonly<{
+  segments: readonly PathSegmentRef[];
+  startIndex: number;
+  endIndex: number;
+}> => {
   const perpendicularSegments = segment.axis === 'h'
     ? segmentIndex.verticalByX
     : segmentIndex.horizontalByY;
-  const coordinate = segment.axis === 'h'
-    ? (candidate: PathSegmentRef) => candidate.a.x
-    : (candidate: PathSegmentRef) => candidate.a.y;
+  const perpendicularCoordinates = segment.axis === 'h'
+    ? segmentIndex.verticalXCoordinates
+    : segmentIndex.horizontalYCoordinates;
   const start = segment.axis === 'h'
     ? Math.min(segment.a.x, segment.b.x) + EPS
     : Math.min(segment.a.y, segment.b.y) + EPS;
   const end = segment.axis === 'h'
     ? Math.max(segment.a.x, segment.b.x) - EPS
     : Math.max(segment.a.y, segment.b.y) - EPS;
-  if (end <= start) return [];
-
-  const first = firstCoordinateAbove(perpendicularSegments, start, coordinate);
-  let last = first;
-  while (last < perpendicularSegments.length && coordinate(perpendicularSegments[last]) < end) {
-    last += 1;
+  if (end <= start) {
+    return { segments: perpendicularSegments, startIndex: 0, endIndex: 0 };
   }
-  return perpendicularSegments.slice(first, last);
+  return {
+    segments: perpendicularSegments,
+    startIndex: firstCoordinateAbove(perpendicularCoordinates, start),
+    endIndex: firstCoordinateAtLeast(perpendicularCoordinates, end),
+  };
 };
 
 export function strictCrossingsForEdgeSegments(
@@ -427,11 +478,50 @@ export function strictCrossingsForEdgeSegments(
   edgeIndex: number,
   segmentIndex = createStrictCrossingSegmentIndex(allSegments),
 ): number {
+  let cacheState = strictCrossingSegmentCacheByIndex.get(segmentIndex);
+  if (!cacheState) {
+    cacheState = {
+      cacheHitCount: 0,
+      evaluationCount: 0,
+      candidateVisitCount: 0,
+      crossingCountBySegment: new Map(),
+    };
+    strictCrossingSegmentCacheByIndex.set(segmentIndex, cacheState);
+  }
   let total = 0;
   for (const candidate of candidateSegments) {
-    for (const other of strictCrossingCandidates(candidate, segmentIndex)) {
+    const cacheable = Number.isSafeInteger(edgeIndex)
+      && Number.isFinite(candidate.a.x)
+      && Number.isFinite(candidate.a.y)
+      && Number.isFinite(candidate.b.x)
+      && Number.isFinite(candidate.b.y);
+    const cacheKey = cacheable
+      ? `${edgeIndex}:${candidate.axis}:${candidate.a.x}:${candidate.a.y}:${candidate.b.x}:${candidate.b.y}`
+      : '';
+    const cached = cacheable
+      ? cacheState.crossingCountBySegment.get(cacheKey)
+      : undefined;
+    if (cached !== undefined && cacheable) {
+      cacheState.cacheHitCount += 1;
+      total += cached;
+      continue;
+    }
+    cacheState.evaluationCount += 1;
+    let segmentCrossings = 0;
+    const range = strictCrossingCandidateRange(candidate, segmentIndex);
+    for (let index = range.startIndex; index < range.endIndex; index += 1) {
+      const other = range.segments[index];
+      cacheState.candidateVisitCount += 1;
       if (other.edgeIndex === edgeIndex) continue;
-      if (strictCross(candidate, other)) total += 1;
+      if (strictCross(candidate, other)) segmentCrossings += 1;
+    }
+    total += segmentCrossings;
+    if (
+      cacheable
+      && cacheState.crossingCountBySegment.size
+      < MAX_STRICT_CROSSING_SEGMENT_CACHE_ENTRIES
+    ) {
+      cacheState.crossingCountBySegment.set(cacheKey, segmentCrossings);
     }
   }
   return total;
@@ -544,7 +634,9 @@ export function findStrictCrossings(paths: Point[][], edges: Edge[]): StrictCros
   const segmentOrder = new Map(segments.map((segment, index) => [segment, index] as const));
   const hits: StrictCrossingHit[] = [];
   for (const horizontal of horizontalSegments) {
-    for (const vertical of strictCrossingCandidates(horizontal, segmentIndex)) {
+    const range = strictCrossingCandidateRange(horizontal, segmentIndex);
+    for (let index = range.startIndex; index < range.endIndex; index += 1) {
+      const vertical = range.segments[index];
       if (horizontal.edgeIndex === vertical.edgeIndex) continue;
       if (!strictCross(horizontal, vertical)) continue;
       const horizontalOrder = segmentOrder.get(horizontal) ?? 0;

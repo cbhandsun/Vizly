@@ -1,9 +1,28 @@
 // @vitest-environment jsdom
 
 import type { Edge, Node } from '@xyflow/react';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { displayAlternateHardClosureCandidateIsReady } from '../baseReactFlowDisplayAlternateHardClosure';
+import { createBaseReactFlowFinalEndpointEvaluation } from '../baseReactFlowDisplayFinalEndpointEvaluation';
 import { closeBaseReactFlowDisplayFinalHardContract } from '../baseReactFlowDisplayFinalHardContract';
+
+const hardGateHarness = vi.hoisted(() => ({ fullReportCount: 0 }));
+
+vi.mock('../baseReactFlowDisplayQualityGates', async importOriginal => {
+  const original = await importOriginal<
+    typeof import('../baseReactFlowDisplayQualityGates')
+  >();
+  return {
+    ...original,
+    getDisplayHardQualityGateReport: (
+      ...args: Parameters<typeof original.getDisplayHardQualityGateReport>
+    ) => {
+      hardGateHarness.fullReportCount += 1;
+      return original.getDisplayHardQualityGateReport(...args);
+    },
+  };
+});
 
 const node = (id: string, x: number, y: number, width: number, height: number): Node => ({
   id,
@@ -16,6 +35,41 @@ const node = (id: string, x: number, y: number, width: number, height: number): 
 });
 
 describe('baseReactFlowDisplayFinalHardContract', () => {
+  beforeEach(() => {
+    hardGateHarness.fullReportCount = 0;
+  });
+
+  it('reuses one session report across final contract and readiness checks', () => {
+    const nodes: Node[] = [
+      node('source', 0, 0, 100, 60),
+      node('target', 300, 0, 100, 60),
+    ];
+    const edges: Edge[] = [{
+      id: 'edge',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'right',
+      targetHandle: 'left',
+      data: { computedPath: [{ x: 100, y: 30 }, { x: 300, y: 30 }] },
+    }];
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
+
+    const outcome = closeBaseReactFlowDisplayFinalHardContract(
+      edges,
+      nodes,
+      undefined,
+      evaluation,
+    );
+    expect(displayAlternateHardClosureCandidateIsReady(outcome.edges, nodes, {
+      evaluation,
+      hardReport: { edges: outcome.edges, report: outcome.report },
+    })).toBe(true);
+    expect(hardGateHarness.fullReportCount).toBe(0);
+
+    expect(displayAlternateHardClosureCandidateIsReady(outcome.edges, nodes)).toBe(true);
+    expect(hardGateHarness.fullReportCount).toBe(1);
+  });
+
   it('closes an independent strict crossing before committing a paired feedback-port repair', () => {
     const nodes: Node[] = [
       node('allocation', 1079.8, 1417.5, 206, 96),

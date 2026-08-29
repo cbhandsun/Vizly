@@ -7,9 +7,11 @@ import {
   type Point,
 } from '../edgeDetachedOverlapRepair';
 import {
+  createStrictCrossingSegmentIndex,
   extractPathSegmentRefs,
   extractPathSegmentRefsForPath,
   findStrictCrossings,
+  readStrictCrossingSegmentIndexMetrics,
   strictCross,
   strictCrossingsForEdgeSegments,
 } from '../edgeDetachedOverlapGeometry';
@@ -42,6 +44,7 @@ const fullScoreContextFactory: DetachedStrictCrossingScoreEvaluationContextFacto
 ) => ({
   evaluate: candidatePaths => scoreDetachedOverlapState(candidatePaths, edges, nodes),
   evaluateChanged: candidatePaths => scoreDetachedOverlapState(candidatePaths, edges, nodes),
+  readMetrics: () => ({ pairCacheHitCount: 0, pairEvaluationCount: 0 }),
 });
 
 describe('detached strict-crossing incremental score parity', () => {
@@ -53,11 +56,49 @@ describe('detached strict-crossing incremental score parity', () => {
     ];
     const edges = paths.map((path, index) => edge(`partition-${index}`, path));
 
+    const allSegments = extractPathSegmentRefs(paths, edges);
+    const segmentIndex = createStrictCrossingSegmentIndex(allSegments);
+    const candidateSegments = extractPathSegmentRefsForPath(paths[0], 0, edges);
     expect(strictCrossingsForEdgeSegments(
-      extractPathSegmentRefsForPath(paths[0], 0, edges),
-      extractPathSegmentRefs(paths, edges),
+      candidateSegments,
+      allSegments,
       0,
+      segmentIndex,
     )).toBe(1);
+    const metricsAfterFirst = readStrictCrossingSegmentIndexMetrics(segmentIndex);
+    expect(strictCrossingsForEdgeSegments(
+      candidateSegments.map(segment => ({ ...segment })),
+      allSegments,
+      0,
+      segmentIndex,
+    )).toBe(1);
+    expect(readStrictCrossingSegmentIndexMetrics(segmentIndex)).toEqual({
+      cacheHitCount: metricsAfterFirst.cacheHitCount + candidateSegments.length,
+      evaluationCount: metricsAfterFirst.evaluationCount,
+      candidateVisitCount: metricsAfterFirst.candidateVisitCount,
+    });
+  });
+
+  it('does not retain invalid candidate geometry in the strict crossing cache', () => {
+    const paths: Point[][] = [
+      [{ x: 0, y: 50 }, { x: 100, y: 50 }],
+      [{ x: 50, y: 0 }, { x: 50, y: 100 }],
+    ];
+    const edges = paths.map((path, index) => edge(`invalid-cache-${index}`, path));
+    const allSegments = extractPathSegmentRefs(paths, edges);
+    const segmentIndex = createStrictCrossingSegmentIndex(allSegments);
+    const source = extractPathSegmentRefsForPath(paths[0], 0, edges)[0];
+    const invalid = { ...source, a: { ...source.a, x: Number.NaN } };
+
+    strictCrossingsForEdgeSegments([invalid], allSegments, 0, segmentIndex);
+    const afterFirst = readStrictCrossingSegmentIndexMetrics(segmentIndex);
+    strictCrossingsForEdgeSegments([invalid], allSegments, 0, segmentIndex);
+
+    expect(readStrictCrossingSegmentIndexMetrics(segmentIndex)).toEqual({
+      cacheHitCount: afterFirst.cacheHitCount,
+      evaluationCount: afterFirst.evaluationCount + 1,
+      candidateVisitCount: afterFirst.candidateVisitCount,
+    });
   });
 
   it('preserves source segment order while partitioning strict-crossing axes', () => {
@@ -108,6 +149,47 @@ describe('detached strict-crossing incremental score parity', () => {
         edgeIndex,
       )).toBe(expectedCount);
     }
+  });
+
+  it('matches the ordered full scan for seeded fixed-coordinate ranges', () => {
+    let state = 0x5eed1234;
+    const next = (): number => {
+      state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0;
+      return state / 0x1_0000_0000;
+    };
+    const paths: Point[][] = Array.from({ length: 96 }, (_, index) => {
+      const fixed = Math.round((next() * 480 - 240) * 2) / 2;
+      const start = Math.round((next() * 480 - 240) * 2) / 2;
+      const length = 8 + Math.round(next() * 360);
+      return index % 2 === 0
+        ? [{ x: start, y: fixed }, { x: start + length, y: fixed }]
+        : [{ x: fixed, y: start }, { x: fixed, y: start + length }];
+    });
+    const edges = paths.map((path, index) => edge(`seeded-${index}`, path));
+    const segments = extractPathSegmentRefs(paths, edges);
+    const expected: number[][] = [];
+    for (let first = 0; first < segments.length; first += 1) {
+      for (let second = first + 1; second < segments.length; second += 1) {
+        if (
+          segments[first].edgeIndex !== segments[second].edgeIndex
+          && strictCross(segments[first], segments[second])
+        ) {
+          expected.push([
+            segments[first].edgeIndex,
+            segments[first].segIdx,
+            segments[second].edgeIndex,
+            segments[second].segIdx,
+          ]);
+        }
+      }
+    }
+
+    expect(findStrictCrossings(paths, edges).map(hit => [
+      hit.a.edgeIndex,
+      hit.a.segIdx,
+      hit.b.edgeIndex,
+      hit.b.segIdx,
+    ])).toEqual(expected);
   });
 
   it.each([

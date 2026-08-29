@@ -346,19 +346,6 @@ const repairDetachedStrictCrossingPaths = (
     }
     const maxEdgeCrossings = Math.max(...crossingCountByEdgeIndex.values());
     const mazeCandidateByEdgeIndex = new Map<number, Point[] | null>();
-    const currentEdgeCrossingsByIndex = new Map<number, number>();
-    const getCurrentEdgeCrossings = (edgeIndex: number): number => {
-      const cached = currentEdgeCrossingsByIndex.get(edgeIndex);
-      if (cached !== undefined) return cached;
-      const crossings = strictCrossingsForEdgeSegments(
-        currentSegments.filter(item => item.edgeIndex === edgeIndex),
-        currentSegments,
-        edgeIndex,
-        strictCrossingSegmentIndex,
-      );
-      currentEdgeCrossingsByIndex.set(edgeIndex, crossings);
-      return crossings;
-    };
     const getDetachedScoreContext = (): DetachedStrictCrossingScoreEvaluationContext => {
       if (!detachedScoreContext) {
         detachedScoreContext = createScoreEvaluationContext(paths, edges, nodes);
@@ -431,7 +418,7 @@ const repairDetachedStrictCrossingPaths = (
           ...shiftedCandidates,
           ...bypassStrictCrossingSegmentCandidates(paths[segment.edgeIndex], segment, other),
         ];
-        const currentEdgeCrossings = getCurrentEdgeCrossings(segment.edgeIndex);
+        const currentEdgeCrossings = crossingCountByEdgeIndex.get(segment.edgeIndex) ?? 0;
         for (const candidatePath of candidatePathsForSegment) {
           const candidateEdgeCrossings = strictCrossingsForEdgeSegments(
             extractPathSegmentRefsForPath(candidatePath, segment.edgeIndex, edges),

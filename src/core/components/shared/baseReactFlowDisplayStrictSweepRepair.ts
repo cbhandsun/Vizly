@@ -9,7 +9,7 @@ import {
 import {
   buildDisplayRoutingObstacles,
   candidateStrictCrossingsForEdge,
-  candidateUnrelatedOverlapForEdge,
+  createDisplayCandidateInteractionContext,
   displayAxisOf,
   displayPathLength,
   extractDisplaySegments,
@@ -423,6 +423,11 @@ export const repairStrictCrossingsWithDirectionalOuterLanes = <T extends Edge[]>
       if (latestPath.length < 4) continue;
       const otherSegments = extractDisplaySegments(current)
         .filter(segment => segment.edgeIndex !== entry.edgeIndex);
+      const candidateInteractionContext = createDisplayCandidateInteractionContext(
+        entry.edgeIndex,
+        current,
+        otherSegments,
+      );
       const latestEdgeStrictCrossings = candidateStrictCrossingsForEdge(
         entry.edgeIndex,
         latestPath,
@@ -537,22 +542,20 @@ export const repairStrictCrossingsWithDirectionalOuterLanes = <T extends Edge[]>
         }
         activeTier = batch.tier;
         const candidates = batch.candidates
-          .map(candidatePath => ({
-            path: candidatePath,
-            strictCrossings: candidateStrictCrossingsForEdge(entry.edgeIndex, candidatePath, otherSegments),
-            obstacleHits: countUnrelatedObstacleHits(candidatePath, latestEdge, latestObstacles),
-            directionalPenalty: directionalOuterLanePenalty(candidatePath),
-            endpointHalfPenalty: allowEndpointHalfPolish
-              ? endpointSameHalfBypassPenalty(candidatePath, latestEdge, nodes)
-              : 0,
-            unrelatedOverlap: candidateUnrelatedOverlapForEdge(
-              entry.edgeIndex,
-              candidatePath,
-              current,
-              otherSegments,
-            ),
-            length: displayPathLength(candidatePath),
-          }))
+          .map((candidatePath) => {
+            const interaction = candidateInteractionContext.evaluate(candidatePath);
+            return {
+              path: candidatePath,
+              strictCrossings: interaction.strictCrossings,
+              obstacleHits: countUnrelatedObstacleHits(candidatePath, latestEdge, latestObstacles),
+              directionalPenalty: directionalOuterLanePenalty(candidatePath),
+              endpointHalfPenalty: allowEndpointHalfPolish
+                ? endpointSameHalfBypassPenalty(candidatePath, latestEdge, nodes)
+                : 0,
+              unrelatedOverlap: interaction.unrelatedOverlap,
+              length: displayPathLength(candidatePath),
+            };
+          })
           .filter(candidate => (
             candidate.strictCrossings < latestEdgeStrictCrossings
             || candidate.obstacleHits < latestEdgeObstacleHits

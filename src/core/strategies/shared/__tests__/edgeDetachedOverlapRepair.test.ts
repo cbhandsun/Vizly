@@ -92,6 +92,40 @@ describe('separateDetachedParallelOverlaps', () => {
       scoreDetachedOverlapState(nextPaths, edges, []),
       8,
     );
+    expect(detachedScoreContext.readMetrics().pairCacheHitCount).toBeGreaterThan(0);
+  });
+
+  it('reuses unchanged peer contributions across two-edge candidate products', () => {
+    const edges: Edge[] = Array.from({ length: 4 }, (_, index) => ({
+      id: `cartesian-${index}`,
+      source: `source-${index}`,
+      target: `target-${index}`,
+      data: {},
+    }));
+    const baselinePaths = [
+      [{ x: 0, y: 0 }, { x: 240, y: 0 }],
+      [{ x: 0, y: 40 }, { x: 240, y: 40 }],
+      [{ x: 80, y: -80 }, { x: 80, y: 120 }],
+      [{ x: 180, y: -80 }, { x: 180, y: 120 }],
+    ];
+    const context = createDetachedOverlapStateEvaluationContext(baselinePaths, edges, []);
+    const first = baselinePaths.map(path => path.map(point => ({ ...point })));
+    first[0] = [{ x: 0, y: 16 }, { x: 240, y: 16 }];
+    first[1] = [{ x: 0, y: 56 }, { x: 240, y: 56 }];
+    expect(context.evaluateChanged(first, [0, 1])).toBeCloseTo(
+      scoreDetachedOverlapState(first, edges, []),
+      8,
+    );
+    const metricsAfterFirst = context.readMetrics();
+
+    const second = first.map(path => path.map(point => ({ ...point })));
+    second[1] = [{ x: 0, y: 72 }, { x: 240, y: 72 }];
+    expect(context.evaluateChanged(second, [0, 1])).toBeCloseTo(
+      scoreDetachedOverlapState(second, edges, []),
+      8,
+    );
+    expect(context.readMetrics().pairCacheHitCount - metricsAfterFirst.pairCacheHitCount)
+      .toBeGreaterThanOrEqual(2);
   });
 
   it('keeps same-source endpoint trunks shared after source stubs', () => {

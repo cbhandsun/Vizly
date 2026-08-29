@@ -189,16 +189,28 @@ export const closeBaseReactFlowFinalDisplayRoute = ({
     emergencyObstacleCandidate,
     repairNodes,
     args.onPhaseTrace,
+    evaluationSession,
   );
-  let renderReadyEdges = [
-    finalHardOutcome.edges,
-    committedRenderCandidate,
-  ].find(candidate => displayAlternateHardClosureCandidateIsReady(candidate, repairNodes));
+  const renderReadyCandidate = [
+    { edges: finalHardOutcome.edges, hardReport: finalHardOutcome.report },
+    { edges: committedRenderCandidate, hardReport: undefined },
+  ].find(candidate => displayAlternateHardClosureCandidateIsReady(
+    candidate.edges,
+    repairNodes,
+    {
+      evaluation: evaluationSession,
+      hardReport: candidate.hardReport
+        ? { edges: candidate.edges, report: candidate.hardReport }
+        : undefined,
+    },
+  ));
+  let renderReadyEdges = renderReadyCandidate?.edges;
   if (!renderReadyEdges) {
     renderReadyEdges = buildBaseReactFlowAlternateHardClosureCandidate({
       args,
       repairNodes,
       primaryCandidate: finalHardOutcome.edges,
+      evaluationSession,
     }) ?? committedRenderCandidate;
   }
   safetyClosureTimer.finish(

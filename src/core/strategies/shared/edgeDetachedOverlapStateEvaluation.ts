@@ -21,7 +21,14 @@ import {
 export type DetachedOverlapStateEvaluationContext = {
   evaluate: (candidatePaths: Point[][]) => number;
   evaluateChanged: (candidatePaths: Point[][], changedIndexes: readonly number[]) => number;
+  readMetrics: () => Readonly<{
+    pairCacheHitCount: number;
+    pairEvaluationCount: number;
+  }>;
 };
+
+const MAX_DETACHED_PAIR_SCORE_CACHE_ENTRIES = 32_768;
+const MAX_DETACHED_PATH_SIGNATURE_ENTRIES = 65_536;
 
 export function scoreDetachedOverlapState(
   paths: Point[][],
@@ -41,8 +48,17 @@ export function scoreDetachedOverlapState(
   for (let i = 0; i < segments.length; i += 1) {
     for (let j = i + 1; j < segments.length; j += 1) {
       if (segments[i].edgeIndex === segments[j].edgeIndex) continue;
-      if (strictCross(segments[i], segments[j])) score += 4500;
+      if (segments[i].axis !== segments[j].axis) {
+        if (strictCross(segments[i], segments[j])) score += 4500;
+        continue;
+      }
       const overlap = segmentOverlap(segments[i], segments[j]);
+      if (overlap <= 8) continue;
+      const reversePair = isReversePairOverlap(segments[i], segments[j], edges);
+      const oppositeDirection = segmentsRunOppositeDirections(segments[i], segments[j]);
+      const unrelated = !sharesAnyEndpoint(segments[i], segments[j], edges);
+      const minimumPenaltyOverlap = reversePair || oppositeDirection ? 8 : 16;
+      if (overlap <= minimumPenaltyOverlap) continue;
       if (isEndpointSharedTrunkOverlap(
         segments[i],
         segments[j],
@@ -51,18 +67,12 @@ export function scoreDetachedOverlapState(
         segmentsByEdgeIndex.get(segments[i].edgeIndex),
         segmentsByEdgeIndex.get(segments[j].edgeIndex),
       )) continue;
-      const reversePair = isReversePairOverlap(segments[i], segments[j], edges);
-      const oppositeDirection = segmentsRunOppositeDirections(segments[i], segments[j]);
-      const unrelated = !sharesAnyEndpoint(segments[i], segments[j], edges);
-      const minimumPenaltyOverlap = reversePair || oppositeDirection ? 8 : 16;
-      if (overlap > minimumPenaltyOverlap) {
-        const multiplier = reversePair || oppositeDirection
-          ? 128
-          : unrelated
-            ? 72
-            : 24;
-        score += overlap * multiplier;
-      }
+      const multiplier = reversePair || oppositeDirection
+        ? 128
+        : unrelated
+          ? 72
+          : 24;
+      score += overlap * multiplier;
     }
   }
 
@@ -93,11 +103,23 @@ const detachedPairScore = (
   secondSegments: PathSegmentRef[],
   edges: Edge[],
 ): number => {
+  const firstSegment = firstSegments[0];
+  const secondSegment = secondSegments[0];
+  if (!firstSegment || !secondSegment) return 0;
+  const reversePair = isReversePairOverlap(firstSegment, secondSegment, edges);
+  const unrelated = !sharesAnyEndpoint(firstSegment, secondSegment, edges);
   let score = 0;
   for (const first of firstSegments) {
     for (const second of secondSegments) {
-      if (strictCross(first, second)) score += 4500;
+      if (first.axis !== second.axis) {
+        if (strictCross(first, second)) score += 4500;
+        continue;
+      }
       const overlap = segmentOverlap(first, second);
+      if (overlap <= 8) continue;
+      const oppositeDirection = segmentsRunOppositeDirections(first, second);
+      const minimumPenaltyOverlap = reversePair || oppositeDirection ? 8 : 16;
+      if (overlap <= minimumPenaltyOverlap) continue;
       if (isEndpointSharedTrunkOverlap(
         first,
         second,
@@ -106,11 +128,6 @@ const detachedPairScore = (
         firstSegments,
         secondSegments,
       )) continue;
-      const reversePair = isReversePairOverlap(first, second, edges);
-      const oppositeDirection = segmentsRunOppositeDirections(first, second);
-      const unrelated = !sharesAnyEndpoint(first, second, edges);
-      const minimumPenaltyOverlap = reversePair || oppositeDirection ? 8 : 16;
-      if (overlap <= minimumPenaltyOverlap) continue;
       const multiplier = reversePair || oppositeDirection
         ? 128
         : unrelated
@@ -153,11 +170,56 @@ export const createDetachedOverlapStateEvaluationContext = (
   ));
   const baselinePairScores = new Map<number, number>();
   const changedScoreCache = new Map<string, number>();
+  const pathIdBySignature = new Map<string, number>();
+  let nextPathId = 1;
+  const pathId = (path: Point[]): number => {
+    const signature = candidatePathSignature(path);
+    const cached = pathIdBySignature.get(signature);
+    if (cached !== undefined) return cached;
+    const id = nextPathId;
+    nextPathId += 1;
+    if (pathIdBySignature.size < MAX_DETACHED_PATH_SIGNATURE_ENTRIES) {
+      pathIdBySignature.set(signature, id);
+    }
+    return id;
+  };
+  const baselinePathIds = baselinePaths.map(pathId);
+  const pairScoreCache = new Map<string, number>();
+  let pairCacheHitCount = 0;
+  let pairEvaluationCount = 0;
+  const scorePair = (
+    firstIndex: number,
+    firstSegments: PathSegmentRef[],
+    firstPathId: number,
+    secondIndex: number,
+    secondSegments: PathSegmentRef[],
+    secondPathId: number,
+  ): number => {
+    const key = `${firstIndex}:${firstPathId}|${secondIndex}:${secondPathId}`;
+    const cached = pairScoreCache.get(key);
+    if (cached !== undefined) {
+      pairCacheHitCount += 1;
+      return cached;
+    }
+    pairEvaluationCount += 1;
+    const score = detachedPairScore(firstSegments, secondSegments, edges);
+    if (pairScoreCache.size < MAX_DETACHED_PAIR_SCORE_CACHE_ENTRIES) {
+      pairScoreCache.set(key, score);
+    }
+    return score;
+  };
   let baselineScore = baselineEdgeScores.reduce((total, value) => total + value, 0);
   for (let first = 0; first < edgeCount; first += 1) {
     for (let second = first + 1; second < edgeCount; second += 1) {
       const key = first * edgeCount + second;
-      const score = detachedPairScore(baselineSegments[first], baselineSegments[second], edges);
+      const score = scorePair(
+        first,
+        baselineSegments[first],
+        baselinePathIds[first],
+        second,
+        baselineSegments[second],
+        baselinePathIds[second],
+      );
       baselinePairScores.set(key, score);
       baselineScore += score;
     }
@@ -173,8 +235,10 @@ export const createDetachedOverlapStateEvaluationContext = (
     }
 
     const candidateSegments = [...baselineSegments];
+    const candidatePathIds = [...baselinePathIds];
     let score = baselineScore;
     for (const edgeIndex of changedIndexes) {
+      candidatePathIds[edgeIndex] = pathId(candidatePaths[edgeIndex]);
       candidateSegments[edgeIndex] = extractPathSegmentRefsForPath(
         candidatePaths[edgeIndex],
         edgeIndex,
@@ -202,12 +266,20 @@ export const createDetachedOverlapStateEvaluationContext = (
       const first = Math.floor(key / edgeCount);
       const second = key % edgeCount;
       score -= baselinePairScores.get(key) ?? 0;
-      score += detachedPairScore(candidateSegments[first], candidateSegments[second], edges);
+      score += scorePair(
+        first,
+        candidateSegments[first],
+        candidatePathIds[first],
+        second,
+        candidateSegments[second],
+        candidatePathIds[second],
+      );
     }
     return score;
   };
 
   return {
+    readMetrics: () => ({ pairCacheHitCount, pairEvaluationCount }),
     evaluate(candidatePaths: Point[][]): number {
       if (candidatePaths.length !== baselinePaths.length) {
         return scoreDetachedOverlapState(candidatePaths, edges, nodes);

@@ -11,6 +11,7 @@ import {
   reduceEdgeCrossingsWithWaypoints,
   repairSharedTrunkAwareCrossings,
 } from '../../strategies/shared/edgeRoutingPipeline';
+import { buildQualityInputSnapshot } from '../../strategies/shared/edgePathQualityInputSnapshot';
 import {
   chooseFewestStrictCrossings,
   countStrictEdgeCrossings,
@@ -38,6 +39,22 @@ import {
   type DisplayRoutingPhaseTrace,
 } from './baseReactFlowDisplayRoutingTrace';
 
+type QualitySeedCandidateChooser<T extends Edge[]> = (...candidates: T[]) => T;
+
+export const chooseDistinctQualitySeedCandidate = <T extends Edge[]>(
+  candidates: readonly T[],
+  choose: QualitySeedCandidateChooser<T>,
+): T => {
+  const seenSignatures = new Set<string>();
+  const uniqueCandidates = candidates.filter((candidate) => {
+    const signature = buildQualityInputSnapshot(candidate).signature;
+    if (seenSignatures.has(signature)) return false;
+    seenSignatures.add(signature);
+    return true;
+  });
+  return choose(...uniqueCandidates);
+};
+
 export const createFastDisplayQualityEdges = (
   normalizedEdges: Edge[],
   repairNodes: Node[],
@@ -57,7 +74,7 @@ export const createFastDisplayQualityEdges = (
     ? targetEntryEdges
     : repairEndpointOrthogonalPaths(repairStrictBypassesIfNeeded(targetEntryEdges, repairNodes), repairNodes);
 
-  return chooseFewestStrictCrossings(
+  return chooseDistinctQualitySeedCandidate([
     normalizedEdges,
     endpointEdges,
     trunkEdges,
@@ -66,7 +83,7 @@ export const createFastDisplayQualityEdges = (
     endpointDetachedEdges,
     targetEntryEdges,
     strictBypassEdges,
-  );
+  ], chooseFewestStrictCrossings);
 };
 
 const INTERACTIVE_DETACHED_OVERLAP_REPAIR_OPTIONS = {
@@ -197,7 +214,7 @@ const createInteractiveDisplayQualityEdges = (
     onPhaseTrace,
   );
 
-  return chooseFewestStrictCrossings(
+  return chooseDistinctQualitySeedCandidate([
     normalizedEdges,
     endpointEdges,
     sharedTargetEdges,
@@ -208,7 +225,7 @@ const createInteractiveDisplayQualityEdges = (
     localPolishedEdges,
     detachedEdges,
     endpointDetachedEdges,
-  );
+  ], chooseFewestStrictCrossings);
 };
 
 export const createBaseReactFlowInteractiveDisplayEdges = ({

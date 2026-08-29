@@ -6,6 +6,11 @@ import { scoreNodeClearanceRisk } from '../../strategies/shared/edgeWaypointCand
 import { displayBusinessNodeCommercialClearanceIsClean } from './baseReactFlowDisplayBusinessNodeClearance';
 import { repairBaseReactFlowDisplayBusinessNodeClearance } from './baseReactFlowDisplayBusinessNodeClearance';
 import { countRenderUnsafeEndpointStubs } from './baseReactFlowDisplayEndpointStubRepair';
+import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
+import {
+  createBaseReactFlowFinalEndpointEvaluation,
+  type BaseReactFlowFinalEndpointEvaluation,
+} from './baseReactFlowDisplayFinalEndpointEvaluation';
 import { closeBaseReactFlowDisplayFinalHardContract } from './baseReactFlowDisplayFinalHardContract';
 import { repairBaseReactFlowFinalCommercialDetours } from './baseReactFlowDisplayFinalEndpointOrder';
 import { repairBaseReactFlowFinalSafetyClosure } from './baseReactFlowDisplayFinalSafetyClosure';
@@ -21,11 +26,25 @@ const MAX_ALTERNATE_HARD_CLOSURE_EDGES = 24;
 export const displayAlternateHardClosureCandidateIsReady = (
   edges: Edge[],
   nodes: Node[],
+  evidence?: Readonly<{
+    evaluation?: BaseReactFlowFinalEndpointEvaluation | undefined;
+    hardReport?: Readonly<{
+      edges: readonly Edge[];
+      report: BaseDisplayBoundedCandidateReport;
+    }> | undefined;
+  }>,
 ): boolean => {
-  const report = getDisplayHardQualityGateReport(edges, nodes, 'polished');
+  const evaluation = evidence?.evaluation?.nodes === nodes
+    ? evidence.evaluation
+    : undefined;
+  const report = evidence?.hardReport?.edges === edges
+    ? evidence.hardReport.report
+    : evaluation?.hardReport(edges)
+    ?? getDisplayHardQualityGateReport(edges, nodes, 'polished');
   return report.hardClean
     && displayBusinessNodeCommercialClearanceIsClean(edges, nodes)
-    && countRenderUnsafeEndpointStubs(edges) === 0;
+    && (evaluation?.unsafeEndpointStubs(edges)
+      ?? countRenderUnsafeEndpointStubs(edges)) === 0;
 };
 
 const collectAlternateHardClosureDefectEdgeIds = (
@@ -60,15 +79,20 @@ export const buildBaseReactFlowAlternateHardClosureCandidate = ({
   args,
   repairNodes,
   primaryCandidate,
+  evaluationSession,
 }: {
   args: BaseReactFlowDisplayEdgesArgs;
   repairNodes: Node[];
   primaryCandidate: Edge[];
+  evaluationSession?: BaseReactFlowFinalEndpointEvaluation;
 }): Edge[] | null => {
   if (args.edges.length === 0 || args.edges.length > MAX_ALTERNATE_HARD_CLOSURE_EDGES) {
     return null;
   }
 
+  const evaluation = evaluationSession
+    ?? args.evaluationSession
+    ?? createBaseReactFlowFinalEndpointEvaluation(repairNodes);
   const interactiveSeed = createBaseReactFlowInteractiveDisplayEdges({
     edges: args.edges,
     nodes: args.nodes,
@@ -77,16 +101,17 @@ export const buildBaseReactFlowAlternateHardClosureCandidate = ({
     isLargeGraph: args.isLargeGraph,
     displayEdgeEpoch: args.displayEdgeEpoch,
   });
-  const closeCandidate = (seed: Edge[]): Edge[] => {
+  const closeCandidate = (seed: Edge[]) => {
     const hardClosedSeed = closeBaseReactFlowDisplayFinalHardContract(
       seed,
       repairNodes,
       args.onPhaseTrace,
+      evaluation,
     ).edges;
     const commercialClosedSeed = repairBaseReactFlowFinalCommercialDetours(
       hardClosedSeed,
       repairNodes,
-      { preferredEdges: args.edges },
+      { preferredEdges: args.edges, evaluation },
     );
     const clearanceClosedSeed = repairBaseReactFlowDisplayBusinessNodeClearance(
       commercialClosedSeed,
@@ -95,25 +120,35 @@ export const buildBaseReactFlowAlternateHardClosureCandidate = ({
     const safetyClosedSeed = repairBaseReactFlowFinalSafetyClosure(
       clearanceClosedSeed,
       repairNodes,
+      { evaluation },
     );
     return closeBaseReactFlowDisplayFinalHardContract(
       safetyClosedSeed,
       repairNodes,
       args.onPhaseTrace,
-    ).edges;
+      evaluation,
+    );
   };
-  const alternateCandidate = closeCandidate(interactiveSeed);
+  const alternateOutcome = closeCandidate(interactiveSeed);
+  const alternateCandidate = alternateOutcome.edges;
   const alternateById = new Map(alternateCandidate.map(edge => [edge.id, edge] as const));
   const defectEdgeIds = collectAlternateHardClosureDefectEdgeIds(primaryCandidate, repairNodes);
   const hybridSeed = primaryCandidate.map(edge => (
     defectEdgeIds.has(edge.id) ? alternateById.get(edge.id) ?? edge : edge
   ));
-  const hybridCandidate = closeCandidate(hybridSeed);
+  const hybridOutcome = closeCandidate(hybridSeed);
+  const hybridCandidate = hybridOutcome.edges;
 
-  if (displayAlternateHardClosureCandidateIsReady(hybridCandidate, repairNodes)) {
+  if (displayAlternateHardClosureCandidateIsReady(hybridCandidate, repairNodes, {
+    evaluation,
+    hardReport: { edges: hybridCandidate, report: hybridOutcome.report },
+  })) {
     return hybridCandidate;
   }
-  return displayAlternateHardClosureCandidateIsReady(alternateCandidate, repairNodes)
+  return displayAlternateHardClosureCandidateIsReady(alternateCandidate, repairNodes, {
+    evaluation,
+    hardReport: { edges: alternateCandidate, report: alternateOutcome.report },
+  })
     ? alternateCandidate
     : null;
 };

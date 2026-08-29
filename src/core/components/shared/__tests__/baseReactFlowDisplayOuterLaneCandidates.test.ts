@@ -1,5 +1,47 @@
 import type { Edge, Node } from '@xyflow/react';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const interactionHarness = vi.hoisted(() => ({
+  createCount: 0,
+  evaluateCount: 0,
+  mode: 'compiled' as 'compiled' | 'legacy',
+}));
+
+vi.mock('../baseReactFlowDisplayGeometry', async importOriginal => {
+  const original = await importOriginal<
+    typeof import('../baseReactFlowDisplayGeometry')
+  >();
+  return {
+    ...original,
+    createDisplayCandidateInteractionContext: (
+      ...args: Parameters<typeof original.createDisplayCandidateInteractionContext>
+    ) => {
+      interactionHarness.createCount += 1;
+      const compiled = original.createDisplayCandidateInteractionContext(...args);
+      const [edgeIndex, edges, otherSegments] = args;
+      return {
+        evaluate: (path: Parameters<typeof compiled.evaluate>[0]) => {
+          interactionHarness.evaluateCount += 1;
+          return interactionHarness.mode === 'compiled'
+            ? compiled.evaluate(path)
+            : {
+                strictCrossings: original.candidateStrictCrossingsForEdge(
+                  edgeIndex,
+                  path,
+                  otherSegments,
+                ),
+                unrelatedOverlap: original.candidateUnrelatedOverlapForEdge(
+                  edgeIndex,
+                  path,
+                  edges,
+                  otherSegments,
+                ),
+              };
+        },
+      };
+    },
+  };
+});
 
 import {
   STRICT_OUTER_LANE_MAX_CANDIDATES,
@@ -9,6 +51,7 @@ import {
   buildStrictInterSegmentLaneXs,
   buildStrictInterSegmentLaneYs,
 } from '../baseReactFlowDisplayLanePositions';
+import { repairStrictCrossingsWithDirectionalOuterLanes } from '../baseReactFlowDisplayStrictSweepRepair';
 
 const edge: Edge = { id: 'edge', source: 'source', target: 'target' };
 const nodes: Node[] = [
@@ -50,6 +93,49 @@ describe('baseReactFlowDisplayOuterLaneCandidates', () => {
       { x: 300, y: 100 },
       { x: 300, y: 600 },
     ], nodes.filter(node => node.id !== 'obstacle'), edge)]).toEqual([]);
+  });
+});
+
+describe('directional strict sweep candidate interaction reuse', () => {
+  const directionalEdges = (): Edge[] => [{
+    id: 'directional-outer-lane',
+    source: 'source',
+    target: 'target',
+    data: {
+      computedPath: [
+        { x: 0, y: 0 },
+        { x: 0, y: 100 },
+        { x: -200, y: 100 },
+        { x: -200, y: 500 },
+        { x: 300, y: 500 },
+        { x: 300, y: 600 },
+      ],
+    },
+  }];
+  const paths = (candidate: Edge[]): unknown[] => candidate.map(edge => edge.data?.computedPath);
+
+  beforeEach(() => {
+    interactionHarness.createCount = 0;
+    interactionHarness.evaluateCount = 0;
+    interactionHarness.mode = 'compiled';
+  });
+
+  it('matches legacy candidate scoring point-for-point while reusing one compiled context', () => {
+    interactionHarness.mode = 'legacy';
+    const legacy = repairStrictCrossingsWithDirectionalOuterLanes(directionalEdges(), nodes);
+    const legacyCreateCount = interactionHarness.createCount;
+    const legacyEvaluateCount = interactionHarness.evaluateCount;
+
+    interactionHarness.createCount = 0;
+    interactionHarness.evaluateCount = 0;
+    interactionHarness.mode = 'compiled';
+    const compiled = repairStrictCrossingsWithDirectionalOuterLanes(directionalEdges(), nodes);
+
+    expect(paths(compiled)).toEqual(paths(legacy));
+    expect(interactionHarness.createCount).toBe(legacyCreateCount);
+    expect(interactionHarness.evaluateCount).toBe(legacyEvaluateCount);
+    expect(interactionHarness.createCount).toBeGreaterThan(0);
+    expect(interactionHarness.evaluateCount).toBeGreaterThan(interactionHarness.createCount);
   });
 });
 
