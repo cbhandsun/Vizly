@@ -241,7 +241,8 @@ export function useLayoutStrategy({
                     // tree. Use the industry layered engine for ranking while
                     // retaining the user's Tree command and the common hard
                     // routing transaction.
-                    const layered = await (await loadDomainElkStrategy()).calculateLayout(
+                    const layered = await calculateLayeredLayoutWithReverse(
+                        await loadDomainElkStrategy(),
                         layoutNodes,
                         layoutEdges,
                         {
@@ -255,6 +256,8 @@ export function useLayoutStrategy({
                             edgeRouting: 'ORTHOGONAL',
                             padding: { top: 40, right: 20, bottom: 20, left: 20 },
                         },
+                        dir,
+                        false,
                         layoutContext,
                     );
                     newNodes = layered.nodes;
@@ -283,6 +286,9 @@ export function useLayoutStrategy({
                     edges: treeEdges,
                     routingJob,
                     beforePreviewRelease,
+                    candidateRepairPolicy: usesNativeTreeLayout
+                        ? 'default'
+                        : 'skip-exact-clean',
                 });
             } else if (strategyName === 'force') {
                 // ── 扁平力导向布局（对齐 SVG 版：不检测域） ──

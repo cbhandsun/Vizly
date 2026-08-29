@@ -134,6 +134,41 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
     });
   });
 
+  it('routes cyclic reverse-tree layouts through the shared reverse geometry adapter', async () => {
+    const cyclicEdges: Edge[] = [
+      ...edges,
+      { id: 'return', source: 'target', target: 'source' },
+    ];
+    mocks.calculateLayeredLayoutWithReverse.mockResolvedValueOnce({
+      nodes,
+      edges: cyclicEdges,
+    });
+    const options = createOptions();
+    options.edgesRef.current = cyclicEdges;
+    const { result } = renderHook(() => useLayoutStrategy({
+      ...options,
+      reactFlowInstance: null,
+    }));
+
+    await act(async () => {
+      await expect(result.current.handleStrategyLayout('tree', undefined, 'BT'))
+        .resolves.toBe(true);
+    });
+
+    expect(mocks.calculateLayeredLayoutWithReverse).toHaveBeenCalledWith(
+      expect.objectContaining({ getName: expect.any(Function) }),
+      expect.any(Array),
+      cyclicEdges,
+      expect.objectContaining({ direction: 'BT', edgeRouting: 'ORTHOGONAL' }),
+      'BT',
+      false,
+      expect.any(Object),
+    );
+    expect(mocks.stageLayoutRouting).toHaveBeenCalledWith(expect.objectContaining({
+      candidateRepairPolicy: 'skip-exact-clean',
+    }));
+  });
+
   it('keeps layout stability paused across a rejected lane attempt and compound fallback', async () => {
     const groupedNodes = nodes.map(node => ({
       ...node,
