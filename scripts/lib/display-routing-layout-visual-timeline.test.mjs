@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { summarizeDisplayRoutingLayoutVisualTimeline } from './display-routing-layout-visual-timeline.mjs';
+import {
+  assertDisplayRoutingLayoutProgressTimeline,
+  summarizeDisplayRoutingLayoutVisualTimeline,
+} from './display-routing-layout-visual-timeline.mjs';
 
 describe('display routing layout visual timeline', () => {
   it('separates preview release, fit motion, busy release, and visual stability', () => {
@@ -10,9 +13,11 @@ describe('display routing layout visual timeline', () => {
       visualStableAt: 2_100,
       events: [
         { type: 'layout-busy', value: true, sampledAt: 1_010 },
+        { type: 'layout-progress', value: true, sampledAt: 1_015 },
         { type: 'layout-committing', value: true, sampledAt: 1_200 },
         { type: 'layout-committing', value: false, sampledAt: 1_550 },
         { type: 'layout-busy', value: false, sampledAt: 1_560 },
+        { type: 'layout-progress', value: false, sampledAt: 1_565 },
         { type: 'fit-dispatched', value: true, sampledAt: 1_570 },
         { type: 'fit-handler-returned', value: true, sampledAt: 1_575 },
         { type: 'viewport-change', value: true, sampledAt: 1_580 },
@@ -25,6 +30,8 @@ describe('display routing layout visual timeline', () => {
       committingClearedFromCommitMs: 50,
       busyStartedFromInputMs: 10,
       busyClearedFromCommitMs: 60,
+      progressStartedFromInputMs: 15,
+      progressClearedFromCommitMs: 65,
       fitDispatchedFromCommitMs: 70,
       fitHandlerDurationMs: 5,
       viewportFirstChangeFromFitMs: 10,
@@ -49,6 +56,8 @@ describe('display routing layout visual timeline', () => {
       'committingClearedFromCommitMs',
       'busyStartedFromInputMs',
       'busyClearedFromCommitMs',
+      'progressStartedFromInputMs',
+      'progressClearedFromCommitMs',
       'fitDispatchedFromCommitMs',
       'fitHandlerDurationMs',
       'viewportFirstChangeFromFitMs',
@@ -60,5 +69,14 @@ describe('display routing layout visual timeline', () => {
       'visualStableAfterBusyClearMs',
       'visualStableAfterDiagnosticBacklogMs',
     ].map(key => [key, null])));
+  });
+
+  it('rejects a production layout that never shows or clears its progress status', () => {
+    expect(() => assertDisplayRoutingLayoutProgressTimeline({
+      progressStartedFromInputMs: 12,
+      progressClearedFromCommitMs: null,
+    }, 'domain-lanes-lr')).toThrow(
+      'domain-lanes-lr did not show and clear the layout progress indicator',
+    );
   });
 });

@@ -16,6 +16,7 @@ export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
   let previousRenderedRouteFingerprint = '';
   let previousLayoutBusy = null;
   let previousLayoutCommitting = null;
+  let previousLayoutProgressVisible = null;
   let previousViewportFingerprint = '';
   let pendingDiagnosticCloneTasks = 0;
   let workerInstanceSequence = 0;
@@ -113,6 +114,13 @@ export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
     if (layoutBusy !== previousLayoutBusy) {
       previousLayoutBusy = layoutBusy;
       recordLayoutVisualEvent('layout-busy', layoutBusy);
+    }
+    const layoutProgressVisible = Boolean(
+      document.querySelector?.('.flowchart-layout-progress'),
+    );
+    if (layoutProgressVisible !== previousLayoutProgressVisible) {
+      previousLayoutProgressVisible = layoutProgressVisible;
+      recordLayoutVisualEvent('layout-progress', layoutProgressVisible);
     }
     const layoutCommitting = Boolean(document.querySelector?.('.vizly-layout-committing'));
     if (layoutCommitting !== previousLayoutCommitting) {

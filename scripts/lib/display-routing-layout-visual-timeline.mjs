@@ -15,6 +15,15 @@ const delta = (event, origin) => (
   event && Number.isFinite(origin) ? event.sampledAt - origin : null
 );
 
+export const assertDisplayRoutingLayoutProgressTimeline = (timeline, label) => {
+  if (
+    !Number.isFinite(timeline?.progressStartedFromInputMs)
+    || !Number.isFinite(timeline?.progressClearedFromCommitMs)
+  ) {
+    throw new Error(`${label} did not show and clear the layout progress indicator`);
+  }
+};
+
 /**
  * Projects aggregate browser observations into phase deltas. No diagram ids,
  * node geometry, paths, or viewport coordinates leave the browser.
@@ -41,6 +50,13 @@ export const summarizeDisplayRoutingLayoutVisualTimeline = ({
     'layout-busy',
     false,
     busyStarted?.sampledAt ?? inputAt,
+  );
+  const progressStarted = firstEvent(events, 'layout-progress', true, inputAt);
+  const progressCleared = firstEvent(
+    events,
+    'layout-progress',
+    false,
+    progressStarted?.sampledAt ?? inputAt,
   );
   const fitDispatched = lastEvent(events, 'fit-dispatched', inputAt);
   const fitHandlerReturned = firstEvent(
@@ -71,6 +87,8 @@ export const summarizeDisplayRoutingLayoutVisualTimeline = ({
     committingClearedFromCommitMs: delta(committingCleared, routingCommitAt),
     busyStartedFromInputMs: delta(busyStarted, inputAt),
     busyClearedFromCommitMs: delta(busyCleared, routingCommitAt),
+    progressStartedFromInputMs: delta(progressStarted, inputAt),
+    progressClearedFromCommitMs: delta(progressCleared, routingCommitAt),
     fitDispatchedFromCommitMs: delta(fitDispatched, routingCommitAt),
     fitHandlerDurationMs: delta(fitHandlerReturned, fitDispatched?.sampledAt),
     viewportFirstChangeFromFitMs: delta(firstViewportChange, fitDispatched?.sampledAt),

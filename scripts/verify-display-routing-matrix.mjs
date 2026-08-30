@@ -51,8 +51,11 @@ import {
   resolveDisplayRoutingLayoutVisualTimeoutMs,
   waitForStableDisplayRoutingLayoutVisual,
 } from './lib/display-routing-layout-visual-settle.mjs';
-import { summarizeDisplayRoutingLayoutVisualTimeline } from './lib/display-routing-layout-visual-timeline.mjs';
-import { assertProductionPreviewMatchesLocalBuild } from './lib/display-routing-build-identity.mjs';
+import {
+  assertDisplayRoutingLayoutProgressTimeline,
+  summarizeDisplayRoutingLayoutVisualTimeline,
+} from './lib/display-routing-layout-visual-timeline.mjs';
+import { assertDisplayRoutingProductionPreview } from './lib/display-routing-production-preview.mjs';
 import { DISPLAY_ROUTING_MATRIX_PRESET_TARGETS } from './lib/display-routing-matrix-presets.mjs';
 import { readDisplayRoutingLayoutDiagnostics } from './lib/display-routing-layout-diagnostics.mjs';
 
@@ -82,19 +85,6 @@ const WARM_LAYOUT_CASE_IDS = parseDisplayRoutingMatrixCaseList(
 const WARM_LAYOUT_CASES = WARM_LAYOUT_CASE_IDS.map(id => (
   DISPLAY_ROUTING_LAYOUT_CASES.find(candidate => candidate.id === id)
 )).filter(Boolean);
-
-const assertProductionPreview = async () => {
-  if (!BASE_URL) throw new Error('PRECOMPILED_ROUTE_BASE_URL must point to a production preview');
-  const response = await fetch(`${BASE_URL}/`, { redirect: 'follow' });
-  if (!response.ok) throw new Error(`Production preview returned HTTP ${response.status}`);
-  const html = await response.text();
-  if (
-    html.includes('/@vite/client')
-    || !/<script[^>]+src=["'][^"']*\/assets\/[^"']+\.js["']/i.test(html)
-  ) throw new Error('PRECOMPILED_ROUTE_BASE_URL is not a production Vite preview');
-  const localHtml = await readFile('dist/index.html', 'utf8');
-  assertProductionPreviewMatchesLocalBuild(html, localHtml);
-};
 
 const waitForValue = async (session, expression, label) => {
   const deadline = Date.now() + WAIT_TIMEOUT_MS;
@@ -575,6 +565,7 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
     routingCommitAt: route.routing.finalAppliedAt,
     visualStableAt: visualSettle.stableSinceAt,
   });
+  assertDisplayRoutingLayoutProgressTimeline(visualTimeline, layoutCase.id);
   const layoutDiagnostics = await session.evaluate(`(() => {
     const readDiagnostics = ${readDisplayRoutingLayoutDiagnostics.toString()};
     return readDiagnostics({
@@ -775,7 +766,7 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
   };
 });
 
-await assertProductionPreview();
+await assertDisplayRoutingProductionPreview(BASE_URL);
 const presetResults = [];
 for (const target of PRECOMPILED_DISPLAY_ROUTE_TARGETS) {
   if (!REQUESTED_CASE || REQUESTED_CASE === target.presetId) {
