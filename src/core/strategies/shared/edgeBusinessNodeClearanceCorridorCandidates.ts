@@ -49,6 +49,20 @@ const riskyRectsForPath = (
     < clearance - EPS
 )));
 
+const pathHasCrossAxisBacktrack = (path: Point[], terminalAxis: Axis): boolean => {
+  let direction = 0;
+  for (let index = 0; index < path.length - 1; index += 1) {
+    const delta = terminalAxis === 'v'
+      ? path[index + 1].x - path[index].x
+      : path[index + 1].y - path[index].y;
+    const nextDirection = Math.sign(delta);
+    if (nextDirection === 0) continue;
+    if (direction !== 0 && direction !== nextDirection) return true;
+    direction = nextDirection;
+  }
+  return false;
+};
+
 const laneLeavesContainingContainer = (
   containerRects: Rect[],
   axis: Axis,
@@ -121,7 +135,8 @@ export const buildBusinessNodeTerminalCorridorCandidates = (
   if (flow === 0 || sourceDirection !== flow || targetDirection !== -flow) return [];
 
   const riskyRects = riskyRectsForPath(path, rects, clearance);
-  if (riskyRects.length === 0 || (riskyRects.length < 2 && path.length < 8)) return [];
+  if (riskyRects.length === 0) return [];
+  if (riskyRects.length < 2 && !pathHasCrossAxisBacktrack(path, sourceAxis)) return [];
   if (sourceAxis === 'v') {
     const sourceY = flow > 0
       ? Math.min(sourceStub.y, ...riskyRects.map(rect => rect.y - clearance))

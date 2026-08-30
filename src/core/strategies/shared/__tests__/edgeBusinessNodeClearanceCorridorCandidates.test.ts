@@ -31,6 +31,21 @@ describe('business-node terminal corridor candidates', () => {
     expect(path[2]).toEqual({ x: 1757, y: 863 });
   });
 
+  it('skips a long monotone route with only one risky obstacle', () => {
+    expect(buildBusinessNodeTerminalCorridorCandidates([
+      { x: 0, y: 300 },
+      { x: 0, y: 252 },
+      { x: 40, y: 252 },
+      { x: 40, y: 200 },
+      { x: 80, y: 200 },
+      { x: 80, y: 100 },
+      { x: 120, y: 100 },
+      { x: 120, y: 0 },
+    ], [
+      { x: 30, y: 140, width: 40, height: 40 },
+    ], 16)).toEqual([]);
+  });
+
   it('builds the horizontal transpose and rejects malformed terminal geometry', () => {
     const horizontal = buildBusinessNodeTerminalCorridorCandidates([
       { x: 0, y: 20 },

@@ -17,6 +17,7 @@ import {
 import {
   createBusinessNodeClearanceCandidateCollection,
 } from './edgeBusinessNodeClearanceCandidateCollection';
+import { selectAcceptedBusinessNodeClearanceCandidate } from './edgeBusinessNodeClearanceCandidateSelection';
 import { buildBusinessNodeTerminalCorridorCandidates } from './edgeBusinessNodeClearanceCorridorCandidates';
 import {
   createEdgePathQualityEvaluationContext,
@@ -469,6 +470,7 @@ const clearanceCandidates = (
   minimumClearance: number,
   maximumHits: number,
   countHits: (candidate: Point[], maximumHits: number) => number,
+  terminalCorridorsOnly = false,
 ) => {
   const hitByCandidate = new WeakMap<Point[], number>();
   const candidates = createBusinessNodeClearanceCandidateCollection<Point[]>(candidate => {
@@ -477,17 +479,28 @@ const clearanceCandidates = (
     hitByCandidate.set(candidate, hits);
     return true;
   });
+  if (terminalCorridorsOnly) {
+    candidates.addAll(buildBusinessNodeTerminalCorridorCandidates(
+      path,
+      rects,
+      minimumClearance,
+      containerRects,
+      CONTAINER_CLEARANCE_OVERFLOW,
+    ));
+    const result = candidates.read();
+    return {
+      candidates: result.paths.map(candidate => ({
+        candidate,
+        hits: hitByCandidate.get(candidate) ?? maximumHits + 1,
+      })),
+      generatedCandidateCount: result.generatedCandidateCount,
+      uniqueCandidateCount: result.uniqueCandidateCount,
+    };
+  }
   const laneClearances = [...new Set([
     ...LEGACY_LANE_CLEARANCES,
     minimumClearance,
   ])].sort((left, right) => left - right);
-  candidates.addAll(buildBusinessNodeTerminalCorridorCandidates(
-    path,
-    rects,
-    minimumClearance,
-    containerRects,
-    CONTAINER_CLEARANCE_OVERFLOW,
-  ));
   candidates.addAll(cornerDetourCandidates(path, rects, laneClearances));
   candidates.addAll(terminalBranchCornerDetourCandidates(path, rects, minimumClearance));
   for (let index = 0; index < path.length - 1; index += 1) {
@@ -615,34 +628,6 @@ const clearanceCandidates = (
   };
 };
 
-const withPath = (edge: Edge, path: Point[]): Edge => {
-  const data: Record<string, unknown> = {
-    ...(edge.data ?? {}),
-    computedPath: path,
-    displayNodeClearanceRepaired: true,
-  };
-  const treeRouting = data.treeRouting;
-  if (treeRouting && typeof treeRouting === 'object' && !Array.isArray(treeRouting)) {
-    data.treeRouting = { ...treeRouting, points: path };
-  }
-  return { ...edge, data };
-};
-
-const hardQualityDoesNotRegress = (
-  before: EdgePathQualityScore,
-  after: EdgePathQualityScore,
-  allowTransientStrictCrossing = false,
-): boolean => {
-  return after.nonOrthogonalSegments <= before.nonOrthogonalSegments
-    && after.strictCrossings <= before.strictCrossings + (allowTransientStrictCrossing ? 1 : 0)
-    && after.reverseOverlap <= before.reverseOverlap
-    && after.unrelatedOverlap <= before.unrelatedOverlap
-    && after.unexplainedRelatedOverlap <= before.unexplainedRelatedOverlap
-    && after.shortEndpointStubs <= before.shortEndpointStubs
-    && after.tinyInteriorDoglegs <= before.tinyInteriorDoglegs
-    && after.hairpins <= before.hairpins;
-};
-
 export const repairBusinessNodeClearanceRisks = (
   edges: Edge[],
   nodes: ReactFlowNode[],
@@ -739,48 +724,53 @@ export const repairBusinessNodeClearanceRisks = (
         options.diagnostics.generatedCandidateCount += candidateCollection.generatedCandidateCount;
         options.diagnostics.uniqueCandidateCount += candidateCollection.uniqueCandidateCount;
       }
-      const candidateRankResult = candidateRankCache.getOrCreate(
-        candidateCollection,
-        candidateCollection.candidates,
-        candidate => clearanceContext.scorePair(
-          candidate,
-          edge,
-          minimumClearance,
-          COMMERCIAL_BUSINESS_NODE_CLEARANCE,
-        ),
-      );
-      if (candidateRankResult.cacheHit && options.diagnostics) {
-        options.diagnostics.candidateRankCacheHitCount += 1;
-      }
-      const rankedCandidates = iterateBusinessNodeClearanceCandidates(
-        candidateRankResult.value,
-        {
+      const rankedCandidatesFor = (collection: typeof candidateCollection) => {
+        const result = candidateRankCache.getOrCreate(
+          collection,
+          collection.candidates,
+          candidate => clearanceContext.scorePair(
+            candidate, edge, minimumClearance, COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+          ),
+        );
+        if (result.cacheHit && options.diagnostics) {
+          options.diagnostics.candidateRankCacheHitCount += 1;
+        }
+        return iterateBusinessNodeClearanceCandidates(result.value, {
           hits: baselineHits,
           risk: baselineRisk,
           commercialRisk: baselineCommercialRisk,
-        },
-      );
-      for (const rankedCandidate of rankedCandidates) {
-        const candidatePath = rankedCandidate.candidate;
-        const candidateEdges = current.slice();
-        candidateEdges[edgeIndex] = withPath(edge, candidatePath);
-        const candidateQuality = qualityBaseline.context.evaluateChanged(
-          candidateEdges,
-          [edgeIndex],
-        );
-        if (!hardQualityDoesNotRegress(
-          qualityBaseline.score,
-          candidateQuality,
-          options.allowTransientStrictCrossing === true,
-        )) continue;
-        if (options.validateCandidate && !options.validateCandidate({
+        });
+      };
+      const selectCandidate = (collection: typeof candidateCollection) => (
+        selectAcceptedBusinessNodeClearanceCandidate({
+          allowTransientStrictCrossing: options.allowTransientStrictCrossing === true,
           baselineEdges: current,
-          candidateEdges,
-          changedEdgeIndex: edgeIndex,
-        })) continue;
-        current = candidateEdges;
-        break;
+          baselineQuality: qualityBaseline.score,
+          edge,
+          edgeIndex,
+          qualityContext: qualityBaseline.context,
+          rankedCandidates: rankedCandidatesFor(collection),
+          validateCandidate: options.validateCandidate,
+        })
+      );
+      const standardCandidate = selectCandidate(candidateCollection);
+      if (standardCandidate) {
+        current = standardCandidate;
+        continue;
       }
+      const corridorCollection = clearanceCandidates(
+        path, rectContext.rectsForTerminals(edge.source, edge.target),
+        rectContext.containerRects, minimumClearance, baselineHits,
+        (candidatePath, maximumHits) => obstacleContext.countUnrelatedObstacleHits(
+          candidatePath, maximumHits,
+        ),
+        true,
+      );
+      if (options.diagnostics) {
+        options.diagnostics.generatedCandidateCount += corridorCollection.generatedCandidateCount;
+        options.diagnostics.uniqueCandidateCount += corridorCollection.uniqueCandidateCount;
+      }
+      current = selectCandidate(corridorCollection) ?? current;
     }
     if (current === passBaseline || current.every((edge, index) => edge === passBaseline[index])) break;
   }

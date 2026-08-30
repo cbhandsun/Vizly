@@ -2,7 +2,7 @@
   "schema": "vizly-precompiled-display-route-manifest-v3",
   "routingVersion": "15",
   "identitySourceHash": "source-v1:752776072602ff4e8a4892530e3faea55f7502310613fe616e04061f339c270a",
-  "routingSourceHash": "source-v1:4ab96bdec1d10b35f163840e55b0e970e4e069745e833d25a15d3520d5e03a63",
+  "routingSourceHash": "source-v1:793d55349959fea19f2df09b4c73ce028682e4afdfb179498c1fd0f6b377f8f8",
   "entries": [
     {
       "presetId": "wms-process-flow-v1",
@@ -12,7 +12,7 @@
       "sourceHash": "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
       "inputSignature": "1417152958",
       "inputGeometryDigest": "geometry-v1:6933a4d0ae9ed2a8b4f4b14092ba34c4",
-      "outputRouteSignature": "route-v2:44:199:7512658bc724fc95"
+      "outputRouteSignature": "route-v2:44:201:0018994581f3647b"
     },
     {
       "presetId": "logistics-architecture-v1",
@@ -28,10 +28,10 @@
       "presetId": "wms-demand-allocation-strategy-v2",
       "variantId": "initial",
       "sourcePath": "src/data/standardized/DeamndAllocation.json",
-      "artifactFile": "route-2072417420.json",
+      "artifactFile": "route-2113580664.json",
       "sourceHash": "source-v1:ea82c502ab6535b5c8f8367c591861e540396a41955a15c6b5f94f922264b7de",
-      "inputSignature": "2072417420",
-      "inputGeometryDigest": "geometry-v1:be8cd0f563a50da59f88074d8d69a169",
+      "inputSignature": "2113580664",
+      "inputGeometryDigest": "geometry-v1:959447b9afedc5b100c74395ce889f05",
       "outputRouteSignature": "route-v2:26:164:d8711ac2fc858b00"
     }
   ]
