@@ -6,6 +6,7 @@ import {
   createBaseReactFlowFinalSafetyNoopCacheKey,
 } from '../baseReactFlowDisplayFinalSafetyNoopCache';
 import { createBaseReactFlowFinalEndpointEvaluation } from '../baseReactFlowDisplayFinalEndpointEvaluation';
+import { auditBaseReactFlowFinalSafetyClosure } from '../baseReactFlowDisplayFinalSafetyAudit';
 import { repairBaseReactFlowFinalSafetyClosure } from '../baseReactFlowDisplayFinalSafetyClosure';
 import type { DisplayRoutingPhaseTrace } from '../baseReactFlowDisplayRoutingTrace';
 
@@ -100,5 +101,34 @@ describe('baseReactFlow final safety no-op cache', () => {
       changedEdgeCount: 0,
       resolution: 'skip',
     })]);
+  });
+
+  it('reports only the aggregate count of render-unsafe endpoint stubs', () => {
+    const baselineNodes = nodes();
+    const unsafeEdges = edges();
+    unsafeEdges[0] = {
+      ...unsafeEdges[0],
+      data: {
+        computedPath: [
+          { x: 100, y: 40 },
+          { x: 140, y: 40 },
+          { x: 260, y: 40 },
+          { x: 300, y: 40 },
+        ],
+      },
+    };
+    const traces: DisplayRoutingPhaseTrace[] = [];
+
+    expect(auditBaseReactFlowFinalSafetyClosure(
+      unsafeEdges,
+      baselineNodes,
+      createBaseReactFlowFinalEndpointEvaluation(baselineNodes),
+      trace => traces.push(trace),
+    )).toEqual({ canSkip: false, endpointDefectOnly: false });
+    expect(traces.find(trace => trace.phase === 'final-safety-stubs')).toMatchObject({
+      candidateCount: 1,
+      resolution: 'rejected',
+      workItemCount: 2,
+    });
   });
 });

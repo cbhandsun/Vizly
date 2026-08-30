@@ -528,6 +528,19 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
           && Number.isFinite(response.__browserCapturedAt)
           ? response.__browserCapturedAt - request.__browserCapturedAt
           : null,
+        closurePhases: summarize(
+          Array.isArray(response.phaseTrace)
+            ? response.phaseTrace.filter(trace => (
+              trace?.phase === 'final-safety-closure'
+              || trace?.phase === 'final-commercial-safety-closure'
+              || trace?.phase === 'final-safety-hard-gate'
+              || trace?.phase === 'final-safety-stubs'
+              || trace?.phase === 'final-safety-endpoint-order'
+              || trace?.phase === 'final-safety-passage-order'
+            ))
+            : [],
+          8,
+        ),
         slowestPhases: summarize(response.phaseTrace),
       };
     });

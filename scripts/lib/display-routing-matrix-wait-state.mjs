@@ -125,6 +125,7 @@ export const summarizeDisplayRoutingWaitState = (
       scannedNodeCount: integer(trace.scannedNodeCount),
       scannedSegmentCount: integer(trace.scannedSegmentCount),
       scannedEdgePairCount: integer(trace.scannedEdgePairCount),
+      workItemCount: integer(trace.workItemCount),
       resolution: token(trace.resolution),
     };
   };

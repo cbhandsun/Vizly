@@ -41,6 +41,7 @@ describe('display routing matrix wait-state summary', () => {
       phaseProgressTrace: [{
         phase: 'quality',
         durationMs: 18,
+        workItemCount: 3,
         privateGeometry: [{ x: 1, y: 2 }],
       }],
     }, [{
@@ -113,7 +114,7 @@ describe('display routing matrix wait-state summary', () => {
         layoutTransactionStatus: 'running',
         layoutTransactionAttemptCount: 1,
         workerStartCount: 1,
-        phaseProgressTrace: [{ phase: 'quality', durationMs: 18 }],
+        phaseProgressTrace: [{ phase: 'quality', durationMs: 18, workItemCount: 3 }],
       },
       responseCount: 1,
       responseTrace: [{

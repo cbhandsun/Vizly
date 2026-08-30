@@ -43,14 +43,16 @@ export const auditBaseReactFlowFinalSafetyClosure = (
 
   const stubTimer = timer('final-safety-stubs');
   const stubMetricsBefore = evaluation?.readMetrics();
-  const stubsClean = (evaluation?.unsafeEndpointStubs(edges)
-    ?? countRenderUnsafeEndpointStubs(edges.slice())) === 0;
+  const unsafeStubCount = evaluation?.unsafeEndpointStubs(edges)
+    ?? countRenderUnsafeEndpointStubs(edges.slice());
+  const stubsClean = unsafeStubCount === 0;
+  const stubMetrics = stubMetricsBefore && evaluation
+    ? diffBaseReactFlowEvaluationMetrics(stubMetricsBefore, evaluation.readMetrics())
+    : {};
   stubTimer.finish(
     stubsClean ? 'accepted' : 'rejected',
     0,
-    stubMetricsBefore && evaluation
-      ? diffBaseReactFlowEvaluationMetrics(stubMetricsBefore, evaluation.readMetrics())
-      : undefined,
+    { ...stubMetrics, workItemCount: unsafeStubCount },
   );
   if (!stubsClean) return { canSkip: false, endpointDefectOnly: false };
 
