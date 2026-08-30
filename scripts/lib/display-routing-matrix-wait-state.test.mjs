@@ -47,6 +47,14 @@ describe('display routing matrix wait-state summary', () => {
       }],
     }], 26, [{
       requestId: 'layout:2',
+      operation: 'incremental-route',
+      changeSet: {
+        classification: 'geometry',
+        reason: 'node-drag',
+        changedNodeIds: ['private-node'],
+      },
+      mutableEdgeIds: ['private-edge'],
+      contextEdgeIds: ['private-context-edge'],
       inputSignature: '123456',
       inputGeometryDigest: 'geometry-v1:0123456789abcdef0123456789abcdef',
       nodes: [{ id: 'private-node' }],
@@ -89,6 +97,12 @@ describe('display routing matrix wait-state summary', () => {
       requestTrace: [{
         requestId: 'layout:2',
         requestKind: 'layout',
+        operation: 'incremental-route',
+        changeClassification: 'geometry',
+        changeReason: 'node-drag',
+        changedNodeCount: 1,
+        mutableEdgeCount: 1,
+        contextEdgeCount: 1,
         inputSignature: '123456',
         inputGeometryDigest: 'geometry-v1:0123456789abcdef0123456789abcdef',
         nodeCount: 1,
@@ -135,6 +149,29 @@ describe('display routing matrix wait-state summary', () => {
       durationMs: undefined,
     }));
     expect(summary.renderedEdgeCount).toBeUndefined();
+  });
+
+  it('keeps the first incremental phases and the latest timeout evidence', () => {
+    const progress = Array.from({ length: 80 }, (_, index) => ({
+      requestId: 'incremental:1',
+      phaseProgress: {
+        phase: index === 0 ? 'incremental-closure' : `phase-${index}`,
+        durationMs: index,
+      },
+    }));
+    const summary = summarizeDisplayRoutingWaitState({
+      phaseProgressTrace: progress.slice(-32).map(item => item.phaseProgress),
+    }, progress, 4);
+
+    expect(summary.routing.phaseProgressTrace).toHaveLength(48);
+    expect(summary.routing.phaseProgressTrace[0]).toMatchObject({
+      phase: 'incremental-closure',
+      durationMs: 0,
+    });
+    expect(summary.routing.phaseProgressTrace.at(-1)).toMatchObject({
+      phase: 'phase-79',
+      durationMs: 79,
+    });
   });
 
   it('summarizes the latest completed response when progress follows it', () => {

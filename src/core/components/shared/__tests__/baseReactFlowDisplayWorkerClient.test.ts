@@ -13,6 +13,7 @@ import {
   projectBaseReactFlowDisplayWorkerInput,
   repairBaseReactFlowDisplayEdgesInWorker,
   resolveBaseReactFlowDisplayedEdges,
+  resolveBaseReactFlowDisplayWorkerFailureStage,
   resolveBaseReactFlowDisplayQualityPolicy,
   scheduleBaseReactFlowDisplayCacheWrite,
   scheduleBaseReactFlowDisplayQuality,
@@ -35,6 +36,19 @@ const TEST_REPAIR_IDENTITY_INPUT = {
   inputSignature: '1234',
   inputGeometryDigest: `geometry-v1:${'a'.repeat(32)}`,
 } as const;
+
+describe('display Worker failure diagnostics', () => {
+  it('preserves the timeout terminal stage without classifying unrelated failures as timeouts', () => {
+    expect(resolveBaseReactFlowDisplayWorkerFailureStage(
+      new Error('display-edge-worker-timeout'),
+    )).toBe('worker-timeout');
+    expect(resolveBaseReactFlowDisplayWorkerFailureStage(
+      new Error('worker-crashed'),
+    )).toBe('worker-rejected');
+    expect(resolveBaseReactFlowDisplayWorkerFailureStage('display-edge-worker-timeout'))
+      .toBe('worker-rejected');
+  });
+});
 
 const installWorkerHarness = (
   onPost: (

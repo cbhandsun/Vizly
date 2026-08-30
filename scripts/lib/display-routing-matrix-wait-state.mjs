@@ -33,9 +33,21 @@ export const summarizeDisplayRoutingWaitState = (
   const report = record(response.hardReport);
   const quality = record(report.quality);
   const traces = Array.isArray(response.phaseTrace) ? response.phaseTrace.slice(-24) : [];
-  const progressTraces = Array.isArray(routing.phaseProgressTrace)
-    ? routing.phaseProgressTrace.slice(-24)
-    : [];
+  const responseProgressTraces = responses.flatMap(value => {
+    const trace = record(value).phaseProgress;
+    return typeof trace === 'object' && trace !== null ? [trace] : [];
+  });
+  const availableProgressTraces = responseProgressTraces.length > 0
+    ? responseProgressTraces
+    : Array.isArray(routing.phaseProgressTrace)
+      ? routing.phaseProgressTrace
+      : [];
+  const progressTraces = availableProgressTraces.length <= 48
+    ? availableProgressTraces
+    : [
+      ...availableProgressTraces.slice(0, 16),
+      ...availableProgressTraces.slice(-32),
+    ];
   const completedResponses = responses.filter(value => {
     const candidate = record(value);
     return typeof candidate.hardClean === 'boolean'
@@ -160,6 +172,18 @@ export const summarizeDisplayRoutingWaitState = (
       return {
         requestId: token(request.requestId),
         requestKind: requestKind(request.requestId),
+        operation: token(request.operation),
+        changeClassification: token(record(request.changeSet).classification),
+        changeReason: token(record(request.changeSet).reason),
+        changedNodeCount: Array.isArray(record(request.changeSet).changedNodeIds)
+          ? integer(record(request.changeSet).changedNodeIds.length)
+          : undefined,
+        mutableEdgeCount: Array.isArray(request.mutableEdgeIds)
+          ? integer(request.mutableEdgeIds.length)
+          : undefined,
+        contextEdgeCount: Array.isArray(request.contextEdgeIds)
+          ? integer(request.contextEdgeIds.length)
+          : undefined,
         inputSignature: identityToken(request.inputSignature ?? request.nextInputSignature),
         inputGeometryDigest: identityToken(
           request.inputGeometryDigest ?? request.nextInputGeometryDigest,

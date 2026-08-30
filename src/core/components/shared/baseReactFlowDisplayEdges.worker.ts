@@ -393,9 +393,10 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
     requestId: request.requestId,
     phaseTrace,
     publish: postDisplayEdgesResponse,
-    // Incremental routing is latency-sensitive and completes in one bounded
-    // transaction. Its aggregate trace travels with the single final response.
-    publishProgress: request.operation !== 'incremental-route',
+    // Completed phase metrics are bounded and contain no graph payload. Keep
+    // publishing them for incremental jobs as well so a client-side timeout
+    // retains the last completed phase instead of losing the entire trace.
+    publishProgress: true,
   });
   const completeResponse = createDisplayWorkerResponseCompleter(request, phaseTrace);
   if (request.operation === 'repair') {

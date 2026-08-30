@@ -6,6 +6,7 @@ import {
 import {
   computeBaseReactFlowDisplayEdgesInWorker,
   prewarmBaseReactFlowDisplayWorker,
+  resolveBaseReactFlowDisplayWorkerFailureStage,
   type DeferredDisplayEdges,
   type DisplayRoutingInput,
 } from './baseReactFlowDisplayWorkerClient';
@@ -623,7 +624,7 @@ export const useBaseReactFlowDisplayRouting = ({
         workerCompleted = true;
         if (routingJob) displayRoutingSessionRuntime.finishJob(routingJob);
         updateDisplayRoutingDebugState({
-          stage: 'worker-rejected',
+          stage: resolveBaseReactFlowDisplayWorkerFailureStage(error),
           signature: displayEdgeCacheSignature,
           requestId,
           error: error instanceof Error ? error.message : 'unknown-worker-error',

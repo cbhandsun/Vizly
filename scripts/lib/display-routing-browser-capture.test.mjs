@@ -123,12 +123,12 @@ describe('display routing browser capture', () => {
       routeResolution: 'repair',
       edges: [],
     });
-    for (let index = 0; index < 80; index += 1) {
+    for (let index = 0; index < 240; index += 1) {
       worker.emit({ requestId: `progress-${index}`, phaseProgress: {} });
     }
     queuedTasks.slice(1).forEach(task => task());
 
-    expect(window.__vizlyRoutingResponses).toHaveLength(66);
+    expect(window.__vizlyRoutingResponses).toHaveLength(198);
     expect(window.__vizlyRoutingResponses.find(item => (
       item.requestId === 'completed-repair'
     ))).toMatchObject({

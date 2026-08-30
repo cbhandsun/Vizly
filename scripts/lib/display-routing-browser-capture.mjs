@@ -204,7 +204,7 @@ export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
             const progress = window.__vizlyRoutingResponses.filter(item => (
               typeof item?.hardClean !== 'boolean'
               && typeof item?.routeResolution !== 'string'
-            )).slice(-64);
+            )).slice(-196);
             window.__vizlyRoutingResponses = [...completed, ...progress];
           } catch {}
           pendingDiagnosticCloneTasks = Math.max(0, pendingDiagnosticCloneTasks - 1);

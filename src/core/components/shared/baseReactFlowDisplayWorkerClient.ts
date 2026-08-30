@@ -108,6 +108,14 @@ export type DisplayQualityPolicy = {
   timeoutMs: number;
 };
 
+export const resolveBaseReactFlowDisplayWorkerFailureStage = (
+  error: unknown,
+): 'worker-timeout' | 'worker-rejected' => (
+  error instanceof Error && error.message === 'display-edge-worker-timeout'
+    ? 'worker-timeout'
+    : 'worker-rejected'
+);
+
 type DisplayQualityCancel = () => void;
 
 const INTERACTIVE_DISPLAY_NODE_THRESHOLD = 30;
