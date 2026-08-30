@@ -37,6 +37,7 @@ import { updateDisplayRoutingDebugState } from './baseReactFlowDisplayRoutingDeb
 import {
   auditBaseReactFlowLayoutCandidateSeed,
   shouldBypassBaseReactFlowObstacleDirtyLaneCandidate,
+  shouldBypassBaseReactFlowUnanchoredFlatElkCandidate,
   shouldSkipBaseReactFlowLayoutCandidateRepair,
 } from './baseReactFlowLayoutCandidateSeedAudit';
 import type { DisplayRoutingWorkerCommitReceipt } from './baseReactFlowDisplayWorkerCommitReceipt';
@@ -405,6 +406,7 @@ export const stageBaseReactFlowLayoutRouting = async ({
   fullRouteTimeoutMs = LAYOUT_FULL_DISPLAY_WORKER_TIMEOUT_MS,
   precompiledLayoutRegeneration,
   rejectObstacleDirtyBoundedCandidate = false,
+  rejectUnanchoredFlatElkCandidate = false,
   candidateRepairPolicy = 'default',
 }: {
   workerRef: MutableRefObject<Worker | null>;
@@ -420,6 +422,7 @@ export const stageBaseReactFlowLayoutRouting = async ({
   fullRouteTimeoutMs?: number;
   precompiledLayoutRegeneration?: BaseReactFlowPrecompiledLayoutRegeneration | null;
   rejectObstacleDirtyBoundedCandidate?: boolean;
+  rejectUnanchoredFlatElkCandidate?: boolean;
   candidateRepairPolicy?: 'default' | 'skip-exact-clean';
 }): Promise<BaseReactFlowLayoutRoutingCommit> => {
   const unseededSourceEdges = sourceEdges.map(edge => ({
@@ -510,6 +513,14 @@ export const stageBaseReactFlowLayoutRouting = async ({
     rejectObstacleDirtyBoundedCandidate
     && seedAudit
     && shouldBypassBaseReactFlowObstacleDirtyLaneCandidate(
+      stagedSeedEdges?.length ?? 0,
+      seedAudit,
+    )
+  ) throw new Error('layout-routing-hard-quality-rejected');
+  if (
+    rejectUnanchoredFlatElkCandidate
+    && seedAudit
+    && shouldBypassBaseReactFlowUnanchoredFlatElkCandidate(
       stagedSeedEdges?.length ?? 0,
       seedAudit,
     )

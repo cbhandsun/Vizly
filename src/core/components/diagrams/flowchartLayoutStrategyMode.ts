@@ -108,7 +108,6 @@ export const shouldRetryRejectedDomainLayoutWithCompoundElk = ({
     usedDomainCompoundElk: boolean;
     canUseFlatElkFallback: boolean;
     hardQualityRejected: boolean;
-}): boolean => !usedDomainElk
-    && !usedDomainCompoundElk
-    && !canUseFlatElkFallback
-    && hardQualityRejected;
+}): boolean => !usedDomainCompoundElk
+    && hardQualityRejected
+    && (usedDomainElk || !canUseFlatElkFallback);

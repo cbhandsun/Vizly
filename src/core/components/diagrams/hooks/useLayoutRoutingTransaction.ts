@@ -21,6 +21,7 @@ type LayoutRoutingTransactionRequest = Readonly<{
   routingJob: BaseReactFlowRoutingSessionJob;
   beforePreviewRelease?: () => Promise<unknown>;
   rejectObstacleDirtyBoundedCandidate?: boolean;
+  rejectUnanchoredFlatElkCandidate?: boolean;
   candidateRepairPolicy?: 'default' | 'skip-exact-clean';
   retainLayoutPreviewOnFailure?: boolean;
   diagnostics?: LayoutRoutingTransactionDiagnostics;
@@ -66,6 +67,7 @@ export const useLayoutRoutingTransaction = ({
     routingJob,
     beforePreviewRelease,
     rejectObstacleDirtyBoundedCandidate,
+    rejectUnanchoredFlatElkCandidate,
     candidateRepairPolicy,
     retainLayoutPreviewOnFailure = false,
     diagnostics,
@@ -129,6 +131,7 @@ export const useLayoutRoutingTransaction = ({
             : undefined,
           precompiledLayoutRegeneration,
           rejectObstacleDirtyBoundedCandidate,
+          rejectUnanchoredFlatElkCandidate,
           candidateRepairPolicy,
         });
         const staged = diagnostics

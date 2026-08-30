@@ -75,6 +75,12 @@ describe('flowchartToolbarLayoutMenu', () => {
       canUseFlatElkFallback: false,
       hardQualityRejected: true,
     })).toBe(false);
+    expect(shouldRetryRejectedDomainLayoutWithCompoundElk({
+      usedDomainElk: true,
+      usedDomainCompoundElk: false,
+      canUseFlatElkFallback: true,
+      hardQualityRejected: true,
+    })).toBe(true);
     expect(createCustomDomainLayoutCommand('TB', 'grid')).toEqual({
       direction: 'TB',
       nodeLayout: 'grid',

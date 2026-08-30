@@ -16,6 +16,7 @@ import type { BaseReactFlowRoutingSessionRuntime } from '../../shared/baseReactF
 import { createLayoutRoutingTransactionDiagnostics } from './layoutRoutingTransactionDiagnostics';
 import { normalizeLayoutVisibilityNodes } from './layoutVisibilityNodes';
 import { isDirectedForestLayoutGraph } from './treeLayoutTopology';
+import { commitCyclicTreeLayeredLayout } from './cyclicTreeLayeredLayout';
 import { calculateLayeredLayoutWithReverse } from './reverseLayeredLayoutGeometry';
 import {
     clearLayoutEdgeRoutingType,
@@ -234,68 +235,52 @@ export function useLayoutStrategy({
                 // ── 扁平树形布局（对齐 SVG 版：不检测域） ──
                 const { refineLayout } = await import('../../../strategies/shared/LayoutRefinement');
                 const usesNativeTreeLayout = isDirectedForestLayoutGraph(layoutNodes, layoutEdges);
-                let newNodes: Node[];
-                let treeSourceEdges = layoutEdges;
                 if (usesNativeTreeLayout) {
                     const positions = treeLayout(layoutNodes, layoutEdges, {
                         direction: dir,
                         ...LAYERED_TREE_ROUTING_SPACING,
                     });
-                    newNodes = applyLayout(layoutNodes, positions);
+                    const newNodes = applyLayout(layoutNodes, positions);
+                    const treeNodeIds = new Set(newNodes.map(n => n.id));
+                    const treePreserved = allNodes.filter(n => (
+                        nonLayoutTypes.has(n.type || '') && !treeNodeIds.has(n.id)
+                    ));
+                    const treeResult = refineLayout([...newNodes, ...treePreserved], layoutEdges, {
+                        direction: axisDirection,
+                        enableChannelSpacing: true,
+                        enableCrossingMinimization: true,
+                        enableNodeNudging: false,
+                    }).nodes;
+                    await commitLayoutAttempt({
+                        nodes: treeResult,
+                        edges: prepareLayeredLayoutEdges(treeResult, layoutEdges, dir),
+                        routingJob,
+                        beforePreviewRelease,
+                        candidateRepairPolicy: 'default',
+                    });
                 } else {
                     // A graph with multiple parents or feedback cycles is not a
                     // tree. Use the industry layered engine for ranking while
                     // retaining the user's Tree command and the common hard
                     // routing transaction.
-                    const layered = await calculateLayeredLayoutWithReverse(
-                        await loadDomainElkStrategy(),
+                    await commitCyclicTreeLayeredLayout({
                         layoutNodes,
                         layoutEdges,
-                        {
-                            type: 'elk-layered' as LayoutOptions['type'],
-                            direction: dir,
-                            nodeLayout: 'elk-layered' as LayoutOptions['nodeLayout'],
-                            spacing: {
-                                horizontal: LAYERED_TREE_ROUTING_SPACING.nodeSpacing,
-                                vertical: LAYERED_TREE_ROUTING_SPACING.levelSpacing,
-                            },
-                            edgeRouting: 'ORTHOGONAL',
-                            padding: { top: 40, right: 20, bottom: 20, left: 20 },
-                        },
-                        dir,
-                        false,
-                        layoutContext,
-                    );
-                    newNodes = layered.nodes;
-                    treeSourceEdges = layered.edges;
+                        allNodes,
+                        nonLayoutTypes,
+                        direction: dir,
+                        context: layoutContext,
+                    }, async (candidate, usedCompoundFallback) => {
+                        await commitLayoutAttempt({
+                            ...candidate,
+                            routingJob,
+                            beforePreviewRelease,
+                            rejectUnanchoredFlatElkCandidate: !usedCompoundFallback,
+                            retainLayoutPreviewOnFailure: !usedCompoundFallback,
+                            candidateRepairPolicy: usedCompoundFallback ? 'default' : 'skip-exact-clean',
+                        });
+                    });
                 }
-                // [FIX] 保留非流程图节点
-                const treeNodeIds = new Set(newNodes.map(n => n.id));
-                const treePreserved = allNodes.filter(n => nonLayoutTypes.has(n.type || '') && !treeNodeIds.has(n.id));
-                const treeResultRaw = [...newNodes, ...treePreserved];
-                // ⭐ 路由感知后处理：优化节点位置以改善连线质量
-                const treeResult = usesNativeTreeLayout
-                    ? refineLayout(treeResultRaw, layoutEdges, {
-                        direction: axisDirection,
-                        enableChannelSpacing: true,
-                        enableCrossingMinimization: true,
-                        enableNodeNudging: false,
-                    }).nodes
-                    : treeResultRaw;
-                // A layered tree has a strong flow direction. Supplying fixed
-                // side candidates gives the router the same port constraint
-                // used by commercial layered layout engines. Same-rank and
-                // return edges still follow their actual relative geometry.
-                const treeEdges = prepareLayeredLayoutEdges(treeResult, treeSourceEdges, dir);
-                await commitLayoutAttempt({
-                    nodes: treeResult,
-                    edges: treeEdges,
-                    routingJob,
-                    beforePreviewRelease,
-                    candidateRepairPolicy: usesNativeTreeLayout
-                        ? 'default'
-                        : 'skip-exact-clean',
-                });
             } else if (strategyName === 'force') {
                 // ── 扁平力导向布局（对齐 SVG 版：不检测域） ──
                 const { refineLayout } = await import('../../../strategies/shared/LayoutRefinement');
@@ -605,6 +590,8 @@ export function useLayoutStrategy({
                             routingJob,
                             beforePreviewRelease,
                             rejectObstacleDirtyBoundedCandidate: isDomainLane,
+                            rejectUnanchoredFlatElkCandidate:
+                                candidateUsesElk && !candidateUsesCompoundElk,
                             retainLayoutPreviewOnFailure:
                                 shouldRetryRejectedDomainLayoutWithCompoundElk({
                                     usedDomainElk,
@@ -631,7 +618,6 @@ export function useLayoutStrategy({
                         const hardQualityRejected = Boolean(
                             legacyFallback.isLayoutRoutingHardQualityRejection(error),
                         );
-                        if (usedDomainElk || usedDomainCompoundElk) throw error;
                         const canRetryWithDomainCompoundElk = shouldRetryRejectedDomainLayoutWithCompoundElk({
                             usedDomainElk,
                             usedDomainCompoundElk,

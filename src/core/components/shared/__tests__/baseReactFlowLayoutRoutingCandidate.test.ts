@@ -60,6 +60,7 @@ import { createTestDisplayHardReport } from './baseReactFlowDisplayWorkerTestFix
 import { readDisplayRoutingDebugState } from '../baseReactFlowDisplayRoutingDebug';
 import {
   shouldBypassBaseReactFlowObstacleDirtyLaneCandidate,
+  shouldBypassBaseReactFlowUnanchoredFlatElkCandidate,
   shouldSkipBaseReactFlowLayoutCandidateRepair,
   type BaseReactFlowLayoutCandidateSeedAudit,
 } from '../baseReactFlowLayoutCandidateSeedAudit';
@@ -238,6 +239,25 @@ describe('baseReactFlow layout routing candidate sequence', () => {
     expect(shouldSkipBaseReactFlowLayoutCandidateRepair(44, exactCleanAudit, true)).toBe(true);
     expect(shouldSkipBaseReactFlowLayoutCandidateRepair(0, exactCleanAudit, true)).toBe(false);
   });
+
+  it.each([
+    ['observed horizontal flat ELK seed', 44, true, false, 0, 0, true],
+    ['empty graph', 0, true, false, 0, 0, false],
+    ['detached terminal', 44, false, false, 0, 0, false],
+    ['anchored terminal', 44, true, true, 0, 0, false],
+    ['obstacle-dirty seed', 44, true, false, 1, 0, false],
+    ['crossing-dirty seed', 44, true, false, 0, 1, false],
+  ] as const)(
+    'classifies the unanchored flat ELK bypass boundary: %s',
+    (_label, edgeCount, terminalsAttached, terminalsAnchored, obstacleHits, strictCrossings, expected) => {
+      expect(shouldBypassBaseReactFlowUnanchoredFlatElkCandidate(edgeCount, {
+        terminalsAttached,
+        terminalsAnchored,
+        obstacleHits,
+        strictCrossings,
+      })).toBe(expected);
+    },
+  );
 
   it.each([
     ['observed dense WMS demand seed', 26, 22, 8, true, true, true],

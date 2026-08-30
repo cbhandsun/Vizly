@@ -34,6 +34,23 @@ export const shouldSkipBaseReactFlowLayoutCandidateRepair = (
 );
 
 /**
+ * Flat full-graph ELK can produce an orthogonal, obstacle-clean seed whose
+ * terminal segments are attached but point away from their resolved handles.
+ * That exact boundary cannot be corrected by routing alone without changing
+ * the requested layout geometry, so the layout owner should retry with the
+ * domain-preserving compound strategy before starting the expensive route.
+ */
+export const shouldBypassBaseReactFlowUnanchoredFlatElkCandidate = (
+  edgeCount: number,
+  audit: BaseReactFlowLayoutCandidateSeedAudit,
+): boolean => Number.isSafeInteger(edgeCount)
+  && edgeCount > 0
+  && audit.terminalsAttached
+  && !audit.terminalsAnchored
+  && audit.obstacleHits === 0
+  && audit.strictCrossings === 0;
+
+/**
  * A fully attached lane seed with dense obstacle penetration and at least one
  * strict crossing is not a near-clean repair candidate. Keep lighter defects
  * on the bounded repair path; only this high-confidence class is sent to the
