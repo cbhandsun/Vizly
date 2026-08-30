@@ -40,6 +40,7 @@ import type { DisplayTerminalValidationSnapshot } from './baseReactFlowTerminalV
 
 export const MIN_RENDER_SAFE_ENDPOINT_STUB = 56;
 const MAX_FINAL_ENDPOINT_STUB_REPAIR_EVALUATIONS = 8;
+const MAX_GLOBAL_STRICT_STUB_FALLBACK_EDGES = 36;
 const COMMERCIAL_CLEARANCE_RISK_EPSILON = 1e-6;
 
 export const commercialClearanceRiskIsGloballyMinimal = (risk: number): boolean => (
@@ -47,6 +48,12 @@ export const commercialClearanceRiskIsGloballyMinimal = (risk: number): boolean 
   && risk >= 0
   && risk <= COMMERCIAL_CLEARANCE_RISK_EPSILON
 );
+
+export const renderSafeEndpointStubRepairUsesGlobalStrictFallback = (
+  edgeCount: number,
+): boolean => Number.isSafeInteger(edgeCount)
+  && edgeCount >= 0
+  && edgeCount <= MAX_GLOBAL_STRICT_STUB_FALLBACK_EDGES;
 
 export const countRenderUnsafeEndpointStubs = (edges: Edge[]): number => edges.reduce((total, edge) => {
   const path = getDisplayComputedPath(edge);
@@ -222,6 +229,12 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
   allowStrictFallback = true,
 ): T => {
   if (countRenderUnsafeEndpointStubs(edges) === 0) return edges;
+  // Companion shifts remain endpoint-local. The two broader sweep fallbacks
+  // rescan the whole graph and duplicate the final safety closure on larger
+  // routes, so leave those graphs to the request-level hard-closure stage.
+  const allowGlobalStrictFallback = renderSafeEndpointStubRepairUsesGlobalStrictFallback(
+    edges.length,
+  );
   let current = edges;
   let evaluations = 0;
   const skippedEdgeIds = new Set<string>();
@@ -419,6 +432,7 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
       }
       if (
         needsStrictFallback
+        && allowGlobalStrictFallback
         && evaluations < maxEvaluations
         && !acceptedCommercialRiskIsGloballyMinimal()
       ) {
@@ -426,6 +440,7 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
       }
       if (
         needsStrictFallback
+        && allowGlobalStrictFallback
         && evaluations < maxEvaluations
         && !acceptedCommercialRiskIsGloballyMinimal()
       ) {

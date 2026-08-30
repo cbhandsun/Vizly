@@ -401,7 +401,7 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
     }
     return stableCandidate;
   };
-  const renderSafeCandidate = repairRenderSafeEndpointStubs(edges, nodes, 32) as T;
+  const renderSafeCandidate = evaluation.repairRenderSafeEndpointStubs(edges, 32) as T;
   const renderSafeChangedIndexes = renderSafeCandidate.flatMap((edge, index) => (
     edge !== edges[index] ? [index] : []
   ));

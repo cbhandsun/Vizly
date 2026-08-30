@@ -8,6 +8,8 @@ import {
   withDisplayAbsolutePositions,
 } from '../baseReactFlowDisplayEdgeCore';
 import { computeBaseReactFlowDisplayEdgesWorkerResponse } from '../baseReactFlowDisplayEdges.worker';
+import * as endpointStubRepair from '../baseReactFlowDisplayEndpointStubRepair';
+import { createBaseReactFlowFinalEndpointEvaluation } from '../baseReactFlowDisplayFinalEndpointEvaluation';
 import * as displayFinalizer from '../baseReactFlowDisplayFinalizer';
 import { createBaseReactFlowDisplayExactReport } from '../baseReactFlowDisplayFinalizer';
 import * as fullRoutePipeline from '../baseReactFlowDisplayFullRoutePipeline';
@@ -51,6 +53,47 @@ afterEach(() => {
 });
 
 describe('baseReactFlowDisplay finalization boundaries', () => {
+  it('reuses the request evaluation session for repeated render-safe stub finalization', () => {
+    const edges: Edge[] = [{
+      ...cleanEdges[0],
+      data: { computedPath: [
+        { x: 100, y: 30 },
+        { x: 148, y: 30 },
+        { x: 148, y: 90 },
+        { x: 252, y: 90 },
+        { x: 252, y: 30 },
+        { x: 300, y: 30 },
+      ] },
+    }];
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation(routeNodes);
+    const rawRepairSpy = vi.spyOn(endpointStubRepair, 'repairRenderSafeEndpointStubs');
+    const sessionRepairSpy = vi.spyOn(evaluation, 'repairRenderSafeEndpointStubs');
+
+    const first = displayFinalizer.finalizeBaseReactFlowDisplayEdgesWithReport(
+      edges,
+      routeNodes,
+      undefined,
+      undefined,
+      false,
+      false,
+      evaluation,
+    );
+    const second = displayFinalizer.finalizeBaseReactFlowDisplayEdgesWithReport(
+      edges,
+      routeNodes,
+      undefined,
+      undefined,
+      false,
+      false,
+      evaluation,
+    );
+
+    expect(first.report.hardClean).toBe(true);
+    expect(second.edges).toEqual(first.edges);
+    expect(sessionRepairSpy).toHaveBeenCalledTimes(2);
+    expect(rawRepairSpy).toHaveBeenCalledTimes(1);
+  });
+
   it('locks only finite internally finalized computed paths to the stable renderer', () => {
     const finalized = markBaseDisplayFinalized<Edge[]>([{
       id: 'final-route',

@@ -130,6 +130,10 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
     evaluation?.hardReport(candidateEdges)
       ?? getDisplayHardQualityGateReport([...candidateEdges], repairNodes, 'polished')
   );
+  const repairRenderSafeStubs = (candidateEdges: T): T => (
+    evaluation?.repairRenderSafeEndpointStubs(candidateEdges)
+      ?? repairRenderSafeEndpointStubs(candidateEdges, repairNodes)
+  ) as T;
   let routedEdges = fullRouteEdges;
   let routedReport = trustedEvaluation?.report ?? hardReportFor(routedEdges);
   let hasAtomicOuterPortHardBaseline = false;
@@ -280,7 +284,7 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
     }
   }
 
-  const renderSafeEdges = repairRenderSafeEndpointStubs(routedEdges, repairNodes) as T;
+  const renderSafeEdges = repairRenderSafeStubs(routedEdges);
   const renderSafeEndpointReport = renderSafeEdges === routedEdges
     ? routedReport
     : hardReportFor(renderSafeEdges);
@@ -295,10 +299,9 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
     return createOutcome(routedEdges, routedReport);
   }
 
-  const renderSafeAxisEdges = repairRenderSafeEndpointStubs(
-    repairRenderSafeTerminalAxes(renderSafeEdges, repairNodes, 48),
-    repairNodes,
-  ) as T;
+  const renderSafeAxisEdges = repairRenderSafeStubs(
+    repairRenderSafeTerminalAxes(renderSafeEdges, repairNodes, 48) as T,
+  );
   const renderSafeReport = renderSafeAxisEdges === renderSafeEdges
     ? renderSafeEndpointReport
     : hardReportFor(renderSafeAxisEdges);
@@ -325,10 +328,7 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
   if (outerPortSafeEdges !== renderSafeAxisEdges) {
     const outerPortSafeReport = hardReportFor(outerPortSafeEdges);
     if (outerPortSafeReport.hardClean) {
-      const preferredOuterPortEdges = repairRenderSafeEndpointStubs(
-        outerPortSafeEdges,
-        repairNodes,
-      ) as T;
+      const preferredOuterPortEdges = repairRenderSafeStubs(outerPortSafeEdges);
       const preferredOuterPortReport = preferredOuterPortEdges === outerPortSafeEdges
         ? outerPortSafeReport
         : hardReportFor(preferredOuterPortEdges);
@@ -360,14 +360,13 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
     };
   }
 
-  const axisSafeEdges = repairRenderSafeEndpointStubs(
+  const axisSafeEdges = repairRenderSafeStubs(
     compactDisplayEdgePaths(repairAxisMismatchedTerminalsWithBoundedPortRoles(
       renderSafeAxisEdges,
       repairNodes,
       Math.min(128, Math.max(32, renderSafeAxisEdges.length * 4)),
-    )),
-    repairNodes,
-  ) as T;
+    )) as T,
+  );
   const axisSafeReport = axisSafeEdges === renderSafeAxisEdges
     ? renderSafeReport
     : hardReportFor(axisSafeEdges);

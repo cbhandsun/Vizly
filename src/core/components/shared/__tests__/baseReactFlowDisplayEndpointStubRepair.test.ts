@@ -14,6 +14,7 @@ import {
   countRenderUnsafeEndpointStubs,
   repairFinalShortEndpointStubs,
   repairRenderSafeEndpointStubs,
+  renderSafeEndpointStubRepairUsesGlobalStrictFallback,
 } from '../baseReactFlowDisplayEndpointStubRepair';
 
 const edgeWithPath = (
@@ -38,6 +39,14 @@ describe('baseReactFlowDisplayEndpointStubRepair', () => {
     expect(commercialClearanceRiskIsGloballyMinimal(-Number.EPSILON)).toBe(false);
     expect(commercialClearanceRiskIsGloballyMinimal(Number.NaN)).toBe(false);
     expect(commercialClearanceRiskIsGloballyMinimal(Number.POSITIVE_INFINITY)).toBe(false);
+  });
+
+  it('keeps global strict fallback bounded to small endpoint repair transactions', () => {
+    expect(renderSafeEndpointStubRepairUsesGlobalStrictFallback(0)).toBe(true);
+    expect(renderSafeEndpointStubRepairUsesGlobalStrictFallback(36)).toBe(true);
+    expect(renderSafeEndpointStubRepairUsesGlobalStrictFallback(37)).toBe(false);
+    expect(renderSafeEndpointStubRepairUsesGlobalStrictFallback(-1)).toBe(false);
+    expect(renderSafeEndpointStubRepairUsesGlobalStrictFallback(Number.NaN)).toBe(false);
   });
 
   it('preserves candidate order and does not mutate the input path', () => {
