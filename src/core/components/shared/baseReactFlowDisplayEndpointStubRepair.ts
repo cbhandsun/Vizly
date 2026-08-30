@@ -219,6 +219,7 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
   endpointOrder?: AtomicEndpointOrderEvaluation,
   reusableTerminalValidation?: DisplayTerminalValidationSnapshot,
   strictDiagnostics?: StrictCrossingRepairDiagnostics,
+  allowStrictFallback = true,
 ): T => {
   if (countRenderUnsafeEndpointStubs(edges) === 0) return edges;
   let current = edges;
@@ -283,7 +284,7 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
         candidate,
         [...new Set([...baselineObstacleChangedIndexes, edgeIndex])],
       );
-      const needsStrictFallback = (
+      const needsStrictFallback = allowStrictFallback && (
         initialIssues < baselineIssues
         && initialObstacleHits <= baselineObstacleHits
         && initialQuality.strictCrossings > baselineQuality.strictCrossings

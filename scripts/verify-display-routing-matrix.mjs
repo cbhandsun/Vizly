@@ -2,7 +2,10 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { readFile } from 'node:fs/promises';
 
 import { DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT } from './lib/display-routing-browser-capture.mjs';
-import { summarizeSlowestDisplayRoutingPhases } from './lib/display-routing-browser-performance.mjs';
+import {
+  isDisplayRoutingClosurePhase,
+  summarizeSlowestDisplayRoutingPhases,
+} from './lib/display-routing-browser-performance.mjs';
 import {
   displayRoutingFinalSvgGeometryIsClean,
   readDisplayRoutingNodeGeometryParity,
@@ -500,6 +503,7 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
         )
       ));
       const summarize = ${summarizeSlowestDisplayRoutingPhases.toString()};
+      const isClosurePhase = ${isDisplayRoutingClosurePhase.toString()};
       return {
         requestId: response.requestId,
         workerInstanceId: response.__browserWorkerInstanceId ?? null,
@@ -530,14 +534,7 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
           : null,
         closurePhases: summarize(
           Array.isArray(response.phaseTrace)
-            ? response.phaseTrace.filter(trace => (
-              trace?.phase === 'final-safety-closure'
-              || trace?.phase === 'final-commercial-safety-closure'
-              || trace?.phase === 'final-safety-hard-gate'
-              || trace?.phase === 'final-safety-stubs'
-              || trace?.phase === 'final-safety-endpoint-order'
-              || trace?.phase === 'final-safety-passage-order'
-            ))
+            ? response.phaseTrace.filter(isClosurePhase)
             : [],
           8,
         ),

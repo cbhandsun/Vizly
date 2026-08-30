@@ -13,8 +13,8 @@ import {
 import { repairBaseReactFlowFinalEndpointOrder } from './baseReactFlowDisplayFinalEndpointOrder';
 import {
   countRenderUnsafeEndpointStubs,
-  repairRenderSafeEndpointStubs,
 } from './baseReactFlowDisplayEndpointStubRepair';
+import { repairFinalSafetyRenderSafeEndpointStubs } from './baseReactFlowDisplayFinalSafetyStubPreference';
 import { repairFastDisplayHardSafety } from './baseReactFlowFastEdgeSafety';
 import { getDisplayHardQualityGateReport } from './baseReactFlowDisplayQualityGates';
 import type { BaseReactFlowFinalEndpointEvaluation } from './baseReactFlowDisplayFinalEndpointEvaluation';
@@ -620,9 +620,15 @@ export const repairBaseReactFlowFinalSafetyClosure = <T extends Edge[]>(
   );
 
   const stubStage = startRepairStage('final-safety-repair-stubs');
-  const renderSafe = options.evaluation
-    ? options.evaluation.repairRenderSafeEndpointStubs(microClosed, 32)
-    : repairRenderSafeEndpointStubs(microClosed, nodes, 32);
+  // The final commercial pass runs after the full endpoint and safety closures.
+  // It may accept a direct 56px render preference, but must not launch another
+  // graph-wide crossing repair for geometry that already meets the formal 48px
+  // hard minimum.
+  const allowStrictStubFallback = options.traceParentPhase
+    !== 'final-commercial-safety-closure';
+  const renderSafe = repairFinalSafetyRenderSafeEndpointStubs(
+    microClosed, nodes, options.evaluation, allowStrictStubFallback,
+  );
   if (
     !sameEdgeReferences(microClosed, renderSafe)
     && candidateIsAccepted(renderSafe)
@@ -664,9 +670,9 @@ export const repairBaseReactFlowFinalSafetyClosure = <T extends Edge[]>(
   );
   const orderFinishStage = startRepairStage('final-safety-repair-order-finish');
   const orderedMicroClosed = repairDisplayMicroArtifacts(orderedStrictClosed);
-  const orderedRenderSafe = options.evaluation
-    ? options.evaluation.repairRenderSafeEndpointStubs(orderedMicroClosed, 32)
-    : repairRenderSafeEndpointStubs(orderedMicroClosed, nodes, 32);
+  const orderedRenderSafe = repairFinalSafetyRenderSafeEndpointStubs(
+    orderedMicroClosed, nodes, options.evaluation, allowStrictStubFallback,
+  );
   orderFinishStage.finish(
     sameEdgeReferences(orderedStrictClosed, orderedRenderSafe) ? 'skip' : 'accepted',
     1,

@@ -48,6 +48,7 @@ export type BaseReactFlowFinalEndpointEvaluation = Readonly<{
   repairRenderSafeEndpointStubs: (
     edges: Edge[],
     maxEvaluations?: number,
+    allowStrictFallback?: boolean,
   ) => Edge[];
   rememberHardReport: (
     edges: readonly Edge[],
@@ -72,6 +73,7 @@ const MAX_REQUEST_LOCAL_STUB_REPAIR_EVIDENCE = 64;
 const MAX_REQUEST_LOCAL_STUB_REPAIR_EDGE_SLOTS = 4_096;
 
 type RenderSafeStubRepairEvidence = Readonly<{
+  allowStrictFallback: boolean;
   baselineSignature: string | null;
   baselineEdges: readonly Edge[];
   maxEvaluations: number;
@@ -284,10 +286,15 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
       rememberBoundedRouteEvidence(passageOrderBySignature, signature, audit);
       return audit;
     },
-    repairRenderSafeEndpointStubs(edges, maxEvaluations = 64) {
+    repairRenderSafeEndpointStubs(
+      edges,
+      maxEvaluations = 64,
+      allowStrictFallback = true,
+    ) {
       const baselineSignature = endpointAuditSignature(edges);
       const cachedIndex = renderSafeStubRepairs.findIndex(entry => (
         entry.maxEvaluations === maxEvaluations
+        && entry.allowStrictFallback === allowStrictFallback
         && (
           sameEdgeReferenceVector(entry.baselineEdges, edges)
           || (
@@ -327,6 +334,7 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
         evaluateEndpointOrder,
         terminalSnapshot,
         strictDiagnostics,
+        allowStrictFallback,
       );
       stubStrictEvaluationCount += strictDiagnostics.qualityEvaluationCount;
       stubStrictCacheHitCount += strictDiagnostics.qualityContextCacheHitCount;
@@ -350,6 +358,7 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
         }
         const repairedSignature = endpointAuditSignature(repairedEdges);
         renderSafeStubRepairs.push({
+          allowStrictFallback,
           baselineSignature,
           baselineEdges: edges,
           maxEvaluations,

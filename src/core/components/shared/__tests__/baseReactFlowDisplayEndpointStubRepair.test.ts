@@ -190,6 +190,41 @@ describe('baseReactFlowDisplayEndpointStubRepair', () => {
     expect(diagnostics.residualRepairInvocationCount).toBe(0);
   });
 
+  it('keeps the formal 48px baseline when strict fallback is disabled', () => {
+    const short = edgeWithPath('commercial-preference-short', [
+      { x: 0, y: 0 },
+      { x: 48, y: 0 },
+      { x: 48, y: 100 },
+      { x: 300, y: 100 },
+    ]);
+    const movableBlocker = edgeWithPath('commercial-preference-blocker', [
+      { x: 40, y: -20 },
+      { x: 52, y: -20 },
+      { x: 52, y: 20 },
+      { x: 64, y: 20 },
+    ]);
+    const edges = [short, movableBlocker];
+    const baselineUnsafeStubCount = countRenderUnsafeEndpointStubs(edges);
+    const diagnostics = createStrictCrossingRepairDiagnostics();
+
+    const repaired = repairRenderSafeEndpointStubs(
+      edges,
+      [],
+      64,
+      undefined,
+      undefined,
+      diagnostics,
+      false,
+    );
+
+    expect(repaired).toBe(edges);
+    expect(countRenderUnsafeEndpointStubs(repaired)).toBe(baselineUnsafeStubCount);
+    expect(calculateEdgePathQualityScore(repaired).strictCrossings).toBe(0);
+    expect(diagnostics.strictFallbackInvocationCount).toBe(0);
+    expect(diagnostics.strictSweepInvocationCount).toBe(0);
+    expect(diagnostics.residualRepairInvocationCount).toBe(0);
+  });
+
   it('does not run strict fallback repairs after the evaluation budget is exhausted', () => {
     const short = edgeWithPath('budgeted-short-source', [
       { x: 0, y: 0 },

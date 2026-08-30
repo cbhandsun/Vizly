@@ -6,6 +6,7 @@ import {
   assertDisplayRoutingPerformanceSummaryBudget,
   displayRoutingIncrementalPhaseTraceIsComplete,
   EXPECTED_INCREMENTAL_DISPLAY_ROUTING_PHASE_SEQUENCES,
+  isDisplayRoutingClosurePhase,
   parseDisplayRoutingBrowserVerificationMode,
   parseDisplayRoutingSampleIndex,
   rotateDisplayRoutingDragCases,
@@ -109,6 +110,13 @@ describe('display-routing browser case selection', () => {
 });
 
 describe('display routing browser performance budget', () => {
+  it('selects only the bounded final closure diagnostic phases', () => {
+    expect(isDisplayRoutingClosurePhase({ phase: 'final-safety-stubs' })).toBe(true);
+    expect(isDisplayRoutingClosurePhase({ phase: 'quality' })).toBe(false);
+    expect(isDisplayRoutingClosurePhase({ phase: 42 })).toBe(false);
+    expect(isDisplayRoutingClosurePhase(null)).toBe(false);
+  });
+
   it('requires one clean atomic Worker transaction for a drag result', () => {
     const dragCase = { expectedMutableCount: 6, expectedAffectedCount: 6 };
     expect(assertDisplayRoutingDragResult(dragCase, validDragResult())).toBeUndefined();

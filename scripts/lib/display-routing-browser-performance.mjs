@@ -12,6 +12,18 @@ export const DISPLAY_ROUTING_P95_BUDGET_MS = Object.freeze({
   localRoute: 150,
 });
 
+export const isDisplayRoutingClosurePhase = trace => {
+  const phase = typeof trace?.phase === 'string' ? trace.phase : '';
+  return [
+    'final-safety-closure',
+    'final-commercial-safety-closure',
+    'final-safety-hard-gate',
+    'final-safety-stubs',
+    'final-safety-endpoint-order',
+    'final-safety-passage-order',
+  ].includes(phase);
+};
+
 export const parseDisplayRoutingBrowserVerificationMode = (rawArgs) => {
   const args = Array.isArray(rawArgs) ? rawArgs : [];
   if (args.length === 0) return 'full';
