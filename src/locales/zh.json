@@ -986,6 +986,7 @@
             },
             "layout": {
                 "tooltip": "自动布局",
+                "applying": "正在应用布局…",
                 "dagreTB": "Dagre 垂直布局（TB）",
                 "dagreLR": "Dagre 水平布局（LR）",
                 "elkTB": "ELK 正交分层（上→下）",

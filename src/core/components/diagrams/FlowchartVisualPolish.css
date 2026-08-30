@@ -749,3 +749,47 @@
   background: rgba(15, 23, 42, 0.96);
   color: #f8fafc;
 }
+/* Immediate acknowledgement for asynchronous layout transactions. */
+.flowchart-layout-progress {
+  position: absolute;
+  top: 72px;
+  right: 16px;
+  z-index: 120;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.9);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+}
+
+.flowchart-layout-progress__spinner {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  border: 2px solid rgba(255, 255, 255, 0.36);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: flowchart-layout-progress-spin 0.8s linear infinite;
+}
+
+@keyframes flowchart-layout-progress-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flowchart-layout-progress__spinner {
+    animation: none;
+  }
+}

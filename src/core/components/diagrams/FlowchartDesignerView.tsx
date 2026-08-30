@@ -35,6 +35,7 @@ import { filterCommentsForPage } from './commentPageScope';
 import { useFlowchartDesignerViewSetup } from './useFlowchartDesignerViewSetup';
 import { resolveDesignerDragRenderPolicy } from './designerDragRenderPolicy';
 import { FlowchartLoadingOverlay } from './FlowchartLoadingOverlay';
+import { FlowchartLayoutProgress } from './FlowchartLayoutProgress';
 import { FlowchartReadonlyStatus } from './FlowchartReadonlyStatus';
 
 export type { FlowchartDesignerViewModel } from './flowchartDesignerViewModel';
@@ -508,9 +509,14 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                             <div
                                 className="canvas-touch-wrapper"
                                 style={{ width: '100%', height: '100%', position: 'relative' }}
+                                aria-busy={isLayoutBusy}
                                 onTouchStart={handleTouchStart}
                                 onTouchEnd={handleTouchEnd}
                             >
+                                <FlowchartLayoutProgress
+                                    visible={isLayoutBusy}
+                                    label={t('designer.flowchart.layout.applying', '正在应用布局…')}
+                                />
                                 <GestureOverlay zoom={currentZoom} visible={showOverlay} />
                                 <FlowchartCanvasShell
                                     viewportPersistenceKey={viewportPersistenceKey}

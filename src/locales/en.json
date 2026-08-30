@@ -1085,6 +1085,7 @@
             },
             "layout": {
                 "tooltip": "Auto Layout",
+                "applying": "Applying layout…",
                 "dagreTB": "Dagre Vertical (TB)",
                 "dagreLR": "Dagre Horizontal (LR)",
                 "elkTB": "ELK Orthogonal Layered (Top–Bottom)",
