@@ -42,17 +42,28 @@ export const shouldSkipBaseReactFlowLayoutCandidateRepair = (
 export const shouldBypassBaseReactFlowObstacleDirtyLaneCandidate = (
   edgeCount: number,
   audit: BaseReactFlowLayoutCandidateSeedAudit,
-): boolean => (
-  Number.isSafeInteger(edgeCount)
-  && edgeCount > 0
-  && Number.isSafeInteger(audit.obstacleHits)
-  && audit.obstacleHits >= 4
-  && audit.obstacleHits / edgeCount >= 2 / 3
-  && Number.isSafeInteger(audit.strictCrossings)
-  && audit.strictCrossings > 0
-  && audit.terminalsAttached
-  && audit.terminalsAnchored
-);
+): boolean => {
+  if (
+    !Number.isSafeInteger(edgeCount)
+    || edgeCount <= 0
+    || !Number.isSafeInteger(audit.obstacleHits)
+    || audit.obstacleHits < 4
+    || !Number.isSafeInteger(audit.strictCrossings)
+    || audit.strictCrossings <= 0
+    || !audit.terminalsAttached
+  ) return false;
+
+  if (audit.terminalsAnchored) return audit.obstacleHits / edgeCount >= 2 / 3;
+
+  // An attached-but-unanchored seed may still be cheaply recoverable, so it
+  // needs stronger evidence than an anchored seed. The observed reverse WMS
+  // lane candidate penetrates at least one obstacle per edge and crosses on
+  // at least one eighth of the graph. That class cannot become hard-clean by
+  // terminal-axis normalization alone and should enter the existing compound
+  // fallback without first paying for a measured obstacle repair.
+  return audit.obstacleHits >= edgeCount
+    && audit.strictCrossings / edgeCount >= 1 / 8;
+};
 
 /**
  * Produces bounded aggregate evidence for deciding whether a staged layout

@@ -17,6 +17,22 @@ describe('display routing matrix wait-state summary', () => {
       layoutSeedTerminalsAnchored: false,
       layoutSeedObstacleHits: 11,
       layoutSeedStrictCrossings: 59,
+      layoutSeedStageAudits: {
+        raw: {
+          terminalsAttached: true,
+          terminalsAnchored: false,
+          obstacleHits: 12,
+          strictCrossings: 9,
+          privateEdgeIds: ['private-edge'],
+        },
+        final: {
+          terminalsAttached: true,
+          terminalsAnchored: true,
+          obstacleHits: 2,
+          strictCrossings: 1,
+        },
+        privateStage: { userContent: 'private stage content' },
+      },
       layoutTransactionJobId: 7,
       layoutTransactionStatus: 'running',
       layoutTransactionAttemptCount: 1,
@@ -79,6 +95,20 @@ describe('display routing matrix wait-state summary', () => {
         layoutSeedTerminalsAnchored: false,
         layoutSeedObstacleHits: 11,
         layoutSeedStrictCrossings: 59,
+        layoutSeedStageAudits: {
+          raw: {
+            terminalsAttached: true,
+            terminalsAnchored: false,
+            obstacleHits: 12,
+            strictCrossings: 9,
+          },
+          final: {
+            terminalsAttached: true,
+            terminalsAnchored: true,
+            obstacleHits: 2,
+            strictCrossings: 1,
+          },
+        },
         layoutTransactionJobId: 7,
         layoutTransactionStatus: 'running',
         layoutTransactionAttemptCount: 1,

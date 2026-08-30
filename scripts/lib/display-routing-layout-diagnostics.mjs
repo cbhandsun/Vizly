@@ -29,6 +29,22 @@ export const readDisplayRoutingLayoutDiagnostics = ({
   const boundedCount = value => (
     Number.isSafeInteger(value) && value >= 0 && value <= 100_000 ? value : null
   );
+  const seedStageAudits = routing.layoutSeedStageAudits
+    && typeof routing.layoutSeedStageAudits === 'object'
+    && !Array.isArray(routing.layoutSeedStageAudits)
+    ? routing.layoutSeedStageAudits
+    : {};
+  const projectSeedAudit = (value) => {
+    const audit = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    return {
+      terminalsAttached: typeof audit.terminalsAttached === 'boolean'
+        ? audit.terminalsAttached : null,
+      terminalsAnchored: typeof audit.terminalsAnchored === 'boolean'
+        ? audit.terminalsAnchored : null,
+      obstacleHits: boundedCount(audit.obstacleHits),
+      strictCrossings: boundedCount(audit.strictCrossings),
+    };
+  };
   return {
     phaseTrace,
     layoutSeedAudit: {
@@ -39,6 +55,18 @@ export const readDisplayRoutingLayoutDiagnostics = ({
       obstacleHits: boundedCount(routing.layoutSeedObstacleHits),
       strictCrossings: boundedCount(routing.layoutSeedStrictCrossings),
     },
+    layoutSeedStageAudits: Object.fromEntries(
+      [
+        'raw',
+        'anchored',
+        'detached-fallback',
+        'axis-repaired',
+        'geometry-normalized',
+        'final',
+      ].flatMap(stage => Object.prototype.hasOwnProperty.call(seedStageAudits, stage)
+        ? [[stage, projectSeedAudit(seedStageAudits[stage])]]
+        : []),
+    ),
     workerHeartbeatCount: heartbeats.length,
     workerHeartbeatMaxElapsedMs: Math.max(
       0,

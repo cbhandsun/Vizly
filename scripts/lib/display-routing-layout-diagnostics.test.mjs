@@ -17,6 +17,22 @@ describe('readDisplayRoutingLayoutDiagnostics', () => {
         layoutSeedTerminalsAnchored: false,
         layoutSeedObstacleHits: 22,
         layoutSeedStrictCrossings: 8,
+        layoutSeedStageAudits: {
+          raw: {
+            terminalsAttached: true,
+            terminalsAnchored: false,
+            obstacleHits: 31,
+            strictCrossings: 12,
+            privateEdgeIds: ['private-edge'],
+          },
+          final: {
+            terminalsAttached: true,
+            terminalsAnchored: false,
+            obstacleHits: 22,
+            strictCrossings: 8,
+          },
+          privateStage: { privatePayload: 'secret' },
+        },
       },
       heartbeatValue: [
         { sampledAt: 90, elapsedMs: 1, workerInstanceId: 'outside' },
@@ -38,6 +54,20 @@ describe('readDisplayRoutingLayoutDiagnostics', () => {
         terminalsAnchored: false,
         obstacleHits: 22,
         strictCrossings: 8,
+      },
+      layoutSeedStageAudits: {
+        raw: {
+          terminalsAttached: true,
+          terminalsAnchored: false,
+          obstacleHits: 31,
+          strictCrossings: 12,
+        },
+        final: {
+          terminalsAttached: true,
+          terminalsAnchored: false,
+          obstacleHits: 22,
+          strictCrossings: 8,
+        },
       },
       workerHeartbeatCount: 2,
       workerHeartbeatMaxElapsedMs: 20,
@@ -63,6 +93,7 @@ describe('readDisplayRoutingLayoutDiagnostics', () => {
     expect(result.workerHeartbeatCount).toBe(0);
     expect(result.phaseTrace[0]).toMatchObject({ sequence: null, durationMs: null });
     expect(result.layoutSeedAudit.obstacleHits).toBeNull();
+    expect(result.layoutSeedStageAudits).toEqual({});
     expect(JSON.stringify(result)).not.toContain('secret');
   });
 });

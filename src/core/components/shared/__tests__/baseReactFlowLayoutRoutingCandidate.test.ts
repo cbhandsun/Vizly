@@ -243,9 +243,12 @@ describe('baseReactFlow layout routing candidate sequence', () => {
     ['observed dense WMS demand seed', 26, 22, 8, true, true, true],
     ['observed dense TMS seed', 17, 33, 24, true, true, true],
     ['observed dense WMS process seed', 44, 32, 15, true, true, true],
+    ['observed reverse WMS process seed', 44, 56, 8, true, false, true],
     ['density just below threshold', 26, 17, 8, true, true, false],
     ['no strict crossing', 26, 22, 0, true, true, false],
-    ['unanchored terminal', 26, 22, 8, true, false, false],
+    ['recoverable unanchored terminal', 26, 22, 8, true, false, false],
+    ['unanchored obstacle density just below one', 44, 43, 8, true, false, false],
+    ['unanchored crossing density below one eighth', 44, 56, 5, true, false, false],
     ['empty edge set', 0, 22, 8, true, true, false],
     ['invalid obstacle count', 26, Number.POSITIVE_INFINITY, 8, true, true, false],
   ] as const)(

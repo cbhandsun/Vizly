@@ -17,6 +17,15 @@ export const summarizeDisplayRoutingWaitState = (
     typeof value === 'string' && /^[a-z0-9:-]{1,64}$/i.test(value) ? value : undefined
   );
   const boolean = value => (typeof value === 'boolean' ? value : undefined);
+  const projectSeedAudit = (value) => {
+    const audit = record(value);
+    return {
+      terminalsAttached: boolean(audit.terminalsAttached),
+      terminalsAnchored: boolean(audit.terminalsAnchored),
+      obstacleHits: integer(audit.obstacleHits),
+      strictCrossings: integer(audit.strictCrossings),
+    };
+  };
   const requestKind = value => (
     typeof value !== 'string'
       ? undefined
@@ -25,6 +34,7 @@ export const summarizeDisplayRoutingWaitState = (
         : 'display'
   );
   const routing = record(routingValue);
+  const layoutSeedStageAudits = record(routing.layoutSeedStageAudits);
   const responses = Array.isArray(responseValue) ? responseValue : [];
   const requests = Array.isArray(requestValue) ? requestValue : [];
   const response = record([...responses].reverse().find(value => (
@@ -143,6 +153,18 @@ export const summarizeDisplayRoutingWaitState = (
       layoutSeedTerminalsAnchored: boolean(routing.layoutSeedTerminalsAnchored),
       layoutSeedObstacleHits: integer(routing.layoutSeedObstacleHits),
       layoutSeedStrictCrossings: integer(routing.layoutSeedStrictCrossings),
+      layoutSeedStageAudits: Object.fromEntries(
+        [
+          'raw',
+          'anchored',
+          'detached-fallback',
+          'axis-repaired',
+          'geometry-normalized',
+          'final',
+        ].flatMap(stage => Object.prototype.hasOwnProperty.call(layoutSeedStageAudits, stage)
+          ? [[stage, projectSeedAudit(layoutSeedStageAudits[stage])]]
+          : []),
+      ),
       layoutTransactionJobId: integer(routing.layoutTransactionJobId),
       layoutTransactionStatus: token(routing.layoutTransactionStatus),
       layoutTransactionAttemptCount: integer(routing.layoutTransactionAttemptCount),
@@ -190,12 +212,7 @@ export const summarizeDisplayRoutingWaitState = (
         ),
         nodeCount: Array.isArray(request.nodes) ? integer(request.nodes.length) : undefined,
         edgeCount: Array.isArray(request.edges) ? integer(request.edges.length) : undefined,
-        layoutSeedAudit: {
-          terminalsAttached: boolean(layoutSeedAudit.terminalsAttached),
-          terminalsAnchored: boolean(layoutSeedAudit.terminalsAnchored),
-          obstacleHits: integer(layoutSeedAudit.obstacleHits),
-          strictCrossings: integer(layoutSeedAudit.strictCrossings),
-        },
+        layoutSeedAudit: projectSeedAudit(layoutSeedAudit),
         nodeGeometryFingerprint: nodeGeometryFingerprint(request.nodes),
         edgeRouteFingerprint: edgeRouteFingerprint(request.edges),
         nodeObjectFingerprint: Array.isArray(request.nodes)
