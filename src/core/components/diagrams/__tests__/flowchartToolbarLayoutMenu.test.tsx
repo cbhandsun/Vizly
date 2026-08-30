@@ -283,6 +283,30 @@ describe('flowchartToolbarLayoutMenu', () => {
     expect(onStrategyLayout).toHaveBeenLastCalledWith('domain-lanes', 'vertical', 'LR');
   });
 
+  it('resets common swimlane scenarios to bounded directional defaults instead of stale node layout', () => {
+    const onStrategyLayout = vi.fn();
+    const model = buildFlowchartLayoutMenuModel({
+      lastDomainStrategy: 'domain-vertical',
+      lastDomainDirection: 'TB',
+      lastNodeLayout: 'vertical',
+      onStrategyLayout,
+      translate: (_key, fallback) => fallback,
+    });
+    const items = collectItems(model.items);
+
+    for (const [key, direction] of [
+      ['domain-lanes-tb', 'TB'],
+      ['domain-lanes-lr', 'LR'],
+      ['domain-lanes-bt', 'BT'],
+      ['domain-lanes-rl', 'RL'],
+    ] as const) {
+      const item = items.find(candidate => candidate.key === key);
+      expect(item).toBeDefined();
+      if (typeof item?.onClick === 'function') item.onClick();
+      expect(onStrategyLayout).toHaveBeenLastCalledWith('domain-lanes', 'flow', direction);
+    }
+  });
+
   it('keeps common scenarios visible and separates custom combinations from layout engines', () => {
     const onSmartLayout = vi.fn();
     const model = buildFlowchartLayoutMenuModel({

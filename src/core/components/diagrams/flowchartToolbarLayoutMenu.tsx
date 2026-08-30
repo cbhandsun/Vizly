@@ -318,13 +318,13 @@ export const buildFlowchartLayoutMenuModel = ({
                 domainItem(
                     'domain-lanes-bt',
                     labels.domainLanesBt,
-                    () => onStrategyLayout('domain-lanes', coerceFlowchartDomainNodeArrangement(lastNodeLayout), 'BT'),
+                    () => onStrategyLayout('domain-lanes', 'flow', 'BT'),
                     <FaRegObjectGroup style={{ transform: 'rotate(180deg)' }} />,
                 ),
                 domainItem(
                     'domain-lanes-rl',
                     labels.domainLanesRl,
-                    () => onStrategyLayout('domain-lanes', coerceFlowchartDomainNodeArrangement(lastNodeLayout), 'RL'),
+                    () => onStrategyLayout('domain-lanes', 'flow', 'RL'),
                     <FaRegObjectGroup style={{ transform: 'rotate(90deg)' }} />,
                 ),
             ],
@@ -409,13 +409,13 @@ export const buildFlowchartLayoutMenuModel = ({
                 domainItem(
                     'domain-lanes-tb',
                     labels.domainLanesTb,
-                    () => onStrategyLayout?.('domain-lanes', coerceFlowchartDomainNodeArrangement(lastNodeLayout), 'TB'),
+                    () => onStrategyLayout?.('domain-lanes', 'flow', 'TB'),
                     <FaRegObjectGroup />,
                 ),
                 domainItem(
                     'domain-lanes-lr',
                     labels.domainLanesLr,
-                    () => onStrategyLayout?.('domain-lanes', coerceFlowchartDomainNodeArrangement(lastNodeLayout), 'LR'),
+                    () => onStrategyLayout?.('domain-lanes', 'flow', 'LR'),
                     <FaRegObjectGroup style={{ transform: 'rotate(-90deg)' }} />,
                 ),
             ],
