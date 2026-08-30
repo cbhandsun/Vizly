@@ -52,6 +52,20 @@ describe('domain Dagre layout boundary', () => {
     expect(boundary.nodeArrangement).toBe('dagre');
   });
 
+  it('applies bounded command spacing only to ordered lane layouts', () => {
+    const ordered = resolveDomainDagreLayoutBoundary({}, {}, {
+      domainPlacement: 'ordered-lanes',
+      spacing: { horizontal: 140, vertical: 130 },
+    });
+    const topology = resolveDomainDagreLayoutBoundary({}, {}, {
+      domainPlacement: 'topology',
+      spacing: { horizontal: 140, vertical: 130 },
+    });
+
+    expect(ordered).toMatchObject({ nodeGapH: 140, nodeGapV: 130 });
+    expect(topology).toMatchObject({ nodeGapH: 100, nodeGapV: 60 });
+  });
+
   it('normalizes each coordinate and dimension independently', () => {
     const nodes = normalizeDomainDagreNodes([{
       id: 'node',

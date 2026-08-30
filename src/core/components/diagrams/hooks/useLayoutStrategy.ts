@@ -433,7 +433,9 @@ export function useLayoutStrategy({
                     nodeLayout: finalNodeLayout as LayoutOptions['nodeLayout'],
                     spacing: isDomainElk || isDomainCompoundElk
                         ? { horizontal: 120, vertical: 120 }
-                        : { horizontal: 50, vertical: 50 },
+                        : isDomainLane
+                            ? { horizontal: 120, vertical: 120 }
+                            : { horizontal: 50, vertical: 50 },
                     edgeRouting: isDomainElk || isDomainCompoundElk ? 'ORTHOGONAL' : undefined,
                     edgeRoutingQuality: resolveDomainLayoutRoutingQuality(strategyName),
                     padding: { top: 40, right: 20, bottom: 20, left: 20 },

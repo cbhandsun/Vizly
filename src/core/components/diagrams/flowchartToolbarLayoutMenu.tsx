@@ -409,13 +409,13 @@ export const buildFlowchartLayoutMenuModel = ({
                 domainItem(
                     'domain-lanes-tb',
                     labels.domainLanesTb,
-                    () => onStrategyLayout?.('domain-lanes', 'flow', 'TB'),
+                    () => onStrategyLayout?.('domain-lanes', 'dagre', 'TB'),
                     <FaRegObjectGroup />,
                 ),
                 domainItem(
                     'domain-lanes-lr',
                     labels.domainLanesLr,
-                    () => onStrategyLayout?.('domain-lanes', 'flow', 'LR'),
+                    () => onStrategyLayout?.('domain-lanes', 'dagre', 'LR'),
                     <FaRegObjectGroup style={{ transform: 'rotate(-90deg)' }} />,
                 ),
             ],

@@ -272,7 +272,7 @@ describe('flowchartToolbarLayoutMenu', () => {
     expect(model.selectedKeys).toEqual(['domain-lanes-lr', 'node-flow']);
     expect(model.statusText).toBe('布局组合：横向泳道（域纵排·左→右） + 流式换行');
     if (typeof lanesLr?.onClick === 'function') lanesLr.onClick();
-    expect(onStrategyLayout).toHaveBeenCalledWith('domain-lanes', 'flow', 'LR');
+    expect(onStrategyLayout).toHaveBeenCalledWith('domain-lanes', 'dagre', 'LR');
     if (typeof lanesBt?.onClick === 'function') lanesBt.onClick();
     if (typeof lanesRl?.onClick === 'function') lanesRl.onClick();
     expect(onStrategyLayout).toHaveBeenCalledWith('domain-lanes', 'flow', 'BT');
@@ -294,16 +294,16 @@ describe('flowchartToolbarLayoutMenu', () => {
     });
     const items = collectItems(model.items);
 
-    for (const [key, direction] of [
-      ['domain-lanes-tb', 'TB'],
-      ['domain-lanes-lr', 'LR'],
-      ['domain-lanes-bt', 'BT'],
-      ['domain-lanes-rl', 'RL'],
+    for (const [key, direction, nodeLayout] of [
+      ['domain-lanes-tb', 'TB', 'dagre'],
+      ['domain-lanes-lr', 'LR', 'dagre'],
+      ['domain-lanes-bt', 'BT', 'flow'],
+      ['domain-lanes-rl', 'RL', 'flow'],
     ] as const) {
       const item = items.find(candidate => candidate.key === key);
       expect(item).toBeDefined();
       if (typeof item?.onClick === 'function') item.onClick();
-      expect(onStrategyLayout).toHaveBeenLastCalledWith('domain-lanes', 'flow', direction);
+      expect(onStrategyLayout).toHaveBeenLastCalledWith('domain-lanes', nodeLayout, direction);
     }
   });
 

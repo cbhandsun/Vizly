@@ -171,10 +171,37 @@ export const resolveDomainDagreLayoutBoundary = (
     optionRecord?.direction,
     coerceDomainDagreDirection(readPath(config, ['diagram', 'layout', 'direction'])),
   );
+  const domainPlacement = coerceDomainDagrePlacement(optionRecord?.domainPlacement);
+  const configuredNodeGapH = boundedDomainDagreNumber(
+    readPath(config, ['node', 'gap', 'horizontal']),
+    100,
+    40,
+    5_000,
+  );
+  const configuredNodeGapV = boundedDomainDagreNumber(
+    readPath(config, ['node', 'gap', 'vertical']),
+    60,
+    30,
+    5_000,
+  );
   return {
     domainGap: boundedDomainDagreNumber(readPath(config, ['domain', 'gap']), 80, 0, 5_000),
-    nodeGapH: boundedDomainDagreNumber(readPath(config, ['node', 'gap', 'horizontal']), 100, 40, 5_000),
-    nodeGapV: boundedDomainDagreNumber(readPath(config, ['node', 'gap', 'vertical']), 60, 30, 5_000),
+    nodeGapH: domainPlacement === 'ordered-lanes'
+      ? boundedDomainDagreNumber(
+        readPath(optionRecord, ['spacing', 'horizontal']),
+        configuredNodeGapH,
+        40,
+        5_000,
+      )
+      : configuredNodeGapH,
+    nodeGapV: domainPlacement === 'ordered-lanes'
+      ? boundedDomainDagreNumber(
+        readPath(optionRecord, ['spacing', 'vertical']),
+        configuredNodeGapV,
+        30,
+        5_000,
+      )
+      : configuredNodeGapV,
     direction,
     subDomainNodeDirection: coerceDomainDagreDirection(optionRecord?.subDomainNodeDirection, direction),
     domainSubGroupDirection: coerceDomainDagreDirection(optionRecord?.domainSubGroupDirection, direction),
@@ -190,7 +217,7 @@ export const resolveDomainDagreLayoutBoundary = (
     subDomainPaddingBottom: boundedDomainDagreNumber(readPath(config, ['subDomain', 'padding', 'bottom']), 16),
     subDomainTitleH: boundedDomainDagreNumber(readPath(config, ['subDomain', 'title', 'height']), 48),
     domainTitleH: boundedDomainDagreNumber(readPath(config, ['domain', 'title', 'height']), 48),
-    domainPlacement: coerceDomainDagrePlacement(optionRecord?.domainPlacement),
+    domainPlacement,
     nodeArrangement: coerceDomainDagreNodeArrangement(optionRecord?.nodeLayout),
     defaultNodeWidth: boundedDomainDagreNumber(readPath(config, ['node', 'width']), 200, 1, 10_000),
     defaultNodeHeight: boundedDomainDagreNumber(readPath(config, ['node', 'height']), 80, 1, 10_000),
