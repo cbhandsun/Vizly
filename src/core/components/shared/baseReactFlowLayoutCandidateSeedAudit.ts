@@ -34,6 +34,27 @@ export const shouldSkipBaseReactFlowLayoutCandidateRepair = (
 );
 
 /**
+ * A fully attached lane seed with dense obstacle penetration and at least one
+ * strict crossing is not a near-clean repair candidate. Keep lighter defects
+ * on the bounded repair path; only this high-confidence class is sent to the
+ * existing domain-compound fallback by the layout transaction owner.
+ */
+export const shouldBypassBaseReactFlowObstacleDirtyLaneCandidate = (
+  edgeCount: number,
+  audit: BaseReactFlowLayoutCandidateSeedAudit,
+): boolean => (
+  Number.isSafeInteger(edgeCount)
+  && edgeCount > 0
+  && Number.isSafeInteger(audit.obstacleHits)
+  && audit.obstacleHits >= 4
+  && audit.obstacleHits / edgeCount >= 2 / 3
+  && Number.isSafeInteger(audit.strictCrossings)
+  && audit.strictCrossings > 0
+  && audit.terminalsAttached
+  && audit.terminalsAnchored
+);
+
+/**
  * Produces bounded aggregate evidence for deciding whether a staged layout
  * seed is close enough for measured repair. It intentionally omits edge ids,
  * paths, node geometry, and the more expensive complete hard-quality report.

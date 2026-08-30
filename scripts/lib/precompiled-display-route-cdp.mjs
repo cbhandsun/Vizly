@@ -7,6 +7,20 @@ import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import WebSocket from 'ws';
 
+const DEFAULT_CDP_COMMAND_TIMEOUT_MS = 30_000;
+
+export const parsePrecompiledRouteCdpCommandTimeoutMs = (
+  rawValue,
+  fallbackMs = DEFAULT_CDP_COMMAND_TIMEOUT_MS,
+) => {
+  if (rawValue === undefined || rawValue === null || rawValue === '') return fallbackMs;
+  const candidate = typeof rawValue === 'number' ? rawValue : Number(String(rawValue).trim());
+  if (!Number.isSafeInteger(candidate) || candidate < 1_000 || candidate > 120_000) {
+    throw new Error('Invalid PRECOMPILED_ROUTE_CDP_COMMAND_TIMEOUT_MS');
+  }
+  return candidate;
+};
+
 const findBrowserExecutable = () => {
   const candidates = [
     process.env.CHROME_PATH,
@@ -82,10 +96,48 @@ const waitForBrowserExit = async (browser, timeoutMs = 5_000) => {
   ]);
 };
 
+const waitForChildExit = async (child, timeoutMs = 5_000) => {
+  if (!child || child.exitCode != null || child.signalCode != null) return;
+  await Promise.race([
+    new Promise(resolve => {
+      child.once('exit', resolve);
+      child.once('error', resolve);
+    }),
+    delay(timeoutMs),
+  ]);
+};
+
+/** Terminates only the exact browser PID spawned by this harness. */
+export const terminatePrecompiledRouteBrowserProcessTree = async (
+  browser,
+  {
+    platform = process.platform,
+    spawnProcess = spawn,
+    waitForExit = waitForChildExit,
+  } = {},
+) => {
+  if (!browser || browser.exitCode != null || browser.signalCode != null) return;
+  const pid = Number(browser.pid);
+  if (platform === 'win32' && Number.isSafeInteger(pid) && pid > 0) {
+    try {
+      const killer = spawnProcess('taskkill', ['/pid', String(pid), '/t', '/f'], {
+        stdio: 'ignore',
+        windowsHide: true,
+      });
+      await waitForExit(killer);
+      return;
+    } catch {
+      // Fall through to the exact direct child when taskkill is unavailable.
+    }
+  }
+  browser.kill();
+};
+
 export const closePrecompiledRouteBrowser = async (
   session,
   browser,
   waitForExit = waitForBrowserExit,
+  terminateProcessTree = terminatePrecompiledRouteBrowserProcessTree,
 ) => {
   let gracefulCloseRequested = false;
   if (session) {
@@ -102,25 +154,31 @@ export const closePrecompiledRouteBrowser = async (
     }
   }
   if (!gracefulCloseRequested && browser.exitCode == null && browser.signalCode == null) {
-    browser.kill();
+    await terminateProcessTree(browser);
   }
   await waitForExit(browser);
   if (browser.exitCode == null && browser.signalCode == null) {
-    browser.kill();
+    await terminateProcessTree(browser);
     await waitForExit(browser);
   }
 };
 
-class CdpPageSession {
-  constructor(webSocketUrl) {
+export class CdpPageSession {
+  constructor(
+    webSocketUrl,
+    commandTimeoutMs = DEFAULT_CDP_COMMAND_TIMEOUT_MS,
+    createSocket = url => new WebSocket(url),
+  ) {
     this.webSocketUrl = webSocketUrl;
+    this.commandTimeoutMs = parsePrecompiledRouteCdpCommandTimeoutMs(commandTimeoutMs);
+    this.createSocket = createSocket;
     this.sequence = 0;
     this.pending = new Map();
     this.socket = null;
   }
 
   async open() {
-    this.socket = new WebSocket(this.webSocketUrl);
+    this.socket = this.createSocket(this.webSocketUrl);
     await new Promise((resolve, reject) => {
       this.socket.once('open', resolve);
       this.socket.once('error', reject);
@@ -131,6 +189,7 @@ class CdpPageSession {
       const pending = this.pending.get(message.id);
       if (!pending) return;
       this.pending.delete(message.id);
+      clearTimeout(pending.timeoutId);
       if (message.error) pending.reject(new Error(message.error.message));
       else pending.resolve(message.result);
     });
@@ -138,7 +197,10 @@ class CdpPageSession {
       const error = reason instanceof Error
         ? reason
         : new Error('CDP session closed before receiving a response');
-      for (const pending of this.pending.values()) pending.reject(error);
+      for (const pending of this.pending.values()) {
+        clearTimeout(pending.timeoutId);
+        pending.reject(error);
+      }
       this.pending.clear();
     };
     this.socket.on('error', rejectPending);
@@ -151,8 +213,18 @@ class CdpPageSession {
     if (!this.socket) return Promise.reject(new Error('CDP session is not open'));
     return new Promise((resolve, reject) => {
       const id = this.sequence += 1;
-      this.pending.set(id, { resolve, reject });
-      this.socket.send(JSON.stringify({ id, method, params }));
+      const timeoutId = setTimeout(() => {
+        if (!this.pending.delete(id)) return;
+        reject(new Error(`CDP command timed out: ${method}`));
+      }, this.commandTimeoutMs);
+      this.pending.set(id, { resolve, reject, timeoutId });
+      try {
+        this.socket.send(JSON.stringify({ id, method, params }));
+      } catch (error) {
+        clearTimeout(timeoutId);
+        this.pending.delete(id);
+        reject(error instanceof Error ? error : new Error('CDP command send failed'));
+      }
     });
   }
 
@@ -169,6 +241,12 @@ class CdpPageSession {
   }
 
   close() {
+    const error = new Error('CDP session closed before receiving a response');
+    for (const pending of this.pending.values()) {
+      clearTimeout(pending.timeoutId);
+      pending.reject(error);
+    }
+    this.pending.clear();
     this.socket?.close();
     this.socket = null;
   }
@@ -205,7 +283,10 @@ export const withPrecompiledRouteBrowser = async (run) => {
     });
     if (!targetResponse.ok) throw new Error('Failed to create a browser target');
     const target = await targetResponse.json();
-    session = new CdpPageSession(target.webSocketDebuggerUrl);
+    const commandTimeoutMs = parsePrecompiledRouteCdpCommandTimeoutMs(
+      process.env.PRECOMPILED_ROUTE_CDP_COMMAND_TIMEOUT_MS,
+    );
+    session = new CdpPageSession(target.webSocketDebuggerUrl, commandTimeoutMs);
     await session.open();
     await session.send('Page.enable');
     await session.send('Runtime.enable');

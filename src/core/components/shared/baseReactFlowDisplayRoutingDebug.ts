@@ -67,7 +67,26 @@ export type DisplayRoutingDebugState = {
   layoutTransactionStatus?: DisplayLayoutTransactionStatus;
   layoutTransactionAttemptCount?: number;
   layoutTransactionErrorCode?: DisplayLayoutTransactionErrorCode;
+  layoutPhaseTrace?: DisplayLayoutPhaseTrace[];
 };
+
+export type DisplayLayoutPhase =
+  | 'command'
+  | 'input-preparation'
+  | 'layout-calculation'
+  | 'dynamic-import'
+  | 'worker-routing'
+  | 'state-commit'
+  | 'render-reconcile'
+  | 'fit-request';
+
+export type DisplayLayoutPhaseTrace = Readonly<{
+  sequence: number;
+  phase: DisplayLayoutPhase;
+  status: 'running' | 'completed' | 'failed';
+  startedAt: number;
+  durationMs?: number;
+}>;
 
 export type DisplayLayoutTransactionStatus = 'running' | 'committed' | 'failed';
 

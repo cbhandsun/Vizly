@@ -13,6 +13,7 @@ import type {
 } from '../../shared/baseReactFlowRoutingSessionRuntime';
 import { resolveBaseReactFlowPrecompiledLayoutRegenerationFromWindow } from '../../shared/baseReactFlowPrecompiledCaptureMode';
 import { PRECOMPILED_CAPTURE_WORKER_TIMEOUT_MS } from '../../shared/baseReactFlowDisplayWorkerTimeout';
+import type { LayoutRoutingTransactionDiagnostics } from './layoutRoutingTransactionDiagnostics';
 
 type LayoutRoutingTransactionRequest = Readonly<{
   nodes: Node[];
@@ -22,6 +23,7 @@ type LayoutRoutingTransactionRequest = Readonly<{
   rejectObstacleDirtyBoundedCandidate?: boolean;
   candidateRepairPolicy?: 'default' | 'skip-exact-clean';
   retainLayoutPreviewOnFailure?: boolean;
+  diagnostics?: LayoutRoutingTransactionDiagnostics;
 }>;
 
 export type LayoutPresentationPreviewRequest = Readonly<{
@@ -66,6 +68,7 @@ export const useLayoutRoutingTransaction = ({
     rejectObstacleDirtyBoundedCandidate,
     candidateRepairPolicy,
     retainLayoutPreviewOnFailure = false,
+    diagnostics,
   }: LayoutRoutingTransactionRequest): Promise<void> => {
     if (routingJob.owner !== 'layout' || !routingSessionRuntime.isCurrentJob(routingJob)) {
       throw new Error('layout-routing-cancelled');
@@ -75,6 +78,11 @@ export const useLayoutRoutingTransaction = ({
       // Layout routing is an explicit interaction. Defer its worker and
       // full-quality transaction until that interaction instead of charging
       // every empty-canvas visit for the complete routing engine.
+      const loadRuntimeDependencies = () => Promise.all([
+        import('../../../config/DiagramConfig'),
+        import('../../shared/baseReactFlowDisplayWorkerClient'),
+        import('../../shared/baseReactFlowLayoutRoutingTransaction'),
+      ]);
       const [
         { diagramConfigManager },
         displayWorkerModule,
@@ -82,11 +90,9 @@ export const useLayoutRoutingTransaction = ({
           clearBaseReactFlowLayoutNodeRuntimeGeometry,
           stageBaseReactFlowLayoutRouting,
         },
-      ] = await Promise.all([
-        import('../../../config/DiagramConfig'),
-        import('../../shared/baseReactFlowDisplayWorkerClient'),
-        import('../../shared/baseReactFlowLayoutRoutingTransaction'),
-      ]);
+      ] = diagnostics
+        ? await diagnostics.measurePhase('dynamic-import', loadRuntimeDependencies)
+        : await loadRuntimeDependencies();
       routingSessionRuntime.registerWorkerDisposer(
         displayWorkerModule.disposeBaseReactFlowDisplayWorker,
       );
@@ -110,7 +116,7 @@ export const useLayoutRoutingTransaction = ({
         });
         const precompiledLayoutRegeneration =
           resolveBaseReactFlowPrecompiledLayoutRegenerationFromWindow();
-        const staged = await stageBaseReactFlowLayoutRouting({
+        const stageRouting = () => stageBaseReactFlowLayoutRouting({
           workerRef: routingSessionRuntime.workerRef,
           requestId: `layout:${routingJob.id}`,
           sourceEdges: edges,
@@ -125,13 +131,16 @@ export const useLayoutRoutingTransaction = ({
           rejectObstacleDirtyBoundedCandidate,
           candidateRepairPolicy,
         });
+        const staged = diagnostics
+          ? await diagnostics.measurePhase('worker-routing', stageRouting)
+          : await stageRouting();
         if (!routingSessionRuntime.isCurrentJob(routingJob)) {
           throw new Error('layout-routing-cancelled');
         }
         committedEdges = staged.committedSourceEdges;
         commitLayoutSnapshot = staged.commitSnapshot;
       }
-      const commitResult = routingSessionRuntime.commitJob(routingJob, () => {
+      const commit = () => routingSessionRuntime.commitJob(routingJob, () => {
         if (!commitLayoutSnapshot(routingSessionRuntime)) {
           throw new Error('layout-routing-hard-quality-rejected');
         }
@@ -140,12 +149,26 @@ export const useLayoutRoutingTransaction = ({
         setNodes(targetNodes);
         setEdges(committedEdges);
       });
+      const commitResult = diagnostics
+        ? diagnostics.measurePhaseSync('state-commit', commit)
+        : commit();
       if (!commitResult.committed) throw new Error('layout-routing-cancelled');
       committed = true;
-      await runAfterLayoutRenderFrames(() => {
+      const reconcileRender = () => runAfterLayoutRenderFrames(() => {
         flushObstacles();
       });
-      await beforePreviewRelease?.();
+      if (diagnostics) {
+        await diagnostics.measurePhase('render-reconcile', reconcileRender);
+      } else {
+        await reconcileRender();
+      }
+      if (beforePreviewRelease) {
+        if (diagnostics) {
+          await diagnostics.measurePhase('fit-request', beforePreviewRelease);
+        } else {
+          await beforePreviewRelease();
+        }
+      }
     } finally {
       if (committed || routingSessionRuntime.isCurrentJob(routingJob)) {
         // A job-level fallback owns the same preview and routing epoch. Keep

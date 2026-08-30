@@ -60,6 +60,27 @@ export const parseDisplayRoutingMatrixTimeoutMs = (rawValue, fallbackMs = 120_00
   return candidate;
 };
 
+export const parseDisplayRoutingMatrixCaseList = (
+  rawValue,
+  knownCaseIds,
+  maximumCases = 8,
+) => {
+  if (rawValue === undefined || rawValue === null || rawValue === '') return [];
+  if (typeof rawValue !== 'string' || rawValue.length > 1_024) {
+    throw new Error('Invalid DISPLAY_ROUTING_MATRIX_WARM_CASES');
+  }
+  const candidates = rawValue.split(',').map(value => value.trim()).filter(Boolean);
+  if (
+    candidates.length === 0
+    || candidates.length > maximumCases
+    || new Set(candidates).size !== candidates.length
+    || candidates.some(candidate => (
+      candidate.length > MAX_MATRIX_CASE_ID_LENGTH || !knownCaseIds.has(candidate)
+    ))
+  ) throw new Error('Invalid DISPLAY_ROUTING_MATRIX_WARM_CASES');
+  return candidates;
+};
+
 export const findDisplayRoutingMenuElementByKey = (elements, rawKey) => {
   if (typeof rawKey !== 'string' || rawKey.length === 0 || rawKey.length > 128) {
     return null;

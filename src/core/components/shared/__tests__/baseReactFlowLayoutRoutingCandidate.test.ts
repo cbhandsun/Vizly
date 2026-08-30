@@ -59,6 +59,7 @@ import { projectBaseReactFlowDisplayWorkerInput } from '../baseReactFlowDisplayW
 import { createTestDisplayHardReport } from './baseReactFlowDisplayWorkerTestFixtures';
 import { readDisplayRoutingDebugState } from '../baseReactFlowDisplayRoutingDebug';
 import {
+  shouldBypassBaseReactFlowObstacleDirtyLaneCandidate,
   shouldSkipBaseReactFlowLayoutCandidateRepair,
   type BaseReactFlowLayoutCandidateSeedAudit,
 } from '../baseReactFlowLayoutCandidateSeedAudit';
@@ -236,6 +237,52 @@ describe('baseReactFlow layout routing candidate sequence', () => {
     expect(shouldSkipBaseReactFlowLayoutCandidateRepair(44, exactCleanAudit)).toBe(false);
     expect(shouldSkipBaseReactFlowLayoutCandidateRepair(44, exactCleanAudit, true)).toBe(true);
     expect(shouldSkipBaseReactFlowLayoutCandidateRepair(0, exactCleanAudit, true)).toBe(false);
+  });
+
+  it.each([
+    ['observed dense WMS demand seed', 26, 22, 8, true, true, true],
+    ['observed dense TMS seed', 17, 33, 24, true, true, true],
+    ['observed dense WMS process seed', 44, 32, 15, true, true, true],
+    ['density just below threshold', 26, 17, 8, true, true, false],
+    ['no strict crossing', 26, 22, 0, true, true, false],
+    ['unanchored terminal', 26, 22, 8, true, false, false],
+    ['empty edge set', 0, 22, 8, true, true, false],
+    ['invalid obstacle count', 26, Number.POSITIVE_INFINITY, 8, true, true, false],
+  ] as const)(
+    'classifies obstacle-dirty lane bypass: %s',
+    (_label, edgeCount, obstacleHits, strictCrossings, terminalsAttached, terminalsAnchored, expected) => {
+      expect(shouldBypassBaseReactFlowObstacleDirtyLaneCandidate(edgeCount, {
+        terminalsAttached,
+        terminalsAnchored,
+        obstacleHits,
+        strictCrossings,
+      })).toBe(expected);
+    },
+  );
+
+  it('rejects a predictably obstacle-dirty lane seed without starting the Worker', async () => {
+    const seedAuditSpy = vi.spyOn(
+      layoutCandidateSeedAudit,
+      'auditBaseReactFlowLayoutCandidateSeed',
+    ).mockReturnValue({
+      terminalsAttached: true,
+      terminalsAnchored: true,
+      obstacleHits: 4,
+      strictCrossings: 1,
+    });
+
+    await expect(stageBaseReactFlowLayoutRouting({
+      workerRef: { current: null },
+      requestId: 'layout:dense-lane-seed',
+      sourceEdges: edges,
+      sourceNodes: nodes,
+      isLargeGraph: false,
+      rejectObstacleDirtyBoundedCandidate: true,
+    })).rejects.toThrow('layout-routing-hard-quality-rejected');
+
+    expect(workerMocks.repair).not.toHaveBeenCalled();
+    expect(workerMocks.compute).not.toHaveBeenCalled();
+    seedAuditSpy.mockRestore();
   });
 
   it('sends a compound-dirty seed directly through the canonical exact request', async () => {

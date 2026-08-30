@@ -1,9 +1,95 @@
+import { EventEmitter } from 'node:events';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  CdpPageSession,
   closePrecompiledRouteBrowser,
+  parsePrecompiledRouteCdpCommandTimeoutMs,
   retryPrecompiledRouteBrowserProfileCleanup,
+  terminatePrecompiledRouteBrowserProcessTree,
 } from './precompiled-display-route-cdp.mjs';
+
+class FakeSocket extends EventEmitter {
+  sent = [];
+
+  send(value) {
+    this.sent.push(JSON.parse(value));
+  }
+
+  close() {
+    this.emit('close', 1000, Buffer.from(''));
+  }
+}
+
+describe('precompiled display route CDP boundary', () => {
+  it.each([undefined, null, '', 30_000, '45000'])(
+    'accepts an empty or bounded command timeout: %s',
+    value => expect(parsePrecompiledRouteCdpCommandTimeoutMs(value)).toBe(
+      value === undefined || value === null || value === '' ? 30_000 : Number(value),
+    ),
+  );
+
+  it.each([0, 999, 120_001, 1.5, 'not-a-number', {}, []])(
+    'rejects an invalid command timeout: %s',
+    value => expect(() => parsePrecompiledRouteCdpCommandTimeoutMs(value)).toThrow(
+      'Invalid PRECOMPILED_ROUTE_CDP_COMMAND_TIMEOUT_MS',
+    ),
+  );
+
+  it('resolves a matching response and clears its pending command', async () => {
+    const socket = new FakeSocket();
+    const session = new CdpPageSession('ws://local', 1_000, () => socket);
+    const opened = session.open();
+    socket.emit('open');
+    await opened;
+    const result = session.send('Runtime.evaluate', { expression: '1 + 1' });
+    const [{ id }] = socket.sent;
+    socket.emit('message', JSON.stringify({ id, result: { value: 2 } }));
+    await expect(result).resolves.toEqual({ value: 2 });
+    session.close();
+  });
+
+  it('rejects a command that receives no response within its bounded timeout', async () => {
+    vi.useFakeTimers();
+    try {
+      const socket = new FakeSocket();
+      const session = new CdpPageSession('ws://local', 1_000, () => socket);
+      const opened = session.open();
+      socket.emit('open');
+      await opened;
+      const result = session.send('Runtime.evaluate');
+      const assertion = expect(result).rejects.toThrow('CDP command timed out: Runtime.evaluate');
+      await vi.advanceTimersByTimeAsync(1_000);
+      await assertion;
+      session.close();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('uses taskkill with the exact spawned PID on Windows', async () => {
+    const killer = new EventEmitter();
+    killer.exitCode = null;
+    killer.signalCode = null;
+    const spawnProcess = vi.fn().mockReturnValue(killer);
+    const waitForExit = vi.fn().mockResolvedValue(undefined);
+    const browser = { pid: 4321, exitCode: null, signalCode: null, kill: vi.fn() };
+
+    await terminatePrecompiledRouteBrowserProcessTree(browser, {
+      platform: 'win32',
+      spawnProcess,
+      waitForExit,
+    });
+
+    expect(spawnProcess).toHaveBeenCalledWith(
+      'taskkill',
+      ['/pid', '4321', '/t', '/f'],
+      { stdio: 'ignore', windowsHide: true },
+    );
+    expect(waitForExit).toHaveBeenCalledWith(killer);
+    expect(browser.kill).not.toHaveBeenCalled();
+  });
+});
 
 describe('precompiled display route browser profile cleanup', () => {
   it('requests graceful browser shutdown before profile cleanup', async () => {

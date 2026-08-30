@@ -7,9 +7,11 @@ export const resolveDisplayRoutingFinalRouteSnapshot = ({
   routing,
   requests,
   responses,
+  currentNodes,
   currentEdges,
   renderedEdgeCount,
   expectedRequestPrefix,
+  minimumExclusiveLayoutJobId,
 }) => {
   const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value);
   const requestMatchesPrefix = request => (
@@ -27,6 +29,19 @@ export const resolveDisplayRoutingFinalRouteSnapshot = ({
     && Number.isSafeInteger(routing?.edgeCount)
     && routing.nodeCount === request.nodes.length
     && routing.edgeCount === request.edges.length
+  );
+  const requestMatchesResponseIdentity = (request, response) => (
+    isRecord(request)
+    && isRecord(response)
+    && request.requestId === response.requestId
+    && (
+      !Number.isSafeInteger(response.__browserRequestOrdinal)
+      || request.__browserRequestOrdinal === response.__browserRequestOrdinal
+    )
+    && (
+      typeof response.__browserWorkerInstanceId !== 'string'
+      || request.__browserWorkerInstanceId === response.__browserWorkerInstanceId
+    )
   );
   const candidateValidationHit = Array.isArray(routing?.phaseProgressTrace)
     && routing.phaseProgressTrace.some(phase => (
@@ -54,12 +69,48 @@ export const resolveDisplayRoutingFinalRouteSnapshot = ({
   ));
   if (response) {
     const request = [...safeRequests].reverse().find(item => (
-      isRecord(item) && item.requestId === response.requestId
+      requestMatchesResponseIdentity(item, response)
     ));
     return requestMatchesCommittedShape(request)
       && renderedEdgeCount === response.edges.length
       ? { routing, request, response, renderedEdgeCount }
       : null;
+  }
+
+  const trustedRuntimeCommit = expectedRequestPrefix === 'layout:'
+    && Number.isSafeInteger(minimumExclusiveLayoutJobId)
+    && Number.isSafeInteger(routing.layoutTransactionJobId)
+    && routing.layoutTransactionJobId > minimumExclusiveLayoutJobId
+    && routing.layoutTransactionStatus === 'committed'
+    && routing.cacheTrustLevel === 'runtime-committed'
+    && routing.requestId.startsWith(expectedRequestPrefix)
+    && Array.isArray(currentNodes)
+    && Array.isArray(currentEdges)
+    && currentNodes.length > 0
+    && currentEdges.length > 0
+    && routing.nodeCount === currentNodes.length
+    && routing.edgeCount === currentEdges.length
+    && renderedEdgeCount === currentEdges.length;
+  if (trustedRuntimeCommit && safeRequests.length === 0 && safeResponses.length === 0) {
+    return {
+      routing,
+      request: {
+        requestId: routing.requestId,
+        nodes: currentNodes,
+        edges: currentEdges,
+        source: 'runtime-committed-cache',
+      },
+      response: {
+        requestId: routing.requestId,
+        hardClean: true,
+        hardReport: { hardClean: true },
+        edges: currentEdges,
+        routeResolution: 'runtime-committed-cache',
+        resolution: 'runtime-committed-cache',
+        source: 'runtime-committed-cache',
+      },
+      renderedEdgeCount,
+    };
   }
 
   const request = [...safeRequests].reverse().find(requestMatchesPrefix);

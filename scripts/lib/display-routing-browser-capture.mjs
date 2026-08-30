@@ -11,17 +11,60 @@ export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
   window.__vizlyLongTasks = [];
   window.__vizlyRenderedRouteSamples = [];
   window.__vizlyLayoutVisualEvents = [];
+  window.__vizlyWorkerHeartbeats = [];
   window.__vizlyRouteSamplingEnabled = true;
   let previousRenderedRouteFingerprint = '';
   let previousLayoutBusy = null;
   let previousLayoutCommitting = null;
   let previousViewportFingerprint = '';
   let pendingDiagnosticCloneTasks = 0;
+  let workerInstanceSequence = 0;
+  let requestSequence = 0;
+  let responseSequence = 0;
+  const readLayoutSeedAudit = () => {
+    const routing = window.__vizlyBaseReactFlowDisplayRouting;
+    const boundedCount = value => Number.isSafeInteger(value)
+      && value >= 0
+      && value <= 100_000
+      ? value
+      : null;
+    if (
+      typeof routing?.layoutSeedTerminalsAttached !== 'boolean'
+      || typeof routing?.layoutSeedTerminalsAnchored !== 'boolean'
+    ) return null;
+    const obstacleHits = boundedCount(routing.layoutSeedObstacleHits);
+    const strictCrossings = boundedCount(routing.layoutSeedStrictCrossings);
+    if (obstacleHits === null || strictCrossings === null) return null;
+    return {
+      terminalsAttached: routing.layoutSeedTerminalsAttached,
+      terminalsAnchored: routing.layoutSeedTerminalsAnchored,
+      obstacleHits,
+      strictCrossings,
+    };
+  };
   const recordLayoutVisualEvent = (type, value) => {
     const sampledAt = performance.timeOrigin + performance.now();
     if (!Number.isFinite(sampledAt)) return;
     window.__vizlyLayoutVisualEvents.push({ type, value, sampledAt });
     window.__vizlyLayoutVisualEvents = window.__vizlyLayoutVisualEvents.slice(-128);
+  };
+  const recordWorkerHeartbeat = ({
+    workerInstanceId,
+    requestOrdinal,
+    attemptOrdinal,
+    operation,
+    startedAt,
+  }) => {
+    const sampledAt = Date.now();
+    window.__vizlyWorkerHeartbeats.push({
+      workerInstanceId,
+      requestOrdinal,
+      attemptOrdinal,
+      operation,
+      sampledAt,
+      elapsedMs: Math.max(0, sampledAt - startedAt),
+    });
+    window.__vizlyWorkerHeartbeats = window.__vizlyWorkerHeartbeats.slice(-128);
   };
   window.addEventListener?.('diagramControl', event => {
     if (event?.detail?.action !== 'fit') return;
@@ -96,6 +139,10 @@ export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
   class CapturingWorker extends NativeWorker {
     constructor(...args) {
       super(...args);
+      this.__vizlyWorkerInstanceId = 'worker-' + String(workerInstanceSequence += 1);
+      this.__vizlyRequestAttemptCounts = new Map();
+      this.__vizlyResponseCounts = new Map();
+      this.__vizlyActiveRequestHeartbeats = new Map();
       this.addEventListener('message', event => {
         const response = event?.data;
         if (!response || typeof response.requestId !== 'string') return;
@@ -113,8 +160,38 @@ export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
               window.__vizlyBoundedCandidates = window.__vizlyBoundedCandidates.slice(-16);
             }
             const capturedResponse = structuredClone(response);
+            const matchingRequest = [...window.__vizlyRoutingRequests].reverse().find(request => (
+              request?.requestId === response.requestId
+              && request?.__browserWorkerInstanceId === this.__vizlyWorkerInstanceId
+            ));
+            const requestOrdinal = matchingRequest?.__browserRequestOrdinal;
+            const responseKey = Number.isSafeInteger(requestOrdinal)
+              ? String(requestOrdinal)
+              : response.requestId;
+            const responseOrdinalWithinRequest = (this.__vizlyResponseCounts.get(responseKey) || 0) + 1;
+            this.__vizlyResponseCounts.set(responseKey, responseOrdinalWithinRequest);
+            if (
+              Number.isSafeInteger(requestOrdinal)
+              && (typeof response.hardClean === 'boolean' || typeof response.routeResolution === 'string')
+            ) {
+              const heartbeatId = this.__vizlyActiveRequestHeartbeats.get(requestOrdinal);
+              if (heartbeatId !== undefined) clearInterval(heartbeatId);
+              this.__vizlyActiveRequestHeartbeats.delete(requestOrdinal);
+            }
             capturedResponse.__browserCapturedAt = receivedAt;
             capturedResponse.__browserCloneMs = performance.now() - cloneStartedAt;
+            capturedResponse.__browserWorkerInstanceId = this.__vizlyWorkerInstanceId;
+            capturedResponse.__browserRequestOrdinal = requestOrdinal;
+            capturedResponse.__browserAttemptOrdinal = matchingRequest?.__browserAttemptOrdinal;
+            capturedResponse.__browserResponseOrdinal = responseSequence += 1;
+            capturedResponse.__browserResponseOrdinalWithinRequest = responseOrdinalWithinRequest;
+            const protocolVersion = response?.commitReceipt?.protocolVersion
+              ?? response?.sessionRef?.protocolVersion;
+            if (
+              typeof protocolVersion === 'string'
+              && /^[a-z0-9:_-]{1,64}$/i.test(protocolVersion)
+            ) capturedResponse.__browserProtocolVersion = protocolVersion;
+            capturedResponse.__browserRoutingVersion = matchingRequest?.__browserRoutingVersion;
             window.__vizlyRoutingResponses.push(capturedResponse);
             // Full-route progress can emit dozens of aggregate responses after
             // a bounded layout repair completes. Preserve completed responses
@@ -142,15 +219,46 @@ export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
         try {
           const cloneStartedAt = performance.now();
           const capturedRequest = structuredClone(message);
+          const attemptOrdinal = (this.__vizlyRequestAttemptCounts.get(message.requestId) || 0) + 1;
+          this.__vizlyRequestAttemptCounts.set(message.requestId, attemptOrdinal);
           capturedRequest.__browserCloneMs = performance.now() - cloneStartedAt;
           capturedRequest.__browserCapturedAt = Date.now();
+          capturedRequest.__browserWorkerInstanceId = this.__vizlyWorkerInstanceId;
+          capturedRequest.__browserRequestOrdinal = requestSequence += 1;
+          capturedRequest.__browserAttemptOrdinal = attemptOrdinal;
+          capturedRequest.__browserLayoutSeedAudit = readLayoutSeedAudit();
+          const routingVersion = message?.inputIdentity?.routingVersion;
+          if (
+            typeof routingVersion === 'string'
+            && /^[a-z0-9:_-]{1,64}$/i.test(routingVersion)
+          ) capturedRequest.__browserRoutingVersion = routingVersion;
           window.__vizlyRoutingRequests.push(capturedRequest);
           window.__vizlyRoutingRequests = window.__vizlyRoutingRequests.slice(-16);
+          const heartbeat = {
+            workerInstanceId: this.__vizlyWorkerInstanceId,
+            requestOrdinal: capturedRequest.__browserRequestOrdinal,
+            attemptOrdinal,
+            operation: typeof message.operation === 'string' ? message.operation : 'unknown',
+            startedAt: capturedRequest.__browserCapturedAt,
+          };
+          recordWorkerHeartbeat(heartbeat);
+          const heartbeatId = setInterval(() => recordWorkerHeartbeat(heartbeat), 1_000);
+          this.__vizlyActiveRequestHeartbeats.set(
+            capturedRequest.__browserRequestOrdinal,
+            heartbeatId,
+          );
         } catch {}
       }
       return typeof transfer === 'undefined'
         ? super.postMessage(message)
         : super.postMessage(message, transfer);
+    }
+    terminate() {
+      for (const heartbeatId of this.__vizlyActiveRequestHeartbeats.values()) {
+        clearInterval(heartbeatId);
+      }
+      this.__vizlyActiveRequestHeartbeats.clear();
+      return super.terminate();
     }
   }
   window.Worker = CapturingWorker;

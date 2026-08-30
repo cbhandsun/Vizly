@@ -6,6 +6,7 @@ import {
   DISPLAY_ROUTING_TOPOLOGY_CASE_ID,
   findDisplayRoutingMenuElementByKey,
   parseDisplayRoutingMatrixCase,
+  parseDisplayRoutingMatrixCaseList,
   parseDisplayRoutingMatrixPreset,
   parseDisplayRoutingMatrixTimeoutMs,
 } from './display-routing-matrix-cases.mjs';
@@ -78,6 +79,18 @@ describe('display routing matrix cases', () => {
       .toThrowError('Invalid DISPLAY_ROUTING_MATRIX_WAIT_TIMEOUT_MS');
     expect(() => parseDisplayRoutingMatrixTimeoutMs('120001'))
       .toThrowError('Invalid DISPLAY_ROUTING_MATRIX_WAIT_TIMEOUT_MS');
+  });
+
+  it('parses a bounded unique sequence of warm layout cases', () => {
+    const known = new Set(DISPLAY_ROUTING_LAYOUT_CASES.map(layoutCase => layoutCase.id));
+    expect(parseDisplayRoutingMatrixCaseList(
+      ' domain-elk-rl,tree-bt,domain-lanes-lr ',
+      known,
+    )).toEqual(['domain-elk-rl', 'tree-bt', 'domain-lanes-lr']);
+    expect(parseDisplayRoutingMatrixCaseList('', known)).toEqual([]);
+    expect(() => parseDisplayRoutingMatrixCaseList('tree-bt,tree-bt', known)).toThrow();
+    expect(() => parseDisplayRoutingMatrixCaseList('unknown', known)).toThrow();
+    expect(() => parseDisplayRoutingMatrixCaseList('x'.repeat(2_000), known)).toThrow();
   });
 
   it('finds Ant menu actions by stable key without depending on translated text', () => {

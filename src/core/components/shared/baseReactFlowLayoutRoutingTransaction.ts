@@ -36,6 +36,7 @@ import { clearBaseReactFlowLayoutEdgeRoutingData } from './baseReactFlowLayoutEd
 import { updateDisplayRoutingDebugState } from './baseReactFlowDisplayRoutingDebug';
 import {
   auditBaseReactFlowLayoutCandidateSeed,
+  shouldBypassBaseReactFlowObstacleDirtyLaneCandidate,
   shouldSkipBaseReactFlowLayoutCandidateRepair,
 } from './baseReactFlowLayoutCandidateSeedAudit';
 import type { DisplayRoutingWorkerCommitReceipt } from './baseReactFlowDisplayWorkerCommitReceipt';
@@ -505,6 +506,14 @@ export const stageBaseReactFlowLayoutRouting = async ({
       candidateRepairPolicy === 'skip-exact-clean',
     ),
   );
+  if (
+    rejectObstacleDirtyBoundedCandidate
+    && seedAudit
+    && shouldBypassBaseReactFlowObstacleDirtyLaneCandidate(
+      stagedSeedEdges?.length ?? 0,
+      seedAudit,
+    )
+  ) throw new Error('layout-routing-hard-quality-rejected');
   // ELK and the geometry-anchored fallback already provide a complete hidden
   // candidate. Flat full-graph ELK can opt to send an exact-clean seed directly
   // through the canonical audit; other near-clean seeds retain the bounded

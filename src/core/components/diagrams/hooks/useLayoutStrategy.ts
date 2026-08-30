@@ -151,6 +151,7 @@ export function useLayoutStrategy({
         // result could open a fresh epoch after a newer display commit.
         const routingJob = routingSessionRuntime.beginJob('layout');
         const transactionDiagnostics = createLayoutRoutingTransactionDiagnostics(routingJob.id);
+        transactionDiagnostics.beginPhase('command');
         layoutFitControllerRef.current?.abort();
         const layoutFitController = new AbortController();
         layoutFitControllerRef.current = layoutFitController;
@@ -166,6 +167,7 @@ export function useLayoutStrategy({
             signal: routingJob.signal,
             elkLayoutRunner: elkLayoutExecutorRef.current ?? undefined,
         };
+        transactionDiagnostics.finishPhase('command');
         const dir = direction || 'TB';
         const appliedDirection = dir;
         const axisDirection = dir === 'LR' || dir === 'RL' ? 'LR' : 'TB';
@@ -173,6 +175,7 @@ export function useLayoutStrategy({
         let appliedNodeLayout = nodeLayout;
 
         try {
+            transactionDiagnostics.beginPhase('input-preparation');
             const rawNodes = nodesRef.current;
 
             // 1. 自动传播折叠容器的折叠状态到子节点
@@ -216,14 +219,17 @@ export function useLayoutStrategy({
                 transactionDiagnostics.noLayoutableNodes();
                 return false;
             }
+            transactionDiagnostics.finishPhase('input-preparation');
 
             const commitLayoutAttempt = async (
                 request: Parameters<typeof commitLayout>[0],
             ): Promise<void> => {
+                transactionDiagnostics.finishPhase('layout-calculation');
                 transactionDiagnostics.beginAttempt();
-                await commitLayout(request);
+                await commitLayout({ ...request, diagnostics: transactionDiagnostics });
             };
 
+            transactionDiagnostics.beginPhase('layout-calculation');
             if (strategyName === 'tree') {
                 // ── 扁平树形布局（对齐 SVG 版：不检测域） ──
                 const { refineLayout } = await import('../../../strategies/shared/LayoutRefinement');
@@ -632,6 +638,7 @@ export function useLayoutStrategy({
                         });
                         if (!canRetryWithDomainCompoundElk) throw error;
                         logLayoutStrategyDomainPreservingFallback(strategyName);
+                        transactionDiagnostics.beginPhase('layout-calculation');
                         result = await calculateDomainCompoundElkFallback();
                         await commitDomainResult(
                             result,

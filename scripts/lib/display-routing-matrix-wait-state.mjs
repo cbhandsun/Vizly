@@ -156,6 +156,7 @@ export const summarizeDisplayRoutingWaitState = (
     }),
     requestTrace: requests.slice(-16).map((value) => {
       const request = record(value);
+      const layoutSeedAudit = record(request.__browserLayoutSeedAudit);
       return {
         requestId: token(request.requestId),
         requestKind: requestKind(request.requestId),
@@ -165,6 +166,12 @@ export const summarizeDisplayRoutingWaitState = (
         ),
         nodeCount: Array.isArray(request.nodes) ? integer(request.nodes.length) : undefined,
         edgeCount: Array.isArray(request.edges) ? integer(request.edges.length) : undefined,
+        layoutSeedAudit: {
+          terminalsAttached: boolean(layoutSeedAudit.terminalsAttached),
+          terminalsAnchored: boolean(layoutSeedAudit.terminalsAnchored),
+          obstacleHits: integer(layoutSeedAudit.obstacleHits),
+          strictCrossings: integer(layoutSeedAudit.strictCrossings),
+        },
         nodeGeometryFingerprint: nodeGeometryFingerprint(request.nodes),
         edgeRouteFingerprint: edgeRouteFingerprint(request.edges),
         nodeObjectFingerprint: Array.isArray(request.nodes)

@@ -22,6 +22,7 @@ import {
   DISPLAY_ROUTING_TOPOLOGY_CASE_ID,
   findDisplayRoutingMenuElementByKey,
   parseDisplayRoutingMatrixCase,
+  parseDisplayRoutingMatrixCaseList,
   parseDisplayRoutingMatrixPreset,
   parseDisplayRoutingMatrixTimeoutMs,
 } from './lib/display-routing-matrix-cases.mjs';
@@ -39,14 +40,21 @@ import {
   readDisplayRoutingCommittedReuseSnapshot,
 } from './lib/display-routing-browser-diagnostics.mjs';
 import { resolveDisplayRoutingFinalRouteSnapshot } from './lib/display-routing-matrix-final-route.mjs';
-import { waitForStableDisplayRoutingLayoutVisual } from './lib/display-routing-layout-visual-settle.mjs';
+import {
+  resolveDisplayRoutingLayoutVisualTimeoutMs,
+  waitForStableDisplayRoutingLayoutVisual,
+} from './lib/display-routing-layout-visual-settle.mjs';
 import { summarizeDisplayRoutingLayoutVisualTimeline } from './lib/display-routing-layout-visual-timeline.mjs';
+import { assertProductionPreviewMatchesLocalBuild } from './lib/display-routing-build-identity.mjs';
+import { DISPLAY_ROUTING_MATRIX_PRESET_TARGETS } from './lib/display-routing-matrix-presets.mjs';
+import { readDisplayRoutingLayoutDiagnostics } from './lib/display-routing-layout-diagnostics.mjs';
 
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '').trim().replace(/\/$/, '');
 const WAIT_TIMEOUT_MS = parseDisplayRoutingMatrixTimeoutMs(
   process.env.DISPLAY_ROUTING_MATRIX_WAIT_TIMEOUT_MS,
 );
 const MAX_LAYOUT_ROUTE_MS = 30_000;
+const VISUAL_SETTLE_TIMEOUT_MS = resolveDisplayRoutingLayoutVisualTimeoutMs(WAIT_TIMEOUT_MS);
 const MATRIX_CASE_IDS = createDisplayRoutingMatrixCaseIds(
   PRECOMPILED_DISPLAY_ROUTE_TARGETS.map(target => target.presetId),
 );
@@ -56,18 +64,17 @@ const REQUESTED_CASE = parseDisplayRoutingMatrixCase(
 );
 const LAYOUT_PRESET_ID = parseDisplayRoutingMatrixPreset(
   process.env.DISPLAY_ROUTING_MATRIX_PRESET,
-  new Set(PRECOMPILED_DISPLAY_ROUTE_TARGETS.map(target => target.presetId)),
+  new Set(DISPLAY_ROUTING_MATRIX_PRESET_TARGETS.map(target => target.presetId)),
   'wms-demand-allocation-strategy-v2',
 );
-const WARM_LAYOUT_CASE_ID = String(
-  process.env.DISPLAY_ROUTING_MATRIX_WARM_CASE || '',
-).trim();
-const WARM_LAYOUT_CASE = WARM_LAYOUT_CASE_ID
-  ? DISPLAY_ROUTING_LAYOUT_CASES.find(candidate => candidate.id === WARM_LAYOUT_CASE_ID)
-  : null;
-if (WARM_LAYOUT_CASE_ID && !WARM_LAYOUT_CASE) {
-  throw new Error('Unknown DISPLAY_ROUTING_MATRIX_WARM_CASE');
-}
+const WARM_LAYOUT_CASE_IDS = parseDisplayRoutingMatrixCaseList(
+  process.env.DISPLAY_ROUTING_MATRIX_WARM_CASES
+    ?? process.env.DISPLAY_ROUTING_MATRIX_WARM_CASE,
+  new Set(DISPLAY_ROUTING_LAYOUT_CASES.map(candidate => candidate.id)),
+);
+const WARM_LAYOUT_CASES = WARM_LAYOUT_CASE_IDS.map(id => (
+  DISPLAY_ROUTING_LAYOUT_CASES.find(candidate => candidate.id === id)
+)).filter(Boolean);
 
 const assertProductionPreview = async () => {
   if (!BASE_URL) throw new Error('PRECOMPILED_ROUTE_BASE_URL must point to a production preview');
@@ -78,6 +85,8 @@ const assertProductionPreview = async () => {
     html.includes('/@vite/client')
     || !/<script[^>]+src=["'][^"']*\/assets\/[^"']+\.js["']/i.test(html)
   ) throw new Error('PRECOMPILED_ROUTE_BASE_URL is not a production Vite preview');
+  const localHtml = await readFile('dist/index.html', 'utf8');
+  assertProductionPreviewMatchesLocalBuild(html, localHtml);
 };
 
 const waitForValue = async (session, expression, label) => {
@@ -123,7 +132,10 @@ const prepareSession = async session => {
   });
 };
 
-const readFinalRouteExpression = expectedRequestPrefix => `(() => {
+const readFinalRouteExpression = (
+  expectedRequestPrefix,
+  minimumExclusiveLayoutJobId,
+) => `(() => {
   const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
   if (routing.stage !== 'final-applied') return null;
   const requests = window.__vizlyRoutingRequests || [];
@@ -134,9 +146,11 @@ const readFinalRouteExpression = expectedRequestPrefix => `(() => {
     routing,
     requests,
     responses,
+    currentNodes: window.reactFlowInstance?.getNodes?.() || [],
     currentEdges: window.reactFlowInstance?.getEdges?.() || [],
     renderedEdgeCount,
     expectedRequestPrefix: ${JSON.stringify(expectedRequestPrefix)},
+    minimumExclusiveLayoutJobId: ${JSON.stringify(minimumExclusiveLayoutJobId)},
   });
 })()`;
 
@@ -410,7 +424,7 @@ const clickLayout = async (session, layoutCase) => {
 const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => {
   await prepareSession(session);
   const presetId = LAYOUT_PRESET_ID;
-  const target = PRECOMPILED_DISPLAY_ROUTE_TARGETS.find(candidate => candidate.presetId === presetId);
+  const target = DISPLAY_ROUTING_MATRIX_PRESET_TARGETS.find(candidate => candidate.presetId === presetId);
   if (!target) throw new Error(`Canonical layout preset target is missing: ${presetId}`);
   const identity = parseCanonicalPresetIdentity(
     JSON.parse(await readFile(target.sourcePath, 'utf8')),
@@ -429,10 +443,13 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
   );
   const initialRouteMs = Date.now() - initialStartedAt;
   await session.evaluate('window.__vizlyRoutingResponses = []');
+  const previousLayoutJobId = await session.evaluate(
+    'window.__vizlyBaseReactFlowDisplayRouting?.layoutTransactionJobId ?? 0',
+  );
   const clickedAt = await clickLayout(session, layoutCase);
   const route = await waitForValue(
     session,
-    readFinalRouteExpression('layout:'),
+    readFinalRouteExpression('layout:', previousLayoutJobId),
     `${layoutCase.id} layout route`,
   );
   const visualSettle = await waitForStableDisplayRoutingLayoutVisual({
@@ -440,6 +457,7 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
     expectedRequestId: route.routing.requestId,
     expectedNodeCount: route.request?.nodes?.length,
     expectedEdgeCount: route.response?.edges?.length,
+    timeoutMs: VISUAL_SETTLE_TIMEOUT_MS,
   });
   const totalRouteMs = Number.isFinite(route.routing.finalAppliedAt)
     ? route.routing.finalAppliedAt - clickedAt
@@ -459,26 +477,40 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
       && task.startedAt >= clickedAtEpoch
       && (!Number.isFinite(finalAppliedAt) || task.startedAt <= finalAppliedAt)
     ));
-    const usedRequestIndexes = new Set();
     const attempts = (window.__vizlyRoutingResponses || []).filter(response => (
       typeof response?.requestId === 'string'
       && response.requestId.startsWith('layout:')
       && typeof response.hardClean === 'boolean'
     )).map(response => {
-      const requestIndex = layoutRequests.findIndex((candidate, index) => (
-        !usedRequestIndexes.has(index)
-        && candidate.requestId === response.requestId
+      const request = [...layoutRequests].reverse().find(candidate => (
+        candidate.requestId === response.requestId
+        && (
+          !Number.isSafeInteger(response.__browserRequestOrdinal)
+          || candidate.__browserRequestOrdinal === response.__browserRequestOrdinal
+        )
+        && (
+          typeof response.__browserWorkerInstanceId !== 'string'
+          || candidate.__browserWorkerInstanceId === response.__browserWorkerInstanceId
+        )
         && (
           !Number.isFinite(candidate.__browserCapturedAt)
           || !Number.isFinite(response.__browserCapturedAt)
           || candidate.__browserCapturedAt <= response.__browserCapturedAt
         )
       ));
-      if (requestIndex >= 0) usedRequestIndexes.add(requestIndex);
-      const request = requestIndex >= 0 ? layoutRequests[requestIndex] : undefined;
       const summarize = ${summarizeSlowestDisplayRoutingPhases.toString()};
       return {
         requestId: response.requestId,
+        workerInstanceId: response.__browserWorkerInstanceId ?? null,
+        requestOrdinal: response.__browserRequestOrdinal ?? null,
+        attemptOrdinal: response.__browserAttemptOrdinal ?? null,
+        responseOrdinal: response.__browserResponseOrdinalWithinRequest ?? null,
+        protocolVersion: response.__browserProtocolVersion ?? null,
+        routingVersion: response.__browserRoutingVersion
+          ?? request?.__browserRoutingVersion
+          ?? null,
+        geometryDigest: request?.inputIdentity?.inputGeometryDigest ?? null,
+        layoutSeedAudit: request?.__browserLayoutSeedAudit ?? null,
         operation: request?.operation,
         resolution: response.routeResolution,
         hardClean: response.hardClean,
@@ -527,6 +559,15 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
     routingCommitAt: route.routing.finalAppliedAt,
     visualStableAt: visualSettle.stableSinceAt,
   });
+  const layoutDiagnostics = await session.evaluate(`(() => {
+    const readDiagnostics = ${readDisplayRoutingLayoutDiagnostics.toString()};
+    return readDiagnostics({
+      routingValue: window.__vizlyBaseReactFlowDisplayRouting,
+      heartbeatValue: window.__vizlyWorkerHeartbeats,
+      clickedAt: ${JSON.stringify(clickedAt)},
+      confirmedAt: ${JSON.stringify(visualSettle.confirmedAt)},
+    });
+  })()`);
   if (route.routing.workerStartCount !== initialRoute.routing.workerStartCount) {
     throw new Error(`${layoutCase.id} started a duplicate Canvas display Worker: ${JSON.stringify({
       before: initialRoute.routing.workerStartCount,
@@ -545,24 +586,28 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
     mountedEdges: mounted.edges,
   });
   const layoutAudit = await auditFinalSvg(session, route, layoutCase.id);
-  let warmLayoutSwitch = null;
-  if (WARM_LAYOUT_CASE) {
+  const warmLayoutSwitches = [];
+  for (const warmLayoutCase of WARM_LAYOUT_CASES) {
     await session.evaluate(`(() => {
       window.__vizlyRoutingRequests = [];
       window.__vizlyRoutingResponses = [];
       return true;
     })()`);
-    const warmClickedAt = await clickLayout(session, WARM_LAYOUT_CASE);
+    const previousWarmLayoutJobId = await session.evaluate(
+      'window.__vizlyBaseReactFlowDisplayRouting?.layoutTransactionJobId ?? 0',
+    );
+    const warmClickedAt = await clickLayout(session, warmLayoutCase);
     const warmRoute = await waitForValue(
       session,
-      readFinalRouteExpression('layout:'),
-      `${layoutCase.id} to ${WARM_LAYOUT_CASE.id} warm layout route`,
+      readFinalRouteExpression('layout:', previousWarmLayoutJobId),
+      `${layoutCase.id} to ${warmLayoutCase.id} warm layout route`,
     );
     const warmVisualSettle = await waitForStableDisplayRoutingLayoutVisual({
       session,
       expectedRequestId: warmRoute.routing.requestId,
       expectedNodeCount: warmRoute.request?.nodes?.length,
       expectedEdgeCount: warmRoute.response?.edges?.length,
+      timeoutMs: VISUAL_SETTLE_TIMEOUT_MS,
     });
     const warmTotalRouteMs = Number.isFinite(warmRoute.routing.finalAppliedAt)
       ? warmRoute.routing.finalAppliedAt - warmClickedAt
@@ -582,8 +627,8 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
         .map(request => request.__browserCapturedAt)
         .filter(Number.isFinite)
     )`);
-    warmLayoutSwitch = {
-      id: WARM_LAYOUT_CASE.id,
+    warmLayoutSwitches.push({
+      id: warmLayoutCase.id,
       inputToFirstWorkerMs: Number.isFinite(warmFirstRequestAt)
         ? warmFirstRequestAt - warmClickedAt
         : null,
@@ -608,10 +653,11 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
       ...(await auditFinalSvg(
         session,
         warmRoute,
-        `${layoutCase.id} to ${WARM_LAYOUT_CASE.id} warm layout`,
+        `${layoutCase.id} to ${warmLayoutCase.id} warm layout`,
       )),
-    };
+    });
   }
+  const warmLayoutSwitch = warmLayoutSwitches[0] ?? null;
   let postLayoutMove = null;
   if (layoutCase.id === 'domain-compound-elk-lr') {
     const dragNodeId = await session.evaluate(`(() => {
@@ -694,10 +740,16 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
     inputToVisualStableMs,
     visualStableConfirmedAt: visualSettle.confirmedAt,
     visualTimeline,
+    layoutPhaseTrace: layoutDiagnostics.phaseTrace,
+    layoutSeedAudit: layoutDiagnostics.layoutSeedAudit,
+    workerHeartbeatCount: layoutDiagnostics.workerHeartbeatCount,
+    workerHeartbeatMaxElapsedMs: layoutDiagnostics.workerHeartbeatMaxElapsedMs,
+    workerInstanceCount: layoutDiagnostics.workerInstanceCount,
     ...layoutTiming,
     slowestPhases: summarizeSlowestDisplayRoutingPhases(route.response.phaseTrace),
     canonicalMount,
     warmLayoutSwitch,
+    warmLayoutSwitches,
     postLayoutMove,
     ...layoutAudit,
   };

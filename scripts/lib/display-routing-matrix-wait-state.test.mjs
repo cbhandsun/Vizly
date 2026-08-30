@@ -51,6 +51,12 @@ describe('display routing matrix wait-state summary', () => {
       inputGeometryDigest: 'geometry-v1:0123456789abcdef0123456789abcdef',
       nodes: [{ id: 'private-node' }],
       edges: [{ id: 'private-edge' }],
+      __browserLayoutSeedAudit: {
+        terminalsAttached: true,
+        terminalsAnchored: true,
+        obstacleHits: 22,
+        strictCrossings: 8,
+      },
     }]);
 
     expect(summary).toMatchObject({
@@ -87,6 +93,12 @@ describe('display routing matrix wait-state summary', () => {
         inputGeometryDigest: 'geometry-v1:0123456789abcdef0123456789abcdef',
         nodeCount: 1,
         edgeCount: 1,
+        layoutSeedAudit: {
+          terminalsAttached: true,
+          terminalsAnchored: true,
+          obstacleHits: 22,
+          strictCrossings: 8,
+        },
         nodeGeometryFingerprint: expect.stringMatching(/^\d+$/),
         edgeRouteFingerprint: expect.stringMatching(/^\d+$/),
         nodeObjectFingerprint: expect.stringMatching(/^\d+$/),

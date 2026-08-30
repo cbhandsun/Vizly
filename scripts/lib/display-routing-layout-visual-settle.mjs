@@ -5,6 +5,18 @@ const DEFAULT_SAMPLE_INTERVAL_MS = 34;
 const DEFAULT_REQUIRED_QUIET_MS = 250;
 const MAX_SAMPLES = 192;
 
+export const resolveDisplayRoutingLayoutVisualTimeoutMs = (
+  waitTimeoutMs,
+  fallbackMs = DEFAULT_TIMEOUT_MS,
+) => {
+  const fallback = Number.isFinite(fallbackMs)
+    ? Math.max(100, Math.min(30_000, fallbackMs))
+    : DEFAULT_TIMEOUT_MS;
+  return Number.isFinite(waitTimeoutMs)
+    ? Math.max(100, Math.min(30_000, waitTimeoutMs))
+    : fallback;
+};
+
 const fingerprintValues = (values) => {
   const text = values.join('\0');
   let hash = 2_166_136_261;
@@ -203,9 +215,7 @@ export const waitForStableDisplayRoutingLayoutVisual = async ({
   if (boundedCount(expectedNodeCount) === null || boundedCount(expectedEdgeCount) === null) {
     throw new Error('Finite expected layout node and edge counts are required');
   }
-  const boundedTimeoutMs = Number.isFinite(timeoutMs)
-    ? Math.max(100, Math.min(30_000, timeoutMs))
-    : DEFAULT_TIMEOUT_MS;
+  const boundedTimeoutMs = resolveDisplayRoutingLayoutVisualTimeoutMs(timeoutMs);
   const boundedSampleIntervalMs = Number.isFinite(sampleIntervalMs)
     ? Math.max(16, Math.min(250, sampleIntervalMs))
     : DEFAULT_SAMPLE_INTERVAL_MS;
