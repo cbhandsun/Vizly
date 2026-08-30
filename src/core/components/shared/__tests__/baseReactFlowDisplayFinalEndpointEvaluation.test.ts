@@ -283,11 +283,19 @@ describe('createBaseReactFlowFinalEndpointEvaluation', () => {
       cacheHitCount: metricsBeforeReuse.cacheHitCount + 1,
     });
 
+    const metricsBeforeCloneReuse = evaluation.readMetrics();
     const copiedEdge = unsafeEdges.map(edge => ({
       ...edge,
-      data: edge.data ? { ...edge.data } : undefined,
+      data: edge.data ? { ...edge.data, businessStatus: 'current' } : undefined,
     }));
-    expect(evaluation.repairRenderSafeEndpointStubs(copiedEdge, 32)).not.toBe(repaired);
+    const replayed = evaluation.repairRenderSafeEndpointStubs(copiedEdge, 32);
+    expect(replayed).not.toBe(repaired);
+    expect(replayed[0]?.data?.computedPath).toEqual(repaired[0]?.data?.computedPath);
+    expect(replayed[0]?.data?.businessStatus).toBe('current');
+    expect(evaluation.readMetrics()).toMatchObject({
+      evaluationCount: metricsBeforeCloneReuse.evaluationCount,
+      cacheHitCount: metricsBeforeCloneReuse.cacheHitCount + 1,
+    });
   });
 
   it('preserves the caller array identity when a cached stub repair is a no-op', () => {

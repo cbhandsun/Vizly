@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 
+import type { RoutingPatch } from '../../routing/routingPatch';
 import {
   createBusinessNodeClearanceGeometryContext,
   type BusinessNodeClearanceGeometryContext,
@@ -26,6 +27,10 @@ import {
   type BaseReactFlowChangedHardReportEvaluation,
 } from './baseReactFlowDisplayChangedHardReport';
 import { createStrictCrossingRepairDiagnostics } from './baseReactFlowDisplayStrictResidualRepair';
+import {
+  createBaseReactFlowDisplayEdgePatches,
+  mergeBaseReactFlowDisplayEdgePatches,
+} from './baseReactFlowDisplayRoutingTransaction';
 
 export type BaseReactFlowFinalEndpointEvaluation = Readonly<{
   nodes: Node[];
@@ -67,9 +72,12 @@ const MAX_REQUEST_LOCAL_STUB_REPAIR_EVIDENCE = 64;
 const MAX_REQUEST_LOCAL_STUB_REPAIR_EDGE_SLOTS = 4_096;
 
 type RenderSafeStubRepairEvidence = Readonly<{
+  baselineSignature: string | null;
   baselineEdges: readonly Edge[];
   maxEvaluations: number;
+  repairedSignature: string | null;
   repairedEdges: Edge[];
+  routingPatches: RoutingPatch[] | null;
 }>;
 
 const sameEdgeReferenceVector = (
@@ -277,17 +285,39 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
       return audit;
     },
     repairRenderSafeEndpointStubs(edges, maxEvaluations = 64) {
+      const baselineSignature = endpointAuditSignature(edges);
       const cachedIndex = renderSafeStubRepairs.findIndex(entry => (
         entry.maxEvaluations === maxEvaluations
-        && sameEdgeReferenceVector(entry.baselineEdges, edges)
+        && (
+          sameEdgeReferenceVector(entry.baselineEdges, edges)
+          || (
+            baselineSignature !== null
+            && entry.baselineSignature === baselineSignature
+          )
+        )
       ));
       if (cachedIndex >= 0) {
-        cacheHitCount += 1;
         const [cached] = renderSafeStubRepairs.splice(cachedIndex, 1);
         renderSafeStubRepairs.push(cached);
-        return sameEdgeReferenceVector(cached.baselineEdges, cached.repairedEdges)
-          ? edges
-          : cached.repairedEdges;
+        if (sameEdgeReferenceVector(cached.baselineEdges, cached.repairedEdges)) {
+          cacheHitCount += 1;
+          return edges;
+        }
+        if (sameEdgeReferenceVector(cached.baselineEdges, edges)) {
+          cacheHitCount += 1;
+          return cached.repairedEdges;
+        }
+        const replayed = cached.routingPatches
+          ? mergeBaseReactFlowDisplayEdgePatches(edges, cached.routingPatches)
+          : null;
+        if (
+          replayed
+          && cached.repairedSignature !== null
+          && endpointAuditSignature(replayed) === cached.repairedSignature
+        ) {
+          cacheHitCount += 1;
+          return replayed;
+        }
       }
       const strictDiagnostics = createStrictCrossingRepairDiagnostics();
       const repairedEdges = repairRenderSafeEndpointStubs(
@@ -318,10 +348,16 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
           if (!evicted) break;
           renderSafeStubRepairEdgeSlots -= evicted.baselineEdges.length;
         }
+        const repairedSignature = endpointAuditSignature(repairedEdges);
         renderSafeStubRepairs.push({
+          baselineSignature,
           baselineEdges: edges,
           maxEvaluations,
+          repairedSignature,
           repairedEdges,
+          routingPatches: sameEdgeReferenceVector(edges, repairedEdges)
+            ? []
+            : createBaseReactFlowDisplayEdgePatches(edges, repairedEdges),
         });
         renderSafeStubRepairEdgeSlots += edges.length;
       }
