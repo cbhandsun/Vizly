@@ -5,6 +5,48 @@ import { describe, expect, it, vi } from 'vitest';
 import { DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT } from './display-routing-browser-capture.mjs';
 
 describe('display routing browser capture', () => {
+  it('observes the awaited layout-commit fit request protocol', () => {
+    const listeners = new Map();
+    const queuedMicrotasks = [];
+    class TestWorker {
+      addEventListener() {}
+    }
+    const window = {
+      Worker: TestWorker,
+      addEventListener: (type, listener) => listeners.set(type, listener),
+    };
+    const context = vm.createContext({
+      Date,
+      PerformanceObserver: class { observe() {} },
+      document: { querySelectorAll: () => [] },
+      performance: { now: () => 10, timeOrigin: 1_000 },
+      queueMicrotask: callback => queuedMicrotasks.push(callback),
+      requestAnimationFrame: () => 1,
+      setInterval: () => 1,
+      clearInterval: () => undefined,
+      setTimeout: () => 1,
+      structuredClone: value => value,
+      window,
+    });
+
+    vm.runInContext(DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT, context);
+    listeners.get('vizly:diagram-control-request')?.({ detail: {
+      schema: 'vizly-diagram-control-request-v1',
+      action: 'fit',
+      mode: 'layout-commit',
+    } });
+
+    expect(window.__vizlyLayoutVisualEvents).toEqual([
+      { type: 'fit-dispatched', value: true, sampledAt: 1_010 },
+    ]);
+    queuedMicrotasks.shift()?.();
+    expect(window.__vizlyLayoutVisualEvents.at(-1)).toEqual({
+      type: 'fit-listeners-returned',
+      value: true,
+      sampledAt: 1_010,
+    });
+  });
+
   it('timestamps a response without delaying the application Worker listener', () => {
     const queuedMicrotasks = [];
     const queuedTasks = [];

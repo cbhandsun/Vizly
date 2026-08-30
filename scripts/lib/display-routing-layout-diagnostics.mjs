@@ -1,3 +1,17 @@
+export const resolveDisplayRoutingLayoutPhaseCompletedAt = (phaseTrace, phase) => {
+  if (!Array.isArray(phaseTrace) || typeof phase !== 'string') return null;
+  const match = [...phaseTrace].reverse().find(item => (
+    item?.phase === phase
+    && item?.status === 'completed'
+    && Number.isFinite(item?.startedAt)
+    && Number.isFinite(item?.durationMs)
+    && item.durationMs >= 0
+  ));
+  if (!match) return null;
+  const completedAt = match.startedAt + match.durationMs;
+  return Number.isFinite(completedAt) ? completedAt : null;
+};
+
 /** Builds a bounded, content-free layout diagnostic summary for the matrix. */
 export const readDisplayRoutingLayoutDiagnostics = ({
   routingValue,

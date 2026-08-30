@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  assertDisplayRoutingLayoutFitTimeline,
   assertDisplayRoutingLayoutProgressTimeline,
   summarizeDisplayRoutingLayoutVisualTimeline,
 } from './display-routing-layout-visual-timeline.mjs';
@@ -9,6 +10,9 @@ describe('display routing layout visual timeline', () => {
   it('separates preview release, fit motion, busy release, and visual stability', () => {
     expect(summarizeDisplayRoutingLayoutVisualTimeline({
       inputAt: 1_000,
+      layoutPhaseTrace: [{
+        phase: 'state-commit', status: 'completed', startedAt: 1_440, durationMs: 10,
+      }],
       routingCommitAt: 1_500,
       visualStableAt: 2_100,
       events: [
@@ -19,7 +23,7 @@ describe('display routing layout visual timeline', () => {
         { type: 'layout-busy', value: false, sampledAt: 1_560 },
         { type: 'layout-progress', value: false, sampledAt: 1_565 },
         { type: 'fit-dispatched', value: true, sampledAt: 1_570 },
-        { type: 'fit-handler-returned', value: true, sampledAt: 1_575 },
+        { type: 'fit-listeners-returned', value: true, sampledAt: 1_575 },
         { type: 'viewport-change', value: true, sampledAt: 1_580 },
         { type: 'route-path-change', value: 26, sampledAt: 1_620 },
         { type: 'diagnostic-clone-backlog-drained', value: true, sampledAt: 1_900 },
@@ -32,8 +36,9 @@ describe('display routing layout visual timeline', () => {
       busyClearedFromCommitMs: 60,
       progressStartedFromInputMs: 15,
       progressClearedFromCommitMs: 65,
+      fitDispatchedFromLayoutStateCommitMs: 120,
       fitDispatchedFromCommitMs: 70,
-      fitHandlerDurationMs: 5,
+      fitListenerDispatchDurationMs: 5,
       viewportFirstChangeFromFitMs: 10,
       viewportFirstChangeFromFitReturnMs: 5,
       viewportLastChangeFromFitMs: 430,
@@ -58,8 +63,9 @@ describe('display routing layout visual timeline', () => {
       'busyClearedFromCommitMs',
       'progressStartedFromInputMs',
       'progressClearedFromCommitMs',
+      'fitDispatchedFromLayoutStateCommitMs',
       'fitDispatchedFromCommitMs',
-      'fitHandlerDurationMs',
+      'fitListenerDispatchDurationMs',
       'viewportFirstChangeFromFitMs',
       'viewportFirstChangeFromFitReturnMs',
       'viewportLastChangeFromFitMs',
@@ -77,6 +83,14 @@ describe('display routing layout visual timeline', () => {
       progressClearedFromCommitMs: null,
     }, 'domain-lanes-lr')).toThrow(
       'domain-lanes-lr did not show and clear the layout progress indicator',
+    );
+  });
+
+  it('rejects a fit event missing or preceding the layout state commit', () => {
+    expect(() => assertDisplayRoutingLayoutFitTimeline({
+      fitDispatchedFromLayoutStateCommitMs: -1,
+    }, 'domain-lanes-lr')).toThrow(
+      'domain-lanes-lr did not dispatch fit after the layout state commit',
     );
   });
 });

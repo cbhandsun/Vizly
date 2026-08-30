@@ -67,10 +67,22 @@ export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
     });
     window.__vizlyWorkerHeartbeats = window.__vizlyWorkerHeartbeats.slice(-128);
   };
+  const recordFitDispatch = () => {
+    recordLayoutVisualEvent('fit-dispatched', true);
+    queueMicrotask(() => recordLayoutVisualEvent('fit-listeners-returned', true));
+  };
   window.addEventListener?.('diagramControl', event => {
     if (event?.detail?.action !== 'fit') return;
-    recordLayoutVisualEvent('fit-dispatched', true);
-    queueMicrotask(() => recordLayoutVisualEvent('fit-handler-returned', true));
+    recordFitDispatch();
+  }, true);
+  window.addEventListener?.('vizly:diagram-control-request', event => {
+    const detail = event?.detail;
+    if (
+      detail?.schema !== 'vizly-diagram-control-request-v1'
+      || detail?.action !== 'fit'
+      || detail?.mode !== 'layout-commit'
+    ) return;
+    recordFitDispatch();
   }, true);
   try {
     const longTaskObserver = new PerformanceObserver((list) => {

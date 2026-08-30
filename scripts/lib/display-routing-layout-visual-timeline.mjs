@@ -1,3 +1,5 @@
+import { resolveDisplayRoutingLayoutPhaseCompletedAt } from './display-routing-layout-diagnostics.mjs';
+
 const firstEvent = (events, type, value, minimumAt) => events.find(event => (
   event?.type === type
   && event?.value === value
@@ -24,6 +26,13 @@ export const assertDisplayRoutingLayoutProgressTimeline = (timeline, label) => {
   }
 };
 
+export const assertDisplayRoutingLayoutFitTimeline = (timeline, label) => {
+  const dispatchedAfterCommit = timeline?.fitDispatchedFromLayoutStateCommitMs;
+  if (!Number.isFinite(dispatchedAfterCommit) || dispatchedAfterCommit < 0) {
+    throw new Error(`${label} did not dispatch fit after the layout state commit`);
+  }
+};
+
 /**
  * Projects aggregate browser observations into phase deltas. No diagram ids,
  * node geometry, paths, or viewport coordinates leave the browser.
@@ -31,9 +40,14 @@ export const assertDisplayRoutingLayoutProgressTimeline = (timeline, label) => {
 export const summarizeDisplayRoutingLayoutVisualTimeline = ({
   events: eventsValue,
   inputAt,
+  layoutPhaseTrace,
   routingCommitAt,
   visualStableAt,
 }) => {
+  const layoutStateCommitAt = resolveDisplayRoutingLayoutPhaseCompletedAt(
+    layoutPhaseTrace,
+    'state-commit',
+  );
   const events = Array.isArray(eventsValue)
     ? eventsValue.filter(event => Number.isFinite(event?.sampledAt) && event.sampledAt >= inputAt)
     : [];
@@ -59,9 +73,9 @@ export const summarizeDisplayRoutingLayoutVisualTimeline = ({
     progressStarted?.sampledAt ?? inputAt,
   );
   const fitDispatched = lastEvent(events, 'fit-dispatched', inputAt);
-  const fitHandlerReturned = firstEvent(
+  const fitListenersReturned = firstEvent(
     events,
-    'fit-handler-returned',
+    'fit-listeners-returned',
     true,
     fitDispatched?.sampledAt ?? inputAt,
   );
@@ -89,12 +103,13 @@ export const summarizeDisplayRoutingLayoutVisualTimeline = ({
     busyClearedFromCommitMs: delta(busyCleared, routingCommitAt),
     progressStartedFromInputMs: delta(progressStarted, inputAt),
     progressClearedFromCommitMs: delta(progressCleared, routingCommitAt),
+    fitDispatchedFromLayoutStateCommitMs: delta(fitDispatched, layoutStateCommitAt),
     fitDispatchedFromCommitMs: delta(fitDispatched, routingCommitAt),
-    fitHandlerDurationMs: delta(fitHandlerReturned, fitDispatched?.sampledAt),
+    fitListenerDispatchDurationMs: delta(fitListenersReturned, fitDispatched?.sampledAt),
     viewportFirstChangeFromFitMs: delta(firstViewportChange, fitDispatched?.sampledAt),
     viewportFirstChangeFromFitReturnMs: delta(
       firstViewportChange,
-      fitHandlerReturned?.sampledAt,
+      fitListenersReturned?.sampledAt,
     ),
     viewportLastChangeFromFitMs: delta(lastViewportChange, fitDispatched?.sampledAt),
     pathLastChangeFromCommitMs: delta(lastPathChange, routingCommitAt),

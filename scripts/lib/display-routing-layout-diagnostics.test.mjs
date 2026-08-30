@@ -1,8 +1,27 @@
 import { describe, expect, it } from 'vitest';
 
-import { readDisplayRoutingLayoutDiagnostics } from './display-routing-layout-diagnostics.mjs';
+import {
+  readDisplayRoutingLayoutDiagnostics,
+  resolveDisplayRoutingLayoutPhaseCompletedAt,
+} from './display-routing-layout-diagnostics.mjs';
 
 describe('readDisplayRoutingLayoutDiagnostics', () => {
+  it('resolves the final completed layout phase boundary', () => {
+    expect(resolveDisplayRoutingLayoutPhaseCompletedAt([
+      { phase: 'state-commit', status: 'failed', startedAt: 80, durationMs: 5 },
+      { phase: 'state-commit', status: 'completed', startedAt: 100, durationMs: 12 },
+    ], 'state-commit')).toBe(112);
+    expect(resolveDisplayRoutingLayoutPhaseCompletedAt([
+      { phase: 'state-commit', status: 'completed', startedAt: 100, durationMs: -1 },
+    ], 'state-commit')).toBeNull();
+    expect(resolveDisplayRoutingLayoutPhaseCompletedAt([{
+      phase: 'state-commit',
+      status: 'completed',
+      startedAt: Number.MAX_VALUE,
+      durationMs: Number.MAX_VALUE,
+    }], 'state-commit')).toBeNull();
+  });
+
   it('keeps bounded phase, seed, and heartbeat aggregates', () => {
     expect(readDisplayRoutingLayoutDiagnostics({
       routingValue: {

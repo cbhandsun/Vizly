@@ -52,6 +52,7 @@ import {
   waitForStableDisplayRoutingLayoutVisual,
 } from './lib/display-routing-layout-visual-settle.mjs';
 import {
+  assertDisplayRoutingLayoutFitTimeline,
   assertDisplayRoutingLayoutProgressTimeline,
   summarizeDisplayRoutingLayoutVisualTimeline,
 } from './lib/display-routing-layout-visual-timeline.mjs';
@@ -559,13 +560,6 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
     ? visualSettle.stableSinceAt - route.routing.finalAppliedAt
     : null;
   const inputToVisualStableMs = visualSettle.stableSinceAt - clickedAt;
-  const visualTimeline = summarizeDisplayRoutingLayoutVisualTimeline({
-    events: await session.evaluate('window.__vizlyLayoutVisualEvents || []'),
-    inputAt: clickedAt,
-    routingCommitAt: route.routing.finalAppliedAt,
-    visualStableAt: visualSettle.stableSinceAt,
-  });
-  assertDisplayRoutingLayoutProgressTimeline(visualTimeline, layoutCase.id);
   const layoutDiagnostics = await session.evaluate(`(() => {
     const readDiagnostics = ${readDisplayRoutingLayoutDiagnostics.toString()};
     return readDiagnostics({
@@ -575,6 +569,15 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
       confirmedAt: ${JSON.stringify(visualSettle.confirmedAt)},
     });
   })()`);
+  const visualTimeline = summarizeDisplayRoutingLayoutVisualTimeline({
+    events: await session.evaluate('window.__vizlyLayoutVisualEvents || []'),
+    inputAt: clickedAt,
+    layoutPhaseTrace: layoutDiagnostics.phaseTrace,
+    routingCommitAt: route.routing.finalAppliedAt,
+    visualStableAt: visualSettle.stableSinceAt,
+  });
+  assertDisplayRoutingLayoutProgressTimeline(visualTimeline, layoutCase.id);
+  assertDisplayRoutingLayoutFitTimeline(visualTimeline, layoutCase.id);
   if (route.routing.workerStartCount !== initialRoute.routing.workerStartCount) {
     throw new Error(`${layoutCase.id} started a duplicate Canvas display Worker: ${JSON.stringify({
       before: initialRoute.routing.workerStartCount,
