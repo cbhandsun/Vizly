@@ -3,6 +3,30 @@
  * without a new Worker response, so that path is reconstructed from the
  * captured request and the current React Flow edges, then audited independently.
  */
+export const findDisplayRoutingRequestForResponse = (requests, response) => {
+  const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+  if (!Array.isArray(requests) || !isRecord(response) || typeof response.requestId !== 'string') {
+    return null;
+  }
+  return [...requests].reverse().find(request => (
+    isRecord(request)
+    && request.requestId === response.requestId
+    && (
+      !Number.isSafeInteger(response.__browserRequestOrdinal)
+      || request.__browserRequestOrdinal === response.__browserRequestOrdinal
+    )
+    && (
+      typeof response.__browserWorkerInstanceId !== 'string'
+      || request.__browserWorkerInstanceId === response.__browserWorkerInstanceId
+    )
+    && (
+      !Number.isFinite(request.__browserCapturedAt)
+      || !Number.isFinite(response.__browserCapturedAt)
+      || request.__browserCapturedAt <= response.__browserCapturedAt
+    )
+  )) ?? null;
+};
+
 export const resolveDisplayRoutingFinalRouteSnapshot = ({
   routing,
   requests,
@@ -30,19 +54,6 @@ export const resolveDisplayRoutingFinalRouteSnapshot = ({
     && routing.nodeCount === request.nodes.length
     && routing.edgeCount === request.edges.length
   );
-  const requestMatchesResponseIdentity = (request, response) => (
-    isRecord(request)
-    && isRecord(response)
-    && request.requestId === response.requestId
-    && (
-      !Number.isSafeInteger(response.__browserRequestOrdinal)
-      || request.__browserRequestOrdinal === response.__browserRequestOrdinal
-    )
-    && (
-      typeof response.__browserWorkerInstanceId !== 'string'
-      || request.__browserWorkerInstanceId === response.__browserWorkerInstanceId
-    )
-  );
   const candidateValidationHit = Array.isArray(routing?.phaseProgressTrace)
     && routing.phaseProgressTrace.some(phase => (
       isRecord(phase)
@@ -68,9 +79,7 @@ export const resolveDisplayRoutingFinalRouteSnapshot = ({
     && item.hardReport.hardClean === true
   ));
   if (response) {
-    const request = [...safeRequests].reverse().find(item => (
-      requestMatchesResponseIdentity(item, response)
-    ));
+    const request = findDisplayRoutingRequestForResponse(safeRequests, response);
     return requestMatchesCommittedShape(request)
       && renderedEdgeCount === response.edges.length
       ? { routing, request, response, renderedEdgeCount }

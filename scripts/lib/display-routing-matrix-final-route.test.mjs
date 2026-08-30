@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { resolveDisplayRoutingFinalRouteSnapshot } from './display-routing-matrix-final-route.mjs';
+import {
+  findDisplayRoutingRequestForResponse,
+  resolveDisplayRoutingFinalRouteSnapshot,
+} from './display-routing-matrix-final-route.mjs';
 
 const request = {
   requestId: 'layout:7',
@@ -7,6 +10,33 @@ const request = {
   edges: [{ id: 'a-b' }],
 };
 const committedShape = { nodeCount: 2, edgeCount: 1 };
+
+it('pairs reused request ids by request ordinal and Worker instance', () => {
+  const first = {
+    ...request,
+    __browserWorkerInstanceId: 'worker-1',
+    __browserRequestOrdinal: 7,
+    __browserCapturedAt: 100,
+  };
+  const second = {
+    ...request,
+    __browserWorkerInstanceId: 'worker-1',
+    __browserRequestOrdinal: 8,
+    __browserCapturedAt: 200,
+  };
+  const response = {
+    requestId: request.requestId,
+    __browserWorkerInstanceId: 'worker-1',
+    __browserRequestOrdinal: 7,
+    __browserCapturedAt: 150,
+  };
+
+  expect(findDisplayRoutingRequestForResponse([first, second], response)).toBe(first);
+  expect(findDisplayRoutingRequestForResponse([first, second], {
+    ...response,
+    __browserWorkerInstanceId: 'worker-2',
+  })).toBeNull();
+});
 
 it('accepts a hard-clean Worker response for the expected layout request', () => {
   const response = {

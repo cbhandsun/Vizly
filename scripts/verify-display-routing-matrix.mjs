@@ -43,7 +43,10 @@ import {
   assertDisplayRoutingCommittedReuse,
   readDisplayRoutingCommittedReuseSnapshot,
 } from './lib/display-routing-browser-diagnostics.mjs';
-import { resolveDisplayRoutingFinalRouteSnapshot } from './lib/display-routing-matrix-final-route.mjs';
+import {
+  findDisplayRoutingRequestForResponse,
+  resolveDisplayRoutingFinalRouteSnapshot,
+} from './lib/display-routing-matrix-final-route.mjs';
 import {
   resolveDisplayRoutingLayoutVisualTimeoutMs,
   waitForStableDisplayRoutingLayoutVisual,
@@ -145,6 +148,7 @@ const readFinalRouteExpression = (
   const requests = window.__vizlyRoutingRequests || [];
   const responses = window.__vizlyRoutingResponses || [];
   const renderedEdgeCount = document.querySelectorAll('.react-flow__edge').length;
+  const findDisplayRoutingRequestForResponse = ${findDisplayRoutingRequestForResponse.toString()};
   const resolveFinalRoute = ${resolveDisplayRoutingFinalRouteSnapshot.toString()};
   return resolveFinalRoute({
     routing,
@@ -160,11 +164,12 @@ const readFinalRouteExpression = (
 
 const readLatestCompletedRouteExpression = `(() => {
   const committedEdgesMatchWorkerPatches = ${displayRoutingCommittedEdgesMatchWorkerPatches.toString()};
+  const findRequestForResponse = ${findDisplayRoutingRequestForResponse.toString()};
   const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
   const requests = window.__vizlyRoutingRequests || [];
   const responses = window.__vizlyRoutingResponses || [];
   const response = [...responses].reverse().find(item => item?.hardClean === true);
-  const request = [...requests].reverse().find(item => item?.requestId === response?.requestId)
+  const request = findRequestForResponse(requests, response)
     ?? requests.at(-1);
   const currentEdges = window.reactFlowInstance?.getEdges?.() || [];
   const responsePatches = response?.routingPatches ?? response?.edges;
