@@ -25,6 +25,7 @@ import {
   parseDisplayRoutingMatrixCaseList,
   parseDisplayRoutingMatrixPreset,
   parseDisplayRoutingMatrixTimeoutMs,
+  resolveDisplayRoutingConnectedDragDelta,
 } from './lib/display-routing-matrix-cases.mjs';
 import {
   displayRoutingWaitStateHasTerminalFailure,
@@ -660,13 +661,17 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
   const warmLayoutSwitch = warmLayoutSwitches[0] ?? null;
   let postLayoutMove = null;
   if (layoutCase.id === 'domain-compound-elk-lr') {
-    const dragNodeId = await session.evaluate(`(() => {
+    const dragTarget = await session.evaluate(`(() => {
       const instance = window.reactFlowInstance;
       const edges = instance?.getEdges?.() || [];
       const incidentIds = new Set(edges.flatMap(edge => [edge.source, edge.target]));
       const connected = (instance?.getNodes?.() || []).filter(node => incidentIds.has(node.id));
-      return connected.find(node => !node.parentId)?.id ?? connected[0]?.id ?? null;
+      const nodeId = connected.find(node => !node.parentId)?.id ?? connected[0]?.id ?? null;
+      const resolveDelta = ${resolveDisplayRoutingConnectedDragDelta.toString()};
+      const delta = nodeId ? resolveDelta(instance.getNodes(), edges, nodeId) : null;
+      return nodeId && delta ? { nodeId, delta } : null;
     })()`);
+    const dragNodeId = dragTarget?.nodeId;
     if (!dragNodeId) throw new Error(`${layoutCase.id} has no connected drag target`);
     await session.evaluate(`(() => {
       window.__vizlyRoutingRequests = [];
@@ -679,8 +684,8 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
       instance.setNodes(nodes => nodes.map(node => node.id === ${JSON.stringify(dragNodeId)} ? {
         ...node,
         position: {
-          x: Number(node.position?.x || 0) + 40,
-          y: Number(node.position?.y || 0) + 12,
+          x: Number(node.position?.x || 0) + ${JSON.stringify(dragTarget.delta.x)},
+          y: Number(node.position?.y || 0) + ${JSON.stringify(dragTarget.delta.y)},
         },
       } : node));
       return true;

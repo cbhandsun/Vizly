@@ -9,6 +9,7 @@ import {
   parseDisplayRoutingMatrixCaseList,
   parseDisplayRoutingMatrixPreset,
   parseDisplayRoutingMatrixTimeoutMs,
+  resolveDisplayRoutingConnectedDragDelta,
 } from './display-routing-matrix-cases.mjs';
 
 describe('display routing matrix cases', () => {
@@ -112,5 +113,41 @@ describe('display routing matrix cases', () => {
       [translatedTreeItem],
       'x'.repeat(10_000),
     )).toBeNull();
+  });
+
+  it('moves the incremental probe away from the dominant connected-node centroid', () => {
+    const origin = {
+      id: 'origin',
+      position: { x: 100, y: 100 },
+      measured: { width: 100, height: 60 },
+    };
+    const horizontal = resolveDisplayRoutingConnectedDragDelta([
+      origin,
+      { id: 'right', position: { x: 300, y: 100 }, width: 100, height: 60 },
+      { id: 'lower-right', position: { x: 260, y: 180 }, width: 100, height: 60 },
+    ], [
+      { source: 'origin', target: 'right' },
+      { source: 'origin', target: 'lower-right' },
+    ], 'origin');
+    expect(horizontal).toEqual({ x: -40, y: 0 });
+
+    const vertical = resolveDisplayRoutingConnectedDragDelta([
+      origin,
+      { id: 'above', positionAbsolute: { x: 100, y: -200 }, width: 100, height: 60 },
+    ], [{ source: 'above', target: 'origin' }], 'origin', 500);
+    expect(vertical).toEqual({ x: 0, y: 200 });
+  });
+
+  it('fails the drag-vector boundary closed for empty, malformed, and disconnected input', () => {
+    expect(resolveDisplayRoutingConnectedDragDelta([], [], 'origin')).toBeNull();
+    expect(resolveDisplayRoutingConnectedDragDelta([
+      { id: 'origin', position: { x: Number.NaN, y: 0 } },
+      { id: 'neighbor', position: { x: 10, y: 0 } },
+    ], [{ source: 'origin', target: 'neighbor' }], 'origin')).toBeNull();
+    expect(resolveDisplayRoutingConnectedDragDelta([
+      { id: 'origin', position: { x: 0, y: 0 } },
+    ], [], 'origin')).toBeNull();
+    expect(resolveDisplayRoutingConnectedDragDelta(null, [], 'origin')).toBeNull();
+    expect(resolveDisplayRoutingConnectedDragDelta([], [], 'x'.repeat(300))).toBeNull();
   });
 });

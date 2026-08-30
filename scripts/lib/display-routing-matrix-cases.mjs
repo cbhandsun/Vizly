@@ -91,3 +91,68 @@ export const findDisplayRoutingMenuElementByKey = (elements, rawKey) => {
     && String(element.getAttribute('data-menu-id') || '').endsWith(suffix)
   )) ?? null;
 };
+
+export const resolveDisplayRoutingConnectedDragDelta = (
+  nodes,
+  edges,
+  nodeId,
+  distance = 40,
+) => {
+  const record = value => (
+    typeof value === 'object' && value !== null && !Array.isArray(value) ? value : {}
+  );
+  const finite = value => (
+    typeof value === 'number' && Number.isFinite(value) ? value : null
+  );
+  const center = (value) => {
+    const node = record(value);
+    const position = record(node.positionAbsolute ?? node.position);
+    const measured = record(node.measured);
+    const style = record(node.style);
+    const x = finite(position.x);
+    const y = finite(position.y);
+    const width = finite(measured.width ?? node.width ?? style.width) ?? 0;
+    const height = finite(measured.height ?? node.height ?? style.height) ?? 0;
+    return x === null || y === null ? null : {
+      x: x + Math.max(0, width) / 2,
+      y: y + Math.max(0, height) / 2,
+    };
+  };
+  if (
+    !Array.isArray(nodes)
+    || !Array.isArray(edges)
+    || typeof nodeId !== 'string'
+    || nodeId.length === 0
+    || nodeId.length > 256
+  ) return null;
+  const safeDistance = Number.isFinite(distance)
+    ? Math.max(1, Math.min(200, Math.round(Math.abs(distance))))
+    : 40;
+  const nodeById = new Map(nodes.flatMap(value => {
+    const node = record(value);
+    return typeof node.id === 'string' && node.id.length <= 256 ? [[node.id, value]] : [];
+  }));
+  const origin = center(nodeById.get(nodeId));
+  if (!origin) return null;
+  const neighborIds = new Set(edges.flatMap(value => {
+    const edge = record(value);
+    if (edge.source === nodeId && typeof edge.target === 'string') return [edge.target];
+    if (edge.target === nodeId && typeof edge.source === 'string') return [edge.source];
+    return [];
+  }));
+  const neighbors = [...neighborIds].flatMap(id => {
+    const point = center(nodeById.get(id));
+    return point ? [point] : [];
+  });
+  if (neighbors.length === 0) return null;
+  const centroid = neighbors.reduce((total, point) => ({
+    x: total.x + point.x / neighbors.length,
+    y: total.y + point.y / neighbors.length,
+  }), { x: 0, y: 0 });
+  const towardX = centroid.x - origin.x;
+  const towardY = centroid.y - origin.y;
+  if (Math.abs(towardX) >= Math.abs(towardY)) {
+    return { x: towardX >= 0 ? -safeDistance : safeDistance, y: 0 };
+  }
+  return { x: 0, y: towardY >= 0 ? -safeDistance : safeDistance };
+};
