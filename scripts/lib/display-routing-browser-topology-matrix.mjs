@@ -205,9 +205,54 @@ export const displayRoutingTopologyRenderIsCommitted = routing => (
   && typeof routing?.outputRouteSignature === 'string'
 );
 
+export const displayRoutingTopologyRequestMatchesResponse = (request, response) => (
+  request !== null
+  && typeof request === 'object'
+  && response !== null
+  && typeof response === 'object'
+  && typeof request.requestId === 'string'
+  && request.requestId === response.requestId
+  && (
+    !Number.isSafeInteger(response.__browserRequestOrdinal)
+    || request.__browserRequestOrdinal === response.__browserRequestOrdinal
+  )
+  && (
+    !Number.isSafeInteger(response.__browserAttemptOrdinal)
+    || request.__browserAttemptOrdinal === response.__browserAttemptOrdinal
+  )
+  && (
+    typeof response.__browserWorkerInstanceId !== 'string'
+    || request.__browserWorkerInstanceId === response.__browserWorkerInstanceId
+  )
+);
+
+/**
+ * A successful Worker commit can immediately be republished from the trusted
+ * committed snapshot. That intentionally clears the global request id so a
+ * later cache reuse cannot impersonate a newer transaction. Accept that state
+ * only when the captured transaction identity and exact output signature still
+ * prove that the rendered snapshot came from this response.
+ */
+export const displayRoutingTopologyTransactionIsCommitted = (
+  routing,
+  request,
+  response,
+) => {
+  if (
+    !displayRoutingTopologyRequestMatchesResponse(request, response)
+    || typeof response?.outputRouteSignature !== 'string'
+    || routing?.outputRouteSignature !== response.outputRouteSignature
+  ) return false;
+  if (routing?.requestId === request.requestId) return true;
+  return routing?.cacheTrustLevel === 'runtime-committed'
+    && response?.commitReceipt?.outputRouteSignature === response.outputRouteSignature;
+};
+
 const readOperationResultExpression = operationCase => `(() => {
   const committedEdgesMatchWorkerPatches = ${displayRoutingCommittedEdgesMatchWorkerPatches.toString()};
   const renderIsCommitted = ${displayRoutingTopologyRenderIsCommitted.toString()};
+  const displayRoutingTopologyRequestMatchesResponse = ${displayRoutingTopologyRequestMatchesResponse.toString()};
+  const transactionIsCommitted = ${displayRoutingTopologyTransactionIsCommitted.toString()};
   const requests = window.__vizlyRoutingRequests || [];
   const responses = window.__vizlyRoutingResponses || [];
   const request = [...requests].reverse().find(item => (
@@ -215,7 +260,7 @@ const readOperationResultExpression = operationCase => `(() => {
     && item?.changeSet?.classification === ${JSON.stringify(operationCase.classification)}
   ));
   const response = request
-    ? [...responses].reverse().find(item => item?.requestId === request.requestId)
+    ? [...responses].reverse().find(item => displayRoutingTopologyRequestMatchesResponse(request, item))
     : null;
   const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
   const committedEdges = window.reactFlowInstance?.getEdges?.() || [];
@@ -223,7 +268,7 @@ const readOperationResultExpression = operationCase => `(() => {
     !request
     || !response
     || !renderIsCommitted(routing)
-    || routing.requestId !== request.requestId
+    || !transactionIsCommitted(routing, request, response)
     || response.hardClean !== true
     || response.hardReport?.hardClean !== true
     || !Array.isArray(committedEdges)

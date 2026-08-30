@@ -4,7 +4,9 @@ import {
   assertDisplayRoutingTopologyOperationGroupResult,
   assertDisplayRoutingTopologyOperationResult,
   displayRoutingCommittedEdgesMatchWorkerPatches,
+  displayRoutingTopologyRequestMatchesResponse,
   displayRoutingTopologyRenderIsCommitted,
+  displayRoutingTopologyTransactionIsCommitted,
   projectDisplayRoutingTopologyAssertionDiagnostics,
   projectDisplayRoutingTopologyDiagnostics,
 } from './display-routing-browser-topology-matrix.mjs';
@@ -62,6 +64,73 @@ describe('display routing browser topology matrix', () => {
       renderAuthorityStatus: 'accepted',
       outputRouteSignature: 'route-v2:14:64:abcd',
     })).toBe(false);
+  });
+
+  it('pairs repeated request ids by captured attempt and Worker identity', () => {
+    const request = {
+      requestId: 'route-request',
+      __browserRequestOrdinal: 4,
+      __browserAttemptOrdinal: 2,
+      __browserWorkerInstanceId: 'worker-2',
+    };
+    expect(displayRoutingTopologyRequestMatchesResponse(request, {
+      ...request,
+      __browserResponseOrdinal: 9,
+    })).toBe(true);
+    expect(displayRoutingTopologyRequestMatchesResponse(request, {
+      ...request,
+      __browserRequestOrdinal: 3,
+    })).toBe(false);
+    expect(displayRoutingTopologyRequestMatchesResponse(request, {
+      ...request,
+      __browserAttemptOrdinal: 1,
+    })).toBe(false);
+    expect(displayRoutingTopologyRequestMatchesResponse(request, {
+      ...request,
+      __browserWorkerInstanceId: 'worker-1',
+    })).toBe(false);
+  });
+
+  it('accepts only an exactly signed trusted committed reuse after request evidence is cleared', () => {
+    const outputRouteSignature = 'route-v2:14:64:0123456789abcdef';
+    const request = {
+      requestId: 'route-request',
+      __browserRequestOrdinal: 4,
+      __browserAttemptOrdinal: 1,
+      __browserWorkerInstanceId: 'worker-1',
+    };
+    const response = {
+      requestId: request.requestId,
+      __browserRequestOrdinal: request.__browserRequestOrdinal,
+      __browserAttemptOrdinal: request.__browserAttemptOrdinal,
+      __browserWorkerInstanceId: request.__browserWorkerInstanceId,
+      outputRouteSignature,
+      commitReceipt: { outputRouteSignature },
+    };
+    expect(displayRoutingTopologyTransactionIsCommitted({
+      requestId: request.requestId,
+      outputRouteSignature,
+    }, request, response)).toBe(true);
+    expect(displayRoutingTopologyTransactionIsCommitted({
+      requestId: undefined,
+      cacheTrustLevel: 'runtime-committed',
+      outputRouteSignature,
+    }, request, response)).toBe(true);
+    expect(displayRoutingTopologyTransactionIsCommitted({
+      requestId: undefined,
+      cacheTrustLevel: 'runtime-committed',
+      outputRouteSignature: 'route-v2:14:64:fedcba9876543210',
+    }, request, response)).toBe(false);
+    expect(displayRoutingTopologyTransactionIsCommitted({
+      requestId: undefined,
+      cacheTrustLevel: 'unverified',
+      outputRouteSignature,
+    }, request, response)).toBe(false);
+    expect(displayRoutingTopologyTransactionIsCommitted({
+      requestId: undefined,
+      cacheTrustLevel: 'runtime-committed',
+      outputRouteSignature,
+    }, request, { ...response, commitReceipt: undefined })).toBe(false);
   });
 
   it('waits until React Flow has applied routing handles and paths from the Worker patch', () => {
