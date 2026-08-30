@@ -23,6 +23,7 @@ import { useLineJumps } from './hooks/useLineJumps';
 import { ContrastSafeBaseEdge } from './ContrastSafeBaseEdge';
 import { injectLineJumps, JUMP_RADIUS } from '../../services/LineJumpEngine';
 import { resolveEdgeContrastPaint } from '../../rendering/edgeContrastPaint';
+import { resolveBaseReactFlowEdgeLabelScale } from '../shared/baseReactFlowViewport';
 import {
     createSharedTrunkBackboneFragments,
     createSharedTrunkJunctionFragments,
@@ -101,8 +102,9 @@ const autoLabelOffset = (
     labelText: string,
     peerPaths: Point[][],
     obstacles: Array<{ x: number; y: number; width: number; height: number }>,
+    labelScale: number,
 ): Point => {
-    return getEdgeLabelAutoOffset(ownPath, labelPoint, labelText, peerPaths, obstacles);
+    return getEdgeLabelAutoOffset(ownPath, labelPoint, labelText, peerPaths, obstacles, labelScale);
 };
 
 const pathLength = (points: readonly Point[]): number => points.reduce(
@@ -183,6 +185,7 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
     const sourceNode = useStore(state => state.nodeLookup.get(props.source));
     const targetNode = useStore(state => state.nodeLookup.get(props.target));
     const labelObstacles = useEdgeLabelObstacles();
+    const labelScale = useStore(state => resolveBaseReactFlowEdgeLabelScale(state.transform?.[2] ?? 1));
     const peerPaths = useMemo(
         () => acceptsCommittedGeometry
             ? collectStablePathPeerPaths(allEdges, id, Boolean(label))
@@ -310,6 +313,7 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
             String(label),
             peerPaths,
             labelObstacles,
+            labelScale,
         );
         labelX += offset.x;
         labelY += offset.y;

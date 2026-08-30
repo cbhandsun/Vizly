@@ -49,15 +49,20 @@ const isOrthogonalSegment = (a: EdgeLabelPoint, b: EdgeLabelPoint): boolean => (
   Math.abs(a.x - b.x) < 1 || Math.abs(a.y - b.y) < 1
 );
 
-export const estimateEdgeLabelRect = (center: EdgeLabelPoint, labelText: string): EdgeLabelRect => {
+export const estimateEdgeLabelRect = (
+  center: EdgeLabelPoint,
+  labelText: string,
+  labelScale = 1,
+): EdgeLabelRect => {
   const normalizedCenter = normalizePoint(center) ?? { x: 0, y: 0 };
   const text = normalizeLabelText(labelText);
-  const width = Math.max(42, Math.min(220, text.length * 8 + 22));
+  const scale = clampNumber(labelScale, 1, 2.4) ?? 1;
+  const width = Math.max(42, Math.min(220, text.length * 8 + 22)) * scale;
   return {
     x: normalizedCenter.x - width / 2,
-    y: normalizedCenter.y - 13,
+    y: normalizedCenter.y - 13 * scale,
     width,
-    height: 26,
+    height: 26 * scale,
   };
 };
 
@@ -88,8 +93,13 @@ const segmentDistanceToRect = (a: EdgeLabelPoint, b: EdgeLabelPoint, rect: EdgeL
   return Number.POSITIVE_INFINITY;
 };
 
-const labelPathClearance = (center: EdgeLabelPoint, labelText: string, points: EdgeLabelPoint[]): number => {
-  const rect = estimateEdgeLabelRect(center, labelText);
+const labelPathClearance = (
+  center: EdgeLabelPoint,
+  labelText: string,
+  points: EdgeLabelPoint[],
+  labelScale: number,
+): number => {
+  const rect = estimateEdgeLabelRect(center, labelText, labelScale);
   let clearance = Number.POSITIVE_INFINITY;
   for (let index = 0; index < points.length - 1; index += 1) {
     const a = points[index];
@@ -100,10 +110,15 @@ const labelPathClearance = (center: EdgeLabelPoint, labelText: string, points: E
   return clearance;
 };
 
-const peerPathClearance = (center: EdgeLabelPoint, labelText: string, peerPaths: EdgeLabelPoint[][]): number => {
+const peerPathClearance = (
+  center: EdgeLabelPoint,
+  labelText: string,
+  peerPaths: EdgeLabelPoint[][],
+  labelScale: number,
+): number => {
   if (!peerPaths.length) return Number.POSITIVE_INFINITY;
   return peerPaths.reduce(
-    (best, points) => Math.min(best, labelPathClearance(center, labelText, points)),
+    (best, points) => Math.min(best, labelPathClearance(center, labelText, points, labelScale)),
     Number.POSITIVE_INFINITY,
   );
 };
@@ -118,9 +133,14 @@ const rectDistance = (first: EdgeLabelRect, second: EdgeLabelRect): number => {
   return Math.hypot(dx, dy);
 };
 
-const obstacleClearance = (center: EdgeLabelPoint, labelText: string, obstacles: EdgeLabelRect[]): number => {
+const obstacleClearance = (
+  center: EdgeLabelPoint,
+  labelText: string,
+  obstacles: EdgeLabelRect[],
+  labelScale: number,
+): number => {
   if (!obstacles.length) return Number.POSITIVE_INFINITY;
-  const rect = estimateEdgeLabelRect(center, labelText);
+  const rect = estimateEdgeLabelRect(center, labelText, labelScale);
   return obstacles.reduce((best, obstacle) => Math.min(best, rectDistance(rect, obstacle)), Number.POSITIVE_INFINITY);
 };
 
@@ -153,6 +173,7 @@ export const getEdgeLabelAutoOffset = (
   labelText: string,
   peerPaths: EdgeLabelPoint[][] = [],
   obstacles: EdgeLabelRect[] = [],
+  labelScale = 1,
 ): EdgeLabelPoint => {
   const safeOwnPath = normalizePath(ownPath);
   const safeLabelPoint = normalizePoint(labelPoint);
@@ -162,15 +183,16 @@ export const getEdgeLabelAutoOffset = (
     ? peerPaths.map(normalizePath).filter(points => points.length >= 2)
     : [];
   const safeObstacles = normalizeRects(obstacles);
+  const safeLabelScale = clampNumber(labelScale, 1, 2.4) ?? 1;
   const nearest = nearestOwnSegment(safeOwnPath, safeLabelPoint);
   if (!nearest) return { x: 0, y: 0 };
 
   const desiredOwnClearance = 8;
   const desiredPeerClearance = 8;
   const desiredObstacleClearance = 10;
-  const currentOwnClearance = labelPathClearance(safeLabelPoint, safeLabelText, safeOwnPath);
-  const currentPeerClearance = peerPathClearance(safeLabelPoint, safeLabelText, safePeerPaths);
-  const currentObstacleClearance = obstacleClearance(safeLabelPoint, safeLabelText, safeObstacles);
+  const currentOwnClearance = labelPathClearance(safeLabelPoint, safeLabelText, safeOwnPath, safeLabelScale);
+  const currentPeerClearance = peerPathClearance(safeLabelPoint, safeLabelText, safePeerPaths, safeLabelScale);
+  const currentObstacleClearance = obstacleClearance(safeLabelPoint, safeLabelText, safeObstacles, safeLabelScale);
   if (
     nearest.distance > 12
     && currentOwnClearance >= desiredOwnClearance
@@ -179,7 +201,7 @@ export const getEdgeLabelAutoOffset = (
   ) return { x: 0, y: 0 };
 
   const vertical = Math.abs(nearest.a.x - nearest.b.x) < 1;
-  const estimated = estimateEdgeLabelRect(safeLabelPoint, safeLabelText);
+  const estimated = estimateEdgeLabelRect(safeLabelPoint, safeLabelText, safeLabelScale);
   const perpendicular = vertical
     ? Math.max(16, estimated.width / 2 + desiredOwnClearance)
     : Math.max(16, estimated.height / 2 + desiredOwnClearance);
@@ -240,9 +262,9 @@ export const getEdgeLabelAutoOffset = (
   const considerCandidates = (candidates: EdgeLabelPoint[]): void => {
     for (const candidate of candidates) {
     const center = { x: safeLabelPoint.x + candidate.x, y: safeLabelPoint.y + candidate.y };
-    const ownClearance = labelPathClearance(center, safeLabelText, safeOwnPath);
-    const peerClearance = peerPathClearance(center, safeLabelText, safePeerPaths);
-    const nodeClearance = obstacleClearance(center, safeLabelText, safeObstacles);
+    const ownClearance = labelPathClearance(center, safeLabelText, safeOwnPath, safeLabelScale);
+    const peerClearance = peerPathClearance(center, safeLabelText, safePeerPaths, safeLabelScale);
+    const nodeClearance = obstacleClearance(center, safeLabelText, safeObstacles, safeLabelScale);
     const displacement = Math.hypot(candidate.x, candidate.y);
     const score = Math.min(ownClearance, desiredOwnClearance * 2)
       + Math.min(peerClearance, desiredPeerClearance * 2) * 2

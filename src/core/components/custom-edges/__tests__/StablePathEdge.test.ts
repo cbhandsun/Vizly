@@ -77,6 +77,27 @@ describe('edge label avoidance', () => {
         expect(Math.abs(offset.x)).toBeLessThanOrEqual(96);
     });
 
+    it('accounts for readable-label scaling at overview zoom', () => {
+        const labelPoint = { x: 1688, y: 1361.5 };
+        const obstacle = { x: 1736, y: 1325, width: 134, height: 73 };
+        const offset = getEdgeLabelAutoOffset(
+            [{ x: 1688, y: 1446 }, { x: 1688, y: 1277 }],
+            labelPoint,
+            '作业数据回传',
+            [],
+            [obstacle],
+            0.72 / 0.45576042278332357,
+        );
+        const rect = estimateEdgeLabelRect({
+            x: labelPoint.x + offset.x,
+            y: labelPoint.y + offset.y,
+        }, '作业数据回传', 0.72 / 0.45576042278332357);
+
+        expect(offset).not.toEqual({ x: 0, y: 0 });
+        expect(rect.x + rect.width <= obstacle.x || rect.x >= obstacle.x + obstacle.width)
+            .toBe(true);
+    });
+
     it('retreats farther along an edge when near offsets cannot clear an endpoint node', () => {
         const labelPoint = { x: 180, y: 100 };
         const labelText = 'carrier';

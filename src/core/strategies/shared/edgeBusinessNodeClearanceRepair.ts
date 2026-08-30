@@ -17,6 +17,7 @@ import {
 import {
   createBusinessNodeClearanceCandidateCollection,
 } from './edgeBusinessNodeClearanceCandidateCollection';
+import { buildBusinessNodeTerminalCorridorCandidates } from './edgeBusinessNodeClearanceCorridorCandidates';
 import {
   createEdgePathQualityEvaluationContext,
 } from './edgeStrictCrossingGuard';
@@ -480,6 +481,13 @@ const clearanceCandidates = (
     ...LEGACY_LANE_CLEARANCES,
     minimumClearance,
   ])].sort((left, right) => left - right);
+  candidates.addAll(buildBusinessNodeTerminalCorridorCandidates(
+    path,
+    rects,
+    minimumClearance,
+    containerRects,
+    CONTAINER_CLEARANCE_OVERFLOW,
+  ));
   candidates.addAll(cornerDetourCandidates(path, rects, laneClearances));
   candidates.addAll(terminalBranchCornerDetourCandidates(path, rects, minimumClearance));
   for (let index = 0; index < path.length - 1; index += 1) {

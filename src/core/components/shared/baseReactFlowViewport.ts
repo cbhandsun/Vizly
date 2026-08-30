@@ -29,7 +29,7 @@ export const resolveBaseReactFlowContainerClassName = ({
   isLayoutStable ? '' : 'vizly-layout-committing',
 ].filter(Boolean).join(' ');
 
-const edgeLabelScaleForZoom = (zoom: number): number => {
+export const resolveBaseReactFlowEdgeLabelScale = (zoom: number): number => {
   if (!Number.isFinite(zoom) || zoom <= 0) return 1;
   return Math.min(MAX_EDGE_LABEL_SCALE, Math.max(1, MIN_READABLE_EDGE_LABEL_ZOOM / zoom));
 };
@@ -47,7 +47,7 @@ export const syncBaseReactFlowZoomClass = ({
 
   container.style.setProperty(
     '--diagram-edge-label-scale',
-    edgeLabelScaleForZoom(viewport.zoom).toFixed(3),
+    resolveBaseReactFlowEdgeLabelScale(viewport.zoom).toFixed(3),
   );
 
   if (isBaseReactFlowZoomedOut(viewport)) {
