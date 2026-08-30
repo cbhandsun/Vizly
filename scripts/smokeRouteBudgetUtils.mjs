@@ -103,7 +103,7 @@ export const isEnterpriseDisplayRoutingSettled = (
     Boolean(value)
     && typeof value === 'object'
     && !Array.isArray(value)
-    && value.stage === 'worker-rejected'
+    && (value.stage === 'worker-timeout' || value.stage === 'worker-rejected')
     && value.error === 'display-edge-worker-timeout'
     && value.workerStartCount === 1
     && value.workerAbortCount === 0

@@ -15,13 +15,18 @@ import {
 import { isEnterpriseDisplayRoutingSettled } from '../smokeRouteBudgetUtils.mjs';
 
 describe('smoke route modules', () => {
+  it.each(['worker-timeout', 'worker-rejected'])(
+    'recognizes the exact bounded enterprise timeout in %s state', (stage) => {
+      expect(isEnterpriseDisplayRoutingSettled({
+        stage,
+        error: 'display-edge-worker-timeout',
+        workerStartCount: 1,
+        workerAbortCount: 0,
+      })).toBe(true);
+    },
+  );
+
   it('waits for the enterprise route to settle before measuring stability', () => {
-    expect(isEnterpriseDisplayRoutingSettled({
-      stage: 'worker-rejected',
-      error: 'display-edge-worker-timeout',
-      workerStartCount: 1,
-      workerAbortCount: 0,
-    })).toBe(true);
     expect(isEnterpriseDisplayRoutingSettled({
       stage: 'worker-rejected',
       error: 'display-edge-worker-invalid-response',
@@ -33,6 +38,20 @@ describe('smoke route modules', () => {
       workerStartCount: 1,
       workerAbortCount: 0,
     })).toBe(false);
+  });
+
+  it.each([
+    null,
+    undefined,
+    [],
+    'worker-timeout',
+    { stage: 'worker-timeout' },
+    { stage: 'worker-phase', error: 'display-edge-worker-timeout', workerStartCount: 1, workerAbortCount: 0 },
+    { stage: 'worker-timeout', error: 'display-edge-worker-invalid-response', workerStartCount: 1, workerAbortCount: 0 },
+    { stage: 'worker-timeout', error: 'display-edge-worker-timeout', workerStartCount: 2, workerAbortCount: 0 },
+    { stage: 'worker-timeout', error: 'display-edge-worker-timeout', workerStartCount: 1, workerAbortCount: 1 },
+  ])('rejects incomplete or unexpected enterprise terminal states: %j', (state) => {
+    expect(isEnterpriseDisplayRoutingSettled(state)).toBe(false);
   });
 
   it('disconnects long-task observation before forcing heap-accounting GC', () => {
