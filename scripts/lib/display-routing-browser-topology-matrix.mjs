@@ -3,6 +3,19 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { DISPLAY_ROUTING_TOPOLOGY_CASE_ID } from './display-routing-matrix-cases.mjs';
 import { readDisplayRoutingNodeDragTarget } from './display-routing-browser-geometry.mjs';
 import { withPrecompiledRouteBrowser } from './precompiled-display-route-cdp.mjs';
+import {
+  countDisplayRoutingTopologyFinalResponses,
+  displayRoutingTopologyRequestMatchesResponse,
+  displayRoutingTopologyResponseIsFinal,
+  findDisplayRoutingTopologyFinalResponse,
+} from './display-routing-browser-topology-response.mjs';
+
+export {
+  countDisplayRoutingTopologyFinalResponses,
+  displayRoutingTopologyRequestMatchesResponse,
+  displayRoutingTopologyResponseIsFinal,
+  findDisplayRoutingTopologyFinalResponse,
+} from './display-routing-browser-topology-response.mjs';
 
 export { DISPLAY_ROUTING_TOPOLOGY_CASE_ID } from './display-routing-matrix-cases.mjs';
 
@@ -205,27 +218,6 @@ export const displayRoutingTopologyRenderIsCommitted = routing => (
   && typeof routing?.outputRouteSignature === 'string'
 );
 
-export const displayRoutingTopologyRequestMatchesResponse = (request, response) => (
-  request !== null
-  && typeof request === 'object'
-  && response !== null
-  && typeof response === 'object'
-  && typeof request.requestId === 'string'
-  && request.requestId === response.requestId
-  && (
-    !Number.isSafeInteger(response.__browserRequestOrdinal)
-    || request.__browserRequestOrdinal === response.__browserRequestOrdinal
-  )
-  && (
-    !Number.isSafeInteger(response.__browserAttemptOrdinal)
-    || request.__browserAttemptOrdinal === response.__browserAttemptOrdinal
-  )
-  && (
-    typeof response.__browserWorkerInstanceId !== 'string'
-    || request.__browserWorkerInstanceId === response.__browserWorkerInstanceId
-  )
-);
-
 /**
  * A successful Worker commit can immediately be republished from the trusted
  * committed snapshot. That intentionally clears the global request id so a
@@ -252,6 +244,9 @@ const readOperationResultExpression = operationCase => `(() => {
   const committedEdgesMatchWorkerPatches = ${displayRoutingCommittedEdgesMatchWorkerPatches.toString()};
   const renderIsCommitted = ${displayRoutingTopologyRenderIsCommitted.toString()};
   const displayRoutingTopologyRequestMatchesResponse = ${displayRoutingTopologyRequestMatchesResponse.toString()};
+  const displayRoutingTopologyResponseIsFinal = ${displayRoutingTopologyResponseIsFinal.toString()};
+  const findFinalResponse = ${findDisplayRoutingTopologyFinalResponse.toString()};
+  const countFinalResponses = ${countDisplayRoutingTopologyFinalResponses.toString()};
   const transactionIsCommitted = ${displayRoutingTopologyTransactionIsCommitted.toString()};
   const requests = window.__vizlyRoutingRequests || [];
   const responses = window.__vizlyRoutingResponses || [];
@@ -259,9 +254,7 @@ const readOperationResultExpression = operationCase => `(() => {
     item?.operation === 'incremental-route'
     && item?.changeSet?.classification === ${JSON.stringify(operationCase.classification)}
   ));
-  const response = request
-    ? [...responses].reverse().find(item => displayRoutingTopologyRequestMatchesResponse(request, item))
-    : null;
+  const response = request ? findFinalResponse(request, responses) : null;
   const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
   const committedEdges = window.reactFlowInstance?.getEdges?.() || [];
   if (
@@ -277,7 +270,7 @@ const readOperationResultExpression = operationCase => `(() => {
   return {
     operationId: ${JSON.stringify(operationCase.id)},
     capturedRequestCount: requests.length,
-    capturedResponseCount: responses.length,
+    capturedResponseCount: countFinalResponses(request, responses),
     requestOperation: request.operation,
     changeSet: request.changeSet,
     requestEdgeCount: request.edges?.length,

@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   assertDisplayRoutingTopologyOperationGroupResult,
   assertDisplayRoutingTopologyOperationResult,
+  countDisplayRoutingTopologyFinalResponses,
   displayRoutingCommittedEdgesMatchWorkerPatches,
+  findDisplayRoutingTopologyFinalResponse,
   displayRoutingTopologyRequestMatchesResponse,
   displayRoutingTopologyRenderIsCommitted,
   displayRoutingTopologyTransactionIsCommitted,
@@ -89,6 +91,33 @@ describe('display routing browser topology matrix', () => {
       ...request,
       __browserWorkerInstanceId: 'worker-1',
     })).toBe(false);
+  });
+
+  it('keeps the complete final response authoritative when later phase messages arrive', () => {
+    const request = {
+      requestId: 'route-request',
+      __browserRequestOrdinal: 4,
+      __browserAttemptOrdinal: 2,
+      __browserWorkerInstanceId: 'worker-2',
+    };
+    const finalResponse = {
+      ...request,
+      hardClean: true,
+      hardReport: { hardClean: true },
+      routingPatches: [],
+    };
+    const latePhase = { ...request, phaseTrace: [{ phase: 'session-commit' }] };
+
+    expect(findDisplayRoutingTopologyFinalResponse(request, [finalResponse, latePhase]))
+      .toBe(finalResponse);
+    expect(countDisplayRoutingTopologyFinalResponses(request, [finalResponse, latePhase])).toBe(1);
+    expect(countDisplayRoutingTopologyFinalResponses(
+      request,
+      [finalResponse, latePhase, structuredClone(finalResponse)],
+    )).toBe(2);
+    expect(findDisplayRoutingTopologyFinalResponse(request, [latePhase])).toBeNull();
+    expect(findDisplayRoutingTopologyFinalResponse(request, null)).toBeNull();
+    expect(countDisplayRoutingTopologyFinalResponses(request, null)).toBe(0);
   });
 
   it('accepts only an exactly signed trusted committed reuse after request evidence is cleared', () => {
@@ -250,6 +279,8 @@ describe('display routing browser topology matrix', () => {
       changeSet: { classification: 'geometry', reason: 'node-resize' },
     }))).toThrow(/misclassified/);
     expect(() => assertValid(validResult({ capturedRequestCount: 2 })))
+      .toThrow(/one atomic Worker transaction/);
+    expect(() => assertValid(validResult({ capturedResponseCount: 2 })))
       .toThrow(/one atomic Worker transaction/);
     expect(() => assertValid(validResult({
       routing: { ...validResult().routing, workerAbortCount: 3 },
