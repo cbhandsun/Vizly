@@ -10,8 +10,8 @@
 
 - 已提交基线 `470625c9` 的 [CI 33334648950](https://github.com/cbhandsun/Vizly/actions/runs/33334648950) 成功，包含静态/构建/桌面与移动 smoke、五组测试、覆盖率和汇总检查。此前“计费导致任务无法启动”的记录已不代表当前状态。
 - 泳道修复已提交并推送 main：`3a28721a`。保持显式 `domain-lanes`，不再用 compound ELK 的成功冒充泳道成功；连线种子允许进入 Worker 完整修复，但最终质量门禁不降低。Logistics 本地 TB → LR → TB 三次提交的 14 条最终 SVG 均通过完整几何与 48px 商业净空检查；164 项相关测试及 `verify:static` 通过。
-- `3a28721a` 的 [CI 33362737849](https://github.com/cbhandsun/Vizly/actions/runs/33362737849) 已完成失败：routing、flow、UI、foundation 通过；core 测试组失败待定位，smoke 的 warehouse-3d 就绪耗时 `4904ms` 超过 `4000ms`，资源数量和体积仍在预算内。不能把本地静态通过表述为完整 CI 通过。
-- 最新 [Routing performance 33362737900](https://github.com/cbhandsun/Vizly/actions/runs/33362737900) 基于 `3a28721a`：交互绘制通过；5 个冷路由样本 p95 为 `1575ms`，仍高于 `1100ms` 预算。增量验收把 58 条阶段进度加 1 条最终响应计为 59 次响应；实际该事务为 1 次 Worker 启动、0 中止且 hard-clean。下一批修复只排除合法阶段通知，保留重复最终响应、错误和非法消息的失败断言；51 项采集/性能/几何测试通过，尚需提交后的专项复验，不据此提前宣布性能达标。
+- `3a28721a` 的 [CI 33362737849](https://github.com/cbhandsun/Vizly/actions/runs/33362737849) 已完成失败：routing、flow、UI、foundation 通过；core 的旧事务测试仍要求显式泳道失败后改成 compound，已定位为过期行为契约。后续测试修复保留普通 domain-dagre 的 fallback 覆盖，同时增加 TB/LR 显式泳道失败时不换策略、不写图、不记历史且释放预览的断言；14 项事务测试及定向 Lint 通过。smoke 的 warehouse-3d 就绪耗时 `4904ms` 超过 `4000ms`，资源数量和体积仍在预算内；该项尚未定位根因。不能把本地静态通过表述为完整 CI 通过。
+- [Routing performance 33362737900](https://github.com/cbhandsun/Vizly/actions/runs/33362737900) 基于 `3a28721a`：交互绘制通过；5 个冷路由样本 p95 为 `1575ms`，仍高于 `1100ms` 预算。增量验收把 58 条阶段进度加 1 条最终响应计为 59 次响应；实际该事务为 1 次 Worker 启动、0 中止且 hard-clean。修复已提交并推送 `782c5f45`：只排除合法阶段通知，保留重复最终响应、错误和非法消息的失败断言；51 项采集/性能/几何测试、定向 Lint、源码规模、CI 测试覆盖和 secrets 门禁通过。[新专项 33363412243](https://github.com/cbhandsun/Vizly/actions/runs/33363412243) 已启动，最终结果待核对，不据此提前宣布性能达标。
 - 第 19 节记录跨域业务排序试验及撤回原因；目前仅名称含义和稳定切换落地，业务阶段排序未完成。不得将既有 CI 或两方向单图抽样称为最新改动的完整矩阵验收。
 
 ### 按交付价值推进的批次

@@ -169,7 +169,7 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
     }));
   });
 
-  it('keeps layout stability paused across a rejected lane attempt and compound fallback', async () => {
+  it('keeps layout stability paused across a rejected legacy domain attempt and compound fallback', async () => {
     const groupedNodes = nodes.map(node => ({
       ...node,
       data: { ...node.data, domain: 'operations' },
@@ -195,7 +195,7 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
     }));
 
     await act(async () => {
-      await expect(result.current.handleStrategyLayout('domain-lanes', undefined, 'LR'))
+      await expect(result.current.handleStrategyLayout('domain-dagre', undefined, 'LR'))
         .resolves.toBe(true);
     });
 
@@ -209,6 +209,44 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
       layoutTransactionStatus: 'committed',
       layoutTransactionAttemptCount: 2,
       layoutTransactionErrorCode: undefined,
+    });
+  });
+
+  it.each(['TB', 'LR'] as const)('preserves the committed layout when explicit %s swimlanes fail quality', async direction => {
+    const groupedNodes = nodes.map(node => ({
+      ...node,
+      data: { ...node.data, domain: 'operations' },
+    }));
+    mocks.calculateLayeredLayoutWithReverse.mockResolvedValueOnce({ nodes: groupedNodes, edges });
+    mocks.stageLayoutRouting.mockRejectedValueOnce(new Error('layout-routing-hard-quality-rejected'));
+    const options = createOptions();
+    options.nodesRef.current = groupedNodes;
+    // Match the real preview release: only its first owner can release it.
+    options.clearLayoutPreview.mockReturnValueOnce(true).mockReturnValue(false);
+    const { result } = renderHook(() => useLayoutStrategy({ ...options, reactFlowInstance: null }));
+    const previousStrategy = result.current.lastDomainStrategy;
+    const previousDirection = result.current.lastDomainDirection;
+
+    await act(async () => {
+      await expect(result.current.handleStrategyLayout('domain-lanes', undefined, direction))
+        .resolves.toBe(false);
+    });
+
+    expect(mocks.stageLayoutRouting).toHaveBeenCalledTimes(1);
+    expect(mocks.calculateLayeredLayoutWithReverse).toHaveBeenCalledTimes(1);
+    expect(mocks.loadDomainCompoundElkStrategy).not.toHaveBeenCalled();
+    expect(mocks.loadDomainElkStrategy).not.toHaveBeenCalled();
+    expect(options.setNodes).not.toHaveBeenCalled();
+    expect(options.setEdges).not.toHaveBeenCalled();
+    expect(options.takeSnapshot).not.toHaveBeenCalled();
+    expect(options.setLayoutStable.mock.calls).toEqual([[false], [true]]);
+    expect(options.clearLayoutPreview).toHaveBeenCalledTimes(2);
+    expect(result.current.lastDomainStrategy).toBe(previousStrategy);
+    expect(result.current.lastDomainDirection).toBe(previousDirection);
+    expect(readDisplayRoutingDebugState()).toMatchObject({
+      layoutTransactionJobId: 1,
+      layoutTransactionStatus: 'failed',
+      layoutTransactionAttemptCount: 1,
     });
   });
 
