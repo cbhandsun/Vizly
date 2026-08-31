@@ -5,6 +5,61 @@ import { describe, expect, it, vi } from 'vitest';
 import { DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT } from './display-routing-browser-capture.mjs';
 
 describe('display routing browser capture', () => {
+  it('retains layout lifecycle events under a flood of diagnostic completions within the original event cap', () => {
+    const tasks = [];
+    let frame;
+    let busy = true;
+    let clock = 0;
+    class TestWorker {
+      listeners = [];
+      addEventListener(_type, listener) { this.listeners.push(listener); }
+      postMessage() {}
+      emit(data) { this.listeners.forEach(listener => listener({ data })); }
+    }
+    const window = { Worker: TestWorker };
+    const context = vm.createContext({
+      Date: { now: () => clock },
+      PerformanceObserver: class { observe() {} },
+      document: {
+        querySelectorAll: selector => selector === 'button' ? [{ getAttribute: key => (
+          key === 'aria-label' ? '自动布局' : String(busy)
+        ) }] : [],
+        querySelector: () => busy ? {} : null,
+      },
+      performance: { now: () => clock, timeOrigin: 0 },
+      queueMicrotask: callback => callback(),
+      requestAnimationFrame: callback => { frame = callback; return 1; },
+      setInterval: () => 1,
+      clearInterval: () => undefined,
+      setTimeout: callback => { tasks.push(callback); return 1; },
+      structuredClone,
+      window,
+    });
+    vm.runInContext(DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT, context);
+    frame();
+    const worker = new window.Worker('worker.js');
+    for (let index = 0; index < 256; index += 1) {
+      clock += 1;
+      worker.emit({ requestId: 'layout:1', phase: 'repair-progress' });
+      while (tasks.length) tasks.shift()();
+    }
+    busy = false;
+    clock += 1;
+    frame();
+    expect(window.__vizlyLayoutVisualEvents.length).toBeLessThanOrEqual(128);
+    for (const type of ['layout-busy', 'layout-progress', 'layout-committing']) {
+      expect(window.__vizlyLayoutVisualEvents).toContainEqual({ type, value: true, sampledAt: 0 });
+      expect(window.__vizlyLayoutVisualEvents).toContainEqual({ type, value: false, sampledAt: clock });
+    }
+    expect(window.__vizlyLayoutVisualEvents.at(-4)).toMatchObject({ type: 'diagnostic-clone-backlog-drained' });
+    for (let index = 0; index < 256; index += 1) {
+      clock += 1;
+      busy = !busy;
+      frame();
+    }
+    expect(window.__vizlyLayoutVisualEvents).toHaveLength(128);
+  });
+
   it('observes the awaited layout-commit fit request protocol', () => {
     const listeners = new Map();
     const queuedMicrotasks = [];

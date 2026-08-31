@@ -22,7 +22,12 @@ export const assertDisplayRoutingLayoutProgressTimeline = (timeline, label) => {
     !Number.isFinite(timeline?.progressStartedFromInputMs)
     || !Number.isFinite(timeline?.progressClearedFromCommitMs)
   ) {
-    throw new Error(`${label} did not show and clear the layout progress indicator`);
+    const observations = Object.fromEntries([
+      'progressStartedFromInputMs', 'progressClearedFromCommitMs',
+      'busyStartedFromInputMs', 'busyClearedFromCommitMs',
+      'committingStartedFromInputMs', 'committingClearedFromCommitMs',
+    ].map(key => [key, Number.isFinite(timeline?.[key]) ? timeline[key] : null]));
+    throw new Error(`${label} did not show and clear the layout progress indicator: ${JSON.stringify(observations)}`);
   }
 };
 

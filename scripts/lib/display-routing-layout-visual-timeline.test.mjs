@@ -93,4 +93,24 @@ describe('display routing layout visual timeline', () => {
       'domain-lanes-lr did not dispatch fit after the layout state commit',
     );
   });
+
+  it('reports bounded numeric lifecycle evidence without serializing user content', () => {
+    let failure;
+    try {
+      assertDisplayRoutingLayoutProgressTimeline({
+        progressStartedFromInputMs: null,
+        progressClearedFromCommitMs: 15,
+        busyStartedFromInputMs: NaN,
+        busyClearedFromCommitMs: Infinity,
+        committingStartedFromInputMs: 'private-content',
+        cookie: 'private-cookie',
+        nested: { toJSON() { throw new Error('must not serialize'); } },
+      }, 'layout');
+    } catch (error) { failure = error; }
+    expect(failure).toBeInstanceOf(Error);
+    expect(failure.message).toContain('"progressStartedFromInputMs":null');
+    expect(failure.message).toContain('"progressClearedFromCommitMs":15');
+    expect(failure.message).toContain('"busyClearedFromCommitMs":null');
+    expect(failure.message).not.toContain('private');
+  });
 });

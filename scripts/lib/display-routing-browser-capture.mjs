@@ -47,7 +47,17 @@ export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
     const sampledAt = performance.timeOrigin + performance.now();
     if (!Number.isFinite(sampledAt)) return;
     window.__vizlyLayoutVisualEvents.push({ type, value, sampledAt });
-    window.__vizlyLayoutVisualEvents = window.__vizlyLayoutVisualEvents.slice(-128);
+    // A long Worker job can emit more than 128 diagnostic completions. Keep
+    // its lifecycle transitions; otherwise a visible progress indicator is
+    // incorrectly reported as missing when its start was evicted by noise.
+    if (window.__vizlyLayoutVisualEvents.length > 128) {
+      const transient = window.__vizlyLayoutVisualEvents.findIndex(event => (
+        event.type === 'diagnostic-clone-backlog-drained'
+        || event.type === 'viewport-change'
+        || event.type === 'route-path-change'
+      ));
+      window.__vizlyLayoutVisualEvents.splice(Math.max(0, transient), 1);
+    }
   };
   const recordWorkerHeartbeat = ({
     workerInstanceId,
