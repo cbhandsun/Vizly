@@ -6,7 +6,9 @@ import {
   countRoutingObstacleHits,
   countUnrelatedObstacleHits,
   createRoutingObstacleEvaluationContext,
+  scoreNodeClearanceRisk,
 } from '../edgeWaypointCandidateRepair';
+import { segmentIntersectsClearanceRect, segmentToClearanceRectDistance } from '../edgeNodeClearanceGeometry';
 
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
@@ -88,6 +90,44 @@ const edge = (source = 'source', target = 'target'): Edge => ({
 });
 
 describe('routing obstacle evaluation context', () => {
+  it('checks diagonal geometry without mistaking a bounding-box overlap or corner touch for traversal', () => {
+    const rect = { x: 20, y: 20, width: 40, height: 40 };
+    const outside = { a: { x: 0, y: 40 }, b: { x: 40, y: 0 } };
+    expect(segmentIntersectsClearanceRect(outside, rect, 0)).toBe(false);
+    expect(segmentToClearanceRectDistance(outside, rect)).toBe(0);
+    expect(segmentIntersectsClearanceRect({ a: { x: -10, y: 40 }, b: { x: 40, y: -10 } }, rect, 0)).toBe(false);
+    expect(segmentIntersectsClearanceRect({ a: { x: 30, y: 30 }, b: { x: 31, y: 31 } }, rect, 0)).toBe(true);
+    const context = createRoutingObstacleEvaluationContext(edge(), new Map([
+      ['first', rect], ['second', { x: 70, y: 70, width: 10, height: 10 }],
+    ]));
+    const path = [{ x: 0, y: 0 }, { x: 100, y: 100 }];
+    expect(context.countUnrelatedObstacleHits(path, 0)).toBe(1);
+    expect(context.countUnrelatedObstacleHits(path)).toBe(2);
+    expect(context.countUnrelatedObstacleHits(path, 0)).toBe(1);
+  });
+
+  it.each([false, true])('detects half-pixel diagonal obstacle traversal (transpose=%s)', transpose => {
+    const point = (x: number, y: number) => transpose ? { x: y, y: x } : { x, y };
+    const rect = transpose
+      ? { x: 120, y: -136.5, width: 96, height: 273 }
+      : { x: -136.5, y: 120, width: 273, height: 96 };
+    const path = [point(0, 0), point(0.5, 336)];
+    const testEdge = edge('source', 'target');
+    const context = createRoutingObstacleEvaluationContext(testEdge, new Map([['block', rect]]));
+    for (const candidate of [path, [...path].reverse()]) {
+      expect(context.countUnrelatedObstacleHits(candidate)).toBe(1);
+      expect(context.countPathHits(candidate)).toBe(1);
+      expect(segmentIntersectsClearanceRect({ a: candidate[0], b: candidate[1] }, rect, 0)).toBe(true);
+      expect(segmentToClearanceRectDistance({ a: candidate[0], b: candidate[1] }, rect)).toBe(0);
+      expect(scoreNodeClearanceRisk(candidate, [{
+        id: 'block', position: { x: rect.x, y: rect.y },
+        measured: { width: rect.width, height: rect.height }, data: {},
+      }], testEdge, 48)).toBe(48);
+    }
+    expect(context.countUnrelatedObstacleHits(path, 0)).toBe(1);
+    expect(context.readMetrics().cacheHitCount).toBeGreaterThan(0);
+  });
+
   it.each([
     {
       name: 'horizontal forward segments',
@@ -127,6 +167,7 @@ describe('routing obstacle evaluation context', () => {
     },
     {
       name: 'diagonal segments',
+      correctedObstacleHits: 1,
       edge: edge('missing-source', 'missing-target'),
       obstacles: new Map([
         ['block', { x: 20, y: 20, width: 40, height: 40 }],
@@ -135,6 +176,7 @@ describe('routing obstacle evaluation context', () => {
     },
     {
       name: 'exact half-pixel axis boundary',
+      correctedObstacleHits: 1,
       edge: edge('missing-source', 'missing-target'),
       obstacles: new Map([
         ['block', { x: 20, y: 20, width: 40, height: 40 }],
@@ -208,8 +250,14 @@ describe('routing obstacle evaluation context', () => {
         { x: 68.875, y: 80.375 },
       ],
     },
-  ])('matches legacy counts for $name', ({ path, edge: testEdge, obstacles }) => {
-    const expected = legacyEvaluation(path, testEdge, obstacles);
+  ])('checks obstacle counts for $name', ({ path, edge: testEdge, obstacles, correctedObstacleHits }) => {
+    // The legacy scanner silently omitted diagonal and exact half-pixel paths.
+    // Keep those fixtures, but require actual collision evidence instead of parity with the bug.
+    const expected = correctedObstacleHits === undefined ? legacyEvaluation(path, testEdge, obstacles) : {
+      endpointNodeTraversalHits: 0,
+      unrelatedObstacleHits: correctedObstacleHits,
+      routingObstacleHits: correctedObstacleHits,
+    };
     const context = createRoutingObstacleEvaluationContext(testEdge, obstacles);
 
     expect(context.evaluate(path)).toEqual(expected);

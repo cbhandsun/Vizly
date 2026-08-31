@@ -1,3 +1,5 @@
+import { lineIntersectsRect } from '../../algorithms/geometryUtils';
+
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
 type Segment = { a: Point; b: Point };
@@ -31,7 +33,11 @@ export const segmentIntersectsClearanceRect = (
     return Math.max(Math.min(segment.a.y, segment.b.y), y1)
       < Math.min(Math.max(segment.a.y, segment.b.y), y2);
   }
-  return false;
+  // Fractional terminal coordinates can produce near-axis segments exactly at
+  // the orthogonal tolerance. They still have physical geometry to audit.
+  return lineIntersectsRect({ start: segment.a, end: segment.b }, {
+    x: x1, y: y1, width: x2 - x1, height: y2 - y1,
+  });
 };
 
 const distancePointToSegment = (point: Point, segment: Segment): number => {

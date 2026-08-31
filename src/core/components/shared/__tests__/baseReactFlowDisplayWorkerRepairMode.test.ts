@@ -35,6 +35,31 @@ afterEach(() => {
 });
 
 describe('baseReactFlowDisplayEdges worker repair mode', () => {
+  it('routes around a node instead of certifying a half-pixel diagonal through it', () => {
+    const repairNodes: Node[] = [
+      { id: 'source', position: { x: -102, y: -96 }, measured: { width: 204, height: 96 }, data: {} },
+      { id: 'blocker', position: { x: -136.5, y: 120 }, measured: { width: 273, height: 96 }, data: {} },
+      { id: 'target', position: { x: -123, y: 336 }, measured: { width: 246, height: 96 }, data: {} },
+    ];
+    const repairEdge: Edge = {
+      id: 'edge', source: 'source', target: 'target', sourceHandle: 'bottom', targetHandle: 'top',
+      data: { computedPath: [{ x: 0, y: 0 }, { x: 0.5, y: 336 }] },
+    };
+    const response = computeBaseReactFlowDisplayEdgesWorkerResponse({
+      operation: 'repair', requestId: 'half-pixel-diagonal', repairMode: 'finalized',
+      nodes: repairNodes, edges: [repairEdge],
+    });
+    expect(response.error).toBeUndefined();
+    expect(response.hardClean).toBe(true);
+    expect(response.hardReport).toMatchObject({
+      obstacleHits: 0, minimumClearanceViolations: 0, commercialClearanceViolations: 0,
+      terminalsAttached: true, terminalsAnchored: true,
+    });
+    const result = response.edges?.[0] ?? repairEdge;
+    expect(getDisplayComputedPath(result)).not.toEqual(repairEdge.data?.computedPath);
+    expect(scoreNodeClearanceRisk(getDisplayComputedPath(result), repairNodes, result, 48)).toBe(0);
+  });
+
   it('finalizes a blocked outer-ring return with zero crossings and commercial clearance violations', () => {
     const graph = outerCorridorGraph();
     const response = computeBaseReactFlowDisplayEdgesWorkerResponse({

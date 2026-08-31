@@ -117,7 +117,11 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
   // Keep ranks and lane bounds, but order peers using all incident endpoints.
   for (let sweep = 0; sweep < 4; sweep += 1) {
     for (const layer of layers.values()) {
-      const slots = layer.map(node => center(replacements.get(node.id) ?? node)).sort((a, b) => a - b);
+      const slots = layer.map(node => replacements.get(node.id) ?? node)
+        .sort((a, b) => a.position[cross] - b.position[cross]);
+      const gaps = slots.slice(1).map((node, index) => (
+        node.position[cross] - slots[index].position[cross] - crossSize(slots[index])
+      ));
       const barycenter = (node: Node) => {
         const adjacent = (neighbors.get(node.id) ?? []).flatMap(id => {
           const neighbor = replacements.get(id);
@@ -126,9 +130,14 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
         return adjacent.length ? adjacent.reduce((sum, value) => sum + value, 0) / adjacent.length : center(node);
       };
       const ordered = layer.toSorted((a, b) => barycenter(a) - barycenter(b));
+      // Centers are not interchangeable slots when peers have different sizes.
+      // Repack their widths/heights and original gaps inside the same span so
+      // React Flow never clamps a reordered child away from its routed position.
+      let cursor = slots[0].position[cross];
       ordered.forEach((node, index) => {
         const current = replacements.get(node.id) ?? node;
-        replacements.set(node.id, { ...current, position: { ...current.position, [cross]: slots[index] - crossSize(current) / 2 } });
+        replacements.set(node.id, { ...current, position: { ...current.position, [cross]: cursor } });
+        cursor += crossSize(current) + (gaps[index] ?? 0);
       });
     }
   }

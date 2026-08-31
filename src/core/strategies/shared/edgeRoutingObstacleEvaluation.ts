@@ -1,4 +1,5 @@
 import type { Edge } from '@xyflow/react';
+import { segmentIntersectsClearanceRect } from './edgeNodeClearanceGeometry';
 
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
@@ -109,6 +110,26 @@ const countPathRectHits = (
         && segmentHitCache
         && segmentHitCache.size < MAX_SEGMENT_HIT_CACHE_ENTRIES
       ) segmentHitCache.set(segmentKey, hits - hitsBeforeSegment);
+      continue;
+    }
+
+    // Never silently discard a non-axis segment: the path-quality tolerance
+    // may accept half-pixel terminal alignment while it crosses a real node.
+    for (let rectIndex = 0; rectIndex < rects.length; rectIndex += 1) {
+      const rect = rects[rectIndex];
+      if (segmentIntersectsClearanceRect({ a, b }, {
+        x: rect.x1, y: rect.y1, width: rect.x2 - rect.x1, height: rect.y2 - rect.y1,
+      }, 0)) {
+        hits += 1;
+        if (boundedMaximum !== undefined && hits > boundedMaximum) {
+          onNodeScan?.(rectIndex + 1);
+          return hits;
+        }
+      }
+    }
+    onNodeScan?.(rects.length);
+    if (segmentKey && segmentHitCache && segmentHitCache.size < MAX_SEGMENT_HIT_CACHE_ENTRIES) {
+      segmentHitCache.set(segmentKey, hits - hitsBeforeSegment);
     }
   }
   return hits;
