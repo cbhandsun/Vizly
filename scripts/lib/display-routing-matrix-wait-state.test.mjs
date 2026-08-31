@@ -6,6 +6,19 @@ import {
 } from './display-routing-matrix-wait-state.mjs';
 
 describe('display routing matrix wait-state summary', () => {
+  it('reports the latest failed transaction instead of an older successful response without exposing error content', () => {
+    for (const error of ['display-edge-worker-invalid-request', 'display-edge-worker-failed', 'Bearer secret user content']) {
+      const summary = summarizeDisplayRoutingWaitState({}, [
+        { requestId: 'layout:1', hardClean: true },
+        { requestId: 'layout:2', error },
+        { requestId: 'layout:2', phaseProgress: { phase: 'finalizer' } },
+      ], 3);
+      expect(summary.lastResponse.requestId).toBe('layout:2');
+      expect(summary.lastResponse.error).toBe(error.startsWith('display-edge-worker-') ? error : undefined);
+      expect(summary.responseTrace.at(-1)?.requestId).toBe('layout:2');
+      expect(JSON.stringify(summary)).not.toContain('secret');
+    }
+  });
   it('keeps bounded routing metrics while dropping geometry and user-authored content', () => {
     const summary = summarizeDisplayRoutingWaitState({
       stage: 'worker-response',

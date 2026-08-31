@@ -17,6 +17,9 @@ export const summarizeDisplayRoutingWaitState = (
     typeof value === 'string' && /^[a-z0-9:-]{1,64}$/i.test(value) ? value : undefined
   );
   const boolean = value => (typeof value === 'boolean' ? value : undefined);
+  const workerError = value => (
+    ['display-edge-worker-invalid-request', 'display-edge-worker-failed'].includes(value) ? value : undefined
+  );
   const projectSeedAudit = (value) => {
     const audit = record(value);
     return {
@@ -38,7 +41,7 @@ export const summarizeDisplayRoutingWaitState = (
   const responses = Array.isArray(responseValue) ? responseValue : [];
   const requests = Array.isArray(requestValue) ? requestValue : [];
   const response = record([...responses].reverse().find(value => (
-    typeof record(value).hardClean === 'boolean'
+    typeof record(value).hardClean === 'boolean' || typeof record(value).error === 'string'
   )) ?? responses.at(-1));
   const report = record(response.hardReport);
   const quality = record(report.quality);
@@ -61,7 +64,8 @@ export const summarizeDisplayRoutingWaitState = (
   const completedResponses = responses.filter(value => {
     const candidate = record(value);
     return typeof candidate.hardClean === 'boolean'
-      || typeof candidate.routeResolution === 'string';
+      || typeof candidate.routeResolution === 'string'
+      || typeof candidate.error === 'string';
   });
   const metric = key => finite(quality[key]);
   const identityToken = value => (
@@ -179,6 +183,7 @@ export const summarizeDisplayRoutingWaitState = (
       return {
         requestId: token(candidate.requestId),
         requestKind: requestKind(candidate.requestId),
+        error: workerError(candidate.error),
         routeResolution: token(candidate.routeResolution),
         hardClean: typeof candidate.hardClean === 'boolean' ? candidate.hardClean : undefined,
         inputSignature: identityToken(identity.inputSignature),
@@ -227,6 +232,7 @@ export const summarizeDisplayRoutingWaitState = (
     lastResponse: {
       requestId: token(response.requestId),
       requestKind: requestKind(response.requestId),
+      error: workerError(response.error),
       routeResolution: token(response.routeResolution),
       hardClean: typeof response.hardClean === 'boolean' ? response.hardClean : undefined,
       workerDurationMs: finite(response.workerDurationMs),

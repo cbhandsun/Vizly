@@ -1,5 +1,9 @@
 export const DISPLAY_ROUTING_MATRIX_PRESET_TARGETS = Object.freeze([
   Object.freeze({
+    presetId: 'logistics-architecture-v1',
+    sourcePath: 'src/data/standardized/LogisticsStandardData.json',
+  }),
+  Object.freeze({
     presetId: 'wms-demand-allocation-strategy-v2',
     sourcePath: 'src/data/standardized/DeamndAllocation.json',
   }),
