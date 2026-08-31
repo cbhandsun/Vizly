@@ -209,7 +209,8 @@ const sourceBranchCornerDetourCandidates = (
       const branch = previousAxis === 'h'
         ? { x: start.x + direction * stemLength, y: start.y }
         : { x: start.x, y: start.y + direction * stemLength };
-      for (const lane of detourLanes) {
+      for (const requestedLane of detourLanes) {
+        const lane = widenClearanceDetourLane(previousAxis === 'h' ? corner.y : corner.x, requestedLane);
         const branchOnLane = previousAxis === 'h'
           ? { x: branch.x, y: lane }
           : { x: lane, y: branch.y };
@@ -760,6 +761,7 @@ export const repairBusinessNodeClearanceRisks = (
           baselineQuality: qualityBaseline.score,
           edge,
           edgeIndex,
+          obstacleContext,
           qualityContext: qualityBaseline.context,
           rankedCandidates: rankedCandidatesFor(collection),
           validateCandidate: options.validateCandidate,

@@ -22,6 +22,54 @@ const pathFor = (edge: Edge): Array<{ x: number; y: number }> => (
 );
 
 describe('repairBusinessNodeClearanceRisks', () => {
+  it.each([
+    { vertical: false, reverse: false }, { vertical: false, reverse: true },
+    { vertical: true, reverse: false }, { vertical: true, reverse: true },
+  ])('clears terminal-adjacent obstacles without terminal traversal ($vertical, $reverse)', ({ vertical, reverse }) => {
+    const originalNodes: Node[] = [
+      { id: 'source', position: { x: 615.5, y: 86 }, data: {}, measured: { width: 73, height: 319 } },
+      { id: 'target', position: { x: 236, y: 665.5 }, data: {}, measured: { width: 73, height: 167 } },
+      { id: 'left-blocker', position: { x: 43, y: 544 }, data: {}, measured: { width: 73, height: 170 } },
+      { id: 'right-blocker', position: { x: 429, y: 785.5 }, data: {}, measured: { width: 73, height: 167 } },
+    ];
+    const originalEdge: Edge = {
+      id: 'edge', source: 'source', target: 'target', sourceHandle: 'left', targetHandle: 'right',
+      data: { computedPath: [
+        { x: 615.5, y: 245.5 }, { x: 480.5, y: 245.5 },
+        { x: 480.5, y: 749 }, { x: 309, y: 749 },
+      ] },
+    };
+    const nodes = originalNodes.map(node => vertical ? {
+      ...node, position: { x: node.position.y, y: node.position.x },
+      measured: { width: node.measured?.height, height: node.measured?.width },
+    } : node);
+    const path = pathFor(originalEdge).map(point => vertical ? { x: point.y, y: point.x } : point);
+    const edge: Edge = {
+      ...originalEdge,
+      source: reverse ? 'target' : 'source', target: reverse ? 'source' : 'target',
+      sourceHandle: vertical ? (reverse ? 'bottom' : 'top') : (reverse ? 'right' : 'left'),
+      targetHandle: vertical ? (reverse ? 'top' : 'bottom') : (reverse ? 'left' : 'right'),
+      data: { computedPath: reverse ? path.toReversed() : path },
+    };
+    const original = structuredClone(edge);
+    const geometry = createBusinessNodeClearanceGeometryContext(nodes);
+    const obstacle = geometry.obstacleFor(edge);
+    expect(obstacle.countEndpointNodeTraversalHits(pathFor(edge))).toBe(0);
+    expect(geometry.clearance.score(pathFor(edge), edge, 48)).toBeGreaterThan(0);
+
+    const repaired = repairBusinessNodeClearanceRisks([edge], nodes, { minimumClearance: 48 });
+
+    expect(obstacle.countEndpointNodeTraversalHits(pathFor(repaired[0]))).toBe(0);
+    expect(obstacle.countUnrelatedObstacleHits(pathFor(repaired[0]))).toBe(0);
+    expect(geometry.clearance.score(pathFor(repaired[0]), edge, 48)).toBe(0);
+    expect(pathFor(repaired[0])[0]).toEqual(pathFor(edge)[0]);
+    expect(pathFor(repaired[0]).at(-1)).toEqual(pathFor(edge).at(-1));
+    expect(calculateEdgePathQualityScore(repaired)).toMatchObject({
+      nonOrthogonalSegments: 0, shortEndpointStubs: 0, tinyInteriorDoglegs: 0, hairpins: 0,
+    });
+    expect(edge).toEqual(original);
+  });
+
   it('scores routing and commercial clearance in one parity-preserving scan', () => {
     const nodes: Node[] = [
       { id: 'source', position: { x: 0, y: 0 }, data: {}, measured: { width: 40, height: 40 } },
@@ -348,9 +396,14 @@ describe('repairBusinessNodeClearanceRisks', () => {
     expect(scoreNodeClearanceRisk(originalPath, nodes, edges[0])).toBeGreaterThan(0);
     expect(scoreNodeClearanceRisk(repairedPath, nodes, repaired[0])).toBe(0);
     expect(repairedPath.length).toBeGreaterThan(originalPath.length);
-    expect(repairedPath.slice(0, 2)).toEqual(originalPath.slice(0, 2));
+    expect(repairedPath[0]).toEqual(originalPath[0]);
+    expect(repairedPath[1].y).toBe(originalPath[0].y);
+    expect(repairedPath[1].x - repairedPath[0].x).toBeGreaterThanOrEqual(48);
     expect(repairedPath.at(-1)).toEqual(originalPath.at(-1));
     expect((repairedPath.at(-2)?.y ?? 0)).toBeGreaterThanOrEqual(268);
+    expect((repairedPath.at(-2)?.y ?? 0)).toBeLessThan(320);
+    expect(createBusinessNodeClearanceGeometryContext(nodes).obstacleFor(edges[0])
+      .countEndpointNodeTraversalHits(repairedPath)).toBe(0);
     expect(scoreNodeClearanceRisk(
       repairedPath,
       nodes,

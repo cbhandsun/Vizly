@@ -6,6 +6,8 @@ import {
   withBusinessNodeClearancePath,
 } from './edgeBusinessNodeClearanceCandidateCommit';
 import { createEdgePathQualityEvaluationContext } from './edgeStrictCrossingGuard';
+import type { RoutingObstacleEvaluationContext } from './edgeRoutingObstacleEvaluation';
+import { getEdgePath } from './edgeRoutingPathGeometry';
 
 type Point = { x: number; y: number };
 
@@ -15,6 +17,7 @@ export const selectAcceptedBusinessNodeClearanceCandidate = ({
   baselineQuality,
   edge,
   edgeIndex,
+  obstacleContext,
   qualityContext,
   rankedCandidates,
   validateCandidate,
@@ -24,6 +27,7 @@ export const selectAcceptedBusinessNodeClearanceCandidate = ({
   baselineQuality: EdgePathQualityScore;
   edge: Edge;
   edgeIndex: number;
+  obstacleContext: Pick<RoutingObstacleEvaluationContext, 'countEndpointNodeTraversalHits'>;
   qualityContext: ReturnType<typeof createEdgePathQualityEvaluationContext>;
   rankedCandidates: Iterable<Readonly<{ candidate: Point[] }>>;
   validateCandidate?: (context: Readonly<{
@@ -32,7 +36,11 @@ export const selectAcceptedBusinessNodeClearanceCandidate = ({
     changedEdgeIndex: number;
   }>) => boolean;
 }>): Edge[] | null => {
+  const baselineEndpointHits = obstacleContext.countEndpointNodeTraversalHits(getEdgePath(edge));
   for (const rankedCandidate of rankedCandidates) {
+    // Clearance excludes the terminals, but a detour must not cross their interiors.
+    if (obstacleContext.countEndpointNodeTraversalHits(rankedCandidate.candidate)
+      > baselineEndpointHits) continue;
     const candidateEdges = baselineEdges.slice();
     candidateEdges[edgeIndex] = withBusinessNodeClearancePath(
       edge,
