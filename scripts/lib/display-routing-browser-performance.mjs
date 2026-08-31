@@ -135,9 +135,21 @@ const REPAIRED_INCREMENTAL_DISPLAY_ROUTING_PHASES = Object.freeze([
   ...FAST_INCREMENTAL_DISPLAY_ROUTING_PHASES.slice(14),
 ]);
 
+// A failed stub audit returns before endpoint/passage auditing. After endpoint
+// repair, the final safety audit completes those stages. The Worker recorder
+// aggregates repeated hard/stub stages at their first position, so this is a
+// distinct complete sequence, not a missing audit or permission to omit one.
+const STUB_REPAIRED_INCREMENTAL_DISPLAY_ROUTING_PHASES = Object.freeze([
+  ...FAST_INCREMENTAL_DISPLAY_ROUTING_PHASES.slice(0, 7),
+  ...FAST_INCREMENTAL_DISPLAY_ROUTING_PHASES.slice(9, 13),
+  ...FAST_INCREMENTAL_DISPLAY_ROUTING_PHASES.slice(7, 9),
+  ...FAST_INCREMENTAL_DISPLAY_ROUTING_PHASES.slice(13),
+]);
+
 export const EXPECTED_INCREMENTAL_DISPLAY_ROUTING_PHASE_SEQUENCES = Object.freeze([
   FAST_INCREMENTAL_DISPLAY_ROUTING_PHASES,
   REPAIRED_INCREMENTAL_DISPLAY_ROUTING_PHASES,
+  STUB_REPAIRED_INCREMENTAL_DISPLAY_ROUTING_PHASES,
 ]);
 
 const REQUIRED_INCREMENTAL_DISPLAY_ROUTING_PHASES = new Set(

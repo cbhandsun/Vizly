@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { runInNewContext } from 'node:vm';
+import { createDisplayRoutingPhaseRecorder } from '../../src/core/components/shared/baseReactFlowDisplayWorkerTraceRecorder';
 
 import {
   assertDisplayRoutingDragResult,
@@ -227,7 +228,54 @@ describe('display routing browser performance budget', () => {
     ]) expect(message).not.toContain(forbidden);
   });
 
-  it('accepts only the complete fast or repaired incremental phase sequence', () => {
+  it('recognizes a stub-rejected audit followed by endpoint repair and a complete final audit', () => {
+    // First-occurrence order from the Worker recorder: the first safety audit
+    // stops at stubs; its repeated hard/stub phases are aggregated in place.
+    const phases = [
+      'incremental-closure', 'local-route', 'hard-gate', 'final-clearance',
+      'final-hard-safety', 'final-safety-hard-gate', 'final-safety-stubs',
+      'final-endpoint-seed', 'final-endpoint-topology', 'final-endpoint-order',
+      'final-endpoint-closure', 'final-safety-endpoint-order',
+      'final-safety-passage-order', 'final-safety-closure',
+      'final-commercial-clearance', 'final-commercial-terminal-preserving',
+      'final-commercial-terminal-changing', 'final-commercial-source-stairs',
+      'final-commercial-evaluation', 'final-commercial-safety-closure',
+      'finalizer', 'session-commit',
+    ];
+    const traces = phases.map(phase => ({ phase }));
+    expect(displayRoutingIncrementalPhaseTraceIsComplete(traces)).toBe(true);
+    const recorded = [];
+    const record = createDisplayRoutingPhaseRecorder({
+      requestId: 'stub-repair', phaseTrace: recorded, publish: () => {}, publishProgress: false,
+    });
+    const rawPhases = [
+      ...phases.slice(0, 11),
+      'final-safety-hard-gate', 'final-safety-stubs',
+      ...phases.slice(11),
+    ];
+    rawPhases.forEach((phase, index) => record({
+      phase, durationMs: 1, candidateCount: 1, changedEdgeCount: 0,
+      resolution: index === 6 ? 'rejected' : 'accepted',
+    }));
+    expect(recorded.map(trace => trace.phase)).toEqual(phases);
+    expect(recorded.find(trace => trace.phase === 'final-safety-stubs')).toMatchObject({
+      durationMs: 2, resolution: 'rejected',
+    });
+    expect(displayRoutingIncrementalPhaseTraceIsComplete(recorded)).toBe(true);
+    for (let index = 0; index < traces.length; index += 1) {
+      expect(displayRoutingIncrementalPhaseTraceIsComplete(
+        traces.filter((_, position) => position !== index),
+      )).toBe(false);
+      expect(displayRoutingIncrementalPhaseTraceIsComplete([
+        ...traces.slice(0, index), traces[index], ...traces.slice(index),
+      ])).toBe(false);
+    }
+    const reordered = [...traces];
+    [reordered[1], reordered[2]] = [reordered[2], reordered[1]];
+    expect(displayRoutingIncrementalPhaseTraceIsComplete(reordered)).toBe(false);
+  });
+
+  it('accepts only a complete supported incremental phase sequence', () => {
     for (const phases of EXPECTED_INCREMENTAL_DISPLAY_ROUTING_PHASE_SEQUENCES) {
       expect(displayRoutingIncrementalPhaseTraceIsComplete(
         phases.map(phase => ({ phase })),
