@@ -6,6 +6,58 @@ import { estimateEdgeLabelRect, getEdgeLabelAutoOffset } from '../edgeLabelAvoid
 import { collectStablePathPeerPaths } from '../stablePathEdgePeerPaths';
 
 describe('edge label avoidance', () => {
+    it.each([false, true])('fits into a vertical gap without changing the input geometry (mirrored=%s)', mirrored => {
+        const sign = mirrored ? -1 : 1;
+        const path = [{ x: 0, y: 16 * sign }, { x: 0, y: 0 }];
+        const center = { x: 0, y: 8 * sign };
+        const obstacles = [
+            { x: -100, y: mirrored ? 0 : -200, width: 200, height: 200 },
+            { x: -100, y: mirrored ? -270 : 70, width: 200, height: 200 },
+        ];
+        const original = structuredClone({ path, center, obstacles });
+        const scale = 0.72 / 0.4199312039312039;
+        const offset = getEdgeLabelAutoOffset(path, center, 'Flow', [], obstacles, scale);
+        const labelRect = estimateEdgeLabelRect({ x: offset.x, y: center.y + offset.y }, 'Flow', scale);
+        for (const obstacle of obstacles) {
+            expect(labelRect.y + labelRect.height <= obstacle.y || labelRect.y >= obstacle.y + obstacle.height).toBe(true);
+        }
+        expect({ path, center, obstacles }).toEqual(original);
+        expect(getEdgeLabelAutoOffset(path, center, 'Flow', [], obstacles, scale)).toEqual(offset);
+        expect(Math.abs(offset.y)).toBeLessThanOrEqual(96);
+    });
+
+    it('keeps an impossible enclosed label search finite and inside its original retreat budget', () => {
+        const offset = getEdgeLabelAutoOffset(
+            [{ x: 0, y: 0 }, { x: 120, y: 0 }], { x: 60, y: 0 }, 'Flow', [],
+            [{ x: -10000, y: -10000, width: 20000, height: 20000 }], 2.4,
+        );
+        expect(Number.isFinite(offset.x) && Number.isFinite(offset.y)).toBe(true);
+        expect(Math.abs(offset.x)).toBeLessThanOrEqual(96);
+        expect(Math.abs(offset.y)).toBeLessThanOrEqual(40);
+    });
+
+    it.each([false, true])('fits a scaled shared-branch label into a narrow node gap (mirrored=%s)', mirrored => {
+        const mirror = (x: number) => mirrored ? -x : x;
+        const rect = (x: number, width: number, y: number, height: number) => ({
+            x: mirrored ? -x - width : x, y, width, height,
+        });
+        for (const fragmentLength of [48, 60]) {
+            const ownPath = [{ x: mirror(fragmentLength), y: 0 }, { x: 0, y: 0 }];
+            const center = { x: mirror(fragmentLength / 2), y: 0 };
+            const obstacles = [rect(-250, 250, -59, 118), rect(120, 282, -59, 118)];
+            const scale = 0.72 / 0.4199312039312039;
+            const offset = getEdgeLabelAutoOffset(ownPath, center, 'Flow', [], obstacles, scale);
+            const labelRect = estimateEdgeLabelRect({ x: center.x + offset.x, y: offset.y }, 'Flow', scale);
+            for (const obstacle of obstacles) {
+                expect(labelRect.x + labelRect.width <= obstacle.x
+                    || labelRect.x >= obstacle.x + obstacle.width
+                    || labelRect.y + labelRect.height <= obstacle.y
+                    || labelRect.y >= obstacle.y + obstacle.height).toBe(true);
+            }
+            expect(Math.abs(offset.x)).toBeLessThanOrEqual(96);
+        }
+    });
+
     it('skips peer-path traversal for unlabeled edges', () => {
         const edges: Edge[] = [{
             id: 'peer-edge',

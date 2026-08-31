@@ -286,5 +286,37 @@ export const getEdgeLabelAutoOffset = (
   if (bestPeerClearance < desiredPeerClearance || bestNodeClearance < desiredObstacleClearance) {
     considerCandidates(farCandidates);
   }
+  if (bestNodeClearance < desiredObstacleClearance) {
+    // Shared-trunk fragments can end inside a narrow free gap. Fixed retreat
+    // distances may jump over every legal label center after readable scaling.
+    // Use the actual obstacle boundaries, without widening the retreat budget.
+    const boundaryCandidates: EdgeLabelPoint[] = [];
+    const alongCenter = vertical ? safeLabelPoint.y : safeLabelPoint.x;
+    const halfAlong = (vertical ? estimated.height : estimated.width) / 2;
+    const halfCross = (vertical ? estimated.width : estimated.height) / 2;
+    for (const side of [preferred, -preferred]) {
+      const crossCenter = (vertical ? safeLabelPoint.x : safeLabelPoint.y) + side * perpendicular;
+      for (const obstacle of safeObstacles) {
+        const crossMin = vertical ? obstacle.x : obstacle.y;
+        const crossMax = crossMin + (vertical ? obstacle.width : obstacle.height);
+        if (crossCenter + halfCross + desiredObstacleClearance <= crossMin
+          || crossCenter - halfCross - desiredObstacleClearance >= crossMax) continue;
+        const alongMin = vertical ? obstacle.y : obstacle.x;
+        const alongMax = alongMin + (vertical ? obstacle.height : obstacle.width);
+        for (const center of [
+          Math.floor(alongMin - halfAlong - desiredObstacleClearance),
+          Math.ceil(alongMax + halfAlong + desiredObstacleClearance),
+        ]) {
+          const delta = center - alongCenter;
+          if (Math.abs(delta) > farAlong) continue;
+          boundaryCandidates.push(vertical
+            ? { x: side * perpendicular, y: delta }
+            : { x: delta, y: side * perpendicular });
+        }
+      }
+    }
+    const uniqueCandidates = [...new Map(boundaryCandidates.map(point => [`${point.x},${point.y}`, point])).values()];
+    considerCandidates(uniqueCandidates.sort((a, b) => Math.hypot(a.x, a.y) - Math.hypot(b.x, b.y)).slice(0, 16));
+  }
   return best;
 };
