@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConfigLayer } from '../../config/LayeredConfigManager';
 
@@ -28,6 +28,18 @@ vi.mock('../../config/DiagramConfig', () => ({
 }));
 
 describe('useConfigIntegration', () => {
+  const sharedIntegration = () => ({
+    isReady: () => true,
+    getStatus: () => ({
+      layeredConfigReady: true,
+      themeSystemReady: true,
+      validationReady: true,
+      performanceOptimizerReady: true,
+      migrationComplete: true,
+    }),
+    dispose: vi.fn(),
+  });
+
   beforeEach(() => {
     vi.resetModules();
     configIntegrationMocks.createConfigIntegration.mockReset();
@@ -36,6 +48,87 @@ describe('useConfigIntegration', () => {
   afterEach(() => {
     Object.values(safeLogState).forEach(mock => mock.mockReset());
     vi.restoreAllMocks();
+  });
+
+  it('does not dispose the application-owned integration when one consumer unmounts', async () => {
+    const integration = sharedIntegration();
+    configIntegrationMocks.createConfigIntegration.mockResolvedValue(integration);
+    const { useConfigIntegration } = await import('../useConfigIntegration');
+    const first = renderHook(() => useConfigIntegration());
+    const second = renderHook(() => useConfigIntegration());
+    await waitFor(() => expect(first.result.current[0].isReady).toBe(true));
+    await waitFor(() => expect(second.result.current[0].isReady).toBe(true));
+
+    first.unmount();
+    expect(integration.dispose).not.toHaveBeenCalled();
+    expect(second.result.current[0].integration).toBe(integration);
+    second.unmount();
+    expect(integration.dispose).not.toHaveBeenCalled();
+  });
+
+  it('does not dispose a shared initialization that resolves after its consumer unmounts', async () => {
+    const integration = sharedIntegration();
+    let finishInitialization: () => void = () => { throw new Error('Initialization has not started'); };
+    const pending = new Promise<typeof integration>(resolve => {
+      finishInitialization = () => resolve(integration);
+    });
+    configIntegrationMocks.createConfigIntegration.mockReturnValue(pending);
+    const { useConfigIntegration } = await import('../useConfigIntegration');
+    const consumer = renderHook(() => useConfigIntegration());
+    await waitFor(() => expect(configIntegrationMocks.createConfigIntegration).toHaveBeenCalledOnce());
+    consumer.unmount();
+    await act(async () => { finishInitialization(); });
+
+    expect(integration.dispose).not.toHaveBeenCalled();
+    const next = renderHook(() => useConfigIntegration());
+    await waitFor(() => expect(next.result.current[0].integration).toBe(integration));
+    next.unmount();
+  });
+
+  it('removes only its own config subscription when a consumer unmounts', async () => {
+    const unsubscribe = vi.fn();
+    const integration = {
+      ...sharedIntegration(),
+      getLayeredConfigManager: () => ({
+        getConfig: vi.fn().mockResolvedValue('current'),
+        addListener: vi.fn(() => unsubscribe),
+      }),
+    };
+    configIntegrationMocks.createConfigIntegration.mockResolvedValue(integration);
+    const { useConfigValue } = await import('../useConfigIntegration');
+    const consumer = renderHook(() => useConfigValue('feature.flag', 'fallback'));
+    await waitFor(() => expect(consumer.result.current[0]).toBe('current'));
+    consumer.unmount();
+
+    expect(unsubscribe).toHaveBeenCalledOnce();
+    expect(integration.dispose).not.toHaveBeenCalled();
+  });
+
+  it('preserves the active global theme CSS when an integration consumer unmounts', async () => {
+    const { EnhancedThemeManager } = await import('../../themes/EnhancedThemeManager');
+    const integrationTheme = new EnhancedThemeManager({ enableTransitions: false });
+    const activeTheme = new EnhancedThemeManager({ enableTransitions: false });
+    try {
+      await waitFor(() => expect(integrationTheme.getCurrentTheme()).toBeDefined());
+      await waitFor(() => expect(activeTheme.getCurrentTheme()).toBeDefined());
+      await activeTheme.setTheme('dark');
+      const primary = () => document.documentElement.style.getPropertyValue('--theme-primary-main');
+      expect(primary()).toBe('#177ddc');
+      const integration = { ...sharedIntegration(), dispose: vi.fn(() => integrationTheme.dispose()) };
+      configIntegrationMocks.createConfigIntegration.mockResolvedValue(integration);
+      const { useConfigIntegration } = await import('../useConfigIntegration');
+      const consumer = renderHook(() => useConfigIntegration());
+      await waitFor(() => expect(consumer.result.current[0].isReady).toBe(true));
+      consumer.unmount();
+
+      expect(primary()).toBe('#177ddc');
+      expect(activeTheme.getCurrentThemeId()).toBe('dark');
+      expect(integration.dispose).not.toHaveBeenCalled();
+    } finally {
+      integrationTheme.dispose();
+      activeTheme.dispose();
+      document.documentElement.classList.remove('dark');
+    }
   });
 
   it('redacts initialization failures before logging them', async () => {

@@ -102,9 +102,9 @@ export function useConfigIntegration(
           isLoading: false,
           status,
         }));
-      } else {
-        integration.dispose();
       }
+      // The factory owns this application-wide service. A consumer that
+      // unmounts during initialization must not dispose it for other consumers.
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       safeLog.error('ConfigIntegration initialization failed:', redactSensitiveLogValue(error));
@@ -270,14 +270,8 @@ export function useConfigIntegration(
     };
   }, [autoInitialize, initialize, state.integration, state.isLoading]);
 
-  // 清理资源
-  useEffect(() => {
-    return () => {
-      if (state.integration) {
-        state.integration.dispose();
-      }
-    };
-  }, [state.integration]);
+  // Consumers clean up their own subscriptions below; only the factory's
+  // resetConfigIntegration boundary may dispose the shared service.
 
   const actions: ConfigIntegrationActions = useMemo(() => ({
     initialize,

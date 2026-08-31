@@ -1,6 +1,6 @@
 # Vizly 首次打开与增量调整统一路由方案
 
-状态：质量、会话、拓扑、缺陷调度与 standalone 渲染协议主链已落地；已推送 main `6c5e761f` 的完整远端 CI 通过。下一批反向坐标统一修复已在工作区完成 TMS、Logistics 四方向连续切换验收，发布门禁进行中；扩大矩阵发现 WMS Demand BT 仍失败，原事务同请求也失败。性能专项和最终完整矩阵尚未闭环。
+状态：质量、会话、拓扑、缺陷调度与 standalone 渲染协议主链已落地；反向坐标统一修复已推送 main `6d1d0a70`，TMS、Logistics 四方向连续切换通过。本批远端静态/构建/smoke 及四组测试通过，但 routing 组 WMS LR 两项超时，不能记为完整 CI 通过。WMS Demand BT、性能专项和最终完整矩阵尚未闭环。
 适用范围：`BaseReactFlow` Canvas 最终显示路由、内置标准图、用户保存图、节点拖拽及局部编辑
 关联标准：`docs/edge-routing-goals.md`
 
@@ -8,7 +8,15 @@
 
 ### 当前交付检查点（2026-08-31，优先于下方历史记录）
 
-当前状态表（优先于后续过程记录；证据绑定已推送的 `6c5e761f2ae59373759bfbfb12809b1781d5ab5b`）：
+最新远端证据绑定 `6d1d0a709f688a0a1a42fa7e43e16b8afc56c637`，优先于下方旧检查点：
+
+- [完整 CI 33379835727](https://github.com/cbhandsun/Vizly/actions/runs/33379835727) 终态失败：静态/构建/桌面与移动 smoke、core/ui/foundation/flow 四组通过；routing 组 `domainLaneAlignedFlow.test.ts` 的 `wms-process LR`、`wms-production LR` 均超出原 30s 限制，coverage 汇总未执行。不是主题改动引入，不能归类为基础设施故障并反复重跑。
+- [性能专项 33379835702](https://github.com/cbhandsun/Vizly/actions/runs/33379835702) 已完成：增量及交互各 5 个样本通过；冷路由 Logistics p95 `1699/1100ms` 失败。单批交互通过不证明此前偶发主题变量丢失已修复；正式 30 样本仍未完成。
+- 当前主题修复已复现独立根因：`createConfigIntegration` 返回应用级单例，但 `useConfigIntegration` 在消费者卸载、或初始化完成时消费者已卸载这两条路径都会销毁共享实例。真实主题管理器回归确认这会把当前暗色 `--theme-primary-main` 从 `#177ddc` 删除为空。移除借用方的共享实例销毁，只保留自己的订阅清理；显式工厂 reset 仍拥有销毁职责。四项新回归在旧实现全部失败，修复后所属 12 文件/48 项和配置/主题 10 文件/64 项通过，最终兼容写法的 7 项再次通过。新增回归已在现有 CI shard，1079 文件全部收录。`verify:static` 与 TS6 全通过，零 Lint 错误/历史警告、零审计漏洞，bundle 总 JS `9379.18KB`，预算不变。这证明一条真实致错路径，不冒充此前远端偶发失败的完整调用栈证据。
+- 本批生产浏览器验收保留失败：独立 `--interaction-only` 在 selected paint `135.3/100ms` 停止，不能记为交互性能通过，也未重跑到绿色。随后在单独测试标签页核验主题状态：light → dark → high-contrast → light 的 mode/primary 全部正确，路径签名始终为 `route-v2:14:59:5ab9a803f38cb989`，Worker start=1、abort=0、stage=final-applied；已恢复浅色并关闭测试标签页，没有改动用户原标签页。状态检查不替代仍失败的绘制预算门禁。本批不重复约 100 分钟的本地全量 CI；远端完整 CI 随提交重新触发，已知 WMS LR 失败继续跟进。
+- 后续按缺陷推进而非逐图定制：先交付主题生命周期修复，再处理 WMS LR 超时与 Demand BT 质量缺陷；随后跑多预设 16 布局/连续切换矩阵、正式性能和 SVG/PDF/3D 验收。保留既有质量与时限要求，不用单图成功替代通用验证。
+
+上一检查点状态表（证据绑定 `6c5e761f2ae59373759bfbfb12809b1781d5ab5b`，不代表后续提交已全部通过）：
 
 | 范围 | 已验证 | 剩余交付条件 |
 | --- | --- | --- |
