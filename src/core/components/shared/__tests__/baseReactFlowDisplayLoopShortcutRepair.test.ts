@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Edge, Node } from '@xyflow/react';
 
 import wmsStandardData from '../../../../data/standardized/WmsStandardData.json';
 import { standardDataToCanvas } from '../../diagrams/designerUtils';
+import * as loopCandidates from '../baseReactFlowDisplayLoopShortcutCandidates';
 import {
   calculateEdgePathQualityScore,
   createEdgePathQualityEvaluationContext,
@@ -47,6 +48,48 @@ const residualPaths: Record<string, Array<{ x: number; y: number }>> = {
 };
 
 describe('display loop shortcut repair', () => {
+  it.each([1, 2, 4, 8])('does not build an unvisited later batch with an evaluation budget of %i', (budget) => {
+    const nodes: Node[] = [
+      { id: 'a', position: { x: 7072, y: 431 }, data: {}, width: 80, height: 80 },
+      { id: 'b', position: { x: 4984, y: 456 }, data: {}, width: 80, height: 80 },
+      { id: 'c', position: { x: 5402, y: 434 }, data: {}, width: 80, height: 80 },
+      { id: 'd', position: { x: 2345, y: 205 }, data: {}, width: 80, height: 80 },
+    ];
+    const edges: Edge[] = [
+      { id: 'first', source: 'a', target: 'b', sourceHandle: 'left', targetHandle: 'right',
+        data: { computedPath: residualPaths.e_shipping_bi.map(point => ({ ...point })) } },
+      { id: 'second', source: 'c', target: 'd', sourceHandle: 'left', targetHandle: 'top',
+        data: { computedPath: residualPaths.e_so_inv.map(point => ({ ...point })) } },
+    ];
+    const before = structuredClone(edges);
+    const diagnostics = createDisplayLoopShortcutRepairDiagnostics();
+    const spy = vi.spyOn(loopCandidates, 'buildBlockingEdgeLaneNudgeVariants');
+    try {
+      repairDisplayLoopShortcuts(edges, nodes, budget, undefined, diagnostics);
+      expect(diagnostics.qualityEvaluationCount).toBeGreaterThan(1);
+      expect(diagnostics.qualityEvaluationCount).toBeLessThanOrEqual(budget + 1);
+      expect(spy).not.toHaveBeenCalled();
+      expect(edges).toEqual(before);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('does not enter candidate builders for empty input or a disabled work budget', () => {
+    const spy = vi.spyOn(loopCandidates, 'buildBlockingEdgeLaneNudgeVariants');
+    try {
+      const empty: Edge[] = [];
+      expect(repairDisplayLoopShortcuts(empty, [], 1)).toBe(empty);
+      const edges: Edge[] = [{ id: 'edge', source: 's', target: 't', data: { computedPath: [] } }];
+      for (const budget of [0, -1]) {
+        expect(repairDisplayLoopShortcuts(edges, [], budget)).toBe(edges);
+      }
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('removes a WMS interior loop before the residual-overlap search', async () => {
     const canvas = await standardDataToCanvas(wmsStandardData as any);
     const nodes = withAbsoluteNodePositions(canvas.nodes as any);

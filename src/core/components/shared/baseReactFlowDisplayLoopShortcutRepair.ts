@@ -366,6 +366,7 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
   const reservedPortEvaluations = Math.min(16, Math.max(4, maxQualityEvaluations / 2));
   const loopEvaluationLimit = Math.max(1, maxQualityEvaluations - reservedPortEvaluations);
   loopSearch: for (const { edgeIndex } of rankedEdgeIndexes) {
+    if (evaluations >= loopEvaluationLimit) break;
     const perEdgeEvaluationBudget = Math.max(
       12,
       Math.floor(loopEvaluationLimit / Math.max(1, rankedEdgeIndexes.length)),
@@ -461,40 +462,47 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
       if (considerCandidate(candidate, [edgeIndex])) return best;
     }
     edgeCandidateSearch: for (const candidatePath of shortcutCandidates) {
-      const variants = [
-        ...(detourPolishMode
+      // All batches use the same immutable baseline as the former eager array,
+      // even if an earlier evaluated variant updates `best`.
+      const variantBaseline = best;
+      const variantBatches = [
+        () => detourPolishMode
           ? buildStrictBlockingTerminalLaneShiftVariants(
             candidatePath,
             edgeIndex,
-            best,
+            variantBaseline,
             nodes,
           ).map(paired => ({ mainPath: candidatePath, paired }))
-          : []),
-        ...buildLoopLaneNudgeVariants(candidatePath, edgeIndex, best)
+          : [],
+        () => buildLoopLaneNudgeVariants(candidatePath, edgeIndex, variantBaseline)
           .map(nudgedPath => ({ mainPath: nudgedPath, paired: null })),
-        ...buildBlockingEdgeLaneNudgeVariants(candidatePath, edgeIndex, best, nodes)
+        () => buildBlockingEdgeLaneNudgeVariants(candidatePath, edgeIndex, variantBaseline, nodes)
           .map(paired => ({ mainPath: candidatePath, paired })),
       ];
-      for (const { mainPath, paired } of variants) {
+      for (const buildVariants of variantBatches) {
         if (evaluations >= loopEvaluationLimit) break loopSearch;
         if (evaluations >= edgeEvaluationLimit) break edgeCandidateSearch;
-        const candidate = best.map((edge, index) => (
-          index === edgeIndex
-            ? withDisplayComputedPath(edge, mainPath)
-            : index === paired?.edgeIndex
-              ? paired.sourceSide && paired.targetSide
-                ? withDisplayPortBridge(
-                  edge,
-                  paired.path,
-                  paired.sourceSide,
-                  paired.targetSide,
-                )
-                : withDisplayComputedPath(edge, paired.path)
-              : edge
-        )) as T;
-        const changedIndexes = paired ? [edgeIndex, paired.edgeIndex] : [edgeIndex];
-        if (considerStrictClosedShortcut(candidate, changedIndexes)) return best;
-        if (considerCandidate(candidate, changedIndexes)) return best;
+        for (const { mainPath, paired } of buildVariants()) {
+          if (evaluations >= loopEvaluationLimit) break loopSearch;
+          if (evaluations >= edgeEvaluationLimit) break edgeCandidateSearch;
+          const candidate = best.map((edge, index) => (
+            index === edgeIndex
+              ? withDisplayComputedPath(edge, mainPath)
+              : index === paired?.edgeIndex
+                ? paired.sourceSide && paired.targetSide
+                  ? withDisplayPortBridge(
+                    edge,
+                    paired.path,
+                    paired.sourceSide,
+                    paired.targetSide,
+                  )
+                  : withDisplayComputedPath(edge, paired.path)
+                : edge
+          )) as T;
+          const changedIndexes = paired ? [edgeIndex, paired.edgeIndex] : [edgeIndex];
+          if (considerStrictClosedShortcut(candidate, changedIndexes)) return best;
+          if (considerCandidate(candidate, changedIndexes)) return best;
+        }
       }
     }
   }
@@ -509,6 +517,7 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
     }
     : null;
   for (const { edgeIndex } of rankedEdgeIndexes) {
+    if (evaluations >= maxQualityEvaluations) return best;
     const edge = edges[edgeIndex];
     const sourceNode = nodeById.get(edge.source);
     const targetNode = nodeById.get(edge.target);
@@ -571,6 +580,7 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
     }
     for (const sourceSide of sourceSides) {
       for (const targetSide of targetSides) {
+        if (evaluations >= maxQualityEvaluations) return best;
         if (sourceSide === currentSourceSide && targetSide === currentTargetSide) continue;
         const originalPath = getDisplayComputedPath(edge);
         const preservedLanePaths = [
@@ -626,6 +636,7 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
           ),
         ];
         for (const candidatePath of candidatePaths) {
+          if (evaluations >= maxQualityEvaluations) return best;
           const candidateEdge = withDisplayPortBridge(
             edge,
             candidatePath,
