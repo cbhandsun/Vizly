@@ -8,6 +8,10 @@ import {
 } from '../multiPagePersistence';
 import { duplicatePageCanvas } from '../multiPageDuplication';
 import {
+    DEFAULT_LAYOUT_SELECTION,
+    type LayoutSelection,
+} from '../layoutSelectionPersistence';
+import {
     createNextPageName,
     createUniquePageName,
     isPageNameAvailable,
@@ -20,6 +24,7 @@ export interface DiagramPage {
     name: string;
     nodes: Node[];
     edges: Edge[];
+    layoutSelection?: LayoutSelection;
 }
 
 const DEFAULT_PAGE_ID = 'page-1';
@@ -30,6 +35,7 @@ const createPage = (id: string, name: string): DiagramPage => ({
     name,
     nodes: [],
     edges: [],
+    layoutSelection: DEFAULT_LAYOUT_SELECTION,
 });
 
 const clearSelectedItems = <T extends Node | Edge>(items: T[]): T[] => items.map(item =>
@@ -48,7 +54,12 @@ export interface MultiPageHistoryScopes {
     removeScopes?: (pageIds: readonly string[]) => void;
     clearSelection?: () => void;
     scopeId?: string;
-    captureCurrentState?: () => { nodes: Node[]; edges: Edge[] };
+    captureCurrentState?: () => {
+        nodes: Node[];
+        edges: Edge[];
+        layoutSelection?: LayoutSelection;
+    };
+    restoreLayoutSelection?: (selection: LayoutSelection) => void;
 }
 
 interface DeletedPageSnapshot {
@@ -89,6 +100,7 @@ export const useMultiPage = (
     const removeHistoryScopes = historyScopes?.removeScopes;
     const clearSelection = historyScopes?.clearSelection;
     const captureCurrentState = historyScopes?.captureCurrentState;
+    const restoreLayoutSelection = historyScopes?.restoreLayoutSelection;
     const historyScopeId = historyScopes?.scopeId?.trim() ?? '';
     const getHistoryScopeKey = useMemo(
         () => historyScopeId
@@ -128,6 +140,7 @@ export const useMultiPage = (
         return {
             nodes: clearSelectedItems(captured?.nodes ?? getCurrentNodes()),
             edges: clearSelectedItems(captured?.edges ?? getCurrentEdges()),
+            layoutSelection: captured?.layoutSelection ?? DEFAULT_LAYOUT_SELECTION,
         };
     }, [captureCurrentState, getCurrentEdges, getCurrentNodes]);
 
@@ -144,13 +157,13 @@ export const useMultiPage = (
         clearSelection?.();
 
         // 保存当前页面状态
-        const { nodes: currentNodes, edges: currentEdges } = readCurrentState();
+        const currentState = readCurrentState();
         const clearedTargetPage = clearPageSelection(targetPage);
 
         setPages(prev => {
             const nextPages = prev.map(p =>
             p.id === currentActivePageId
-                ? { ...p, nodes: currentNodes, edges: currentEdges }
+                ? { ...p, ...currentState }
                 : p
             );
             pagesRef.current = nextPages;
@@ -158,12 +171,20 @@ export const useMultiPage = (
         });
 
         // 加载目标页面；历史作用域已在替换画布前同步切换。
+        restoreLayoutSelection?.(clearedTargetPage.layoutSelection ?? DEFAULT_LAYOUT_SELECTION);
         setNodes(clearedTargetPage.nodes);
         setEdges(clearedTargetPage.edges);
 
         activePageIdRef.current = targetPageId;
         setActivePageId(targetPageId);
-    }, [activateHistoryScope, clearSelection, readCurrentState, setNodes, setEdges]);
+    }, [
+        activateHistoryScope,
+        clearSelection,
+        readCurrentState,
+        restoreLayoutSelection,
+        setNodes,
+        setEdges,
+    ]);
 
     // 添加页面
     const addPage = useCallback(() => {
@@ -171,7 +192,7 @@ export const useMultiPage = (
         const currentActivePageId = activePageIdRef.current;
 
         // 先保存当前页面
-        const { nodes: currentNodes, edges: currentEdges } = readCurrentState();
+        const currentState = readCurrentState();
 
         const newId = `page-${crypto.randomUUID()}`;
         const newName = createNextPageName(pagesRef.current, createPageName);
@@ -185,7 +206,7 @@ export const useMultiPage = (
             const nextPages = [
                 ...prev.map(p =>
                 p.id === currentActivePageId
-                    ? { ...p, nodes: currentNodes, edges: currentEdges }
+                    ? { ...p, ...currentState }
                     : p
                 ),
                 newPage,
@@ -195,13 +216,22 @@ export const useMultiPage = (
         });
 
         // 切换到新页面（空画布）；历史作用域已在替换画布前同步隔离。
+        restoreLayoutSelection?.(newPage.layoutSelection ?? DEFAULT_LAYOUT_SELECTION);
         setNodes([]);
         setEdges([]);
         activePageIdRef.current = newId;
         setActivePageId(newId);
 
         return newId;
-    }, [activateHistoryScope, clearSelection, createPageName, readCurrentState, setNodes, setEdges]);
+    }, [
+        activateHistoryScope,
+        clearSelection,
+        createPageName,
+        readCurrentState,
+        restoreLayoutSelection,
+        setNodes,
+        setEdges,
+    ]);
 
     // 删除页面
     const deletePage = useCallback((pageId: string) => {
@@ -228,6 +258,9 @@ export const useMultiPage = (
             pageOperationVersionRef.current += 1;
             activateHistoryScope(adjacentPage.id);
             clearSelection?.();
+            restoreLayoutSelection?.(
+                clearedAdjacentPage.layoutSelection ?? DEFAULT_LAYOUT_SELECTION,
+            );
             setNodes(clearedAdjacentPage.nodes);
             setEdges(clearedAdjacentPage.edges);
             activePageIdRef.current = adjacentPage.id;
@@ -243,7 +276,15 @@ export const useMultiPage = (
         setRestorableDeletedPageName(deletedPage.name);
         setCanRestoreDeletedPage(true);
         return true;
-    }, [activateHistoryScope, clearSelection, readCurrentState, removePageHistoryScope, setNodes, setEdges]);
+    }, [
+        activateHistoryScope,
+        clearSelection,
+        readCurrentState,
+        removePageHistoryScope,
+        restoreLayoutSelection,
+        setNodes,
+        setEdges,
+    ]);
 
     const discardPage = useCallback((pageId: string) => {
         const currentPages = pagesRef.current;
@@ -259,6 +300,9 @@ export const useMultiPage = (
             pageOperationVersionRef.current += 1;
             activateHistoryScope(clearedAdjacentPage.id);
             clearSelection?.();
+            restoreLayoutSelection?.(
+                clearedAdjacentPage.layoutSelection ?? DEFAULT_LAYOUT_SELECTION,
+            );
             setNodes(clearedAdjacentPage.nodes);
             setEdges(clearedAdjacentPage.edges);
             activePageIdRef.current = clearedAdjacentPage.id;
@@ -268,7 +312,14 @@ export const useMultiPage = (
         setPages(remainingPages);
         removePageHistoryScope(pageId);
         return true;
-    }, [activateHistoryScope, clearSelection, removePageHistoryScope, setEdges, setNodes]);
+    }, [
+        activateHistoryScope,
+        clearSelection,
+        removePageHistoryScope,
+        restoreLayoutSelection,
+        setEdges,
+        setNodes,
+    ]);
 
     const restoreDeletedPage = useCallback(() => {
         const snapshot = deletedPageSnapshotRef.current;
@@ -284,7 +335,7 @@ export const useMultiPage = (
         const currentActivePageId = activePageIdRef.current;
         const currentState = readCurrentState();
         const savedPages = currentPages.map(page => page.id === currentActivePageId
-            ? { ...page, nodes: currentState.nodes, edges: currentState.edges }
+            ? { ...page, ...currentState }
             : page);
         const insertionIndex = Math.min(Math.max(snapshot.index, 0), savedPages.length);
         const restoredPage = clearPageSelection(snapshot.page);
@@ -299,6 +350,7 @@ export const useMultiPage = (
         clearSelection?.();
         pagesRef.current = nextPages;
         setPages(nextPages);
+        restoreLayoutSelection?.(restoredPage.layoutSelection ?? DEFAULT_LAYOUT_SELECTION);
         setNodes(restoredPage.nodes);
         setEdges(restoredPage.edges);
         activePageIdRef.current = restoredPage.id;
@@ -307,7 +359,14 @@ export const useMultiPage = (
         setRestorableDeletedPageName(null);
         setCanRestoreDeletedPage(false);
         return restoredPage.id;
-    }, [activateHistoryScope, clearSelection, readCurrentState, setEdges, setNodes]);
+    }, [
+        activateHistoryScope,
+        clearSelection,
+        readCurrentState,
+        restoreLayoutSelection,
+        setEdges,
+        setNodes,
+    ]);
 
     // 重命名页面
     const renamePage = useCallback((pageId: string, newName: string) => {
@@ -341,7 +400,11 @@ export const useMultiPage = (
         const sourcePage = currentPages[sourceIndex];
         const sourceCanvas = pageId === activePageIdRef.current
             ? currentState
-            : { nodes: sourcePage.nodes, edges: sourcePage.edges };
+            : {
+                nodes: sourcePage.nodes,
+                edges: sourcePage.edges,
+                layoutSelection: sourcePage.layoutSelection ?? DEFAULT_LAYOUT_SELECTION,
+            };
         const batchId = crypto.randomUUID();
         const duplicateId = `page-${batchId}`;
         const duplicatedCanvas = duplicatePageCanvas(sourceCanvas.nodes, sourceCanvas.edges, batchId);
@@ -349,10 +412,11 @@ export const useMultiPage = (
             id: duplicateId,
             name: duplicateName,
             ...duplicatedCanvas,
+            layoutSelection: sourceCanvas.layoutSelection,
         };
 
         const savedPages = currentPages.map(page => page.id === activePageIdRef.current
-            ? { ...page, nodes: currentState.nodes, edges: currentState.edges }
+            ? { ...page, ...currentState }
             : page);
         const nextPages = [
             ...savedPages.slice(0, sourceIndex + 1),
@@ -365,12 +429,22 @@ export const useMultiPage = (
         clearSelection?.();
         pagesRef.current = nextPages;
         setPages(nextPages);
+        restoreLayoutSelection?.(
+            duplicatedPage.layoutSelection ?? DEFAULT_LAYOUT_SELECTION,
+        );
         setNodes(duplicatedPage.nodes);
         setEdges(duplicatedPage.edges);
         activePageIdRef.current = duplicateId;
         setActivePageId(duplicateId);
         return duplicateId;
-    }, [activateHistoryScope, clearSelection, readCurrentState, setEdges, setNodes]);
+    }, [
+        activateHistoryScope,
+        clearSelection,
+        readCurrentState,
+        restoreLayoutSelection,
+        setEdges,
+        setNodes,
+    ]);
 
     const movePage = useCallback((pageId: string, direction: 'left' | 'right') => {
         const currentPages = pagesRef.current;
@@ -394,6 +468,7 @@ export const useMultiPage = (
             activePageIdRef.current,
             currentState.nodes,
             currentState.edges,
+            currentState.layoutSelection,
         );
     }, [readCurrentState]);
 
@@ -415,8 +490,12 @@ export const useMultiPage = (
         activePageIdRef.current = restored.activePageId;
         setPages(clearedPages);
         setActivePageId(restored.activePageId);
-        return clearedPages.find(page => page.id === restored.activePageId) ?? null;
-    }, [activateHistoryScope, clearSelection, resetPageHistoryScopes]);
+        const activePage = clearedPages.find(page => page.id === restored.activePageId) ?? null;
+        if (activePage) {
+            restoreLayoutSelection?.(activePage.layoutSelection ?? DEFAULT_LAYOUT_SELECTION);
+        }
+        return activePage;
+    }, [activateHistoryScope, clearSelection, resetPageHistoryScopes, restoreLayoutSelection]);
 
     const getPageOperationScope = useCallback(
         () => `${activePageIdRef.current}:${pageOperationVersionRef.current}`,

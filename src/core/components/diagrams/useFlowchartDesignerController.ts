@@ -373,15 +373,24 @@ export const useFlowchartDesignerController = ({
 
 
 
+    const { autoRoutingEnabled, setAutoRoutingEnabled, isLayoutStable, isLayoutBusy, layoutPresentationPreview, handleStrategyLayout, lastDomainStrategy, lastDomainDirection, lastNodeLayout, routingSessionRuntime, layoutSelection, restoreLayoutSelection } = useAutoRouting({
+        setNodes, setEdges, nodesRef, edgesRef, takeSnapshot, reactFlowInstance,
+        diagramId: diagramIdForExport,
+        loadLayoutPresetMap,
+    });
+
     // 协作层 diagramId：优先使用 id prop，回退到导出 ID，避免多画布协作时 ID 冲突
     const diagramId = id || diagramIdForExport || 'default';
     const { updateLocalCursor } = useDiagramCollaboration(diagramId, !isReadonly);
-    const captureCurrentPageState = useCallback(() => {
-        if (activePlugin?.capturePageState && pluginCtx) {
-            return activePlugin.capturePageState(pluginCtx);
-        }
-        return { nodes: nodesRef.current, edges: edgesRef.current };
-    }, [activePlugin, edgesRef, nodesRef, pluginCtx]);
+    const restorePageLayoutSelection = useCallback((selection: typeof layoutSelection) => {
+        restoreLayoutSelection({ layoutSelection: selection });
+    }, [restoreLayoutSelection]);
+    const captureCurrentPageState = useCallback(() => ({
+        ...(activePlugin?.capturePageState && pluginCtx
+            ? activePlugin.capturePageState(pluginCtx)
+            : { nodes: nodesRef.current, edges: edgesRef.current }),
+        layoutSelection,
+    }), [activePlugin, edgesRef, layoutSelection, nodesRef, pluginCtx]);
     const setPageNodes = useCallback((nextNodes: typeof nodes) => {
         nodesRef.current = nextNodes;
         setNodes(nextNodes);
@@ -409,6 +418,7 @@ export const useFlowchartDesignerController = ({
             clearSelection,
             scopeId: diagramId,
             captureCurrentState: captureCurrentPageState,
+            restoreLayoutSelection: restorePageLayoutSelection,
         },
         createLocalizedPageName,
     );
@@ -473,18 +483,6 @@ export const useFlowchartDesignerController = ({
         }
     }, [clearCanvasSelection, isCommentMode, contextMenuPaneClick]);
 
-    // Features
-    const { autoRoutingEnabled, setAutoRoutingEnabled, isLayoutStable, isLayoutBusy, layoutPresentationPreview, handleStrategyLayout, lastDomainStrategy, lastDomainDirection, lastNodeLayout, routingSessionRuntime, layoutSelection, restoreLayoutSelection } = useAutoRouting({
-        setNodes,
-        setEdges,
-        nodesRef,
-        edgesRef,
-        takeSnapshot,
-        reactFlowInstance,
-        diagramId: diagramIdForExport,
-        loadLayoutPresetMap,
-    });
-    
     // Auto-Routing: Sync internal `autoRoutingEnabled` with the exposed edgeMode from config/topbar
     useEffect(() => {
         if (internalEdgeMode === 'native') {

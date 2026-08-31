@@ -3,6 +3,10 @@ import type { Edge, Node } from '@xyflow/react';
 import { coerceClipboardData } from '../../utils/flowchartClipboard';
 
 import type { DiagramPage } from './hooks/useMultiPage';
+import {
+    DEFAULT_LAYOUT_SELECTION,
+    parseLayoutSelection,
+} from './layoutSelectionPersistence';
 import { createPageNameKey } from './multiPageNaming';
 
 const MULTI_PAGE_VERSION = 1;
@@ -31,13 +35,21 @@ const coercePage = (value: unknown): DiagramPage | null => {
     const id = coerceBoundedText(value.id, MAX_PAGE_ID_LENGTH);
     const name = coerceBoundedText(value.name, MAX_DIAGRAM_PAGE_NAME_LENGTH);
     if (!id || !name || !Array.isArray(value.nodes) || !Array.isArray(value.edges)) return null;
+    const layoutSelection = typeof value.layoutSelection === 'undefined'
+        ? DEFAULT_LAYOUT_SELECTION
+        : parseLayoutSelection(value.layoutSelection);
+    if (!layoutSelection) return null;
 
     if (value.nodes.length === 0) {
-        return value.edges.length === 0 ? { id, name, nodes: [], edges: [] } : null;
+        return value.edges.length === 0
+            ? { id, name, nodes: [], edges: [], layoutSelection }
+            : null;
     }
 
     const canvas = coerceClipboardData({ nodes: value.nodes, edges: value.edges });
-    return canvas ? { id, name, nodes: canvas.nodes, edges: canvas.edges } : null;
+    return canvas
+        ? { id, name, nodes: canvas.nodes, edges: canvas.edges, layoutSelection }
+        : null;
 };
 
 const createUniquePersistedPageName = (name: string, pageNames: Set<string>): string => {
@@ -85,9 +97,15 @@ export const createMultiPageMetadata = (
     activePageId: string,
     activeNodes: Node[],
     activeEdges: Edge[],
+    activeLayoutSelection?: DiagramPage['layoutSelection'],
 ): { multiPage: PersistedMultiPageState } | null => {
     const snapshot = pages.map(page => page.id === activePageId
-        ? { ...page, nodes: activeNodes, edges: activeEdges }
+        ? {
+            ...page,
+            nodes: activeNodes,
+            edges: activeEdges,
+            ...(activeLayoutSelection ? { layoutSelection: activeLayoutSelection } : {}),
+        }
         : page);
     const parsed = parseMultiPageMetadata({
         multiPage: {

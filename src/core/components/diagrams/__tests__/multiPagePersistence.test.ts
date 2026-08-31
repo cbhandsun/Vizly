@@ -5,6 +5,7 @@ import {
     createMultiPageMetadata,
     parseMultiPageMetadata,
 } from '../multiPagePersistence';
+import { DEFAULT_LAYOUT_SELECTION } from '../layoutSelectionPersistence';
 import { createAutoSavePayload, parseAutoSavePayload } from '../../../utils/autoSaveStorage';
 
 const node = (id: string): Node => ({
@@ -24,10 +25,82 @@ describe('multiPagePersistence', () => {
             version: 1,
             activePageId: 'page-1',
             pages: [
-                { id: 'page-1', name: 'Overview', nodes: [node('latest')], edges: [] },
-                { id: 'page-2', name: 'Details', nodes: [], edges: [] },
+                {
+                    id: 'page-1',
+                    name: 'Overview',
+                    nodes: [node('latest')],
+                    edges: [],
+                    layoutSelection: DEFAULT_LAYOUT_SELECTION,
+                },
+                {
+                    id: 'page-2',
+                    name: 'Details',
+                    nodes: [],
+                    edges: [],
+                    layoutSelection: DEFAULT_LAYOUT_SELECTION,
+                },
             ],
         });
+    });
+
+    it('round-trips independent layout selections for each page', () => {
+        const horizontalSelection = {
+            version: 1 as const,
+            strategy: 'domain-lanes',
+            direction: 'LR' as const,
+            nodeLayout: 'horizontal',
+        };
+        const metadata = createMultiPageMetadata([
+            {
+                id: 'page-1',
+                name: 'Overview',
+                nodes: [],
+                edges: [],
+                layoutSelection: DEFAULT_LAYOUT_SELECTION,
+            },
+            {
+                id: 'page-2',
+                name: 'Details',
+                nodes: [],
+                edges: [],
+                layoutSelection: horizontalSelection,
+            },
+        ], 'page-2', [], []);
+
+        expect(parseMultiPageMetadata(metadata)?.pages.map(page => page.layoutSelection)).toEqual([
+            DEFAULT_LAYOUT_SELECTION,
+            horizontalSelection,
+        ]);
+    });
+
+    it('defaults legacy pages without a layout selection and rejects an invalid explicit selection', () => {
+        const legacy = parseMultiPageMetadata({
+            multiPage: {
+                version: 1,
+                activePageId: 'page-1',
+                pages: [{ id: 'page-1', name: 'Legacy', nodes: [], edges: [] }],
+            },
+        });
+        expect(legacy?.pages[0]?.layoutSelection).toEqual(DEFAULT_LAYOUT_SELECTION);
+
+        expect(parseMultiPageMetadata({
+            multiPage: {
+                version: 1,
+                activePageId: 'page-1',
+                pages: [{
+                    id: 'page-1',
+                    name: 'Unsafe',
+                    nodes: [],
+                    edges: [],
+                    layoutSelection: {
+                        version: 1,
+                        strategy: 'domain-lanes',
+                        direction: 'diagonal',
+                        nodeLayout: 'horizontal',
+                    },
+                }],
+            },
+        })).toBeNull();
     });
 
     it('accepts a valid empty active page without discarding populated sibling pages', () => {

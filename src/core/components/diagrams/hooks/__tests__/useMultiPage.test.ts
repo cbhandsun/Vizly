@@ -5,6 +5,10 @@ import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createMultiPageHistoryScopeKey, useMultiPage } from '../useMultiPage';
+import {
+  DEFAULT_LAYOUT_SELECTION,
+  type LayoutSelection,
+} from '../../layoutSelectionPersistence';
 
 const node = (id: string): Node => ({
   id,
@@ -13,6 +17,89 @@ const node = (id: string): Node => ({
 });
 
 describe('useMultiPage', () => {
+  it('stores and restores layout selection independently for each page', () => {
+    const horizontalSelection: LayoutSelection = {
+      version: 1,
+      strategy: 'domain-lanes',
+      direction: 'LR',
+      nodeLayout: 'horizontal',
+    };
+    let currentSelection: LayoutSelection = DEFAULT_LAYOUT_SELECTION;
+    const restoreLayoutSelection = vi.fn((selection: LayoutSelection) => {
+      currentSelection = selection;
+    });
+    const { result } = renderHook(() => useMultiPage(
+      () => [],
+      () => [],
+      vi.fn(),
+      vi.fn(),
+      {
+        switchScope: vi.fn(),
+        removeScope: vi.fn(),
+        captureCurrentState: () => ({
+          nodes: [],
+          edges: [],
+          layoutSelection: currentSelection,
+        }),
+        restoreLayoutSelection,
+      },
+    ));
+
+    let secondPageId = '';
+    act(() => {
+      secondPageId = result.current.addPage() ?? '';
+    });
+    expect(secondPageId).not.toBe('');
+    expect(restoreLayoutSelection).toHaveBeenLastCalledWith(DEFAULT_LAYOUT_SELECTION);
+
+    currentSelection = horizontalSelection;
+    act(() => result.current.switchPage('page-1'));
+    expect(restoreLayoutSelection).toHaveBeenLastCalledWith(DEFAULT_LAYOUT_SELECTION);
+
+    act(() => result.current.switchPage(secondPageId));
+    expect(restoreLayoutSelection).toHaveBeenLastCalledWith(horizontalSelection);
+    expect(result.current.pages.find(page => page.id === secondPageId)?.layoutSelection).toEqual(
+      horizontalSelection,
+    );
+  });
+
+  it('inherits the source layout selection when duplicating a page', () => {
+    const horizontalSelection: LayoutSelection = {
+      version: 1,
+      strategy: 'domain-horizontal',
+      direction: 'LR',
+      nodeLayout: 'horizontal',
+    };
+    const restoreLayoutSelection = vi.fn();
+    const { result } = renderHook(() => useMultiPage(
+      () => [],
+      () => [],
+      vi.fn(),
+      vi.fn(),
+      {
+        switchScope: vi.fn(),
+        removeScope: vi.fn(),
+        captureCurrentState: () => ({
+          nodes: [],
+          edges: [],
+          layoutSelection: horizontalSelection,
+        }),
+        restoreLayoutSelection,
+      },
+    ));
+
+    let duplicateId = '';
+    act(() => {
+      duplicateId = result.current.duplicatePage('page-1', '页面 1') ?? '';
+    });
+
+    expect(duplicateId).not.toBe('');
+    expect(result.current.pages.find(page => page.id === duplicateId)?.layoutSelection).toEqual(
+      horizontalSelection,
+    );
+    expect(restoreLayoutSelection).toHaveBeenLastCalledWith(horizontalSelection);
+  });
+
   it('captures plugin-owned canvas data before replacing the active page', () => {
     let capturedNodes = [node('live-page-one')];
     const captureCurrentState = vi.fn(() => ({ nodes: capturedNodes, edges: [] as Edge[] }));
