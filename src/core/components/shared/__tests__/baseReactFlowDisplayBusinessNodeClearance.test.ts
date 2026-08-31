@@ -209,14 +209,14 @@ describe('final display business-node clearance', () => {
     });
   });
 
-  it('rolls back when commercial repair cannot preserve the exact terminal contract', () => {
+  it.each([true, false])('preserves authored exact terminals (%s) while repairing freely routed edges', fixed => {
     const edges: Edge[] = [{
       id: 'edge',
       source: 'source',
       target: 'target',
       sourceHandle: 'right',
       targetHandle: 'left',
-      data: { computedPath: [{ x: 80, y: 30 }, { x: 300, y: 30 }] },
+      data: { manualHandles: { source: fixed, target: fixed }, computedPath: [{ x: 80, y: 30 }, { x: 300, y: 30 }] },
     }];
     const exactBaseline = withExactDisplayHardReport({
       requestId: 'commercial-final-rollback',
@@ -230,11 +230,12 @@ describe('final display business-node clearance', () => {
       repairNodes: nodes,
     });
 
-    expect(finalized).toBe(exactBaseline);
+    if (fixed) expect(finalized).toBe(exactBaseline);
+    else expect(finalized).not.toBe(exactBaseline);
     expect(finalized.hardReport).toMatchObject({
-      hardClean: false,
+      hardClean: !fixed,
       terminalsAnchored: true,
-      commercialClearanceViolations: 1,
+      commercialClearanceViolations: fixed ? 1 : 0,
     });
   });
 });

@@ -7,6 +7,7 @@ import {
 import { displayHardQualityReportGeometryIsClean } from './baseReactFlowDisplayEvaluation';
 import type { DisplayEdgesWorkerResponse } from './baseReactFlowDisplayWorkerProtocol';
 import { withExactDisplayHardReport } from './baseReactFlowDisplayWorkerResponse';
+import { repairBaseReactFlowDisplayPerimeterClosure } from './baseReactFlowDisplayPerimeterClosure';
 
 const isCommercialClearanceOnlyFailure = (
   response: DisplayEdgesWorkerResponse,
@@ -38,9 +39,20 @@ export const finalizeBaseReactFlowExactCommercialClearance = ({
     repairNodes: Node[],
   ) => DisplayEdgesWorkerResponse;
 }>): DisplayEdgesWorkerResponse => {
-  if (exactBaseline.hardClean || !isCommercialClearanceOnlyFailure(exactBaseline)) {
+  if (exactBaseline.hardClean) {
     return exactBaseline;
   }
+  // A full layout can be trapped by existing local trunks. Only full-graph
+  // transactions may use this bounded geometric closure; incremental frozen
+  // boundaries and source-authored terminal constraints remain untouched.
+  if (!eligibleEdgeIds && exactBaseline.edges && exactBaseline.routeResolution !== 'incremental-route') {
+    const closed = repairBaseReactFlowDisplayPerimeterClosure(exactBaseline.edges, repairNodes);
+    if (closed !== exactBaseline.edges) {
+      const repaired = exactReport({ ...exactBaseline, edges: lockFinalDisplayComputedPaths(closed, repairNodes) }, repairNodes);
+      if (repaired.hardClean) return repaired;
+    }
+  }
+  if (!isCommercialClearanceOnlyFailure(exactBaseline)) return exactBaseline;
   const repairedEdges = repairBaseReactFlowMinimumBusinessNodeClearance(
     exactBaseline.edges ?? [],
     repairNodes,
