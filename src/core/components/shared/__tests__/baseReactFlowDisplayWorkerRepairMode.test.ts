@@ -10,6 +10,7 @@ import { getDisplayComputedPath } from '../baseReactFlowDisplayGeometry';
 import { COMMERCIAL_BUSINESS_NODE_CLEARANCE } from '../../../strategies/shared/edgeBusinessNodeClearanceRepair';
 import { scoreNodeClearanceRisk } from '../../../strategies/shared/edgeWaypointCandidateRepair';
 import { createDisplayRoutingIdentity } from '../baseReactFlowDisplayRoutingSession';
+import { outerCorridorGraph } from './fixtures/outerCorridorGraph';
 
 const nodes: Node[] = [
   { id: 'source', position: { x: 0, y: 0 }, measured: { width: 100, height: 60 }, data: {} },
@@ -34,6 +35,23 @@ afterEach(() => {
 });
 
 describe('baseReactFlowDisplayEdges worker repair mode', () => {
+  it('finalizes a blocked outer-ring return with zero crossings and commercial clearance violations', () => {
+    const graph = outerCorridorGraph();
+    const response = computeBaseReactFlowDisplayEdgesWorkerResponse({
+      operation: 'repair', requestId: 'outer-corridor-repair', repairMode: 'finalized',
+      edges: graph.edges, nodes: graph.nodes,
+    });
+    expect(response.error).toBeUndefined();
+    expect(response.hardClean).toBe(true);
+    expect(response.hardReport).toMatchObject({
+      terminalsAttached: true, terminalsAnchored: true, obstacleHits: 0,
+      minimumClearanceViolations: 0, commercialClearanceViolations: 0,
+      quality: { strictCrossings: 0, unrelatedOverlap: 0, reverseOverlap: 0 },
+    });
+    expect(response.edges?.map(edge => [edge.id, edge.source, edge.target]))
+      .toEqual(graph.edges.map(edge => [edge.id, edge.source, edge.target]));
+  }, 30000);
+
   it('uses a hard bounded obstacle budget when the result will be discarded on obstacle failure', () => {
     expect(measuredDisplayRepair.resolveMeasuredObstacleRepairOptions(true, 'TB')).toEqual({
       maxEdges: 2,

@@ -10,6 +10,12 @@ import { repairResidualOuterPortTransactionWithHardGate } from '../baseReactFlow
 import { getDisplayHardQualityGateReport } from '../baseReactFlowDisplayQualityGates';
 import { createBaseReactFlowFinalEndpointEvaluation } from '../baseReactFlowDisplayFinalEndpointEvaluation';
 import type { DisplayRoutingPhaseTrace } from '../baseReactFlowDisplayRoutingTrace';
+import { outerCorridorGraph } from './fixtures/outerCorridorGraph';
+import {
+  buildBoundedOuterCorridorCandidates,
+  buildOuterTerminalCorridorPaths,
+} from '../baseReactFlowDisplayOuterCorridorCandidates';
+import { getDisplayComputedPath } from '../baseReactFlowDisplayGeometry';
 
 const node = (id: string, x: number, y: number): Node => ({
   id,
@@ -111,6 +117,121 @@ const crossingOnlyEdges = (): Edge[] => [
 describe('outer port transaction', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('escapes a blocked exterior return without requiring a clean local port seed', () => {
+    const { edges, nodes } = outerCorridorGraph();
+    const before = getDisplayHardQualityGateReport(edges, nodes, 'polished');
+    expect(before.quality.strictCrossings).toBe(1);
+    const candidates = buildBoundedOuterPortTransactionCandidates(edges, nodes, {
+      includeStrictCrossings: true, maxCandidates: 12,
+    });
+    expect(candidates.length).toBeGreaterThan(0);
+    expect(candidates.length).toBeLessThanOrEqual(12);
+    expect(candidates.some(candidate => getDisplayHardQualityGateReport(
+      candidate.edges, nodes, 'polished',
+    ).hardClean)).toBe(true);
+    expect(candidates.every(candidate => edges.filter(
+      (edge, index) => candidate.edges[index] !== edge,
+    ).length === 1)).toBe(true);
+    const repaired = repairResidualOuterPortTransactionWithHardGate(edges, nodes);
+    expect(getDisplayHardQualityGateReport(repaired, nodes, 'polished').hardClean).toBe(true);
+    expect(repaired.map(edge => [edge.id, edge.source, edge.target]))
+      .toEqual(edges.map(edge => [edge.id, edge.source, edge.target]));
+  });
+
+  it.each([1, 2, 3])('retains the exterior escape after %i quarter turns', turns => {
+    const { edges, nodes } = outerCorridorGraph();
+    const rotate = (point: { x: number; y: number }) => {
+      let { x, y } = point;
+      for (let turn = 0; turn < turns; turn += 1) [x, y] = [-y, x];
+      return { x, y };
+    };
+    const sides = ['top', 'right', 'bottom', 'left'];
+    const rotatedNodes = nodes.map(node => {
+      const width = node.width ?? 0;
+      const height = node.height ?? 0;
+      const first = rotate(node.position);
+      const last = rotate({ x: node.position.x + width, y: node.position.y + height });
+      const nextWidth = Math.abs(last.x - first.x);
+      const nextHeight = Math.abs(last.y - first.y);
+      return { ...node, position: { x: Math.min(first.x, last.x), y: Math.min(first.y, last.y) },
+        width: nextWidth, height: nextHeight, measured: { width: nextWidth, height: nextHeight } };
+    });
+    const rotatedEdges = edges.map(edge => ({ ...edge,
+      sourceHandle: sides[(sides.indexOf(edge.sourceHandle ?? '') + turns) % 4],
+      targetHandle: sides[(sides.indexOf(edge.targetHandle ?? '') + turns) % 4],
+      data: { ...edge.data, computedPath: getDisplayComputedPath(edge).map(rotate) },
+    }));
+    const candidates = buildBoundedOuterPortTransactionCandidates(rotatedEdges, rotatedNodes, {
+      includeStrictCrossings: true, maxCandidates: 12,
+    });
+    expect(candidates.some(candidate => getDisplayHardQualityGateReport(
+      candidate.edges, rotatedNodes, 'polished',
+    ).hardClean)).toBe(true);
+  });
+
+  it('retains exact manual source positions and never mutates the source graph', () => {
+    const graph = outerCorridorGraph();
+    const edges = graph.edges.map(edge => ({ ...edge, data: { ...edge.data,
+      manualHandles: { source: true }, label: '<img src=x onerror=alert(1)>',
+    } }));
+    const before = JSON.stringify({ edges, nodes: graph.nodes });
+    const candidates = buildBoundedOuterCorridorCandidates(edges, graph.nodes, [2, 6], 48, 64);
+    expect(candidates.length).toBeGreaterThan(0);
+    for (const candidate of candidates) {
+      candidate.edges.forEach((edge, index) => {
+        expect(edge.sourceHandle).toBe(edges[index].sourceHandle);
+        expect(getDisplayComputedPath(edge)[0]).toEqual(getDisplayComputedPath(edges[index])[0]);
+        expect(edge.data?.label).toBe(edges[index].data?.label);
+      });
+    }
+    expect(JSON.stringify({ edges, nodes: graph.nodes })).toBe(before);
+  });
+
+  it('fails closed when both residual edges forbid terminal routing', () => {
+    const graph = outerCorridorGraph();
+    const edges = graph.edges.map(edge => ({ ...edge, data: { ...edge.data,
+      sourcePortPolicy: 'forbidden', targetPortPolicy: 'forbidden',
+    } }));
+    expect(buildBoundedOuterCorridorCandidates(edges, graph.nodes, [2, 6], 48, 64)).toEqual([]);
+    expect(repairResidualOuterPortTransactionWithHardGate(edges, graph.nodes)).toBe(edges);
+  });
+
+  it('bounds corridor candidates and rejects invalid budgets and graph references', () => {
+    const { edges, nodes } = outerCorridorGraph();
+    for (const limit of [NaN, Infinity, -1, 0, 1.5]) {
+      expect(buildBoundedOuterCorridorCandidates(edges, nodes, [2, 6], 48, limit)).toEqual([]);
+    }
+    for (const stub of [NaN, Infinity, -1, 0, 47]) {
+      expect(buildBoundedOuterCorridorCandidates(edges, nodes, [2, 6], stub, 12)).toEqual([]);
+    }
+    expect(buildBoundedOuterCorridorCandidates([], nodes, [2], 48, 12)).toEqual([]);
+    expect(buildBoundedOuterCorridorCandidates(edges, [], [2], 48, 12)).toEqual([]);
+    expect(buildBoundedOuterCorridorCandidates(edges, nodes, [NaN, -1], 48, 12)).toEqual([]);
+    const candidates = buildBoundedOuterCorridorCandidates(edges, nodes, [2, 6], 48, 1);
+    expect(candidates).toHaveLength(1);
+    expect(buildBoundedOuterCorridorCandidates(edges, nodes, [2, 6], 48, 1)).toEqual(candidates);
+  });
+
+  it('derives two return corridors from the complete blocker wall', () => {
+    const source = { x: 826.5, y: 313 };
+    const stub = { x: 778.5, y: 313 };
+    const target = { x: 1259, y: 1322 };
+    const targetStub = { x: 1259, y: 1370 };
+    const ring = { x: 144, y: 1844 };
+    const wall = [{ x: 1149.5, y: 1678, width: 219, height: 73 }];
+    const candidates = buildOuterTerminalCorridorPaths(source, stub, target, targetStub, ring, wall, 48);
+    expect(candidates).toHaveLength(2);
+    expect(candidates.map(candidate => candidate.transitionLane)).toEqual([1101.5, 1416.5]);
+    expect(buildOuterTerminalCorridorPaths(source, stub, target, targetStub, ring, [], 48)).toEqual([]);
+    for (const value of [NaN, Infinity, -Infinity]) {
+      expect(buildOuterTerminalCorridorPaths({ x: value, y: 0 }, stub, target, targetStub, ring, wall, 48)).toEqual([]);
+      expect(buildOuterTerminalCorridorPaths(source, stub, target, targetStub, ring,
+        [{ ...wall[0], width: value }], 48)).toEqual([]);
+    }
+    expect(buildOuterTerminalCorridorPaths(source, stub, target, targetStub, ring,
+      [{ ...wall[0], width: 0 }], 48)).toEqual([]);
   });
 
   it('enters the bounded port search for a strict-only residual when explicitly requested', () => {

@@ -25,6 +25,7 @@ import {
 } from './baseReactFlowDisplayTerminalPortCandidates';
 import { buildDiverseFacingPortPathCandidates } from './baseReactFlowDisplayOuterFacingPortCandidates';
 import { selectDiverseOuterPortPairSeeds } from './baseReactFlowDisplayOuterPortSeedSelection';
+import { buildBoundedOuterCorridorCandidates } from './baseReactFlowDisplayOuterCorridorCandidates';
 import {
   buildOuterPortTerminalStubPlan,
   type OuterPortTerminalStubProfile,
@@ -294,6 +295,9 @@ export const buildBoundedOuterPortTransactionCandidates = <T extends Edge[]>(
   const maxPortCandidates = Math.max(4, Math.min(16, options.maxPortCandidatesPerEdge ?? 16));
   const pair = findPrimaryResidualPair(edges, options.includeStrictCrossings === true);
   if (!pair) return [];
+  const outerCorridorFallback = () => buildBoundedOuterCorridorCandidates(
+    edges, nodes, [pair.firstIndex, pair.secondIndex], minStub, maxCandidates,
+  );
   const nodeById = new Map(nodes.map(node => [node.id, node] as const));
   const obstacles = buildDisplayRoutingObstacles(nodes);
   const baselineSegments = extractDisplaySegments(edges);
@@ -319,7 +323,7 @@ export const buildBoundedOuterPortTransactionCandidates = <T extends Edge[]>(
     minStub,
     maxPortCandidates,
   );
-  if (firstPorts.length === 0 || secondPorts.length === 0) return [];
+  if (firstPorts.length === 0 || secondPorts.length === 0) return outerCorridorFallback();
 
   const rankedSeeds = firstPorts.flatMap((first, firstIndex) => (
     secondPorts.map((second, secondIndex) => {
@@ -507,6 +511,7 @@ export const buildBoundedOuterPortTransactionCandidates = <T extends Edge[]>(
     }
   }
 
+  if (generated.length === 0) return outerCorridorFallback();
   const groups = new Map<string, Array<OuterPortTransactionCandidate<T>>>();
   for (const candidate of generated) {
     const key = `${candidate.movingEdgeIndex}:${candidate.ringAxis}`;
