@@ -165,6 +165,27 @@ export const prepareDisplayRoutingIncrementalCapture = session => session.evalua
   return true;
 })()`);
 
+export const releaseDisplayRoutingDrag = async (session, x, y) => {
+  if (![x, y].every(value => Number.isFinite(value) && value >= 0 && value <= 16_384)) {
+    throw new Error('Invalid display routing drag release coordinates');
+  }
+  await session.evaluate(`(() => {
+    window.__vizlyDragReleaseCapture = { count: 0, releasedAt: null };
+  })()`);
+  try {
+    await session.send('Input.dispatchMouseEvent', {
+      type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1,
+    });
+    const capture = await session.evaluate('window.__vizlyDragReleaseCapture');
+    if (capture?.count !== 1 || !Number.isSafeInteger(capture.releasedAt) || capture.releasedAt <= 0) {
+      throw new Error('Expected exactly one browser drag release timestamp');
+    }
+    return capture.releasedAt;
+  } finally {
+    await session.evaluate('window.__vizlyDragReleaseCapture = null');
+  }
+};
+
 export const readDisplayRoutingViewportZoomFromSession = async session => {
   const zoom = await session.evaluate(`(() => {
     const readViewportZoom = ${readDisplayRoutingViewportZoom.toString()};

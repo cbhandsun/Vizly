@@ -3,6 +3,66 @@ import vm from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 
 import { DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT } from './display-routing-browser-capture.mjs';
+import { releaseDisplayRoutingDrag } from './display-routing-browser-diagnostics.mjs';
+
+const releaseHarness = (dispatch = emit => emit({ button: 0, isTrusted: true })) => {
+  const listeners = new Map();
+  let clock = 1_000;
+  const window = {
+    Worker: class {},
+    addEventListener: (type, listener, capture) => { listeners.set(type, { listener, capture }); },
+  };
+  const context = vm.createContext({
+    window, Date: { now: () => clock },
+    PerformanceObserver: class { observe() {} },
+    requestAnimationFrame: () => 1,
+  });
+  vm.runInContext(DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT, context);
+  const session = {
+    evaluate: source => vm.runInContext(source, context),
+    send: vi.fn(async () => {
+      dispatch(event => listeners.get('mouseup').listener(event));
+      // Routing can finish at 1100 before CDP acknowledges at 1206.
+      clock = 1_206;
+    }),
+  };
+  return { window, session, listeners };
+};
+
+describe('browser drag release capture', () => {
+  it('timestamps the first trusted left release before application handlers, not CDP acknowledgement', async () => {
+    const { session, window, listeners } = releaseHarness();
+    expect(listeners.get('mouseup').capture).toBe(true);
+    listeners.get('mouseup').listener({ button: 0, isTrusted: true });
+    expect(window.__vizlyDragReleaseCapture).toBeNull();
+    expect(await releaseDisplayRoutingDrag(session, 42.5, 60)).toBe(1_000);
+    expect(window.__vizlyDragReleaseCapture).toBeNull();
+    expect(session.send).toHaveBeenCalledWith('Input.dispatchMouseEvent', {
+      type: 'mouseReleased', x: 42.5, y: 60, button: 'left', buttons: 0, clickCount: 1,
+    });
+  });
+
+  it('does not measure synthetic or other-button events and detects missing or duplicate releases', async () => {
+    for (const events of [[], [{ button: 0, isTrusted: false }], [{ button: 2, isTrusted: true }],
+      [{ button: 0, isTrusted: true }, { button: 0, isTrusted: true }]]) {
+      const { session, window } = releaseHarness(emit => events.forEach(emit));
+      await expect(releaseDisplayRoutingDrag(session, 0, 0)).rejects.toThrow(/exactly one/);
+      expect(window.__vizlyDragReleaseCapture).toBeNull();
+    }
+  });
+
+  it('cleans up after dispatch failure and refuses invalid input before dispatch', async () => {
+    const { session, window } = releaseHarness(() => { throw new Error('dispatch failed'); });
+    await expect(releaseDisplayRoutingDrag(session, 0, 0)).rejects.toThrow('dispatch failed');
+    expect(window.__vizlyDragReleaseCapture).toBeNull();
+    session.send.mockClear();
+    for (const value of [null, undefined, '', '1', '<script>', NaN, Infinity, -1, 16_385]) {
+      await expect(releaseDisplayRoutingDrag(session, value, 0)).rejects.toThrow(/coordinates/);
+      await expect(releaseDisplayRoutingDrag(session, 0, value)).rejects.toThrow(/coordinates/);
+    }
+    expect(session.send).not.toHaveBeenCalled();
+  });
+});
 
 describe('display routing browser capture', () => {
   it('retains layout lifecycle events under a flood of diagnostic completions within the original event cap', () => {

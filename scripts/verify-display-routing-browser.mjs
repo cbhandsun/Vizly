@@ -18,6 +18,7 @@ import {
   assertDisplayRoutingDragResult,
   countDisplayRoutingTransactionResponses,
   assertDisplayRoutingPerformanceBudget,
+  measureDisplayRoutingReleaseTiming,
   parseDisplayRoutingBrowserVerificationMode,
   parseDisplayRoutingSampleIndex,
   rotateDisplayRoutingDragCases,
@@ -30,6 +31,7 @@ import {
 import { DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT } from './lib/display-routing-browser-capture.mjs';
 import {
   prepareDisplayRoutingIncrementalCapture,
+  releaseDisplayRoutingDrag,
   readDisplayRoutingRequestDriftProbe,
   readDisplayRoutingIncrementalFailureStatus,
 } from './lib/display-routing-browser-diagnostics.mjs';
@@ -215,15 +217,7 @@ const dragNode = async (session, nodeId, beforeRelease = null) => {
     await delay(20);
   }
   if (beforeRelease) await beforeRelease();
-  await session.send('Input.dispatchMouseEvent', {
-    type: 'mouseReleased',
-    x: endX,
-    y: endY,
-    button: 'left',
-    buttons: 0,
-    clickCount: 1,
-  });
-  const releasedAt = Date.now();
+  const releasedAt = await releaseDisplayRoutingDrag(session, endX, endY);
   await delay(34);
   const releaseSnapshot = await session.evaluate(displayRoutingDragSnapshotExpression(nodeId));
   if (!displayRoutingViewportSnapshotsMatch(stableSnapshot.viewport, releaseSnapshot?.viewport)) {
@@ -686,11 +680,10 @@ const main = async () => {
       } finally {
         cpuProfile = await stopDisplayRoutingCpuProfile(session, cpuProfileStarted);
       }
-      const observedAt = Date.now();
-      incremental.releaseToObservedMs = observedAt - drag.releasedAt;
-      incremental.releaseToFinalMs = Number.isFinite(incremental.routing.finalAppliedAt)
-        ? incremental.routing.finalAppliedAt - drag.releasedAt
-        : incremental.releaseToObservedMs;
+      const observedAt = await session.evaluate('Date.now()');
+      Object.assign(incremental, measureDisplayRoutingReleaseTiming(
+        drag.releasedAt, incremental.routing.finalAppliedAt, observedAt,
+      ));
       incremental.scheduledToWorkerMs = Number.isFinite(incremental.routing.scheduledAt)
         && Number.isFinite(incremental.routing.workerStartedAt)
         ? incremental.routing.workerStartedAt - incremental.routing.scheduledAt

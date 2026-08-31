@@ -13,6 +13,15 @@ export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
   window.__vizlyLayoutVisualEvents = [];
   window.__vizlyWorkerHeartbeats = [];
   window.__vizlyRouteSamplingEnabled = true;
+  window.__vizlyDragReleaseCapture = null;
+  // Installed before application listeners: their mouseup handler may stop
+  // propagation, and CDP's acknowledgement can arrive after routing finishes.
+  window.addEventListener?.('mouseup', event => {
+    const capture = window.__vizlyDragReleaseCapture;
+    if (!capture || event.button !== 0 || !event.isTrusted) return;
+    capture.count = Math.min(2, capture.count + 1);
+    if (capture.count === 1) capture.releasedAt = Date.now();
+  }, true);
   let previousRenderedRouteFingerprint = '';
   let previousLayoutBusy = null;
   let previousLayoutCommitting = null;

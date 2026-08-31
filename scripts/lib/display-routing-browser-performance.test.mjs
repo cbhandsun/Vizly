@@ -7,6 +7,7 @@ import {
   countDisplayRoutingTransactionResponses,
   assertDisplayRoutingPerformanceBudget,
   assertDisplayRoutingPerformanceSummaryBudget,
+  measureDisplayRoutingReleaseTiming,
   displayRoutingIncrementalPhaseTraceIsComplete,
   EXPECTED_INCREMENTAL_DISPLAY_ROUTING_PHASE_SEQUENCES,
   isDisplayRoutingClosurePhase,
@@ -29,6 +30,37 @@ const availableCases = [
   { nodeId: 'wms', expectedMutableCount: 4 },
   { nodeId: 'l-oms', expectedMutableCount: 5 },
 ];
+
+describe('browser drag release clock', () => {
+  it('measures the browser event, not the later CDP acknowledgement', () => {
+    expect(measureDisplayRoutingReleaseTiming(1_000, 1_100, 1_206)).toEqual({
+      releaseToFinalMs: 100, releaseToObservedMs: 206,
+    });
+    expect(() => measureDisplayRoutingReleaseTiming(1_206, 1_100, 1_206)).toThrow(/timing/);
+    expect(measureDisplayRoutingReleaseTiming(1_000, 1_000, 1_000).releaseToFinalMs).toBe(0);
+  });
+
+  it('fails on missing, unsafe, nonfinite, stale and backwards timestamps without a fallback', () => {
+    for (const value of [null, undefined, '', '1000', '<script>', NaN, Infinity, -1, 0, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+      for (let index = 0; index < 3; index += 1) {
+        const times = [1_000, 1_100, 1_200];
+        times[index] = value;
+        expect(() => measureDisplayRoutingReleaseTiming(...times)).toThrow(/timing/);
+      }
+    }
+    expect(() => measureDisplayRoutingReleaseTiming(1_000, 1_200, 1_100)).toThrow(/timing/);
+    expect(() => measureDisplayRoutingReleaseTiming(1_000, 1_100, 601_001)).toThrow(/timing/);
+  });
+
+  it('rejects negative required metrics even when they fit the upper budget', () => {
+    for (const invalid of [-106, NaN, Infinity, null, '1']) {
+      expect(() => assertDisplayRoutingPerformanceBudget({}, { routeMs: 10 }, incremental({ releaseToFinalMs: invalid }))).toThrow();
+      expect(() => assertDisplayRoutingPerformanceBudget({}, { routeMs: invalid }, incremental())).toThrow();
+      expect(() => assertDisplayRoutingPerformanceBudget({}, { routeMs: 10 }, incremental({ workerToFinalMs: invalid }))).toThrow();
+      expect(() => assertDisplayRoutingPerformanceBudget({}, { routeMs: 10 }, incremental({ response: { phaseTrace: [{ phase: 'local-route', durationMs: invalid }] } }))).toThrow();
+    }
+  });
+});
 
 describe('incremental Worker transaction response count', () => {
   const progress = () => ({
@@ -476,12 +508,12 @@ describe('display routing browser performance budget', () => {
   it('applies benchmark budgets to p95 without rejecting an isolated maximum', () => {
     const summary = {
       sampleCount: 30,
-      initialRoute: { p95Ms: 740, maxMs: 810 },
+      initialRoute: { sampleCount: 30, p95Ms: 740, maxMs: 810 },
       dragCases: {
         wms: {
-          releaseToFinal: { p95Ms: 290 },
-          workerToFinal: { p95Ms: 290 },
-          localRoute: { p95Ms: 140 },
+          releaseToFinal: { sampleCount: 30, p95Ms: 290 },
+          workerToFinal: { sampleCount: 30, p95Ms: 290 },
+          localRoute: { sampleCount: 30, p95Ms: 140 },
           workerStartCount: 30,
           abortCount: 0,
           fallbackCount: 0,
@@ -490,6 +522,19 @@ describe('display routing browser performance budget', () => {
     };
 
     expect(assertDisplayRoutingPerformanceSummaryBudget(summary)).toHaveLength(4);
+    for (const invalid of [-106, NaN, null]) {
+      const values = [...Array(29).fill(20), invalid];
+      expect(() => assertDisplayRoutingPerformanceSummaryBudget({
+        ...summary,
+        dragCases: { wms: {
+          ...summary.dragCases.wms,
+          releaseToFinal: summarizeDisplayRoutingSamples(values),
+        } },
+      })).toThrow(/sampleViolations/);
+    }
+    expect(() => assertDisplayRoutingPerformanceSummaryBudget({
+      sampleCount: 30, initialRoute: summary.initialRoute, dragCases: {},
+    })).toThrow(/sampleViolations/);
     expect(() => assertDisplayRoutingPerformanceSummaryBudget({
       ...summary,
       initialRoute: { p95Ms: 751 },

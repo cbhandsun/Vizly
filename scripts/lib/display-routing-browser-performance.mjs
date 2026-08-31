@@ -384,6 +384,18 @@ export const summarizeDisplayRoutingOutlierSamples = (
   )).slice(0, limit);
 };
 
+export const measureDisplayRoutingReleaseTiming = (releasedAt, finalAppliedAt, observedAt) => {
+  if (![releasedAt, finalAppliedAt, observedAt].every(value => Number.isSafeInteger(value) && value > 0)
+    || finalAppliedAt < releasedAt || observedAt < finalAppliedAt
+    || observedAt - releasedAt > 600_000) {
+    throw new Error('Invalid browser drag release/final/observation timing');
+  }
+  return {
+    releaseToObservedMs: observedAt - releasedAt,
+    releaseToFinalMs: finalAppliedAt - releasedAt,
+  };
+};
+
 export const assertDisplayRoutingPerformanceBudget = (
   dragCase,
   initial,
@@ -399,7 +411,7 @@ export const assertDisplayRoutingPerformanceBudget = (
   };
   const exceeded = Object.entries(DISPLAY_ROUTING_PERFORMANCE_BUDGET_MS)
     .filter(([name, budget]) => (
-      !Number.isFinite(measurements[name]) || measurements[name] > budget
+      !Number.isFinite(measurements[name]) || measurements[name] < 0 || measurements[name] > budget
     ));
   if (exceeded.length === 0) return measurements;
   throw new Error(`Routing performance budget exceeded:\n${JSON.stringify({
@@ -431,8 +443,23 @@ export const assertDisplayRoutingPerformanceSummaryBudget = summary => {
     }
   }
   const exceeded = measurements.filter(([, value, budget]) => (
-    !Number.isFinite(value) || value > budget
+    !Number.isFinite(value) || value < 0 || value > budget
   ));
+  // The summarizer filters invalid optional diagnostics. Required metrics must
+  // still contain every sample; otherwise a discarded negative duration can
+  // silently improve the reported p95.
+  const dragEntries = Object.entries(summary?.dragCases ?? {});
+  const sampleViolations = [
+    ...(!expectedSampleCount || dragEntries.length === 0 ? [['sampleCount']] : []),
+    ...(summary?.initialRoute?.sampleCount === expectedSampleCount * dragEntries.length
+      ? [] : [['initialRoute.sampleCount']]),
+    ...dragEntries.flatMap(([nodeId, dragCase]) => (
+      ['releaseToFinal', 'workerToFinal', 'localRoute'].flatMap(name => (
+        dragCase?.[name]?.sampleCount === expectedSampleCount
+          ? [] : [[`${nodeId}.${name}.sampleCount`]]
+      ))
+    )),
+  ];
   const lifecycleViolations = Object.entries(summary?.dragCases ?? {}).flatMap(
     ([nodeId, dragCase]) => [
       dragCase?.workerStartCount === expectedSampleCount
@@ -446,11 +473,12 @@ export const assertDisplayRoutingPerformanceSummaryBudget = summary => {
         : [`${nodeId}.fallbackCount`, dragCase?.fallbackCount, 0],
     ].filter(Boolean),
   );
-  if (exceeded.length === 0 && lifecycleViolations.length === 0) return measurements;
+  if (exceeded.length === 0 && lifecycleViolations.length === 0 && sampleViolations.length === 0) return measurements;
   throw new Error(`Routing performance or lifecycle budget exceeded:\n${JSON.stringify({
     sampleCount: summary?.sampleCount ?? null,
     budgets: DISPLAY_ROUTING_P95_BUDGET_MS,
     exceeded,
     lifecycleViolations,
+    sampleViolations,
   }, null, 2)}`);
 };
