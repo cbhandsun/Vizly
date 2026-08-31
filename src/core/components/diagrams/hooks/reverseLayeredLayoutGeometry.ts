@@ -66,9 +66,10 @@ const mirrorPath = (
 
 /**
  * Reverses a known-good layered layout without asking the ranking engine to
- * rediscover feedback lanes in the opposite direction. Node coordinates are
- * mirrored in their own parent coordinate space; absolute route candidates
- * are mirrored once across the complete graph envelope.
+ * rediscover feedback lanes in the opposite direction. Nodes and route points
+ * share one absolute reflection; node positions are then converted back to
+ * their mirrored parent's coordinate space. Per-sibling reflection would move
+ * cross-domain endpoints by different amounts and invalidate the route seed.
  */
 export const reverseLayeredLayoutGeometry = <T extends { nodes: Node[]; edges: Edge[] }>(
     result: T,
@@ -109,36 +110,22 @@ export const reverseLayeredLayoutGeometry = <T extends { nodes: Node[]; edges: E
     }, { minimum: Number.POSITIVE_INFINITY, maximum: Number.NEGATIVE_INFINITY });
     if (!Number.isFinite(graphBounds.minimum) || !Number.isFinite(graphBounds.maximum)) return result;
 
-    const siblingBounds = new Map<string, { minimum: number; maximum: number }>();
-    for (const node of result.nodes) {
-        const key = node.parentId ?? '';
-        const position = direction === 'BT' ? node.position.y : node.position.x;
+    const mirroredAbsolutePositions = new Map(result.nodes.map(node => {
+        const point = mirrorPoint(absolutePosition(node), direction, graphBounds.minimum, graphBounds.maximum);
         const size = nodeSize(node);
-        const extent = direction === 'BT' ? size.height : size.width;
-        const current = siblingBounds.get(key) ?? {
-            minimum: Number.POSITIVE_INFINITY,
-            maximum: Number.NEGATIVE_INFINITY,
-        };
-        current.minimum = Math.min(current.minimum, position);
-        current.maximum = Math.max(current.maximum, position + extent);
-        siblingBounds.set(key, current);
-    }
+        return [node.id, direction === 'BT'
+            ? { x: point.x, y: point.y - size.height }
+            : { x: point.x - size.width, y: point.y }] as const;
+    }));
 
     const nodes = result.nodes.map((node) => {
-        const bounds = siblingBounds.get(node.parentId ?? '');
-        if (!bounds) return node;
-        const size = nodeSize(node);
+        const absolute = mirroredAbsolutePositions.get(node.id);
+        if (!absolute) return node;
+        const parent = node.parentId ? mirroredAbsolutePositions.get(node.parentId) : undefined;
         return {
             ...node,
-            position: direction === 'BT'
-                ? {
-                    x: node.position.x,
-                    y: bounds.minimum + bounds.maximum - node.position.y - size.height,
-                }
-                : {
-                    x: bounds.minimum + bounds.maximum - node.position.x - size.width,
-                    y: node.position.y,
-                },
+            position: { x: absolute.x - (parent?.x ?? 0), y: absolute.y - (parent?.y ?? 0) },
+            ...('positionAbsolute' in node ? { positionAbsolute: { ...absolute } } : {}),
         };
     });
     const edges = result.edges.map((edge) => {
@@ -192,7 +179,13 @@ export const calculateLayeredLayoutWithReverse = async (
     reverseRanking: boolean,
     context?: LayoutCalculationContext,
 ): Promise<{ nodes: Node[]; edges: Edge[] }> => {
+    // Semantic lanes already reverse their global business ranks while keeping
+    // container headers upright. Mirroring that layout would swap header and
+    // bottom padding and place terminal nodes inside the title strip.
+    const nativeSemanticReverse = options.domainPlacement === 'ordered-lanes'
+        && (options.nodeLayout === 'dagre' || options.nodeLayout === 'flow');
     const reverseDirection = reverseRanking
+        && !nativeSemanticReverse
         && (requestedDirection === 'BT' || requestedDirection === 'RL')
         ? requestedDirection
         : null;

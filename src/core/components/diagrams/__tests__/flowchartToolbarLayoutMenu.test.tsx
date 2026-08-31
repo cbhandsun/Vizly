@@ -290,8 +290,8 @@ describe('flowchartToolbarLayoutMenu', () => {
     expect(onStrategyLayout).toHaveBeenCalledWith('domain-lanes', 'dagre', 'LR');
     if (typeof lanesBt?.onClick === 'function') lanesBt.onClick();
     if (typeof lanesRl?.onClick === 'function') lanesRl.onClick();
-    expect(onStrategyLayout).toHaveBeenCalledWith('domain-lanes', 'flow', 'BT');
-    expect(onStrategyLayout).toHaveBeenCalledWith('domain-lanes', 'flow', 'RL');
+    expect(onStrategyLayout).toHaveBeenCalledWith('domain-lanes', 'dagre', 'BT');
+    expect(onStrategyLayout).toHaveBeenCalledWith('domain-lanes', 'dagre', 'RL');
 
     const nodeVertical = items.find(item => item.key === 'node-vertical');
     if (typeof nodeVertical?.onClick === 'function') nodeVertical.onClick();
@@ -316,8 +316,8 @@ describe('flowchartToolbarLayoutMenu', () => {
     for (const [key, direction, nodeLayout] of [
       ['domain-lanes-tb', 'TB', 'dagre'],
       ['domain-lanes-lr', 'LR', 'dagre'],
-      ['domain-lanes-bt', 'BT', 'flow'],
-      ['domain-lanes-rl', 'RL', 'flow'],
+      ['domain-lanes-bt', 'BT', 'dagre'],
+      ['domain-lanes-rl', 'RL', 'dagre'],
     ] as const) {
       const item = items.find(candidate => candidate.key === key);
       expect(item).toBeDefined();
