@@ -1,5 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import {
+  DISPLAY_ROUTING_LAYOUT_CASES,
   displayRoutingLayoutSelectionMatches,
   findDisplayRoutingMenuElementByKey,
   resolveDisplayRoutingMenuPointerTarget,
@@ -79,6 +80,10 @@ export const assertRequestedLayoutSelected = async (session, caseId) => {
       ?.getAttribute('aria-label'),
   }))()`);
   if (!displayRoutingLayoutSelectionMatches(selection.requested, selection.applied)) {
-    throw new Error(`${caseId} committed a different layout than requested`);
+    const knownSelection = value => DISPLAY_ROUTING_LAYOUT_CASES.find(candidate => (
+      displayRoutingLayoutSelectionMatches(candidate.label, value)
+    ))?.id ?? 'unrecognized';
+    throw new Error(`${caseId} committed a different layout than requested`
+      + ` (requested=${knownSelection(selection.requested)}, applied=${knownSelection(selection.applied)})`);
   }
 };

@@ -130,6 +130,20 @@ describe('display routing matrix cases', () => {
     await expect(assertRequestedLayoutSelected({}, 'tree-tb')).resolves.toBeUndefined();
   });
 
+  it('reports only known layout ids when selection verification fails', async () => {
+    const mismatch = { evaluate: async () => ({
+      requested: '泳道 · 域左右并列（域内上→下）',
+      applied: '自动布局：复杂流程（保留域·上→下）',
+    }) };
+    await expect(assertRequestedLayoutSelected(mismatch, 'domain-lanes-tb')).rejects.toThrow(
+      'requested=domain-lanes-tb, applied=domain-compound-elk-tb',
+    );
+    const unknown = { evaluate: async () => ({ requested: 'private diagram token=secret', applied: null }) };
+    await expect(assertRequestedLayoutSelected(unknown, 'domain-lanes-tb')).rejects.toThrow(
+      'domain-lanes-tb committed a different layout than requested (requested=unrecognized, applied=unrecognized)',
+    );
+  });
+
   it('fails the command when no toolbar trigger exists', async () => {
     await expect(clickLayout({ evaluate: async () => false }, { id: 'domain-lanes-tb' }))
       .rejects.toThrow('trigger was not found');

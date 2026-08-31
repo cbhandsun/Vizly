@@ -66,6 +66,19 @@ export const resolveDisplayRoutingFinalRouteSnapshot = ({
     || routing.renderAuthorityStatus !== 'accepted'
     || typeof routing.requestId !== 'string'
   ) return null;
+  // Geometry can be applied before the command finishes restoring selection
+  // and releasing its preview. A new-layout waiter must observe the complete
+  // transaction, including on Worker-response and validated-candidate paths.
+  if (expectedRequestPrefix === 'layout:' && minimumExclusiveLayoutJobId !== undefined) {
+    const jobId = routing.layoutTransactionJobId;
+    const requestPrefix = `layout:${jobId}`;
+    if (!Number.isSafeInteger(minimumExclusiveLayoutJobId) || minimumExclusiveLayoutJobId < 0
+      || !Number.isSafeInteger(jobId) || jobId <= minimumExclusiveLayoutJobId
+      || routing.layoutTransactionStatus !== 'committed'
+      || (routing.requestId !== requestPrefix && !routing.requestId.startsWith(`${requestPrefix}:`))) {
+      return null;
+    }
+  }
   const safeRequests = Array.isArray(requests) ? requests : [];
   const safeResponses = Array.isArray(responses) ? responses : [];
   const response = [...safeResponses].reverse().find(item => (

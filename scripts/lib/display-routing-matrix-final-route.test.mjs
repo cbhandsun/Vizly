@@ -11,6 +11,43 @@ const request = {
 };
 const committedShape = { nodeCount: 2, edgeCount: 1 };
 
+describe('new layout completion requires the whole transaction', () => {
+  const options = (status, jobId = 7, responses = []) => ({
+    routing: { ...committedShape, stage: 'final-applied', requestId: 'layout:7',
+      renderAuthorityStatus: 'accepted', layoutTransactionJobId: jobId,
+      layoutTransactionStatus: status,
+      phaseProgressTrace: [{ phase: 'candidate-validation', resolution: 'hit' }] },
+    requests: [request], responses, currentEdges: request.edges,
+    renderedEdgeCount: 1, expectedRequestPrefix: 'layout:', minimumExclusiveLayoutJobId: 6,
+  });
+  const response = { requestId: 'layout:7', edges: request.edges,
+    hardClean: true, hardReport: { hardClean: true } };
+  const modes = [{ mode: 'candidate', responses: [] }, { mode: 'worker', responses: [response] }];
+
+  it.each(modes)('does not accept $mode geometry before selection/transaction commit', ({ mode, responses }) => {
+    for (const status of ['running', 'failed', undefined, null]) {
+      expect(resolveDisplayRoutingFinalRouteSnapshot(options(status, 7, responses))).toBeNull();
+    }
+    const result = resolveDisplayRoutingFinalRouteSnapshot(options('committed', 7, responses));
+    expect(result).not.toBeNull();
+    if (mode === 'worker') expect(result.response).toBe(response);
+    else expect(result.response.source).toBe('final-applied-candidate');
+  });
+
+  it.each(modes)('rejects old or mismatched transactions even with a clean $mode route', ({ responses }) => {
+    for (const jobId of [6, 5, 8, NaN, Infinity, -1, 6.5, undefined]) {
+      const input = options('committed', 7, responses);
+      input.routing.layoutTransactionJobId = jobId;
+      expect(resolveDisplayRoutingFinalRouteSnapshot(input)).toBeNull();
+    }
+    for (const boundary of [null, NaN, Infinity, -1, 6.5, '6']) {
+      expect(resolveDisplayRoutingFinalRouteSnapshot({
+        ...options('committed', 7, responses), minimumExclusiveLayoutJobId: boundary,
+      })).toBeNull();
+    }
+  });
+});
+
 it('pairs reused request ids by request ordinal and Worker instance', () => {
   const first = {
     ...request,
