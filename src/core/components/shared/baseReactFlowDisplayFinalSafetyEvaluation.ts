@@ -42,7 +42,9 @@ export const finalSafetyCandidateIsAccepted = (
   if (options.eligibleEdgeIds && candidate.some((edge, index) => (
     edge !== baseline[index] && !options.eligibleEdgeIds?.has(edge.id)
   ))) return false;
-  if (countRenderUnsafeEndpointStubs(candidate) !== 0) return false;
+  const unsafeEndpointStubCount = options.evaluation?.unsafeEndpointStubs(candidate)
+    ?? countRenderUnsafeEndpointStubs(candidate);
+  if (unsafeEndpointStubCount !== 0) return false;
   const endpointOrder = options.evaluation?.endpointOrder(candidate)
     ?? auditFinalSameSideEndpointOrder(candidate, nodes);
   const passageOrder = options.evaluation?.passageOrder(candidate)

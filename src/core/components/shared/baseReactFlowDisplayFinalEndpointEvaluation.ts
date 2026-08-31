@@ -31,6 +31,7 @@ import {
   createBaseReactFlowDisplayEdgePatches,
   mergeBaseReactFlowDisplayEdgePatches,
 } from './baseReactFlowDisplayRoutingTransaction';
+import { createBaseReactFlowRequestMemo } from './baseReactFlowDisplayRequestMemo';
 
 export type BaseReactFlowFinalEndpointEvaluation = Readonly<{
   nodes: Node[];
@@ -151,6 +152,10 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
   const hardGateMemo = createBaseDisplayHardGateMemo(nodes, terminalSnapshot);
   let evaluationCount = 0;
   let cacheHitCount = 0;
+  const getEndpointAuditSignature = createBaseReactFlowRequestMemo(endpointAuditSignature);
+  const getOutputRouteSignature = createBaseReactFlowRequestMemo(
+    computeBaseReactFlowDisplayOutputRouteSignature,
+  );
   const endpointOrderByEdges = new WeakMap<
     readonly Edge[],
     ReturnType<typeof auditFinalSameSideEndpointOrder>
@@ -202,7 +207,7 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
       cacheHitCount += 1;
       return cached;
     }
-    const signature = endpointAuditSignature(edges);
+    const signature = getEndpointAuditSignature(edges);
     const routeCached = signature ? endpointOrderBySignature.get(signature) : undefined;
     if (routeCached) {
       cacheHitCount += 1;
@@ -275,7 +280,7 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
         cacheHitCount += 1;
         return cached;
       }
-      const signature = endpointAuditSignature(edges);
+      const signature = getEndpointAuditSignature(edges);
       const routeCached = signature ? passageOrderBySignature.get(signature) : undefined;
       if (routeCached) {
         cacheHitCount += 1;
@@ -293,7 +298,7 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
       maxEvaluations = 64,
       allowStrictFallback = true,
     ) {
-      const baselineSignature = endpointAuditSignature(edges);
+      const baselineSignature = getEndpointAuditSignature(edges);
       const cachedIndex = renderSafeStubRepairs.findIndex(entry => (
         entry.maxEvaluations === maxEvaluations
         && entry.allowStrictFallback === allowStrictFallback
@@ -322,7 +327,7 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
         if (
           replayed
           && cached.repairedSignature !== null
-          && endpointAuditSignature(replayed) === cached.repairedSignature
+          && getEndpointAuditSignature(replayed) === cached.repairedSignature
         ) {
           cacheHitCount += 1;
           return replayed;
@@ -363,7 +368,7 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
           if (!evicted) break;
           renderSafeStubRepairEdgeSlots -= evicted.baselineEdges.length;
         }
-        const repairedSignature = endpointAuditSignature(repairedEdges);
+        const repairedSignature = getEndpointAuditSignature(repairedEdges);
         renderSafeStubRepairs.push({
           allowStrictFallback,
           baselineSignature,
@@ -385,7 +390,7 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
         cacheHitCount += 1;
         return cached;
       }
-      const signature = computeBaseReactFlowDisplayOutputRouteSignature(edges);
+      const signature = getOutputRouteSignature(edges);
       const routeCached = signature ? terminalReportBySignature.get(signature) : undefined;
       if (routeCached) {
         cacheHitCount += 1;
@@ -404,7 +409,7 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
         cacheHitCount += 1;
         return cached;
       }
-      const signature = computeBaseReactFlowDisplayOutputRouteSignature(edges);
+      const signature = getOutputRouteSignature(edges);
       const routeCached = signature ? unsafeStubsBySignature.get(signature) : undefined;
       if (typeof routeCached === 'number') {
         cacheHitCount += 1;

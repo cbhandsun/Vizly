@@ -12,7 +12,9 @@ import { createDisplayWorkerFinalEvaluation } from '../baseReactFlowDisplayWorke
 import { repairRenderSafeEndpointStubs } from '../baseReactFlowDisplayEndpointStubRepair';
 import { repairBaseReactFlowFinalCommercialDetours } from '../baseReactFlowDisplayCommercialDetourRepair';
 import { repairTerminalPreservingOuterStairs } from '../baseReactFlowDisplayCommercialOuterStairRepair';
+import { finalSafetyCandidateIsAccepted } from '../baseReactFlowDisplayFinalSafetyEvaluation';
 import { getDisplayComputedPath } from '../baseReactFlowDisplayGeometry';
+import { createBaseReactFlowRequestMemo } from '../baseReactFlowDisplayRequestMemo';
 
 const nodes: Node[] = [
   { id: 'source', position: { x: 0, y: 0 }, width: 100, height: 60, data: {} },
@@ -47,6 +49,37 @@ const edges: Edge[] = [
 ];
 
 describe('createBaseReactFlowFinalEndpointEvaluation', () => {
+  it('memoizes request-local evidence once per immutable reference including null results', () => {
+    const compute = vi.fn((input: Readonly<{ valid: boolean }>) => (
+      input.valid ? 'ready' : null
+    ));
+    const memoized = createBaseReactFlowRequestMemo(compute);
+    const valid = { valid: true };
+    const invalid = { valid: false };
+
+    expect(memoized(valid)).toBe('ready');
+    expect(memoized(valid)).toBe('ready');
+    expect(memoized({ ...valid })).toBe('ready');
+    expect(memoized(invalid)).toBeNull();
+    expect(memoized(invalid)).toBeNull();
+    expect(compute).toHaveBeenCalledTimes(3);
+  });
+
+  it('routes final safety stub checks through the shared request-local evaluation', () => {
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
+    const unsafeEndpointStubs = vi.spyOn(evaluation, 'unsafeEndpointStubs');
+
+    finalSafetyCandidateIsAccepted(
+      edges,
+      edges,
+      nodes,
+      { evaluation },
+      () => evaluation.endpointOrder(edges).legalSharedTrunks,
+    );
+
+    expect(unsafeEndpointStubs).toHaveBeenCalledOnce();
+  });
+
   it('only treats one fully declared immutable edge replacement as an exact obstacle delta', () => {
     const replacement = { ...edges[0], data: { ...edges[0].data } };
     const candidate = [replacement, edges[1]];
