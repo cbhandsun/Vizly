@@ -15,8 +15,7 @@ import {
 } from './baseReactFlowDisplayIncrementalWorkerClient';
 import {
   readDisplayRoutingDebugState,
-  resolveDisplayRoutingCommittedReuseTiming,
-  resolveDisplayRoutingCommittedReuseTransactionEvidence,
+  resolveDisplayRoutingCommittedReuseState,
   updateDisplayRoutingDebugState,
   updateDisplayRoutingFinalAppliedState,
   updateDisplayRoutingLifecycleState,
@@ -241,13 +240,15 @@ export const useBaseReactFlowDisplayRouting = ({
       }
       if (authorityBaseline) {
         rememberCommittedRenderAuthority(authorityBaseline, authorityEdges);
+        displayRoutingSessionRuntime.rememberDocumentSnapshot(authorityBaseline, { enableSmartEdges, smartEdgePadding, isLargeGraph });
       }
-      const committedReuseTiming = resolveDisplayRoutingCommittedReuseTiming({
+      const committedReuseState = resolveDisplayRoutingCommittedReuseState({
         current: previousDebugState,
         signature: displayEdgeCacheSignature,
         inputGeometryDigest,
         outputRouteSignature,
         now: Date.now(),
+        trustedTransactionHandoff: reusableCommittedFinalDisplayEntry?.trustedTransactionHandoff === true,
       });
       updateDisplayRoutingFinalAppliedState({
         signature: displayEdgeCacheSignature,
@@ -257,11 +258,7 @@ export const useBaseReactFlowDisplayRouting = ({
         cacheTrustLevel: 'runtime-committed',
         nodeCount,
         edgeCount,
-        ...committedReuseTiming,
-        ...resolveDisplayRoutingCommittedReuseTransactionEvidence(
-          previousDebugState,
-          reusableCommittedFinalDisplayEntry?.trustedTransactionHandoff === true,
-        ),
+        ...committedReuseState,
         workerStartCount: displayEdgeWorkerStartCountRef.current,
         workerAbortCount: displayEdgeWorkerAbortCountRef.current,
       });
@@ -478,9 +475,7 @@ export const useBaseReactFlowDisplayRouting = ({
           cachedCandidateEdges: candidateResolution.candidateEdges,
           candidateSource: candidateResolution.source === 'miss'
             ? undefined
-            : candidateResolution.source === 'precompiled'
-              ? 'precompiled'
-              : 'persistent',
+            : candidateResolution.source,
           qualityMode: displayWorkerQualityMode,
           timeoutMs: displayQualityPolicy.timeoutMs,
           signal: routingJob.signal,
@@ -577,6 +572,7 @@ export const useBaseReactFlowDisplayRouting = ({
           rememberCommittedBaseline: (baseline, committedEdges) => {
             committedSnapshotBaselineRef.current = baseline;
             rememberCommittedRenderAuthority(baseline, committedEdges);
+            displayRoutingSessionRuntime.rememberDocumentSnapshot(baseline, { enableSmartEdges, smartEdgePadding, isLargeGraph });
           },
           applyFinalGeometry: () => {
             const finalAppliedAt = Date.now();
@@ -668,9 +664,11 @@ export const useBaseReactFlowDisplayRouting = ({
     displayRoutingSessionRuntime,
     displayQualityPolicy,
     documentDisplayCandidateEdges,
+    enableSmartEdges,
     forceFreshFullRoute,
     inputGeometryDigest,
     isContainerReady,
+    isLargeGraph,
     isNodeDragFallbackPending,
     isNodeDragging,
     nodeDragFallbackKey,
@@ -680,6 +678,7 @@ export const useBaseReactFlowDisplayRouting = ({
     rememberCommittedRenderAuthority,
     routingGeometryReady,
     routingPaused,
+    smartEdgePadding,
   ]);
 
   return useBaseReactFlowDisplayRoutingResult({

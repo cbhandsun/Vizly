@@ -270,6 +270,14 @@ export const readDisplayRoutingDebugState = (): DisplayRoutingDebugState | undef
   readDisplayRoutingDebugWindow()?.__vizlyBaseReactFlowDisplayRouting
 );
 
+/** Timing and request evidence must describe the same accepted reuse. */
+export const resolveDisplayRoutingCommittedReuseState = (
+  options: Parameters<typeof resolveDisplayRoutingCommittedReuseTiming>[0] & { trustedTransactionHandoff: boolean },
+): DisplayRoutingDebugState => ({
+  ...resolveDisplayRoutingCommittedReuseTiming(options),
+  ...resolveDisplayRoutingCommittedReuseTransactionEvidence(options.current, options.trustedTransactionHandoff),
+});
+
 export const appendDisplayRoutingPhaseProgress = (
   trace: DisplayRoutingPhaseTrace,
 ): void => {

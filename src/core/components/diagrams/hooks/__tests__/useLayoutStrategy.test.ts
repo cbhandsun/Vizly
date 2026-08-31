@@ -1,5 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { act, renderHook } from '@testing-library/react';
+import { parsePersistedLayoutSelection, usePersistedLayoutSelection, useLayoutAutoSaveMetadata } from '../usePersistedLayoutSelection';
 import {
   clearLayoutRuntimeAbsolutePosition,
   LAYERED_TREE_ROUTING_SPACING,
@@ -13,6 +15,46 @@ import {
   prepareLayeredLayoutEdges,
   sanitizeLayoutEdges,
 } from '../layeredLayoutEdgePreparation';
+
+describe('persisted layout selection', () => {
+  it('roundtrips layout metadata alongside pages and preserves the page restore result', () => {
+    const page = { nodes: [], edges: [] };
+    const restorePages = vi.fn(() => page);
+    const multiPage = { getPersistedMetadata: () => ({ multiPage: { version: 1 } }), restorePersistedMetadata: restorePages };
+    const { result } = renderHook(() => {
+      const selection = usePersistedLayoutSelection('first');
+      return { ...selection, ...useLayoutAutoSaveMetadata(multiPage, selection.layoutSelection, selection.restoreLayoutSelection) };
+    });
+    const saved = { multiPage: { version: 1 }, layoutSelection: { version: 1, strategy: 'domain-lanes', direction: 'LR', nodeLayout: 'grid' } };
+    act(() => expect(result.current.restoreAutoSaveMetadata(saved)).toBe(page));
+    expect(restorePages).toHaveBeenCalledWith(saved);
+    expect(result.current.getAutoSaveMetadata()).toEqual(saved);
+    expect(result.current.lastDomainDirection).toBe('LR');
+  });
+  it.each(['TB', 'LR', 'BT', 'RL'] as const)('restores %s without running layout and isolates another diagram', direction => {
+    const { result, rerender } = renderHook(({ id }) => usePersistedLayoutSelection(id), { initialProps: { id: 'first' } });
+    act(() => result.current.restoreLayoutSelection({ layoutSelection: { version: 1, strategy: 'domain-lanes', direction, nodeLayout: 'dagre' } }));
+    expect(result.current.lastDomainStrategy).toBe('domain-lanes');
+    expect(result.current.lastDomainDirection).toBe(direction);
+    expect(parsePersistedLayoutSelection({ layoutSelection: result.current.layoutSelection })).toEqual(result.current.layoutSelection);
+    rerender({ id: 'second' });
+    expect(result.current.lastDomainDirection).toBe('TB');
+    expect(result.current.lastDomainStrategy).toBe('domain-dagre');
+    act(() => { result.current.setLastDomainStrategy('tree'); result.current.setLastDomainDirection('RL'); });
+    expect(result.current.lastDomainStrategy).toBe('tree');
+    expect(result.current.lastDomainDirection).toBe('RL');
+    act(() => result.current.restoreLayoutSelection(null));
+    expect(result.current.lastDomainDirection).toBe('TB');
+  });
+  it.each([null, {}, [], { layoutSelection: null }, { layoutSelection: { version: 2 } },
+    { layoutSelection: { version: 1, strategy: '<img onerror=alert(1)>', direction: 'TB', nodeLayout: 'dagre' } },
+    { layoutSelection: { version: 1, strategy: 'tree', direction: 'diagonal', nodeLayout: 'dagre' } },
+    { layoutSelection: { version: 1, strategy: 'tree', direction: 'LR', nodeLayout: [] } },
+    { layoutSelection: { version: 1, strategy: 'x'.repeat(10_000), direction: 'TB', nodeLayout: 'dagre' } },
+  ])('rejects malformed, unsupported or unsafe metadata', value => {
+    expect(parsePersistedLayoutSelection(value)).toBeNull();
+  });
+});
 
 describe('LAYERED_TREE_ROUTING_SPACING', () => {
   it('reserves two terminal stubs and a routing channel between ranks', () => {

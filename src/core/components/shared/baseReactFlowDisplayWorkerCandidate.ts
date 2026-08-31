@@ -4,6 +4,7 @@ import { sanitizeBaseReactFlowPrecompiledRoutePatches } from './baseReactFlowPre
 import {
   mergeBaseReactFlowDisplayEdgePatches,
   sanitizeBaseReactFlowDisplayCachePatches,
+  sanitizeBaseReactFlowDocumentCandidatePatches,
 } from './baseReactFlowDisplayRoutingTransaction';
 import type {
   DisplayEdgesWorkerCandidateSource,
@@ -22,7 +23,9 @@ export const resolveDisplayWorkerCandidate = (
   const safePatches = request.candidatePatches
     ? (request.candidateSource === 'precompiled'
       ? sanitizeBaseReactFlowPrecompiledRoutePatches(request.edges, request.candidatePatches)
-      : sanitizeBaseReactFlowDisplayCachePatches(request.edges, request.candidatePatches))
+      : request.candidateSource === 'document'
+        ? sanitizeBaseReactFlowDocumentCandidatePatches(request.edges, request.candidatePatches)
+        : sanitizeBaseReactFlowDisplayCachePatches(request.edges, request.candidatePatches))
     : null;
   return {
     edges: request.candidateEdges

@@ -13,6 +13,7 @@ import {
 } from '../baseReactFlowDisplayRoutingTrace';
 import { createDisplayRoutingIdentity } from '../baseReactFlowDisplayRoutingSession';
 import { createDisplayEdgesTransportResponse } from '../baseReactFlowDisplayWorkerScope';
+import { resolveDisplayWorkerCandidate } from '../baseReactFlowDisplayWorkerCandidate';
 import {
   TEST_DISPLAY_WORKER_NODES as nodes,
   TEST_DISPLAY_WORKER_REPAIR_REQUEST as validRepairRequest,
@@ -23,6 +24,35 @@ import {
 const cleanHardReport = createTestDisplayHardReport();
 
 describe('baseReactFlowDisplayWorkerProtocol', () => {
+  it('keeps document router intent through the Worker boundary without widening browser cache authority', () => {
+    const candidate = { ...validRepairRequest.edges[0], data: {
+      computedPath: [{ x: 100, y: 30 }, { x: 300, y: 30 }],
+      sharedTrunkSynthesized: true, businessMetadata: 'untrusted',
+    } };
+    for (const candidateSource of ['document', 'persistent']) {
+      const parsed = parseDisplayEdgesWorkerRequest({
+        ...validRepairRequest, operation: 'validate-or-route', candidateSource,
+        enableSmartEdges: true, smartEdgePadding: 20, isLargeGraph: false, displayEdgeEpoch: 1, qualityMode: 'full',
+        candidatePatches: [candidate],
+      });
+      expect(parsed).not.toBeNull();
+      if (!parsed) throw new Error('Candidate source rejected');
+      const resolved = resolveDisplayWorkerCandidate(parsed);
+      expect(resolved.source).toBe(candidateSource);
+      expect(resolved.edges?.[0].data?.computedPath).toEqual(candidate.data.computedPath);
+      expect(resolved.edges?.[0].data?.sharedTrunkSynthesized).toBe(candidateSource === 'document' ? true : undefined);
+      expect(resolved.edges?.[0].data).not.toHaveProperty('businessMetadata');
+      if (parsed.operation === 'validate-or-route') {
+        for (const candidatePatches of [[], [{ ...candidate, source: 'other' }],
+          [{ ...candidate, data: { sharedTrunkSynthesized: 'true' } }],
+          [{ ...candidate, data: { computedPath: [{ x: Infinity, y: 0 }] } }]]) {
+          const rejected = resolveDisplayWorkerCandidate({ ...parsed, candidatePatches });
+          if (candidateSource === 'document') expect(rejected.edges).toBeNull();
+        }
+      }
+    }
+  });
+
   it('compacts incremental transport to routing patches and rejects ambiguous carriers', () => {
     const sourceEdges = validRepairRequest.edges.map(edge => ({
       ...edge,

@@ -90,7 +90,8 @@ export function useAutoRouting({
     }, []);
 
     // 布局策略
-    const { handleStrategyLayout: _handleStrategyLayout, lastDomainStrategy, lastDomainDirection, lastNodeLayout } = useLayoutStrategy({
+    const { handleStrategyLayout: _handleStrategyLayout, lastDomainStrategy, lastDomainDirection, lastNodeLayout,
+        layoutSelection, restoreLayoutSelection } = useLayoutStrategy({
         setNodes,
         setEdges,
         nodesRef,
@@ -186,6 +187,8 @@ export function useAutoRouting({
         lastDomainStrategy,
         lastDomainDirection,
         lastNodeLayout,
+        layoutSelection,
+        restoreLayoutSelection,
         routingSessionRuntime,
     };
 }

@@ -713,7 +713,7 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
     await rejected;
   });
 
-  it('preserves only schema-authorized routing intent for a precompiled candidate', async () => {
+  it.each(['precompiled', 'document'] as const)('preserves only schema-authorized routing intent for a %s candidate', async candidateSource => {
     const harness = installWorkerHarness();
     const controller = new AbortController();
     const edges = [{
@@ -750,13 +750,13 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
       isLargeGraph: false,
       displayEdgeEpoch: 1,
       cachedCandidateEdges: precompiledCandidateEdges,
-      candidateSource: 'precompiled',
+      candidateSource,
       signal: controller.signal,
     });
 
     expect(harness.posted[0]).toMatchObject({
       operation: 'validate-or-route',
-      candidateSource: 'precompiled',
+      candidateSource,
       candidatePatches: [{
         id: 'edge',
         source: 'source',

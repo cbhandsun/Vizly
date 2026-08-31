@@ -5,6 +5,7 @@ import { useDesignerCanvasState } from './hooks/useDesignerCanvasState';
 import { useDesignerInteractions } from './hooks/useDesignerInteractions';
 import { useDesignerEventHandlers } from './hooks/useDesignerEventHandlers';
 import { useDesignerSystemSync } from './hooks/useDesignerSystemSync';
+import { useLayoutAutoSaveMetadata } from './hooks/usePersistedLayoutSelection';
 import { useDiagramScopedSelection } from './hooks/useDiagramScopedSelection';
 import { useCanonicalSelectionChange } from './hooks/useCanonicalSelectionChange';
 import { DiagramComponentProps } from '../../types/diagram-components';
@@ -473,7 +474,7 @@ export const useFlowchartDesignerController = ({
     }, [clearCanvasSelection, isCommentMode, contextMenuPaneClick]);
 
     // Features
-    const { autoRoutingEnabled, setAutoRoutingEnabled, isLayoutStable, isLayoutBusy, layoutPresentationPreview, handleStrategyLayout, lastDomainStrategy, lastDomainDirection, lastNodeLayout, routingSessionRuntime } = useAutoRouting({
+    const { autoRoutingEnabled, setAutoRoutingEnabled, isLayoutStable, isLayoutBusy, layoutPresentationPreview, handleStrategyLayout, lastDomainStrategy, lastDomainDirection, lastNodeLayout, routingSessionRuntime, layoutSelection, restoreLayoutSelection } = useAutoRouting({
         setNodes,
         setEdges,
         nodesRef,
@@ -560,10 +561,11 @@ export const useFlowchartDesignerController = ({
     const setShowShortcuts = useCallback(() => setShortcutHelpVisible(true), [setShortcutHelpVisible]);
 
     // 4. System Sync Domain Controller
+    const persistenceMetadata = useLayoutAutoSaveMetadata(multiPage, layoutSelection, restoreLayoutSelection);
     const { performanceMode, isInitialDiagramLoading, saveState } = useDesignerSystemSync({
         id, diagramIdForExport, nodes, edges, setNodes, setEdges, reactFlowInstance, isDragging, pluginId, messageApi,
-        getAutoSaveMetadata: multiPage.getPersistedMetadata,
-        restoreAutoSaveMetadata: multiPage.restorePersistedMetadata,
+        ...persistenceMetadata,
+        routingSessionRuntime,
     });
 
     const { commandPaletteItems } = useDesignerCommands({

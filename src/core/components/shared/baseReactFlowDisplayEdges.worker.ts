@@ -550,7 +550,7 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
       );
       const exceedsCommercialPromotionBudget = candidateEdges.length > 80
         || candidateRepairNodes.length > 120;
-      const persistentBoundaryCandidate = candidateSource === 'persistent'
+      const persistentBoundaryCandidate = candidateSource !== 'precompiled'
         ? repairDisplayContainerBoundaryClearanceRisks(candidateEdges, candidateRepairNodes, {
           maxEdges: request.isLargeGraph ? 4 : 8,
           maxQualityEvaluations: request.isLargeGraph ? 16 : 32,

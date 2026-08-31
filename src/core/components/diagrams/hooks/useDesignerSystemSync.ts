@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from 'react';
 import { MarkerType, type Edge, type Node, type ReactFlowInstance } from '@xyflow/react';
 import type { MessageInstance } from 'antd/es/message/interface';
 import { useAutoSave } from './useAutoSave';
@@ -26,6 +26,7 @@ import {
 } from '../../../utils/flowDataBridge';
 import type { StandardDiagramData } from '../../../models/DiagramModels';
 import { createBaseReactFlowRoutingOnlyDocumentSnapshot } from '../../shared/baseReactFlowDisplayCommittedSnapshot';
+import type { BaseReactFlowRoutingSessionRuntime } from '../../shared/baseReactFlowRoutingSessionRuntime';
 
 export interface UseDesignerSystemSyncProps {
     id?: string;
@@ -40,12 +41,13 @@ export interface UseDesignerSystemSyncProps {
     messageApi?: Pick<MessageInstance, 'info' | 'success'>;
     getAutoSaveMetadata?: () => unknown;
     restoreAutoSaveMetadata?: (metadata: unknown) => { nodes: Node[]; edges: Edge[] } | null;
+    routingSessionRuntime?: BaseReactFlowRoutingSessionRuntime;
 }
 
 export function useDesignerSystemSync({
     id, diagramIdForExport, nodes, edges, setNodes, setEdges,
     reactFlowInstance, isDragging, pluginId, messageApi,
-    getAutoSaveMetadata, restoreAutoSaveMetadata,
+    getAutoSaveMetadata, restoreAutoSaveMetadata, routingSessionRuntime,
 }: UseDesignerSystemSyncProps) {
     // 使用 ref 持有最新的 nodes/edges，避免 __flowDataBridge Effect 因每次编辑重建整个 API 对象
     const nodesRef = useRef(nodes);
@@ -54,6 +56,10 @@ export function useDesignerSystemSync({
     useEffect(() => { nodesRef.current = nodes; }, [nodes]);
     useEffect(() => { edgesRef.current = edges; }, [edges]);
     useEffect(() => { reactFlowRef.current = reactFlowInstance; }, [reactFlowInstance]);
+    const readRoutingSnapshot = useCallback(() => routingSessionRuntime
+        ? routingSessionRuntime.createDocumentSnapshot(nodesRef.current, edgesRef.current) ?? undefined
+        : createBaseReactFlowRoutingOnlyDocumentSnapshot(edgesRef.current) ?? undefined,
+    [routingSessionRuntime]);
 
     useEffect(() => {
         const standardData: FlowDataBridgeEntry = {
@@ -84,7 +90,7 @@ export function useDesignerSystemSync({
             getCanvasSnapshot: () => ({
                 nodes: nodesRef.current,
                 edges: edgesRef.current,
-                routingSnapshot: createBaseReactFlowRoutingOnlyDocumentSnapshot(edgesRef.current) ?? undefined,
+                routingSnapshot: readRoutingSnapshot(),
             }),
         };
 
@@ -103,7 +109,7 @@ export function useDesignerSystemSync({
             },
             routingSnapshot: {
                 enumerable: true,
-                get: () => createBaseReactFlowRoutingOnlyDocumentSnapshot(edgesRef.current) ?? undefined,
+                get: readRoutingSnapshot,
             },
         });
             
@@ -407,7 +413,7 @@ export function useDesignerSystemSync({
 
         return registerFlowDataBridge(diagramIdForExport, standardData);
     // 仅在 diagramIdForExport/id/pluginId 变化时重建，nodes/edges 通过 ref 访问
-    }, [diagramIdForExport, id, setNodes, setEdges, pluginId, messageApi]);
+    }, [diagramIdForExport, id, setNodes, setEdges, pluginId, messageApi, readRoutingSnapshot]);
 
     useEffect(() => {
         const openCloudDiagram = async (data: StandardDiagramData) => {
@@ -460,9 +466,7 @@ export function useDesignerSystemSync({
         onSaveSuccess: undefined,
         onSaveError: (error) => logDesignerSystemSyncAutoSaveFailure(error),
         getMetadata: getAutoSaveMetadata,
-        getRoutingSnapshot: () => (
-            createBaseReactFlowRoutingOnlyDocumentSnapshot(edgesRef.current) ?? undefined
-        ),
+        getRoutingSnapshot: readRoutingSnapshot,
     });
 
     // Only debounce after the active diagram has completed initialization.

@@ -29,6 +29,7 @@ import {
   doBaseReactFlowDisplayRoutesMatchExactly,
   mergeBaseReactFlowDisplayEdgePatches,
   sanitizeBaseReactFlowDisplayCachePatches,
+  sanitizeBaseReactFlowDocumentCandidatePatches,
   sanitizeBaseReactFlowTrustedDisplayPatches,
 } from './baseReactFlowDisplayRoutingTransaction';
 import { createDisplayWorkerFinalQualityError } from './baseReactFlowDisplayWorkerFailure';
@@ -579,7 +580,9 @@ export const computeBaseReactFlowDisplayEdgesInWorker = async ({
   const safeCandidatePatches = cachedCandidateEdges
     ? (candidateSource === 'precompiled'
       ? sanitizeBaseReactFlowPrecompiledRoutePatches(edges, rawPrecompiledPatches)
-      : sanitizeBaseReactFlowDisplayCachePatches(edges, cachedCandidateEdges))
+      : candidateSource === 'document'
+        ? sanitizeBaseReactFlowDocumentCandidatePatches(edges, cachedCandidateEdges)
+        : sanitizeBaseReactFlowDisplayCachePatches(edges, cachedCandidateEdges))
     : null;
   const routeRequest = {
     requestId,
@@ -599,7 +602,7 @@ export const computeBaseReactFlowDisplayEdgesInWorker = async ({
         ...routeRequest,
         operation: 'validate-or-route',
         candidatePatches: safeCandidatePatches,
-        candidateSource: candidateSource === 'precompiled' ? 'precompiled' : 'persistent',
+        candidateSource: candidateSource ?? 'persistent',
       }
       : { ...routeRequest, operation: 'route' },
     qualityMode,

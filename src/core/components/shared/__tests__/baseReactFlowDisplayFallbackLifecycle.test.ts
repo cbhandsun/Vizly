@@ -21,6 +21,7 @@ import {
   classifyDisplayLayoutTransactionError,
   resolveDisplayRoutingCommittedReuseTiming,
   resolveDisplayRoutingCommittedReuseTransactionEvidence,
+  resolveDisplayRoutingCommittedReuseState,
 } from '../baseReactFlowDisplayRoutingDebug';
 
 describe('baseReactFlow display fallback lifecycle', () => {
@@ -272,5 +273,9 @@ describe('baseReactFlow display fallback lifecycle', () => {
       lastPhaseTrace: undefined,
       phaseProgressTrace: undefined,
     });
+    expect(resolveDisplayRoutingCommittedReuseState({
+      current, signature: 'new', inputGeometryDigest: 'new-geometry', now: 200,
+      trustedTransactionHandoff: true,
+    })).toMatchObject({ requestId: 'layout:7', finalAppliedAt: 200, routeMs: undefined });
   });
 });

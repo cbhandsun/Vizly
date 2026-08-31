@@ -89,7 +89,7 @@ const DISPLAY_NODE_KEYS = new Set([
 const UNSAFE_OBJECT_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 
 export type DisplayQualityMode = 'full' | 'interactive';
-export type DisplayEdgesWorkerCandidateSource = 'persistent' | 'precompiled';
+export type DisplayEdgesWorkerCandidateSource = 'document' | 'persistent' | 'precompiled';
 export type DisplayEdgesWorkerRouteRequest = {
   operation: 'route';
   requestId: string;
@@ -498,7 +498,7 @@ export const parseDisplayEdgesWorkerRequest = (
     };
   }
   if (value.operation === 'validate-or-route') {
-    if (value.candidateSource !== 'persistent' && value.candidateSource !== 'precompiled') {
+    if (value.candidateSource !== 'document' && value.candidateSource !== 'persistent' && value.candidateSource !== 'precompiled') {
       return null;
     }
     if (

@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { MutableRefObject } from 'react';
+import type { Edge, Node } from '@xyflow/react';
+import type { RoutingOnlyDocumentSnapshot } from '../../routing/persistedRoutingCandidate';
+import { createBaseReactFlowDocumentSnapshotSource, type BaseReactFlowDocumentSnapshotSource,
+  type DocumentSnapshotRoutingOptions } from './baseReactFlowDocumentSnapshotSource';
 
 import {
   commitBaseReactFlowDisplaySnapshot,
@@ -32,6 +36,8 @@ export type BaseReactFlowRoutingSessionRuntime = Readonly<{
   commitDisplaySnapshot: (
     options: BaseReactFlowDisplaySnapshotCommitOptions,
   ) => BaseReactFlowDisplayCommittedSnapshotBaseline | null;
+  rememberDocumentSnapshot: (baseline: BaseReactFlowDisplayCommittedSnapshotBaseline, options: DocumentSnapshotRoutingOptions) => void;
+  createDocumentSnapshot: (nodes: Node[], edges: Edge[]) => RoutingOnlyDocumentSnapshot | null;
   registerWorkerDisposer: (
     disposer: (workerRef: MutableRefObject<Worker | null>) => void,
   ) => void;
@@ -61,6 +67,7 @@ export const createBaseReactFlowRoutingSessionRuntime = (
   let committingJob: BaseReactFlowRoutingSessionJob | null = null;
   let workerDisposer = terminateWorkerDirectly;
   let disposed = false;
+  let documentSource: BaseReactFlowDocumentSnapshotSource | null = null;
 
   const isCurrentJob = (job: BaseReactFlowRoutingSessionJob): boolean => (
     !disposed
@@ -85,6 +92,7 @@ export const createBaseReactFlowRoutingSessionRuntime = (
     workerRef,
     beginJob: (owner) => {
       if (disposed) throw new Error('routing-session-runtime-disposed');
+      documentSource = null;
       activeJob?.abortController.abort();
       const abortController = new AbortController();
       const publicJob = Object.freeze({
@@ -114,12 +122,17 @@ export const createBaseReactFlowRoutingSessionRuntime = (
         ? commitBaseReactFlowDisplaySnapshot(options)
         : null
     ),
+    rememberDocumentSnapshot: (baseline, options) => {
+      if (!disposed) documentSource = createBaseReactFlowDocumentSnapshotSource(baseline, options);
+    },
+    createDocumentSnapshot: (nodes, edges) => !disposed ? documentSource?.read(nodes, edges) ?? null : null,
     registerWorkerDisposer: (disposer) => {
       if (!disposed) workerDisposer = disposer;
     },
     dispose: () => {
       if (disposed) return;
       disposed = true;
+      documentSource = null;
       activeJob?.abortController.abort();
       activeJob = null;
       committingJob = null;

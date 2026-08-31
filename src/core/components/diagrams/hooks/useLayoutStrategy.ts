@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
+import { useCallback, useEffect, useRef, type MutableRefObject } from 'react';
+import { usePersistedLayoutSelection } from './usePersistedLayoutSelection';
 import { Node, Edge, ReactFlowInstance } from '@xyflow/react';
 import { requestLayoutCommitFit } from '../../shared/diagramControlRequest';
 import { applyLayout, forceDirectedLayout, treeLayout } from '../../../utils/LayoutAlgorithms';
@@ -102,12 +103,8 @@ export function useLayoutStrategy({
     publishLayoutPreview,
     clearLayoutPreview,
 }: UseLayoutStrategyParams) {
-    // lastDomainStrategy is retained as a public compatibility name, but it
-    // represents the active top-level layout strategy (domain-aware or global).
-    const [lastDomainStrategy, setLastDomainStrategy] = useState<string>('domain-dagre');
-    const [lastDomainDirection, setLastDomainDirection] = useState<FlowchartLayoutDirection>('TB');
-    // Remember the domain-internal arrangement across temporary global modes.
-    const [lastNodeLayout, setLastNodeLayout] = useState<string>('dagre');
+    const { lastDomainStrategy, setLastDomainStrategy, lastDomainDirection, setLastDomainDirection,
+        lastNodeLayout, setLastNodeLayout, layoutSelection, restoreLayoutSelection } = usePersistedLayoutSelection(diagramId);
     const elkLayoutExecutorRef = useRef<ElkLayoutExecutor | null>(null);
     const layoutFitControllerRef = useRef<AbortController | null>(null);
 
@@ -674,6 +671,9 @@ export function useLayoutStrategy({
         edgesRef,
         routingSessionRuntime,
         setLayoutStable,
+        setLastDomainStrategy,
+        setLastDomainDirection,
+        setLastNodeLayout,
     ]);
 
     return {
@@ -681,5 +681,7 @@ export function useLayoutStrategy({
         lastDomainStrategy,
         lastDomainDirection,
         lastNodeLayout,
+        layoutSelection,
+        restoreLayoutSelection,
     };
 }
