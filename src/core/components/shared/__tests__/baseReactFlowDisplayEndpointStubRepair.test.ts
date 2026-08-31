@@ -17,6 +17,7 @@ import { getDisplayComputedPath } from '../baseReactFlowDisplayGeometry';
 import { auditFinalSameSideEndpointOrder } from '../../../strategies/shared/edgeFinalSameSideEndpointOrderRepair';
 import { getExactDisplayHardReport } from '../baseReactFlowDisplayWorkerResponse';
 import { buildSafeEndpointSideStepCandidates } from '../baseReactFlowDisplayEndpointStubCandidates';
+import { prioritizeNonCrossingEndpointStubCandidates } from '../baseReactFlowDisplayEndpointStubCandidates';
 import {
   commercialClearanceRiskIsGloballyMinimal,
   countRenderUnsafeEndpointStubs,
@@ -502,6 +503,50 @@ describe('baseReactFlowDisplayEndpointStubRepair', () => {
     expect(repairFinalShortEndpointStubs(edges, [])).toBe(edges);
     expect(sweep).toHaveBeenCalledTimes(companionCount < 7 ? 1 : 0);
     expect(edges).toEqual(original);
+  });
+
+  it('does not exhaust the budget on crossing fallbacks before a direct short-stub repair', () => {
+    const edges = [edgeWithPath('short', [
+      { x: 0, y: 0 }, { x: 16, y: 0 }, { x: 16, y: 100 }, { x: 300, y: 100 },
+    ]), edgeWithPath('blocker', [{ x: 50, y: -50 }, { x: 50, y: 50 }])];
+    const pathAt = (x: number) => [
+      { x: 0, y: 0 }, { x, y: 0 }, { x, y: 100 }, { x: 300, y: 100 },
+    ];
+    const direct = pathAt(-48);
+    const original = structuredClone(edges);
+    vi.spyOn(stubCandidates, 'buildSafeEndpointSideStepCandidates')
+      .mockReturnValue([pathAt(64), pathAt(96), pathAt(128), direct]);
+    const companion = vi.spyOn(terminalPortRepair, 'buildStrictCrossingCompanionShiftVariants')
+      .mockImplementation(candidate => Array.from({ length: 6 }, () => candidate));
+    const sweep = vi.spyOn(strictSweep, 'finalStrictDisplaySweep').mockImplementation(candidate => candidate);
+    const quality = vi.spyOn(displayEvaluation, 'evaluateDisplayQualityCandidate');
+
+    const repaired = repairFinalShortEndpointStubs(edges, []);
+
+    expect(getDisplayComputedPath(repaired[0])).toEqual(direct);
+    expect(calculateEdgePathQualityScore(repaired).strictCrossings).toBe(0);
+    expect(companion).not.toHaveBeenCalled();
+    expect(sweep).not.toHaveBeenCalled();
+    expect(quality.mock.calls.length).toBeLessThanOrEqual(8);
+    expect(edges).toEqual(original);
+  });
+
+  it('stably prioritizes non-crossing candidates without mutating the generated list', () => {
+    const edges = [edgeWithPath('short', [
+      { x: 0, y: 0 }, { x: 16, y: 0 }, { x: 16, y: 100 }, { x: 300, y: 100 },
+    ]), edgeWithPath('blocker', [{ x: 50, y: -50 }, { x: 50, y: 50 }])];
+    const pathAt = (x: number) => [
+      { x: 0, y: 0 }, { x, y: 0 }, { x, y: 100 }, { x: 300, y: 100 },
+    ];
+    const candidates = [pathAt(64), pathAt(-48), pathAt(96), pathAt(-64)];
+    const original = structuredClone(candidates);
+
+    expect(prioritizeNonCrossingEndpointStubCandidates(candidates, 0, edges))
+      .toEqual([pathAt(-48), pathAt(-64), pathAt(64), pathAt(96)]);
+    expect(candidates).toEqual(original);
+    expect(prioritizeNonCrossingEndpointStubCandidates([], 0, edges)).toEqual([]);
+    expect(prioritizeNonCrossingEndpointStubCandidates(candidates, -1, edges)).toBe(candidates);
+    expect(prioritizeNonCrossingEndpointStubCandidates(candidates, 2, edges)).toBe(candidates);
   });
 
   it('does not initialize repair contexts for an already render-safe route', () => {

@@ -20,6 +20,7 @@ import {
 import {
   buildSafeEndpointSideStepCandidates,
   MIN_DISPLAY_ENDPOINT_STUB,
+  prioritizeNonCrossingEndpointStubCandidates,
 } from './baseReactFlowDisplayEndpointStubCandidates';
 import {
   buildStrictCrossingCompanionShiftVariants,
@@ -92,7 +93,11 @@ export const repairFinalShortEndpointStubs = <T extends Edge[]>(edges: T, nodes:
   edgeRepairOrder.forEach(({ edge, edgeIndex, shortest }) => {
     if (qualityEvaluations >= MAX_FINAL_ENDPOINT_STUB_REPAIR_EVALUATIONS) return;
     const path = getDisplayComputedPath(edge);
-    const candidatePaths = buildSafeEndpointSideStepCandidates(path, edgeIndex, bestEdges, nodes);
+    const candidatePaths = prioritizeNonCrossingEndpointStubCandidates(
+      buildSafeEndpointSideStepCandidates(path, edgeIndex, bestEdges, nodes),
+      edgeIndex,
+      bestEdges,
+    );
     for (const candidatePath of candidatePaths) {
       if (qualityEvaluations >= MAX_FINAL_ENDPOINT_STUB_REPAIR_EVALUATIONS) break;
       const candidateEdges = bestEdges.map((item, index) => (

@@ -1,4 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
+import { createSingleMoverStrictCrossingCounter } from '../../strategies/shared/edgeSingleMoverStrictCrossingCounter';
 
 import {
   compactOrthogonalPath,
@@ -8,6 +9,7 @@ import {
   buildDisplayRoutingObstacles,
   displayAxisOf,
   extractDisplaySegments,
+  getDisplayComputedPath,
   OBSTACLE_REPAIR_NODE_PADDING,
   RESIDUAL_PARALLEL_LANE_GAP,
   segmentDisplayLength,
@@ -633,4 +635,24 @@ export const buildSafeEndpointSideStepCandidates = (
     seen.add(key);
     return true;
   });
+};
+
+/** Keep generator order inside equal groups, but try candidates that do not
+ * add strict crossings before spending the bounded full-quality budget. */
+export const prioritizeNonCrossingEndpointStubCandidates = (
+  candidates: DisplayPoint[][],
+  edgeIndex: number,
+  edges: Edge[],
+): DisplayPoint[][] => {
+  if (candidates.length < 2 || !edges[edgeIndex]) return candidates;
+  const paths = edges.map(getDisplayComputedPath);
+  const counter = createSingleMoverStrictCrossingCounter(paths, edges, edgeIndex);
+  const preferred: DisplayPoint[][] = [];
+  const fallback: DisplayPoint[][] = [];
+  for (const candidate of candidates) {
+    (counter.count(candidate) <= counter.baseline ? preferred : fallback).push(candidate);
+  }
+  return preferred.length === 0 || fallback.length === 0
+    ? candidates
+    : [...preferred, ...fallback];
 };
