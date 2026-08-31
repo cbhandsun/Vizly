@@ -1,4 +1,5 @@
 import type { Edge } from '@xyflow/react';
+import { routeDisplayReverseLayout } from './baseReactFlowDisplayReverseLayoutRoute';
 
 import {
   mergeBaseReactFlowDisplayEdgePatches,
@@ -30,7 +31,7 @@ const resolvePersistentCandidate = (
     : null;
 };
 
-/** Preserves the former repair -> validate-or-route transaction byte-for-byte. */
+/** Normalize reversed layout jobs; retain the existing repair/validation flow otherwise. */
 export const runDisplayWorkerLayoutRepairTransaction = (
   request: DisplayEdgesWorkerRepairValidateOrRouteRequest,
   compute: ComputeWorkerResponse,
@@ -48,6 +49,8 @@ export const runDisplayWorkerLayoutRepairTransaction = (
   if (!stagedCandidate || !fallbackCandidate) {
     return { requestId: request.requestId, error: 'display-edge-worker-invalid-request' };
   }
+  const reversed = routeDisplayReverseLayout(request, stagedCandidate, compute);
+  if (reversed) return reversed;
   const repaired = compute({
     operation: 'repair',
     requestId: request.requestId,
