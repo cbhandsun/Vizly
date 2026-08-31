@@ -239,7 +239,9 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
     expect(options.setNodes).not.toHaveBeenCalled();
     expect(options.setEdges).not.toHaveBeenCalled();
     expect(options.takeSnapshot).not.toHaveBeenCalled();
-    expect(options.setLayoutStable.mock.calls).toEqual([[false], [true]]);
+    expect(options.setLayoutStable).toHaveBeenCalledTimes(2);
+    expect(options.setLayoutStable).toHaveBeenNthCalledWith(1, false);
+    expect(options.setLayoutStable).toHaveBeenNthCalledWith(2, true);
     expect(options.clearLayoutPreview).toHaveBeenCalledTimes(2);
     expect(result.current.lastDomainStrategy).toBe(previousStrategy);
     expect(result.current.lastDomainDirection).toBe(previousDirection);
