@@ -60,6 +60,7 @@ import {
 import { assertDisplayRoutingProductionPreview } from './lib/display-routing-production-preview.mjs';
 import { DISPLAY_ROUTING_MATRIX_PRESET_TARGETS } from './lib/display-routing-matrix-presets.mjs';
 import { readDisplayRoutingLayoutDiagnostics } from './lib/display-routing-layout-diagnostics.mjs';
+import { auditDisplayRoutingLayoutSemantics } from './lib/display-routing-semantic-audit.mjs';
 
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '').trim().replace(/\/$/, '');
 const WAIT_TIMEOUT_MS = parseDisplayRoutingMatrixTimeoutMs(
@@ -554,6 +555,7 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
     mountedEdges: mounted.edges,
   });
   const layoutAudit = await auditFinalSvg(session, route, layoutCase.id);
+  const semanticAudit = await auditDisplayRoutingLayoutSemantics(session, layoutCase, target.semanticChains);
   const warmLayoutSwitches = [];
   for (const warmLayoutCase of WARM_LAYOUT_CASES) {
     await session.evaluate(`(() => {
@@ -598,6 +600,7 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
     )`);
     warmLayoutSwitches.push({
       id: warmLayoutCase.id,
+      semanticAudit: await auditDisplayRoutingLayoutSemantics(session, warmLayoutCase, target.semanticChains),
       inputToFirstWorkerMs: Number.isFinite(warmFirstRequestAt)
         ? warmFirstRequestAt - warmClickedAt
         : null,
@@ -724,6 +727,7 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
     warmLayoutSwitch,
     warmLayoutSwitches,
     postLayoutMove,
+    semanticAudit,
     ...layoutAudit,
   };
 });
