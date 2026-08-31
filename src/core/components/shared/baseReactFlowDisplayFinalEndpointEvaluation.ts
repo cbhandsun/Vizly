@@ -335,6 +335,10 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
         terminalSnapshot,
         strictDiagnostics,
         allowStrictFallback,
+        // Final display transactions preserve exact trunk lengths. Reject an
+        // incompatible local preference before it discards other valid repairs
+        // when the complete batch reaches the outer commit gate.
+        'preserve-length',
       );
       stubStrictEvaluationCount += strictDiagnostics.qualityEvaluationCount;
       stubStrictCacheHitCount += strictDiagnostics.qualityContextCacheHitCount;

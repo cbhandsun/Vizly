@@ -14,7 +14,7 @@ import {
 } from './baseReactFlowDisplayEvaluation';
 import { createDisplayTerminalValidationSnapshot } from './baseReactFlowTerminalAxisRepair';
 import type { DisplayTerminalValidationSnapshot } from './baseReactFlowTerminalValidation';
-import { preservesInitialTrueTrunksWithinClearanceMargin } from './baseReactFlowDisplayTrueTrunkContract';
+import { preservesInitialTrueTrunks, preservesInitialTrueTrunksWithinClearanceMargin } from './baseReactFlowDisplayTrueTrunkContract';
 
 export type AtomicEndpointOrderEvaluation = (
   edges: readonly Edge[],
@@ -38,6 +38,7 @@ export const createAtomicRouteTransactionEvaluation = <T extends Edge[]>(
     baselineObstacleHits?: number;
     endpointOrder?: AtomicEndpointOrderEvaluation;
     terminalValidation?: DisplayTerminalValidationSnapshot;
+    trunkPolicy?: 'preserve-length' | 'clearance-margin';
   }>,
 ) => {
   const qualityContext = reusable?.qualityContext
@@ -89,7 +90,10 @@ export const createAtomicRouteTransactionEvaluation = <T extends Edge[]>(
         const edge = candidate[index];
         return Boolean(edge && terminalValidation.validateEdge(edge).anchored);
       });
-      const trunksPreserved = preservesInitialTrueTrunksWithinClearanceMargin(
+      const preserveTrunks = reusable?.trunkPolicy === 'preserve-length'
+        ? preservesInitialTrueTrunks
+        : preservesInitialTrueTrunksWithinClearanceMargin;
+      const trunksPreserved = preserveTrunks(
         baselineTrunks,
         endpointOrder(candidate).legalSharedTrunks,
       );

@@ -16,6 +16,7 @@ import {
   compactDisplayEdgePaths,
   extractDisplaySegments,
   getDisplayComputedPath,
+  isDisplayContainerNode,
   NEAR_PARALLEL_LANE_TOLERANCE,
 } from './baseReactFlowDisplayGeometry';
 import { MIN_RENDER_SAFE_ENDPOINT_STUB } from './baseReactFlowDisplayEndpointStubRepair';
@@ -49,6 +50,7 @@ const commercialObstacles = (
   nodes: Node[],
   nodeById: Map<string, Node>,
 ): Rectangle[] => nodes.flatMap((node) => {
+  if (isDisplayContainerNode(node)) return [];
   const rect = getNodeRect(node, nodeById);
   if (!rect) return [];
   if (node.id === edge.source || node.id === edge.target) {

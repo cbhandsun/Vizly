@@ -1,7 +1,75 @@
 import { describe, expect, it } from 'vitest';
-import { findPath, generateSimplePath, type LineObstacle, type Point } from '../pathfinding';
+import { buildPathfindingGrid, findPath, generateSimplePath, type LineObstacle, type Point } from '../pathfinding';
+import { isPathBlocked } from '../pathfindingCollision';
 
 describe('pathfinding edge avoidance', () => {
+    it('relaxes soft-zone costs without turning an actual node into a soft obstacle', () => {
+        const start = { x: 0, y: 0 };
+        const end = { x: 400, y: 0 };
+        const softZone = { x: 150, y: -150, width: 100, height: 300, padding: 40, isSoftZone: true };
+        const peerLines = [{ start: end, end: { x: 25, y: 0 } }];
+        const bounds = { startX: 0, startY: 0, endX: 400, endY: 0 };
+        const grid = buildPathfindingGrid([softZone], bounds, 20);
+        const softPath = findPath(start, end, [softZone], 20, peerLines, undefined, grid, [], true);
+        expect(softPath).not.toBeNull();
+        if (!softPath) throw new Error('Expected a traversable soft zone');
+        expect(softPath[0]).toEqual(start);
+        expect(softPath.at(-1)).toEqual(end);
+        const length = softPath.slice(1).reduce((total, point, index) => total
+            + Math.abs(point.x - softPath[index].x) + Math.abs(point.y - softPath[index].y), 0);
+        expect(length).toBeLessThanOrEqual(400 * 1.8);
+        expect(isPathBlocked(softPath, [softZone], 0)).toBe(true);
+
+        const node = { x: 150, y: -80, width: 100, height: 160, padding: 0 };
+        const obstacles = [softZone, node];
+        const blockedGrid = buildPathfindingGrid(obstacles, bounds, 20);
+        const path = findPath(start, end, obstacles, 20, peerLines, undefined, blockedGrid, [], true);
+        expect(path).not.toBeNull();
+        if (!path) throw new Error('Expected a detour around the hard node');
+        expect(isPathBlocked(path, [node], 0)).toBe(false);
+    });
+
+    it.each([false, true])('still shortens a safe narrow corridor (custom clearance: %s)', customClearance => {
+        const start = { x: 288, y: 140 };
+        const end = { x: 512, y: 140 };
+        const obstacles = [
+            { x: 302, y: -200, width: 196, height: 338, ...(customClearance ? { padding: 10 } : {}) },
+            { x: 302, y: 142, width: 196, height: 300, ...(customClearance ? { padding: 10 } : {}) },
+        ];
+        const grid = buildPathfindingGrid(obstacles, {
+            startX: start.x, startY: start.y, endX: end.x, endY: end.y,
+        }, 16);
+        expect(generateSimplePath(start, end, obstacles)).toBeNull();
+        const path = findPath(start, end, obstacles, 16, [], undefined, grid, [], true);
+        expect(path).toEqual([start, end]);
+        expect(isPathBlocked(path ?? [], obstacles.map(rect => ({ ...rect, padding: 1 })), 1)).toBe(false);
+    });
+
+    it.each([
+        { strict: false, vertical: false, reverse: false },
+        { strict: true, vertical: false, reverse: false },
+        { strict: true, vertical: true, reverse: false },
+        { strict: true, vertical: false, reverse: true },
+        { strict: true, vertical: true, reverse: true },
+    ])('preserves a necessary long detour: %j', ({ strict, vertical, reverse }) => {
+        const transform = (x: number, y: number): Point => vertical ? { x: y, y: x } : { x, y };
+        const start = transform(reverse ? 512 : 288, 140);
+        const end = transform(reverse ? 288 : 512, 140);
+        const obstacles = [{ ...transform(302, 52), width: vertical ? 176 : 196,
+            height: vertical ? 196 : 176, padding: 0 }];
+        const before = structuredClone(obstacles);
+        const grid = buildPathfindingGrid(obstacles, {
+            startX: start.x, startY: start.y, endX: end.x, endY: end.y,
+        }, 16);
+        const path = findPath(start, end, obstacles, 16, [], undefined, grid, [], strict);
+        expect(path).not.toBeNull();
+        if (!path) throw new Error('Expected a safe detour');
+        expect(path[0]).toEqual(start);
+        expect(path.at(-1)).toEqual(end);
+        expect(isPathBlocked(path, obstacles, 0)).toBe(false);
+        expect(obstacles).toEqual(before);
+    });
+
     it('does not use a simple path that crosses an existing routed edge', () => {
         const start = { x: 0, y: 0 };
         const end = { x: 100, y: 0 };

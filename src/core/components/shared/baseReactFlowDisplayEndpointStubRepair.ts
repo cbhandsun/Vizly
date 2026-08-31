@@ -37,6 +37,7 @@ import { createDisplayDeclaredAxisMismatchCounter } from './baseReactFlowDisplay
 import { eligibleCommercialClearanceDoesNotRegress } from './baseReactFlowDisplayBusinessNodeClearance';
 import { createDisplayTerminalValidationSnapshot } from './baseReactFlowTerminalValidation';
 import type { DisplayTerminalValidationSnapshot } from './baseReactFlowTerminalValidation';
+import { buildSharedRenderSafeStubCandidate } from './baseReactFlowDisplaySharedStubCandidate';
 
 export const MIN_RENDER_SAFE_ENDPOINT_STUB = 56;
 const MAX_FINAL_ENDPOINT_STUB_REPAIR_EVALUATIONS = 8;
@@ -232,6 +233,7 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
   reusableTerminalValidation?: DisplayTerminalValidationSnapshot,
   strictDiagnostics?: StrictCrossingRepairDiagnostics,
   allowStrictFallback = true,
+  trunkPolicy: 'preserve-length' | 'clearance-margin' = 'clearance-margin',
 ): T => {
   if (countRenderUnsafeEndpointStubs(edges) === 0) return edges;
   // Companion shifts remain endpoint-local. The two broader sweep fallbacks
@@ -280,6 +282,7 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
       baselineObstacleHits,
       endpointOrder,
       terminalValidation,
+      trunkPolicy,
     });
     const countAxisMismatches = createDisplayDeclaredAxisMismatchCounter(nodes);
     const baselineAxisMismatches = current.map(countAxisMismatches);
@@ -312,6 +315,8 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
       if (needsStrictFallback) {
         if (strictDiagnostics) strictDiagnostics.strictFallbackInvocationCount += 1;
         qualityContext.rememberState?.(candidate, initialQualityState);
+        const sharedCandidate = buildSharedRenderSafeStubCandidate(current, candidate, edgeIndex);
+        if (sharedCandidate !== candidate) initialVariants.push(sharedCandidate);
         initialVariants.push(...buildStrictCrossingCompanionShiftVariants(candidate, edgeIndex));
       }
       const evaluatedVariantReferences = new Set<T>();

@@ -11,6 +11,8 @@ import * as terminalPortRepair from '../baseReactFlowDisplayTerminalPortRepair';
 import * as strictSweep from '../baseReactFlowDisplayStrictSweepRepair';
 import { createAtomicRouteTransactionEvaluation } from '../baseReactFlowDisplayAtomicTransactionEvaluation';
 import { createStrictCrossingRepairDiagnostics } from '../baseReactFlowDisplayStrictResidualRepair';
+import { buildSharedRenderSafeStubCandidate } from '../baseReactFlowDisplaySharedStubCandidate';
+import { getDisplayComputedPath } from '../baseReactFlowDisplayGeometry';
 import { buildSafeEndpointSideStepCandidates } from '../baseReactFlowDisplayEndpointStubCandidates';
 import {
   commercialClearanceRiskIsGloballyMinimal,
@@ -168,6 +170,89 @@ describe('baseReactFlowDisplayEndpointStubRepair', () => {
     expect(diagnostics.duplicateVariantReferenceCount).toBeGreaterThan(0);
     expect(diagnostics.knownQualityStrictReuseCount).toBeGreaterThan(0);
   });
+
+  it.each([
+    [false, false, false], [true, false, false], [false, true, false], [true, true, false],
+    [false, false, true], [true, false, true], [false, true, true], [true, true, true],
+  ])('extends an exact shared trunk (transpose=%s, reflect=%s, target=%s)', (transpose, reflect, target) => {
+    const point = (x: number, y: number) => {
+      const horizontal = reflect ? -x : x;
+      return transpose ? { x: y, y: horizontal } : { x: horizontal, y };
+    };
+    const orient = (edge: Edge): Edge => target ? {
+      ...edge, source: edge.target, target: edge.source,
+      data: { ...edge.data, computedPath: [...getDisplayComputedPath(edge)].reverse() },
+    } : edge;
+    const primary = { ...edgeWithPath('shared-primary', [
+      point(0, 0), point(55, 0), point(55, 100), point(300, 100),
+    ]), source: 'shared' };
+    const sibling = { ...edgeWithPath('shared-sibling', [
+      point(0, 0), point(55, 0), point(55, 50), point(400, 50), point(400, 200), point(500, 200),
+    ]), source: 'shared' };
+    const baseline = [orient(primary), orient(sibling)];
+    const before = structuredClone(baseline);
+    const repaired = repairRenderSafeEndpointStubs(baseline, []);
+    expect(baseline).toEqual(before);
+    expect(countRenderUnsafeEndpointStubs(repaired)).toBe(0);
+    expect(calculateEdgePathQualityScore(repaired)).toMatchObject({
+      strictCrossings: 0, unexplainedRelatedOverlap: 0, tinyInteriorDoglegs: 0, hairpins: 0,
+    });
+    const primaryExpected = [
+      point(0, 0), point(56, 0), point(56, 100), point(300, 100),
+    ];
+    const siblingExpected = [
+      point(0, 0), point(56, 0), point(56, 50), point(400, 50), point(400, 200), point(500, 200),
+    ];
+    expect(repaired[0].data?.computedPath).toEqual(target ? primaryExpected.reverse() : primaryExpected);
+    expect(repaired[1].data?.computedPath).toEqual(target ? siblingExpected.reverse() : siblingExpected);
+  });
+
+  it('does not synthesize a shared stub for missing, invalid or distinct terminals', () => {
+    const primary = edgeWithPath('primary', [
+      { x: 0, y: 0 }, { x: 55, y: 0 }, { x: 55, y: 100 }, { x: 300, y: 100 },
+    ]);
+    const proposed = edgeWithPath('primary', [
+      { x: 0, y: 0 }, { x: 56, y: 0 }, { x: 56, y: 100 }, { x: 300, y: 100 },
+    ]);
+    const empty: Edge[] = [];
+    expect(buildSharedRenderSafeStubCandidate(empty, empty, 0)).toBe(empty);
+    const invalid: Edge = { ...primary, data: { computedPath: [{ x: Infinity, y: 0 }] } };
+    for (const sibling of [
+      edgeWithPath('unrelated', getDisplayComputedPath(primary)),
+      { ...primary, id: 'missing-path', data: {} },
+      { ...invalid, id: 'invalid' },
+      { ...primary, id: 'different-anchor', data: { computedPath: [
+        { x: 0, y: 1 }, { x: 55, y: 1 }, { x: 55, y: 100 }, { x: 300, y: 100 },
+      ] } },
+    ]) {
+      const baseline = [primary, sibling];
+      const candidate = [proposed, sibling];
+      expect(buildSharedRenderSafeStubCandidate(baseline, candidate, 0)).toBe(candidate);
+      expect(buildSharedRenderSafeStubCandidate(baseline, candidate, Number.NaN)).toBe(candidate);
+    }
+    const candidate = [proposed];
+    expect(buildSharedRenderSafeStubCandidate([invalid], candidate, 0)).toBe(candidate);
+    expect(buildSharedRenderSafeStubCandidate([], candidate, 0)).toBe(candidate);
+  });
+
+  it('moves intermediate shared bends without moving longer trunks or endpoints', () => {
+    const edge = (id: string, stub: number) => ({ ...edgeWithPath(id, [
+      { x: 0, y: 0 }, { x: stub, y: 0 }, { x: stub, y: 100 }, { x: 300, y: 100 },
+    ]), source: 'shared' });
+    const baseline = [edge('primary', 48), edge('intermediate', 55), edge('longer', 72)];
+    const candidate = [edge('primary', 56), ...baseline.slice(1)];
+    const before = structuredClone({ baseline, candidate });
+    const shared = buildSharedRenderSafeStubCandidate(baseline, candidate, 0);
+    expect(shared[0]).toBe(candidate[0]);
+    expect(getDisplayComputedPath(shared[1])).toEqual(getDisplayComputedPath(edge('intermediate', 56)));
+    expect(shared[2]).toBe(baseline[2]);
+    expect({ baseline, candidate }).toEqual(before);
+    const reversed = [edge('primary', -56), ...baseline.slice(1)];
+    expect(buildSharedRenderSafeStubCandidate(baseline, reversed, 0)).toBe(reversed);
+    const shorter = [edge('primary', 40), ...baseline.slice(1)];
+    expect(buildSharedRenderSafeStubCandidate(baseline, shorter, 0)).toBe(shorter);
+  });
+
 
   it('skips expensive strict tiers after a zero-risk companion closes the crossing', () => {
     const short = edgeWithPath('companion-short-source', [

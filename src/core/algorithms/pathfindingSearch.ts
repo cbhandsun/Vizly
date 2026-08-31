@@ -509,41 +509,41 @@ export function findPath(
             }
             restoreSavedCells();
             const optimized = optimizePath(result, obstacles, [], lineObstacles);
-            const DETOUR_RATIO = 1.8;
             const directDist = Math.abs(end.x - start.x) + Math.abs(end.y - start.y);
             let detourLen = 0;
-            for (let di = 0; di < optimized.length - 1; di++) {
-                detourLen += Math.abs(optimized[di + 1].x - optimized[di].x) + Math.abs(optimized[di + 1].y - optimized[di].y);
+            for (let i = 0; i < optimized.length - 1; i++) {
+                detourLen += Math.abs(optimized[i + 1].x - optimized[i].x)
+                    + Math.abs(optimized[i + 1].y - optimized[i].y);
             }
-            if (detourLen > directDist * DETOUR_RATIO && directDist > 100) {
-                const relaxedPath = generateSimplePath(start, end, [], lineObstacles, {
+            if (detourLen > directDist * 1.8 && directDist > 100) {
+                // Soft zones and line crossings are costs in A*, not solid nodes.
+                // Relaxing those costs must never remove actual hard obstacles.
+                const hardObstacles = obstacleList.filter(obstacle => (
+                    !('isSoftZone' in obstacle && obstacle.isSoftZone === true)
+                )).map(({ x, y, width, height }) => ({ x, y, width, height }));
+                // This existing fallback relaxes clearance padding, not rectangle
+                // interiors. Pre-inflated hard barriers retain their full bounds.
+                const relaxedPath = generateSimplePath(start, end, hardObstacles, lineObstacles, {
                     enableBuffer: false,
                     maxSegments: 4,
                     sourcePos: generateOpts?.sourcePos,
-                    targetPos: generateOpts?.targetPos
+                    targetPos: generateOpts?.targetPos,
                 });
-                if (relaxedPath) {
-                    return simplifyPath(relaxedPath);
-                }
-                const sPos = generateOpts?.sourcePos;
-                const tPos = generateOpts?.targetPos;
-                const isSourceHoriz = sPos === 'left' || sPos === 'right';
-                const isTargetHoriz = tPos === 'left' || tPos === 'right';
-                let fallbackPath: Point[];
-                if (isSourceHoriz && !isTargetHoriz) {
-                    const midX = (start.x + end.x) / 2;
-                    fallbackPath = [start, { x: midX, y: start.y }, { x: midX, y: end.y }, end];
-                } else if (!isSourceHoriz && isTargetHoriz) {
-                    const midY = (start.y + end.y) / 2;
-                    fallbackPath = [start, { x: start.x, y: midY }, { x: end.x, y: midY }, end];
-                } else if (isSourceHoriz) {
-                    const midX = (start.x + end.x) / 2;
-                    fallbackPath = [start, { x: midX, y: start.y }, { x: midX, y: end.y }, end];
-                } else {
-                    const midY = (start.y + end.y) / 2;
-                    fallbackPath = [start, { x: start.x, y: midY }, { x: end.x, y: midY }, end];
-                }
-                return simplifyPath(fallbackPath);
+                if (relaxedPath) return simplifyPath(relaxedPath);
+                const sourceHorizontal = generateOpts?.sourcePos === 'left'
+                    || generateOpts?.sourcePos === 'right';
+                const midpoint = sourceHorizontal ? (start.x + end.x) / 2 : (start.y + end.y) / 2;
+                const fallbackPath = sourceHorizontal
+                    ? [start, { x: midpoint, y: start.y }, { x: midpoint, y: end.y }, end]
+                    : [start, { x: start.x, y: midpoint }, { x: end.x, y: midpoint }, end];
+                if (!isPathBlocked(fallbackPath, hardObstacles, 1)) return simplifyPath(fallbackPath);
+                const obstacleDetour = generateSimplePath(start, end, hardObstacles, [], {
+                    enableBuffer: false,
+                    maxSegments: 4,
+                    sourcePos: generateOpts?.sourcePos,
+                    targetPos: generateOpts?.targetPos,
+                });
+                if (obstacleDetour) return simplifyPath(obstacleDetour);
             }
             return optimized;
         }

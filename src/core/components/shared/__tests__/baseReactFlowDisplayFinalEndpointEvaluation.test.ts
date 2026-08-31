@@ -9,6 +9,8 @@ import { createBaseReactFlowFinalEndpointResidualRepair } from '../baseReactFlow
 import { commercialEdgeDetoursDoNotRegress } from '../baseReactFlowDisplayCommercialDetourGuard';
 import { isExactSingleImmutableEdgeReplacement } from '../baseReactFlowDisplayFinalEndpointGate';
 import { createDisplayWorkerFinalEvaluation } from '../baseReactFlowDisplayWorkerFinalEvaluation';
+import { repairRenderSafeEndpointStubs } from '../baseReactFlowDisplayEndpointStubRepair';
+import { repairBaseReactFlowFinalCommercialDetours } from '../baseReactFlowDisplayCommercialDetourRepair';
 
 const nodes: Node[] = [
   { id: 'source', position: { x: 0, y: 0 }, width: 100, height: 60, data: {} },
@@ -304,6 +306,38 @@ describe('createBaseReactFlowFinalEndpointEvaluation', () => {
 
     const copiedArray = [...edges];
     expect(evaluation.repairRenderSafeEndpointStubs(copiedArray, 32)).toBe(copiedArray);
+  });
+
+  it('rejects a local stub preference that shortens a trunk required by the final gate', () => {
+    const routeNodes: Node[] = [
+      { id: 's', position: { x: -100, y: -40 }, width: 100, height: 80, data: {} },
+      { id: 'a', position: { x: 333, y: -40 }, width: 100, height: 80, data: {} },
+      { id: 'b', position: { x: 350, y: 193 }, width: 100, height: 80, data: {} },
+    ];
+    const route: Edge[] = [
+      { id: 'straight', source: 's', target: 'a', sourceHandle: 'right', targetHandle: 'left',
+        data: { computedPath: [{ x: 0, y: 0 }, { x: 333, y: 0 }] } },
+      { id: 'branch', source: 's', target: 'b', sourceHandle: 'right', targetHandle: 'left',
+        data: { computedPath: [{ x: 0, y: 0 }, { x: 295, y: 0 }, { x: 295, y: 233 }, { x: 350, y: 233 }] } },
+    ];
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation(routeNodes);
+    const trunks = evaluation.endpointOrder(route).legalSharedTrunks;
+    expect(trunks).toHaveLength(1);
+    expect(trunks[0].commonStemLength).toBe(295);
+    const marginCandidate = repairRenderSafeEndpointStubs(route, routeNodes);
+    expect(marginCandidate).not.toBe(route);
+    expect(evaluation.endpointOrder(marginCandidate).legalSharedTrunks[0].commonStemLength).toBe(294);
+    expect(evaluation.repairRenderSafeEndpointStubs(route)).toBe(route);
+    expect(evaluation.endpointOrder(route).legalSharedTrunks).toEqual(trunks);
+  });
+
+  it('leaves compound stub searches to endpoint closure during commercial shortening', () => {
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
+    const repair = vi.spyOn(evaluation, 'repairRenderSafeEndpointStubs');
+    const candidate = repairBaseReactFlowFinalCommercialDetours(edges, nodes, { evaluation });
+    expect(repair).toHaveBeenCalledWith(edges, 32, false);
+    expect(evaluation.hardReport(candidate).hardClean).toBe(true);
+    repair.mockRestore();
   });
 
   it('reuses exact request-local evidence for a copied immutable route', () => {

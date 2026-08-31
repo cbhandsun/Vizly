@@ -401,7 +401,10 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
     }
     return stableCandidate;
   };
-  const renderSafeCandidate = evaluation.repairRenderSafeEndpointStubs(edges, 32) as T;
+  // Endpoint closure owns compound crossing repairs. Commercial shortening may
+  // apply a direct stub improvement, but must not restart that search merely
+  // to promote the already-valid 48px minimum to the 56px render preference.
+  const renderSafeCandidate = evaluation.repairRenderSafeEndpointStubs(edges, 32, false) as T;
   const renderSafeChangedIndexes = renderSafeCandidate.flatMap((edge, index) => (
     edge !== edges[index] ? [index] : []
   ));

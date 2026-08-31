@@ -161,7 +161,9 @@ describe('baseReactFlowDisplayEdges WMS cold performance', () => {
     expect(edgeNodeObstacleHits(result, absoluteNodes), JSON.stringify(paths, null, 2)).toEqual([]);
     expect(displayEdgesHaveNodeAttachedTerminals(result, absoluteNodes), terminalDiagnostics).toBe(true);
     expect(displayEdgesHaveNodeAnchoredTerminals(result, absoluteNodes), terminalDiagnostics).toBe(true);
-    expect(finalOutputRouteSignature).toBe('route-v2:44:223:9c8cbc8cd24d31aa');
+    // Hard-obstacle-aware detour seeds produce one fewer final waypoint.
+    // Keep the geometry fingerprint alongside the unchanged quality/work budgets.
+    expect(finalOutputRouteSignature).toBe('route-v2:44:222:13f595f00784c8fe');
     expect(result.some(edge => (
       edge.data?.sharedTrunkAware === true || edge.data?.sharedTrunkSynthesized === true
     ))).toBe(true);
