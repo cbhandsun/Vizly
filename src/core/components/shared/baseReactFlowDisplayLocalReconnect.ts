@@ -226,6 +226,11 @@ const rankReconnectCandidates = ({
   const qualityContext = createEdgePathQualityEvaluationContext(edges);
   const obstacleContext = createDisplayObstacleEvaluationContext(edges, nodes);
   const ranked: RankedReconnectCandidate[] = [];
+  // Candidate scoring is synchronous and changes exactly one edge. Reuse the
+  // private array during evaluation, then snapshot only candidates retained by
+  // the bounded beam. This avoids allocating a full edge vector for every
+  // generated path while preserving immutable returned transactions.
+  const candidateEdges = edges.slice();
 
   for (const path of candidatePaths) {
     diagnostics.evaluatedPathCount += 1;
@@ -245,9 +250,7 @@ const rankReconnectCandidates = ({
         targetRect,
       )
     ) continue;
-    const candidateEdges = edges.map((item, index) => (
-      index === edgeIndex ? candidateEdge : item
-    ));
+    candidateEdges[edgeIndex] = candidateEdge;
     const quality = qualityContext.evaluateChanged(candidateEdges, [edgeIndex]);
     if (quality.hairpins > 0) continue;
     const obstacleHits = obstacleContext.evaluateKnownChanges(candidateEdges, [edgeIndex]);
@@ -255,7 +258,7 @@ const rankReconnectCandidates = ({
     const score = obstacleRepairScore(quality, obstacleHits);
     pushBoundedReconnectRankedCandidate(
       ranked,
-      { edges: candidateEdges, score, hardDefects },
+      { edges: candidateEdges.slice(), score, hardDefects },
       limit,
     );
   }

@@ -379,6 +379,20 @@ describe('baseReactFlowDisplayEvaluation', () => {
       maximumCandidateCount: expect.any(Number),
     });
     expect(JSON.stringify({ traces, diagnostics })).not.toContain('private-');
+
+    const retained = createBaseReactFlowMovedNodeReconnectCandidates({
+      baselineEdges,
+      nodes,
+      changedNodeIds: ['private-target'],
+      mutableEdgeIds: ['private-edge'],
+      beamWidth: 2,
+    });
+    expect(retained).toHaveLength(2);
+    expect(retained[0]).not.toBe(retained[1]);
+    expect(retained[0][0]).not.toBe(retained[1][0]);
+    expect(retained[0][0].data?.computedPath).not.toEqual(
+      retained[1][0].data?.computedPath,
+    );
   });
 
   it('tokenizes only explicit routing-quality intent flags', () => {
