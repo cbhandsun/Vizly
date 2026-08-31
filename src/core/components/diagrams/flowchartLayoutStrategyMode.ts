@@ -99,15 +99,18 @@ export const shouldPromoteDomainDagreRouteCandidate = (
 ): boolean => true;
 
 export const shouldRetryRejectedDomainLayoutWithCompoundElk = ({
+    preserveOrderedLanes = false,
     usedDomainElk,
     usedDomainCompoundElk,
     canUseFlatElkFallback,
     hardQualityRejected,
 }: {
+    preserveOrderedLanes?: boolean;
     usedDomainElk: boolean;
     usedDomainCompoundElk: boolean;
     canUseFlatElkFallback: boolean;
     hardQualityRejected: boolean;
-}): boolean => !usedDomainCompoundElk
+}): boolean => !preserveOrderedLanes
+    && !usedDomainCompoundElk
     && hardQualityRejected
     && (usedDomainElk || !canUseFlatElkFallback);

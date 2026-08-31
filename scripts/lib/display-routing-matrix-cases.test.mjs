@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { assertRequestedLayoutSelected, clickLayout } from './display-routing-matrix-layout-command.mjs';
 
 import {
   createDisplayRoutingMatrixCaseIds,
+  displayRoutingLayoutSelectionMatches,
   DISPLAY_ROUTING_LAYOUT_CASES,
   DISPLAY_ROUTING_TOPOLOGY_CASE_ID,
   findDisplayRoutingMenuElementByKey,
@@ -13,6 +15,29 @@ import {
 } from './display-routing-matrix-cases.mjs';
 
 describe('display routing matrix cases', () => {
+  it('checks the applied layout in the live-session assertion', async () => {
+    const correct = { evaluate: async () => ({ requested: 'Vertical swimlanes', applied: 'Auto Layout: Vertical swimlanes' }) };
+    await expect(assertRequestedLayoutSelected(correct, 'domain-lanes-tb')).resolves.toBeUndefined();
+    const fallback = { evaluate: async () => ({ requested: 'Vertical swimlanes', applied: 'Auto Layout: Complex process' }) };
+    await expect(assertRequestedLayoutSelected(fallback, 'domain-lanes-tb')).rejects.toThrow('different layout');
+    await expect(assertRequestedLayoutSelected({}, 'tree-tb')).resolves.toBeUndefined();
+  });
+
+  it('fails the command when no toolbar trigger exists', async () => {
+    await expect(clickLayout({ evaluate: async () => false }, { id: 'domain-lanes-tb' }))
+      .rejects.toThrow('trigger was not found');
+  });
+
+  it('rejects silent compound fallback even when its routes committed cleanly', () => {
+    expect(displayRoutingLayoutSelectionMatches('Vertical swimlanes', 'Auto Layout: Vertical swimlanes + Automatic layered')).toBe(true);
+    expect(displayRoutingLayoutSelectionMatches('Vertical swimlanes', 'Auto Layout: Complex process')).toBe(false);
+    expect(displayRoutingLayoutSelectionMatches('Horizontal swimlanes', 'Auto Layout: Vertical swimlanes')).toBe(false);
+    expect(displayRoutingLayoutSelectionMatches('  Vertical\n swimlanes ', 'Auto Layout: Vertical swimlanes')).toBe(true);
+    for (const malformed of ['', undefined, null, {}, 'x'.repeat(1025)]) {
+      expect(displayRoutingLayoutSelectionMatches(malformed, 'Auto Layout: Vertical swimlanes')).toBe(false);
+      expect(displayRoutingLayoutSelectionMatches('Vertical swimlanes', malformed)).toBe(false);
+    }
+  });
   it('covers every layout action currently exposed by the flowchart toolbar', () => {
     expect(DISPLAY_ROUTING_LAYOUT_CASES.map(layoutCase => layoutCase.id)).toEqual([
       'domain-compound-elk-tb',

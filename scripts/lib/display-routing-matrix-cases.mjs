@@ -1,5 +1,14 @@
 const MAX_MATRIX_CASE_ID_LENGTH = 128;
 
+export const displayRoutingLayoutSelectionMatches = (requestedLabel, appliedLabel) => {
+  const normalize = value => typeof value === 'string' && value.length <= 1024
+    ? value.replace(/\s+/g, ' ').trim()
+    : '';
+  const requested = normalize(requestedLabel);
+  const applied = normalize(appliedLabel);
+  return requested.length > 0 && applied.includes(requested);
+};
+
 export const DISPLAY_ROUTING_TOPOLOGY_CASE_ID = 'topology-edit-cycle';
 
 export const DISPLAY_ROUTING_LAYOUT_CASES = Object.freeze([
@@ -7,10 +16,10 @@ export const DISPLAY_ROUTING_LAYOUT_CASES = Object.freeze([
   Object.freeze({ id: 'domain-compound-elk-bt', label: '复杂流程（保留域·下→上）' }),
   Object.freeze({ id: 'domain-compound-elk-lr', label: '复杂流程（保留域·左→右）' }),
   Object.freeze({ id: 'domain-compound-elk-rl', label: '复杂流程（保留域·右→左）' }),
-  Object.freeze({ id: 'domain-lanes-tb', label: '循环流程泳道（上→下）' }),
-  Object.freeze({ id: 'domain-lanes-bt', label: '循环流程泳道（下→上）' }),
-  Object.freeze({ id: 'domain-lanes-lr', label: '循环流程泳道（左→右）' }),
-  Object.freeze({ id: 'domain-lanes-rl', label: '循环流程泳道（右→左）' }),
+  Object.freeze({ id: 'domain-lanes-tb', label: '泳道 · 域左右并列（域内上→下）' }),
+  Object.freeze({ id: 'domain-lanes-bt', label: '泳道 · 域左右并列（域内下→上）' }),
+  Object.freeze({ id: 'domain-lanes-lr', label: '泳道 · 域上下堆叠（域内左→右）' }),
+  Object.freeze({ id: 'domain-lanes-rl', label: '泳道 · 域上下堆叠（域内右→左）' }),
   Object.freeze({ id: 'domain-elk-tb', label: '全图正交分层（上→下）' }),
   Object.freeze({ id: 'domain-elk-bt', label: '全图正交分层（下→上）' }),
   Object.freeze({ id: 'domain-elk-lr', label: '全图正交分层（左→右）' }),

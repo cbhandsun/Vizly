@@ -143,19 +143,19 @@ export const buildFlowchartLayoutMenuModel = ({
         ),
         domainLanesTb: translate(
             'designer.flowchart.layout.cyclicLanesTB',
-            '纵向泳道（域横排·上→下）',
+            '泳道 · 域左右并列（域内上→下）',
         ),
         domainLanesBt: translate(
             'designer.flowchart.layout.cyclicLanesBT',
-            '纵向泳道（域横排·下→上）',
+            '泳道 · 域左右并列（域内下→上）',
         ),
         domainLanesLr: translate(
             'designer.flowchart.layout.cyclicLanesLR',
-            '横向泳道（域纵排·左→右）',
+            '泳道 · 域上下堆叠（域内左→右）',
         ),
         domainLanesRl: translate(
             'designer.flowchart.layout.cyclicLanesRL',
-            '横向泳道（域纵排·右→左）',
+            '泳道 · 域上下堆叠（域内右→左）',
         ),
         domainElkTb: translate('designer.flowchart.layout.globalOrthogonalTB', '全图正交分层（上→下）'),
         domainElkBt: translate('designer.flowchart.layout.globalOrthogonalBT', '全图正交分层（下→上）'),

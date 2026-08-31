@@ -649,7 +649,7 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
             name: /标准流程.*上→下/,
         });
         const inactiveLayout = screen.getByRole('menuitemradio', {
-            name: /横向泳道.*左→右/,
+            name: /泳道.*域上下堆叠.*域内左→右/,
         });
 
         expect(domainLayout.getAttribute('aria-checked')).toBe('true');

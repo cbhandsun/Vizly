@@ -36,6 +36,15 @@ const collectItems = (value: unknown): Record<string, unknown>[] => {
 };
 
 describe('flowchartToolbarLayoutMenu', () => {
+  it('never substitutes a compound layout for an explicitly requested swimlane', () => {
+    expect(shouldRetryRejectedDomainLayoutWithCompoundElk({
+      preserveOrderedLanes: true,
+      usedDomainElk: false,
+      usedDomainCompoundElk: false,
+      canUseFlatElkFallback: false,
+      hardQualityRejected: true,
+    })).toBe(false);
+  });
   it('distinguishes global strategies from composable domain layouts', () => {
     expect(isGlobalFullGraphLayoutStrategy('tree')).toBe(true);
     expect(isGlobalFullGraphLayoutStrategy('force')).toBe(true);
@@ -276,7 +285,7 @@ describe('flowchartToolbarLayoutMenu', () => {
     expect(lanesBt).toBeDefined();
     expect(lanesRl).toBeDefined();
     expect(model.selectedKeys).toEqual(['domain-lanes-lr', 'node-flow']);
-    expect(model.statusText).toBe('布局组合：横向泳道（域纵排·左→右） + 流式换行');
+    expect(model.statusText).toBe('布局组合：泳道 · 域上下堆叠（域内左→右） + 流式换行');
     if (typeof lanesLr?.onClick === 'function') lanesLr.onClick();
     expect(onStrategyLayout).toHaveBeenCalledWith('domain-lanes', 'dagre', 'LR');
     if (typeof lanesBt?.onClick === 'function') lanesBt.onClick();
@@ -299,6 +308,10 @@ describe('flowchartToolbarLayoutMenu', () => {
       translate: (_key, fallback) => fallback,
     });
     const items = collectItems(model.items);
+    expect(items.find(item => item.key === 'domain-lanes-tb')?.label)
+      .toBe('泳道 · 域左右并列（域内上→下）');
+    expect(items.find(item => item.key === 'domain-lanes-lr')?.label)
+      .toBe('泳道 · 域上下堆叠（域内左→右）');
 
     for (const [key, direction, nodeLayout] of [
       ['domain-lanes-tb', 'TB', 'dagre'],

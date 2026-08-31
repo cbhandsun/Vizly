@@ -1,5 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { readFile } from 'node:fs/promises';
+import { clickLayout, assertRequestedLayoutSelected } from './lib/display-routing-matrix-layout-command.mjs';
 
 import { DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT } from './lib/display-routing-browser-capture.mjs';
 import {
@@ -23,7 +24,6 @@ import {
   createDisplayRoutingMatrixCaseIds,
   DISPLAY_ROUTING_LAYOUT_CASES,
   DISPLAY_ROUTING_TOPOLOGY_CASE_ID,
-  findDisplayRoutingMenuElementByKey,
   parseDisplayRoutingMatrixCase,
   parseDisplayRoutingMatrixCaseList,
   parseDisplayRoutingMatrixPreset,
@@ -376,50 +376,6 @@ const verifyPreset = target => withPrecompiledRouteBrowser(async session => {
   };
 });
 
-const clickLayout = async (session, layoutCase) => {
-  const opened = await session.evaluate(`(() => {
-    const trigger = Array.from(document.querySelectorAll('button'))
-      .find(button => /自动布局|layout/i.test(button.getAttribute('aria-label') || ''));
-    trigger?.click();
-    return Boolean(trigger);
-  })()`);
-  if (!opened) throw new Error('Layout menu trigger was not found');
-  await delay(300);
-  const clickVisibleItem = () => session.evaluate(`(() => {
-    const findByKey = ${findDisplayRoutingMenuElementByKey.toString()};
-    const item = findByKey(
-      document.querySelectorAll('.flowchart-layout-menu [data-menu-id]'),
-      ${JSON.stringify(layoutCase.id)},
-    );
-    const clickedAt = Date.now();
-    item?.click();
-    return item ? clickedAt : null;
-  })()`);
-  let clicked = await clickVisibleItem();
-  if (!clicked) {
-    const submenuCenter = await session.evaluate(`(() => {
-      const findByKey = ${findDisplayRoutingMenuElementByKey.toString()};
-      const item = findByKey(
-        document.querySelectorAll('.flowchart-layout-menu [data-menu-id]'),
-        'more-layout-engines',
-      );
-      if (!item) return null;
-      const rect = item.getBoundingClientRect();
-      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-    })()`);
-    if (submenuCenter) {
-      await session.send('Input.dispatchMouseEvent', {
-        type: 'mouseMoved',
-        x: submenuCenter.x,
-        y: submenuCenter.y,
-      });
-      await delay(500);
-      clicked = await clickVisibleItem();
-    }
-  }
-  if (!clicked) throw new Error(`Layout menu item was not found: ${layoutCase.label}`);
-  return clicked;
-};
 
 const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => {
   await prepareSession(session);
@@ -578,6 +534,7 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
   });
   assertDisplayRoutingLayoutProgressTimeline(visualTimeline, layoutCase.id);
   assertDisplayRoutingLayoutFitTimeline(visualTimeline, layoutCase.id);
+  await assertRequestedLayoutSelected(session, layoutCase.id);
   if (route.routing.workerStartCount !== initialRoute.routing.workerStartCount) {
     throw new Error(`${layoutCase.id} started a duplicate Canvas display Worker: ${JSON.stringify({
       before: initialRoute.routing.workerStartCount,
@@ -619,6 +576,7 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
       expectedEdgeCount: warmRoute.response?.edges?.length,
       timeoutMs: VISUAL_SETTLE_TIMEOUT_MS,
     });
+    await assertRequestedLayoutSelected(session, warmLayoutCase.id);
     const warmTotalRouteMs = Number.isFinite(warmRoute.routing.finalAppliedAt)
       ? warmRoute.routing.finalAppliedAt - warmClickedAt
       : warmRoute.routing.totalRouteMs;

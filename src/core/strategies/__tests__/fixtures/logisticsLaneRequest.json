@@ -1,0 +1,1506 @@
+{
+  "operation": "repair-validate-or-route",
+  "requestId": "layout:4",
+  "edges": [
+    {
+      "id": "edge-loms-customs",
+      "source": "l-oms",
+      "target": "customs",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "data": {
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "trunkPolishVersion": 2
+      }
+    },
+    {
+      "id": "edge-loms-tms",
+      "source": "l-oms",
+      "target": "tms",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "type": "advanced-smart-step",
+      "data": {
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "trunkPolishVersion": 2
+      }
+    },
+    {
+      "id": "edge-loms-visibility",
+      "source": "l-oms",
+      "target": "visibility",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "data": {
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": false,
+        "crossingOptimized": true,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "trunkPolishVersion": 2
+      }
+    },
+    {
+      "id": "edge-loms-wms",
+      "source": "l-oms",
+      "target": "wms",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "data": {
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "trunkPolishVersion": 2
+      }
+    },
+    {
+      "id": "edge-tms-bms",
+      "source": "tms",
+      "target": "bms",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "data": {
+        "crossingOptimized": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "trunkPolishVersion": 2
+      }
+    },
+    {
+      "id": "edge-tms-carrier",
+      "source": "tms",
+      "target": "carrier-portal",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "data": {
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "sameNodeInOutCrossingRepaired": true,
+        "crossingOptimized": true,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "trunkPolishVersion": 2
+      }
+    },
+    {
+      "id": "edge-tms-downstream",
+      "source": "tms",
+      "target": "downstream",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "data": {
+        "detachedSourceEndpointReanchored": true,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "crossingOptimized": true,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "trunkPolishVersion": 2
+      }
+    },
+    {
+      "id": "edge-tms-visibility",
+      "source": "tms",
+      "target": "visibility",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "data": {
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "displayNodeClearanceRepaired": true,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "trunkPolishVersion": 2
+      }
+    },
+    {
+      "id": "edge-tms-yms",
+      "source": "tms",
+      "target": "yms",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "data": {
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "trunkPolishVersion": 2
+      }
+    },
+    {
+      "id": "edge-upstream-loms",
+      "source": "upstream",
+      "target": "l-oms",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "type": "advanced-smart-step",
+      "data": {
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "trunkPolishVersion": 2
+      }
+    },
+    {
+      "id": "edge-visibility-downstream",
+      "source": "visibility",
+      "target": "downstream",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "type": "advanced-smart-step",
+      "data": {
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "sameNodeInOutCrossingRepaired": true,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "trunkPolishVersion": 2
+      }
+    },
+    {
+      "id": "edge-wms-bms",
+      "source": "wms",
+      "target": "bms",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "type": "advanced-smart-step",
+      "data": {
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "crossingOptimized": true,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "trunkPolishVersion": 2
+      }
+    },
+    {
+      "id": "edge-wms-visibility",
+      "source": "wms",
+      "target": "visibility",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "data": {
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "displayNodeClearanceRepaired": true,
+        "crossingOptimized": true,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "trunkPolishVersion": 2
+      }
+    },
+    {
+      "id": "edge-wms-wcs",
+      "source": "wms",
+      "target": "wcs",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "data": {
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "trunkPolishVersion": 2
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "id": "titlegroup-external",
+      "type": "titleGroup",
+      "position": {
+        "x": 1774.2575,
+        "y": 0
+      },
+      "positionAbsolute": {
+        "x": 1774.2575,
+        "y": 0
+      },
+      "width": 1178,
+      "height": 880,
+      "measured": {
+        "width": 1178,
+        "height": 880
+      },
+      "style": {
+        "width": 1178,
+        "height": 880
+      },
+      "data": {}
+    },
+    {
+      "id": "titlegroup-logistics",
+      "type": "titleGroup",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "positionAbsolute": {
+        "x": 0,
+        "y": 0
+      },
+      "width": 1614,
+      "height": 880,
+      "measured": {
+        "width": 1614,
+        "height": 880
+      },
+      "style": {
+        "width": 1614,
+        "height": 880
+      },
+      "data": {}
+    },
+    {
+      "id": "titlegroup-data",
+      "type": "titleGroup",
+      "position": {
+        "x": 3112.435,
+        "y": 0
+      },
+      "positionAbsolute": {
+        "x": 3112.435,
+        "y": 0
+      },
+      "width": 520,
+      "height": 880,
+      "measured": {
+        "width": 520,
+        "height": 880
+      },
+      "style": {
+        "width": 520,
+        "height": 880
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-external-external",
+      "type": "subGroup",
+      "parentId": "titlegroup-external",
+      "position": {
+        "x": 105,
+        "y": 84
+      },
+      "positionAbsolute": {
+        "x": 1879.2575,
+        "y": 84
+      },
+      "width": 969,
+      "height": 232,
+      "measured": {
+        "width": 969,
+        "height": 232
+      },
+      "style": {
+        "width": 968.85,
+        "height": 232
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-logistics-logistics",
+      "type": "subGroup",
+      "parentId": "titlegroup-logistics",
+      "position": {
+        "x": 133,
+        "y": 84
+      },
+      "positionAbsolute": {
+        "x": 133,
+        "y": 84
+      },
+      "width": 1348,
+      "height": 708,
+      "measured": {
+        "width": 1348,
+        "height": 708
+      },
+      "style": {
+        "width": 1348.05,
+        "height": 708
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-data-data",
+      "type": "subGroup",
+      "parentId": "titlegroup-data",
+      "position": {
+        "x": 62,
+        "y": 84
+      },
+      "positionAbsolute": {
+        "x": 3174.435,
+        "y": 84
+      },
+      "width": 396,
+      "height": 232,
+      "measured": {
+        "width": 396,
+        "height": 232
+      },
+      "style": {
+        "width": 396.4000000000001,
+        "height": 232
+      },
+      "data": {}
+    },
+    {
+      "id": "upstream",
+      "type": "custom",
+      "parentId": "subgroup-external-external",
+      "position": {
+        "x": 28,
+        "y": 84.5
+      },
+      "positionAbsolute": {
+        "x": 1907.2575,
+        "y": 168.5
+      },
+      "width": 210,
+      "height": 73,
+      "measured": {
+        "width": 210,
+        "height": 73
+      },
+      "style": {
+        "width": 210,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "l-oms",
+      "type": "custom",
+      "parentId": "subgroup-logistics-logistics",
+      "position": {
+        "x": 605.25,
+        "y": 62
+      },
+      "positionAbsolute": {
+        "x": 738.25,
+        "y": 146
+      },
+      "width": 259,
+      "height": 118,
+      "measured": {
+        "width": 259,
+        "height": 118
+      },
+      "style": {
+        "width": 259,
+        "height": 118
+      },
+      "data": {}
+    },
+    {
+      "id": "wms",
+      "type": "custom",
+      "parentId": "subgroup-logistics-logistics",
+      "position": {
+        "x": 593.75,
+        "y": 300
+      },
+      "positionAbsolute": {
+        "x": 726.75,
+        "y": 384
+      },
+      "width": 282,
+      "height": 118,
+      "measured": {
+        "width": 282,
+        "height": 118
+      },
+      "style": {
+        "width": 282,
+        "height": 118
+      },
+      "data": {}
+    },
+    {
+      "id": "wcs",
+      "type": "custom",
+      "parentId": "subgroup-logistics-logistics",
+      "position": {
+        "x": 792.75,
+        "y": 538
+      },
+      "positionAbsolute": {
+        "x": 925.75,
+        "y": 622
+      },
+      "width": 298,
+      "height": 118,
+      "measured": {
+        "width": 298,
+        "height": 118
+      },
+      "style": {
+        "width": 298,
+        "height": 118
+      },
+      "data": {}
+    },
+    {
+      "id": "tms",
+      "type": "custom",
+      "parentId": "subgroup-logistics-logistics",
+      "position": {
+        "x": 191.75,
+        "y": 300
+      },
+      "positionAbsolute": {
+        "x": 324.75,
+        "y": 384
+      },
+      "width": 282,
+      "height": 118,
+      "measured": {
+        "width": 282,
+        "height": 118
+      },
+      "style": {
+        "width": 282,
+        "height": 118
+      },
+      "data": {}
+    },
+    {
+      "id": "customs",
+      "type": "custom",
+      "parentId": "subgroup-logistics-logistics",
+      "position": {
+        "x": 995.75,
+        "y": 311
+      },
+      "positionAbsolute": {
+        "x": 1128.75,
+        "y": 395
+      },
+      "width": 282,
+      "height": 96,
+      "measured": {
+        "width": 282,
+        "height": 96
+      },
+      "style": {
+        "width": 282,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "bms",
+      "type": "custom",
+      "parentId": "subgroup-logistics-logistics",
+      "position": {
+        "x": 28,
+        "y": 538
+      },
+      "positionAbsolute": {
+        "x": 161,
+        "y": 622
+      },
+      "width": 243,
+      "height": 118,
+      "measured": {
+        "width": 243,
+        "height": 118
+      },
+      "style": {
+        "width": 243,
+        "height": 118
+      },
+      "data": {}
+    },
+    {
+      "id": "yms",
+      "type": "custom",
+      "parentId": "subgroup-logistics-logistics",
+      "position": {
+        "x": 418.75,
+        "y": 538
+      },
+      "positionAbsolute": {
+        "x": 551.75,
+        "y": 622
+      },
+      "width": 250,
+      "height": 118,
+      "measured": {
+        "width": 250,
+        "height": 118
+      },
+      "style": {
+        "width": 250,
+        "height": 118
+      },
+      "data": {}
+    },
+    {
+      "id": "carrier-portal",
+      "type": "custom",
+      "parentId": "subgroup-external-external",
+      "position": {
+        "x": 357.9999999999998,
+        "y": 62
+      },
+      "positionAbsolute": {
+        "x": 2237.2574999999997,
+        "y": 146
+      },
+      "width": 211,
+      "height": 118,
+      "measured": {
+        "width": 211,
+        "height": 118
+      },
+      "style": {
+        "width": 211,
+        "height": 118
+      },
+      "data": {}
+    },
+    {
+      "id": "visibility",
+      "type": "custom",
+      "parentId": "subgroup-data-data",
+      "position": {
+        "x": 28,
+        "y": 62
+      },
+      "positionAbsolute": {
+        "x": 3202.435,
+        "y": 146
+      },
+      "width": 296,
+      "height": 118,
+      "measured": {
+        "width": 296,
+        "height": 118
+      },
+      "style": {
+        "width": 296,
+        "height": 118
+      },
+      "data": {}
+    },
+    {
+      "id": "downstream",
+      "type": "custom",
+      "parentId": "subgroup-external-external",
+      "position": {
+        "x": 688.9999999999998,
+        "y": 84.5
+      },
+      "positionAbsolute": {
+        "x": 2568.2574999999997,
+        "y": 168.5
+      },
+      "width": 219,
+      "height": 73,
+      "measured": {
+        "width": 219,
+        "height": 73
+      },
+      "style": {
+        "width": 219,
+        "height": 73
+      },
+      "data": {}
+    }
+  ],
+  "enableSmartEdges": true,
+  "smartEdgePadding": 20,
+  "isLargeGraph": false,
+  "displayEdgeEpoch": 0,
+  "qualityMode": "full",
+  "inputIdentity": {
+    "routingVersion": "15",
+    "visualVersion": "commercial-hard-gate-v1",
+    "inputSignature": "3603121192",
+    "inputGeometryDigest": "geometry-v1:d06d5e9c143ff780ebeb51b6f97add54"
+  },
+  "candidatePatches": [
+    {
+      "id": "edge-loms-customs",
+      "source": "l-oms",
+      "target": "customs",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 997,
+            "y": 205
+          },
+          {
+            "x": 1073,
+            "y": 205
+          },
+          {
+            "x": 1073,
+            "y": 443
+          },
+          {
+            "x": 1129,
+            "y": 443
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "edge-loms-tms",
+      "source": "l-oms",
+      "target": "tms",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 738,
+            "y": 205
+          },
+          {
+            "x": 663,
+            "y": 205
+          },
+          {
+            "x": 663,
+            "y": 443
+          },
+          {
+            "x": 607,
+            "y": 443
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "edge-loms-visibility",
+      "source": "l-oms",
+      "target": "visibility",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 997,
+            "y": 205
+          },
+          {
+            "x": 3202,
+            "y": 205
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "edge-loms-wms",
+      "source": "l-oms",
+      "target": "wms",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 868,
+            "y": 264
+          },
+          {
+            "x": 868,
+            "y": 384
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "edge-tms-bms",
+      "source": "tms",
+      "target": "bms",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 466,
+            "y": 502
+          },
+          {
+            "x": 466,
+            "y": 566
+          },
+          {
+            "x": 283,
+            "y": 566
+          },
+          {
+            "x": 283,
+            "y": 622
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "edge-tms-carrier",
+      "source": "tms",
+      "target": "carrier-portal",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 607,
+            "y": 443
+          },
+          {
+            "x": 2181,
+            "y": 443
+          },
+          {
+            "x": 2181,
+            "y": 205
+          },
+          {
+            "x": 2237,
+            "y": 205
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "edge-tms-downstream",
+      "source": "tms",
+      "target": "downstream",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 607,
+            "y": 443
+          },
+          {
+            "x": 2181,
+            "y": 443
+          },
+          {
+            "x": 2181,
+            "y": 205
+          },
+          {
+            "x": 2568,
+            "y": 205
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "edge-tms-visibility",
+      "source": "tms",
+      "target": "visibility",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 607,
+            "y": 443
+          },
+          {
+            "x": 2181,
+            "y": 443
+          },
+          {
+            "x": 2181,
+            "y": 205
+          },
+          {
+            "x": 3202,
+            "y": 205
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "edge-tms-yms",
+      "source": "tms",
+      "target": "yms",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 466,
+            "y": 502
+          },
+          {
+            "x": 466,
+            "y": 566
+          },
+          {
+            "x": 677,
+            "y": 566
+          },
+          {
+            "x": 677,
+            "y": 622
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "edge-upstream-loms",
+      "source": "upstream",
+      "target": "l-oms",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1907,
+            "y": 205
+          },
+          {
+            "x": 997,
+            "y": 205
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "edge-visibility-downstream",
+      "source": "visibility",
+      "target": "downstream",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 3202,
+            "y": 205
+          },
+          {
+            "x": 2787,
+            "y": 205
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "edge-wms-bms",
+      "source": "wms",
+      "target": "bms",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 727,
+            "y": 443
+          },
+          {
+            "x": 460,
+            "y": 443
+          },
+          {
+            "x": 460,
+            "y": 681
+          },
+          {
+            "x": 404,
+            "y": 681
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "edge-wms-visibility",
+      "source": "wms",
+      "target": "visibility",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1009,
+            "y": 443
+          },
+          {
+            "x": 3146,
+            "y": 443
+          },
+          {
+            "x": 3146,
+            "y": 205
+          },
+          {
+            "x": 3202,
+            "y": 205
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "edge-wms-wcs",
+      "source": "wms",
+      "target": "wcs",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 868,
+            "y": 502
+          },
+          {
+            "x": 868,
+            "y": 566
+          },
+          {
+            "x": 1075,
+            "y": 566
+          },
+          {
+            "x": 1075,
+            "y": 622
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    }
+  ],
+  "fallbackCandidatePatches": [
+    {
+      "id": "edge-loms-customs",
+      "source": "l-oms",
+      "target": "customs",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 997.25,
+            "y": 205
+          },
+          {
+            "x": 1063,
+            "y": 205
+          },
+          {
+            "x": 1063,
+            "y": 443
+          },
+          {
+            "x": 1128.75,
+            "y": 443
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "edge-loms-tms",
+      "source": "l-oms",
+      "target": "tms",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 738.25,
+            "y": 205
+          },
+          {
+            "x": 672.5,
+            "y": 205
+          },
+          {
+            "x": 672.5,
+            "y": 443
+          },
+          {
+            "x": 606.75,
+            "y": 443
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "edge-loms-visibility",
+      "source": "l-oms",
+      "target": "visibility",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 997.25,
+            "y": 205
+          },
+          {
+            "x": 3202.435,
+            "y": 205
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "edge-loms-wms",
+      "source": "l-oms",
+      "target": "wms",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 867.75,
+            "y": 264
+          },
+          {
+            "x": 867.75,
+            "y": 384
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "edge-tms-bms",
+      "source": "tms",
+      "target": "bms",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 465.75,
+            "y": 502
+          },
+          {
+            "x": 465.75,
+            "y": 562
+          },
+          {
+            "x": 282.5,
+            "y": 562
+          },
+          {
+            "x": 282.5,
+            "y": 622
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "edge-tms-carrier",
+      "source": "tms",
+      "target": "carrier-portal",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 606.75,
+            "y": 443
+          },
+          {
+            "x": 1422.0037499999999,
+            "y": 443
+          },
+          {
+            "x": 1422.0037499999999,
+            "y": 205
+          },
+          {
+            "x": 2237.2574999999997,
+            "y": 205
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "edge-tms-downstream",
+      "source": "tms",
+      "target": "downstream",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 606.75,
+            "y": 443
+          },
+          {
+            "x": 1587.5037499999999,
+            "y": 443
+          },
+          {
+            "x": 1587.5037499999999,
+            "y": 205
+          },
+          {
+            "x": 2568.2574999999997,
+            "y": 205
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "edge-tms-visibility",
+      "source": "tms",
+      "target": "visibility",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 606.75,
+            "y": 443
+          },
+          {
+            "x": 1904.5925,
+            "y": 443
+          },
+          {
+            "x": 1904.5925,
+            "y": 205
+          },
+          {
+            "x": 3202.435,
+            "y": 205
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "edge-tms-yms",
+      "source": "tms",
+      "target": "yms",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 465.75,
+            "y": 502
+          },
+          {
+            "x": 465.75,
+            "y": 562
+          },
+          {
+            "x": 676.75,
+            "y": 562
+          },
+          {
+            "x": 676.75,
+            "y": 622
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "edge-upstream-loms",
+      "source": "upstream",
+      "target": "l-oms",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1907.2575,
+            "y": 205
+          },
+          {
+            "x": 997.25,
+            "y": 205
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "edge-visibility-downstream",
+      "source": "visibility",
+      "target": "downstream",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 3202.435,
+            "y": 205
+          },
+          {
+            "x": 2787.2574999999997,
+            "y": 205
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "edge-wms-bms",
+      "source": "wms",
+      "target": "bms",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 726.75,
+            "y": 443
+          },
+          {
+            "x": 565.375,
+            "y": 443
+          },
+          {
+            "x": 565.375,
+            "y": 681
+          },
+          {
+            "x": 404,
+            "y": 681
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "edge-wms-visibility",
+      "source": "wms",
+      "target": "visibility",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1008.75,
+            "y": 443
+          },
+          {
+            "x": 2105.5924999999997,
+            "y": 443
+          },
+          {
+            "x": 2105.5924999999997,
+            "y": 205
+          },
+          {
+            "x": 3202.435,
+            "y": 205
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "edge-wms-wcs",
+      "source": "wms",
+      "target": "wcs",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 867.75,
+            "y": 502
+          },
+          {
+            "x": 867.75,
+            "y": 562
+          },
+          {
+            "x": 1074.75,
+            "y": 562
+          },
+          {
+            "x": 1074.75,
+            "y": 622
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    }
+  ],
+  "candidateSource": "persistent",
+  "stopAfterObstacleFailure": false
+}

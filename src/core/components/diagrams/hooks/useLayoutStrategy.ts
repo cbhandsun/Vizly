@@ -589,11 +589,14 @@ export function useLayoutStrategy({
                             edges: finalEdges,
                             routingJob,
                             beforePreviewRelease,
-                            rejectObstacleDirtyBoundedCandidate: isDomainLane,
+                            // Lane seeds are provisional endpoint paths, not a
+                            // verdict on whether the requested geometry can route.
+                            // Let the Worker repair them before the exact hard gate.
                             rejectUnanchoredFlatElkCandidate:
                                 candidateUsesElk && !candidateUsesCompoundElk,
                             retainLayoutPreviewOnFailure:
                                 shouldRetryRejectedDomainLayoutWithCompoundElk({
+                                    preserveOrderedLanes: isDomainLane,
                                     usedDomainElk,
                                     usedDomainCompoundElk,
                                     canUseFlatElkFallback,
@@ -619,6 +622,7 @@ export function useLayoutStrategy({
                             legacyFallback.isLayoutRoutingHardQualityRejection(error),
                         );
                         const canRetryWithDomainCompoundElk = shouldRetryRejectedDomainLayoutWithCompoundElk({
+                            preserveOrderedLanes: isDomainLane,
                             usedDomainElk,
                             usedDomainCompoundElk,
                             canUseFlatElkFallback,

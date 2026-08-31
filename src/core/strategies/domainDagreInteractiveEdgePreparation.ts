@@ -1,5 +1,6 @@
 import type { Edge } from '@xyflow/react';
 import type { LayoutOptions } from '../types/layout';
+import { repairDomainLanePortRoutes } from './domainLanePortRouting';
 import { expandHandle } from '../routing/utils/handleUtils';
 import {
   buildEndpointOrthogonalFallbackPath,
@@ -123,9 +124,10 @@ export function prepareDomainDagreInteractiveEdges({
     return nextEdge;
   });
 
-  return repairSharedTargetEntryCrossings(
+  const trunkEdges = repairSharedTargetEntryCrossings(
     synthesizeSharedEndpointTrunks(interactiveEdges, { nodes }),
-  ).map(edge => ({
+  );
+  return (orderedLanes ? repairDomainLanePortRoutes(trunkEdges, nodes) : trunkEdges).map(edge => ({
     ...edge,
     data: {
       ...(edge.data || {}),
