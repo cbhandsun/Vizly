@@ -1,5 +1,28 @@
 const MAX_MATRIX_CASE_ID_LENGTH = 128;
 
+export const parseDisplayRoutingMatrixViewport = rawValue => {
+  if (rawValue === undefined || rawValue === null || rawValue === '') return { width: 1600, height: 1200 };
+  const match = typeof rawValue === 'string' && rawValue.length <= 16
+    ? /^(\d{3,4})x(\d{3,4})$/.exec(rawValue.trim()) : null;
+  const width = match ? Number(match[1]) : 0;
+  const height = match ? Number(match[2]) : 0;
+  if (width < 320 || width > 3840 || height < 240 || height > 2160) {
+    throw new Error('Invalid DISPLAY_ROUTING_MATRIX_VIEWPORT');
+  }
+  return { width, height };
+};
+
+/** A DOM match is not proof that a user can click it. Reject offscreen,
+ * clipped/covered and non-finite targets before issuing a pointer event. */
+export const resolveDisplayRoutingMenuPointerTarget = (rect, viewport, hitMatches = true) => {
+  if (!rect || !viewport || hitMatches !== true) return null;
+  const { left, top, width, height } = rect;
+  if (![left, top, width, height, viewport.width, viewport.height].every(Number.isFinite)
+    || width <= 0 || height <= 0 || viewport.width <= 0 || viewport.height <= 0
+    || left < 0 || top < 0 || left + width > viewport.width || top + height > viewport.height) return null;
+  return { x: left + width / 2, y: top + height / 2 };
+};
+
 export const displayRoutingLayoutSelectionMatches = (requestedLabel, appliedLabel) => {
   const normalize = value => typeof value === 'string' && value.length <= 1024
     ? value.replace(/\s+/g, ' ').trim()

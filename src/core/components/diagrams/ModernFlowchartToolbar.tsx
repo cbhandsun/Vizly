@@ -10,7 +10,7 @@ import {
 } from 'react-icons/fa';
 import { BackgroundVariant } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
-import { Tooltip, Button, Dropdown, MenuProps, Popover, Grid } from 'antd';
+import { Tooltip, Button, ConfigProvider, Dropdown, MenuProps, Popover, Grid } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 import { appMessage, appModal } from '../../utils/antdStaticBridge';
 import { executeConfirmedLocalEditorReset } from '../../utils/localEditorReset';
@@ -21,6 +21,7 @@ import { FlowchartCreationTools } from './FlowchartCreationTools';
 import { resolveFlowchartToolbarHistoryCount } from './flowchartToolbarHistoryPresentation';
 import { DropdownMenuTriggerButton } from './DropdownMenuTriggerButton';
 import { buildFlowchartLayoutMenuModel } from './flowchartToolbarLayoutMenu';
+import { getFlowchartLayoutMenuPlacements } from './flowchartLayoutMenuPlacement';
 import type { FlowchartLayoutDirection } from './flowchartLayoutStrategyMode';
 import { buildToolModeMenuItems, resolveActiveToolModeKey } from './flowchartToolbarToolModeMenu';
 import { getFlowchartZoomControlState } from './flowchartZoomControlState';
@@ -166,6 +167,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     onDistribute,
 }) => {
     const { t } = useTranslation();
+    const { direction } = React.useContext(ConfigProvider.ConfigContext);
     const screens = Grid.useBreakpoint();
     const isMobile = !screens.md;
     const onLabel = t('common.on');
@@ -519,6 +521,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                             items: layoutMenuModel.items,
                             selectedKeys: layoutMenuModel.selectedKeys,
                             selectable: true,
+                            builtinPlacements: getFlowchartLayoutMenuPlacements(direction),
                             onKeyDown: layoutDropdown.handleMenuKeyDown,
                         }}
                         placement="bottom"

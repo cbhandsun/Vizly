@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { assertRequestedLayoutSelected, clickLayout } from './display-routing-matrix-layout-command.mjs';
 
 import {
@@ -12,14 +12,54 @@ import {
   parseDisplayRoutingMatrixPreset,
   parseDisplayRoutingMatrixTimeoutMs,
   resolveDisplayRoutingConnectedDragDelta,
+  resolveDisplayRoutingMenuPointerTarget,
+  parseDisplayRoutingMatrixViewport,
 } from './display-routing-matrix-cases.mjs';
 
 describe('display routing matrix cases', () => {
+  it('accepts bounded desktop and narrow viewport configurations', () => {
+    expect(parseDisplayRoutingMatrixViewport()).toEqual({ width: 1600, height: 1200 });
+    expect(parseDisplayRoutingMatrixViewport('1280x720')).toEqual({ width: 1280, height: 720 });
+    expect(parseDisplayRoutingMatrixViewport('320x240')).toEqual({ width: 320, height: 240 });
+    expect(parseDisplayRoutingMatrixViewport('3840x2160')).toEqual({ width: 3840, height: 2160 });
+    for (const invalid of ['0x720', '319x720', '1280x239', '3841x2160', '1280x2161',
+      '1280x720<script>', 'x'.repeat(100), {}, 1280, 'NaNx720']) {
+      expect(() => parseDisplayRoutingMatrixViewport(invalid)).toThrow('Invalid DISPLAY_ROUTING_MATRIX_VIEWPORT');
+    }
+  });
+
+  it('rejects hidden, clipped, covered and invalid pointer targets', () => {
+    const viewport = { width: 1280, height: 720 };
+    const rect = { left: 780, top: 100, width: 240, height: 44 };
+    expect(resolveDisplayRoutingMenuPointerTarget(rect, viewport)).toEqual({ x: 900, y: 122 });
+    expect(resolveDisplayRoutingMenuPointerTarget(rect, viewport, false)).toBeNull();
+    for (const invalid of [null, {}, { ...rect, top: -106 }, { ...rect, left: -1 },
+      { ...rect, width: 0 }, { ...rect, height: -1 }, { ...rect, top: 700 },
+      { ...rect, left: 1200 }, { ...rect, width: Infinity }, { ...rect, top: NaN }]) {
+      expect(resolveDisplayRoutingMenuPointerTarget(invalid, viewport)).toBeNull();
+    }
+    expect(resolveDisplayRoutingMenuPointerTarget(rect, null)).toBeNull();
+    expect(resolveDisplayRoutingMenuPointerTarget(rect, { width: 0, height: 720 })).toBeNull();
+  });
+
+  it('uses pointer events instead of invoking an offscreen DOM click', async () => {
+    const session = {
+      evaluate: vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce({ x: 120, y: 90, clickedAt: 123 }),
+      send: vi.fn().mockResolvedValue(undefined),
+    };
+    await expect(clickLayout(session, { id: 'domain-compound-elk-bt' })).resolves.toBe(123);
+    expect(session.send.mock.calls.map(call => call[1].type)).toEqual(['mouseMoved', 'mousePressed', 'mouseReleased']);
+    expect(session.evaluate.mock.calls[1][0]).not.toContain('item?.click()');
+    const covered = { evaluate: vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce({ inaccessible: true }), send: vi.fn() };
+    await expect(clickLayout(covered, { id: 'domain-compound-elk-bt' })).rejects.toThrow('outside the viewport or covered');
+    expect(covered.send).not.toHaveBeenCalled();
+  });
   it('checks the applied layout in the live-session assertion', async () => {
     const correct = { evaluate: async () => ({ requested: 'Vertical swimlanes', applied: 'Auto Layout: Vertical swimlanes' }) };
     await expect(assertRequestedLayoutSelected(correct, 'domain-lanes-tb')).resolves.toBeUndefined();
     const fallback = { evaluate: async () => ({ requested: 'Vertical swimlanes', applied: 'Auto Layout: Complex process' }) };
     await expect(assertRequestedLayoutSelected(fallback, 'domain-lanes-tb')).rejects.toThrow('different layout');
+    await expect(assertRequestedLayoutSelected(fallback, 'domain-compound-elk-bt')).rejects.toThrow('different layout');
     await expect(assertRequestedLayoutSelected({}, 'tree-tb')).resolves.toBeUndefined();
   });
 

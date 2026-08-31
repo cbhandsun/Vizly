@@ -28,6 +28,7 @@ import {
   parseDisplayRoutingMatrixCaseList,
   parseDisplayRoutingMatrixPreset,
   parseDisplayRoutingMatrixTimeoutMs,
+  parseDisplayRoutingMatrixViewport,
   resolveDisplayRoutingConnectedDragDelta,
 } from './lib/display-routing-matrix-cases.mjs';
 import {
@@ -65,6 +66,7 @@ const WAIT_TIMEOUT_MS = parseDisplayRoutingMatrixTimeoutMs(
   process.env.DISPLAY_ROUTING_MATRIX_WAIT_TIMEOUT_MS,
 );
 const MAX_LAYOUT_ROUTE_MS = 30_000;
+const MATRIX_VIEWPORT = parseDisplayRoutingMatrixViewport(process.env.DISPLAY_ROUTING_MATRIX_VIEWPORT);
 const VISUAL_SETTLE_TIMEOUT_MS = resolveDisplayRoutingLayoutVisualTimeoutMs(WAIT_TIMEOUT_MS);
 const MATRIX_CASE_IDS = createDisplayRoutingMatrixCaseIds(
   PRECOMPILED_DISPLAY_ROUTE_TARGETS.map(target => target.presetId),
@@ -120,8 +122,7 @@ const waitForValue = async (session, expression, label) => {
 
 const prepareSession = async session => {
   await session.send('Emulation.setDeviceMetricsOverride', {
-    width: 1_600,
-    height: 1_200,
+    ...MATRIX_VIEWPORT,
     deviceScaleFactor: 1,
     mobile: false,
   });
@@ -753,4 +754,4 @@ if (!REQUESTED_CASE || REQUESTED_CASE === DISPLAY_ROUTING_TOPOLOGY_CASE_ID) {
     auditFinalSvg,
   }));
 }
-console.log(JSON.stringify({ presetResults, layoutResults, topologyResults }, null, 2));
+console.log(JSON.stringify({ viewport: MATRIX_VIEWPORT, presetResults, layoutResults, topologyResults }, null, 2));

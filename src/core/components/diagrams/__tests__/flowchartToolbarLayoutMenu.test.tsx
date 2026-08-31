@@ -17,6 +17,7 @@ import {
   usesSelectableDomainNodeArrangement,
 } from '../flowchartLayoutStrategyMode';
 import { resolveFlowchartCustomDomainLayoutCapability } from '../flowchartLayoutCapabilities';
+import { getFlowchartLayoutMenuPlacements } from '../flowchartLayoutMenuPlacement';
 
 const asRecord = (value: unknown): Record<string, unknown> => (
   value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -36,6 +37,24 @@ const collectItems = (value: unknown): Record<string, unknown>[] => {
 };
 
 describe('flowchartToolbarLayoutMenu', () => {
+  it('shifts every advanced popup inside the viewport while retaining directional flips', () => {
+    const ltr = getFlowchartLayoutMenuPlacements('ltr');
+    const rtl = getFlowchartLayoutMenuPlacements('rtl');
+    expect(getFlowchartLayoutMenuPlacements()).toBe(ltr);
+    expect(getFlowchartLayoutMenuPlacements('ltr')).toBe(ltr);
+    expect(ltr.rightTop.points).toEqual(['tl', 'tr']);
+    expect(ltr.rightBottom.points).toEqual(['bl', 'br']);
+    expect(ltr.leftTop.points).toEqual(['tr', 'tl']);
+    expect(ltr.leftBottom.points).toEqual(['br', 'bl']);
+    expect(rtl.rightTop.points).toEqual(ltr.leftTop.points);
+    expect(rtl.rightBottom.points).toEqual(ltr.leftBottom.points);
+    expect(rtl.leftTop.points).toEqual(ltr.rightTop.points);
+    expect(rtl.leftBottom.points).toEqual(ltr.rightBottom.points);
+    for (const candidate of [...Object.values(ltr), ...Object.values(rtl)]) {
+      expect(candidate.overflow).toEqual({ adjustX: true, adjustY: true, shiftY: true });
+    }
+  });
+
   it('never substitutes a compound layout for an explicitly requested swimlane', () => {
     expect(shouldRetryRejectedDomainLayoutWithCompoundElk({
       preserveOrderedLanes: true,
