@@ -10,6 +10,7 @@ import WebSocket from 'ws';
 import { createSmokeRouteCatalog } from './lib/smoke-route-catalog.mjs';
 import { CdpSession } from './lib/smoke-route-cdp-session.mjs';
 import { waitForRouteReadiness } from './lib/smoke-route-readiness.mjs';
+import { waitForBrowserDevTools } from './lib/precompiled-display-route-browser-startup.mjs';
 import {
   aggregateRouteSamples,
   attachInitiators,
@@ -326,24 +327,15 @@ const launchBrowser = async (browserPath) => {
   });
   log(`Browser child pid: ${child.pid ?? 'unknown'}`);
 
-  const output = [];
-  const collect = (chunk) => {
-    output.push(String(chunk));
-    if (output.length > 30) output.shift();
-  };
-  child.stdout.on('data', collect);
-  child.stderr.on('data', collect);
-
-  await waitForHttp(`http://${HOST}:${DEBUG_PORT}/json/version`, 15000).catch((error) => {
-    child.kill();
-    fail('Browser did not expose a DevTools endpoint', {
-      error: error.message,
-      browserPath,
-      output: output.join('').slice(-4000),
-    });
-  });
+  let version;
+  try {
+    version = await waitForBrowserDevTools(child, DEBUG_PORT);
+  } catch (error) {
+    // launchBrowser has not returned, so outer cleanup does not own this child yet.
+    await killProcessTree(child);
+    throw error;
+  }
   log(`Browser DevTools endpoint ready at http://${HOST}:${DEBUG_PORT}/json/version`);
-  const version = await requestJson(`http://${HOST}:${DEBUG_PORT}/json/version`);
   child.browserWebSocketDebuggerUrl = version.webSocketDebuggerUrl;
 
   return child;

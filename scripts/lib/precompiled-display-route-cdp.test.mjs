@@ -1,5 +1,8 @@
+// @vitest-environment node
 import { EventEmitter } from 'node:events';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
+import { waitForBrowserDevTools } from './precompiled-display-route-browser-startup.mjs';
 
 import {
   CdpPageSession,
@@ -20,6 +23,232 @@ class FakeSocket extends EventEmitter {
     this.emit('close', 1000, Buffer.from(''));
   }
 }
+
+const startupChild = () => Object.assign(new EventEmitter(), {
+  pid: 4321,
+  exitCode: null,
+  signalCode: null,
+  stdout: new EventEmitter(),
+  stderr: new EventEmitter(),
+});
+const startupResponse = (webSocketDebuggerUrl = 'ws://127.0.0.1:9333/devtools/browser/test-id') => (
+  new Response(JSON.stringify({ webSocketDebuggerUrl, ignored: 'private browser data' }))
+);
+const startupDiagnostic = error => JSON.parse(error.message.split('startup failed: ')[1]);
+
+describe('browser startup lifecycle and safe diagnostics', () => {
+  it('accepts only the local browser endpoint and removes startup listeners on success', async () => {
+    const browser = startupChild();
+    const fetchEndpoint = vi.fn().mockResolvedValue(startupResponse());
+    await expect(waitForBrowserDevTools(browser, 9333, { fetchEndpoint })).resolves.toEqual({
+      webSocketDebuggerUrl: 'ws://127.0.0.1:9333/devtools/browser/test-id',
+    });
+    expect(fetchEndpoint).toHaveBeenCalledWith('http://127.0.0.1:9333/json/version', {
+      signal: expect.any(AbortSignal), redirect: 'error',
+    });
+    expect(browser.listenerCount('exit')).toBe(0);
+    expect(browser.listenerCount('error')).toBe(0);
+    expect(browser.stderr.listenerCount('data')).toBe(0);
+    expect(browser.stdout.listenerCount('data')).toBe(0);
+  });
+
+  it('polls a not-yet-listening browser without restarting it', async () => {
+    const browser = startupChild();
+    const fetchEndpoint = vi.fn()
+      .mockRejectedValueOnce(new Error('ECONNREFUSED with private URL'))
+      .mockResolvedValueOnce(startupResponse());
+    await expect(waitForBrowserDevTools(browser, 9333, { fetchEndpoint })).resolves.toBeDefined();
+    expect(fetchEndpoint).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([0, -1, 65536, NaN, Infinity, '9333', null, [], {}])(
+    'rejects invalid port %j before touching a child or endpoint', async port => {
+      const fetchEndpoint = vi.fn();
+      await expect(waitForBrowserDevTools(null, port, { fetchEndpoint })).rejects.toThrow('Invalid browser DevTools port');
+      expect(fetchEndpoint).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([0, -1, 15_001, NaN, Infinity, '15000', null])(
+    'does not allow an invalid or expanded startup budget %j', async timeoutMs => {
+      await expect(waitForBrowserDevTools(null, 9333, { timeoutMs })).rejects.toThrow('Invalid browser startup timeout');
+    },
+  );
+
+  it.each(['request', 'body'])(
+    'enforces the original total deadline even when the %s never completes', async stage => {
+      vi.useFakeTimers();
+      try {
+        let signal;
+        const fetchEndpoint = vi.fn().mockImplementation((_url, options) => {
+          signal = options.signal;
+          return stage === 'request' ? new Promise(() => {}) : Promise.resolve(new Response(
+            new ReadableStream({ start() {} }),
+          ));
+        });
+        const browser = startupChild();
+        const result = waitForBrowserDevTools(browser, 9333, { fetchEndpoint });
+        const failed = result.catch(startupDiagnostic);
+        await vi.advanceTimersByTimeAsync(14_999);
+        expect(signal.aborted).toBe(false);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(await failed).toMatchObject({
+          reason: 'deadline', elapsedMs: 15_000, attempts: 1,
+          lastProbe: stage === 'request' ? 'request-pending' : 'body-pending',
+        });
+        expect(signal.aborted).toBe(true);
+        expect(browser.listenerCount('exit')).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it('fails immediately when the child exits during an unresolved request', async () => {
+    const browser = startupChild();
+    let signal;
+    const result = waitForBrowserDevTools(browser, 9333, {
+      fetchEndpoint: (_url, options) => {
+        signal = options.signal;
+        return new Promise(() => {});
+      },
+    });
+    browser.exitCode = 23;
+    browser.emit('exit', 23);
+    expect(await result.catch(startupDiagnostic)).toMatchObject({
+      reason: 'process-exited', exitCode: 23, attempts: 1,
+    });
+    expect(signal.aborted).toBe(true);
+  });
+
+  it('does not probe a child that has already exited', async () => {
+    const browser = startupChild();
+    browser.exitCode = 0;
+    const fetchEndpoint = vi.fn();
+    expect(await waitForBrowserDevTools(browser, 9333, { fetchEndpoint }).catch(startupDiagnostic))
+      .toMatchObject({ reason: 'process-exited', exitCode: 0, attempts: 0 });
+    expect(fetchEndpoint).not.toHaveBeenCalled();
+  });
+
+  it('does not accept a late successful response after child exit', async () => {
+    const browser = startupChild();
+    const result = waitForBrowserDevTools(browser, 9333, {
+      fetchEndpoint: async () => {
+        browser.exitCode = 1;
+        browser.emit('exit', 1);
+        return startupResponse();
+      },
+    });
+    expect(await result.catch(startupDiagnostic)).toMatchObject({ reason: 'process-exited' });
+  });
+
+  it.each(['ECONNREFUSED', 'private-network-code'])(
+    'retains only safe network failure codes: %s', async code => {
+      vi.useFakeTimers();
+      try {
+        const result = waitForBrowserDevTools(startupChild(), 9333, {
+          fetchEndpoint: async () => {
+            throw new Error('token=private', { cause: { code } });
+          },
+        }).catch(startupDiagnostic);
+        await vi.advanceTimersByTimeAsync(15_000);
+        const diagnostic = await result;
+        expect(diagnostic).toMatchObject({
+          reason: 'deadline', lastProbe: 'request-failed',
+          probeErrorCode: code === 'ECONNREFUSED' ? code : 'OTHER',
+        });
+        expect(JSON.stringify(diagnostic)).not.toContain('private');
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it.each(['ENOENT', 'EACCES', 'private error code'])(
+    'handles spawn failure and emits only allowlisted error code %s', async code => {
+      const browser = startupChild();
+      browser.pid = undefined;
+      const result = waitForBrowserDevTools(browser, 9333, {
+        fetchEndpoint: () => new Promise(() => {}),
+      });
+      browser.emit('error', Object.assign(new Error('token=private-value C:/private/profile'), { code }));
+      const diagnostic = await result.catch(startupDiagnostic);
+      expect(diagnostic).toMatchObject({
+        reason: 'spawn-error', processSpawned: false,
+        errorCode: code === 'private error code' ? 'OTHER' : code,
+      });
+      expect(JSON.stringify(diagnostic)).not.toContain('private');
+    },
+  );
+
+  it.each([
+    null, [], {}, { webSocketDebuggerUrl: 123 },
+    { webSocketDebuggerUrl: 'ws://remote.invalid:9333/devtools/browser/id' },
+    { webSocketDebuggerUrl: 'ws://127.0.0.1:9334/devtools/browser/id' },
+    { webSocketDebuggerUrl: 'ws://user:secret@127.0.0.1:9333/devtools/browser/id' },
+    { webSocketDebuggerUrl: 'ws://127.0.0.1:9333/devtools/browser/id?token=secret' },
+    { webSocketDebuggerUrl: 'ws://127.0.0.1:9333/devtools/page/id' },
+    { webSocketDebuggerUrl: 'x'.repeat(513) },
+  ])('rejects malformed, foreign or unsafe endpoint data %j', async value => {
+    vi.useFakeTimers();
+    try {
+      const browser = startupChild();
+      const result = waitForBrowserDevTools(browser, 9333, {
+        fetchEndpoint: async () => new Response(JSON.stringify(value)),
+      }).catch(startupDiagnostic);
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(await result).toMatchObject({ reason: 'deadline', lastProbe: 'invalid-response' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each(['invalid-json', 'oversized', 'http-error'])(
+    'rejects %s responses without including the response body', async mode => {
+      vi.useFakeTimers();
+      try {
+        const body = mode === 'oversized' ? 'secret'.repeat(3000) : 'private-body';
+        const result = waitForBrowserDevTools(startupChild(), 9333, {
+          fetchEndpoint: async () => new Response(body, { status: mode === 'http-error' ? 503 : 200 }),
+        }).catch(startupDiagnostic);
+        await vi.advanceTimersByTimeAsync(15_000);
+        const diagnostic = await result;
+        expect(diagnostic).toMatchObject({
+          reason: 'deadline',
+          lastProbe: mode === 'http-error' ? 'http-error' : 'invalid-response',
+        });
+        expect(JSON.stringify(diagnostic)).not.toMatch(/secret|private-body/);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it('keeps bounded counters and split stderr markers but never returns raw process output', async () => {
+    const browser = startupChild();
+    const result = waitForBrowserDevTools(browser, 9333, { fetchEndpoint: () => new Promise(() => {}) });
+    browser.stdout.emit('data', Buffer.alloc(9 * 1024 * 1024));
+    browser.stderr.emit('data', Buffer.from('token=private-value Cookie=secret C:/private/profile ProcessSingle'));
+    browser.stderr.emit('data', Buffer.from('ton DevTools listening on ws://private?token=secret'));
+    browser.signalCode = 'private signal';
+    browser.emit('exit', null);
+    const diagnostic = await result.catch(startupDiagnostic);
+    expect(diagnostic).toMatchObject({
+      reason: 'process-exited', stdoutBytes: 8 * 1024 * 1024, signal: null,
+      outputMarkers: ['devtools-listening', 'profile-lock'],
+    });
+    expect(JSON.stringify(diagnostic)).not.toMatch(/token|Cookie|private|secret/);
+  });
+
+  it('wires both real harnesses to the lifecycle-aware startup boundary', () => {
+    const cdpSource = readFileSync(new URL('./precompiled-display-route-cdp.mjs', import.meta.url), 'utf8');
+    const smokeSource = readFileSync(new URL('../smoke-routes.mjs', import.meta.url), 'utf8');
+    expect(cdpSource).toContain('await waitForBrowserDevTools(browser, port)');
+    expect(cdpSource).toContain("stdio: ['ignore', 'pipe', 'pipe']");
+    expect(smokeSource).toContain('version = await waitForBrowserDevTools(child, DEBUG_PORT)');
+    expect(smokeSource).toContain('await killProcessTree(child);\n    throw error;');
+  });
+});
 
 describe('precompiled display route CDP boundary', () => {
   it.each([undefined, null, '', 30_000, '45000'])(

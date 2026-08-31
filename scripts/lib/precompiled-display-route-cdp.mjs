@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import WebSocket from 'ws';
+import { waitForBrowserDevTools } from './precompiled-display-route-browser-startup.mjs';
 
 const DEFAULT_CDP_COMMAND_TIMEOUT_MS = 30_000;
 
@@ -47,20 +48,6 @@ const findAvailablePort = () => new Promise((resolve, reject) => {
     resolve(port);
   });
 });
-
-const waitForJson = async (url, timeoutMs = 15_000) => {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    try {
-      const response = await fetch(url);
-      if (response.ok) return response.json();
-    } catch {
-      // Browser startup is intentionally polled.
-    }
-    await delay(150);
-  }
-  throw new Error(`Timed out waiting for ${url}`);
-};
 
 const RETRYABLE_PROFILE_CLEANUP_CODES = new Set(['EBUSY', 'EPERM', 'ENOTEMPTY']);
 
@@ -274,10 +261,10 @@ export const withPrecompiledRouteBrowser = async (run) => {
     `--remote-debugging-port=${port}`,
     `--user-data-dir=${profile}`,
     'about:blank',
-  ], { stdio: 'ignore', windowsHide: true });
+  ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
   let session = null;
   try {
-    await waitForJson(`http://127.0.0.1:${port}/json/version`);
+    await waitForBrowserDevTools(browser, port);
     const targetResponse = await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, {
       method: 'PUT',
     });
