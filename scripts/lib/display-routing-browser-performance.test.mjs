@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { runInNewContext } from 'node:vm';
 
 import {
   assertDisplayRoutingDragResult,
+  countDisplayRoutingTransactionResponses,
   assertDisplayRoutingPerformanceBudget,
   assertDisplayRoutingPerformanceSummaryBudget,
   displayRoutingIncrementalPhaseTraceIsComplete,
@@ -26,6 +28,64 @@ const availableCases = [
   { nodeId: 'wms', expectedMutableCount: 4 },
   { nodeId: 'l-oms', expectedMutableCount: 5 },
 ];
+
+describe('incremental Worker transaction response count', () => {
+  const progress = () => ({
+    requestId: 'incremental:1',
+    phaseProgress: { phase: 'local-route', durationMs: 10, candidateCount: 14, changedEdgeCount: 6, resolution: 'accepted' },
+  });
+  const final = () => ({ requestId: 'incremental:1', hardClean: true, routeResolution: 'incremental-route', routingPatches: [] });
+
+  it('counts one final reply despite the 58 phase notifications seen in CI', () => {
+    const responses = [...Array.from({ length: 58 }, progress), final()];
+    const before = structuredClone(responses);
+    expect(countDisplayRoutingTransactionResponses(responses)).toBe(1);
+    expect(countDisplayRoutingTransactionResponses(responses.toReversed())).toBe(1);
+    expect(responses).toEqual(before);
+    expect(() => assertDisplayRoutingDragResult(availableCases[0], validDragResult({
+      capturedResponseCount: countDisplayRoutingTransactionResponses(responses),
+    }))).not.toThrow();
+    expect(() => assertDisplayRoutingDragResult(availableCases[0], validDragResult({
+      capturedResponseCount: countDisplayRoutingTransactionResponses([...responses, final()]),
+    }))).toThrow();
+  });
+
+  it('recognizes all trace resolutions when injected without module bindings', () => {
+    const injected = runInNewContext(`(${countDisplayRoutingTransactionResponses.toString()})`);
+    const notifications = ['hit', 'skip', 'accepted', 'rejected', 'fallback'].map(resolution => {
+      const value = progress();
+      return { ...value, phaseProgress: { ...value.phaseProgress, resolution } };
+    });
+    expect(injected([...notifications, final()])).toBe(1);
+  });
+
+  it('does not conceal duplicate replies, error replies or mixed envelopes', () => {
+    expect(countDisplayRoutingTransactionResponses([progress(), final(), final()])).toBe(2);
+    expect(countDisplayRoutingTransactionResponses([final(), { requestId: 'incremental:1', error: 'worker-failed' }])).toBe(2);
+    expect(countDisplayRoutingTransactionResponses([final(), { ...progress(), hardClean: false }])).toBe(2);
+    expect(countDisplayRoutingTransactionResponses([final(), { ...progress(), edges: [] }])).toBe(2);
+    expect(countDisplayRoutingTransactionResponses([{ requestId: 'incremental:1', boundedCandidate: {} }])).toBe(1);
+  });
+
+  it('handles empty captures and refuses an invalid capture collection', () => {
+    expect(countDisplayRoutingTransactionResponses([])).toBe(0);
+    expect(countDisplayRoutingTransactionResponses([progress()])).toBe(0);
+    for (const value of [null, undefined, {}, 'responses']) {
+      expect(() => countDisplayRoutingTransactionResponses(value)).toThrow(TypeError);
+    }
+  });
+
+  it('keeps malformed, extreme and unsafe-looking messages visible to the gate', () => {
+    const base = progress();
+    const messages = [null, [], {}, { ...base, requestId: '' }, { ...base, requestId: 'x'.repeat(501) },
+      { ...base, phaseProgress: null }, { ...base, phaseProgress: {} },
+      ...[NaN, Infinity, -1, 600_001, '10'].map(durationMs => ({ ...base, phaseProgress: { ...base.phaseProgress, durationMs } })),
+      { ...base, phaseProgress: { ...base.phaseProgress, phase: '<script>alert(1)</script>' } },
+      { ...base, phaseProgress: { ...base.phaseProgress, candidateCount: 1_000_001 } }];
+    expect(countDisplayRoutingTransactionResponses(messages)).toBe(messages.length);
+    expect(Object.prototype).not.toHaveProperty('phaseProgress');
+  });
+});
 
 const incremental = overrides => ({
   releaseToFinalMs: 400,

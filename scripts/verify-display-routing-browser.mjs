@@ -16,6 +16,7 @@ import {
 } from './lib/display-routing-browser-viewport.mjs';
 import {
   assertDisplayRoutingDragResult,
+  countDisplayRoutingTransactionResponses,
   assertDisplayRoutingPerformanceBudget,
   parseDisplayRoutingBrowserVerificationMode,
   parseDisplayRoutingSampleIndex,
@@ -240,6 +241,7 @@ const dragNode = async (session, nodeId, beforeRelease = null) => {
 };
 
 const finalIncrementalExpression = nodeId => `(() => {
+  const countTransactionResponses = ${countDisplayRoutingTransactionResponses.toString()};
   const readRequestDriftProbe = ${readDisplayRoutingRequestDriftProbe.toString()};
   const replayResponseEdges = ${replayDisplayRoutingResponseEdges.toString()};
   const selectAuditRoute = ${selectDisplayRoutingAuditRoute.toString()};
@@ -274,7 +276,7 @@ const finalIncrementalExpression = nodeId => `(() => {
   return {
     requestId: request.requestId,
     capturedRequestCount: requests.length,
-    capturedResponseCount: responses.length,
+    capturedResponseCount: countTransactionResponses(responses),
     driftProbe: {
       initial: window.__vizlyInitialRoutingDriftProbe || null,
       incremental: readRequestDriftProbe(request),

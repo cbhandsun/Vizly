@@ -1,3 +1,31 @@
+/** Count transaction replies, not the phase notifications retained for diagnosis.
+ * Unknown/mixed envelopes remain counted so they cannot hide duplicate replies.
+ * Self-contained because the browser verifier injects this function into CDP.
+ */
+export const countDisplayRoutingTransactionResponses = responses => {
+  if (!Array.isArray(responses)) throw new TypeError('Worker responses must be an array');
+  const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+  const terminalKeys = [
+    'hardClean', 'hardReport', 'routeResolution', 'error', 'edges', 'routingPatches',
+    'boundedCandidate', 'phaseTrace', 'affectedEdgeCount', 'fallbackLevel',
+    'nextIdentity', 'outputRouteSignature', 'sessionRef', 'commitReceipt', 'workerDurationMs',
+  ];
+  return responses.filter(response => {
+    const phase = isRecord(response) ? response.phaseProgress : null;
+    const isPhaseNotification = isRecord(phase)
+      && typeof response.requestId === 'string' && response.requestId.length > 0
+      && response.requestId.length <= 500
+      && typeof phase.phase === 'string' && /^[a-z][a-z0-9-]{0,127}$/.test(phase.phase)
+      && ['hit', 'skip', 'accepted', 'rejected', 'fallback'].includes(phase.resolution)
+      && Number.isFinite(phase.durationMs) && phase.durationMs >= 0 && phase.durationMs <= 600_000
+      && [phase.candidateCount, phase.changedEdgeCount].every(value => (
+        Number.isSafeInteger(value) && value >= 0 && value <= 1_000_000
+      ))
+      && terminalKeys.every(key => typeof response[key] === 'undefined');
+    return !isPhaseNotification;
+  }).length;
+};
+
 export const DISPLAY_ROUTING_PERFORMANCE_BUDGET_MS = Object.freeze({
   initialRoute: 750,
   releaseToFinal: 1_000,
