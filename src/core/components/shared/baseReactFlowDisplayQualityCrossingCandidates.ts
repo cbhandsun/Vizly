@@ -6,7 +6,7 @@ import {
   chooseFewestStrictCrossings,
   keepIfNoNewStrictCrossings,
 } from '../../strategies/shared/edgeStrictCrossingGuard';
-import { repairSharedTrunkAwareCrossings } from '../../strategies/shared/edgeRoutingPipeline';
+import { repairSharedTrunkAwareCrossings } from '../../strategies/shared/edgeRoutingWaypointRefinement';
 import {
   DISPLAY_BOUNDED_DETACHED_OVERLAP_REPAIR_OPTIONS,
   DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,

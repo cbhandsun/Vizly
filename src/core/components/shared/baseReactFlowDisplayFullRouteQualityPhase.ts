@@ -16,7 +16,7 @@ import { synthesizeSharedTargetTrunks } from '../../strategies/shared/edgeShared
 import {
   createEdgeWaypointRefinementDiagnostics,
   reduceEdgeCrossingsWithWaypoints,
-} from '../../strategies/shared/edgeRoutingPipeline';
+} from '../../strategies/shared/edgeRoutingWaypointRefinement';
 import { collectDisplayRoutingAffectedEdgeIndexes } from './baseReactFlowDisplayChangedEdgePromotion';
 import { repairStrictBypassesIfNeeded } from './baseReactFlowDisplayObstacleRepair';
 import {

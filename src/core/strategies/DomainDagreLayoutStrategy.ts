@@ -29,8 +29,8 @@ import {
     isDomainDagreNodeHidden,
     sortDomainDagreHierarchy,
     sortDomainDagreSubGroups,
+    orderDomainDagreEdges,
 } from './domainDagreHierarchy';
-import { runDomainDagreSimplifiedPath } from './domainDagreSimplifiedPaths';
 import {
     runDomainDagreOrderedLaneLayout,
     runDomainDagreTopLevelLayout,
@@ -77,6 +77,9 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             boundary.defaultNodeHeight,
         );
         if (normalizedNodes.length === 0) return { nodes: [], edges };
+        if (boundary.domainPlacement === 'ordered-lanes') {
+            edges = orderDomainDagreEdges(normalizedNodes, edges);
+        }
         const num = (value: unknown, fallback: number) => (
             typeof value === 'number' && Number.isFinite(value) ? value : fallback
         );
@@ -185,29 +188,32 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             return ai - bi;
         });
 
-        const simplifiedResult = runDomainDagreSimplifiedPath({
-            nodes: updatedNodes,
-            edges,
-            domains,
-            subGroups,
-            leafNodes,
-            idMap,
-            routingConfig: cfg,
-            options,
-            isHorizontal,
-            subDomainNodeIsHorizontal,
-            domainSubGroupIsHorizontal,
-            nodeGapH,
-            nodeGapV,
-            subDomainPaddingH: sdPadHEffective,
-            subDomainPaddingV: sdPadV,
-            subDomainPaddingBottom: sdBottomSafe,
-            subDomainTitleHeight: sdTitleH,
-            titleSafetyGap: titleSafe,
-            widthCompensation,
-            getNodeDimensions,
-        });
-        if (simplifiedResult) return simplifiedResult;
+        if (domains.length === 0) {
+            const { runDomainDagreSimplifiedPath } = await import('./domainDagreSimplifiedPaths');
+            const simplifiedResult = runDomainDagreSimplifiedPath({
+                nodes: updatedNodes,
+                edges,
+                domains,
+                subGroups,
+                leafNodes,
+                idMap,
+                routingConfig: cfg,
+                options,
+                isHorizontal,
+                subDomainNodeIsHorizontal,
+                domainSubGroupIsHorizontal,
+                nodeGapH,
+                nodeGapV,
+                subDomainPaddingH: sdPadHEffective,
+                subDomainPaddingV: sdPadV,
+                subDomainPaddingBottom: sdBottomSafe,
+                subDomainTitleHeight: sdTitleH,
+                titleSafetyGap: titleSafe,
+                widthCompensation,
+                getNodeDimensions,
+            });
+            if (simplifiedResult) return simplifiedResult;
+        }
 
         // 构建归属关系
         const {
@@ -472,6 +478,14 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                     domain.style = { ...domain.style, width: finalW, height: finalH };
                 }
             }
+        }
+
+        if (domainPlacement === 'ordered-lanes' && (nodeArrangement === 'dagre' || nodeArrangement === 'flow')) {
+            const { alignDomainDagreLaneFlow } = await import('./domainDagreSemanticLaneFlow');
+            updatedNodes = alignDomainDagreLaneFlow(updatedNodes, edges, {
+                direction, nodeToSubGroup, domainOrder: domainOrderArr, subDomainOrder: subDomainOrderOpt,
+                horizontalGap: nodeGapH, verticalGap: nodeGapV,
+            });
         }
 
         // ============================================

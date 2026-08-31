@@ -99,7 +99,7 @@ export const repairFinalShortEndpointStubs = <T extends Edge[]>(edges: T, nodes:
       const initialQuality = evaluateDisplayQualityCandidate(qualityContext, edges, candidateEdges);
       const initialObstacleHits = evaluateDisplayObstacleCandidate(obstacleContext, edges, candidateEdges);
       const initialEndpointStubIssues = countDisplayShortEndpointStubs(candidateEdges, MIN_DISPLAY_ENDPOINT_STUB);
-      const variants: T[] = [candidateEdges];
+      const variants: Array<() => T> = [() => candidateEdges];
       if (
         initialObstacleHits <= bestObstacleHits
         && initialEndpointStubIssues < bestEndpointStubIssues
@@ -107,13 +107,18 @@ export const repairFinalShortEndpointStubs = <T extends Edge[]>(edges: T, nodes:
         && initialQuality.strictCrossings <= bestQuality.strictCrossings + 2
       ) {
         variants.push(
-          ...buildStrictCrossingCompanionShiftVariants(candidateEdges, edgeIndex),
-          finalStrictDisplaySweep(candidateEdges, nodes),
+          ...buildStrictCrossingCompanionShiftVariants(candidateEdges, edgeIndex)
+            .map(variant => () => variant),
+          () => finalStrictDisplaySweep(candidateEdges, nodes),
         );
       }
       const evaluatedVariantReferences = new Set<T>();
-      for (const variantEdges of variants) {
+      for (const materializeVariant of variants) {
         if (qualityEvaluations >= MAX_FINAL_ENDPOINT_STUB_REPAIR_EVALUATIONS) break;
+        // Materialize only candidates the unchanged evaluation budget can visit.
+        // In particular, do not run a full strict sweep after companion variants
+        // have already consumed the remaining slots.
+        const variantEdges = materializeVariant();
         qualityEvaluations += 1;
         if (evaluatedVariantReferences.has(variantEdges)) continue;
         evaluatedVariantReferences.add(variantEdges);

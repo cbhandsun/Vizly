@@ -3,7 +3,7 @@ import type { Edge, Node } from '@xyflow/react';
 import { repairEndpointLaneCrossings } from '../../strategies/shared/edgeEndpointLaneNudgeRepair';
 import { repairEndpointOrthogonalPaths } from '../../strategies/shared/edgeEndpointPathRepair';
 import { repairReverseFlowBypassCrossings } from '../../strategies/shared/edgeReverseFlowBypassRepair';
-import { repairSharedTrunkAwareCrossings } from '../../strategies/shared/edgeRoutingPipeline';
+import { repairSharedTrunkAwareCrossings } from '../../strategies/shared/edgeRoutingWaypointRefinement';
 import {
   countChangedRoutingItems,
   startDisplayRoutingPhaseTrace,

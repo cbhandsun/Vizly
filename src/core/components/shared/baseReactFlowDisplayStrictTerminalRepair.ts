@@ -8,7 +8,6 @@ import {
   isFinitePoint,
 } from './baseReactFlowDisplayEdgeCore';
 import {
-  candidateStrictCrossingsForEdge,
   displayAxisOf,
   extractDisplaySegments,
   findDisplayStrictCrossingHits,
@@ -28,6 +27,7 @@ import {
   evaluateDisplayQualityCandidate,
 } from './baseReactFlowDisplayEvaluation';
 import { buildCrossingCompanionOuterPortVariants } from './baseReactFlowDisplayTerminalPortRepair';
+import { createDisplayStrictCrossingCounter } from './baseReactFlowDisplayStrictCrossingCounter';
 
 const MIN_DISPLAY_ENDPOINT_STUB = 48;
 
@@ -128,6 +128,7 @@ export const buildTerminalStrictStubPaths = (
 
   const compactCandidates = (candidates: DisplayPoint[][]): DisplayPoint[][] => {
     const seen = new Set<string>();
+    const countStrictCrossings = createDisplayStrictCrossingCounter(blockers);
     return candidates
       .map(candidate => compactOrthogonalPath(candidate))
       .filter(candidate => candidate.length >= 2 && candidate.every(isFinitePoint))
@@ -137,10 +138,9 @@ export const buildTerminalStrictStubPaths = (
         seen.add(key);
         return true;
       })
-      .sort((first, second) => (
-        candidateStrictCrossingsForEdge(segment.edgeIndex ?? -1, first, blockers)
-        - candidateStrictCrossingsForEdge(segment.edgeIndex ?? -1, second, blockers)
-      ));
+      .map(path => ({ path, crossings: countStrictCrossings(path) }))
+      .sort((first, second) => first.crossings - second.crossings)
+      .map(candidate => candidate.path);
   };
 
   if (segment.axis === 'h') {

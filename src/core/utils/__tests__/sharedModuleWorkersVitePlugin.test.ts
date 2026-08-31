@@ -35,6 +35,19 @@ const classifyGraph = (
 });
 
 describe('display routing chunk classifier', () => {
+  it('keeps display quality helpers independent of the full layout pipeline barrel', () => {
+    for (const name of [
+      'baseReactFlowDisplayFullRouteQualityPhase',
+      'baseReactFlowDisplayQualityCrossingCandidates',
+      'baseReactFlowDisplayQualitySeedPipeline',
+      'baseReactFlowDisplayQualityStructuralCrossing',
+    ]) {
+      const source = readFileSync(resolve(process.cwd(), `src/core/components/shared/${name}.ts`), 'utf8');
+      expect(source).not.toContain("from '../../strategies/shared/edgeRoutingPipeline'");
+      expect(source).toContain("from '../../strategies/shared/edgeRoutingWaypointRefinement'");
+    }
+  });
+
   it('shares the worker/app intersection while keeping private and dynamic worker modules out', () => {
     const shared = 'C:/repo/src/core/routing/shared.ts';
     const sharedCycle = 'C:/repo/src/core/routing/sharedCycle.ts';
@@ -284,6 +297,22 @@ const worker = new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', impor
     )).toBe(true);
     expect(matchesFlowchartDesignerStartupModule(
       'C:/repo/src/pages/DiagramManagementPage.tsx',
+    )).toBe(false);
+  });
+
+  it('co-loads the node style subscription with its startup style manager', () => {
+    for (const id of [
+      'C:/repo/src/core/hooks/useDiagramStylePreset_v2.ts',
+      'C:\\repo\\src\\core\\hooks\\useDiagramStylePreset_v2.ts?import',
+      'C:/repo/src/core/components/shared/DiagramStyleManager.ts',
+    ]) {
+      expect(matchesFlowchartDesignerStartupModule(id)).toBe(true);
+    }
+    expect(matchesFlowchartDesignerStartupModule(
+      'C:/repo/src/core/hooks/useDiagramStylePreset_v2.test.ts',
+    )).toBe(false);
+    expect(matchesFlowchartDesignerStartupModule(
+      'C:/repo/src/core/strategies/domainDagreFullEdgePreparation.ts',
     )).toBe(false);
   });
 

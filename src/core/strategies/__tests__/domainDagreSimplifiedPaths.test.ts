@@ -4,7 +4,7 @@ import { LayoutType } from '../../types/layout';
 
 const { routeEdges } = vi.hoisted(() => ({ routeEdges: vi.fn() }));
 
-vi.mock('../DomainDagreEdgePreparation', () => ({
+vi.mock('../domainDagreFullEdgePreparation', () => ({
   applyDomainDagreEdgeRouting: routeEdges,
 }));
 

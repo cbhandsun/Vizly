@@ -1,4 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
+import { createDisplayStrictCrossingCounter } from './baseReactFlowDisplayStrictCrossingCounter';
 
 import { repairDetachedStrictCrossingBypasses } from '../../strategies/shared/edgeDetachedStrictCrossingRepair';
 import { repairEndpointOrthogonalPaths } from '../../strategies/shared/edgeEndpointPathRepair';
@@ -220,11 +221,8 @@ export const repairTerminalStrictCrossingsWithEndpointLanes = <T extends Edge[]>
         const otherIsTerminal = !!otherPath
           && (other.segmentIndex === 0 || other.segmentIndex === otherPath.length - 2);
         const otherSegments = allSegments.filter(item => item.edgeIndex !== segment.edgeIndex);
-        const baselineEdgeDisplayStrictCrossings = candidateStrictCrossingsForEdge(
-          segment.edgeIndex,
-          path,
-          otherSegments,
-        );
+        const countStrictCrossings = createDisplayStrictCrossingCounter(otherSegments);
+        const baselineEdgeDisplayStrictCrossings = countStrictCrossings(path);
         const baselinePathObstacleHits = countUnrelatedObstacleHits(
           path,
           current[segment.edgeIndex],
@@ -237,11 +235,7 @@ export const repairTerminalStrictCrossingsWithEndpointLanes = <T extends Edge[]>
             : []),
         ].slice(0, STRICT_TERMINAL_MAX_CANDIDATES);
         for (const candidatePath of candidates) {
-          const candidateEdgeDisplayStrictCrossings = candidateStrictCrossingsForEdge(
-            segment.edgeIndex,
-            candidatePath,
-            otherSegments,
-          );
+          const candidateEdgeDisplayStrictCrossings = countStrictCrossings(candidatePath);
           if (candidateEdgeDisplayStrictCrossings > baselineEdgeDisplayStrictCrossings) continue;
           const candidatePathObstacleHits = countUnrelatedObstacleHits(
             candidatePath,

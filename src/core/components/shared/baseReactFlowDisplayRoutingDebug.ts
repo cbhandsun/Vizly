@@ -93,6 +93,7 @@ export type DisplayLayoutTransactionStatus = 'running' | 'committed' | 'failed';
 export type DisplayLayoutTransactionErrorCode =
   | 'cancelled'
   | 'hard-quality-rejected'
+  | 'worker-timeout'
   | 'no-layoutable-nodes'
   | 'strategy-failed';
 
@@ -171,6 +172,7 @@ export const classifyDisplayLayoutTransactionError = (
 ): DisplayLayoutTransactionErrorCode => {
   if (!(error instanceof Error)) return 'strategy-failed';
   if (error.message === 'layout-routing-cancelled') return 'cancelled';
+  if (error.message === 'display-edge-worker-timeout') return 'worker-timeout';
   if (error.message === 'layout-routing-hard-quality-rejected') {
     return 'hard-quality-rejected';
   }

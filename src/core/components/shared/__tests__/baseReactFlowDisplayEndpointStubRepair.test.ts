@@ -6,6 +6,9 @@ import * as edgeStrictCrossingGuard from '../../../strategies/shared/edgeStrictC
 import * as waypointCandidateRepair from '../../../strategies/shared/edgeWaypointCandidateRepair';
 import * as displayEvaluation from '../baseReactFlowDisplayEvaluation';
 import * as terminalValidation from '../baseReactFlowTerminalValidation';
+import * as stubCandidates from '../baseReactFlowDisplayEndpointStubCandidates';
+import * as terminalPortRepair from '../baseReactFlowDisplayTerminalPortRepair';
+import * as strictSweep from '../baseReactFlowDisplayStrictSweepRepair';
 import { createAtomicRouteTransactionEvaluation } from '../baseReactFlowDisplayAtomicTransactionEvaluation';
 import { createStrictCrossingRepairDiagnostics } from '../baseReactFlowDisplayStrictResidualRepair';
 import { buildSafeEndpointSideStepCandidates } from '../baseReactFlowDisplayEndpointStubCandidates';
@@ -306,6 +309,26 @@ describe('baseReactFlowDisplayEndpointStubRepair', () => {
     expect(calculateEdgePathQualityScore(repaired).shortEndpointStubs).toBe(0);
     expect(qualitySpy).toHaveBeenCalledTimes(8);
     expect(obstacleSpy).toHaveBeenCalledTimes(8);
+  });
+
+  it.each([0, 6, 7, 8, 100])('materializes the strict fallback only inside the budget with %i companions', companionCount => {
+    const edges = [edgeWithPath('lazy-short-stub', [
+      { x: 0, y: 0 }, { x: 16, y: 0 }, { x: 16, y: 100 }, { x: 300, y: 100 },
+    ])];
+    const original = structuredClone(edges);
+    const candidatePath = [
+      { x: 0, y: 0 }, { x: 64, y: 0 }, { x: 64, y: 100 }, { x: 300, y: 100 },
+    ];
+    vi.spyOn(stubCandidates, 'buildSafeEndpointSideStepCandidates').mockReturnValue([candidatePath]);
+    const candidateQuality = { ...calculateEdgePathQualityScore(edges), strictCrossings: 1, shortEndpointStubs: 0 };
+    vi.spyOn(displayEvaluation, 'evaluateDisplayQualityCandidate').mockReturnValue(candidateQuality);
+    vi.spyOn(terminalPortRepair, 'buildStrictCrossingCompanionShiftVariants')
+      .mockImplementation(candidate => Array.from({ length: companionCount }, () => candidate));
+    const sweep = vi.spyOn(strictSweep, 'finalStrictDisplaySweep').mockImplementation(candidate => candidate);
+
+    expect(repairFinalShortEndpointStubs(edges, [])).toBe(edges);
+    expect(sweep).toHaveBeenCalledTimes(companionCount < 7 ? 1 : 0);
+    expect(edges).toEqual(original);
   });
 
   it('does not initialize repair contexts for an already render-safe route', () => {

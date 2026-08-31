@@ -6,6 +6,7 @@ import {
   convertDomainDagreToHierarchy,
   sortDomainDagreHierarchy,
   sortDomainDagreSubGroups,
+  orderDomainDagreEdges,
 } from '../domainDagreHierarchy';
 
 const node = (
@@ -16,6 +17,18 @@ const node = (
 ): Node => ({ id, type, data, position });
 
 describe('domain Dagre hierarchy model', () => {
+  it('keeps business node order independent of edge storage order', () => {
+    const nodes = ['start', 'second', 'first'].map(id => node(id, 'custom', {}));
+    const edges = [
+      { id: 'a', source: 'start', target: 'first' },
+      { id: 'b', source: 'start', target: 'second' },
+      { id: 'missing', source: 'unknown', target: 'first' },
+    ];
+    expect(orderDomainDagreEdges(nodes, edges).map(edge => edge.id)).toEqual(['b', 'a', 'missing']);
+    expect(orderDomainDagreEdges(nodes, edges.toReversed())).toEqual(orderDomainDagreEdges(nodes, edges));
+    expect(edges.map(edge => edge.id)).toEqual(['a', 'b', 'missing']);
+    expect(orderDomainDagreEdges([], [])).toEqual([]);
+  });
   it('builds bounded subgroup membership from valid current nodes', () => {
     const child = node('child', 'default', { domain: 'A' });
     const group = node('group', 'subGroup', { children: ['child', 'missing', 'child'] });

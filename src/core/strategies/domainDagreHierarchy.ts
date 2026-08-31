@@ -1,4 +1,4 @@
-import type { Node, XYPosition } from '@xyflow/react';
+import type { Edge, Node, XYPosition } from '@xyflow/react';
 
 import {
   getDomainDagreSubDomainOrderIndex,
@@ -30,6 +30,14 @@ const childIds = (value: unknown): string[] => {
 };
 
 export const domainDagreDomainOf = (node: Node): string => boundedString(node.data.domain);
+
+/** Edge storage order is not business order: retain the declared node order. */
+export const orderDomainDagreEdges = (nodes: readonly Node[], edges: readonly Edge[]): Edge[] => {
+  const nodeOrder = new Map(nodes.map((node, index) => [node.id, index]));
+  const rank = (id: string) => nodeOrder.get(id) ?? Number.MAX_SAFE_INTEGER;
+  return edges.toSorted((a, b) => rank(a.source) - rank(b.source)
+    || rank(a.target) - rank(b.target) || a.id.localeCompare(b.id));
+};
 
 export const isDomainDagreGroupNode = (node: Node): boolean => GROUP_TYPES.has(String(node.type || ''));
 

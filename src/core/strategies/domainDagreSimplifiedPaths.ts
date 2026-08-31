@@ -6,7 +6,7 @@ import {
   layoutWithDagre,
   mapEdgesToContainers,
 } from './DomainDagreLayoutHelpers';
-import { applyDomainDagreEdgeRouting } from './DomainDagreEdgePreparation';
+import { applyDomainDagreEdgeRouting } from './domainDagreFullEdgePreparation';
 import {
   buildDomainDagreMembership,
   convertDomainDagreToHierarchy,

@@ -19,6 +19,7 @@ import {
 } from './edgeBusinessNodeClearanceCandidateCollection';
 import { selectAcceptedBusinessNodeClearanceCandidate } from './edgeBusinessNodeClearanceCandidateSelection';
 import { buildBusinessNodeTerminalCorridorCandidates } from './edgeBusinessNodeClearanceCorridorCandidates';
+import { segmentToClearanceRectDistance } from './edgeNodeClearanceGeometry';
 import {
   createEdgePathQualityEvaluationContext,
 } from './edgeStrictCrossingGuard';
@@ -164,6 +165,7 @@ const sourceBranchCornerDetourCandidates = (
   path: Point[],
   rects: Rect[],
   clearance: number,
+  includeSegmentRisks = false,
 ) => {
   if (path.length < 4) return [];
   const start = path[0];
@@ -182,8 +184,14 @@ const sourceBranchCornerDetourCandidates = (
   if (direction === 0) return candidates;
 
   for (const rect of rects) {
-    if (!isDiagonalToRect(corner, rect)
-      || pointToRectDistance(corner, rect) >= clearance - EPS) continue;
+    // Preserve corner-only candidates when the run stops before the obstacle;
+    // additionally cover a run skimming alongside its longitudinal span.
+    const overlapsRun = previousAxis === 'h'
+      ? Math.max(start.x, corner.x) > rect.x + EPS && Math.min(start.x, corner.x) < rect.x + rect.width - EPS
+      : Math.max(start.y, corner.y) > rect.y + EPS && Math.min(start.y, corner.y) < rect.y + rect.height - EPS;
+    const riskyCorner = isDiagonalToRect(corner, rect) && pointToRectDistance(corner, rect) < clearance - EPS;
+    if (!riskyCorner && !(includeSegmentRisks && overlapsRun
+      && segmentToClearanceRectDistance({ a: start, b: corner }, rect) < clearance - EPS)) continue;
     const allDetourLanes = previousAxis === 'h'
       ? [rect.y - clearance, rect.y + rect.height + clearance]
       : [rect.x - clearance, rect.x + rect.width + clearance];
@@ -225,9 +233,10 @@ const terminalBranchCornerDetourCandidates = (
   path: Point[],
   rects: Rect[],
   clearance: number,
+  includeSegmentRisks = false,
 ): Point[][] => [
-  ...sourceBranchCornerDetourCandidates(path, rects, clearance),
-  ...sourceBranchCornerDetourCandidates([...path].reverse(), rects, clearance)
+  ...sourceBranchCornerDetourCandidates(path, rects, clearance, includeSegmentRisks),
+  ...sourceBranchCornerDetourCandidates([...path].reverse(), rects, clearance, includeSegmentRisks)
     .map(candidate => candidate.reverse()),
 ];
 
@@ -480,6 +489,9 @@ const clearanceCandidates = (
     return true;
   });
   if (terminalCorridorsOnly) {
+    // Try the existing simple lane moves first. Only then introduce a new
+    // terminal branch to clear an obstacle alongside the outgoing segment.
+    candidates.addAll(terminalBranchCornerDetourCandidates(path, rects, minimumClearance, true));
     candidates.addAll(buildBusinessNodeTerminalCorridorCandidates(
       path,
       rects,

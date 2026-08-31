@@ -1,9 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Edge } from '@xyflow/react';
 
 import { LayoutType, type LayoutOptions } from '../../types/layout';
 import { prepareDomainDagreEdges } from '../DomainDagreEdgePreparation';
 import type { RoutingNode } from '../domainDagreEdgePreparationSupport';
+
+const { loadFull } = vi.hoisted(() => ({ loadFull: vi.fn() }));
+vi.mock('../domainDagreFullEdgePreparation', async importOriginal => {
+  loadFull();
+  return importOriginal<typeof import('../domainDagreFullEdgePreparation')>();
+});
 
 describe('prepareDomainDagreEdges', () => {
   it('preserves leaf geometry and canonicalizes subpixel DOM dimensions', async () => {
@@ -39,6 +45,8 @@ describe('prepareDomainDagreEdges', () => {
       nodeById,
       leafNodes: nodes,
     });
+
+    expect(loadFull).not.toHaveBeenCalled();
 
     expect(nodes.map(node => ({
       width: node.width,

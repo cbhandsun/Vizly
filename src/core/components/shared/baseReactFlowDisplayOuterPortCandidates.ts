@@ -1,4 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
+import { createDisplayStrictCrossingCounter } from './baseReactFlowDisplayStrictCrossingCounter';
 
 import { normalizeHandle } from '../../routing/utils/handleUtils';
 import { MIN_EDGE_PATH_PENALIZED_OVERLAP } from '../../strategies/shared/edgeStrictCrossingGuard';
@@ -187,6 +188,7 @@ const buildPortCandidates = (
   if (!sourceRect || !targetRect) return [];
   const externalSegments = baselineSegments
     .filter(segment => segment.edgeIndex !== edgeIndex && segment.edgeIndex !== pairIndex);
+  const countExternalStrictCrossings = createDisplayStrictCrossingCounter(externalSegments);
   const declaredSourceSide = fullDisplayPortSide(normalizeHandle(edge.sourceHandle)) ?? null;
   const declaredTargetSide = fullDisplayPortSide(normalizeHandle(edge.targetHandle)) ?? null;
   const sidePairBuckets: PortCandidate[][] = [];
@@ -226,7 +228,7 @@ const buildPortCandidates = (
         })
       )).filter(candidate => (
         countRoutingObstacleHits(candidate.path, candidate.edge, obstacles) === 0
-        && candidateStrictCrossingsForEdge(edgeIndex, candidate.path, externalSegments) === 0
+        && countExternalStrictCrossings(candidate.path) === 0
         && candidateUnrelatedOverlapForEdge(
           edgeIndex,
           candidate.path,
@@ -461,6 +463,7 @@ export const buildBoundedOuterPortTransactionCandidates = <T extends Edge[]>(
       ];
       const otherSegments = extractDisplaySegments(seed.edges)
         .filter(segment => segment.edgeIndex !== movingEdgeIndex);
+      const countStrictCrossings = createDisplayStrictCrossingCounter(otherSegments);
       for (const item of paths) {
         const degenerate = (
           (item.ringAxis === 'x'
@@ -480,7 +483,7 @@ export const buildBoundedOuterPortTransactionCandidates = <T extends Edge[]>(
         const path = compactOrthogonalPath(getDisplayComputedPath(candidateEdge));
         if (pathSignature(path) === currentSignature) continue;
         if (countRoutingObstacleHits(path, candidateEdge, obstacles) > 0) continue;
-        if (candidateStrictCrossingsForEdge(movingEdgeIndex, path, otherSegments) > 0) continue;
+        if (countStrictCrossings(path) > 0) continue;
         if (candidateUnrelatedOverlapForEdge(
           movingEdgeIndex,
           path,

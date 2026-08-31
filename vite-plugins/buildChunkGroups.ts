@@ -35,6 +35,7 @@ const DISPLAY_ROUTING_NEUTRAL_MODULES = new Set([
 
 const FLOWCHART_DESIGNER_STARTUP_MODULES = new Set([
   '/src/core/hooks/useConfigIntegration.ts',
+  '/src/core/hooks/useDiagramStylePreset_v2.ts',
   '/src/core/components/shared/DiagramStyleManager.ts',
   '/src/core/utils/layoutStorage.ts',
   '/src/core/components/shared/exportUtils.ts',

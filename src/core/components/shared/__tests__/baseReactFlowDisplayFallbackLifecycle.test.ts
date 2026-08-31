@@ -32,6 +32,12 @@ describe('baseReactFlow display fallback lifecycle', () => {
       new Error('layout-routing-hard-quality-rejected'),
     )).toBe('hard-quality-rejected');
     expect(classifyDisplayLayoutTransactionError(
+      new Error('display-edge-worker-timeout'),
+    )).toBe('worker-timeout');
+    expect(classifyDisplayLayoutTransactionError(
+      new Error('display-edge-worker-timeout private provider payload'),
+    )).toBe('strategy-failed');
+    expect(classifyDisplayLayoutTransactionError(
       new Error('private provider payload'),
     )).toBe('strategy-failed');
     expect(classifyDisplayLayoutTransactionError({ message: 'layout-routing-cancelled' }))

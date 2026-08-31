@@ -10,7 +10,7 @@ import { repairLocalDoglegArtifacts } from '../../strategies/shared/edgeLocalDog
 import {
   reduceEdgeCrossingsWithWaypoints,
   repairSharedTrunkAwareCrossings,
-} from '../../strategies/shared/edgeRoutingPipeline';
+} from '../../strategies/shared/edgeRoutingWaypointRefinement';
 import { buildQualityInputSnapshot } from '../../strategies/shared/edgePathQualityInputSnapshot';
 import {
   chooseFewestStrictCrossings,

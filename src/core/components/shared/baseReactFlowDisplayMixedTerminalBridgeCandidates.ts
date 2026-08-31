@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import { findStrictCrossings } from '../../strategies/shared/edgeDetachedOverlapRepair';
+import { createSingleMoverStrictCrossingCounter } from '../../strategies/shared/edgeSingleMoverStrictCrossingCounter';
 import { compactOrthogonalPath } from './baseReactFlowDisplayEdgeCore';
 import {
   collectPathHitObstacleRects,
@@ -141,10 +142,12 @@ export const buildCrossedHorizontalMixedTerminalBridgeVariants = <T extends Edge
     Math.min(...graphPoints.map(point => point.x)) - TERMINAL_STUB,
     Math.max(...graphPoints.map(point => point.x)) + TERMINAL_STUB,
   ], (sourceRect.x + targetRect.x) / 2);
-  const baselineStrictCrossings = findStrictCrossings(
+  const singleMoverCrossings = createSingleMoverStrictCrossingCounter(
     edges.map(candidate => getDisplayComputedPath(candidate)),
     edges,
-  ).length;
+    companion.edgeIndex,
+  );
+  const baselineStrictCrossings = singleMoverCrossings.baseline;
   const ranked: RankedBridgeCandidate<T>[] = [];
   const pairSeeds: RankedBridgeCandidate<T>[] = [];
 
@@ -176,10 +179,7 @@ export const buildCrossedHorizontalMixedTerminalBridgeVariants = <T extends Edge
           const baseCandidateEdges = edges.map((candidate, edgeIndex) => (
             edgeIndex === companion.edgeIndex ? baseBridged : candidate
           )) as T;
-          const baseStrictCrossings = findStrictCrossings(
-            baseCandidateEdges.map(candidate => getDisplayComputedPath(candidate)),
-            baseCandidateEdges,
-          ).length;
+          const baseStrictCrossings = singleMoverCrossings.count(getDisplayComputedPath(baseBridged));
           if (baseStrictCrossings <= baselineStrictCrossings + 3) {
             pairSeeds.push({
               edges: baseCandidateEdges,
@@ -218,10 +218,7 @@ export const buildCrossedHorizontalMixedTerminalBridgeVariants = <T extends Edge
         const candidateEdges = edges.map((candidate, edgeIndex) => (
           edgeIndex === companion.edgeIndex ? bridged : candidate
         )) as T;
-        const strictCrossings = findStrictCrossings(
-          candidateEdges.map(candidate => getDisplayComputedPath(candidate)),
-          candidateEdges,
-        ).length;
+        const strictCrossings = singleMoverCrossings.count(getDisplayComputedPath(bridged));
         if (strictCrossings <= baselineStrictCrossings + 2) {
           pairSeeds.push({
             edges: candidateEdges,
