@@ -42,6 +42,40 @@ jobs:
       - name: Run mobile route smoke checks
         run: npm run smoke:routes:mobile
 
+      - name: Verify ordinary saved diagram recovery
+        shell: pwsh
+        env:
+          PRECOMPILED_ROUTE_BASE_URL: http://127.0.0.1:4176
+          DISPLAY_ROUTING_MATRIX_VIEWPORT: 1024x600
+          DISPLAY_ROUTING_MATRIX_CASE: domain-lanes-tb
+        run: |
+          $savedPreview = Start-Process -FilePath (Get-Command node).Source -ArgumentList @(
+            'node_modules/vite/bin/vite.js', 'preview', '--host', '127.0.0.1', '--port', '4176', '--strictPort'
+          ) -WindowStyle Hidden -PassThru
+          try {
+            $ready = $false
+            for ($attempt = 1; $attempt -le 60; $attempt += 1) {
+              if ($savedPreview.HasExited) { throw 'Saved diagram preview exited before readiness.' }
+              try {
+                Invoke-WebRequest -Uri $env:PRECOMPILED_ROUTE_BASE_URL -UseBasicParsing -TimeoutSec 2 | Out-Null
+                $ready = $true
+                break
+              } catch { Start-Sleep -Seconds 1 }
+            }
+            if (-not $ready) { throw 'Saved diagram preview did not become ready.' }
+            $env:DISPLAY_ROUTING_MATRIX_SAVED_RELOAD = 'initial'
+            $env:DISPLAY_ROUTING_MATRIX_PRESET = 'wms-process-flow-v1'
+            npm run verify:display-routing-matrix
+            if ($LASTEXITCODE -ne 0) { throw 'WMS saved diagram recovery failed.' }
+            $env:DISPLAY_ROUTING_MATRIX_SAVED_RELOAD = 'layout'
+            $env:DISPLAY_ROUTING_MATRIX_PRESET = 'logistics-architecture-v1'
+            $env:DISPLAY_ROUTING_MATRIX_WARM_CASES = 'domain-lanes-lr'
+            npm run verify:display-routing-matrix
+            if ($LASTEXITCODE -ne 0) { throw 'Saved layout switching failed.' }
+          } finally {
+            if (-not $savedPreview.HasExited) { Stop-Process -Id $savedPreview.Id -Force }
+          }
+
   tests:
     name: Tests (${{ matrix.group }})
     runs-on: windows-latest

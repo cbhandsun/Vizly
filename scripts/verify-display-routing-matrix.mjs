@@ -61,12 +61,14 @@ import { assertDisplayRoutingProductionPreview } from './lib/display-routing-pro
 import { DISPLAY_ROUTING_MATRIX_PRESET_TARGETS } from './lib/display-routing-matrix-presets.mjs';
 import { readDisplayRoutingLayoutDiagnostics } from './lib/display-routing-layout-diagnostics.mjs';
 import { auditDisplayRoutingLayoutSemantics } from './lib/display-routing-semantic-audit.mjs';
+import { parseSavedDisplayRoutingMode, verifySavedDisplayRoutingRoundtrip } from './lib/display-routing-saved-roundtrip.mjs';
 
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '').trim().replace(/\/$/, '');
 const WAIT_TIMEOUT_MS = parseDisplayRoutingMatrixTimeoutMs(
   process.env.DISPLAY_ROUTING_MATRIX_WAIT_TIMEOUT_MS,
 );
 const MAX_LAYOUT_ROUTE_MS = 30_000;
+const SAVED_RELOAD_MODE = parseSavedDisplayRoutingMode(process.env.DISPLAY_ROUTING_MATRIX_SAVED_RELOAD);
 const MATRIX_VIEWPORT = parseDisplayRoutingMatrixViewport(process.env.DISPLAY_ROUTING_MATRIX_VIEWPORT);
 const VISUAL_SETTLE_TIMEOUT_MS = resolveDisplayRoutingLayoutVisualTimeoutMs(WAIT_TIMEOUT_MS);
 const MATRIX_CASE_IDS = createDisplayRoutingMatrixCaseIds(
@@ -81,6 +83,9 @@ const LAYOUT_PRESET_ID = parseDisplayRoutingMatrixPreset(
   new Set(DISPLAY_ROUTING_MATRIX_PRESET_TARGETS.map(target => target.presetId)),
   'wms-demand-allocation-strategy-v2',
 );
+if (SAVED_RELOAD_MODE && !DISPLAY_ROUTING_LAYOUT_CASES.some(item => item.id === REQUESTED_CASE)) {
+  throw new Error('Saved recovery requires one explicit DISPLAY_ROUTING_MATRIX_CASE layout');
+}
 const WARM_LAYOUT_CASE_IDS = parseDisplayRoutingMatrixCaseList(
   process.env.DISPLAY_ROUTING_MATRIX_WARM_CASES
     ?? process.env.DISPLAY_ROUTING_MATRIX_WARM_CASE,
@@ -390,7 +395,7 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
   );
   const initialStartedAt = Date.now();
   await session.send('Page.navigate', {
-    url: `${BASE_URL}/?canonicalPreset=${encodeURIComponent(presetId)}`
+    url: `${BASE_URL}/?${SAVED_RELOAD_MODE ? 'diagram' : 'canonicalPreset'}=${encodeURIComponent(presetId)}`
       + `&routingMatrix=${layoutCase.id}-${Date.now()}`
       + `#/?diagram=${encodeURIComponent(presetId)}`,
   });
@@ -400,6 +405,12 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
     `${layoutCase.id} initial route`,
   );
   const initialRouteMs = Date.now() - initialStartedAt;
+  const savedRoundtripOptions = { session, presetId, semanticChains: target.semanticChains,
+    waitForValue, readFinalRouteExpression, auditFinalSvg, visualSettleTimeoutMs: VISUAL_SETTLE_TIMEOUT_MS };
+  if (SAVED_RELOAD_MODE === 'initial') return {
+    id: layoutCase.id, initialRouteMs,
+    savedRoundtrip: await verifySavedDisplayRoutingRoundtrip(savedRoundtripOptions),
+  };
   await session.evaluate('window.__vizlyRoutingResponses = []');
   const previousLayoutJobId = await session.evaluate(
     'window.__vizlyBaseReactFlowDisplayRouting?.layoutTransactionJobId ?? 0',
@@ -630,6 +641,9 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
     });
   }
   const warmLayoutSwitch = warmLayoutSwitches[0] ?? null;
+  const savedRoundtrip = SAVED_RELOAD_MODE === 'layout'
+    ? await verifySavedDisplayRoutingRoundtrip({ ...savedRoundtripOptions,
+      savedLayoutCase: WARM_LAYOUT_CASES.at(-1) ?? layoutCase }) : null;
   let postLayoutMove = null;
   if (layoutCase.id === 'domain-compound-elk-lr') {
     const dragTarget = await session.evaluate(`(() => {
@@ -726,6 +740,7 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
     canonicalMount,
     warmLayoutSwitch,
     warmLayoutSwitches,
+    savedRoundtrip,
     postLayoutMove,
     semanticAudit,
     ...layoutAudit,

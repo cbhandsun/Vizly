@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { assertRequestedLayoutSelected, clickLayout } from './display-routing-matrix-layout-command.mjs';
+import { parseSavedDisplayRoutingMode, readSavedDisplayRoutingState } from './display-routing-saved-roundtrip.mjs';
 
 import {
   createDisplayRoutingMatrixCaseIds,
@@ -17,6 +19,71 @@ import {
 } from './display-routing-matrix-cases.mjs';
 
 describe('display routing matrix cases', () => {
+  it('runs both ordinary saved-document regressions in the main CI build job', () => {
+    const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
+    const savedStep = workflow.split('- name: Verify ordinary saved diagram recovery')[1]?.split('\n  tests:')[0];
+    expect(savedStep).toBeDefined();
+    expect(savedStep).toContain("DISPLAY_ROUTING_MATRIX_SAVED_RELOAD = 'initial'");
+    expect(savedStep).toContain("DISPLAY_ROUTING_MATRIX_SAVED_RELOAD = 'layout'");
+    expect(savedStep).toContain("DISPLAY_ROUTING_MATRIX_PRESET = 'wms-process-flow-v1'");
+    expect(savedStep).toContain("DISPLAY_ROUTING_MATRIX_PRESET = 'logistics-architecture-v1'");
+    expect(savedStep.match(/npm run verify:display-routing-matrix/g)).toHaveLength(2);
+    expect(savedStep.match(/if \(\$LASTEXITCODE -ne 0\)/g)).toHaveLength(2);
+    expect(savedStep).toContain('finally {');
+    expect(savedStep).toContain('Stop-Process -Id $savedPreview.Id');
+    expect(savedStep).not.toContain('continue-on-error');
+  });
+
+  it('requires an explicit supported saved-document scenario', () => {
+    expect(parseSavedDisplayRoutingMode()).toBeNull();
+    expect(parseSavedDisplayRoutingMode('')).toBeNull();
+    expect(parseSavedDisplayRoutingMode('initial')).toBe('initial');
+    expect(parseSavedDisplayRoutingMode('layout')).toBe('layout');
+    for (const invalid of ['true', '1', [], {}, null, 'layout'.repeat(2000)]) {
+      expect(() => parseSavedDisplayRoutingMode(invalid)).toThrow('DISPLAY_ROUTING_MATRIX_SAVED_RELOAD');
+    }
+  });
+
+  it('requires a durable route snapshot, exact geometry/topology and the actual saved edit', () => {
+    const nodes = [{ id: 'source', position: { x: 0, y: 0 }, width: 100, height: 60 },
+      { id: 'target', position: { x: 300, y: 0 }, measured: { width: 100, height: 60 } }];
+    const edges = [{ id: 'edge', source: 'source', target: 'target', label: 'saved-check' }];
+    const saved = { nodes, edges, routingSnapshot: { candidate: { hardClean: true } } };
+    const raw = JSON.stringify(saved);
+    expect(readSavedDisplayRoutingState(raw, nodes, edges, 'edge')).toMatchObject({ nodeCount: 2, edgeCount: 1 });
+    expect(readSavedDisplayRoutingState(raw, structuredClone(nodes), structuredClone(edges))).not.toBeNull();
+    for (const changed of [[], nodes.map(node => ({ ...node, position: { x: 0.0001, y: 0 } })),
+      nodes.map(node => ({ ...node, measured: { width: 101, height: 60 } })),
+      nodes.map(node => ({ ...node, parentId: 'other' }))]) {
+      expect(readSavedDisplayRoutingState(raw, changed, edges)).toBeNull();
+    }
+    expect(readSavedDisplayRoutingState(raw, nodes, [{ ...edges[0], target: 'source' }])).toBeNull();
+    expect(readSavedDisplayRoutingState(raw, nodes, [{ ...edges[0], label: 'old' }], 'edge')).toBeNull();
+    expect(readSavedDisplayRoutingState(JSON.stringify({ ...saved, routingSnapshot: null }), nodes, edges)).toBeNull();
+    expect(readSavedDisplayRoutingState(JSON.stringify({ ...saved, edges: [{ ...edges[0], label: 'old' }] }), nodes, edges, 'edge')).toBeNull();
+  });
+
+  it('fails closed on malformed, empty, unsafe-size or invalid saved geometry', () => {
+    const node = { id: 'node', position: { x: 0, y: 0 }, width: 100, height: 60 };
+    const edge = { id: 'edge', source: 'node', target: 'node' };
+    const saved = { nodes: [node], edges: [edge], routingSnapshot: { candidate: { hardClean: true } } };
+    for (const raw of [null, 1, {}, '', '{', 'null', '[]', 'x'.repeat(2 * 1024 * 1024 + 1)]) {
+      expect(readSavedDisplayRoutingState(raw, [node], [edge])).toBeNull();
+    }
+    for (const nodes of [[], [node, node], [null], [{ ...node, id: 'x'.repeat(1025) }],
+      [{ ...node, width: 0 }], [{ ...node, height: -1 }], [{ ...node, position: { x: Infinity, y: 0 } }],
+      [{ ...node, position: { x: 1_000_001, y: 0 } }], Array(5001).fill(node)]) {
+      expect(readSavedDisplayRoutingState(JSON.stringify({ ...saved, nodes }), nodes, [edge])).toBeNull();
+    }
+    for (const edges of [[], [null], [edge, edge], [{ ...edge, source: 'missing' }], Array(301).fill(edge)]) {
+      expect(readSavedDisplayRoutingState(JSON.stringify({ ...saved, edges }), [node], edges)).toBeNull();
+    }
+    const safeId = { ...node, id: '__proto__' };
+    const safeEdge = { ...edge, source: '__proto__', target: '__proto__' };
+    expect(readSavedDisplayRoutingState(JSON.stringify({ ...saved, nodes: [safeId], edges: [safeEdge] }), [safeId], [safeEdge])).not.toBeNull();
+    expect({}.polluted).toBeUndefined();
+  });
+
   it('accepts bounded desktop and narrow viewport configurations', () => {
     expect(parseDisplayRoutingMatrixViewport()).toEqual({ width: 1600, height: 1200 });
     expect(parseDisplayRoutingMatrixViewport('1280x720')).toEqual({ width: 1280, height: 720 });
