@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Edge, Node } from '@xyflow/react';
 import {
   candidateStrictCrossingsForEdge,
+  createDisplayCandidateInteractionContext,
   displaySegmentsForPath,
   getDisplayComputedPath,
   type DisplayPoint,
@@ -28,6 +29,23 @@ const transpose = (segment: DisplaySegment): DisplaySegment => ({
 });
 
 describe('display candidate strict crossing index', () => {
+  it('indexes the immutable blockers once for repeated candidate interaction scores', () => {
+    const blockers = Array.from({ length: 2000 }, (_, index) => vertical(index * 20));
+    const metrics = { candidateVisitCount: 0 };
+    const originalFactory = crossingIndex.createDisplayStrictCrossingCounter;
+    const factory = vi.spyOn(crossingIndex, 'createDisplayStrictCrossingCounter')
+      .mockImplementation(segments => originalFactory(segments, metrics));
+    try {
+      const context = createDisplayCandidateInteractionContext(0, [], blockers);
+      const path = [{ x: 19, y: 0 }, { x: 21, y: 0 }];
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        expect(context.evaluate(path)).toEqual({ strictCrossings: 1, unrelatedOverlap: 0 });
+      }
+      expect(factory).toHaveBeenCalledTimes(1);
+      expect(metrics.candidateVisitCount).toBe(100);
+    } finally { factory.mockRestore(); }
+  });
+
   it('reuses blocker indexes across internal lane searches without changing the committed candidate', () => {
     const nodes: Node[] = [
       { id: 'a', position: { x: -100, y: -50 }, width: 100, height: 100, data: {} },

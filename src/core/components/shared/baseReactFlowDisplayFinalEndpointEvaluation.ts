@@ -143,7 +143,9 @@ export const diffBaseReactFlowEvaluationMetrics = (
  */
 export const createBaseReactFlowFinalEndpointEvaluation = (
   nodes: Node[],
+  eligibleEdgeIds?: ReadonlySet<string>,
 ): BaseReactFlowFinalEndpointEvaluation => {
+  const mutableEdgeIds = eligibleEdgeIds ? new Set(eligibleEdgeIds) : undefined;
   const terminalSnapshot = createDisplayTerminalValidationSnapshot(nodes);
   const businessNodeClearanceGeometry = createBusinessNodeClearanceGeometryContext(nodes);
   const hardGateMemo = createBaseDisplayHardGateMemo(nodes, terminalSnapshot);
@@ -339,6 +341,7 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
         // incompatible local preference before it discards other valid repairs
         // when the complete batch reaches the outer commit gate.
         'preserve-length',
+        mutableEdgeIds,
       );
       stubStrictEvaluationCount += strictDiagnostics.qualityEvaluationCount;
       stubStrictCacheHitCount += strictDiagnostics.qualityContextCacheHitCount;

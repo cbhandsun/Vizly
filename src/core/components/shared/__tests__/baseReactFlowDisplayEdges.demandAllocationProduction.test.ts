@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import productionRequestJson from './fixtures/demandAllocationProductionWorkerRequest.json';
+import regeneratedRequestJson from './fixtures/demandAllocationRegeneratedWorkerRequest.json';
+import { auditBaseReactFlowDisplayCommercialQuality } from '../baseReactFlowDisplayCommercialQuality';
 import { computeBaseReactFlowDisplayEdgesWorkerResponse } from '../baseReactFlowDisplayEdges.worker';
 import {
   findDisplayStrictCrossingHits,
@@ -20,6 +22,16 @@ const pathLength = (path: Array<{ x: number; y: number }>): number => path
   ), 0);
 
 describe('demand-allocation production display routing', () => {
+  it('keeps the regenerated initial route within the production bend contract', () => {
+    const request = parseDisplayEdgesWorkerRequest(regeneratedRequestJson);
+    if (!request) throw new Error('Invalid production capture');
+    const response = computeBaseReactFlowDisplayEdgesWorkerResponse(request);
+    const edges = response.edges ?? [];
+    expect(response.hardClean).toBe(true);
+    expect(countRenderUnsafeEndpointStubs(edges)).toBe(0);
+    expect(auditBaseReactFlowDisplayCommercialQuality(edges)).toEqual([]);
+  }, 30_000);
+
   it('avoids the merge-result fan without an outer-canvas detour', () => {
     const request = parseDisplayEdgesWorkerRequest(productionRequestJson);
     expect(request).not.toBeNull();

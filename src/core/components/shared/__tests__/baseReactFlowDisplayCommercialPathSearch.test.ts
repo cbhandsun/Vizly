@@ -14,6 +14,40 @@ const edge: Edge = { id: 'route', source: 'source', target: 'target', sourceHand
 } };
 
 describe('commercial path search container geometry', () => {
+  it.each(['source', 'target'] as const)('rejects reverse overlap in the fixed %s lead', role => {
+    const fixed: Edge = { ...edge, data: { ...edge.data, manualHandleSides: ['source', 'target'] } };
+    const x = role === 'source' ? 200 : 540;
+    const blocker: Edge = { id: 'incoming', source: role === 'target' ? edge.target : 'other',
+      target: role === 'source' ? edge.source : 'other',
+      data: { computedPath: [{ x: x + 60, y: 140 }, { x, y: 140 }] } };
+    expect(buildCommercialPathSearchTerminalCandidates(fixed, nodes, [fixed, blocker])).toEqual([]);
+  });
+
+  it.each(['source', 'target'] as const)('rejects unrelated same-direction overlap in the fixed %s lead', role => {
+    const fixed: Edge = { ...edge, data: { ...edge.data, manualHandleSides: ['source', 'target'] } };
+    const x = role === 'source' ? 200 : 540;
+    const blocker: Edge = { id: 'unrelated', source: 'other-source', target: 'other-target',
+      data: { computedPath: [{ x, y: 140 }, { x: x + 60, y: 140 }] } };
+    expect(buildCommercialPathSearchTerminalCandidates(fixed, nodes, [fixed, blocker])).toEqual([]);
+  });
+
+  it.each(['source', 'target'] as const)('preserves a legal same-direction shared %s lead', role => {
+    const fixed: Edge = { ...edge, data: { ...edge.data, manualHandleSides: ['source', 'target'] } };
+    const x = role === 'source' ? 200 : 540;
+    const buddy: Edge = { id: 'buddy', source: role === 'source' ? edge.source : 'other',
+      target: role === 'target' ? edge.target : 'other',
+      data: { computedPath: [{ x, y: 140 }, { x: x + 60, y: 140 }] } };
+    expect(buildCommercialPathSearchTerminalCandidates(fixed, nodes, [fixed, buddy]).length).toBeGreaterThan(0);
+  });
+
+  it.each(['source', 'target'])('rejects a crossing in the fixed %s lead before searching the interior', role => {
+    const fixed: Edge = { ...edge, data: { ...edge.data, manualHandleSides: ['source', 'target'] } };
+    const x = role === 'source' ? 240 : 560;
+    const blocker: Edge = { id: 'lead-blocker', source: 'blocker-source', target: 'blocker-target',
+      data: { computedPath: [{ x, y: 100 }, { x, y: 180 }] } };
+    expect(buildCommercialPathSearchTerminalCandidates(fixed, nodes, [fixed, blocker])).toEqual([]);
+  });
+
   it('resolves nested container coordinates without blocking their interiors', () => {
     const nested: Node[] = [
       { id: 'outer', type: 'domain', position: { x: 20, y: 30 }, width: 900, height: 500, data: {} },

@@ -38,6 +38,7 @@ import { eligibleCommercialClearanceDoesNotRegress } from './baseReactFlowDispla
 import { createDisplayTerminalValidationSnapshot } from './baseReactFlowTerminalValidation';
 import type { DisplayTerminalValidationSnapshot } from './baseReactFlowTerminalValidation';
 import { buildSharedRenderSafeStubCandidate } from './baseReactFlowDisplaySharedStubCandidate';
+import { buildPerpendicularTerminalStubCandidates } from './baseReactFlowDisplayPerpendicularStubCandidate';
 
 export const MIN_RENDER_SAFE_ENDPOINT_STUB = 56;
 const MAX_FINAL_ENDPOINT_STUB_REPAIR_EVALUATIONS = 8;
@@ -234,6 +235,7 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
   strictDiagnostics?: StrictCrossingRepairDiagnostics,
   allowStrictFallback = true,
   trunkPolicy: 'preserve-length' | 'clearance-margin' = 'clearance-margin',
+  eligibleEdgeIds?: ReadonlySet<string>,
 ): T => {
   if (countRenderUnsafeEndpointStubs(edges) === 0) return edges;
   // Companion shifts remain endpoint-local. The two broader sweep fallbacks
@@ -259,7 +261,7 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
     const baselineIssues = countRenderUnsafeEndpointStubs(current);
     if (baselineIssues === 0) break;
     const edgeIndex = current.findIndex((edge) => {
-      if (skippedEdgeIds.has(edge.id)) return false;
+      if (skippedEdgeIds.has(edge.id) || (eligibleEdgeIds && !eligibleEdgeIds.has(edge.id))) return false;
       const path = getDisplayComputedPath(edge);
       return path.length >= 3 && (
         segmentDisplayLength(path[0], path[1]) < MIN_RENDER_SAFE_ENDPOINT_STUB
@@ -289,10 +291,21 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
     let accepted: T | null = null;
     let acceptedQualityState: ReturnType<typeof qualityContext.evaluateStateChanged> | null = null;
     let acceptedCommercialRiskDelta = Number.POSITIVE_INFINITY;
-    for (const candidatePath of buildRenderSafeEndpointStubPaths(getDisplayComputedPath(current[edgeIndex]))) {
+    let needsTrunkPreservingPortAlternative = false;
+    function* candidateEdges(): Generator<Edge> {
+      for (const candidatePath of buildRenderSafeEndpointStubPaths(getDisplayComputedPath(current[edgeIndex]))) {
+        yield withDisplayComputedPath(current[edgeIndex], candidatePath);
+      }
+      // The loop stops on acceptance, so port changes are only considered when
+      // the existing fixed-port extensions failed within the same work budget.
+      if (needsTrunkPreservingPortAlternative) {
+        yield* buildPerpendicularTerminalStubCandidates(current[edgeIndex], nodes, MIN_RENDER_SAFE_ENDPOINT_STUB);
+      }
+    }
+    for (const candidateEdge of candidateEdges()) {
       if (evaluations >= maxEvaluations) break;
       const candidate = current.map((edge, index) => (
-        index === edgeIndex ? withDisplayComputedPath(edge, candidatePath) : edge
+        index === edgeIndex ? candidateEdge : edge
       )) as T;
       const initialIssues = countRenderUnsafeEndpointStubs(candidate);
       const initialQualityState = qualityContext.evaluateStateChanged(
@@ -334,6 +347,7 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
           edge === current[index] ? [] : [index]
         ));
         const changedEdgeIds = new Set(changedIndexes.map(index => current[index].id));
+        if (eligibleEdgeIds && [...changedEdgeIds].some(id => !eligibleEdgeIds.has(id))) return;
         let candidateQualityState = variant === candidate ? initialQualityState : null;
         const cachedCandidateQuality = candidateQualityState
           ? undefined
@@ -393,8 +407,11 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
           !transaction.hardQualityDoesNotRegress
           || !transaction.obstacleHitsDoNotRegress
           || !transaction.terminalsAnchored
-          || !transaction.trunksPreserved
         ) return;
+        if (!transaction.trunksPreserved) {
+          needsTrunkPreservingPortAlternative = trunkPolicy === 'preserve-length';
+          return;
+        }
         // Every variant is compared with the same current baseline, so total
         // commercial risk ordering is exactly equivalent to ordering the risk
         // delta over only the immutable changed indexes.

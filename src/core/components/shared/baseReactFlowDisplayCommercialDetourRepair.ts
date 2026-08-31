@@ -16,25 +16,20 @@ import { createBaseReactFlowFinalEndpointEvaluation } from './baseReactFlowDispl
 import { commercialEdgeDetoursDoNotRegress } from './baseReactFlowDisplayCommercialDetourGuard';
 import {
   buildCommercialBranchedTerminalShortcutCandidates,
-  buildCommercialSameSideRectangularShortcutPaths,
-  buildCommercialParallelTerminalCorridorShortcutPaths,
   buildCommercialSourceTerminalShortcutCandidates,
   buildCommercialTerminalShortcutCandidates,
 } from './baseReactFlowDisplayCommercialTerminalShortcut';
 import { buildCommercialPathSearchTerminalCandidates } from './baseReactFlowDisplayCommercialPathSearch';
 import {
-  passesBaseReactFlowCommercialFinalDisplayGate,
   passesBaseReactFlowFinalDisplayGate,
   type BaseReactFlowFinalEndpointOrderOptions,
 } from './baseReactFlowDisplayFinalEndpointGate';
 import {
-  buildTerminalPreservingDirectShortcutCandidates,
   repairDisplayLoopShortcuts,
 } from './baseReactFlowDisplayLoopShortcutRepair';
 import {
   displayPathLength,
   getDisplayComputedPath,
-  withDisplayComputedPath,
 } from './baseReactFlowDisplayGeometry';
 import { getDisplayHardQualityGateReport } from './baseReactFlowDisplayQualityGates';
 import { commercialRepairOutputIsEquivalent } from './baseReactFlowDisplayCommercialRepairContract';
@@ -42,19 +37,19 @@ import { repairFinalResidualStrictCrossings } from './baseReactFlowDisplayStrict
 import { withDisplayLocalShortcutSoftCrossingBridge } from './baseReactFlowDisplaySoftCrossingBridge';
 import { repairAxisMismatchedTerminalsWithBoundedPortRoles } from './baseReactFlowDisplayTerminalPortRepair';
 import { preservesCommercialTrueTrunkMembership } from './baseReactFlowDisplayTrueTrunkContract';
+import { repairTerminalPreservingOuterStairs } from './baseReactFlowDisplayCommercialOuterStairRepair';
 import { startDisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
 
 const FINAL_COMMERCIAL_DETOUR_QUALITY_BUDGET = 128;
 const FINAL_COMMERCIAL_DETOUR_PASSES = 1;
-const FINAL_COMMERCIAL_OUTER_STAIR_EVALUATIONS = 16;
 const FINAL_COMMERCIAL_TERMINAL_SHORTCUT_EVALUATIONS = 24;
 const FINAL_COMMERCIAL_SOURCE_SHORTCUT_EVALUATIONS = 32;
 const FINAL_COMMERCIAL_SOURCE_SHORTCUT_EVALUATIONS_PER_EDGE = 8;
 const FINAL_COMMERCIAL_PHASES = [
   'final-commercial-clearance',
   'final-commercial-terminal-preserving',
-  'final-commercial-terminal-changing',
   'final-commercial-source-stairs',
+  'final-commercial-terminal-changing',
   'final-commercial-evaluation',
   'final-commercial-safety-closure',
 ] as const;
@@ -67,108 +62,6 @@ export const traceSkippedFinalCommercialDetours = (
     startDisplayRoutingPhaseTrace({ phase, candidateCount, onTrace: onPhaseTrace })
       .finish('skip');
   }
-};
-
-const withTerminalPreservingOuterStairPath = (
-  edge: Edge,
-  path: ReturnType<typeof getDisplayComputedPath>,
-): Edge => {
-  const changed = withDisplayComputedPath(edge, path);
-  if (changed.data?.displayNodeClearanceRepaired !== true) return changed;
-  const data = { ...changed.data };
-  delete data.displayNodeClearanceRepaired;
-  return { ...changed, data };
-};
-
-const repairTerminalPreservingOuterStairs = <T extends Edge[]>(
-  edges: T,
-  nodes: Node[],
-  options: BaseReactFlowFinalEndpointOrderOptions,
-  evaluation: ReturnType<typeof createBaseReactFlowFinalEndpointEvaluation>,
-): T => {
-  let best = edges;
-  let bestReport = evaluation.hardReport(best);
-  if (!bestReport.hardClean) return edges;
-  let evaluations = 0;
-  const rankedEdgeIndexes = edges.map((edge, edgeIndex) => {
-    const path = getDisplayComputedPath(edge);
-    const first = path[0];
-    const last = path.at(-1);
-    if (!first || !last || path.length < 4) return null;
-    const direct = Math.abs(last.x - first.x) + Math.abs(last.y - first.y);
-    return { edgeIndex, excessLength: displayPathLength(path) - direct };
-  }).filter((entry): entry is { edgeIndex: number; excessLength: number } => Boolean(entry))
-    .sort((first, second) => (
-      second.excessLength - first.excessLength || first.edgeIndex - second.edgeIndex
-    ));
-
-  for (const { edgeIndex } of rankedEdgeIndexes) {
-    if (options.eligibleEdgeIds && !options.eligibleEdgeIds.has(edges[edgeIndex].id)) continue;
-    const baselinePath = getDisplayComputedPath(best[edgeIndex]);
-    const shortcutPaths = [
-      ...buildTerminalPreservingDirectShortcutCandidates(baselinePath),
-      ...buildCommercialParallelTerminalCorridorShortcutPaths(
-        baselinePath,
-        nodes,
-        best[edgeIndex],
-      ),
-      ...buildCommercialSameSideRectangularShortcutPaths(best[edgeIndex], nodes, best),
-    ];
-    for (const candidatePath of shortcutPaths) {
-      if (evaluations >= FINAL_COMMERCIAL_OUTER_STAIR_EVALUATIONS) return best;
-      evaluations += 1;
-      const baselineLength = displayPathLength(baselinePath);
-      const candidateLength = displayPathLength(candidatePath);
-      const reducesBendsAtEqualLength = candidatePath.length < baselinePath.length
-        && candidateLength <= baselineLength + 0.5;
-      if (candidateLength >= baselineLength - 0.5 && !reducesBendsAtEqualLength) continue;
-      const candidate = best.map((edge, index) => (
-        index === edgeIndex
-          ? withTerminalPreservingOuterStairPath(edge, candidatePath)
-          : edge
-      )) as T;
-      const candidateEdge = candidate[edgeIndex];
-      const candidateReport = evaluation.hardReport(candidate);
-      if (
-        !candidateEdge
-        || !candidateReport.hardClean
-        || candidateReport.quality.totalLength > bestReport.quality.totalLength + 0.5
-        || (
-          candidateReport.quality.totalLength >= bestReport.quality.totalLength - 0.5
-          && candidateReport.quality.bends >= bestReport.quality.bends
-        )
-        || candidateReport.quality.detourPenalty > bestReport.quality.detourPenalty
-        || scoreNodeClearanceRisk(
-          candidatePath,
-          nodes,
-          candidateEdge,
-          COMMERCIAL_BUSINESS_NODE_CLEARANCE,
-        ) > scoreNodeClearanceRisk(
-          baselinePath,
-          nodes,
-          best[edgeIndex],
-          COMMERCIAL_BUSINESS_NODE_CLEARANCE,
-        )
-        || evaluation.unsafeEndpointStubs(candidate) > evaluation.unsafeEndpointStubs(best)
-        || !changedEdgesObstacleHitsDoNotRegress(best, candidate, [edgeIndex], nodes)
-        || !visualPolishHardQualityDoesNotRegress(
-          bestReport.quality,
-          candidateReport.quality,
-        )
-        || !passesBaseReactFlowCommercialFinalDisplayGate(
-          best,
-          candidate,
-          [edgeIndex],
-          options,
-          evaluation,
-        )
-      ) continue;
-      best = candidate;
-      bestReport = candidateReport;
-      break;
-    }
-  }
-  return best;
 };
 
 const repairTerminalChangingOuterStairs = <T extends Edge[]>(
@@ -550,36 +443,38 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
     preservingTimer.finish(
       preservingCandidate === clearanceCandidate ? 'skip' : 'accepted',
     );
-    const changingTimer = startDisplayRoutingPhaseTrace({
-      phase: 'final-commercial-terminal-changing',
-      candidateCount: baseline.length,
-      onTrace: options.onPhaseTrace,
-    });
-    const changingCandidate = repairTerminalChangingOuterStairs(
-      preservingCandidate,
-      nodes,
-      options,
-      evaluation,
-    );
-    changingTimer.finish(changingCandidate === preservingCandidate ? 'skip' : 'accepted');
+    // A preserving shortcut can expose a source corridor. Repair that source
+    // before moving its target and thereby invalidating the newly viable route.
     const sourceTimer = startDisplayRoutingPhaseTrace({
       phase: 'final-commercial-source-stairs',
       candidateCount: baseline.length,
       onTrace: options.onPhaseTrace,
     });
     const sourceCandidate = repairSourceTerminalOuterStairs(
-      changingCandidate,
+      preservingCandidate,
       nodes,
       options,
       evaluation,
     );
-    sourceTimer.finish(sourceCandidate === changingCandidate ? 'skip' : 'accepted');
+    sourceTimer.finish(sourceCandidate === preservingCandidate ? 'skip' : 'accepted');
+    const changingTimer = startDisplayRoutingPhaseTrace({
+      phase: 'final-commercial-terminal-changing',
+      candidateCount: baseline.length,
+      onTrace: options.onPhaseTrace,
+    });
+    const changingCandidate = repairTerminalChangingOuterStairs(
+      sourceCandidate,
+      nodes,
+      options,
+      evaluation,
+    );
+    changingTimer.finish(changingCandidate === sourceCandidate ? 'skip' : 'accepted');
     const evaluationTimer = startDisplayRoutingPhaseTrace({
       phase: 'final-commercial-evaluation',
       candidateCount: baseline.length,
       onTrace: options.onPhaseTrace,
     });
-    const result = finish(sourceCandidate);
+    const result = finish(changingCandidate);
     evaluationTimer.finish(result === baseline ? 'skip' : 'accepted');
     return result;
   }
@@ -589,14 +484,16 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
     options,
     evaluation,
   );
-  baseline = repairTerminalChangingOuterStairs(
+  const beforeSourceStairs = baseline;
+  // Keep the same source-before-target order as the traced closure above.
+  baseline = repairSourceTerminalOuterStairs(
     baseline,
     nodes,
     options,
     evaluation,
   );
-  const beforeSourceStairs = baseline;
-  baseline = repairSourceTerminalOuterStairs(
+  const sourceStairsChanged = baseline !== beforeSourceStairs;
+  baseline = repairTerminalChangingOuterStairs(
     baseline,
     nodes,
     options,
@@ -605,7 +502,7 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
   // A hard-defect source reroute can establish the first clean baseline. Give
   // the cheaper terminal-preserving/changing shortcuts one bounded pass over
   // that clean graph so unrelated outer rectangles are not stranded.
-  if (baseline !== beforeSourceStairs) {
+  if (sourceStairsChanged) {
     baseline = repairTerminalPreservingOuterStairs(
       baseline,
       nodes,

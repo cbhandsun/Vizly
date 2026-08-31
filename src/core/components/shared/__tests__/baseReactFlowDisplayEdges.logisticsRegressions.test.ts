@@ -732,6 +732,11 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
         : null;
       const diagnostics = JSON.stringify({
         nodeId: dragCase.nodeId,
+        mutableEdgeIds: affectedClosure.mutableEdgeIds,
+        routes: incrementalResponse.edges?.map(edge => ({
+          id: edge.id, sourceHandle: edge.sourceHandle, targetHandle: edge.targetHandle,
+          path: finitePointPath(edge.data?.computedPath),
+        })),
         routeResolution: incrementalResponse.routeResolution,
         affectedEdgeCount: incrementalResponse.affectedEdgeCount,
         fallbackLevel: incrementalResponse.fallbackLevel,

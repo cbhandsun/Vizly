@@ -4,7 +4,7 @@
   "sourceHash": "source-v1:da286fbefa1a0d0a3ba3bf5a6589d2edba849af0f477ddb910ecad4d91649986",
   "inputSignature": "1553610876",
   "inputGeometryDigest": "geometry-v1:0cb0f24303d795fb7a123befd3e20fc7",
-  "outputRouteSignature": "route-v2:14:62:feaf177dfbc73def",
+  "outputRouteSignature": "route-v2:14:61:7cb06f918279772f",
   "hardClean": true,
   "patches": [
     {
@@ -216,15 +216,15 @@
           },
           {
             "x": 1477.75,
-            "y": 967
+            "y": 775
           },
           {
-            "x": 1961,
-            "y": 967
+            "x": 1979,
+            "y": 775
           },
           {
-            "x": 1961,
-            "y": 179.5
+            "x": 1979,
+            "y": 180
           }
         ],
         "sharedTrunkAware": true,
@@ -246,11 +246,11 @@
           },
           {
             "x": 1054,
-            "y": 1256
+            "y": 1400
           },
           {
             "x": 1434,
-            "y": 1256
+            "y": 1400
           },
           {
             "x": 1434,
@@ -267,7 +267,7 @@
       "target": "yms",
       "type": "stablePath",
       "sourceHandle": "bottom",
-      "targetHandle": "top",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
@@ -276,15 +276,11 @@
           },
           {
             "x": 1054,
-            "y": 1041
+            "y": 1149
           },
           {
-            "x": 1242,
-            "y": 1041
-          },
-          {
-            "x": 1242,
-            "y": 1090
+            "x": 1213,
+            "y": 1149
           }
         ],
         "sharedTrunkAware": true,
@@ -334,14 +330,14 @@
           },
           {
             "x": 1523,
-            "y": 1392
+            "y": 1400
           },
           {
-            "x": 1997,
-            "y": 1392
+            "x": 1979,
+            "y": 1400
           },
           {
-            "x": 1997,
+            "x": 1979,
             "y": 180
           }
         ],
@@ -396,11 +392,11 @@
             "y": 1020
           },
           {
-            "x": 382,
+            "x": 378,
             "y": 1020
           },
           {
-            "x": 382,
+            "x": 378,
             "y": 1450
           },
           {

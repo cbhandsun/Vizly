@@ -4,6 +4,7 @@ import {
   compactOrthogonalPath,
   isFinitePoint,
 } from './baseReactFlowDisplayEdgeCore';
+import { createDisplayStrictCrossingCounter } from './baseReactFlowDisplayStrictCrossingCounter';
 
 export type DisplayPoint = { x: number; y: number };
 export type DisplaySegment = {
@@ -444,9 +445,9 @@ const compileDisplayCandidateInteractionSegment = (
 
 /**
  * Reuses the mover-independent half of candidate interaction scoring. The
- * numeric axis partitions preserve the original segment order, so overlap
- * accumulation and strict-crossing boundary behavior stay identical to the
- * standalone scorers without allocating candidate segment objects. The
+ * overlap partitions preserve the original segment order; strict crossings use
+ * one immutable coordinate index for all candidates. Both retain the boundary
+ * behavior of the standalone scorers without candidate segment objects. The
  * returned context snapshots segment geometry and edge relationships.
  */
 export const createDisplayCandidateInteractionContext = (
@@ -455,25 +456,22 @@ export const createDisplayCandidateInteractionContext = (
   otherSegments: DisplaySegment[],
 ): DisplayCandidateInteractionContext => {
   const edge = edges[edgeIndex];
-  const horizontalSegments: DisplayCandidateInteractionSegment[] = [];
-  const verticalSegments: DisplayCandidateInteractionSegment[] = [];
+  const countStrictCrossings = createDisplayStrictCrossingCounter(otherSegments);
   const unrelatedHorizontalSegments: DisplayCandidateInteractionSegment[] = [];
   const unrelatedVerticalSegments: DisplayCandidateInteractionSegment[] = [];
 
   for (const segment of otherSegments) {
-    const compiled = compileDisplayCandidateInteractionSegment(segment);
-    if (segment.axis === 'h') horizontalSegments.push(compiled);
-    else verticalSegments.push(compiled);
     if (!edge) continue;
     const otherEdge = edges[segment.edgeIndex];
     if (!otherEdge || displayEdgesRelated(edge, otherEdge)) continue;
+    const compiled = compileDisplayCandidateInteractionSegment(segment);
     if (segment.axis === 'h') unrelatedHorizontalSegments.push(compiled);
     else unrelatedVerticalSegments.push(compiled);
   }
 
   return {
     evaluate: (path: DisplayPoint[]): DisplayCandidateInteractionCounts => {
-      let strictCrossings = 0;
+      const strictCrossings = countStrictCrossings(path);
       let unrelatedOverlap = 0;
       for (let index = 0; index < path.length - 1; index += 1) {
         const first = path[index];
@@ -482,16 +480,6 @@ export const createDisplayCandidateInteractionContext = (
           const fixed = first.y;
           const min = Math.min(first.x, second.x);
           const max = Math.max(first.x, second.x);
-          for (const other of verticalSegments) {
-            if (
-              other.fixed > min + STRICT_CROSSING_INTERIOR_EPS
-              && other.fixed < max - STRICT_CROSSING_INTERIOR_EPS
-              && fixed > other.min + STRICT_CROSSING_INTERIOR_EPS
-              && fixed < other.max - STRICT_CROSSING_INTERIOR_EPS
-            ) {
-              strictCrossings += 1;
-            }
-          }
           for (const other of unrelatedHorizontalSegments) {
             if (Math.abs(fixed - other.fixed) > NEAR_PARALLEL_LANE_TOLERANCE) continue;
             unrelatedOverlap += Math.max(
@@ -506,16 +494,6 @@ export const createDisplayCandidateInteractionContext = (
           const fixed = first.x;
           const min = Math.min(first.y, second.y);
           const max = Math.max(first.y, second.y);
-          for (const other of horizontalSegments) {
-            if (
-              fixed > other.min + STRICT_CROSSING_INTERIOR_EPS
-              && fixed < other.max - STRICT_CROSSING_INTERIOR_EPS
-              && other.fixed > min + STRICT_CROSSING_INTERIOR_EPS
-              && other.fixed < max - STRICT_CROSSING_INTERIOR_EPS
-            ) {
-              strictCrossings += 1;
-            }
-          }
           for (const other of unrelatedVerticalSegments) {
             if (Math.abs(fixed - other.fixed) > NEAR_PARALLEL_LANE_TOLERANCE) continue;
             unrelatedOverlap += Math.max(

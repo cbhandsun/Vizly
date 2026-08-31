@@ -59,6 +59,15 @@ export type BaseReactFlowRigidMoveSeed = Readonly<{
   rigidEdgeIds: string[];
 }>;
 
+/** Rigid paths are already translated exactly. Re-read the current mutable
+ * closure so later context promotions remain eligible, but never polish a
+ * rigid path's terminals as a side effect of finalizing a neighbouring edge.
+ */
+export const getBaseReactFlowNonRigidMutableEdgeIds = (
+  mutableEdgeIds: Iterable<string>,
+  rigidEdgeIds: ReadonlySet<string>,
+): string[] => [...mutableEdgeIds].filter(id => !rigidEdgeIds.has(id)).sort();
+
 /**
  * Translates committed paths whose two terminals moved by the same finite
  * delta. This preserves a hard-clean internal corridor when an entire

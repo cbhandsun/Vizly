@@ -238,7 +238,7 @@ describe('display routing browser performance budget', () => {
       'final-endpoint-closure', 'final-safety-endpoint-order',
       'final-safety-passage-order', 'final-safety-closure',
       'final-commercial-clearance', 'final-commercial-terminal-preserving',
-      'final-commercial-terminal-changing', 'final-commercial-source-stairs',
+      'final-commercial-source-stairs', 'final-commercial-terminal-changing',
       'final-commercial-evaluation', 'final-commercial-safety-closure',
       'finalizer', 'session-commit',
     ];
@@ -273,6 +273,12 @@ describe('display routing browser performance budget', () => {
     const reordered = [...traces];
     [reordered[1], reordered[2]] = [reordered[2], reordered[1]];
     expect(displayRoutingIncrementalPhaseTraceIsComplete(reordered)).toBe(false);
+    const targetBeforeSource = [...traces];
+    const sourceIndex = phases.indexOf('final-commercial-source-stairs');
+    const targetIndex = phases.indexOf('final-commercial-terminal-changing');
+    [targetBeforeSource[sourceIndex], targetBeforeSource[targetIndex]] =
+      [targetBeforeSource[targetIndex], targetBeforeSource[sourceIndex]];
+    expect(displayRoutingIncrementalPhaseTraceIsComplete(targetBeforeSource)).toBe(false);
   });
 
   it('accepts only a complete supported incremental phase sequence', () => {

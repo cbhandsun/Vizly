@@ -49,17 +49,19 @@ export const createDisplayWorkerFinalEvaluation = ({
   responseEdges,
   initialHardReport,
   initialHardReportEdges,
+  eligibleEdgeIds,
 }: Readonly<{
   nodes: Node[];
   responseEdges: Edge[];
   initialHardReport?: BaseDisplayBoundedCandidateReport;
   initialHardReportEdges?: readonly Edge[];
+  eligibleEdgeIds?: ReadonlySet<string>;
 }>): DisplayWorkerFinalEvaluation => {
   const repairNodes = withDisplayAbsolutePositions(
     nodes,
     new Map(nodes.map(node => [node.id, node] as const)),
   );
-  const evaluation = createBaseReactFlowFinalEndpointEvaluation(repairNodes);
+  const evaluation = createBaseReactFlowFinalEndpointEvaluation(repairNodes, eligibleEdgeIds);
   if (initialHardReport && initialHardReportEdges === responseEdges) {
     evaluation.rememberHardReport(responseEdges, initialHardReport);
   }
@@ -90,6 +92,7 @@ export const createTracedDisplayWorkerFinalEvaluation = ({
     responseEdges,
     initialHardReport: options.initialHardReport,
     initialHardReportEdges: options.initialHardReportEdges,
+    eligibleEdgeIds: options.eligibleEdgeIds,
   });
   evaluationTimer.finish(options.finalEvaluation ? 'hit' : 'accepted');
 

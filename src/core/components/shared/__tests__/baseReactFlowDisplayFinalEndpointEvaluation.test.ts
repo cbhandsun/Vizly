@@ -11,6 +11,8 @@ import { isExactSingleImmutableEdgeReplacement } from '../baseReactFlowDisplayFi
 import { createDisplayWorkerFinalEvaluation } from '../baseReactFlowDisplayWorkerFinalEvaluation';
 import { repairRenderSafeEndpointStubs } from '../baseReactFlowDisplayEndpointStubRepair';
 import { repairBaseReactFlowFinalCommercialDetours } from '../baseReactFlowDisplayCommercialDetourRepair';
+import { repairTerminalPreservingOuterStairs } from '../baseReactFlowDisplayCommercialOuterStairRepair';
+import { getDisplayComputedPath } from '../baseReactFlowDisplayGeometry';
 
 const nodes: Node[] = [
   { id: 'source', position: { x: 0, y: 0 }, width: 100, height: 60, data: {} },
@@ -300,6 +302,24 @@ describe('createBaseReactFlowFinalEndpointEvaluation', () => {
     });
   });
 
+  it('snapshots the mutable edge scope for cached stub repairs and Worker finalization', () => {
+    const unsafe: Edge[] = [{ ...edges[1], data: { computedPath: [
+      { x: 50, y: 60 }, { x: 50, y: 108 }, { x: 230, y: 108 }, { x: 230, y: 220 },
+    ] } }];
+    const mutable = new Set<string>();
+    const frozen = createBaseReactFlowFinalEndpointEvaluation(nodes, mutable);
+    mutable.add('b');
+    expect(frozen.repairRenderSafeEndpointStubs(unsafe)).toBe(unsafe);
+    expect(frozen.repairRenderSafeEndpointStubs([...unsafe])).toEqual(unsafe);
+    const editable = createBaseReactFlowFinalEndpointEvaluation(nodes, mutable);
+    expect(editable.unsafeEndpointStubs(editable.repairRenderSafeEndpointStubs(unsafe))).toBe(0);
+    const workerScope = createDisplayWorkerFinalEvaluation({ nodes, responseEdges: unsafe,
+      eligibleEdgeIds: new Set(['unrelated']) });
+    expect(workerScope.evaluation.repairRenderSafeEndpointStubs(unsafe)).toBe(unsafe);
+    expect(createDisplayWorkerFinalEvaluation({ nodes, responseEdges: unsafe }).evaluation
+      .repairRenderSafeEndpointStubs(unsafe)).not.toBe(unsafe);
+  });
+
   it('preserves the caller array identity when a cached stub repair is a no-op', () => {
     const evaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
     expect(evaluation.repairRenderSafeEndpointStubs(edges, 32)).toBe(edges);
@@ -338,6 +358,68 @@ describe('createBaseReactFlowFinalEndpointEvaluation', () => {
     expect(repair).toHaveBeenCalledWith(edges, 32, false);
     expect(evaluation.hardReport(candidate).hardClean).toBe(true);
     repair.mockRestore();
+  });
+
+  it('does not let a blocked corridor consume the shortcut budget before an independent staircase', () => {
+    const routeNodes: Node[] = [
+      { id: 's', position: { x: 0, y: 0 }, width: 100, height: 60, data: {} },
+      { id: 't', position: { x: 0, y: 800 }, width: 100, height: 60, data: {} },
+      { id: 'u', position: { x: 1000, y: 0 }, width: 100, height: 60, data: {} },
+      { id: 'v', position: { x: 1100, y: 800 }, width: 100, height: 60, data: {} },
+      ...Array.from({ length: 20 }, (_, index) => ({
+        id: `inner-${index}`, position: { x: index * 8, y: 320 }, width: 60, height: 60, data: {},
+      })),
+      { id: 'blocker', position: { x: -120, y: 300 }, width: 520, height: 200, data: {} },
+    ];
+    const route: Edge[] = [
+      { id: 'outer', source: 's', target: 't', sourceHandle: 'bottom', targetHandle: 'top',
+        data: { manualHandleSides: ['source', 'target'], computedPath: [
+          { x: 50, y: 60 }, { x: 50, y: 160 }, { x: -300, y: 160 },
+          { x: -300, y: 700 }, { x: 50, y: 700 }, { x: 50, y: 800 },
+        ] } },
+      { id: 'stair', source: 'u', target: 'v', sourceHandle: 'bottom', targetHandle: 'top',
+        data: { manualHandleSides: ['source', 'target'], computedPath: [
+          { x: 1050, y: 60 }, { x: 1050, y: 160 }, { x: 1100, y: 160 },
+          { x: 1100, y: 700 }, { x: 1150, y: 700 }, { x: 1150, y: 800 },
+        ] } },
+    ];
+    const original = structuredClone(route);
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation(routeNodes);
+    expect(evaluation.hardReport(route).hardClean).toBe(true);
+    const repaired = repairBaseReactFlowFinalCommercialDetours(route, routeNodes, {
+      evaluation, skipLoopShortcut: true,
+    });
+    expect(evaluation.hardReport(repaired).hardClean).toBe(true);
+    expect(getDisplayComputedPath(repaired[1])).toHaveLength(4);
+    expect(route).toEqual(original);
+  });
+
+  it('keeps obstacle-rejected shortcuts out of the exact whole-graph evaluation budget', () => {
+    const routeNodes: Node[] = [];
+    const route: Edge[] = [];
+    for (let index = 0; index < 17; index += 1) {
+      const x = index * 1000;
+      const stair = index === 16;
+      routeNodes.push(
+        { id: `s${index}`, position: { x, y: 0 }, width: 100, height: 60, data: {} },
+        { id: `t${index}`, position: { x: x + (stair ? 100 : 0), y: 800 }, width: 100, height: 60, data: {} },
+      );
+      if (!stair) routeNodes.push({ id: `block${index}`, position: { x, y: 300 }, width: 100, height: 200, data: {} });
+      route.push({ id: `edge${index}`, source: `s${index}`, target: `t${index}`,
+        sourceHandle: 'bottom', targetHandle: 'top', data: { computedPath: [
+          { x: x + 50, y: 60 }, { x: x + 50, y: 160 },
+          { x: x + (stair ? 100 : -150), y: 160 },
+          { x: x + (stair ? 100 : -150), y: 700 },
+          { x: x + (stair ? 150 : 50), y: 700 }, { x: x + (stair ? 150 : 50), y: 800 },
+        ] } });
+    }
+    const original = structuredClone(route);
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation(routeNodes);
+    expect(evaluation.hardReport(route).hardClean).toBe(true);
+    const repaired = repairTerminalPreservingOuterStairs(route, routeNodes, {}, evaluation);
+    expect(evaluation.hardReport(repaired).hardClean).toBe(true);
+    expect(getDisplayComputedPath(repaired[16])).toHaveLength(4);
+    expect(route).toEqual(original);
   });
 
   it('reuses exact request-local evidence for a copied immutable route', () => {

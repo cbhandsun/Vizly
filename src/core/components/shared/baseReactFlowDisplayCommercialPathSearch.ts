@@ -14,12 +14,17 @@ import {
 } from './baseReactFlowDisplayEdgeGeometry';
 import {
   compactDisplayEdgePaths,
+  displaySegmentOverlap,
+  displaySegmentsForPath,
   extractDisplaySegments,
   getDisplayComputedPath,
   isDisplayContainerNode,
+  isProtectedDisplaySharedTrunkPair,
   NEAR_PARALLEL_LANE_TOLERANCE,
+  type DisplayPoint,
 } from './baseReactFlowDisplayGeometry';
 import { MIN_RENDER_SAFE_ENDPOINT_STUB } from './baseReactFlowDisplayEndpointStubRepair';
+import { createDisplayStrictCrossingCounter } from './baseReactFlowDisplayStrictCrossingCounter';
 import { withDisplayPortBridge } from './baseReactFlowDisplayTerminalPortBridge';
 import {
   displayTerminalSideCanSwitch,
@@ -65,11 +70,6 @@ const commercialObstacles = (
   }];
 });
 
-const routedLineObstacles = (edge: Edge, allEdges: readonly Edge[]): LineObstacle[] => (
-  extractDisplaySegments(allEdges.filter(candidate => candidate.id !== edge.id))
-    .map(segment => ({ start: segment.a, end: segment.b }))
-);
-
 const routedLineBarriers = (lineObstacles: readonly LineObstacle[]): Rectangle[] => {
   const halfGap = NEAR_PARALLEL_LANE_TOLERANCE + 1;
   return lineObstacles.flatMap(({ start, end }) => {
@@ -112,7 +112,22 @@ export const buildCommercialPathSearchTerminalCandidates = (
   const sourceRect = getNodeRect(nodeById.get(edge.source), nodeById);
   const targetRect = getNodeRect(nodeById.get(edge.target), nodeById);
   if (!sourceRect || !targetRect) return [];
-  const lineObstacles = routedLineObstacles(edge, allEdges);
+  const frozenEdges = allEdges.filter(candidate => candidate.id !== edge.id);
+  const routedSegments = extractDisplaySegments(frozenEdges);
+  const lineObstacles: LineObstacle[] = routedSegments.map(segment => ({ start: segment.a, end: segment.b }));
+  const countLeadCrossings = createDisplayStrictCrossingCounter(routedSegments);
+  const leadIsBlocked = (path: DisplayPoint[]): boolean => {
+    if (countLeadCrossings(path) > 0) return true;
+    const [lead] = displaySegmentsForPath(path, -1);
+    if (!lead) return true;
+    return routedSegments.some(segment => {
+      if (displaySegmentOverlap(lead, segment) <= 0.5) return false;
+      const frozen = frozenEdges[segment.edgeIndex];
+      return !isProtectedDisplaySharedTrunkPair(
+        lead, path, edge, segment, getDisplayComputedPath(frozen), frozen,
+      );
+    });
+  };
   const obstacles = [
     ...commercialObstacles(edge, nodes, nodeById),
     ...routedLineBarriers(lineObstacles),
@@ -131,6 +146,9 @@ export const buildCommercialPathSearchTerminalCandidates = (
       sourceSide,
       MIN_RENDER_SAFE_ENDPOINT_STUB + COMMERCIAL_PATH_SEARCH_GRID_SIZE * 2,
     );
+    // The grid begins beyond the terminal stub. A blocked entry cannot be
+    // repaired by its interior search and must not consume the candidate cap.
+    if (leadIsBlocked([sourceAnchor, sourceLead])) continue;
     const targetSides = currentTargetSide
       ? [
         currentTargetSide,
@@ -149,6 +167,7 @@ export const buildCommercialPathSearchTerminalCandidates = (
         targetSide,
         MIN_RENDER_SAFE_ENDPOINT_STUB + COMMERCIAL_PATH_SEARCH_GRID_SIZE * 2,
       );
+      if (leadIsBlocked([targetLead, targetAnchor])) continue;
       const grid = buildPathfindingGrid(
         obstacles,
         {

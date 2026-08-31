@@ -16,7 +16,7 @@ import {
 import { computeBaseReactFlowDisplayInputIdentityBundle } from './baseReactFlowDisplayInputIdentity';
 import { repairTerminalHandleHemisphereHairpins } from './baseReactFlowDisplayHemisphereHairpinRepair';
 import { createBaseReactFlowMovedNodeReconnectCandidates } from './baseReactFlowDisplayLocalReconnect';
-import { createBaseReactFlowRigidMoveSeed } from './baseReactFlowDisplayRigidMove';
+import { createBaseReactFlowRigidMoveSeed, getBaseReactFlowNonRigidMutableEdgeIds } from './baseReactFlowDisplayRigidMove';
 import { repairFastDisplayHardSafety } from './baseReactFlowFastEdgeSafety';
 import {
   findDisplayStrictCrossingHits,
@@ -296,6 +296,7 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
   const reconnectCandidates = reconnectMutableEdgeIds.length > 0
     ? createBaseReactFlowMovedNodeReconnectCandidates({
         baselineEdges: rigidMoveSeed.edges,
+        baselineNodes: request.baselineNodes,
         nodes: repairNodes,
         changedNodeIds: verifiedChangeSet.changedNodeIds,
         mutableEdgeIds: reconnectMutableEdgeIds,
@@ -364,7 +365,7 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
     return {
       edges: lockedCandidateEdges,
       affectedEdgeCount: changedEdgeCount,
-      eligibleEdgeIds: [...transactionMutableIds].sort(),
+      eligibleEdgeIds: getBaseReactFlowNonRigidMutableEdgeIds(transactionMutableIds, rigidEdgeIds),
       hardReport: report,
     };
   };
@@ -567,7 +568,7 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
       return {
         edges: candidateEdges,
         affectedEdgeCount: changedEdgeCount,
-        eligibleEdgeIds: [...transactionMutableIds].sort(),
+        eligibleEdgeIds: getBaseReactFlowNonRigidMutableEdgeIds(transactionMutableIds, rigidEdgeIds),
         hardReport: reconnectReport,
       };
     }
@@ -627,7 +628,7 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
       return {
         edges: lockedExpandedCandidate,
         affectedEdgeCount: expandedChangedEdgeCount,
-        eligibleEdgeIds: [...transactionMutableIds].sort(),
+        eligibleEdgeIds: getBaseReactFlowNonRigidMutableEdgeIds(transactionMutableIds, rigidEdgeIds),
         hardReport: expandedReport,
       };
     }
@@ -688,7 +689,7 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
     edges: hardReport.hardClean && candidateClearanceClean ? candidateEdges : null,
     affectedEdgeCount,
     eligibleEdgeIds: hardReport.hardClean && candidateClearanceClean
-      ? [...transactionMutableIds].sort()
+      ? getBaseReactFlowNonRigidMutableEdgeIds(transactionMutableIds, rigidEdgeIds)
       : [],
     ...(hardReport.hardClean && candidateClearanceClean ? { hardReport } : {}),
   };

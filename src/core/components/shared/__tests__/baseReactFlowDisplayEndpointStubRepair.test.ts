@@ -1,4 +1,4 @@
-import type { Edge } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { calculateEdgePathQualityScore } from '../../../strategies/shared/edgeStrictCrossingGuard';
@@ -12,7 +12,10 @@ import * as strictSweep from '../baseReactFlowDisplayStrictSweepRepair';
 import { createAtomicRouteTransactionEvaluation } from '../baseReactFlowDisplayAtomicTransactionEvaluation';
 import { createStrictCrossingRepairDiagnostics } from '../baseReactFlowDisplayStrictResidualRepair';
 import { buildSharedRenderSafeStubCandidate } from '../baseReactFlowDisplaySharedStubCandidate';
+import { buildPerpendicularTerminalStubCandidates } from '../baseReactFlowDisplayPerpendicularStubCandidate';
 import { getDisplayComputedPath } from '../baseReactFlowDisplayGeometry';
+import { auditFinalSameSideEndpointOrder } from '../../../strategies/shared/edgeFinalSameSideEndpointOrderRepair';
+import { getExactDisplayHardReport } from '../baseReactFlowDisplayWorkerResponse';
 import { buildSafeEndpointSideStepCandidates } from '../baseReactFlowDisplayEndpointStubCandidates';
 import {
   commercialClearanceRiskIsGloballyMinimal,
@@ -35,6 +38,91 @@ const edgeWithPath = (
 describe('baseReactFlowDisplayEndpointStubRepair', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it.each((['source', 'target'] as const).flatMap(role => [false, true].flatMap(transpose => (
+    [false, true].map(mirror => ({ role, transpose, mirror }))
+  ))))('repairs a short $role with transpose=$transpose mirror=$mirror without shortening the remote trunk', ({ role, transpose, mirror }) => {
+    const transformPoint = ({ x, y }: { x: number; y: number }) => ({
+      x: (transpose ? y : x) * (mirror ? -1 : 1),
+      y: (transpose ? x : y) * (mirror ? -1 : 1),
+    });
+    const transformSide = (side: string | null | undefined) => {
+      if (!side) return side;
+      const mirrored: Record<string, string> = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' };
+      const transposed: Record<string, string> = { top: 'left', bottom: 'right', left: 'top', right: 'bottom' };
+      const reflected = mirror ? mirrored[side] : side;
+      return transpose ? transposed[reflected] : reflected;
+    };
+    const originalNodes: Node[] = [
+      { id: 's', position: { x: 0, y: 0 }, width: 100, height: 100, data: {} },
+      { id: 't', position: { x: 250, y: 260 }, width: 100, height: 100, data: {} },
+      { id: 'other', position: { x: 450, y: 600 }, width: 100, height: 100, data: {} },
+    ];
+    const nodes = originalNodes.map(node => {
+      const width = (transpose ? node.height : node.width) ?? 0;
+      const height = (transpose ? node.width : node.height) ?? 0;
+      const corner = transformPoint(node.position);
+      return { ...node, width, height, position: {
+        x: corner.x - (mirror ? width : 0), y: corner.y - (mirror ? height : 0),
+      } };
+    });
+    const forward: Edge[] = [
+      { id: 'short', source: 's', target: 't', sourceHandle: 'bottom', targetHandle: 'top', data: {
+        computedPath: [{ x: 50, y: 100 }, { x: 50, y: 211 }, { x: 280, y: 211 }, { x: 280, y: 260 }],
+      } },
+      { id: 'buddy', source: 's', target: 'other', sourceHandle: 'bottom', targetHandle: 'top', data: {
+        computedPath: [{ x: 50, y: 100 }, { x: 50, y: 500 }, { x: 500, y: 500 }, { x: 500, y: 600 }],
+      } },
+    ];
+    const oriented = role === 'target' ? forward : forward.map(edge => ({ ...edge,
+      source: edge.target, target: edge.source, sourceHandle: edge.targetHandle, targetHandle: edge.sourceHandle,
+      data: { ...edge.data, computedPath: [...getDisplayComputedPath(edge)].reverse() },
+    }));
+    const edges = oriented.map(edge => ({ ...edge,
+      sourceHandle: transformSide(edge.sourceHandle), targetHandle: transformSide(edge.targetHandle),
+      data: { ...edge.data, computedPath: getDisplayComputedPath(edge).map(transformPoint) },
+    }));
+    const before = structuredClone(edges);
+    const result = repairRenderSafeEndpointStubs(edges, nodes, 32, undefined, undefined, undefined, true, 'preserve-length');
+    expect(countRenderUnsafeEndpointStubs(result)).toBe(0);
+    expect(getExactDisplayHardReport(result, nodes).hardClean).toBe(true);
+    expect(result[0][role === 'target' ? 'targetHandle' : 'sourceHandle']).toBe(transformSide('left'));
+    expect(result[1]).toBe(edges[1]);
+    expect(auditFinalSameSideEndpointOrder(result, nodes).legalSharedTrunks[0].commonStemLength).toBeGreaterThanOrEqual(111);
+    expect(edges).toEqual(before);
+    const locked = edges.map(edge => ({ ...edge, data: { ...edge.data, manualHandleSides: [role] } }));
+    expect(repairRenderSafeEndpointStubs(locked, nodes, 32, undefined, undefined, undefined, true, 'preserve-length')).toBe(locked);
+    expect(repairRenderSafeEndpointStubs(edges, nodes, 0, undefined, undefined, undefined, true, 'preserve-length')).toBe(edges);
+    expect(repairRenderSafeEndpointStubs(edges, nodes, 32, undefined, undefined, undefined, true,
+      'preserve-length', new Set(['buddy']))).toBe(edges);
+    expect(countRenderUnsafeEndpointStubs(repairRenderSafeEndpointStubs(edges, nodes, 32,
+      undefined, undefined, undefined, true, 'preserve-length', new Set(['short'])))).toBe(0);
+    const obstacles = [...nodes, ...originalNodes.slice(0, 1).map(node => {
+      const corner = transformPoint({ x: 120, y: 280 });
+      return { ...node, id: 'blocker', width: 80, height: 80,
+        position: { x: corner.x - (mirror ? 80 : 0), y: corner.y - (mirror ? 80 : 0) } };
+    })];
+    expect(repairRenderSafeEndpointStubs(edges, obstacles, 32, undefined, undefined, undefined, true, 'preserve-length')).toBe(edges);
+  });
+
+  it('rejects missing, non-finite and degenerate perpendicular stub inputs', () => {
+    const edge: Edge = { id: 'short', source: 's', target: 't', sourceHandle: 'bottom', targetHandle: 'top', data: {
+      computedPath: [{ x: 50, y: 100 }, { x: 50, y: 211 }, { x: 280, y: 211 }, { x: 280, y: 260 }],
+    } };
+    const nodes: Node[] = [{ id: 't', position: { x: 250, y: 260 }, width: 100, height: 100, data: {} }];
+    for (const minimum of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(buildPerpendicularTerminalStubCandidates(edge, nodes, minimum)).toEqual([]);
+    }
+    expect(buildPerpendicularTerminalStubCandidates(edge, [], 56)).toEqual([]);
+    expect(buildPerpendicularTerminalStubCandidates({ ...edge, data: {} }, nodes, 56)).toEqual([]);
+    expect(buildPerpendicularTerminalStubCandidates({ ...edge, sourceHandle: 'unknown' }, nodes, 56)).toEqual([]);
+    for (const width of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(buildPerpendicularTerminalStubCandidates(edge, nodes.map(node => ({ ...node, width })), 56)).toEqual([]);
+    }
+    for (const data of [{ targetPortPolicy: 'forbidden' }, { targetPortPolicy: 'fixed-pos' }, { manualHandlePositions: ['target'] }]) {
+      expect(buildPerpendicularTerminalStubCandidates({ ...edge, data: { ...edge.data, ...data } }, nodes, 56)).toEqual([]);
+    }
   });
 
   it('recognizes only finite non-negative zero commercial risk as globally minimal', () => {

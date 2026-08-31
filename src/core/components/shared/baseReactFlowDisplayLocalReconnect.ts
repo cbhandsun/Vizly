@@ -24,6 +24,7 @@ import {
 } from './baseReactFlowDisplayRoutingTrace';
 import { displayTerminalRoleNeedsDeclaredAxisRepair } from './baseReactFlowDisplayTerminalPortCandidates';
 import { createDisplayTerminalValidationSnapshot } from './baseReactFlowTerminalValidation';
+import { restoreBaseReactFlowReconnectTrunks } from './baseReactFlowDisplayReconnectTrunks';
 
 type DisplayTerminalRole = 'source' | 'target';
 type DisplayTerminalSide = 'left' | 'right' | 'top' | 'bottom';
@@ -268,6 +269,7 @@ const rankReconnectCandidates = ({
  */
 export const createBaseReactFlowMovedNodeReconnectCandidates = ({
   baselineEdges,
+  baselineNodes,
   nodes,
   changedNodeIds,
   mutableEdgeIds,
@@ -276,6 +278,7 @@ export const createBaseReactFlowMovedNodeReconnectCandidates = ({
   onPhaseTrace,
 }: {
   baselineEdges: Edge[];
+  baselineNodes?: Node[];
   nodes: Node[];
   changedNodeIds: readonly string[];
   mutableEdgeIds: readonly string[];
@@ -466,7 +469,9 @@ export const createBaseReactFlowMovedNodeReconnectCandidates = ({
       .slice(0, beamWidth);
     if (states[0]?.hardDefects === 0) break;
   }
-  return states.map(state => state.edges);
+  return states.map(state => baselineNodes ? restoreBaseReactFlowReconnectTrunks({
+    baselineEdges, baselineNodes, edges: state.edges, nodes, changedNodeIds, mutableEdgeIds,
+  }) : state.edges);
   } finally {
     onDiagnostics?.({ ...diagnostics });
   }

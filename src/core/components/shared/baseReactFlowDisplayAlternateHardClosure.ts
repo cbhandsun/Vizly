@@ -12,6 +12,7 @@ import {
   type BaseReactFlowFinalEndpointEvaluation,
 } from './baseReactFlowDisplayFinalEndpointEvaluation';
 import { closeBaseReactFlowDisplayFinalHardContract } from './baseReactFlowDisplayFinalHardContract';
+import { passesBaseReactFlowFinalDisplayGate } from './baseReactFlowDisplayFinalEndpointGate';
 import { repairBaseReactFlowFinalCommercialDetours } from './baseReactFlowDisplayFinalEndpointOrder';
 import { repairBaseReactFlowFinalSafetyClosure } from './baseReactFlowDisplayFinalSafetyClosure';
 import { getDisplayHardQualityGateReport } from './baseReactFlowDisplayQualityGates';
@@ -93,6 +94,32 @@ export const buildBaseReactFlowAlternateHardClosureCandidate = ({
   const evaluation = evaluationSession
     ?? args.evaluationSession
     ?? createBaseReactFlowFinalEndpointEvaluation(repairNodes);
+  // A hard-clean primary needs only commercial clearance, not a new routing
+  // seed. Keep this repair atomic: a local improvement must also preserve the
+  // committed trunks, endpoint order and complete final display contract.
+  if (evaluation.hardReport(primaryCandidate).hardClean
+    && evaluation.unsafeEndpointStubs(primaryCandidate) === 0) {
+    const clearanceCandidate = repairBaseReactFlowDisplayBusinessNodeClearance(
+      primaryCandidate, repairNodes,
+    );
+    const changedIndexes = clearanceCandidate.flatMap((edge, index) => (
+      edge === primaryCandidate[index] ? [] : [index]
+    ));
+    const beforeOrder = evaluation.endpointOrder(primaryCandidate);
+    const afterOrder = evaluation.endpointOrder(clearanceCandidate);
+    if (displayAlternateHardClosureCandidateIsReady(clearanceCandidate, repairNodes, { evaluation })
+      && passesBaseReactFlowFinalDisplayGate(
+        primaryCandidate, clearanceCandidate, changedIndexes, {}, evaluation,
+      )
+      && afterOrder.inversions <= beforeOrder.inversions
+      && afterOrder.ambiguousLaneTies <= beforeOrder.ambiguousLaneTies
+      && afterOrder.collapsedLanePairs <= beforeOrder.collapsedLanePairs
+      && afterOrder.invalidEndpointCount <= beforeOrder.invalidEndpointCount
+      && evaluation.passageOrder(clearanceCandidate).passageDefects
+        <= evaluation.passageOrder(primaryCandidate).passageDefects) {
+      return clearanceCandidate;
+    }
+  }
   const interactiveSeed = createBaseReactFlowInteractiveDisplayEdges({
     edges: args.edges,
     nodes: args.nodes,

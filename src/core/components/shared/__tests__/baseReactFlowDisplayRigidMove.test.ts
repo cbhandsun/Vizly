@@ -1,9 +1,20 @@
 import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
-import { createBaseReactFlowRigidMoveSeed } from '../baseReactFlowDisplayRigidMove';
+import { createBaseReactFlowRigidMoveSeed, getBaseReactFlowNonRigidMutableEdgeIds } from '../baseReactFlowDisplayRigidMove';
 
 describe('baseReactFlowDisplayRigidMove', () => {
+  it('excludes rigid paths without losing later mutable context promotions', () => {
+    const mutable = new Set(['rigid', 'z']);
+    const rigid = new Set(['rigid']);
+    expect(getBaseReactFlowNonRigidMutableEdgeIds([], rigid)).toEqual([]);
+    expect(getBaseReactFlowNonRigidMutableEdgeIds(mutable, rigid)).toEqual(['z']);
+    mutable.add('a');
+    expect(getBaseReactFlowNonRigidMutableEdgeIds(mutable, rigid)).toEqual(['a', 'z']);
+    expect([...mutable]).toEqual(['rigid', 'z', 'a']);
+    expect([...rigid]).toEqual(['rigid']);
+  });
+
   it('fails rigid translation closed for empty, resized, asymmetric, and extreme input', () => {
     const baselineNodes: Node[] = [
       { id: 'source', position: { x: 0, y: 0 }, width: 100, height: 60, data: {} },

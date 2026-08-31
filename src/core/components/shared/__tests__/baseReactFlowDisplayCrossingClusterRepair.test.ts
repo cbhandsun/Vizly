@@ -1,5 +1,8 @@
 import type { Edge, Node } from '@xyflow/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as qualitySeed from '../baseReactFlowDisplayQualitySeedPipeline';
+import * as clearanceRepair from '../baseReactFlowDisplayBusinessNodeClearance';
+import { createBaseReactFlowFinalEndpointEvaluation } from '../baseReactFlowDisplayFinalEndpointEvaluation';
 
 import { calculateEdgePathQualityScore } from '../../../strategies/shared/edgeStrictCrossingGuard';
 import { hasDisplayCrossingClusterFixedPoint } from '../baseReactFlowDisplayCrossingClusterFixedPointCache';
@@ -229,6 +232,126 @@ describe('bounded display crossing cluster repair', () => {
 });
 
 describe('alternate display hard closure', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const clearanceFixture = () => {
+    const nodes: Node[] = [
+      node('source', 0, 0, 100, 60),
+      node('target', 400, 400, 100, 60),
+      node('obstacle', 200, 130, 80, 40),
+    ];
+    const primary: Edge[] = [{
+      ...edge('route', 'source', 'target', [
+        { x: 50, y: 60 }, { x: 50, y: 200 },
+        { x: 450, y: 200 }, { x: 450, y: 400 },
+      ]),
+      sourceHandle: 'bottom', targetHandle: 'top',
+    }];
+    return { nodes, primary };
+  };
+  const closePrimary = (primary: Edge[], nodes: Node[]) => buildBaseReactFlowAlternateHardClosureCandidate({
+    args: { edges: primary, nodes, enableSmartEdges: true, smartEdgePadding: 20,
+      isLargeGraph: false, displayEdgeEpoch: 1 },
+    repairNodes: nodes, primaryCandidate: primary,
+  });
+
+  it.each([
+    { transpose: false, reverse: false }, { transpose: true, reverse: false },
+    { transpose: false, reverse: true }, { transpose: true, reverse: true },
+  ])('repairs clearance without reseeding: %j', ({ transpose, reverse }) => {
+    const fixture = clearanceFixture();
+    const nodes = fixture.nodes.map(original => transpose ? {
+      ...original, position: { x: original.position.y, y: original.position.x },
+      width: original.height, height: original.width,
+    } : original);
+    const primary = fixture.primary.map(original => {
+      const path = getDisplayComputedPath(original).map(point => transpose ? { x: point.y, y: point.x } : point);
+      const sourceHandle = transpose ? 'right' : 'bottom';
+      const targetHandle = transpose ? 'left' : 'top';
+      return {
+        ...original, source: reverse ? original.target : original.source,
+        target: reverse ? original.source : original.target,
+        sourceHandle: reverse ? targetHandle : sourceHandle,
+        targetHandle: reverse ? sourceHandle : targetHandle,
+        data: { ...original.data, manualHandleSides: ['source', 'target'],
+          computedPath: reverse ? path.reverse() : path },
+      };
+    });
+    const snapshot = structuredClone(primary);
+    const seed = vi.spyOn(qualitySeed, 'createBaseReactFlowInteractiveDisplayEdges');
+    expect(displayAlternateHardClosureCandidateIsReady(primary, nodes)).toBe(false);
+    const repaired = closePrimary(primary, nodes);
+    expect(repaired).not.toBeNull();
+    expect(displayAlternateHardClosureCandidateIsReady(repaired ?? [], nodes)).toBe(true);
+    expect(primary).toEqual(snapshot);
+    expect(repaired?.[0].sourceHandle).toBe(primary[0].sourceHandle);
+    expect(repaired?.[0].targetHandle).toBe(primary[0].targetHandle);
+    const repairedPath = getDisplayComputedPath(repaired?.[0] ?? primary[0]);
+    expect(repairedPath[0]).toEqual(getDisplayComputedPath(primary[0])[0]);
+    expect(repairedPath.at(-1)).toEqual(getDisplayComputedPath(primary[0]).at(-1));
+    expect(seed).not.toHaveBeenCalled();
+  });
+
+  it('returns an already clean primary unchanged', () => {
+    const { primary, nodes } = clearanceFixture();
+    const seed = vi.spyOn(qualitySeed, 'createBaseReactFlowInteractiveDisplayEdges');
+    expect(closePrimary(primary, nodes.slice(0, 2))).toBe(primary);
+    expect(seed).not.toHaveBeenCalled();
+  });
+
+  it('does not run clearance-only repair when the primary still has unsafe endpoint stubs', () => {
+    const { primary, nodes } = clearanceFixture();
+    primary[0] = { ...primary[0], data: { ...primary[0].data, computedPath: [
+      { x: 50, y: 60 }, { x: 50, y: 114 }, { x: 450, y: 114 }, { x: 450, y: 400 },
+    ] } };
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
+    expect(evaluation.hardReport(primary).hardClean).toBe(true);
+    expect(evaluation.unsafeEndpointStubs(primary)).toBe(1);
+    const repair = vi.spyOn(clearanceRepair, 'repairBaseReactFlowDisplayBusinessNodeClearance');
+    vi.spyOn(qualitySeed, 'createBaseReactFlowInteractiveDisplayEdges')
+      .mockImplementation(() => { throw new Error('alternate search required'); });
+    expect(() => closePrimary(primary, nodes)).toThrow('alternate search required');
+    expect(repair).not.toHaveBeenCalled();
+  });
+
+  it.each(['residual-clearance', 'invalid-path'])(
+    'retains the alternate search when local repair leaves %s', failure => {
+      const { primary, nodes } = clearanceFixture();
+      const candidate = failure === 'residual-clearance' ? primary : [{
+        ...primary[0], data: { ...primary[0].data, computedPath: [
+          { x: 50, y: 60 }, { x: 450, y: 400 },
+        ] },
+      }];
+      vi.spyOn(clearanceRepair, 'repairBaseReactFlowDisplayBusinessNodeClearance').mockReturnValue(candidate);
+      const seed = vi.spyOn(qualitySeed, 'createBaseReactFlowInteractiveDisplayEdges')
+        .mockImplementation(() => { throw new Error('alternate search required'); });
+      expect(() => closePrimary(primary, nodes)).toThrow('alternate search required');
+      expect(seed).toHaveBeenCalledOnce();
+    },
+  );
+
+  it('rejects a clean clearance candidate that dismantles a committed shared trunk', () => {
+    const { primary, nodes } = clearanceFixture();
+    nodes.push(node('peer', -200, 400, 100, 60));
+    primary.push({ ...edge('peer-route', 'source', 'peer', [
+      { x: 50, y: 60 }, { x: 50, y: 200 }, { x: -150, y: 200 }, { x: -150, y: 400 },
+    ]), sourceHandle: 'bottom', targetHandle: 'top' });
+    const clean = clearanceRepair.repairBaseReactFlowDisplayBusinessNodeClearance(primary, nodes);
+    const broken = clean.map(candidate => candidate.id !== 'peer-route' ? candidate : {
+      ...candidate, data: { ...candidate.data, computedPath: [
+        { x: 30, y: 60 }, { x: 30, y: 200 }, { x: -150, y: 200 }, { x: -150, y: 400 },
+      ] },
+    });
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
+    expect(evaluation.endpointOrder(primary).legalSharedTrunks.length).toBeGreaterThan(0);
+    expect(displayAlternateHardClosureCandidateIsReady(broken, nodes)).toBe(true);
+    expect(evaluation.endpointOrder(broken).legalSharedTrunks).toHaveLength(0);
+    vi.spyOn(clearanceRepair, 'repairBaseReactFlowDisplayBusinessNodeClearance').mockReturnValue(broken);
+    vi.spyOn(qualitySeed, 'createBaseReactFlowInteractiveDisplayEdges')
+      .mockImplementation(() => { throw new Error('alternate search required'); });
+    expect(() => closePrimary(primary, nodes)).toThrow('alternate search required');
+  });
+
   it('requires the 48px commercial clearance contract in addition to the hard report', () => {
     const candidate: Edge = {
       id: 'source-target',

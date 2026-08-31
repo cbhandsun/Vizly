@@ -4,7 +4,7 @@
   "sourceHash": "source-v1:ea82c502ab6535b5c8f8367c591861e540396a41955a15c6b5f94f922264b7de",
   "inputSignature": "2113580664",
   "inputGeometryDigest": "geometry-v1:959447b9afedc5b100c74395ce889f05",
-  "outputRouteSignature": "route-v2:26:164:d8711ac2fc858b00",
+  "outputRouteSignature": "route-v2:26:162:4ab70b5fedf39c25",
   "hardClean": true,
   "patches": [
     {
@@ -496,7 +496,7 @@
       "target": "greedy-spec",
       "type": "stablePath",
       "sourceHandle": "left",
-      "targetHandle": "top",
+      "targetHandle": "right",
       "data": {
         "computedPath": [
           {
@@ -509,21 +509,25 @@
           },
           {
             "x": 1032,
-            "y": 2828
+            "y": 2672
           },
           {
-            "x": 216,
-            "y": 2828
+            "x": 445,
+            "y": 2672
           },
           {
-            "x": 216,
-            "y": 2884
+            "x": 445,
+            "y": 2947
+          },
+          {
+            "x": 326,
+            "y": 2947
           }
         ],
-        "h": ";1032,2293;664,2828;",
+        "h": ";741,2672;",
         "treeRouting": {
           "effectiveSourceHandle": "left",
-          "effectiveTargetHandle": "top",
+          "effectiveTargetHandle": "right",
           "points": [
             {
               "x": 1102,
@@ -535,15 +539,19 @@
             },
             {
               "x": 1032,
-              "y": 2828
+              "y": 2672
             },
             {
-              "x": 216,
-              "y": 2828
+              "x": 445,
+              "y": 2672
             },
             {
-              "x": 216,
-              "y": 2884
+              "x": 445,
+              "y": 2947
+            },
+            {
+              "x": 326,
+              "y": 2947
             }
           ]
         },
@@ -704,11 +712,11 @@
           },
           {
             "x": 741,
-            "y": 2680
+            "y": 2728
           },
           {
             "x": 664,
-            "y": 2680
+            "y": 2728
           },
           {
             "x": 664,
@@ -733,14 +741,6 @@
           },
           {
             "x": 1172,
-            "y": 2293
-          },
-          {
-            "x": 984,
-            "y": 2293
-          },
-          {
-            "x": 984,
             "y": 2828
           },
           {
@@ -762,14 +762,6 @@
             },
             {
               "x": 1172,
-              "y": 2293
-            },
-            {
-              "x": 984,
-              "y": 2293
-            },
-            {
-              "x": 984,
               "y": 2828
             },
             {
