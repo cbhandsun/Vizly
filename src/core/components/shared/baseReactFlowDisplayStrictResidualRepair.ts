@@ -4,7 +4,6 @@ import { findStrictCrossings } from '../../strategies/shared/edgeDetachedOverlap
 import { repairEndpointOrthogonalPaths } from '../../strategies/shared/edgeEndpointPathRepair';
 import { isFinitePoint } from './baseReactFlowDisplayEdgeCore';
 import {
-  candidateStrictCrossingsForEdge,
   displayAxisOf,
   extractDisplaySegments,
   findDisplayStrictCrossingHits,
@@ -36,6 +35,7 @@ import {
   visualPolishHardQualityDoesNotRegress,
 } from './baseReactFlowDisplayEvaluation';
 import { createDisplayStrictCrossingCounter } from './baseReactFlowDisplayStrictCrossingCount';
+import { createDisplayStrictCrossingCounter as createCandidateStrictCrossingCounter } from './baseReactFlowDisplayStrictCrossingCounter';
 import { buildCrossingCompanionOuterPortVariants } from './baseReactFlowDisplayTerminalPortRepair';
 import {
   buildTerminalStrictStubPaths,
@@ -109,11 +109,6 @@ export const repairInternalStrictCrossingLanes = <T extends Edge[]>(
         const path = paths[segment.edgeIndex];
         if (!path) continue;
         const otherSegments = allSegments.filter(item => item.edgeIndex !== segment.edgeIndex);
-        const baselineEdgeStrict = candidateStrictCrossingsForEdge(
-          segment.edgeIndex,
-          path,
-          otherSegments,
-        );
         const candidatePaths = buildInternalStrictLaneShiftCandidates(
           path,
           segment,
@@ -121,12 +116,11 @@ export const repairInternalStrictCrossingLanes = <T extends Edge[]>(
           paths[other.edgeIndex],
           nodes,
         );
+        if (candidatePaths.length === 0) continue;
+        const countCandidateStrict = createCandidateStrictCrossingCounter(otherSegments);
+        const baselineEdgeStrict = countCandidateStrict(path);
         for (const candidatePath of candidatePaths) {
-          const candidateEdgeStrict = candidateStrictCrossingsForEdge(
-            segment.edgeIndex,
-            candidatePath,
-            otherSegments,
-          );
+          const candidateEdgeStrict = countCandidateStrict(candidatePath);
           const candidateStrict = baselineStrict - baselineEdgeStrict + candidateEdgeStrict;
           const candidateDisplayStrict = baselineDisplayStrict - baselineEdgeStrict + candidateEdgeStrict;
           const reducesBaselineStrict = candidateStrict < baselineStrict

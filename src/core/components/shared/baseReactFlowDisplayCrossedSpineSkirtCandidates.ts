@@ -1,10 +1,10 @@
 import type { Edge, Node } from '@xyflow/react';
+import { createDisplayStrictCrossingCounter } from './baseReactFlowDisplayStrictCrossingCounter';
 
 import { compactOrthogonalPath } from './baseReactFlowDisplayEdgeCore';
 import { anchorForHandle, getNodeRect } from './baseReactFlowDisplayEdgeGeometry';
 import {
   buildDisplayRoutingObstacles,
-  candidateStrictCrossingsForEdge,
   collectPathHitObstacleRects,
   getDisplayComputedPath,
   shiftDisplayInternalSegment,
@@ -94,6 +94,7 @@ export const buildCrossedSpineInternalLaneCandidates = (
   const path = getDisplayComputedPath(edge);
   const lanes = blockerEscapeLanesForCrossedSpine(spine, otherSegments);
   if (path.length < 4 || lanes.length === 0) return [];
+  const countStrictCrossings = createDisplayStrictCrossingCounter(otherSegments);
   const obstacles = [...buildDisplayRoutingObstacles(nodes)]
     .filter(([nodeId]) => nodeId !== edge.source && nodeId !== edge.target)
     .map(([, rect]) => rect);
@@ -111,11 +112,7 @@ export const buildCrossedSpineInternalLaneCandidates = (
       edge: withDisplayComputedPath(edge, candidatePath),
       obstacleHits: collectPathHitObstacleRects(candidatePath, obstacles).length,
       pathLength: crossedSpinePathLength(candidatePath),
-      strictCrossings: candidateStrictCrossingsForEdge(
-        edgeIndex,
-        candidatePath,
-        otherSegments,
-      ),
+      strictCrossings: countStrictCrossings(candidatePath),
       topologyPriority: -3,
     }];
   });
@@ -134,6 +131,7 @@ export const buildCrossedSpineLocalWallCandidates = (
   const start = path[spine.segmentIndex];
   const end = path[spine.segmentIndex + 1];
   if (!start || !end || blockers.length === 0 || lanes.length === 0) return [];
+  const countStrictCrossings = createDisplayStrictCrossingCounter(otherSegments);
   const obstacles = [...buildDisplayRoutingObstacles(nodes)]
     .filter(([nodeId]) => nodeId !== edge.source && nodeId !== edge.target)
     .map(([, rect]) => rect);
@@ -214,11 +212,7 @@ export const buildCrossedSpineLocalWallCandidates = (
       ...detour,
       ...path.slice(spine.segmentIndex + 1),
     ]);
-    const strictCrossings = candidateStrictCrossingsForEdge(
-      edgeIndex,
-      candidatePath,
-      otherSegments,
-    );
+    const strictCrossings = countStrictCrossings(candidatePath);
     return [{
       edgeIndex,
       edge: withDisplayComputedPath(edge, candidatePath),
@@ -259,6 +253,7 @@ export const buildChangedTerminalCandidates = (
     .filter(([nodeId]) => nodeId !== edge.source && nodeId !== edge.target)
     .map(([, rect]) => rect);
   const blockerEscapeLanes = blockerEscapeLanesForCrossedSpine(spine, otherSegments);
+  const countStrictCrossings = createDisplayStrictCrossingCounter(otherSegments);
 
   for (const side of ['left', 'right', 'top', 'bottom'] as const) {
     if (!displayTerminalSideCanSwitch(edge, role, side)) continue;
@@ -284,11 +279,7 @@ export const buildChangedTerminalCandidates = (
         ? orientedCandidate
         : [...orientedCandidate].reverse();
       if (candidatePath.length < 4) continue;
-      const strictCrossings = candidateStrictCrossingsForEdge(
-        edgeIndex,
-        candidatePath,
-        otherSegments,
-      );
+      const strictCrossings = countStrictCrossings(candidatePath);
       const key = `${String(nextHandle)}:${candidatePath.map(point => `${point.x}:${point.y}`).join('|')}`;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -337,6 +328,7 @@ export const buildSingleTerminalOuterRingCandidates = (
     .filter(([nodeId]) => nodeId !== edge.source && nodeId !== edge.target)
     .map(([, rect]) => rect);
   if (obstacles.length === 0) return [];
+  const countStrictCrossings = createDisplayStrictCrossingCounter(otherSegments);
   const segmentXs = otherSegments.flatMap(segment => [segment.a.x, segment.b.x]);
   const segmentYs = otherSegments.flatMap(segment => [segment.a.y, segment.b.y]);
   const outerXLanes = [
@@ -404,11 +396,7 @@ export const buildSingleTerminalOuterRingCandidates = (
           : { ...pathEdge, sourceHandle: changedHandle },
         obstacleHits: collectPathHitObstacleRects(candidatePath, obstacles).length,
         pathLength: crossedSpinePathLength(candidatePath),
-        strictCrossings: candidateStrictCrossingsForEdge(
-          edgeIndex,
-          candidatePath,
-          otherSegments,
-        ),
+        strictCrossings: countStrictCrossings(candidatePath),
         topologyPriority: -5,
       });
     }
@@ -429,6 +417,7 @@ export const buildDualTerminalOuterLaneCandidates = (
   if (!sourceRect || !targetRect) return [];
   const lanes = blockerEscapeLanesForCrossedSpine(spine, otherSegments);
   if (lanes.length === 0) return [];
+  const countStrictCrossings = createDisplayStrictCrossingCounter(otherSegments);
   const obstacles = [...buildDisplayRoutingObstacles(nodes)]
     .filter(([nodeId]) => nodeId !== edge.source && nodeId !== edge.target)
     .map(([, rect]) => rect);
@@ -507,11 +496,7 @@ export const buildDualTerminalOuterLaneCandidates = (
           .map(point => `${point.x}:${point.y}`).join('|')}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        const strictCrossings = candidateStrictCrossingsForEdge(
-          edgeIndex,
-          candidatePath,
-          otherSegments,
-        );
+        const strictCrossings = countStrictCrossings(candidatePath);
         const pathEdge = withDisplayComputedPath(edge, candidatePath);
         candidates.push({
           edgeIndex,

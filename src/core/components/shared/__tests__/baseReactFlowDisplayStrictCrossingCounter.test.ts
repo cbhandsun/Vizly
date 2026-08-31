@@ -1,10 +1,22 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type { Edge, Node } from '@xyflow/react';
 import {
   candidateStrictCrossingsForEdge,
+  displaySegmentsForPath,
+  getDisplayComputedPath,
   type DisplayPoint,
   type DisplaySegment,
 } from '../baseReactFlowDisplayGeometry';
 import { createDisplayStrictCrossingCounter } from '../baseReactFlowDisplayStrictCrossingCounter';
+import * as crossingIndex from '../baseReactFlowDisplayStrictCrossingCounter';
+import { repairInternalStrictCrossingLanes } from '../baseReactFlowDisplayStrictResidualRepair';
+import {
+  buildChangedTerminalCandidates,
+  buildCrossedSpineInternalLaneCandidates,
+  buildCrossedSpineLocalWallCandidates,
+  buildDualTerminalOuterLaneCandidates,
+  buildSingleTerminalOuterRingCandidates,
+} from '../baseReactFlowDisplayCrossedSpineSkirtCandidates';
 
 const vertical = (x: number, bottom = 10, top = -10): DisplaySegment => ({
   edgeIndex: 0, segmentIndex: 0, axis: 'v', direction: 1,
@@ -16,6 +28,44 @@ const transpose = (segment: DisplaySegment): DisplaySegment => ({
 });
 
 describe('display candidate strict crossing index', () => {
+  it('reuses blocker indexes across internal lane searches without changing the committed candidate', () => {
+    const nodes: Node[] = [
+      { id: 'a', position: { x: -100, y: -50 }, width: 100, height: 100, data: {} },
+      { id: 'b', position: { x: 300, y: 250 }, width: 100, height: 100, data: {} },
+      { id: 'c', position: { x: -100, y: 100 }, width: 100, height: 100, data: {} },
+      { id: 'd', position: { x: 400, y: 350 }, width: 100, height: 100, data: {} },
+    ];
+    const edges: Edge[] = [
+      { id: 'ab', source: 'a', target: 'b', sourceHandle: 'right', targetHandle: 'left', data: {
+        computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 300 }, { x: 300, y: 300 }],
+      } },
+      { id: 'cd', source: 'c', target: 'd', sourceHandle: 'right', targetHandle: 'left', data: {
+        computedPath: [{ x: 0, y: 150 }, { x: 250, y: 150 }, { x: 250, y: 400 }, { x: 400, y: 400 }],
+      } },
+    ];
+    const originalFactory = crossingIndex.createDisplayStrictCrossingCounter;
+    const queries: number[] = [];
+    const factory = vi.spyOn(crossingIndex, 'createDisplayStrictCrossingCounter').mockImplementation(segments => {
+      const count = originalFactory(segments);
+      const index = queries.length;
+      queries.push(0);
+      return path => {
+        queries[index] += 1;
+        expect(count(path)).toBe(candidateStrictCrossingsForEdge(0, [...path], [...segments]));
+        return count(path);
+      };
+    });
+    try {
+      const before = structuredClone({ edges, nodes });
+      const indexed = repairInternalStrictCrossingLanes(edges, nodes);
+      expect(queries.length).toBeGreaterThan(0);
+      expect(queries.every(count => count > 1)).toBe(true);
+      factory.mockImplementation(segments => path => candidateStrictCrossingsForEdge(0, [...path], [...segments]));
+      expect(repairInternalStrictCrossingLanes(edges, nodes)).toEqual(indexed);
+      expect({ edges, nodes }).toEqual(before);
+    } finally { factory.mockRestore(); }
+  });
+
   it.each([false, true])('matches the original scorer at exact tolerance boundaries, transposed=%s', transposed => {
     const original = [
       vertical(0.5), vertical(0.500001), vertical(9.5), vertical(9.499999),
@@ -80,4 +130,60 @@ describe('display candidate strict crossing index', () => {
     expect(count(path)).toBe(candidateStrictCrossingsForEdge(0, path, blockers));
     expect(metrics.candidateVisitCount).toBe(1);
   });
+
+  it.each(['internal', 'wall', 'terminal', 'ring', 'dual'] as const)(
+    'reuses one exact blocker index for the entire %s candidate family', family => {
+      const path = [
+        { x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 400 },
+        { x: 500, y: 400 }, { x: 500, y: 500 }, { x: 600, y: 500 },
+      ];
+      const edge: Edge = { id: 'route', source: 'a', target: 'b', sourceHandle: 'right',
+        targetHandle: 'left', data: { computedPath: path } };
+      const nodes: Node[] = [
+        { id: 'a', position: { x: -100, y: -50 }, width: 100, height: 100, data: {} },
+        { id: 'b', position: { x: 600, y: 450 }, width: 100, height: 100, data: {} },
+        { id: 'obstacle', position: { x: 250, y: 100 }, width: 100, height: 100, data: {} },
+      ];
+      const blockers = [100, 200].flatMap((y, index) => displaySegmentsForPath([
+        { x: 50, y }, { x: 200, y },
+      ], index + 1));
+      const spine = displaySegmentsForPath(path, 0)[1];
+      const before = structuredClone({ edge, nodes, blockers });
+      const originalFactory = crossingIndex.createDisplayStrictCrossingCounter;
+      let evaluations = 0;
+      const factory = vi.spyOn(crossingIndex, 'createDisplayStrictCrossingCounter')
+        .mockImplementation((segments, metrics) => {
+          const count = originalFactory(segments, metrics);
+          return candidate => {
+            evaluations += 1;
+            const result = count(candidate);
+            expect(result).toBe(candidateStrictCrossingsForEdge(0, [...candidate], [...segments]));
+            return result;
+          };
+        });
+      try {
+        const build = () => family === 'internal' ? buildCrossedSpineInternalLaneCandidates(edge, 0, spine, nodes, blockers)
+          : family === 'wall' ? buildCrossedSpineLocalWallCandidates(edge, 0, spine, nodes, blockers)
+          : family === 'terminal' ? buildChangedTerminalCandidates(edge, 0, spine, nodes, blockers, 'target')
+          : family === 'ring' ? buildSingleTerminalOuterRingCandidates(edge, 0, nodes, blockers, 'target')
+          : buildDualTerminalOuterLaneCandidates(edge, 0, spine, nodes, blockers);
+        const candidates = build();
+        expect(candidates.length).toBeGreaterThan(1);
+        for (const candidate of candidates) {
+          expect(candidate.strictCrossings).toBe(candidateStrictCrossingsForEdge(
+            candidate.edgeIndex, getDisplayComputedPath(candidate.edge), blockers,
+          ));
+        }
+        expect({ edge, nodes, blockers }).toEqual(before);
+        expect(factory).toHaveBeenCalledTimes(1);
+        expect(evaluations).toBeGreaterThanOrEqual(candidates.length);
+        factory.mockImplementation(segments => candidate => (
+          candidateStrictCrossingsForEdge(0, [...candidate], [...segments])
+        ));
+        expect(build()).toEqual(candidates);
+      } finally {
+        factory.mockRestore();
+      }
+    },
+  );
 });
