@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
 import {
   createSmokeRouteCatalog,
   isManagementTemplatesReady,
@@ -167,6 +168,63 @@ describe('smoke route modules', () => {
     expect(session.networkIssues).toEqual([]);
   });
 
+  it('timestamps readiness in the same browser evaluation, before unrelated long tasks', async () => {
+    let browserTime = 875;
+    let evaluations = 0;
+    const session = {
+      logs: [], networkIssues: [], pendingLogEnrichments: [],
+      evaluate: async (expression) => {
+        evaluations += 1;
+        const result = runInNewContext(expression, {
+          readinessProbe: () => ({ ready: true }),
+          performance: { now: () => browserTime },
+        });
+        // A render task can occupy the main thread before the next CDP call.
+        browserTime += 9_000;
+        return result;
+      },
+    };
+    const state = await waitForRouteReadiness(session, {
+      name: 'progressive-route', expression: 'readinessProbe()', timeoutMs: 20_000,
+    });
+    expect(state).toEqual({ ready: true, readyAt: 875 });
+    expect(evaluations).toBe(1);
+  });
+
+  it.each([undefined, null, '0', -1, NaN, Infinity, 'secret-test-marker'])(
+    'rejects invalid readiness timestamps without exposing their value: %s', async (timestamp) => {
+      const session = {
+        evaluate: async (expression) => runInNewContext(expression, {
+          readinessProbe: () => ({ ready: true }),
+          performance: { now: () => timestamp },
+        }),
+      };
+      await expect(waitForRouteReadiness(session, {
+        name: 'invalid-clock', expression: 'readinessProbe()', timeoutMs: 1_000,
+      })).rejects.toThrow(/^Invalid route readiness timestamp$/);
+    },
+  );
+
+  it('does not mark empty or loading probes ready and timestamps only the successful probe', async () => {
+    let currentTime = 0;
+    let clockReads = 0;
+    const states = [null, undefined, { ready: false }, { ready: true, readyAt: -1 }];
+    const session = {
+      evaluate: async (expression) => runInNewContext(expression, {
+        readinessProbe: () => states.shift(),
+        performance: { now: () => { clockReads += 1; return 0; } },
+      }),
+    };
+    expect(await waitForRouteReadiness(session, {
+      name: 'loading-route', expression: 'readinessProbe()', timeoutMs: 2_000,
+    }, {
+      now: () => currentTime,
+      wait: async (durationMs) => { currentTime += durationMs; },
+    })).toEqual({ ready: true, readyAt: 0 });
+    expect(currentTime).toBe(1_500);
+    expect(clockReads).toBe(1);
+  });
+
   it('keeps polling within the route deadline after a Runtime.evaluate timeout', async () => {
     let currentTime = 0;
     const expressions = [];
@@ -179,8 +237,10 @@ describe('smoke route modules', () => {
         if (expressions.length === 1) {
           throw new Error('CDP command timed out: Runtime.evaluate');
         }
-        if (expression === 'performance.now()') return 875;
-        return { ready: true, href: 'http://example.test/ready' };
+        return runInNewContext(expression, {
+          readinessProbe: () => ({ ready: true, href: 'http://example.test/ready' }),
+          performance: { now: () => 875 },
+        });
       },
     };
 
@@ -198,11 +258,8 @@ describe('smoke route modules', () => {
       href: 'http://example.test/ready',
       readyAt: 875,
     });
-    expect(expressions).toEqual([
-      'readinessProbe()',
-      'readinessProbe()',
-      'performance.now()',
-    ]);
+    expect(expressions).toHaveLength(2);
+    expect(expressions[0]).toBe(expressions[1]);
   });
 
   it('does not swallow unrelated CDP or evaluation errors', async () => {
@@ -230,7 +287,7 @@ describe('smoke route modules', () => {
       networkIssues: [],
       pendingLogEnrichments: [],
       evaluate: async (expression) => {
-        if (expression === 'readinessProbe()') {
+        if (expression.includes('readinessProbe()')) {
           readinessAttempts += 1;
           throw new Error('CDP command timed out: Runtime.evaluate');
         }

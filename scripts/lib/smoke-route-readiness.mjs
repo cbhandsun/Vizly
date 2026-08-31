@@ -58,12 +58,20 @@ export const waitForRouteReadiness = async (
   let state;
   let evaluateTimeoutCount = 0;
   let lastEvaluateTimeout = null;
+  // Catalog expressions are trusted, synchronous probes. Capture their timestamp
+  // in the same browser task so later rendering cannot inflate readiness time.
+  const timedExpression = `(() => {
+    const state = (${route.expression});
+    return state?.ready ? { ...state, readyAt: performance.now() } : state;
+  })()`;
 
   while (now() < deadline) {
     try {
-      state = await session.evaluate(route.expression);
+      state = await session.evaluate(timedExpression);
       if (state?.ready) {
-        state.readyAt = await session.evaluate('performance.now()');
+        if (!Number.isFinite(state.readyAt) || state.readyAt < 0) {
+          throw new Error('Invalid route readiness timestamp');
+        }
         return state;
       }
       if (state?.errorBoundary) break;
