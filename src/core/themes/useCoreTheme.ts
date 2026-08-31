@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getThemeManager } from './index';
+import { getThemeManager } from './EnhancedThemeManagerRefactored';
 import { logUseCoreThemeSetFailure } from './themeLogging';
 import type { Theme } from './types/ThemeTypes';
 

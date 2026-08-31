@@ -35,6 +35,18 @@ const classifyGraph = (
 });
 
 describe('display routing chunk classifier', () => {
+  it('keeps theme singleton consumers off the broad theme barrel on diagram startup', () => {
+    for (const modulePath of [
+      'src/core/themes/useCoreTheme.ts',
+      'src/core/components/diagrams/designerUtils.ts',
+      'src/core/components/diagrams/EdgeUpdateContext.tsx',
+    ]) {
+      const source = readFileSync(resolve(process.cwd(), modulePath), 'utf8');
+      expect(source).toMatch(/import \{ getThemeManager \} from '[^']*\/EnhancedThemeManagerRefactored';/);
+      expect(source).not.toMatch(/from '(?:\.\/index|\.\.\/\.\.\/themes)';/);
+    }
+  });
+
   it('keeps display quality helpers independent of the full layout pipeline barrel', () => {
     for (const name of [
       'baseReactFlowDisplayFullRouteQualityPhase',

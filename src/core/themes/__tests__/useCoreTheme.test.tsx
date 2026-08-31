@@ -9,7 +9,7 @@ const themeManagerMock = vi.hoisted(() => ({
     setTheme: vi.fn(),
 }));
 
-vi.mock('../index', () => ({
+vi.mock('../EnhancedThemeManagerRefactored', () => ({
     getThemeManager: () => themeManagerMock,
 }));
 

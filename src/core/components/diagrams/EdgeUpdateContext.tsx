@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import type { Theme } from '../../themes/types/ThemeTypes';
-import { getThemeManager } from '../../themes';
+import { getThemeManager } from '../../themes/EnhancedThemeManagerRefactored';
 import { EdgeThemeContext, EdgeUpdateContext } from './edgeUpdateContextState';
 import { logEdgeUpdateContextFailure } from './edgeUpdateLogging';
 

@@ -3,7 +3,7 @@ import { Node, Edge, MarkerType, Position } from '@xyflow/react';
 import type { CSSProperties } from 'react';
 import { StandardDiagramData, StandardNodeData, StandardEdgeData, GroupNodeData } from '../../models/DiagramModels';
 import { LayoutType, type LayoutOptions } from '../../types/layout';
-import { getThemeManager } from '../../themes';
+import { getThemeManager } from '../../themes/EnhancedThemeManagerRefactored';
 import { isSafeCssColor } from '../../themes/themeImportSecurity';
 import { appendBaseReactFlowEdgeSemanticClassName } from '../shared/baseReactFlowEdgePresentation';
 import { downloadFile } from '../../utils/downloadUtils';
