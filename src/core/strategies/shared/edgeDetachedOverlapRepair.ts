@@ -11,6 +11,12 @@ import {
   type QualityEvaluationBudget,
 } from './edgeDetachedOverlapEvaluationCache';
 import { createDetachedOverlapCandidateDedup } from './edgeDetachedOverlapCandidateDedup';
+import { coerceDetachedRepairBudget } from './edgeDetachedOverlapRepairBoundary';
+import {
+  edgesWithPaths,
+  groupDetachedSegmentsByEdgeIndex,
+  replaceDetachedPathAtIndex,
+} from './edgeDetachedOverlapPathCollections';
 
 import { buildDetachedOuterBypassCandidates } from './edgeDetachedOuterBypass';
 import { createRoutingObstacleGate } from './edgeDetachedObstacleGate';
@@ -59,6 +65,7 @@ import {
 } from './edgeDetachedOverlapCandidates';
 
 export * from './edgeDetachedOverlapCandidates';
+export { edgesWithPaths } from './edgeDetachedOverlapPathCollections';
 export {
   createDetachedOverlapStateEvaluationContext,
   scoreDetachedOverlapState,
@@ -108,35 +115,6 @@ function shiftEndpointSegment(
 
   const compacted = compactPath(shifted);
   return allSegmentsOrthogonal(compacted) ? compacted : null;
-}
-
-export function edgesWithPaths(
-  edges: Edge[],
-  paths: Point[][],
-  changedIndexes?: readonly number[],
-): Edge[] {
-  if (!changedIndexes) {
-    return edges.map((edge, index) => ({
-      ...edge,
-      data: {
-        ...(edge.data || {}),
-        computedPath: paths[index],
-      },
-    }));
-  }
-  const result = edges.slice();
-  for (const index of new Set(changedIndexes)) {
-    const edge = edges[index];
-    if (!edge || !paths[index]) continue;
-    result[index] = {
-      ...edge,
-      data: {
-        ...(edge.data || {}),
-        computedPath: paths[index],
-      },
-    };
-  }
-  return result;
 }
 
 export function compareQualityScores(first: EdgePathQualityScore, second: EdgePathQualityScore): number {
@@ -216,44 +194,22 @@ export function hasShortHairpin(path: Point[]): boolean {
 
 export { createRoutingObstacleGate } from './edgeDetachedObstacleGate';
 
-const toBoundedPositiveInteger = (value: unknown, fallback: number): number => {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.max(0, Math.floor(parsed));
-};
-
-const groupSegmentsByEdgeIndex = (
-  segments: readonly PathSegmentRef[],
-): ReadonlyMap<number, PathSegmentRef[]> => {
-  const grouped = new Map<number, PathSegmentRef[]>();
-  for (const segment of segments) {
-    const edgeSegments = grouped.get(segment.edgeIndex);
-    if (edgeSegments) edgeSegments.push(segment);
-    else grouped.set(segment.edgeIndex, [segment]);
-  }
-  return grouped;
-};
-
-const replacePathAtIndex = (
-  paths: Point[][],
-  edgeIndex: number,
-  candidatePath: Point[],
-): Point[][] => {
-  const candidatePaths = paths.slice();
-  candidatePaths[edgeIndex] = candidatePath;
-  return candidatePaths;
-};
-
 export function separateDetachedParallelOverlaps(
   edges: Edge[],
   nodes: ReactFlowNode[],
   minOverlap = 96,
   options: DetachedParallelOverlapRepairOptions = {},
 ): Edge[] {
-  const maxIterations = toBoundedPositiveInteger(options.maxIterations, 4);
-  const maxHitBudget = toBoundedPositiveInteger(options.maxHitBudget, minOverlap <= 24 ? 4 : 16);
-  const maxQualityEvaluations = toBoundedPositiveInteger(options.maxQualityEvaluations, Number.POSITIVE_INFINITY);
-  const maxResidualPasses = toBoundedPositiveInteger(options.maxResidualPasses, 4);
+  const maxIterations = coerceDetachedRepairBudget(options.maxIterations, 4);
+  const maxHitBudget = coerceDetachedRepairBudget(
+    options.maxHitBudget,
+    minOverlap <= 24 ? 4 : 16,
+  );
+  const maxQualityEvaluations = coerceDetachedRepairBudget(
+    options.maxQualityEvaluations,
+    Number.POSITIVE_INFINITY,
+  );
+  const maxResidualPasses = coerceDetachedRepairBudget(options.maxResidualPasses, 4);
   const qualityOnly = options.qualityOnly === true;
   const enableActionableSubthresholdRepair = minOverlap <= 24 && edges.length <= 8;
   const qualityBudget = createQualityEvaluationBudget(
@@ -319,7 +275,7 @@ export function separateDetachedParallelOverlaps(
       ? scoreActionableDetachedOverlaps(paths, edges, minOverlap)
       : 0;
     const currentSegments = extractPathSegmentRefs(paths, edges);
-    const currentSegmentsByEdgeIndex = groupSegmentsByEdgeIndex(currentSegments);
+    const currentSegmentsByEdgeIndex = groupDetachedSegmentsByEdgeIndex(currentSegments);
     const strictCrossingSegmentIndex = createStrictCrossingSegmentIndex(currentSegments);
     let bestScore: number | null = null;
     const getBestScore = () => {
@@ -547,7 +503,11 @@ export function separateDetachedParallelOverlaps(
               strictCrossingSegmentIndex,
             );
             if (candidateEdgeCrossings > currentEdgeCrossings) continue;
-            const candidatePaths = replacePathAtIndex(paths, segment.edgeIndex, candidatePath);
+            const candidatePaths = replaceDetachedPathAtIndex(
+              paths,
+              segment.edgeIndex,
+              candidatePath,
+            );
             const candidateEvaluation = candidateDedup.evaluate(
               candidatePaths,
               [segment.edgeIndex],
@@ -679,7 +639,7 @@ function repairResidualReverseOrUnrelatedOverlap(
   if (hits.length === 0) return null;
 
   const currentSegments = extractPathSegmentRefs(paths, edges);
-  const currentSegmentsByEdgeIndex = groupSegmentsByEdgeIndex(currentSegments);
+  const currentSegmentsByEdgeIndex = groupDetachedSegmentsByEdgeIndex(currentSegments);
   const strictCrossingSegmentIndex = createStrictCrossingSegmentIndex(currentSegments);
   let bestQuality = currentQuality;
   let bestActionableOverlapScore = useActionableOverlapScore
@@ -758,7 +718,11 @@ function repairResidualReverseOrUnrelatedOverlap(
             strictCrossingSegmentIndex,
           ) > currentEdgeCrossings) continue;
 
-          const candidatePaths = replacePathAtIndex(paths, segment.edgeIndex, candidatePath);
+          const candidatePaths = replaceDetachedPathAtIndex(
+            paths,
+            segment.edgeIndex,
+            candidatePath,
+          );
           const candidateEvaluation = candidateDedup.evaluate(
             candidatePaths,
             [segment.edgeIndex],
