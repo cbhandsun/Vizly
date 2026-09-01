@@ -130,6 +130,7 @@ export const readRenderedDisplayEdgeHardGeometryAudit = (rawEdges, rawNodes) => 
   const shortEndpointStubEdgeIds = [];
   const tinyInteriorDoglegEdgeIds = [];
   const excessiveBendEdgeIds = [];
+  const excessiveBendFindings = [];
   const hairpinEdgeIds = [];
   const audited = [];
   for (const [edgeIndex, edge] of edges.entries()) {
@@ -174,7 +175,14 @@ export const readRenderedDisplayEdgeHardGeometryAudit = (rawEdges, rawNodes) => 
     if (
       points.length - 2 > MAX_BEND_COUNT
       && edge?.data?.sharedTrunkSynthesized !== true
-    ) recordFinding(excessiveBendEdgeIds, edgeId);
+    ) {
+      recordFinding(excessiveBendEdgeIds, edgeId);
+      recordFinding(excessiveBendFindings, {
+        edgeId,
+        bendCount: points.length - 2,
+        points: points.slice(0, 16),
+      });
+    }
     const orthogonalSegments = segments.filter(segment => segment.axis).map(segment => ({
       ...segment,
       direction: direction(segment.a, segment.b, segment.axis),
@@ -378,6 +386,7 @@ export const readRenderedDisplayEdgeHardGeometryAudit = (rawEdges, rawNodes) => 
     shortEndpointStubEdgeIds,
     tinyInteriorDoglegEdgeIds,
     excessiveBendEdgeIds,
+    excessiveBendFindings,
     hairpinEdgeIds,
     strictCrossings,
     illegalOverlaps,

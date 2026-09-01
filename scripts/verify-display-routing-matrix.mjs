@@ -255,6 +255,12 @@ const auditFinalSvg = async (session, route, label) => {
       shortEndpointStubPathCount: hardAudit?.shortEndpointStubEdgeIds?.length,
       tinyInteriorDoglegPathCount: hardAudit?.tinyInteriorDoglegEdgeIds?.length,
       excessiveBendPathCount: hardAudit?.excessiveBendEdgeIds?.length,
+      excessiveBendEdgeIds: hardAudit?.excessiveBendEdgeIds,
+      excessiveBendFindings: hardAudit?.excessiveBendFindings,
+      routeResolution: route.response.routeResolution ?? route.response.resolution,
+      commercialPhaseTrace: route.response.phaseTrace?.filter(trace => (
+        typeof trace?.phase === 'string' && trace.phase.startsWith('final-commercial')
+      )),
       hairpinPathCount: hardAudit?.hairpinEdgeIds?.length,
       strictCrossingCount: hardAudit?.strictCrossings?.length,
       illegalOverlapCount: hardAudit?.illegalOverlaps?.length,

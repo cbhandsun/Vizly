@@ -6,7 +6,11 @@ import { changedEdgesObstacleHitsDoNotRegress, visualPolishHardQualityDoesNotReg
 import type { BaseReactFlowFinalEndpointEvaluation } from './baseReactFlowDisplayFinalEndpointEvaluation';
 import { passesBaseReactFlowCommercialFinalDisplayGate, type BaseReactFlowFinalEndpointOrderOptions } from './baseReactFlowDisplayFinalEndpointGate';
 import { buildCommercialParallelTerminalCorridorShortcutPaths, buildCommercialSameSideRectangularShortcutPaths } from './baseReactFlowDisplayCommercialTerminalShortcut';
-import { buildTerminalPreservingDirectShortcutCandidates } from './baseReactFlowDisplayLoopShortcutRepair';
+import { MAX_COMMERCIAL_BEND_COUNT } from './baseReactFlowDisplayCommercialQuality';
+import {
+  buildTerminalPreservingDirectShortcutCandidates,
+} from './baseReactFlowDisplayLoopShortcutRepair';
+import { buildTerminalPreservingInteriorShortcutCandidates } from './baseReactFlowDisplayInteriorShortcutCandidates';
 import { displayPathLength, getDisplayComputedPath, withDisplayComputedPath } from './baseReactFlowDisplayGeometry';
 
 const FINAL_COMMERCIAL_OUTER_STAIR_EVALUATIONS = 16;
@@ -21,6 +25,35 @@ const withTerminalPreservingOuterStairPath = (
   delete data.displayNodeClearanceRepaired;
   return { ...changed, data };
 };
+
+export const rankCommercialInteriorShortcutCandidates = (
+  edge: Edge,
+  path: ReturnType<typeof getDisplayComputedPath>,
+  nodes: Node[],
+): ReturnType<typeof getDisplayComputedPath>[] => (
+  buildTerminalPreservingInteriorShortcutCandidates(path)
+    .map((candidatePath, originalIndex) => {
+      const candidateEdge = withTerminalPreservingOuterStairPath(edge, candidatePath);
+      return {
+        candidatePath,
+        clearanceRisk: scoreNodeClearanceRisk(
+          candidatePath,
+          nodes,
+          candidateEdge,
+          COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+        ),
+        length: displayPathLength(candidatePath),
+        originalIndex,
+      };
+    })
+    .sort((first, second) => (
+      first.clearanceRisk - second.clearanceRisk
+      || first.candidatePath.length - second.candidatePath.length
+      || first.length - second.length
+      || first.originalIndex - second.originalIndex
+    ))
+    .map(candidate => candidate.candidatePath)
+);
 
 export const repairTerminalPreservingOuterStairs = <T extends Edge[]>(
   edges: T,
@@ -38,10 +71,27 @@ export const repairTerminalPreservingOuterStairs = <T extends Edge[]>(
     const last = path.at(-1);
     if (!first || !last || path.length < 4) return null;
     const direct = Math.abs(last.x - first.x) + Math.abs(last.y - first.y);
-    return { edgeIndex, excessLength: displayPathLength(path) - direct };
-  }).filter((entry): entry is { edgeIndex: number; excessLength: number } => Boolean(entry))
+    const bends = Math.max(0, path.length - 2);
+    return {
+      bends,
+      edgeIndex,
+      // Candidate promotion cannot rely on transient shared-trunk intent, so
+      // an objectively excessive chain must receive the bounded shortcut
+      // budget before merely long but structurally acceptable routes.
+      excessiveBends: Math.max(0, bends - MAX_COMMERCIAL_BEND_COUNT),
+      excessLength: displayPathLength(path) - direct,
+    };
+  }).filter((entry): entry is {
+    bends: number;
+    edgeIndex: number;
+    excessiveBends: number;
+    excessLength: number;
+  } => Boolean(entry))
     .sort((first, second) => (
-      second.excessLength - first.excessLength || first.edgeIndex - second.edgeIndex
+      second.excessiveBends - first.excessiveBends
+      || second.bends - first.bends
+      || second.excessLength - first.excessLength
+      || first.edgeIndex - second.edgeIndex
     ));
 
   const pending = rankedEdgeIndexes.filter(({ edgeIndex }) => (
@@ -50,6 +100,9 @@ export const repairTerminalPreservingOuterStairs = <T extends Edge[]>(
     edgeIndex,
     candidates: (function* () {
       const path = getDisplayComputedPath(best[edgeIndex]);
+      yield* rankCommercialInteriorShortcutCandidates(
+        best[edgeIndex], path, nodes,
+      );
       yield* buildTerminalPreservingDirectShortcutCandidates(path);
       yield* buildCommercialParallelTerminalCorridorShortcutPaths(path, nodes, best[edgeIndex]);
       yield* buildCommercialSameSideRectangularShortcutPaths(best[edgeIndex], nodes, best);

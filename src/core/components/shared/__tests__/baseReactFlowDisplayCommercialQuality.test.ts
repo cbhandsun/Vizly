@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   auditBaseReactFlowDisplayCommercialQuality,
+  baseReactFlowDisplayCandidateCommercialQualityIsClean,
   baseReactFlowDisplayCommercialQualityIsClean,
   commercialBendSimplificationLengthBudget,
 } from '../baseReactFlowDisplayCommercialQuality';
@@ -79,6 +80,18 @@ describe('baseReactFlowDisplayCommercialQuality', () => {
       'excessive-bends',
       'tiny-interior-segment',
     ]));
+  });
+
+  it('does not promote an excessive-bend candidate using transient shared-trunk intent', () => {
+    const candidate = edgeWithPath('candidate-shared-intent', [
+      { x: 0, y: 0 }, { x: 0, y: 40 }, { x: 40, y: 40 }, { x: 40, y: 80 },
+      { x: 80, y: 80 }, { x: 80, y: 120 }, { x: 120, y: 120 }, { x: 120, y: 160 },
+      { x: 160, y: 160 }, { x: 160, y: 200 },
+    ]);
+    candidate.data = { ...candidate.data, sharedTrunkSynthesized: true };
+
+    expect(baseReactFlowDisplayCommercialQualityIsClean([candidate])).toBe(true);
+    expect(baseReactFlowDisplayCandidateCommercialQualityIsClean([candidate])).toBe(false);
   });
 
   it('budgets a clean structural reroute by the bends it actually removes', () => {

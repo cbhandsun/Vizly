@@ -55,6 +55,7 @@ import {
 } from './baseReactFlowDisplayLoopShortcutQuality';
 
 export { buildStrictBlockingTerminalLaneShiftVariants } from './baseReactFlowDisplayLoopShortcutCandidates';
+export { buildTerminalPreservingInteriorShortcutCandidates } from './baseReactFlowDisplayInteriorShortcutCandidates';
 export {
   createDisplayLoopShortcutRepairDiagnostics,
 } from './baseReactFlowDisplayLoopShortcutQuality';

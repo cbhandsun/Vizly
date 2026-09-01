@@ -143,7 +143,7 @@ describe('display Worker candidate commercial closure', () => {
     expect(fullRouteSpy).not.toHaveBeenCalled();
   });
 
-  it('retains the full-route fallback when bounded commercial closure stays dirty', () => {
+  it('closes a remaining commercial defect after final path locking', () => {
     vi.spyOn(
       finalEndpointOrder,
       'repairBaseReactFlowFinalCommercialDetours',
@@ -158,11 +158,12 @@ describe('display Worker candidate commercial closure', () => {
       requestId: 'validate-commercial-fallback',
     });
 
-    expect(fullRouteSpy).toHaveBeenCalledOnce();
+    expect(fullRouteSpy).not.toHaveBeenCalled();
     expect(response).toMatchObject({
       requestId: 'validate-commercial-fallback',
       hardClean: true,
-      routeResolution: 'full-route',
+      routeResolution: 'repaired-candidate',
     });
+    expect(baseReactFlowDisplayCommercialQualityIsClean(response.edges ?? [])).toBe(true);
   });
 });

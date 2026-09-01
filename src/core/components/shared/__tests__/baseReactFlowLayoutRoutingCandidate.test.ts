@@ -425,7 +425,6 @@ describe('baseReactFlow layout routing candidate sequence', () => {
       sourceEdges: edges,
       sourceNodes: nodes,
       isLargeGraph: false,
-      forceFreshFullRoute: true,
       fullRouteTimeoutMs: 120_000,
       precompiledLayoutRegeneration: {
         presetId: 'wms-process-flow-v1',
@@ -434,6 +433,7 @@ describe('baseReactFlow layout routing candidate sequence', () => {
       loadPrecompiledCandidate,
     });
 
+    expect(loadPrecompiledCandidate).not.toHaveBeenCalled();
     expect(workerMocks.repair).toHaveBeenCalledOnce();
     expect(workerMocks.compute).toHaveBeenCalledOnce();
     expect(workerMocks.compute.mock.calls[0][0]).toMatchObject({

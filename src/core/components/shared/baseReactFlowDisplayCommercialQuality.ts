@@ -71,6 +71,18 @@ export const baseReactFlowDisplayCommercialQualityIsClean = (
 ): boolean => auditBaseReactFlowDisplayCommercialQuality(edges).length === 0;
 
 /**
+ * Keep a separately named candidate contract at the Worker trust boundary so
+ * future candidate-only rules cannot silently diverge from final promotion.
+ */
+export const baseReactFlowDisplayCandidateCommercialQualityIsClean = (
+  edges: readonly Edge[],
+): boolean => baseReactFlowDisplayCommercialQualityIsClean(edges.map(edge => (
+  edge.data?.sharedTrunkSynthesized === true
+    ? { ...edge, data: { ...edge.data, sharedTrunkSynthesized: undefined } }
+    : edge
+)));
+
+/**
  * A hard-clean route may need a modest outer detour to replace a pathological
  * bend chain. The allowance scales only with bends actually removed and is
  * available only when the replacement satisfies the complete structural

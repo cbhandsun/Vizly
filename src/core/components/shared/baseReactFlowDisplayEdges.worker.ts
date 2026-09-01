@@ -10,7 +10,10 @@ import {
   baseReactFlowDisplayHardQualityIsClean,
   getDisplayHardQualityGateReport,
 } from './baseReactFlowDisplayQualityGates';
-import { baseReactFlowDisplayCommercialQualityIsClean } from './baseReactFlowDisplayCommercialQuality';
+import {
+  baseReactFlowDisplayCandidateCommercialQualityIsClean,
+  baseReactFlowDisplayCommercialQualityIsClean,
+} from './baseReactFlowDisplayCommercialQuality';
 import { createBaseReactFlowInteractiveDisplayEdges } from './baseReactFlowDisplayQualitySeedPipeline';
 import { resolveDisplayWorkerCandidate } from './baseReactFlowDisplayWorkerCandidate';
 import { doBaseReactFlowDisplayRoutesMatchExactly } from './baseReactFlowDisplayRoutingTransaction';
@@ -502,7 +505,10 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
       routeResolution: 'validated-candidate',
       phaseTrace,
     };
-    if (!baseReactFlowDisplayCommercialQualityIsClean(candidateEdges)) {
+    const candidateCommercialQualityIsClean = candidateSource === 'precompiled'
+      ? baseReactFlowDisplayCommercialQualityIsClean(candidateEdges)
+      : baseReactFlowDisplayCandidateCommercialQualityIsClean(candidateEdges);
+    if (!candidateCommercialQualityIsClean) {
       const exactValidatedCandidateResponse = withExactDisplayHardReport(
         validatedCandidateResponse,
         candidateRepairNodes,

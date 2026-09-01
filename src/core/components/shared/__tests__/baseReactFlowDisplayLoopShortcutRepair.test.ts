@@ -18,15 +18,24 @@ import {
   countRenderUnsafeEndpointStubs,
   repairRenderSafeEndpointStubs,
 } from '../baseReactFlowDisplayEndpointStubRepair';
-import { withDisplayComputedPath } from '../baseReactFlowDisplayGeometry';
+import {
+  getDisplayComputedPath,
+  withDisplayComputedPath,
+} from '../baseReactFlowDisplayGeometry';
 import {
   buildStrictBlockingTerminalLaneShiftVariants,
+  buildTerminalPreservingInteriorShortcutCandidates,
   createDisplayLoopShortcutRepairDiagnostics,
   repairDisplayLoopShortcuts,
 } from '../baseReactFlowDisplayLoopShortcutRepair';
 import { withDisplayPortBridge } from '../baseReactFlowDisplayTerminalPortCandidates';
 import { getDisplayHardQualityGateReport } from '../baseReactFlowDisplayQualityGates';
 import { repairFinalResidualStrictCrossings } from '../baseReactFlowDisplayStrictResidualRepair';
+import {
+  rankCommercialInteriorShortcutCandidates,
+  repairTerminalPreservingOuterStairs,
+} from '../baseReactFlowDisplayCommercialOuterStairRepair';
+import { createBaseReactFlowFinalEndpointEvaluation } from '../baseReactFlowDisplayFinalEndpointEvaluation';
 import { repairAxisMismatchedTerminalsWithBoundedPortRoles } from '../baseReactFlowDisplayTerminalPortRepair';
 import {
   getDisplayTerminalValidationReport,
@@ -34,6 +43,8 @@ import {
 } from '../baseReactFlowTerminalAxisRepair';
 import { withAbsoluteNodePositions } from './baseReactFlowDisplayEdges.testUtils';
 import { auditFinalSameSideEndpointOrder } from '../../../strategies/shared/edgeFinalSameSideEndpointOrderRepair';
+import { COMMERCIAL_BUSINESS_NODE_CLEARANCE } from '../../../strategies/shared/edgeBusinessNodeClearanceRepair';
+import { scoreNodeClearanceRisk } from '../../../strategies/shared/edgeWaypointCandidateRepair';
 
 const residualPaths: Record<string, Array<{ x: number; y: number }>> = {
   e_shipping_bi: [
@@ -48,6 +59,128 @@ const residualPaths: Record<string, Array<{ x: number; y: number }>> = {
 };
 
 describe('display loop shortcut repair', () => {
+  it('builds a bounded terminal-preserving shortcut for an interior rectangular stair', () => {
+    const path = [
+      { x: 1617, y: 1531 }, { x: 1561, y: 1531 },
+      { x: 1561, y: 1611 }, { x: 1413, y: 1611 },
+      { x: 1413, y: 1635 }, { x: 1129, y: 1635 },
+      { x: 1129, y: 1611 }, { x: 829, y: 1611 },
+      { x: 829, y: 2227 },
+    ];
+
+    expect(buildTerminalPreservingInteriorShortcutCandidates(path)).toContainEqual([
+      { x: 1617, y: 1531 }, { x: 1561, y: 1531 },
+      { x: 1561, y: 1611 }, { x: 829, y: 1611 },
+      { x: 829, y: 2227 },
+    ]);
+    expect(buildTerminalPreservingInteriorShortcutCandidates(path)).toContainEqual([
+      { x: 1617, y: 1531 }, { x: 1561, y: 1531 },
+      { x: 1561, y: 1635 }, { x: 829, y: 1635 },
+      { x: 829, y: 2227 },
+    ]);
+    expect(buildTerminalPreservingInteriorShortcutCandidates(path, 0)).toEqual([]);
+    expect(buildTerminalPreservingInteriorShortcutCandidates(path.slice(0, 5))).toEqual([]);
+
+    const targetStair = [
+      { x: 4245.5, y: 5615.5 }, { x: 4245.5, y: 5559.5 },
+      { x: 4381, y: 5559.5 }, { x: 4381, y: 4995 },
+      { x: 5109, y: 4995 }, { x: 5109, y: 5582 },
+      { x: 5133, y: 5582 }, { x: 5133, y: 5722 },
+      { x: 5109, y: 5722 }, { x: 5109, y: 5802 },
+    ];
+    expect(buildTerminalPreservingInteriorShortcutCandidates(targetStair)).toContainEqual([
+      { x: 4245.5, y: 5615.5 }, { x: 4245.5, y: 5559.5 },
+      { x: 4381, y: 5559.5 }, { x: 4381, y: 4995 },
+      { x: 5133, y: 4995 }, { x: 5133, y: 5722 },
+      { x: 5109, y: 5722 }, { x: 5109, y: 5802 },
+    ]);
+    const targetEdge: Edge = {
+      id: 'target-stair',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'top',
+      targetHandle: 'top',
+      data: { computedPath: targetStair },
+    };
+    const targetNodes: Node[] = [
+      { id: 'source', position: { x: 4086, y: 5615.5 }, width: 319, height: 73, data: {} },
+      { id: 'target', position: { x: 5040, y: 5802 }, width: 138, height: 60, data: {} },
+      { id: 'packing', position: { x: 4900, y: 5622 }, width: 178, height: 60, data: {} },
+    ];
+    expect(rankCommercialInteriorShortcutCandidates(
+      targetEdge, targetStair, targetNodes,
+    )[0]).toEqual([
+      { x: 4245.5, y: 5615.5 }, { x: 4245.5, y: 5559.5 },
+      { x: 4381, y: 5559.5 }, { x: 4381, y: 4995 },
+      { x: 5133, y: 4995 }, { x: 5133, y: 5722 },
+      { x: 5109, y: 5722 }, { x: 5109, y: 5802 },
+    ]);
+  });
+
+  it('uses only the clearance-safe portion of an interior lane when its extension is blocked', () => {
+    const node = (id: string, x: number, y: number, width: number, height: number): Node => ({
+      id,
+      position: { x, y },
+      width,
+      height,
+      measured: { width, height },
+      data: {},
+    });
+    const routeNodes = [
+      node('source', 1617, 1494.5, 217, 73),
+      node('target', 743.5, 2227, 172, 96),
+      node('direct-lane-blocker', 1169, 1483, 204, 96),
+    ];
+    const route: Edge[] = [{
+      id: 'stair',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'left',
+      targetHandle: 'top',
+      data: { computedPath: [
+        { x: 1617, y: 1531 }, { x: 1561, y: 1531 },
+        { x: 1561, y: 1611 }, { x: 1413, y: 1611 },
+        { x: 1413, y: 1635 }, { x: 1129, y: 1635 },
+        { x: 1129, y: 1611 }, { x: 829, y: 1611 },
+        { x: 829, y: 2227 },
+      ] },
+    }];
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation(routeNodes);
+    const repaired = repairTerminalPreservingOuterStairs(
+      route, routeNodes, {}, evaluation,
+    );
+
+    expect(getDisplayHardQualityGateReport(repaired, routeNodes, 'polished').hardClean).toBe(true);
+    expect(getDisplayComputedPath(repaired[0])).toEqual([
+      { x: 1617, y: 1531 }, { x: 1561, y: 1531 },
+      { x: 1561, y: 1635 }, { x: 829, y: 1635 },
+      { x: 829, y: 2227 },
+    ]);
+
+    const fullyBlockedNodes = [
+      ...routeNodes,
+      node('outer-lane-blocker', 900, 1660, 80, 20),
+    ];
+    const blockedEvaluation = createBaseReactFlowFinalEndpointEvaluation(fullyBlockedNodes);
+    const blocked = repairTerminalPreservingOuterStairs(
+      route, fullyBlockedNodes, {}, blockedEvaluation,
+    );
+    expect(getDisplayComputedPath(blocked[0])).toEqual([
+      { x: 1617, y: 1531 }, { x: 1561, y: 1531 },
+      { x: 1561, y: 1635 }, { x: 1129, y: 1635 },
+      { x: 1129, y: 1611 }, { x: 829, y: 1611 },
+      { x: 829, y: 2227 },
+    ]);
+    expect(scoreNodeClearanceRisk(
+      getDisplayComputedPath(blocked[0]),
+      fullyBlockedNodes,
+      blocked[0],
+      COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+    )).toBe(0);
+    expect(getDisplayHardQualityGateReport(blocked, fullyBlockedNodes, 'polished').hardClean)
+      .toBe(true);
+  });
+
   it.each([1, 2, 4, 8])('does not build an unvisited later batch with an evaluation budget of %i', (budget) => {
     const nodes: Node[] = [
       { id: 'a', position: { x: 7072, y: 431 }, data: {}, width: 80, height: 80 },

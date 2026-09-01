@@ -440,7 +440,11 @@ export const stageBaseReactFlowLayoutRouting = async ({
     smartEdgePadding,
     isLargeGraph,
   });
-  const cached = forceFreshFullRoute
+  // Explicit artifact regeneration must measure and capture newly computed
+  // geometry. Revalidating an existing snapshot/precompiled candidate and
+  // labelling it "fresh" makes generation unable to repair stale artifacts.
+  const requiresFreshLayoutRoute = forceFreshFullRoute || Boolean(precompiledLayoutRegeneration);
+  const cached = requiresFreshLayoutRoute
     ? null
     : readBaseReactFlowDisplayCommittedSnapshot({
       inputSignature: projectedIdentity.cacheSignature,
@@ -471,7 +475,7 @@ export const stageBaseReactFlowLayoutRouting = async ({
       }),
     };
   }
-  const precompiledCandidateEdges = forceFreshFullRoute
+  const precompiledCandidateEdges = requiresFreshLayoutRoute
     ? null
     : await loadPrecompiledCandidate({
       inputSignature: projectedIdentity.cacheSignature,

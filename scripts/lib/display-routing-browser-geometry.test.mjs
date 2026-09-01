@@ -68,6 +68,7 @@ describe('display routing browser geometry', () => {
       shortEndpointStubEdgeIds: [],
       tinyInteriorDoglegEdgeIds: [],
       excessiveBendEdgeIds: [],
+      excessiveBendFindings: [],
       hairpinEdgeIds: [],
       strictCrossings: [],
       illegalOverlaps: [],
@@ -124,6 +125,7 @@ describe('display routing browser geometry', () => {
       shortEndpointStubEdgeIds: [],
       tinyInteriorDoglegEdgeIds: [],
       excessiveBendEdgeIds: [],
+      excessiveBendFindings: [],
       hairpinEdgeIds: [],
       strictCrossings: [],
       illegalOverlaps: [],
@@ -143,6 +145,21 @@ describe('display routing browser geometry', () => {
     )];
     expect(readRenderedDisplayEdgeHardGeometryAudit([edge], nodes)).toMatchObject({
       excessiveBendEdgeIds: ['edge'],
+      excessiveBendFindings: [{
+        edgeId: 'edge',
+        bendCount: 7,
+        points: [
+          { x: 40, y: 20 },
+          { x: 80, y: 20 },
+          { x: 80, y: 80 },
+          { x: 120, y: 80 },
+          { x: 120, y: 140 },
+          { x: 160, y: 140 },
+          { x: 160, y: 80 },
+          { x: 200, y: 80 },
+          { x: 200, y: 20 },
+        ],
+      }],
     });
     expect(readRenderedDisplayEdgeHardGeometryAudit(
       [{ ...edge, data: { sharedTrunkSynthesized: true } }],

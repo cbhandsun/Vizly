@@ -288,9 +288,23 @@ const captureTarget = async (session, target, source, routingVersion) => {
   ) throw new Error(`Generated route identity mismatch for ${preset.id}:${variantId}`);
   const commercialIssues = auditPrecompiledDisplayRouteCommercialQuality(patches);
   if (commercialIssues.length > 0) {
+    const issueContexts = commercialIssues.map(issue => ({
+      ...issue,
+      path: patches.find(patch => patch?.id === issue.edgeId)?.data?.computedPath ?? null,
+    }));
     throw new Error(
       `Generated route failed commercial quality for ${preset.id}:${variantId}: `
-      + JSON.stringify(commercialIssues),
+      + JSON.stringify({
+        issues: issueContexts,
+        workerResolution,
+        provenance,
+        commercialPhases: Array.isArray(routing.phaseTrace)
+          ? routing.phaseTrace.filter(trace => (
+            typeof trace?.phase === 'string'
+            && (trace.phase.includes('commercial') || trace.phase === 'candidate-validation')
+          ))
+          : [],
+      }),
     );
   }
   console.log(

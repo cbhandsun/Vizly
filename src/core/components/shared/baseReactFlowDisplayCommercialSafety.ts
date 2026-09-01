@@ -2,6 +2,9 @@ import type { Edge, Node } from '@xyflow/react';
 
 import type { BaseReactFlowFinalEndpointEvaluation } from './baseReactFlowDisplayFinalEndpointEvaluation';
 import { lockFinalDisplayComputedPaths } from './baseReactFlowDisplayEdgeCore';
+import { repairTerminalPreservingOuterStairs } from './baseReactFlowDisplayCommercialOuterStairRepair';
+import { baseReactFlowDisplayCandidateCommercialQualityIsClean } from './baseReactFlowDisplayCommercialQuality';
+import { createBaseReactFlowFinalEndpointEvaluation } from './baseReactFlowDisplayFinalEndpointEvaluation';
 import { closeBaseReactFlowDisplayFinalHardContract } from './baseReactFlowDisplayFinalHardContract';
 import { eligibleCommercialClearanceDoesNotRegress } from './baseReactFlowDisplayBusinessNodeClearance';
 import { finalDisplayRenderContractIsLocked } from './baseReactFlowDisplayCandidateValidation';
@@ -123,7 +126,26 @@ export const commitBaseReactFlowFinalCommercialSafety = ({
     )
     ? outcome.edges
     : response.edges;
-  const edges = lockFinalDisplayComputedPaths(contractEdges, repairNodes);
+  const lockedEdges = lockFinalDisplayComputedPaths(contractEdges, repairNodes);
+  // Port locking may add a narrow bridge after the earlier commercial pass.
+  // Close that structural contract on the exact render geometry without
+  // moving either terminal, then re-lock to retain the render authority.
+  const finalEvaluation = evaluation
+    ?? createBaseReactFlowFinalEndpointEvaluation(repairNodes);
+  const commerciallyClosedEdges = baseReactFlowDisplayCandidateCommercialQualityIsClean(lockedEdges)
+    ? lockedEdges
+    : repairTerminalPreservingOuterStairs(
+      lockedEdges,
+      repairNodes,
+      { eligibleEdgeIds, evaluation: finalEvaluation },
+      finalEvaluation,
+    );
+  const relockedEdges = lockFinalDisplayComputedPaths(commerciallyClosedEdges, repairNodes);
+  const relockedReport = finalEvaluation.hardReport(relockedEdges);
+  const edges = relockedReport.hardClean
+    && baseReactFlowDisplayCandidateCommercialQualityIsClean(relockedEdges)
+    ? relockedEdges
+    : lockedEdges;
   if (
     finalDisplayRenderContractIsLocked(contractEdges, edges)
     && (
@@ -134,8 +156,8 @@ export const commitBaseReactFlowFinalCommercialSafety = ({
   return {
     ...response,
     edges,
-    hardClean: contractEdges === outcome.edges ? outcome.report.hardClean : response.hardClean,
-    hardReport: contractEdges === outcome.edges ? outcome.report : response.hardReport,
+    hardClean: edges === relockedEdges ? relockedReport.hardClean : response.hardClean,
+    hardReport: edges === relockedEdges ? relockedReport : response.hardReport,
     routeResolution: response.routeResolution === 'validated-candidate'
       ? 'repaired-candidate'
       : response.routeResolution,
