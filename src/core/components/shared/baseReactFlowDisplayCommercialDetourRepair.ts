@@ -35,7 +35,6 @@ import {
   displayPathLength,
   getDisplayComputedPath,
 } from './baseReactFlowDisplayGeometry';
-import { getDisplayHardQualityGateReport } from './baseReactFlowDisplayQualityGates';
 import { commercialRepairOutputIsEquivalent } from './baseReactFlowDisplayCommercialRepairContract';
 import { repairFinalResidualStrictCrossings } from './baseReactFlowDisplayStrictResidualRepair';
 import { withDisplayLocalShortcutSoftCrossingBridge } from './baseReactFlowDisplaySoftCrossingBridge';
@@ -328,12 +327,8 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
     nodes,
   ) as T;
   if (reclaimedTargetTrunkCandidate !== baseline) {
-    const baselineReport = getDisplayHardQualityGateReport(baseline, nodes, 'polished');
-    const candidateReport = getDisplayHardQualityGateReport(
-      reclaimedTargetTrunkCandidate,
-      nodes,
-      'polished',
-    );
+    const baselineReport = evaluation.hardReport(baseline);
+    const candidateReport = evaluation.hardReport(reclaimedTargetTrunkCandidate);
     const changedEdgeIndexes = reclaimedTargetTrunkCandidate.flatMap((edge, index) => (
       edge !== baseline[index] ? [index] : []
     ));
