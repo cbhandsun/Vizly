@@ -454,6 +454,7 @@ function scorePathCandidate(
   improvementCutoff?: number,
   acceptedSegmentIndex?: RoutingWaypointSegmentGroupIndex,
   originalSegmentIndex?: RoutingWaypointSegmentGroupIndex,
+  excludedOriginalGroupIndex?: number,
 ): number {
   const segments = toEdgeRoutingSegments(path);
   let scannedNodeCount = 0;
@@ -485,14 +486,20 @@ function scorePathCandidate(
   let crossingsAll = 0;
   let overlap = 0;
   const acceptedQuery = acceptedSegmentIndex?.queryPotentialGroupIndexes(segments);
-  const originalQuery = originalSegmentIndex?.queryPotentialGroupIndexes(segments);
+  const originalQuery = originalSegmentIndex?.queryPotentialGroupIndexes(
+    segments,
+    excludedOriginalGroupIndex,
+  );
   scannedSegmentCount += acceptedQuery?.scannedSegmentCount ?? 0;
   scannedSegmentCount += originalQuery?.scannedSegmentCount ?? 0;
   const relevantAcceptedSegments = acceptedQuery
     ? acceptedSegments.filter((_, index) => acceptedQuery.groupIndexes.has(index))
     : acceptedSegments;
   const relevantOriginalSegments = originalQuery
-    ? originalSegments.filter((_, index) => originalQuery.groupIndexes.has(index))
+    ? originalSegments.filter((_, index) => (
+      index !== excludedOriginalGroupIndex
+      && originalQuery.groupIndexes.has(index)
+    ))
     : originalSegments;
   for (const otherSegments of relevantAcceptedSegments) {
     scannedEdgePairCount += 1;
@@ -587,6 +594,14 @@ export function reduceEdgeCrossingsWithWaypoints(
       [edgeId, toEdgeRoutingSegments(path)] as const
     )),
   );
+  const originalSegmentEntries = [...originalSegmentsById.entries()];
+  const originalSegmentGroups = originalSegmentEntries.map(([, segments]) => segments);
+  const originalSegmentGroupIndexById = new Map(
+    originalSegmentEntries.map(([edgeId], index) => [edgeId, index] as const),
+  );
+  const reusableOriginalSegmentIndex = options.disableSegmentIndex
+    ? undefined
+    : createRoutingWaypointSegmentGroupIndex(originalSegmentGroups);
   const nodeVisualContext = buildNodeVisualContext(nodes, options.disableNodeVisualIndex);
   const buddyGroups = buildPipelineBuddyGroups(edges);
   const topologyStats = buildEdgeTopologyStats(edges);
@@ -630,15 +645,16 @@ export function reduceEdgeCrossingsWithWaypoints(
     processedCandidateEdges += 1;
     if (options.diagnostics) options.diagnostics.processedCandidateEdgeCount += 1;
 
-    const otherSegments = Array.from(originalSegmentsById.entries())
-      .filter(([id]) => id !== edge.id)
-      .map(([, segments]) => segments);
+    const excludedOriginalGroupIndex = originalSegmentGroupIndexById.get(edge.id);
+    const otherSegments = options.disableSegmentIndex
+      ? originalSegmentEntries
+        .filter(([id]) => id !== edge.id)
+        .map(([, segments]) => segments)
+      : originalSegmentGroups;
     const acceptedSegmentIndex = options.disableSegmentIndex
       ? undefined
       : createRoutingWaypointSegmentGroupIndex(acceptedSegments);
-    const originalSegmentIndex = options.disableSegmentIndex
-      ? undefined
-      : createRoutingWaypointSegmentGroupIndex(otherSegments);
+    const originalSegmentIndex = reusableOriginalSegmentIndex;
     const baseLength = pathLength(path);
     const edgeVisualContext = createEdgeVisualContext(
       edge,
@@ -672,6 +688,7 @@ export function reduceEdgeCrossingsWithWaypoints(
       undefined,
       acceptedSegmentIndex,
       originalSegmentIndex,
+      excludedOriginalGroupIndex,
     );
     for (const candidate of candidates.slice(1)) {
       if (!preservesSharedTrunkWithContext(candidate, sharedTrunkContext)) continue;
@@ -692,6 +709,7 @@ export function reduceEdgeCrossingsWithWaypoints(
         options.disableScoreLowerBoundPruning ? undefined : bestScore - 5,
         acceptedSegmentIndex,
         originalSegmentIndex,
+        excludedOriginalGroupIndex,
       );
       if (score < bestScore - 5) {
         bestScore = score;

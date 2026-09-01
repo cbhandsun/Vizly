@@ -20,6 +20,7 @@ export type RoutingWaypointSegmentGroupQuery = Readonly<{
 export type RoutingWaypointSegmentGroupIndex = Readonly<{
   queryPotentialGroupIndexes: (
     segments: readonly EdgeRoutingSegment[],
+    excludedGroupIndex?: number,
   ) => RoutingWaypointSegmentGroupQuery;
 }>;
 
@@ -90,6 +91,7 @@ export const createRoutingWaypointSegmentGroupIndex = (
   const horizontal: IndexedWaypointSegment[] = [];
   const vertical: IndexedWaypointSegment[] = [];
   const allGroupIndexes = new Set<number>();
+  const segmentCountByGroupIndex = new Map<number, number>();
   let hasUnsupportedGeometry = false;
 
   segmentGroups.forEach((segments, groupIndex) => {
@@ -100,6 +102,10 @@ export const createRoutingWaypointSegmentGroupIndex = (
         hasUnsupportedGeometry = true;
         continue;
       }
+      segmentCountByGroupIndex.set(
+        groupIndex,
+        (segmentCountByGroupIndex.get(groupIndex) ?? 0) + 1,
+      );
       const entry = { groupIndex, ...segmentRange(segment, axis) };
       (axis === 'h' ? horizontal : vertical).push(entry);
     }
@@ -108,14 +114,17 @@ export const createRoutingWaypointSegmentGroupIndex = (
   vertical.sort((first, second) => first.line - second.line);
 
   return {
-    queryPotentialGroupIndexes(segments) {
+    queryPotentialGroupIndexes(segments, excludedGroupIndex) {
       if (
         hasUnsupportedGeometry
         || segments.some(segment => !finiteSegment(segment) || !segmentAxis(segment))
       ) {
+        const groupIndexes = new Set(allGroupIndexes);
+        if (excludedGroupIndex !== undefined) groupIndexes.delete(excludedGroupIndex);
         return {
-          groupIndexes: new Set(allGroupIndexes),
-          scannedSegmentCount: horizontal.length + vertical.length,
+          groupIndexes,
+          scannedSegmentCount: horizontal.length + vertical.length
+            - (segmentCountByGroupIndex.get(excludedGroupIndex ?? -1) ?? 0),
         };
       }
 
@@ -130,6 +139,7 @@ export const createRoutingWaypointSegmentGroupIndex = (
         const parallelEnd = upperBoundLine(parallel, line + 2);
         for (let index = parallelStart; index < parallelEnd; index += 1) {
           const entry = parallel[index];
+          if (entry.groupIndex === excludedGroupIndex) continue;
           scannedSegmentCount += 1;
           if (
             Math.abs(entry.line - line) < 2
@@ -147,6 +157,7 @@ export const createRoutingWaypointSegmentGroupIndex = (
         const crossingEnd = upperBoundLine(crossing, rangeMax - 1);
         for (let index = crossingStart; index < crossingEnd; index += 1) {
           const entry = crossing[index];
+          if (entry.groupIndex === excludedGroupIndex) continue;
           scannedSegmentCount += 1;
           if (
             entry.line > rangeMin + 1

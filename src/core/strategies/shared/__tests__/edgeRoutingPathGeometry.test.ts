@@ -56,6 +56,35 @@ describe('edge routing module boundaries', () => {
       .toEqual([0, 1, 2]);
   });
 
+  it('excludes the owner group before indexed relation accounting', () => {
+    const index = createRoutingWaypointSegmentGroupIndex([
+      [{ a: { x: 0, y: 0 }, b: { x: 100, y: 0 } }],
+      [{ a: { x: 50, y: -50 }, b: { x: 50, y: 50 } }],
+    ]);
+
+    const query = index.queryPotentialGroupIndexes([
+      { a: { x: 0, y: 0 }, b: { x: 100, y: 0 } },
+    ], 0);
+
+    expect([...query.groupIndexes]).toEqual([1]);
+    expect(query.scannedSegmentCount).toBe(1);
+
+    const unsupported = index.queryPotentialGroupIndexes([
+      { a: { x: 0, y: 0 }, b: { x: 100, y: 100 } },
+    ], 0);
+    expect([...unsupported.groupIndexes]).toEqual([1]);
+    expect(unsupported.scannedSegmentCount).toBe(1);
+
+    const unsupportedOwner = createRoutingWaypointSegmentGroupIndex([
+      [{ a: { x: 0, y: 0 }, b: { x: 100, y: 100 } }],
+      [{ a: { x: 50, y: -50 }, b: { x: 50, y: 50 } }],
+    ]).queryPotentialGroupIndexes([
+      { a: { x: 0, y: 0 }, b: { x: 100, y: 0 } },
+    ], 0);
+    expect([...unsupportedOwner.groupIndexes]).toEqual([1]);
+    expect(unsupportedOwner.scannedSegmentCount).toBe(1);
+  });
+
   it('keeps the pipeline compatibility exports bound to the extracted implementations', () => {
     expect(computeAbsolutePositionFromPipeline).toBe(computeAbsolutePosition);
     expect(setAbsolutePositionsFromPipeline).toBe(setAbsolutePositions);
