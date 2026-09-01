@@ -73,12 +73,13 @@ const EmptyFlowchartCanvas = ({
  * Advanced routing is loaded only after the first node or edge exists.
  */
 export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.memo((props) => {
+    const routingScope = props.viewportPersistenceKey?.trim() || 'flowchart-canvas';
     if (props.nodes.length === 0 && props.displayEdges.length === 0) {
-        return <EmptyFlowchartCanvas {...props} />;
+        return <EmptyFlowchartCanvas key={routingScope} {...props} />;
     }
 
     return (
-        <Suspense fallback={<EmptyFlowchartCanvas {...props} />}>
+        <Suspense key={routingScope} fallback={<EmptyFlowchartCanvas {...props} />}>
             <AdvancedFlowchartCanvasShell {...props} />
         </Suspense>
     );

@@ -33,6 +33,7 @@ export const displayRoutingLayoutSelectionMatches = (requestedLabel, appliedLabe
 };
 
 export const DISPLAY_ROUTING_TOPOLOGY_CASE_ID = 'topology-edit-cycle';
+export const DISPLAY_ROUTING_MULTI_PAGE_CASE_ID = 'multi-page-roundtrip';
 
 export const DISPLAY_ROUTING_LAYOUT_CASES = Object.freeze([
   Object.freeze({ id: 'domain-compound-elk-tb', label: '复杂流程（保留域·上→下）' }),
@@ -57,6 +58,7 @@ export const createDisplayRoutingMatrixCaseIds = presetIds => new Set([
   ...presetIds,
   ...DISPLAY_ROUTING_LAYOUT_CASES.map(layoutCase => layoutCase.id),
   DISPLAY_ROUTING_TOPOLOGY_CASE_ID,
+  DISPLAY_ROUTING_MULTI_PAGE_CASE_ID,
 ]);
 
 export const parseDisplayRoutingMatrixCase = (rawValue, knownCaseIds) => {

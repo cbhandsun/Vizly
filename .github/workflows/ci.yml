@@ -72,6 +72,12 @@ jobs:
             $env:DISPLAY_ROUTING_MATRIX_WARM_CASES = 'domain-lanes-lr'
             npm run verify:display-routing-matrix
             if ($LASTEXITCODE -ne 0) { throw 'Saved layout switching failed.' }
+            Remove-Item Env:DISPLAY_ROUTING_MATRIX_SAVED_RELOAD -ErrorAction SilentlyContinue
+            Remove-Item Env:DISPLAY_ROUTING_MATRIX_PRESET -ErrorAction SilentlyContinue
+            Remove-Item Env:DISPLAY_ROUTING_MATRIX_WARM_CASES -ErrorAction SilentlyContinue
+            $env:DISPLAY_ROUTING_MATRIX_CASE = 'multi-page-roundtrip'
+            npm run verify:display-routing-matrix
+            if ($LASTEXITCODE -ne 0) { throw 'Multi-page routing roundtrip failed.' }
           } finally {
             if (-not $savedPreview.HasExited) { Stop-Process -Id $savedPreview.Id -Force }
           }

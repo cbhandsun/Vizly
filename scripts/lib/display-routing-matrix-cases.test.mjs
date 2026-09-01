@@ -7,6 +7,7 @@ import {
   createDisplayRoutingMatrixCaseIds,
   displayRoutingLayoutSelectionMatches,
   DISPLAY_ROUTING_LAYOUT_CASES,
+  DISPLAY_ROUTING_MULTI_PAGE_CASE_ID,
   DISPLAY_ROUTING_TOPOLOGY_CASE_ID,
   findDisplayRoutingMenuElementByKey,
   parseDisplayRoutingMatrixCase,
@@ -27,8 +28,9 @@ describe('display routing matrix cases', () => {
     expect(savedStep).toContain("DISPLAY_ROUTING_MATRIX_SAVED_RELOAD = 'layout'");
     expect(savedStep).toContain("DISPLAY_ROUTING_MATRIX_PRESET = 'wms-process-flow-v1'");
     expect(savedStep).toContain("DISPLAY_ROUTING_MATRIX_PRESET = 'logistics-architecture-v1'");
-    expect(savedStep.match(/npm run verify:display-routing-matrix/g)).toHaveLength(2);
-    expect(savedStep.match(/if \(\$LASTEXITCODE -ne 0\)/g)).toHaveLength(2);
+    expect(savedStep).toContain("DISPLAY_ROUTING_MATRIX_CASE = 'multi-page-roundtrip'");
+    expect(savedStep.match(/npm run verify:display-routing-matrix/g)).toHaveLength(3);
+    expect(savedStep.match(/if \(\$LASTEXITCODE -ne 0\)/g)).toHaveLength(3);
     expect(savedStep).toContain('finally {');
     expect(savedStep).toContain('Stop-Process -Id $savedPreview.Id');
     expect(savedStep).not.toContain('continue-on-error');
@@ -222,6 +224,8 @@ describe('display routing matrix cases', () => {
       .toBe('domain-lanes-tb');
     expect(parseDisplayRoutingMatrixCase(DISPLAY_ROUTING_TOPOLOGY_CASE_ID, knownCaseIds))
       .toBe(DISPLAY_ROUTING_TOPOLOGY_CASE_ID);
+    expect(parseDisplayRoutingMatrixCase(DISPLAY_ROUTING_MULTI_PAGE_CASE_ID, knownCaseIds))
+      .toBe(DISPLAY_ROUTING_MULTI_PAGE_CASE_ID);
     expect(parseDisplayRoutingMatrixCase('', knownCaseIds)).toBe('');
     expect(parseDisplayRoutingMatrixCase(undefined, knownCaseIds)).toBe('');
   });

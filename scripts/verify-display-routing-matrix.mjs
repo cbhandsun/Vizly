@@ -23,7 +23,6 @@ import {
 import {
   createDisplayRoutingMatrixCaseIds,
   DISPLAY_ROUTING_LAYOUT_CASES,
-  DISPLAY_ROUTING_TOPOLOGY_CASE_ID,
   parseDisplayRoutingMatrixCase,
   parseDisplayRoutingMatrixCaseList,
   parseDisplayRoutingMatrixPreset,
@@ -38,8 +37,8 @@ import {
 import { assertDisplayRoutingVisualScaleAudit } from './lib/display-routing-browser-visual-audit.mjs';
 import {
   displayRoutingCommittedEdgesMatchWorkerPatches,
-  verifyDisplayRoutingTopologyMatrix,
 } from './lib/display-routing-browser-topology-matrix.mjs';
+import { verifyDisplayRoutingBrowserCases } from './lib/display-routing-matrix-browser-cases.mjs';
 import {
   assertDisplayRoutingCommittedReuse,
   readDisplayRoutingCommittedReuseSnapshot,
@@ -782,17 +781,14 @@ for (const layoutCase of DISPLAY_ROUTING_LAYOUT_CASES) {
     layoutResults.push(await verifyLayout(layoutCase));
   }
 }
-const topologyResults = [];
-if (!REQUESTED_CASE || REQUESTED_CASE === DISPLAY_ROUTING_TOPOLOGY_CASE_ID) {
-  topologyResults.push(await verifyDisplayRoutingTopologyMatrix({
-    baseUrl: BASE_URL,
-    prepareSession,
-    waitForInitialRoute: (session, label) => waitForValue(
-      session,
-      readFinalRouteExpression(''),
-      `${label} initial route`,
-    ),
-    auditFinalSvg,
-  }));
-}
-console.log(JSON.stringify({ viewport: MATRIX_VIEWPORT, presetResults, layoutResults, topologyResults }, null, 2));
+const { topologyResults, multiPageResults } = await verifyDisplayRoutingBrowserCases({
+  requestedCase: REQUESTED_CASE, baseUrl: BASE_URL, prepareSession, waitForValue,
+  readFinalRouteExpression, auditFinalSvg,
+});
+console.log(JSON.stringify({
+  viewport: MATRIX_VIEWPORT,
+  presetResults,
+  layoutResults,
+  topologyResults,
+  multiPageResults,
+}, null, 2));

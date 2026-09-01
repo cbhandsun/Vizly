@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const baseReactFlowProps = vi.fn();
 const lightweightReactFlowProps = vi.fn();
+const baseReactFlowMounts = vi.fn();
+const baseReactFlowUnmounts = vi.fn();
 
 vi.mock('@xyflow/react', async () => {
   const actual = await vi.importActual<typeof import('@xyflow/react')>('@xyflow/react');
@@ -25,8 +27,12 @@ vi.mock('@xyflow/react', async () => {
   };
 });
 
-vi.mock('../../shared/BaseReactFlow', () => ({
-  default: (props: Record<string, unknown>) => {
+vi.mock('../../shared/BaseReactFlow', () => {
+  const MockBaseReactFlow = (props: Record<string, unknown>) => {
+    React.useEffect(() => {
+      baseReactFlowMounts();
+      return () => baseReactFlowUnmounts();
+    }, []);
     baseReactFlowProps(props);
     return (
       <div data-testid="base-react-flow">
@@ -34,8 +40,9 @@ vi.mock('../../shared/BaseReactFlow', () => ({
         {props.children as React.ReactNode}
       </div>
     );
-  },
-}));
+  };
+  return { default: MockBaseReactFlow };
+});
 
 import { FlowchartCanvasShell } from '../FlowchartCanvasShell';
 import { AdvancedFlowchartCanvasShell } from '../AdvancedFlowchartCanvasShell';
@@ -54,6 +61,8 @@ describe('FlowchartCanvasShell', () => {
   beforeEach(() => {
     baseReactFlowProps.mockClear();
     lightweightReactFlowProps.mockClear();
+    baseReactFlowMounts.mockClear();
+    baseReactFlowUnmounts.mockClear();
   });
 
   afterEach(() => {
@@ -106,6 +115,56 @@ describe('FlowchartCanvasShell', () => {
       edgesFocusable: true,
     });
     expect(baseReactFlowProps).not.toHaveBeenCalled();
+  });
+
+  it('remounts advanced routing state when the active page scope changes', async () => {
+    const noop = vi.fn();
+    const nodes: Node[] = [{ id: 'node', position: { x: 0, y: 0 }, data: {} }];
+    const edges: Edge[] = [{ id: 'edge', source: 'node', target: 'node' }];
+    const renderShell = (routingScope: string) => (
+      <FlowchartCanvasShell
+        viewportPersistenceKey={routingScope}
+        nodes={nodes}
+        displayEdges={edges}
+        nodeTypes={{}}
+        onInit={noop}
+        onNodesChange={noop}
+        onEdgesChange={noop}
+        onConnect={noop}
+        onConnectStart={noop}
+        onConnectEnd={noop}
+        autoRoutingEnabled
+        enableSmartEdges
+        showMinimap={false}
+        showGrid={false}
+        gridVariant={'dots' as never}
+        onNodeDrag={noop}
+        onNodeDragStart={noop}
+        onSelectionChange={noop}
+        onPaneClick={noop}
+        onPaneDoubleClick={noop}
+        selectionMode={'partial' as never}
+        onNodeContextMenu={noop}
+        onEdgeContextMenu={noop}
+        onPaneContextMenu={noop}
+        isSpacePressed={false}
+        isConnecting={false}
+        connectPreview={null}
+        connectionMode={'loose' as never}
+        isDragging={false}
+      />
+    );
+    const { rerender } = render(renderShell('page-1:0'));
+    await waitFor(() => expect(baseReactFlowMounts).toHaveBeenCalledTimes(1));
+
+    rerender(renderShell('page-1:0'));
+    expect(baseReactFlowUnmounts).not.toHaveBeenCalled();
+
+    rerender(renderShell('page-2:1'));
+    await waitFor(() => {
+      expect(baseReactFlowUnmounts).toHaveBeenCalledTimes(1);
+      expect(baseReactFlowMounts).toHaveBeenCalledTimes(2);
+    });
   });
 
   it('keeps unchanged accessibility projections stable across a node move', async () => {
