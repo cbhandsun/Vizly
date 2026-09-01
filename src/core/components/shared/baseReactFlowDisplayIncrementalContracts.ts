@@ -82,5 +82,5 @@ export const baseReactFlowIncrementalEdgesHaveNodeClearance = (
   || createNodeClearanceEvaluationContext(nodes, edge).score(
     getDisplayComputedPath(edge),
     minimumClearance,
-  ) <= 1e-6
+  ) <= 0.5
 ));
