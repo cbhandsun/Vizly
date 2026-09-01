@@ -5,6 +5,17 @@ import type {
   DisplayEdgesWorkerResponse,
 } from './baseReactFlowDisplayWorkerProtocol';
 
+// Keep live diagnostics responsive without serializing every tiny nested phase.
+// The final Worker response still carries the complete aggregated phase trace.
+const MIN_NESTED_PHASE_PROGRESS_DURATION_MS = 25;
+
+export const shouldPublishDisplayRoutingPhaseProgress = (
+  trace: DisplayRoutingPhaseTrace,
+): boolean => trace.parentPhase === undefined
+  || trace.durationMs >= MIN_NESTED_PHASE_PROGRESS_DURATION_MS
+  || trace.resolution === 'rejected'
+  || trace.resolution === 'fallback';
+
 export const appendDisplayRoutingPhaseTrace = (
   phaseTrace: DisplayRoutingPhaseTrace[],
   trace: DisplayRoutingPhaseTrace,
@@ -117,7 +128,9 @@ export const createDisplayRoutingPhaseRecorder = ({
   publishProgress?: boolean;
 }): ((trace: DisplayRoutingPhaseTrace) => void) => (trace) => {
   appendDisplayRoutingPhaseTrace(phaseTrace, trace);
-  if (publishProgress) publish({ requestId, phaseProgress: trace });
+  if (publishProgress && shouldPublishDisplayRoutingPhaseProgress(trace)) {
+    publish({ requestId, phaseProgress: trace });
+  }
 };
 
 export const createDisplayRoutingFallbackMetadata = (
