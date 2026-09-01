@@ -23,6 +23,7 @@ const MAX_EXPORT_AREA = 80_000_000;
 const MAX_EXPORT_PIXEL_RATIO = 4;
 const MAX_METADATA_BYTES = 512 * 1024;
 const MAX_IMAGE_DATA_URL_CHARS = 32 * 1024 * 1024;
+const PDF_JPEG_QUALITY = 0.92;
 
 const EXPORT_IMAGE_DATA_URL_PATTERN = /^data:image\/(png|jpeg|jpg);base64,([a-z0-9+/=\s]+)$/i;
 const EXPORT_SVG_DATA_URL_PATTERN = /^data:image\/svg\+xml(?:;charset=[\w-]+)?,/i;
@@ -223,15 +224,23 @@ export const downloadImage = async (
             break;
         }
         case 'pdf': {
-            const { toPng } = await import('html-to-image');
+            const { toJpeg } = await import('html-to-image');
             const { jsPDF } = await import('jspdf');
-            const dataUrl = await toPng(viewportElem, exportOptions);
+            // PDF pages are raster-backed. Embedding the lossless PNG produced files
+            // tens of megabytes large for ordinary diagrams, while a high-quality
+            // JPEG keeps text legible at the requested pixel ratio and is already
+            // compressed before jsPDF embeds it.
+            const dataUrl = await toJpeg(viewportElem, {
+                ...exportOptions,
+                backgroundColor: '#fff',
+                quality: PDF_JPEG_QUALITY,
+            });
             const pdf = new jsPDF({
                 orientation: bounds.width > bounds.height ? 'l' : 'p',
                 unit: 'px',
                 format: [bounds.width + 100, bounds.height + 100]
             });
-            pdf.addImage(dataUrl, 'PNG', 0, 0, bounds.width + 100, bounds.height + 100);
+            pdf.addImage(dataUrl, 'JPEG', 0, 0, bounds.width + 100, bounds.height + 100);
             pdf.save(`${filename}.pdf`);
             break;
         }

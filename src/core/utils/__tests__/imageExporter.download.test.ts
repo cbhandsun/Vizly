@@ -85,4 +85,33 @@ describe('downloadImage completion contract', () => {
 
     expect(exportMocks.pdfAddImage).toHaveBeenCalled();
   });
+
+  it('embeds a high-quality JPEG raster in PDF exports to avoid lossless PNG bloat', async () => {
+    await downloadImage([], {
+      format: 'pdf',
+      pixelRatio: 2,
+      includeBackground: false,
+      embedMetadata: false,
+      fileNameBase: 'pdf-size-regression',
+    });
+
+    expect(exportMocks.toPng).not.toHaveBeenCalled();
+    expect(exportMocks.toJpeg).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      expect.objectContaining({
+        backgroundColor: '#fff',
+        pixelRatio: 2,
+        quality: 0.92,
+      }),
+    );
+    expect(exportMocks.pdfAddImage).toHaveBeenCalledWith(
+      JPEG_DATA_URL,
+      'JPEG',
+      0,
+      0,
+      300,
+      200,
+    );
+    expect(exportMocks.pdfSave).toHaveBeenCalledWith('pdf-size-regression.pdf');
+  });
 });
