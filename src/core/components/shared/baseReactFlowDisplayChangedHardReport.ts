@@ -23,13 +23,18 @@ export type BaseReactFlowChangedHardReportEvaluation = Readonly<{
     candidate: Edge[],
     changedEdgeIndexes: readonly number[],
     candidateKind: BaseDisplayBoundedCandidateReport['candidate'],
-    knownCandidateQuality?: EdgePathQualityScore,
+    knownEvidence?: BaseReactFlowChangedHardReportEvidence,
   ) => BaseDisplayBoundedCandidateReport | null;
   readMetrics: () => Readonly<{
     evaluationCount: number;
     scannedNodeCount: number;
     scannedEdgePairCount: number;
   }>;
+}>;
+
+export type BaseReactFlowChangedHardReportEvidence = Readonly<{
+  obstacleHits?: number;
+  quality?: EdgePathQualityScore;
 }>;
 
 const exactDeclaredChanges = (
@@ -72,16 +77,6 @@ export const createBaseReactFlowChangedHardReportEvaluation = (
   terminalSnapshot?: DisplayTerminalValidationSnapshot,
 ): BaseReactFlowChangedHardReportEvaluation => {
   const normalizedBaseline = compactDisplayEdgePaths(baseline);
-  const obstacleInitialization: DisplayObstacleEvaluationInitializationMetrics = {
-    cacheHit: false,
-    scannedNodeCount: 0,
-  };
-  const obstacles = createDisplayObstacleEvaluationContext(
-    normalizedBaseline,
-    nodes,
-    obstacleInitialization,
-  );
-  const obstacleHitContext = createDisplayObstacleHitContext(nodes);
   const clearance = createNodeClearanceGraphEvaluationContext(nodes);
   const baselineClearanceViolations = normalizedBaseline.map(edge => (
     clearance.score(
@@ -91,9 +86,30 @@ export const createBaseReactFlowChangedHardReportEvaluation = (
     ) > 0.5
   ));
   let evaluationCount = 0;
-  let scannedNodeCount = obstacleInitialization.scannedNodeCount
-    + clearance.readMetrics().scannedNodeCount;
+  let scannedNodeCount = clearance.readMetrics().scannedNodeCount;
   let scannedEdgePairCount = 0;
+  let obstacleEvidence: Readonly<{
+    evaluation: ReturnType<typeof createDisplayObstacleEvaluationContext>;
+    hitContext: ReturnType<typeof createDisplayObstacleHitContext>;
+  }> | null = null;
+  const getObstacleEvidence = () => {
+    if (obstacleEvidence) return obstacleEvidence;
+    const initialization: DisplayObstacleEvaluationInitializationMetrics = {
+      cacheHit: false,
+      scannedNodeCount: 0,
+    };
+    const evaluation = createDisplayObstacleEvaluationContext(
+      normalizedBaseline,
+      nodes,
+      initialization,
+    );
+    scannedNodeCount += initialization.scannedNodeCount;
+    obstacleEvidence = {
+      evaluation,
+      hitContext: createDisplayObstacleHitContext(nodes),
+    };
+    return obstacleEvidence;
+  };
   let quality: ReturnType<typeof createEdgePathQualityEvaluationContext> | null = null;
   const getQuality = (): ReturnType<typeof createEdgePathQualityEvaluationContext> => {
     if (quality) return quality;
@@ -108,18 +124,31 @@ export const createBaseReactFlowChangedHardReportEvaluation = (
   };
 
   return {
-    evaluate(candidate, changedEdgeIndexes, candidateKind, knownCandidateQuality) {
+    evaluate(candidate, changedEdgeIndexes, candidateKind, knownEvidence) {
       const indexes = exactDeclaredChanges(baseline, candidate, changedEdgeIndexes);
       if (!indexes) return null;
       const normalizedCandidate = compactDisplayEdgePaths(candidate);
-      const obstacleBefore = obstacleHitContext.readMetrics();
       const clearanceBefore = clearance.readMetrics();
-      const qualityContext = knownCandidateQuality ? null : getQuality();
+      const qualityContext = knownEvidence?.quality ? null : getQuality();
       const qualityBefore = qualityContext?.readMetrics?.();
-      const candidateQuality = knownCandidateQuality
+      const candidateQuality = knownEvidence?.quality
         ?? qualityContext?.evaluateChanged(normalizedCandidate, indexes);
       if (!candidateQuality) return null;
-      const obstacleHits = obstacles.evaluateKnownChanges(normalizedCandidate, indexes);
+      const knownObstacleHits = knownEvidence?.obstacleHits;
+      const knownObstacleHitsAreValid = typeof knownObstacleHits === 'number'
+        && Number.isSafeInteger(knownObstacleHits)
+        && knownObstacleHits >= 0;
+      const candidateObstacleEvidence = knownObstacleHitsAreValid
+        ? null
+        : getObstacleEvidence();
+      const obstacleBefore = candidateObstacleEvidence?.hitContext.readMetrics();
+      const obstacleHits = knownObstacleHitsAreValid
+        ? knownObstacleHits
+        : candidateObstacleEvidence?.evaluation.evaluateKnownChanges(
+          normalizedCandidate,
+          indexes,
+        );
+      if (typeof obstacleHits !== 'number') return null;
       const clearanceViolations = baselineClearanceViolations.slice();
       for (const index of indexes) {
         const edge = normalizedCandidate[index];
@@ -150,9 +179,14 @@ export const createBaseReactFlowChangedHardReportEvaluation = (
       report.hardClean = displayHardQualityReportGeometryIsClean(report) && terminalsAnchored;
       const qualityAfter = qualityContext?.readMetrics?.();
       evaluationCount += 1;
-      scannedNodeCount += Math.max(
-        0,
-        obstacleHitContext.readMetrics().scannedNodeCount - obstacleBefore.scannedNodeCount,
+      scannedNodeCount += (
+        candidateObstacleEvidence && obstacleBefore
+          ? Math.max(
+            0,
+            candidateObstacleEvidence.hitContext.readMetrics().scannedNodeCount
+              - obstacleBefore.scannedNodeCount,
+          )
+          : 0
       ) + Math.max(
         0,
         clearance.readMetrics().scannedNodeCount - clearanceBefore.scannedNodeCount,

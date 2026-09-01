@@ -810,17 +810,22 @@ describe('repairBusinessNodeClearanceRisks', () => {
     const globallyValidatedEdgeIds: string[] = [];
     const validationEvidence: Array<{
       baselineEdges: Edge[];
+      baselineRoutingObstacleHits: number;
       baselineQuality: ReturnType<typeof calculateEdgePathQualityScore>;
       candidateEdges: Edge[];
+      candidateRoutingObstacleHits: number;
       candidateQuality: ReturnType<typeof calculateEdgePathQualityScore>;
+      changedEdgeIndex: number;
     }> = [];
 
     expect(repairBusinessNodeClearanceRisks(edges, nodes, {
       diagnostics,
       validateCandidate: ({
         baselineEdges,
+        baselineRoutingObstacleHits,
         baselineQuality,
         candidateEdges,
+        candidateRoutingObstacleHits,
         candidateQuality,
         changedEdgeIndex,
       }) => {
@@ -828,9 +833,12 @@ describe('repairBusinessNodeClearanceRisks', () => {
         if (changedEdge) globallyValidatedEdgeIds.push(changedEdge.id);
         validationEvidence.push({
           baselineEdges,
+          baselineRoutingObstacleHits,
           baselineQuality,
           candidateEdges,
+          candidateRoutingObstacleHits,
           candidateQuality,
+          changedEdgeIndex,
         });
         return false;
       },
@@ -846,6 +854,14 @@ describe('repairBusinessNodeClearanceRisks', () => {
     for (const evidence of validationEvidence) {
       expect(evidence.baselineQuality).toEqual(calculateEdgePathQualityScore(evidence.baselineEdges));
       expect(evidence.candidateQuality).toEqual(calculateEdgePathQualityScore(evidence.candidateEdges));
+      const baselineEdge = evidence.baselineEdges[evidence.changedEdgeIndex];
+      const candidateEdge = evidence.candidateEdges[evidence.changedEdgeIndex];
+      const obstacleContext = createBusinessNodeClearanceGeometryContext(nodes)
+        .obstacleFor(baselineEdge);
+      expect(evidence.baselineRoutingObstacleHits)
+        .toBe(obstacleContext.countPathHits(pathFor(baselineEdge)));
+      expect(evidence.candidateRoutingObstacleHits)
+        .toBe(obstacleContext.countPathHits(pathFor(candidateEdge)));
     }
   });
 

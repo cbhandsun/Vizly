@@ -1702,3 +1702,11 @@ post-trunk 障碍修复原本先用增量质量上下文计算候选的完整路
 回归验证直传质量与独立完整 hard report 完全一致，并确认该路径的第二次 `scannedEdgePairCount` 为零；障碍修复回调同时验证收到的基线和候选质量均等于独立全量计算。曾尝试只为直接进入线段净空带的节点生成候选，但已有“低折点外侧通道”回归证明远侧节点仍可能定义更优绕行，该实验已完整撤回，未通过缩窄候选集合换取速度。
 
 最终 production build 的 5 个独立 Logistics 样本仍为 `full-route-repaired`、零 abort；路由中位 `2000ms`、p95 `2465/1100ms`，未证明总体耗时改善。`final-endpoint-closure-obstacles-post-trunk` 中位 `111.8ms`、p95 `158ms`；单次全 trace 中该阶段生成 `3863` 个候选、执行 `55` 次最终评估、`scannedEdgePairCount=0`，说明重复质量扫描已经清零，剩余成本主要在候选几何、净空节点扫描与其他 hard gate。下一批优先收敛不改变候选集合的几何/净空证据复用；`quality-global-route-detached` 和初始 dogleg refine 继续作为并列后续热点，3D 维持后置。
+
+## 33. 障碍命中证据直传与按需上下文（2026-09-01）
+
+业务节点绕行候选在进入最终门禁前已经用同一节点几何分别计算非端点障碍命中与端点内部穿越，但旧 changed hard report 又为同一单边替换创建全图障碍上下文并重扫候选。本批将两类命中合成为单边 routing obstacle 精确证据，再用已缓存的基线总报告计算候选总命中；changed hard report 只有收到非负安全整数时才复用，否则按原路径创建障碍上下文并完整评估。质量、最小净空、终端附着、锚定和 shared-trunk 门禁均保持不变。
+
+回归覆盖候选阶段的基线/候选命中与底层 `countPathHits` 完全一致、精确 hard report 等价，以及负数、小数、`NaN`、无穷值全部安全回退。精确证据路径同时把障碍上下文改为按需创建，避免仅仅因为评估会话存在就扫描基线。
+
+单次同构 production trace 中 post-trunk 保持 `3863` 个生成候选、`55` 次最终评估和 6 条接受变更，节点扫描由上一批 `10427` 降至 `9954`（约 4.5%），边对扫描继续为零，阶段耗时为 `101.2ms`。5 样本绝对耗时受到整机同步变慢影响：route p95 `2865/1100ms`，同时 detached、waypoint、dogleg、stub 均上升约 30–50%，因此不把本组绝对值解释为代码回退或整体收益。5/5 仍为 `full-route-repaired`、零 abort；下一批转向最小净空证据的同扫描复用或 `quality-global-route-detached`，不削减候选集合、不提高预算。

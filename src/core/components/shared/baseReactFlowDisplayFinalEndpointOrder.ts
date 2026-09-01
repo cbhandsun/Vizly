@@ -71,16 +71,22 @@ const commitPostTrunkBranchObstacleCandidate = (
   return repairBusinessNodeClearanceRisks(baseline, repairNodes, {
     geometryContext: evaluation.businessNodeClearanceGeometry,
     eligibleEdgeIds: options.eligibleEdgeIds,
-    validateCandidate: context => passesFinalDisplayGate(
-      context.baselineEdges,
-      context.candidateEdges,
-      [context.changedEdgeIndex],
-      options,
-      evaluation,
-      false,
-      undefined,
-      context.candidateQuality,
-    ),
+    validateCandidate: (context) => {
+      const baselineObstacleHits = evaluation.hardReport(context.baselineEdges).obstacleHits;
+      const candidateObstacleHits = baselineObstacleHits
+        - context.baselineRoutingObstacleHits
+        + context.candidateRoutingObstacleHits;
+      return passesFinalDisplayGate(
+        context.baselineEdges,
+        context.candidateEdges,
+        [context.changedEdgeIndex],
+        options,
+        evaluation,
+        false,
+        undefined,
+        { quality: context.candidateQuality, obstacleHits: candidateObstacleHits },
+      );
+    },
     diagnostics,
   });
 };

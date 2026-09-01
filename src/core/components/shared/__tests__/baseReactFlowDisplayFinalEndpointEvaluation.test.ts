@@ -547,14 +547,45 @@ describe('createBaseReactFlowFinalEndpointEvaluation', () => {
     const evaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
     const before = evaluation.readMetrics();
 
-    const report = evaluation.hardReportChanged(edges, candidate, [0], quality);
+    const exactReport = createBaseReactFlowFinalEndpointEvaluation(nodes).hardReport(candidate);
+    const report = evaluation.hardReportChanged(edges, candidate, [0], {
+      obstacleHits: exactReport.obstacleHits,
+      quality,
+    });
     const after = evaluation.readMetrics();
 
-    expect(report).toEqual(createBaseReactFlowFinalEndpointEvaluation(nodes).hardReport(candidate));
+    expect(report).toEqual(exactReport);
     expect(report.quality).toEqual(quality);
     expect(after.scannedEdgePairCount).toBe(before.scannedEdgePairCount);
     expect(evaluation.hardReport(candidate)).toBe(report);
   });
+
+  it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(
+    'falls back to exact obstacle evaluation for invalid known hits (%s)',
+    (obstacleHits) => {
+      const candidate: Edge[] = edges.map((edge, index) => index === 0 ? {
+        ...edge,
+        data: {
+          ...edge.data,
+          computedPath: [
+            { x: 50, y: 60 },
+            { x: 80, y: 60 },
+            { x: 80, y: 220 },
+            { x: 50, y: 220 },
+          ],
+        },
+      } : edge);
+      const quality = createEdgePathQualityEvaluationContext(edges)
+        .evaluateChanged(candidate, [0]);
+
+      expect(createBaseReactFlowFinalEndpointEvaluation(nodes).hardReportChanged(
+        edges,
+        candidate,
+        [0],
+        { obstacleHits, quality },
+      )).toEqual(createBaseReactFlowFinalEndpointEvaluation(nodes).hardReport(candidate));
+    },
+  );
 
   it.each([9, 21])(
     'keeps a bounded %i-edge hard report incremental on a large route',

@@ -1,5 +1,5 @@
 import type { Edge } from '@xyflow/react';
-import type { EdgePathQualityScore } from '../../strategies/shared/edgeStrictCrossingGuard';
+import type { BaseReactFlowChangedHardReportEvidence } from './baseReactFlowDisplayChangedHardReport';
 
 import type { SameSideEndpointTrunkIdentity } from '../../strategies/shared/edgeFinalSameSideEndpointOrderRepair';
 import {
@@ -56,7 +56,7 @@ const passesBaseReactFlowFinalDisplayHardQualityGate = (
   changedEdgeIndexes: readonly number[],
   options: BaseReactFlowFinalEndpointOrderOptions,
   evaluation: BaseReactFlowFinalEndpointEvaluation,
-  knownCandidateQuality?: EdgePathQualityScore,
+  knownEvidence?: BaseReactFlowChangedHardReportEvidence,
 ): boolean => {
   if (
     options.eligibleEdgeIds
@@ -74,7 +74,7 @@ const passesBaseReactFlowFinalDisplayHardQualityGate = (
     baselineEdges,
     candidateEdges,
     changedEdgeIndexes,
-    knownCandidateQuality,
+    knownEvidence,
   );
   if (
     baselineReport.hardClean
@@ -120,7 +120,7 @@ export const passesBaseReactFlowFinalDisplayGate = (
   evaluation: BaseReactFlowFinalEndpointEvaluation,
   allowBoundedClearanceStemReduction = false,
   restoredPreferredSourceTrunk?: SameSideEndpointTrunkIdentity,
-  knownCandidateQuality?: EdgePathQualityScore,
+  knownEvidence?: BaseReactFlowChangedHardReportEvidence,
 ): boolean => {
   const baselineTrunks = evaluation.endpointOrder(baselineEdges).legalSharedTrunks;
   const candidateOrder = evaluation.endpointOrder(candidateEdges);
@@ -160,7 +160,7 @@ export const passesBaseReactFlowFinalDisplayGate = (
     changedEdgeIndexes,
     options,
     evaluation,
-    knownCandidateQuality,
+    knownEvidence,
   );
 };
 

@@ -17,7 +17,10 @@ import {
 import {
   createBusinessNodeClearanceCandidateCollection,
 } from './edgeBusinessNodeClearanceCandidateCollection';
-import { selectAcceptedBusinessNodeClearanceCandidate } from './edgeBusinessNodeClearanceCandidateSelection';
+import {
+  selectAcceptedBusinessNodeClearanceCandidate,
+  type BusinessNodeClearanceCandidateValidation,
+} from './edgeBusinessNodeClearanceCandidateSelection';
 import { buildBusinessNodeTerminalCorridorCandidates } from './edgeBusinessNodeClearanceCorridorCandidates';
 import { segmentToClearanceRectDistance } from './edgeNodeClearanceGeometry';
 import {
@@ -26,15 +29,8 @@ import {
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
 
-export interface BusinessNodeClearanceCandidateValidation {
-  baselineEdges: Edge[];
-  baselineQuality: EdgePathQualityScore;
-  candidateEdges: Edge[];
-  candidateQuality: EdgePathQualityScore;
-  changedEdgeIndex: number;
-}
-
 export type { BusinessNodeClearanceRepairDiagnostics } from './edgeBusinessNodeClearanceCandidateCache';
+export type { BusinessNodeClearanceCandidateValidation } from './edgeBusinessNodeClearanceCandidateSelection';
 
 export interface BusinessNodeClearanceRepairOptions {
   eligibleEdgeIds?: ReadonlySet<string>;
@@ -760,6 +756,7 @@ export const repairBusinessNodeClearanceRisks = (
         selectAcceptedBusinessNodeClearanceCandidate({
           allowTransientStrictCrossing: options.allowTransientStrictCrossing === true,
           baselineEdges: current,
+          baselineObstacleHits: baselineHits,
           baselineQuality: qualityBaseline.score,
           edge,
           edgeIndex,

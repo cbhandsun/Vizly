@@ -1,7 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import type { RoutingPatch } from '../../routing/routingPatch';
-import type { EdgePathQualityScore } from '../../strategies/shared/edgeStrictCrossingGuard';
 import {
   createBusinessNodeClearanceGeometryContext,
   type BusinessNodeClearanceGeometryContext,
@@ -25,6 +24,7 @@ import { getDisplayTerminalValidationReport } from './baseReactFlowTerminalValid
 import { computeBaseReactFlowDisplayOutputRouteSignature } from './baseReactFlowDisplayCache';
 import {
   createBaseReactFlowChangedHardReportEvaluation,
+  type BaseReactFlowChangedHardReportEvidence,
   type BaseReactFlowChangedHardReportEvaluation,
 } from './baseReactFlowDisplayChangedHardReport';
 import { createStrictCrossingRepairDiagnostics } from './baseReactFlowDisplayStrictResidualRepair';
@@ -45,7 +45,7 @@ export type BaseReactFlowFinalEndpointEvaluation = Readonly<{
     baselineEdges: readonly Edge[],
     candidateEdges: readonly Edge[],
     changedEdgeIndexes: readonly number[],
-    knownCandidateQuality?: EdgePathQualityScore,
+    knownEvidence?: BaseReactFlowChangedHardReportEvidence,
   ) => ReturnType<ReturnType<typeof createBaseDisplayHardGateMemo>['getReport']>;
   passageOrder: (edges: readonly Edge[]) => ReturnType<typeof auditFinalSameSidePassageOrder>;
   repairRenderSafeEndpointStubs: (
@@ -235,7 +235,7 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
       baselineEdges,
       candidateEdges,
       changedEdgeIndexes,
-      knownCandidateQuality,
+      knownEvidence,
     ) {
       const remembered = hardGateMemo.getRememberedImmutableReport(
         candidateEdges,
@@ -263,7 +263,7 @@ export const createBaseReactFlowFinalEndpointEvaluation = (
         [...candidateEdges],
         changedEdgeIndexes,
         'polished',
-        knownCandidateQuality,
+        knownEvidence,
       );
       const after = evaluation.readMetrics();
       changedHardReportEvaluationCount += Math.max(
