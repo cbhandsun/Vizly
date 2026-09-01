@@ -123,10 +123,28 @@ export const DISPLAY_ROUTING_EXPORT_CAPTURE_SCRIPT = String.raw`(() => {
     };
   };
 
+  const auditPdf = bytes => {
+    if (!(bytes instanceof Uint8Array) || bytes.length === 0 || bytes.length > ${MAX_EXPORT_BYTES}) {
+      throw new Error('pdf-size');
+    }
+    const source = new TextDecoder('latin1').decode(bytes);
+    const count = pattern => source.match(pattern)?.length || 0;
+    return {
+      pageObjectCount: count(/\/Type\s*\/Page\b/g),
+      fontObjectCount: count(/\/Type\s*\/Font\b/g),
+      embeddedFontFileCount: count(/\/FontFile(?:2|3)?\b/g),
+      imageObjectCount: count(/\/Subtype\s*\/Image\b/g),
+    };
+  };
+
   const analyzeBlob = async (blob, download) => {
     const format = extensionFrom(download, blob?.type);
     const byteLength = Number(blob?.size) || 0;
-    const header = new Uint8Array(await blob.slice(0, 12).arrayBuffer());
+    const bytes = format === 'pdf' && byteLength <= ${MAX_EXPORT_BYTES}
+      ? new Uint8Array(await blob.arrayBuffer())
+      : null;
+    const header = bytes?.subarray(0, 12)
+      || new Uint8Array(await blob.slice(0, 12).arrayBuffer());
     const capture = {
       format,
       mimeType: String(blob?.type || '').toLowerCase(),
@@ -134,6 +152,7 @@ export const DISPLAY_ROUTING_EXPORT_CAPTURE_SCRIPT = String.raw`(() => {
       headerHex: bytesToHex(header),
     };
     if (format === 'svg') capture.svg = auditSvg(await blob.text());
+    if (format === 'pdf') capture.pdf = auditPdf(bytes);
     pushCapture(capture);
   };
 
@@ -272,7 +291,12 @@ export const assertDisplayRoutingExportCapture = ({
   const formatValid = format === 'png'
     ? capture?.mimeType === 'image/png' && capture.headerHex?.startsWith('89504e470d0a1a0a')
     : format === 'pdf'
-      ? capture?.mimeType === 'application/pdf' && capture.headerHex?.startsWith('255044462d')
+      ? capture?.mimeType === 'application/pdf'
+        && capture.headerHex?.startsWith('255044462d')
+        && capture.pdf?.pageObjectCount > 0
+        && capture.pdf?.fontObjectCount > 0
+        && capture.pdf?.embeddedFontFileCount > 0
+        && capture.pdf?.imageObjectCount === 0
       : capture?.mimeType === 'image/svg+xml'
         && capture.headerHex === 'svg'
         && capture.svg?.logicalEdgeCount === expectedLogicalEdgeCount
@@ -299,6 +323,7 @@ export const assertDisplayRoutingExportCapture = ({
     byteLength: capture?.byteLength ?? null,
     headerHex: capture?.headerHex ?? null,
     error: capture?.error ?? null,
+    pdf: capture?.pdf ?? null,
     svg: capture?.svg ?? null,
   })}`);
 };

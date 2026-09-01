@@ -3689,6 +3689,8 @@
         "exportRecoveryTitle": "导出未完成",
         "exportRecoveryDescription": "请检查画布内容，或降低图片清晰度后重试。",
         "sceneBasedHint": "PNG/SVG 将基于当前画布数据生成，确保导出结果稳定可用。",
+        "vectorPdfHint": "PDF 将以矢量路径和嵌入文字生成；转换失败时会直接报错，不会降级为栅格图片。",
+        "vectorPdfUnavailableHint": "矢量 PDF 需要读取当前画布场景，场景不可用时无法导出。",
         "legacyExportHint": "当前格式将使用标准导出引擎生成。",
         "svgPreviewAlt": "SVG 导出预览",
         "previewCounts": "{{nodes}} 个节点 / {{edges}} 条连线",

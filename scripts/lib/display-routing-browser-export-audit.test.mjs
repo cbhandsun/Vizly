@@ -33,10 +33,23 @@ const svgCapture = {
   },
 };
 
+const pdfCapture = {
+  format: 'pdf',
+  mimeType: 'application/pdf',
+  byteLength: 4_096,
+  headerHex: '255044462d312e3700000000',
+  pdf: {
+    pageObjectCount: 1,
+    fontObjectCount: 4,
+    embeddedFontFileCount: 1,
+    imageObjectCount: 0,
+  },
+};
+
 describe('display routing browser export audit', () => {
   it.each([
     ['png', { format: 'png', mimeType: 'image/png', byteLength: 4_096, headerHex: '89504e470d0a1a0a00000000' }],
-    ['pdf', { format: 'pdf', mimeType: 'application/pdf', byteLength: 4_096, headerHex: '255044462d312e3700000000' }],
+    ['pdf', pdfCapture],
     ['svg', svgCapture],
   ])('accepts a bounded and structurally valid %s export', (format, capture) => {
     expect(assertDisplayRoutingExportCapture({
@@ -56,6 +69,19 @@ describe('display routing browser export audit', () => {
     expect(() => assertDisplayRoutingExportCapture({
       format: 'svg',
       capture: { ...svgCapture, ...override },
+      expectedLogicalEdgeCount: 14,
+    })).toThrow(/export audit failed/);
+  });
+
+  it.each([
+    ['raster image object', { imageObjectCount: 1 }],
+    ['missing PDF page', { pageObjectCount: 0 }],
+    ['missing font object', { fontObjectCount: 0 }],
+    ['font without embedded bytes', { embeddedFontFileCount: 0 }],
+  ])('rejects PDF output with %s', (_name, pdfOverride) => {
+    expect(() => assertDisplayRoutingExportCapture({
+      format: 'pdf',
+      capture: { ...pdfCapture, pdf: { ...pdfCapture.pdf, ...pdfOverride } },
       expectedLogicalEdgeCount: 14,
     })).toThrow(/export audit failed/);
   });

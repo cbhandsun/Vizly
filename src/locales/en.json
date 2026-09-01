@@ -3844,6 +3844,8 @@
         "exportRecoveryTitle": "Export did not complete",
         "exportRecoveryDescription": "Check the canvas content or lower the image resolution, then try again.",
         "sceneBasedHint": "PNG/SVG exports are rendered from the current canvas data for a reliable result.",
+        "vectorPdfHint": "PDF is generated as vector paths with embedded text. Export fails instead of falling back to a raster image.",
+        "vectorPdfUnavailableHint": "Vector PDF requires the current canvas scene and is unavailable without it.",
         "legacyExportHint": "The selected format uses the standard export engine.",
         "svgPreviewAlt": "SVG export preview",
         "previewCounts": "{{nodes}} nodes / {{edges}} edges",

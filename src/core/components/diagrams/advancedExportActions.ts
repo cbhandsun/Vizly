@@ -14,8 +14,16 @@ import {
   downloadImage,
   type ExportOptions,
 } from '../../utils/imageExporter';
-import { safeLog } from '../../utils/consoleCleanup';
-import { redactSensitiveLogValue } from '../../utils/logSecurity';
+
+export class AdvancedExportError extends Error {
+  readonly code: 'ADVANCED_EXPORT_VECTOR_PDF_SNAPSHOT_REQUIRED';
+
+  constructor() {
+    super('Vector PDF export requires a current diagram scene snapshot');
+    this.name = 'AdvancedExportError';
+    this.code = 'ADVANCED_EXPORT_VECTOR_PDF_SNAPSHOT_REQUIRED';
+  }
+}
 
 export interface RunAdvancedExportOptions {
   diagramId?: string;
@@ -45,20 +53,16 @@ export const runAdvancedExport = async ({
   const title = diagramTitle?.trim() || diagramId?.trim() || 'advanced-export';
   const sceneFormat = canUseSceneExport(format) ? format : null;
   const snapshot = sceneFormat ? getReactFlowSnapshot?.() : null;
+  if (format === 'pdf' && !snapshot) {
+    throw new AdvancedExportError();
+  }
   if (snapshot && sceneFormat) {
     const scene = buildRenderSceneFromReactFlowSnapshot(snapshot, { padding: 40 });
     if (sceneFormat === 'pdf') {
-      try {
-        const pdfBlob = await exportRenderSceneToPdfBlob(scene, { title, includeBackground });
-        const pdfUrl = URL.createObjectURL(pdfBlob);
-        triggerDownload(pdfUrl, buildExportFileName(title, 'pdf'));
-        return 'scene';
-      } catch (error) {
-        safeLog.warn(
-          'Vector PDF export failed; using bounded raster fallback:',
-          redactSensitiveLogValue(error),
-        );
-      }
+      const pdfBlob = await exportRenderSceneToPdfBlob(scene, { title, includeBackground });
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      triggerDownload(pdfUrl, buildExportFileName(title, 'pdf'));
+      return 'scene';
     } else {
       const baseDataUrl = sceneFormat === 'png'
         ? await exportRenderSceneToPngDataUrl(scene, { title, pixelRatio, includeBackground })

@@ -187,8 +187,8 @@ describe('AdvancedExportModeNotice', () => {
       clipboard: false,
     });
     expect(getAdvancedExportCapabilities('pdf')).toEqual({
-      pixelRatio: true,
-      background: false,
+      pixelRatio: false,
+      background: true,
       metadata: false,
       clipboard: false,
     });
@@ -200,11 +200,11 @@ describe('AdvancedExportModeNotice', () => {
     });
   });
 
-  it('classifies PNG and SVG as scene-based advanced export formats', () => {
+  it('classifies PNG, SVG, and vector PDF as scene-based advanced export formats', () => {
     expect(isSceneBasedAdvancedExportFormat('png')).toBe(true);
     expect(isSceneBasedAdvancedExportFormat('svg')).toBe(true);
     expect(isSceneBasedAdvancedExportFormat('jpg')).toBe(false);
-    expect(isSceneBasedAdvancedExportFormat('pdf')).toBe(false);
+    expect(isSceneBasedAdvancedExportFormat('pdf')).toBe(true);
     expect(isSceneBasedAdvancedExportFormat('json')).toBe(false);
   });
 
@@ -216,11 +216,22 @@ describe('AdvancedExportModeNotice', () => {
     );
   });
 
-  it('explains fallback behavior when the selected format is not scene based', () => {
+  it('identifies vector PDF output and its fail-closed behavior', () => {
     render(<AdvancedExportModeNotice format="pdf" hasSnapshotProvider />);
 
     expect(screen.getByTestId('advanced-export-mode-notice').textContent).toContain(
-      'standard export engine',
+      'vector paths with embedded text',
+    );
+    expect(screen.getByTestId('advanced-export-mode-notice').textContent).toContain(
+      'instead of falling back to a raster image',
+    );
+  });
+
+  it('explains when vector PDF cannot access a scene snapshot', () => {
+    render(<AdvancedExportModeNotice format="pdf" hasSnapshotProvider={false} />);
+
+    expect(screen.getByTestId('advanced-export-mode-notice').textContent).toContain(
+      'requires the current canvas scene',
     );
   });
 
@@ -298,8 +309,8 @@ describe('AdvancedExportModal commercial controls', () => {
     expect(screen.queryByRole('button', { name: '复制 PNG 到剪贴板' })).toBeNull();
 
     fireEvent.click(screen.getByRole('radio', { name: 'PDF' }));
-    expect(screen.getByRole('combobox', { name: '图片清晰度 (DPI)' })).toBeTruthy();
-    expect(screen.queryByRole('checkbox', { name: '包含底色背景' })).toBeNull();
+    expect(screen.queryByRole('combobox', { name: '图片清晰度 (DPI)' })).toBeNull();
+    expect(screen.getByRole('checkbox', { name: '包含底色背景' })).toBeTruthy();
     expect(screen.queryByRole('checkbox', { name: '注入元数据' })).toBeNull();
   });
 

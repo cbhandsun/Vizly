@@ -25,6 +25,10 @@ declare module 'virtual:vizly-pdf-font-url' {
     export default fontUrl;
 }
 
+declare module 'svg2pdf.js/dist/svg2pdf.es.min.js' {
+    export { svg2pdf } from 'svg2pdf.js';
+}
+
 interface ImportMetaEnv {
     readonly VITE_SUPABASE_URL: string
     readonly VITE_SUPABASE_ANON_KEY: string

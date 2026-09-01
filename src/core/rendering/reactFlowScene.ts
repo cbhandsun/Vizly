@@ -447,14 +447,36 @@ const buildEdge = (
   return expandSharedTrunkRenderEdge(geometry, dataPoints, edgeData, jumps);
 };
 
-const boundsFromNodes = (nodes: RenderNodeGeometry[], padding: number): RenderBounds => {
-  if (nodes.length === 0) {
+const boundsFromScene = (
+  nodes: readonly RenderNodeGeometry[],
+  edges: readonly RenderEdgeGeometry[],
+  padding: number,
+): RenderBounds => {
+  if (nodes.length === 0 && edges.every(edge => edge.points.length === 0)) {
     return { minX: -padding, minY: -padding, maxX: 400 + padding, maxY: 300 + padding, width: 400 + padding * 2, height: 300 + padding * 2 };
   }
-  const minX = Math.min(...nodes.map(node => node.x)) - padding;
-  const minY = Math.min(...nodes.map(node => node.y)) - padding;
-  const maxX = Math.max(...nodes.map(node => node.x + node.width)) + padding;
-  const maxY = Math.max(...nodes.map(node => node.y + node.height)) + padding;
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const node of nodes) {
+    minX = Math.min(minX, node.x);
+    minY = Math.min(minY, node.y);
+    maxX = Math.max(maxX, node.x + node.width);
+    maxY = Math.max(maxY, node.y + node.height);
+  }
+  for (const edge of edges) {
+    for (const point of edge.points) {
+      minX = Math.min(minX, point.x);
+      minY = Math.min(minY, point.y);
+      maxX = Math.max(maxX, point.x);
+      maxY = Math.max(maxY, point.y);
+    }
+  }
+  minX -= padding;
+  minY -= padding;
+  maxX += padding;
+  maxY += padding;
   return { minX, minY, maxX, maxY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
 };
 
@@ -489,7 +511,7 @@ export const buildRenderSceneFromReactFlow = (
   });
   const renderEdges = displayEdges
     .flatMap(edge => buildEdge(edge, nodesById, warnings, jumpsByEdge));
-  const bounds = boundsFromNodes(renderNodes, padding);
+  const bounds = boundsFromScene(renderNodes, renderEdges, padding);
 
   const theme = {
     background: normalizeSvgPaint(options.theme?.background, defaultTheme.background),

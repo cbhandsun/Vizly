@@ -56,7 +56,17 @@ export const AdvancedExportModeNotice: React.FC<{
 }> = ({ format, hasSnapshotProvider }) => {
   const { t } = useTranslation();
   const usesScenePath = isSceneBasedAdvancedExportFormat(format) && hasSnapshotProvider;
-  const message = usesScenePath
+  const message = format === 'pdf' && usesScenePath
+    ? t(
+      'advancedExport.vectorPdfHint',
+      'PDF is generated as vector paths with embedded text. Export fails instead of falling back to a raster image.',
+    )
+    : format === 'pdf'
+      ? t(
+        'advancedExport.vectorPdfUnavailableHint',
+        'Vector PDF requires the current canvas scene and is unavailable without it.',
+      )
+      : usesScenePath
     ? t(
       'advancedExport.sceneBasedHint',
       'PNG/SVG exports are rendered from the current canvas data for a reliable result.',

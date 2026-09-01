@@ -49,6 +49,32 @@ describe('svgExport', () => {
     expect(transparentSvg).not.toContain(backgroundRect);
   });
 
+  it('expands the export viewBox around routed edge points outside node bounds', () => {
+    const routedEdges: Edge[] = [{
+      ...edges[0],
+      data: {
+        computedPath: [
+          { x: -120, y: 25 },
+          { x: -120, y: 140 },
+          { x: 400, y: 140 },
+          { x: 400, y: 25 },
+        ],
+      },
+    }];
+    const scene = buildRenderSceneFromReactFlow(nodes, routedEdges, { padding: 20 });
+    const svg = exportRenderSceneToSvg(scene);
+
+    expect(scene.bounds).toEqual({
+      minX: -140,
+      minY: -20,
+      maxX: 420,
+      maxY: 160,
+      width: 560,
+      height: 180,
+    });
+    expect(svg).toContain('viewBox="-140 -20 560 180"');
+  });
+
   it('rejects oversized scenes', () => {
     const scene = buildRenderSceneFromReactFlow([], []);
     scene.bounds.width = 60_000;

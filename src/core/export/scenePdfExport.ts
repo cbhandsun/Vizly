@@ -118,7 +118,7 @@ export const exportRenderSceneToPdfBlob = async (
   const page = normalizeVectorPdfPageGeometry(scene.bounds.width, scene.bounds.height);
   const [{ jsPDF }, { svg2pdf }, fontBytes] = await Promise.all([
     import('jspdf'),
-    import('svg2pdf.js'),
+    import('svg2pdf.js/dist/svg2pdf.es.min.js'),
     loadPdfFontBytes(),
   ]);
   const pdf = new jsPDF({

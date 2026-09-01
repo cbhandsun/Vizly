@@ -7,7 +7,6 @@ const exportRenderSceneToPdfBlob = vi.fn(async () => new Blob(['pdf'], { type: '
 const triggerDownload = vi.fn();
 const downloadImage = vi.fn(async () => undefined);
 const attachVizlyExportMetadata = vi.fn(async (dataUrl: string) => `${dataUrl}#metadata`);
-const safeWarn = vi.fn();
 
 vi.mock('../../../export/svgRasterExport', () => ({
   exportRenderSceneToPngDataUrl,
@@ -29,14 +28,6 @@ vi.mock('../../shared/exportUtils', () => ({
 vi.mock('../../../utils/imageExporter', () => ({
   attachVizlyExportMetadata,
   downloadImage,
-}));
-
-vi.mock('../../../utils/consoleCleanup', () => ({
-  safeLog: { warn: safeWarn },
-}));
-
-vi.mock('../../../utils/logSecurity', () => ({
-  redactSensitiveLogValue: () => '[redacted]',
 }));
 
 const snapshot = {
@@ -198,11 +189,12 @@ describe('runAdvancedExport', () => {
     expect(downloadImage).not.toHaveBeenCalled();
   });
 
-  it('falls back to bounded raster PDF export when vector conversion fails', async () => {
+  it('fails closed instead of silently producing a raster PDF when vector conversion fails', async () => {
     const { runAdvancedExport } = await import('../advancedExportActions');
-    exportRenderSceneToPdfBlob.mockRejectedValueOnce(new Error('vector conversion failed'));
+    const vectorFailure = new Error('vector conversion failed');
+    exportRenderSceneToPdfBlob.mockRejectedValueOnce(vectorFailure);
 
-    const result = await runAdvancedExport({
+    await expect(runAdvancedExport({
       diagramId: 'diagram-pdf-fallback',
       nodes: [{ id: 'legacy-node' }],
       format: 'pdf',
@@ -210,20 +202,34 @@ describe('runAdvancedExport', () => {
       includeBackground: true,
       embedMetadata: false,
       getReactFlowSnapshot: () => snapshot as unknown as ReactFlowRenderSnapshot,
-    });
+    })).rejects.toBe(vectorFailure);
 
-    expect(result).toBe('fallback');
-    expect(safeWarn).toHaveBeenCalledWith(
-      'Vector PDF export failed; using bounded raster fallback:',
-      '[redacted]',
-    );
-    expect(downloadImage).toHaveBeenCalledWith([{ id: 'legacy-node' }], {
+    expect(downloadImage).not.toHaveBeenCalled();
+    expect(triggerDownload).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['missing provider', undefined],
+    ['empty snapshot', () => null],
+  ])('rejects vector PDF export for a %s', async (_name, getReactFlowSnapshot) => {
+    const { AdvancedExportError, runAdvancedExport } = await import('../advancedExportActions');
+
+    const operation = runAdvancedExport({
+      diagramId: 'diagram-pdf-no-scene',
+      nodes: [{ id: 'legacy-node' }],
       format: 'pdf',
-      pixelRatio: 2,
+      pixelRatio: 4,
       includeBackground: true,
       embedMetadata: false,
-      fileNameBase: 'diagram-pdf-fallback',
+      getReactFlowSnapshot,
     });
+
+    await expect(operation).rejects.toBeInstanceOf(AdvancedExportError);
+    await expect(operation).rejects.toMatchObject({
+      code: 'ADVANCED_EXPORT_VECTOR_PDF_SNAPSHOT_REQUIRED',
+    });
+    expect(exportRenderSceneToPdfBlob).not.toHaveBeenCalled();
+    expect(downloadImage).not.toHaveBeenCalled();
   });
 
   it('falls back to legacy image export for unsupported formats or missing snapshots', async () => {
