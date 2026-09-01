@@ -62,6 +62,10 @@ import { DISPLAY_ROUTING_MATRIX_PRESET_TARGETS } from './lib/display-routing-mat
 import { readDisplayRoutingLayoutDiagnostics } from './lib/display-routing-layout-diagnostics.mjs';
 import { auditDisplayRoutingLayoutSemantics } from './lib/display-routing-semantic-audit.mjs';
 import { parseSavedDisplayRoutingMode, verifySavedDisplayRoutingRoundtrip } from './lib/display-routing-saved-roundtrip.mjs';
+import {
+  startDisplayRoutingCpuProfile,
+  stopDisplayRoutingCpuProfile,
+} from './lib/display-routing-cpu-profile.mjs';
 
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '').trim().replace(/\/$/, '');
 const WAIT_TIMEOUT_MS = parseDisplayRoutingMatrixTimeoutMs(
@@ -71,6 +75,7 @@ const MAX_LAYOUT_ROUTE_MS = 30_000;
 const SAVED_RELOAD_MODE = parseSavedDisplayRoutingMode(process.env.DISPLAY_ROUTING_MATRIX_SAVED_RELOAD);
 const MATRIX_VIEWPORT = parseDisplayRoutingMatrixViewport(process.env.DISPLAY_ROUTING_MATRIX_VIEWPORT);
 const VISUAL_SETTLE_TIMEOUT_MS = resolveDisplayRoutingLayoutVisualTimeoutMs(WAIT_TIMEOUT_MS);
+const INCLUDE_CPU_PROFILE = process.env.DISPLAY_ROUTING_MATRIX_CPU_PROFILE === '1';
 const MATRIX_CASE_IDS = createDisplayRoutingMatrixCaseIds(
   PRECOMPILED_DISPLAY_ROUTE_TARGETS.map(target => target.presetId),
 );
@@ -423,12 +428,20 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
   const previousLayoutJobId = await session.evaluate(
     'window.__vizlyBaseReactFlowDisplayRouting?.layoutTransactionJobId ?? 0',
   );
-  const clickedAt = await clickLayout(session, layoutCase);
-  const route = await waitForValue(
-    session,
-    readFinalRouteExpression('layout:', previousLayoutJobId),
-    `${layoutCase.id} layout route`,
-  );
+  const cpuProfileStarted = await startDisplayRoutingCpuProfile(session, INCLUDE_CPU_PROFILE);
+  let clickedAt;
+  let route;
+  let cpuProfile;
+  try {
+    clickedAt = await clickLayout(session, layoutCase);
+    route = await waitForValue(
+      session,
+      readFinalRouteExpression('layout:', previousLayoutJobId),
+      `${layoutCase.id} layout route`,
+    );
+  } finally {
+    cpuProfile = await stopDisplayRoutingCpuProfile(session, cpuProfileStarted);
+  }
   const visualSettle = await waitForStableDisplayRoutingLayoutVisual({
     session,
     expectedRequestId: route.routing.requestId,
@@ -722,6 +735,7 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
   }
   return {
     id: layoutCase.id,
+    cpuProfile,
     resolution: route.response.routeResolution,
     initialRouteMs,
     initialWorkerRouteMs: Number.isFinite(initialRoute.request?.__browserCapturedAt)
