@@ -140,7 +140,10 @@ const SwimLaneNode: React.FC<NodeProps<Node<SwimLaneNodeData>>> = ({ id, data, s
     }, [id, direction, getNodes, getNode, setNodes]);
 
     return (
-        <div className={`swimlane-node ${selected ? 'selected' : ''}`}>
+        <div
+            className={`swimlane-node ${selected ? 'selected' : ''}`}
+            data-vizly-export-node-id={id}
+        >
             {/* Resizer */}
             <NodeResizer
                 minWidth={400}
@@ -154,13 +157,17 @@ const SwimLaneNode: React.FC<NodeProps<Node<SwimLaneNodeData>>> = ({ id, data, s
             />
 
             {/* Header */}
-            <div className="swimlane-header">
+            <div
+                className="swimlane-header"
+                data-vizly-export-node-header="true"
+                data-vizly-export-node-content="true"
+            >
                 <span className="swimlane-header-icon">🏊</span>
                 <span className="swimlane-header-label">{label}</span>
             </div>
 
             {/* Content: titleGroup children rendered by React Flow via parentId */}
-            <div className="swimlane-content" />
+            <div className="swimlane-content" data-vizly-export-node-body="true" />
 
             {/* 🔥 Overlay Actions (Add Row/Col) */}
             <div 

@@ -156,6 +156,7 @@ const TitleGroupNode = React.memo(({ id, data, selected }: NodeProps<Node<TitleG
   return (
     <div
       {...containerAccessibility}
+      data-vizly-export-node-id={id}
       className={`title-group-node ${data?.hidden ? 'hidden' : ''} ${preset?.name === 'glass' ? 'glass' : ''} ${preset?.name === 'blueprint' ? 'blueprint' : ''} ${data.isDropTarget ? 'drop-target' : ''}`}
       style={nodeStyle}
     >
@@ -173,7 +174,11 @@ const TitleGroupNode = React.memo(({ id, data, selected }: NodeProps<Node<TitleG
 
       {renderDebugOverlay()}
 
-      <div className="title-group-bar">
+      <div
+        className="title-group-bar"
+        data-vizly-export-node-header="true"
+        data-vizly-export-node-content="true"
+      >
         {data.iconSvg && (
           <div
             className="title-group-icon"
@@ -235,7 +240,7 @@ const TitleGroupNode = React.memo(({ id, data, selected }: NodeProps<Node<TitleG
         )}
       </div>
 
-      <div className="title-group-content">
+      <div className="title-group-content" data-vizly-export-node-body="true">
         {/* Children rendered by React Flow via nested nodes, this div just provides background/border */}
       </div>
 

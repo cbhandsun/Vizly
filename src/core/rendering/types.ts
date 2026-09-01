@@ -73,6 +73,9 @@ export interface RenderNodeContainerMetadata {
   laneCount: number;
   laneDirection: 'horizontal' | 'vertical';
   headerColor?: string;
+  headerTextColor?: string;
+  headerHeight?: number;
+  headerOpacity?: number;
 }
 
 export interface RenderEdgeMarker {

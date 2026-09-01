@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import type { Edge, Node, ReactFlowInstance } from '@xyflow/react';
 import { useDiagramControls } from '../../../hooks/useDiagramControls';
 import type { DiagramExportFormat } from '../../../types/diagram-components';
+import { enrichSnapshotWithRenderedNodeStyles } from '../../../rendering/reactFlowDomSnapshotStyles';
 import { runPermittedFlowchartExport } from '../flowchartExportAccess';
 
 export const useFlowchartExportControls = (
@@ -11,12 +12,14 @@ export const useFlowchartExportControls = (
 ) => {
   const getReactFlowSnapshot = useCallback(() => {
     if (!reactFlowInstance) return null;
-    return {
+    return enrichSnapshotWithRenderedNodeStyles({
       nodes: reactFlowInstance.getNodes(),
       edges: reactFlowInstance.getEdges(),
       viewport: reactFlowInstance.getViewport(),
-    };
-  }, [reactFlowInstance]);
+    }, typeof document === 'undefined'
+      ? undefined
+      : document.getElementById(`diagram-${diagramId}`) ?? document);
+  }, [diagramId, reactFlowInstance]);
 
   const controls = useDiagramControls(diagramId, false, { getReactFlowSnapshot });
   const exportToSVG = useCallback(() => runPermittedFlowchartExport(

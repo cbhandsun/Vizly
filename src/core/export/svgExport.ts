@@ -314,9 +314,13 @@ const tableNodeToSvg = (node: RenderNodeGeometry, strokeDash: string): string =>
 
 const containerNodeChromeToSvg = (node: RenderNodeGeometry): string => {
   if (!node.container) return '';
-  const headerHeight = node.container.isLane ? 30 : node.container.isSwimlane ? 40 : 34;
+  const headerHeight = node.container.headerHeight
+    ?? (node.container.isLane ? 30 : node.container.isSwimlane ? 40 : 34);
   const headerFill = node.container.headerColor || (node.container.isSwimlane ? node.stroke : '#f8fafc');
-  const titleFill = node.container.isSwimlane ? '#ffffff' : node.textColor;
+  const titleFill = node.container.headerTextColor
+    || (node.container.isSwimlane ? '#ffffff' : node.textColor);
+  const headerOpacity = node.container.headerOpacity
+    ?? (node.container.isSwimlane ? 0.95 : 0.72);
   const title = truncateText(node.label, Math.max(10, Math.floor(node.width / 9)));
   const titleX = node.x + 14;
   const titleY = node.y + headerHeight / 2;
@@ -327,7 +331,7 @@ const containerNodeChromeToSvg = (node: RenderNodeGeometry): string => {
     ? `<g class="vizly-export-collapse-badge"><rect${attr('x', node.x + node.width - 24)}${attr('y', node.y + 8)} width="16" height="16" rx="8" fill="#ffffff" opacity="0.92"/><text${attr('x', node.x + node.width - 16)}${attr('y', node.y + 16)} text-anchor="middle" dominant-baseline="central" font-family="Inter, Arial, sans-serif" font-size="12" font-weight="700"${attr('fill', node.stroke)}>+</text></g>`
     : '';
   return [
-    `<rect${attr('x', node.x)}${attr('y', node.y)}${attr('width', node.width)}${attr('height', headerHeight)}${attr('fill', headerFill)} opacity="${node.container.isSwimlane ? '0.95' : '0.72'}"/>`,
+    `<rect${attr('x', node.x)}${attr('y', node.y)}${attr('width', node.width)}${attr('height', headerHeight)}${attr('fill', headerFill)}${attr('opacity', headerOpacity)}/>`,
     `<line${attr('x1', node.x)}${attr('y1', node.y + headerHeight)}${attr('x2', node.x + node.width)}${attr('y2', node.y + headerHeight)}${attr('stroke', node.stroke)} stroke-width="0.9" opacity="0.75"/>`,
     `<text${attr('x', titleX)}${attr('y', titleY)} text-anchor="start" dominant-baseline="central" font-family="Inter, Arial, sans-serif" font-size="${node.container.isSwimlane ? '13' : '12'}" font-weight="700"${attr('fill', titleFill)}>${escapeXml(title)}</text>`,
     childBadge,

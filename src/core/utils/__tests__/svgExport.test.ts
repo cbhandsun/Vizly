@@ -544,4 +544,33 @@ describe('svgExport', () => {
     expect(svg).toContain('stroke-dasharray="4 4"');
     expect(svg).not.toContain('foreignObject');
   });
+
+  it('preserves captured container header paint, text, height, opacity and solid border', () => {
+    const scene = buildRenderSceneFromReactFlow([{
+      id: 'domain',
+      type: 'titleGroup',
+      position: { x: 0, y: 0 },
+      measured: { width: 280, height: 180 },
+      data: {
+        label: 'Domain',
+        __vizlyExportStyle: {
+          fill: 'rgb(255, 255, 255)',
+          stroke: 'rgb(133, 164, 192)',
+          strokeWidth: 1,
+          strokeDasharray: '',
+          textColor: 'rgb(31, 41, 55)',
+          headerFill: 'rgb(147, 169, 189)',
+          headerTextColor: 'rgb(31, 41, 55)',
+          headerHeight: 50,
+          headerOpacity: 1,
+        },
+      },
+    } as Node], []);
+    const svg = exportRenderSceneToSvg(scene);
+
+    expect(svg).toContain('<rect x="0" y="0" width="280" height="180" rx="10" fill="rgb(255, 255, 255)" stroke="rgb(133, 164, 192)" stroke-width="1"/>');
+    expect(svg).toContain('<rect x="0" y="0" width="280" height="50" fill="rgb(147, 169, 189)" opacity="1"/>');
+    expect(svg).toContain('y="25" text-anchor="start"');
+    expect(svg).toContain('fill="rgb(31, 41, 55)">Domain</text>');
+  });
 });

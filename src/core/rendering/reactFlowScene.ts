@@ -208,6 +208,7 @@ const normalizeContainerMetadata = (
   node: Node,
   data: Record<string, unknown> | undefined,
   shape: string | undefined,
+  exportStyle: Record<string, unknown>,
 ): RenderNodeGeometry['container'] | undefined => {
   const type = String(node.type ?? '').toLowerCase();
   const isSwimlane = type.includes('swimlane') || String(data?.shape ?? '').toLowerCase().includes('swimlane');
@@ -225,7 +226,13 @@ const normalizeContainerMetadata = (
     childCount,
     laneCount,
     laneDirection: normalizeLaneDirection(data?.direction ?? data?.laneDirection),
-    headerColor: normalizeSvgPaint(data?.themeColor ?? dataStyle?.backgroundColor ?? dataStyle?.borderColor, ''),
+    headerColor: normalizeSvgPaint(
+      exportStyle.headerFill ?? data?.themeColor ?? dataStyle?.backgroundColor ?? dataStyle?.borderColor,
+      '',
+    ),
+    headerTextColor: normalizeSvgPaint(exportStyle.headerTextColor, ''),
+    headerHeight: coerceRenderNumber(exportStyle.headerHeight, isLane ? 30 : isSwimlane ? 40 : 34, 1, 200),
+    headerOpacity: coerceRenderNumber(exportStyle.headerOpacity, isSwimlane ? 0.95 : 0.72, 0, 1),
   };
 };
 
@@ -253,7 +260,8 @@ const buildNode = (node: Node, position: RenderPoint): RenderNodeGeometry | null
   const tableColumns = normalizeTableColumns(data?.columns);
   const label = firstText(data?.tableName, data?.title, data?.label, data?.description, renderNode.label, node.id);
   const subtitle = firstText(data?.subtitle, data?.caption, data?.description);
-  const container = normalizeContainerMetadata(node, data, shape);
+  const container = normalizeContainerMetadata(node, data, shape, exportStyle);
+  const hasCapturedStrokeDasharray = Object.prototype.hasOwnProperty.call(exportStyle, 'strokeDasharray');
   return {
     id: String(node.id),
     x: position.x,
@@ -273,7 +281,9 @@ const buildNode = (node: Node, position: RenderPoint): RenderNodeGeometry | null
     strokeWidth: coerceRenderNumber(exportStyle.strokeWidth, 1.2, 0.1, 24),
     textColor: normalizeSvgPaint(exportStyle.textColor, dataStyleColor(data, node.style, 'color', defaultTheme.textColor)),
     strokeDasharray: shape === 'group'
-      ? (normalizeSvgStrokeDasharray(nodeStyle.strokeDasharray) || normalizeSvgStrokeDasharray(dataStyle?.strokeDasharray) || '6 4')
+      ? (hasCapturedStrokeDasharray
+        ? normalizeSvgStrokeDasharray(exportStyle.strokeDasharray)
+        : normalizeSvgStrokeDasharray(nodeStyle.strokeDasharray) || normalizeSvgStrokeDasharray(dataStyle?.strokeDasharray) || '6 4')
       : (normalizeSvgStrokeDasharray(nodeStyle.strokeDasharray) || normalizeSvgStrokeDasharray(dataStyle?.strokeDasharray)),
     borderRadius: coerceRenderNumber(exportStyle.borderRadius, normalizeBorderRadius(node.style ?? dataStyle, shape), 0, 80),
     fontSize: coerceRenderNumber(exportStyle.fontSize ?? nodeStyle.fontSize ?? dataStyle?.fontSize, 13, 8, 48),

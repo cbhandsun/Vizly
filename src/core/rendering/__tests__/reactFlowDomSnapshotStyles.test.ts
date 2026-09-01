@@ -59,4 +59,28 @@ describe('enrichSnapshotWithRenderedNodeStyles', () => {
       accent: { position: 'left', size: 0.56 },
     });
   });
+
+  it('captures rendered container body, header and solid-border styles', () => {
+    document.body.innerHTML = `
+      <div data-vizly-export-node-id="domain" style="border:0.56px solid rgb(133,164,192);border-radius:6px">
+        <div data-vizly-export-node-header="true" data-vizly-export-node-content="true"
+          style="height:50px;background:linear-gradient(rgb(158,178,196),rgb(147,169,189));color:rgb(31,41,55);font-size:16px;font-weight:700"></div>
+        <div data-vizly-export-node-body="true" style="background-color:rgb(255,255,255)"></div>
+      </div>`;
+    const result = enrichSnapshotWithRenderedNodeStyles({
+      nodes: [{ id: 'domain', type: 'titleGroup', position: { x: 0, y: 0 }, data: {} } as Node],
+      edges: [],
+    }, document);
+
+    expect(result.nodes[0].data?.__vizlyExportStyle).toMatchObject({
+      fill: 'rgb(255, 255, 255)',
+      stroke: 'rgb(133, 164, 192)',
+      strokeWidth: 1,
+      strokeDasharray: '',
+      headerFill: 'rgb(158, 178, 196)',
+      headerTextColor: 'rgb(31, 41, 55)',
+      headerHeight: 50,
+      headerOpacity: 1,
+    });
+  });
 });

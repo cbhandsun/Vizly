@@ -33,6 +33,10 @@ const boundedFontFamily = (value: string): string | undefined => {
 
 const captureSurfaceStyle = (surface: HTMLElement): Record<string, unknown> => {
   const surfaceStyle = window.getComputedStyle(surface);
+  const body = surface.querySelector<HTMLElement>('[data-vizly-export-node-body="true"]');
+  const bodyStyle = body ? window.getComputedStyle(body) : surfaceStyle;
+  const header = surface.querySelector<HTMLElement>('[data-vizly-export-node-header="true"]');
+  const headerStyle = header ? window.getComputedStyle(header) : null;
   const content = surface.querySelector<HTMLElement>('[data-vizly-export-node-content="true"]');
   const contentStyle = content ? window.getComputedStyle(content) : surfaceStyle;
   const accent = surface.querySelector<HTMLElement>('[data-vizly-export-node-accent="true"]');
@@ -45,9 +49,10 @@ const captureSurfaceStyle = (surface: HTMLElement): Record<string, unknown> => {
   const accentSize = accentPosition === 'left' ? accentWidth : accentHeight;
 
   return {
-    fill: firstComputedPaint(surfaceStyle),
+    fill: firstComputedPaint(bodyStyle) || firstComputedPaint(surfaceStyle),
     stroke: surfaceStyle.borderColor,
     strokeWidth: exportBorderWidth(surfaceStyle.borderTopWidth),
+    strokeDasharray: surfaceStyle.borderTopStyle === 'dashed' ? '6 4' : '',
     borderRadius: finiteCssPixel(
       surface.style.borderTopLeftRadius
       || surface.style.borderRadius
@@ -61,6 +66,12 @@ const captureSurfaceStyle = (surface: HTMLElement): Record<string, unknown> => {
     textAlign: contentStyle.textAlign,
     paddingLeft: finiteCssPixel(surfaceStyle.paddingLeft),
     paddingTop: finiteCssPixel(surfaceStyle.paddingTop),
+    headerFill: headerStyle
+      ? firstComputedPaint(headerStyle) || firstComputedPaint(bodyStyle) || firstComputedPaint(surfaceStyle)
+      : undefined,
+    headerTextColor: headerStyle?.color,
+    headerHeight: headerStyle ? finiteCssPixel(headerStyle.height) : undefined,
+    headerOpacity: headerStyle ? 1 : undefined,
     accent: accentStyle && accentSize !== undefined
       ? { position: accentPosition, size: accentSize, color: firstComputedPaint(accentStyle) }
       : undefined,

@@ -27,6 +27,10 @@ vi.mock('../../../shared/diagramControl', () => ({
 
 describe('useFlowchartExportControls', () => {
   it('passes an explicit React Flow snapshot to SVG export actions', async () => {
+    document.body.innerHTML = `
+      <div id="diagram-diagram-1">
+        <div data-vizly-export-node-id="n1" style="background-color:rgb(1,2,3);border:1px solid rgb(4,5,6)"></div>
+      </div>`;
     const reactFlowInstance = {
       getNodes: vi.fn(() => [{ id: 'n1' }]),
       getEdges: vi.fn(() => [{ id: 'e1', source: 'n1', target: 'n2' }]),
@@ -36,7 +40,10 @@ describe('useFlowchartExportControls', () => {
     const { result } = renderHook(() => useFlowchartExportControls('diagram-1', reactFlowInstance as any));
 
     expect(result.current.getReactFlowSnapshot()).toEqual({
-      nodes: [{ id: 'n1' }],
+      nodes: [{ id: 'n1', data: { __vizlyExportStyle: expect.objectContaining({
+        fill: 'rgb(1, 2, 3)',
+        stroke: 'rgb(4, 5, 6)',
+      }) } }],
       edges: [{ id: 'e1', source: 'n1', target: 'n2' }],
       viewport: { x: 1, y: 2, zoom: 1.25 },
     });
@@ -48,7 +55,10 @@ describe('useFlowchartExportControls', () => {
     const context = exportDiagramToSVG.mock.calls[0]?.[0];
     expect(context?.diagramId).toBe('diagram-1');
     expect(context?.getReactFlowSnapshot?.()).toEqual({
-      nodes: [{ id: 'n1' }],
+      nodes: [{ id: 'n1', data: { __vizlyExportStyle: expect.objectContaining({
+        fill: 'rgb(1, 2, 3)',
+        stroke: 'rgb(4, 5, 6)',
+      }) } }],
       edges: [{ id: 'e1', source: 'n1', target: 'n2' }],
       viewport: { x: 1, y: 2, zoom: 1.25 },
     });

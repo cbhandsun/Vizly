@@ -147,6 +147,7 @@ const SubGroupNode = ({ id, data, zIndex, selected, isConnectable }: NodeProps<N
   return (
     <div
       {...containerAccessibility}
+      data-vizly-export-node-id={id}
       className={`sub-group-node ${selected ? 'selected' : ''} ${data.hidden ? 'hidden' : ''} ${preset?.name === 'glass' ? 'glass' : ''} ${preset?.name === 'blueprint' ? 'blueprint' : ''} ${data.isDropTarget ? 'drop-target' : ''}`}
       style={{
         zIndex,
@@ -195,6 +196,8 @@ const SubGroupNode = ({ id, data, zIndex, selected, isConnectable }: NodeProps<N
 
       <div
         className="sub-group-title"
+        data-vizly-export-node-header="true"
+        data-vizly-export-node-content="true"
         style={{
           fontWeight: preset?.subdomain?.titleFontWeight ?? 600,
           fontSize: `${(preset?.subdomain?.titleFontSize ?? theme?.typography?.fontSize?.lg ?? theme?.typography?.fontSize?.md ?? 16)}px`,
