@@ -563,6 +563,9 @@ describe('svgExport', () => {
           headerTextColor: 'rgb(31, 41, 55)',
           headerHeight: 50,
           headerOpacity: 1,
+          headerFontSize: 16,
+          headerFontWeight: 700,
+          headerTextTransform: 'uppercase',
         },
       },
     } as Node], []);
@@ -571,6 +574,6 @@ describe('svgExport', () => {
     expect(svg).toContain('<rect x="0" y="0" width="280" height="180" rx="10" fill="rgb(255, 255, 255)" stroke="rgb(133, 164, 192)" stroke-width="1"/>');
     expect(svg).toContain('<rect x="0" y="0" width="280" height="50" fill="rgb(147, 169, 189)" opacity="1"/>');
     expect(svg).toContain('y="25" text-anchor="start"');
-    expect(svg).toContain('fill="rgb(31, 41, 55)">Domain</text>');
+    expect(svg).toContain('font-size="16" font-weight="700" fill="rgb(31, 41, 55)">DOMAIN</text>');
   });
 });

@@ -72,6 +72,9 @@ const captureSurfaceStyle = (surface: HTMLElement): Record<string, unknown> => {
     headerTextColor: headerStyle?.color,
     headerHeight: headerStyle ? finiteCssPixel(headerStyle.height) : undefined,
     headerOpacity: headerStyle ? 1 : undefined,
+    headerFontSize: headerStyle ? finiteCssPixel(headerStyle.fontSize) : undefined,
+    headerFontWeight: headerStyle?.fontWeight,
+    headerTextTransform: headerStyle?.textTransform,
     accent: accentStyle && accentSize !== undefined
       ? { position: accentPosition, size: accentSize, color: firstComputedPaint(accentStyle) }
       : undefined,

@@ -76,6 +76,9 @@ export interface RenderNodeContainerMetadata {
   headerTextColor?: string;
   headerHeight?: number;
   headerOpacity?: number;
+  headerFontSize?: number;
+  headerFontWeight?: number;
+  headerTextTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
 }
 
 export interface RenderEdgeMarker {

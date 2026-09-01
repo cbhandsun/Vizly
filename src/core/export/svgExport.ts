@@ -321,7 +321,16 @@ const containerNodeChromeToSvg = (node: RenderNodeGeometry): string => {
     || (node.container.isSwimlane ? '#ffffff' : node.textColor);
   const headerOpacity = node.container.headerOpacity
     ?? (node.container.isSwimlane ? 0.95 : 0.72);
-  const title = truncateText(node.label, Math.max(10, Math.floor(node.width / 9)));
+  const transformedTitle = node.container.headerTextTransform === 'uppercase'
+    ? node.label.toLocaleUpperCase()
+    : node.container.headerTextTransform === 'lowercase'
+      ? node.label.toLocaleLowerCase()
+      : node.container.headerTextTransform === 'capitalize'
+        ? node.label.replace(/(^|\s)(\S)/gu, (_match, prefix: string, character: string) => (
+          `${prefix}${character.toLocaleUpperCase()}`
+        ))
+        : node.label;
+  const title = truncateText(transformedTitle, Math.max(10, Math.floor(node.width / 9)));
   const titleX = node.x + 14;
   const titleY = node.y + headerHeight / 2;
   const childBadge = node.container.childCount > 0
@@ -333,7 +342,7 @@ const containerNodeChromeToSvg = (node: RenderNodeGeometry): string => {
   return [
     `<rect${attr('x', node.x)}${attr('y', node.y)}${attr('width', node.width)}${attr('height', headerHeight)}${attr('fill', headerFill)}${attr('opacity', headerOpacity)}/>`,
     `<line${attr('x1', node.x)}${attr('y1', node.y + headerHeight)}${attr('x2', node.x + node.width)}${attr('y2', node.y + headerHeight)}${attr('stroke', node.stroke)} stroke-width="0.9" opacity="0.75"/>`,
-    `<text${attr('x', titleX)}${attr('y', titleY)} text-anchor="start" dominant-baseline="central" font-family="Inter, Arial, sans-serif" font-size="${node.container.isSwimlane ? '13' : '12'}" font-weight="700"${attr('fill', titleFill)}>${escapeXml(title)}</text>`,
+    `<text${attr('x', titleX)}${attr('y', titleY)} text-anchor="start" dominant-baseline="central" font-family="Inter, Arial, sans-serif"${attr('font-size', node.container.headerFontSize ?? (node.container.isSwimlane ? 13 : 12))}${attr('font-weight', node.container.headerFontWeight ?? 700)}${attr('fill', titleFill)}>${escapeXml(title)}</text>`,
     childBadge,
     collapse,
   ].join('');

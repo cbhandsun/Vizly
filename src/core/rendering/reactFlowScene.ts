@@ -218,6 +218,9 @@ const normalizeContainerMetadata = (
   const laneCount = coerceRenderNumber(data?.laneCount, 0, 0, 24);
   const childCount = coerceRenderNumber(data?.childCount ?? data?.childrenCount, 0, 0, 999);
   const dataStyle = data?.style as Record<string, unknown> | undefined;
+  const headerTextTransform = ['none', 'uppercase', 'lowercase', 'capitalize'].includes(
+    String(exportStyle.headerTextTransform),
+  ) ? exportStyle.headerTextTransform as 'none' | 'uppercase' | 'lowercase' | 'capitalize' : 'none';
   return {
     isContainer: true,
     isSwimlane,
@@ -233,6 +236,9 @@ const normalizeContainerMetadata = (
     headerTextColor: normalizeSvgPaint(exportStyle.headerTextColor, ''),
     headerHeight: coerceRenderNumber(exportStyle.headerHeight, isLane ? 30 : isSwimlane ? 40 : 34, 1, 200),
     headerOpacity: coerceRenderNumber(exportStyle.headerOpacity, isSwimlane ? 0.95 : 0.72, 0, 1),
+    headerFontSize: coerceRenderNumber(exportStyle.headerFontSize, isSwimlane ? 13 : 12, 8, 48),
+    headerFontWeight: coerceRenderNumber(exportStyle.headerFontWeight, 700, 100, 900),
+    headerTextTransform,
   };
 };
 
