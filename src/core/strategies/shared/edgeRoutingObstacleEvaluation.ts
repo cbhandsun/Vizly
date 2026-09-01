@@ -4,6 +4,14 @@ import { segmentIntersectsClearanceRect } from './edgeNodeClearanceGeometry';
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
 type PaddedRectBounds = { x1: number; y1: number; x2: number; y2: number };
+type SegmentHitReferenceEntry = Readonly<{
+  ax: number;
+  ay: number;
+  bx: number;
+  by: number;
+  hitCount: number;
+}>;
+type SegmentHitReferenceCache = WeakMap<Point, WeakMap<Point, SegmentHitReferenceEntry>>;
 
 export type RoutingObstacleHitEvaluation = Readonly<{
   endpointNodeTraversalHits: number;
@@ -30,6 +38,33 @@ const paddedRectBounds = (rect: Rect, padding: number): PaddedRectBounds => ({
   y2: rect.y + rect.height + padding,
 });
 
+const retainSegmentHitResult = (
+  segmentKey: string | null,
+  segmentHitCache: Map<string, number> | undefined,
+  segmentHitReferenceCache: SegmentHitReferenceCache | undefined,
+  a: Point,
+  b: Point,
+  hitCount: number,
+): void => {
+  if (!segmentKey) return;
+  if (segmentHitCache && segmentHitCache.size < MAX_SEGMENT_HIT_CACHE_ENTRIES) {
+    segmentHitCache.set(segmentKey, hitCount);
+  }
+  if (!segmentHitReferenceCache) return;
+  let byEndPoint = segmentHitReferenceCache.get(a);
+  if (!byEndPoint) {
+    byEndPoint = new WeakMap();
+    segmentHitReferenceCache.set(a, byEndPoint);
+  }
+  byEndPoint.set(b, {
+    ax: a.x,
+    ay: a.y,
+    bx: b.x,
+    by: b.y,
+    hitCount,
+  });
+};
+
 const countPathRectHits = (
   path: Point[],
   rects: readonly PaddedRectBounds[],
@@ -37,6 +72,7 @@ const countPathRectHits = (
   maximumHits?: number,
   segmentHitCache?: Map<string, number>,
   onCacheHit?: () => void,
+  segmentHitReferenceCache?: SegmentHitReferenceCache,
 ): number => {
   const boundedMaximum = Number.isSafeInteger(maximumHits) && (maximumHits ?? -1) >= 0
     ? maximumHits
@@ -48,6 +84,21 @@ const countPathRectHits = (
     const deltaX = Math.abs(a.x - b.x);
     const deltaY = Math.abs(a.y - b.y);
     if (!(deltaX > ORTHOGONAL_TOLERANCE || deltaY > ORTHOGONAL_TOLERANCE)) continue;
+    const referenceEntry = segmentHitReferenceCache?.get(a)?.get(b);
+    if (
+      referenceEntry
+      && referenceEntry.ax === a.x
+      && referenceEntry.ay === a.y
+      && referenceEntry.bx === b.x
+      && referenceEntry.by === b.y
+    ) {
+      onCacheHit?.();
+      if (boundedMaximum !== undefined && hits + referenceEntry.hitCount > boundedMaximum) {
+        return boundedMaximum + 1;
+      }
+      hits += referenceEntry.hitCount;
+      continue;
+    }
     const segmentKey = Number.isFinite(a.x)
       && Number.isFinite(a.y)
       && Number.isFinite(b.x)
@@ -56,6 +107,14 @@ const countPathRectHits = (
       : null;
     const cachedSegmentHits = segmentKey ? segmentHitCache?.get(segmentKey) : undefined;
     if (typeof cachedSegmentHits === 'number') {
+      retainSegmentHitResult(
+        segmentKey,
+        undefined,
+        segmentHitReferenceCache,
+        a,
+        b,
+        cachedSegmentHits,
+      );
       onCacheHit?.();
       if (boundedMaximum !== undefined && hits + cachedSegmentHits > boundedMaximum) {
         return boundedMaximum + 1;
@@ -81,11 +140,14 @@ const countPathRectHits = (
         }
       }
       onNodeScan?.(rects.length);
-      if (
-        segmentKey
-        && segmentHitCache
-        && segmentHitCache.size < MAX_SEGMENT_HIT_CACHE_ENTRIES
-      ) segmentHitCache.set(segmentKey, hits - hitsBeforeSegment);
+      retainSegmentHitResult(
+        segmentKey,
+        segmentHitCache,
+        segmentHitReferenceCache,
+        a,
+        b,
+        hits - hitsBeforeSegment,
+      );
       continue;
     }
 
@@ -105,11 +167,14 @@ const countPathRectHits = (
         }
       }
       onNodeScan?.(rects.length);
-      if (
-        segmentKey
-        && segmentHitCache
-        && segmentHitCache.size < MAX_SEGMENT_HIT_CACHE_ENTRIES
-      ) segmentHitCache.set(segmentKey, hits - hitsBeforeSegment);
+      retainSegmentHitResult(
+        segmentKey,
+        segmentHitCache,
+        segmentHitReferenceCache,
+        a,
+        b,
+        hits - hitsBeforeSegment,
+      );
       continue;
     }
 
@@ -128,9 +193,14 @@ const countPathRectHits = (
       }
     }
     onNodeScan?.(rects.length);
-    if (segmentKey && segmentHitCache && segmentHitCache.size < MAX_SEGMENT_HIT_CACHE_ENTRIES) {
-      segmentHitCache.set(segmentKey, hits - hitsBeforeSegment);
-    }
+    retainSegmentHitResult(
+      segmentKey,
+      segmentHitCache,
+      segmentHitReferenceCache,
+      a,
+      b,
+      hits - hitsBeforeSegment,
+    );
   }
   return hits;
 };
@@ -157,6 +227,9 @@ export function createRoutingObstacleEvaluationContext(
   const unrelatedSegmentHits = new Map<string, number>();
   const endpointSegmentHits = new Map<string, number>();
   const routingSegmentHits = new Map<string, number>();
+  const unrelatedSegmentHitsByReference: SegmentHitReferenceCache = new WeakMap();
+  const endpointSegmentHitsByReference: SegmentHitReferenceCache = new WeakMap();
+  const routingSegmentHitsByReference: SegmentHitReferenceCache = new WeakMap();
   const recordNodeScans = (count: number) => {
     scannedNodeCount += count;
   };
@@ -171,6 +244,7 @@ export function createRoutingObstacleEvaluationContext(
       maximumHits,
       unrelatedSegmentHits,
       recordCacheHit,
+      unrelatedSegmentHitsByReference,
     )
   );
   const countEndpointPathHits = (path: Point[]): number => (
@@ -181,6 +255,7 @@ export function createRoutingObstacleEvaluationContext(
       undefined,
       endpointSegmentHits,
       recordCacheHit,
+      endpointSegmentHitsByReference,
     )
   );
 
@@ -193,6 +268,7 @@ export function createRoutingObstacleEvaluationContext(
       undefined,
       routingSegmentHits,
       recordCacheHit,
+      routingSegmentHitsByReference,
     ),
     countUnrelatedObstacleHits: countUnrelatedPathHits,
     readMetrics: () => ({ cacheHitCount, scannedNodeCount }),

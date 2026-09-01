@@ -316,6 +316,26 @@ describe('routing obstacle evaluation context', () => {
     expect(context.readMetrics().cacheHitCount).toBe(1);
   });
 
+  it('invalidates a reference hit when a segment point changes in place', () => {
+    const context = createRoutingObstacleEvaluationContext(
+      edge('missing-source', 'missing-target'),
+      new Map([['block', { x: 10, y: 0, width: 10, height: 20 }]]),
+    );
+    const path = [{ x: 0, y: 10 }, { x: 40, y: 10 }];
+
+    expect(context.countUnrelatedObstacleHits(path)).toBe(1);
+    expect(context.countUnrelatedObstacleHits(path)).toBe(1);
+    const afterReferenceHit = context.readMetrics();
+
+    path[0].y = 50;
+    path[1].y = 50;
+    expect(context.countUnrelatedObstacleHits(path)).toBe(0);
+    expect(context.readMetrics()).toEqual({
+      cacheHitCount: afterReferenceHit.cacheHitCount,
+      scannedNodeCount: afterReferenceHit.scannedNodeCount + 1,
+    });
+  });
+
   it('stops only after proving that a bounded obstacle threshold was exceeded', () => {
     const obstacles = new Map<string, Rect>([
       ['first', { x: 10, y: 0, width: 10, height: 20 }],
