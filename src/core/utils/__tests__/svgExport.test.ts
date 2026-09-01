@@ -227,6 +227,48 @@ describe('svgExport', () => {
     expect(svg).toContain('opacity="0.92"');
   });
 
+  it('paints container backgrounds below edges and foreground nodes', () => {
+    const scene = buildRenderSceneFromReactFlow([
+      {
+        id: 'container',
+        type: 'titleGroup',
+        position: { x: 0, y: 0 },
+        measured: { width: 360, height: 220 },
+        data: { label: 'Domain', themeColor: '#2563eb' },
+      } as Node,
+      {
+        id: 'source',
+        position: { x: 40, y: 80 },
+        measured: { width: 100, height: 50 },
+        data: { label: 'Source' },
+      } as Node,
+      {
+        id: 'target',
+        position: { x: 220, y: 80 },
+        measured: { width: 100, height: 50 },
+        data: { label: 'Target' },
+      } as Node,
+    ], [{
+      id: 'route',
+      source: 'source',
+      target: 'target',
+      label: 'Visible route',
+      markerEnd: { type: MarkerType.ArrowClosed, color: '#2563eb' },
+    }]);
+    const svg = exportRenderSceneToSvg(scene);
+
+    const containerLayer = svg.indexOf('vizly-export-container-nodes');
+    const edgeLayer = svg.indexOf('class="vizly-export-edges"');
+    const foregroundLayer = svg.indexOf('vizly-export-foreground-nodes');
+    expect(containerLayer).toBeGreaterThan(-1);
+    expect(containerLayer).toBeLessThan(edgeLayer);
+    expect(edgeLayer).toBeLessThan(foregroundLayer);
+    expect(svg.slice(containerLayer, edgeLayer)).toContain('data-node-id="container"');
+    expect(svg.slice(edgeLayer, foregroundLayer)).toContain('data-edge-id="route"');
+    expect(svg.slice(foregroundLayer)).toContain('data-node-id="source"');
+    expect(svg.slice(foregroundLayer)).toContain('data-node-id="target"');
+  });
+
   it('exports a complete semantic edge when an orphan render-only plan is injected', () => {
     const sharedNodes = [
       { id: 'source', position: { x: 0, y: 0 }, data: {} },

@@ -399,6 +399,10 @@ const nodeToSvg = (node: RenderNodeGeometry): string => {
   return `<g${attr('data-node-id', node.id)}${node.type ? attr('data-node-type', node.type) : ''}>${shape}${nodeAccentToSvg(node)}${groupHeader}${nodeMetadataToSvg(node)}${contentText}</g>`;
 };
 
+const isContainerNode = (node: RenderNodeGeometry): boolean => (
+  node.container?.isContainer === true || node.shape === 'group'
+);
+
 const assertExportableScene = (scene: DiagramRenderScene) => {
   if (scene.nodes.length > MAX_EXPORT_NODES) {
     throw new SvgExportError('SVG_EXPORT_NODE_LIMIT', 'SVG export node limit exceeded');
@@ -432,16 +436,18 @@ export const exportRenderSceneToSvg = (scene: DiagramRenderScene, options: SvgEx
   const background = options.includeBackground === false
     ? ''
     : `<rect${attr('x', scene.bounds.minX)}${attr('y', scene.bounds.minY)}${attr('width', scene.bounds.width)}${attr('height', scene.bounds.height)}${attr('fill', scene.theme.background)}/>`;
+  const containerNodes = scene.nodes.filter(isContainerNode).map(nodeToSvg).join('');
+  const foregroundNodes = scene.nodes.filter(node => !isContainerNode(node)).map(nodeToSvg).join('');
   const edges = scene.edges.map(edge => edgeToSvg(edge, namespace, contrastCanvasBackground)).join('');
-  const nodes = scene.nodes.map(nodeToSvg).join('');
   const svg = [
     '<?xml version="1.0" encoding="UTF-8"?>',
     `<svg xmlns="http://www.w3.org/2000/svg"${attr('width', scene.bounds.width)}${attr('height', scene.bounds.height)}${attr('viewBox', `${scene.bounds.minX} ${scene.bounds.minY} ${scene.bounds.width} ${scene.bounds.height}`)} role="img">`,
     title,
     defs,
     background,
+    `<g class="vizly-export-nodes vizly-export-container-nodes">${containerNodes}</g>`,
     `<g class="vizly-export-edges">${edges}</g>`,
-    `<g class="vizly-export-nodes">${nodes}</g>`,
+    `<g class="vizly-export-nodes vizly-export-foreground-nodes">${foregroundNodes}</g>`,
     '</svg>',
   ].join('');
   if (svg.length > MAX_SVG_CHARS) {

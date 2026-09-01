@@ -82,7 +82,8 @@ describe('svg visual fixture', () => {
     const svg = exportRenderSceneToSvg(scene, { title: 'mixed-fixture' });
 
     expect(svg).toMatchSnapshot();
-    expect(svg.indexOf('class="vizly-export-edges"')).toBeLessThan(svg.indexOf('class="vizly-export-nodes"'));
+    expect(svg.indexOf('vizly-export-container-nodes')).toBeLessThan(svg.indexOf('class="vizly-export-edges"'));
+    expect(svg.indexOf('class="vizly-export-edges"')).toBeLessThan(svg.indexOf('vizly-export-foreground-nodes'));
     expect(svg).toContain('data-node-type="swimlane"');
     expect(svg).toContain('data-node-type="ERDatabaseNode"');
     expect(svg).toContain('class="vizly-export-node-icon"');

@@ -9,6 +9,7 @@ import {
   exportRenderSceneToPdfBlob,
   isValidVectorPdfFontBytes,
   normalizeVectorPdfPageGeometry,
+  resolveVectorPdfSyntheticTextStrokeWidth,
   ScenePdfExportError,
 } from '../../export/scenePdfExport';
 
@@ -58,6 +59,27 @@ describe('isValidVectorPdfFontBytes', () => {
   ])('rejects empty, malformed, typed, and oversized values %#', value => {
     expect(isValidVectorPdfFontBytes(value)).toBe(false);
   });
+});
+
+describe('resolveVectorPdfSyntheticTextStrokeWidth', () => {
+  it.each([
+    ['normal', 0],
+    ['400', 0],
+    ['600', 0.28],
+    ['700', 0.45],
+    ['900', 0.45],
+    ['bold', 0.45],
+    [' bolder ', 0.45],
+  ])('maps supported font weight %s to a bounded PDF text stroke', (weight, expected) => {
+    expect(resolveVectorPdfSyntheticTextStrokeWidth(weight)).toBe(expected);
+  });
+
+  it.each([undefined, null, 700, '', 'invalid', '999', '5000', '-700'])(
+    'rejects empty, typed, malformed, and extreme weight %#',
+    weight => {
+      expect(resolveVectorPdfSyntheticTextStrokeWidth(weight)).toBe(0);
+    },
+  );
 });
 
 describe('exportRenderSceneToPdfBlob', () => {

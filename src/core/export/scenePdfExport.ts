@@ -105,8 +105,30 @@ const parsePdfSvgElement = (markup: string): SVGSVGElement => {
   }
   root.querySelectorAll('text').forEach(text => {
     text.setAttribute('font-family', PDF_FONT_FAMILY);
+    const syntheticStrokeWidth = resolveVectorPdfSyntheticTextStrokeWidth(
+      text.getAttribute('font-weight'),
+    );
+    const fill = text.getAttribute('fill')?.trim();
+    if (syntheticStrokeWidth > 0 && fill && fill !== 'none' && fill !== 'transparent') {
+      text.setAttribute('stroke', fill);
+      text.setAttribute('stroke-width', String(syntheticStrokeWidth));
+      text.setAttribute('stroke-linejoin', 'round');
+      text.setAttribute('paint-order', 'stroke fill');
+    }
   });
   return root as unknown as SVGSVGElement;
+};
+
+export const resolveVectorPdfSyntheticTextStrokeWidth = (fontWeight: unknown): number => {
+  if (typeof fontWeight !== 'string') return 0;
+  const normalized = fontWeight.trim().toLowerCase();
+  if (normalized === 'bold' || normalized === 'bolder') return 0.45;
+  if (!/^\d{3}$/u.test(normalized)) return 0;
+  const numericWeight = Number(normalized);
+  if (numericWeight > 900) return 0;
+  if (numericWeight >= 700) return 0.45;
+  if (numericWeight >= 600) return 0.28;
+  return 0;
 };
 
 export const exportRenderSceneToPdfBlob = async (
