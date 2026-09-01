@@ -163,7 +163,7 @@ describe('baseReactFlowDisplayEdges WMS cold performance', () => {
     expect(displayEdgesHaveNodeAnchoredTerminals(result, absoluteNodes), terminalDiagnostics).toBe(true);
     // Fair shortcut scheduling and source-before-target repair remove redundant waypoints.
     // Keep the geometry fingerprint alongside the unchanged quality/work budgets.
-    expect(finalOutputRouteSignature).toBe('route-v2:44:178:88a0550ecf25c090');
+    expect(finalOutputRouteSignature).toBe('route-v2:44:176:f3bd1036a9318e20');
     expect(result.some(edge => (
       edge.data?.sharedTrunkAware === true || edge.data?.sharedTrunkSynthesized === true
     ))).toBe(true);
