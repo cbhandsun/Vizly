@@ -17,6 +17,7 @@ const candidate = (
   commercialRisk: 8,
   hits: 1,
   length: 200,
+  minimumClearanceViolation: false,
   risk: 8,
   ...values,
 });
@@ -29,28 +30,35 @@ describe('rankBusinessNodeClearanceCandidates', () => {
       { candidate: [{ x: 0, y: 0 }, { x: 10, y: 0 }], hits: 1 },
       { candidate: [{ x: 0, y: 0 }, { x: 0, y: 5 }, { x: 8, y: 5 }], hits: 0 },
     ];
-    const scorePair = vi.fn((path: Array<{ x: number; y: number }>) => (
-      [path.length, path.length * 2] as const
+    const scoreCandidate = vi.fn((path: Array<{ x: number; y: number }>) => (
+      [path.length, path.length * 2, path.length > 2] as const
     ));
 
-    const first = cache.getOrCreate(collection, candidates, scorePair);
-    const hit = cache.getOrCreate(collection, candidates, scorePair);
-    const cloneMiss = cache.getOrCreate({}, candidates, scorePair);
+    const first = cache.getOrCreate(collection, candidates, scoreCandidate);
+    const hit = cache.getOrCreate(collection, candidates, scoreCandidate);
+    const cloneMiss = cache.getOrCreate({}, candidates, scoreCandidate);
 
     expect(first.cacheHit).toBe(false);
     expect(hit).toEqual({ value: first.value, cacheHit: true });
     expect(hit.value).toBe(first.value);
     expect(cloneMiss.cacheHit).toBe(false);
-    expect(scorePair).toHaveBeenCalledTimes(4);
+    expect(scoreCandidate).toHaveBeenCalledTimes(4);
     expect(first.value.map(rank => ({
       bends: rank.bendCount,
       commercialRisk: rank.commercialRisk,
       hits: rank.hits,
       length: rank.length,
+      minimumClearanceViolation: rank.minimumClearanceViolation,
       risk: rank.risk,
     }))).toEqual([
-      { bends: 0, commercialRisk: 4, hits: 1, length: 10, risk: 2 },
-      { bends: 1, commercialRisk: 6, hits: 0, length: 13, risk: 3 },
+      {
+        bends: 0, commercialRisk: 4, hits: 1, length: 10,
+        minimumClearanceViolation: false, risk: 2,
+      },
+      {
+        bends: 1, commercialRisk: 6, hits: 0, length: 13,
+        minimumClearanceViolation: true, risk: 3,
+      },
     ]);
   });
 

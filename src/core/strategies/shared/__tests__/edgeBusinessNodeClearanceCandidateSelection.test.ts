@@ -53,7 +53,7 @@ describe('business-node clearance candidate selection', () => {
       baselineQuality: qualityContext.evaluate(baseline), edge: baseline[0], edgeIndex: 0,
       obstacleContext, qualityContext,
       rankedCandidates: (dirty ? [safePath] : [unsafePath, safePath])
-        .map(candidate => ({ candidate, hits: 0 })),
+        .map(candidate => ({ candidate, hits: 0, minimumClearanceViolation: false })),
       validateCandidate,
     });
     expect(selected?.[0].data?.computedPath).toEqual(safePath);
@@ -70,7 +70,9 @@ describe('business-node clearance candidate selection', () => {
       baselineObstacleHits: 0,
       baselineQuality: qualityContext.evaluate(baseline), edge: baseline[0], edgeIndex: 0,
       obstacleContext: createRoutingObstacleEvaluationContext(baseline[0], terminals), qualityContext,
-      rankedCandidates: paths.map(candidate => ({ candidate, hits: 0 })), validateCandidate,
+      rankedCandidates: paths.map(candidate => ({
+        candidate, hits: 0, minimumClearanceViolation: false,
+      })), validateCandidate,
     })).toBeNull();
     expect(validateCandidate).not.toHaveBeenCalled();
   });
@@ -93,7 +95,7 @@ describe('business-node clearance candidate selection', () => {
       qualityContext,
       rankedCandidates: [{ candidate: [
         { x: 0, y: 0 }, { x: 120, y: 0 }, { x: 120, y: 100 },
-      ], hits: 0 }],
+      ], hits: 0, minimumClearanceViolation: false }],
       validateCandidate,
     });
 
@@ -119,7 +121,7 @@ describe('business-node clearance candidate selection', () => {
       qualityContext,
       rankedCandidates: [{ candidate: [
         { x: 0, y: 0 }, { x: 120, y: 0 }, { x: 120, y: 100 },
-      ], hits: 0 }],
+      ], hits: 0, minimumClearanceViolation: false }],
       validateCandidate: () => false,
     })).toBeNull();
   });

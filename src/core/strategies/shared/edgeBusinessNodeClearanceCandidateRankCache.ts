@@ -22,7 +22,7 @@ export const createBusinessNodeClearanceCandidateRankCache = () => {
     getOrCreate: (
       collection: object,
       candidates: readonly CandidateWithHits[],
-      scorePair: (candidate: Point[]) => readonly [number, number],
+      scoreCandidate: (candidate: Point[]) => readonly [number, number, boolean],
     ): Readonly<{
       value: BusinessNodeClearanceCandidateRank<Point[]>[];
       cacheHit: boolean;
@@ -30,7 +30,7 @@ export const createBusinessNodeClearanceCandidateRankCache = () => {
       const cached = ranksByCollection.get(collection);
       if (cached) return { value: cached, cacheHit: true };
       const value = candidates.map(({ candidate, hits }) => {
-        const [risk, commercialRisk] = scorePair(candidate);
+        const [risk, commercialRisk, minimumClearanceViolation] = scoreCandidate(candidate);
         let length = 0;
         for (let index = 1; index < candidate.length; index += 1) {
           length += Math.abs(candidate[index].x - candidate[index - 1].x)
@@ -42,6 +42,7 @@ export const createBusinessNodeClearanceCandidateRankCache = () => {
           commercialRisk,
           hits,
           length,
+          minimumClearanceViolation,
           bendCount: Math.max(0, candidate.length - 2),
         };
       });

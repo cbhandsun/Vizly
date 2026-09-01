@@ -33,6 +33,7 @@ export type BaseReactFlowChangedHardReportEvaluation = Readonly<{
 }>;
 
 export type BaseReactFlowChangedHardReportEvidence = Readonly<{
+  minimumClearanceViolation?: boolean;
   obstacleHits?: number;
   quality?: EdgePathQualityScore;
 }>;
@@ -152,11 +153,13 @@ export const createBaseReactFlowChangedHardReportEvaluation = (
       const clearanceViolations = baselineClearanceViolations.slice();
       for (const index of indexes) {
         const edge = normalizedCandidate[index];
-        clearanceViolations[index] = Boolean(edge) && clearance.score(
-          getDisplayComputedPath(edge),
-          edge,
-          MINIMUM_BUSINESS_NODE_CLEARANCE,
-        ) > 0.5;
+        clearanceViolations[index] = typeof knownEvidence?.minimumClearanceViolation === 'boolean'
+          ? knownEvidence.minimumClearanceViolation
+          : Boolean(edge) && clearance.score(
+            getDisplayComputedPath(edge),
+            edge,
+            MINIMUM_BUSINESS_NODE_CLEARANCE,
+          ) > 0.5;
       }
       const minimumClearanceViolationEdgeIds = normalizedCandidate.flatMap((edge, index) => (
         clearanceViolations[index] ? [edge.id] : []

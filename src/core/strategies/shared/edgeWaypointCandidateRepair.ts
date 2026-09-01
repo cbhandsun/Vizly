@@ -39,6 +39,12 @@ export type NodeClearanceGraphEvaluationContext = Readonly<{
     firstMinimumClearance: number,
     secondMinimumClearance: number,
   ) => readonly [number, number];
+  scorePairWithMinimumViolation: (
+    path: Point[],
+    edge: Edge,
+    firstMinimumClearance: number,
+    secondMinimumClearance: number,
+  ) => readonly [number, number, boolean];
   readMetrics: () => Readonly<{ cacheHitCount: number; scannedNodeCount: number }>;
 }>;
 
@@ -48,6 +54,7 @@ export type RoutingWaypointCandidateAxes = Readonly<{
 }>;
 
 export const BUSINESS_NODE_CLEARANCE = 28;
+export const HARD_MINIMUM_BUSINESS_NODE_CLEARANCE = 16;
 
 const EPS = 0.5;
 const FLEXIBLE_SHARED_TRUNK_MIN = 24;
@@ -193,6 +200,7 @@ export function createNodeClearanceGraphEvaluationContext(
   let cacheHitCount = 0;
   type SegmentClearanceScore = Readonly<{
     firstRisk: number;
+    hardMinimumRisk: number;
     scannedNodeCount: number;
     secondRisk: number;
   }>;
@@ -210,9 +218,10 @@ export function createNodeClearanceGraphEvaluationContext(
     edge: Edge,
     firstRequiredClearance: number,
     secondRequiredClearance: number,
-  ): readonly [number, number] => {
+  ): readonly [number, number, boolean] => {
     let firstRisk = 0;
     let secondRisk = 0;
+    let hardMinimumRisk = 0;
     let memoContext = memoByEdge.get(edge);
     if (
       !memoContext
@@ -239,6 +248,7 @@ export function createNodeClearanceGraphEvaluationContext(
       const calculate = (): SegmentClearanceScore => {
         let segmentFirstRisk = 0;
         let segmentSecondRisk = 0;
+        let segmentHardMinimumRisk = 0;
         let segmentScannedNodeCount = 0;
         for (const node of nearbyNodes(
           segment,
@@ -249,9 +259,14 @@ export function createNodeClearanceGraphEvaluationContext(
           const clearance = segmentToClearanceRectDistance(segment, node.rect);
           segmentFirstRisk += Math.max(0, firstRequiredClearance - clearance);
           segmentSecondRisk += Math.max(0, secondRequiredClearance - clearance);
+          segmentHardMinimumRisk += Math.max(
+            0,
+            HARD_MINIMUM_BUSINESS_NODE_CLEARANCE - clearance,
+          );
         }
         return {
           firstRisk: segmentFirstRisk,
+          hardMinimumRisk: segmentHardMinimumRisk,
           secondRisk: segmentSecondRisk,
           scannedNodeCount: segmentScannedNodeCount,
         };
@@ -261,10 +276,11 @@ export function createNodeClearanceGraphEvaluationContext(
         : segmentMemo.getOrCreate(segment, calculate);
       firstRisk += result.value.firstRisk;
       secondRisk += result.value.secondRisk;
+      hardMinimumRisk += result.value.hardMinimumRisk;
       if (result.cacheHit) cacheHitCount += 1;
       else scannedNodeCount += result.value.scannedNodeCount;
     }
-    return [firstRisk, secondRisk];
+    return [firstRisk, secondRisk, hardMinimumRisk > 0.5];
   };
   return Object.freeze({
     score(path: Point[], edge: Edge, minimumClearance = BUSINESS_NODE_CLEARANCE): number {
@@ -281,7 +297,24 @@ export function createNodeClearanceGraphEvaluationContext(
       if (nodeRects.length === 0) return [0, 0];
       const firstRequiredClearance = normalizeNodeClearance(firstMinimumClearance);
       const secondRequiredClearance = normalizeNodeClearance(secondMinimumClearance);
-      return scoreSegments(path, edge, firstRequiredClearance, secondRequiredClearance);
+      const [firstRisk, secondRisk] = scoreSegments(
+        path, edge, firstRequiredClearance, secondRequiredClearance,
+      );
+      return [firstRisk, secondRisk];
+    },
+    scorePairWithMinimumViolation(
+      path: Point[],
+      edge: Edge,
+      firstMinimumClearance: number,
+      secondMinimumClearance: number,
+    ): readonly [number, number, boolean] {
+      if (nodeRects.length === 0) return [0, 0, false];
+      return scoreSegments(
+        path,
+        edge,
+        normalizeNodeClearance(firstMinimumClearance),
+        normalizeNodeClearance(secondMinimumClearance),
+      );
     },
     readMetrics: () => ({ cacheHitCount, scannedNodeCount }),
   });

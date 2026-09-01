@@ -4,6 +4,7 @@ export type BusinessNodeClearanceCandidateRank<T> = Readonly<{
   commercialRisk: number;
   hits: number;
   length: number;
+  minimumClearanceViolation: boolean;
   risk: number;
 }>;
 
@@ -100,6 +101,7 @@ export function* iterateBusinessNodeClearanceCandidates<T>(
       commercialRisk: baseline.commercialRisk,
       hits: baseline.hits,
       length: Number.POSITIVE_INFINITY,
+      minimumClearanceViolation: false,
       risk: baseline.risk,
     };
     let bestIndex = -1;

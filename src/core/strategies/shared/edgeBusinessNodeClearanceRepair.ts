@@ -26,6 +26,7 @@ import { segmentToClearanceRectDistance } from './edgeNodeClearanceGeometry';
 import {
   createEdgePathQualityEvaluationContext,
 } from './edgeStrictCrossingGuard';
+import { HARD_MINIMUM_BUSINESS_NODE_CLEARANCE } from './edgeWaypointCandidateRepair';
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
 
@@ -47,7 +48,7 @@ export interface BusinessNodeClearanceRepairOptions {
 const EPS = 0.5;
 export const COMMERCIAL_BUSINESS_NODE_CLEARANCE = 48;
 /** Minimum local repair target; commercial routing targets 48px or more. */
-export const MINIMUM_BUSINESS_NODE_CLEARANCE = 16;
+export const MINIMUM_BUSINESS_NODE_CLEARANCE = HARD_MINIMUM_BUSINESS_NODE_CLEARANCE;
 export const COMMERCIAL_BUSINESS_NODE_ROUTING_CLEARANCE = 192;
 const CONTAINER_CLEARANCE_OVERFLOW = (
   COMMERCIAL_BUSINESS_NODE_ROUTING_CLEARANCE - COMMERCIAL_BUSINESS_NODE_CLEARANCE
@@ -739,7 +740,7 @@ export const repairBusinessNodeClearanceRisks = (
         const result = candidateRankCache.getOrCreate(
           collection,
           collection.candidates,
-          candidate => clearanceContext.scorePair(
+          candidate => clearanceContext.scorePairWithMinimumViolation(
             candidate, edge, minimumClearance, COMMERCIAL_BUSINESS_NODE_CLEARANCE,
           ),
         );

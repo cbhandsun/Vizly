@@ -549,6 +549,8 @@ describe('createBaseReactFlowFinalEndpointEvaluation', () => {
 
     const exactReport = createBaseReactFlowFinalEndpointEvaluation(nodes).hardReport(candidate);
     const report = evaluation.hardReportChanged(edges, candidate, [0], {
+      minimumClearanceViolation: exactReport.minimumClearanceViolationEdgeIds
+        ?.includes(candidate[0]?.id ?? '') ?? false,
       obstacleHits: exactReport.obstacleHits,
       quality,
     });
@@ -558,6 +560,35 @@ describe('createBaseReactFlowFinalEndpointEvaluation', () => {
     expect(report.quality).toEqual(quality);
     expect(after.scannedEdgePairCount).toBe(before.scannedEdgePairCount);
     expect(evaluation.hardReport(candidate)).toBe(report);
+  });
+
+  it('reuses known minimum-clearance evidence without rescanning candidate nodes', () => {
+    const candidate: Edge[] = edges.map((edge, index) => index === 0 ? {
+      ...edge,
+      data: {
+        ...edge.data,
+        computedPath: [
+          { x: 50, y: 60 },
+          { x: 80, y: 60 },
+          { x: 80, y: 220 },
+          { x: 50, y: 220 },
+        ],
+      },
+    } : edge);
+    const exact = createBaseReactFlowFinalEndpointEvaluation(nodes).hardReport(candidate);
+    const known = createBaseReactFlowFinalEndpointEvaluation(nodes);
+    const fallback = createBaseReactFlowFinalEndpointEvaluation(nodes);
+
+    const knownReport = known.hardReportChanged(edges, candidate, [0], {
+      minimumClearanceViolation: exact.minimumClearanceViolationEdgeIds
+        ?.includes(candidate[0]?.id ?? '') ?? false,
+    });
+    const fallbackReport = fallback.hardReportChanged(edges, candidate, [0]);
+
+    expect(knownReport).toEqual(exact);
+    expect(fallbackReport).toEqual(exact);
+    expect(known.readMetrics().scannedNodeCount)
+      .toBeLessThan(fallback.readMetrics().scannedNodeCount);
   });
 
   it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(

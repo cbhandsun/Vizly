@@ -18,6 +18,7 @@ export interface BusinessNodeClearanceCandidateValidation {
   candidateEdges: Edge[];
   candidateRoutingObstacleHits: number;
   candidateQuality: EdgePathQualityScore;
+  candidateMinimumClearanceViolation: boolean;
   changedEdgeIndex: number;
 }
 
@@ -41,7 +42,11 @@ export const selectAcceptedBusinessNodeClearanceCandidate = ({
   edgeIndex: number;
   obstacleContext: Pick<RoutingObstacleEvaluationContext, 'countEndpointNodeTraversalHits'>;
   qualityContext: ReturnType<typeof createEdgePathQualityEvaluationContext>;
-  rankedCandidates: Iterable<Readonly<{ candidate: Point[]; hits: number }>>;
+  rankedCandidates: Iterable<Readonly<{
+    candidate: Point[];
+    hits: number;
+    minimumClearanceViolation: boolean;
+  }>>;
   validateCandidate?: (context: BusinessNodeClearanceCandidateValidation) => boolean;
 }>): Edge[] | null => {
   const baselineEndpointHits = obstacleContext.countEndpointNodeTraversalHits(getEdgePath(edge));
@@ -69,6 +74,7 @@ export const selectAcceptedBusinessNodeClearanceCandidate = ({
       candidateEdges,
       candidateRoutingObstacleHits: rankedCandidate.hits + candidateEndpointHits,
       candidateQuality,
+      candidateMinimumClearanceViolation: rankedCandidate.minimumClearanceViolation,
       changedEdgeIndex: edgeIndex,
     })) continue;
     return candidateEdges;

@@ -125,6 +125,43 @@ describe('repairBusinessNodeClearanceRisks', () => {
     expect(indexed.scorePair(path, edge, Number.NaN, Number.POSITIVE_INFINITY)).toEqual(
       exhaustive.scorePair(path, Number.NaN, Number.POSITIVE_INFINITY),
     );
+    const [routingRisk, commercialRisk, minimumClearanceViolation] = (
+      indexed.scorePairWithMinimumViolation(
+        path,
+        edge,
+        COMMERCIAL_BUSINESS_NODE_ROUTING_CLEARANCE,
+        COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+      )
+    );
+    expect([routingRisk, commercialRisk]).toEqual(exhaustive.scorePair(
+      path,
+      COMMERCIAL_BUSINESS_NODE_ROUTING_CLEARANCE,
+      COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+    ));
+    expect(minimumClearanceViolation).toBe(exhaustive.score(path, 16) > 0.5);
+  });
+
+  it('keeps the hard minimum evidence aligned with the existing half-pixel gate', () => {
+    const nodes: Node[] = [{
+      id: 'blocker',
+      position: { x: 40, y: 32 },
+      data: {},
+      measured: { width: 20, height: 20 },
+    }];
+    const edge: Edge = { id: 'edge', source: 'source', target: 'target' };
+    const context = createNodeClearanceGraphEvaluationContext(nodes);
+    const belowGate = [{ x: 0, y: 16.25 }, { x: 100, y: 16.25 }];
+    const aboveGate = [{ x: 0, y: 16.75 }, { x: 100, y: 16.75 }];
+
+    expect(context.scorePairWithMinimumViolation(
+      belowGate, edge, 192, 48,
+    )[2]).toBe(false);
+    expect(context.scorePairWithMinimumViolation(
+      aboveGate, edge, 192, 48,
+    )[2]).toBe(true);
+    expect(createNodeClearanceGraphEvaluationContext([]).scorePairWithMinimumViolation(
+      aboveGate, edge, Number.NaN, Number.POSITIVE_INFINITY,
+    )).toEqual([0, 0, false]);
   });
 
   it('indexes candidate-heavy small graphs without changing clearance scores', () => {
@@ -815,6 +852,7 @@ describe('repairBusinessNodeClearanceRisks', () => {
       candidateEdges: Edge[];
       candidateRoutingObstacleHits: number;
       candidateQuality: ReturnType<typeof calculateEdgePathQualityScore>;
+      candidateMinimumClearanceViolation: boolean;
       changedEdgeIndex: number;
     }> = [];
 
@@ -827,6 +865,7 @@ describe('repairBusinessNodeClearanceRisks', () => {
         candidateEdges,
         candidateRoutingObstacleHits,
         candidateQuality,
+        candidateMinimumClearanceViolation,
         changedEdgeIndex,
       }) => {
         const changedEdge = candidateEdges[changedEdgeIndex];
@@ -838,6 +877,7 @@ describe('repairBusinessNodeClearanceRisks', () => {
           candidateEdges,
           candidateRoutingObstacleHits,
           candidateQuality,
+          candidateMinimumClearanceViolation,
           changedEdgeIndex,
         });
         return false;
@@ -862,6 +902,10 @@ describe('repairBusinessNodeClearanceRisks', () => {
         .toBe(obstacleContext.countPathHits(pathFor(baselineEdge)));
       expect(evidence.candidateRoutingObstacleHits)
         .toBe(obstacleContext.countPathHits(pathFor(candidateEdge)));
+      expect(evidence.candidateMinimumClearanceViolation).toBe(
+        createNodeClearanceGraphEvaluationContext(nodes)
+          .score(pathFor(candidateEdge), candidateEdge, 16) > 0.5,
+      );
     }
   });
 

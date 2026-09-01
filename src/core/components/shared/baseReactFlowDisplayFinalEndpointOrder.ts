@@ -84,7 +84,11 @@ const commitPostTrunkBranchObstacleCandidate = (
         evaluation,
         false,
         undefined,
-        { quality: context.candidateQuality, obstacleHits: candidateObstacleHits },
+        {
+          minimumClearanceViolation: context.candidateMinimumClearanceViolation,
+          obstacleHits: candidateObstacleHits,
+          quality: context.candidateQuality,
+        },
       );
     },
     diagnostics,
