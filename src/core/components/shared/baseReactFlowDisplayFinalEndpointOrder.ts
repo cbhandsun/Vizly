@@ -383,6 +383,7 @@ export const repairBaseReactFlowFinalEndpointOrder = <T extends Edge[]>(
       preferredSourceTrunkCandidate,
       repairNodes,
       {
+        evaluateEndpointOrder: evaluation.endpointOrder,
         validateCandidate: context => passesFinalDisplayGate(
           context.baselineEdges,
           context.candidateEdges,
@@ -498,12 +499,15 @@ export const repairBaseReactFlowFinalEndpointOrder = <T extends Edge[]>(
   });
   const beforeOrder = repaired;
   repaired = repairFinalSameTargetTerminalTrunks(repaired, repairNodes, {
+    evaluateEndpointOrder: evaluation.endpointOrder,
     validateCandidate: validateTopologyCandidate,
   });
   repaired = repairFinalSharedSourceTerminalTrunks(repaired, repairNodes, {
+    evaluateEndpointOrder: evaluation.endpointOrder,
     validateCandidate: validateTopologyCandidate,
   });
   repaired = repairFinalSharedTargetTerminalTrunks(repaired, repairNodes, {
+    evaluateEndpointOrder: evaluation.endpointOrder,
     validateCandidate: validateTopologyCandidate,
   });
   repaired = repairFinalSameSidePassageOrder(repaired, repairNodes, {

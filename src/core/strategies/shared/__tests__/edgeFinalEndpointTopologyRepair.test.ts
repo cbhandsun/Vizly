@@ -412,7 +412,13 @@ describe('final endpoint topology repair', () => {
     const quality = createEdgePathQualityEvaluationContext(edges);
     const baselineQuality = quality.evaluate(edges);
 
-    const result = repairFinalSharedSourceTerminalTrunks(edges, nodes);
+    let endpointEvaluationCount = 0;
+    const result = repairFinalSharedSourceTerminalTrunks(edges, nodes, {
+      evaluateEndpointOrder: candidateEdges => {
+        endpointEvaluationCount += 1;
+        return auditFinalSameSideEndpointOrder(candidateEdges, nodes);
+      },
+    });
     const resultOrder = auditFinalSameSideEndpointOrder(result, nodes);
     const resultSourceTrunk = resultOrder.legalSharedTrunks.find(trunk => (
       trunk.nodeId === 'hub'
@@ -425,6 +431,7 @@ describe('final endpoint topology repair', () => {
     const dualTrunkEdge = result.find(edge => edge.id === 'dual-trunk-edge');
     const resultQuality = quality.evaluate(result);
 
+    expect(endpointEvaluationCount).toBeGreaterThan(0);
     expect(baselineSourceTrunk?.edgeIds).toEqual(['source-trunk-a', 'source-trunk-b']);
     expect(baselineTargetTrunk?.edgeIds).toEqual([
       'dual-trunk-edge',

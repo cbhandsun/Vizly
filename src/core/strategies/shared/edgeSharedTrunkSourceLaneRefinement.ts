@@ -333,6 +333,7 @@ function sourceTrunkBypassCandidates(
 
 export function refineSourceBranchLanesByDirection(edges: Edge[]): Edge[] {
   const nextEdges = [...edges];
+  let changed = false;
   const paths = nextEdges.map(edge => getEdgePath(edge));
   const groups = new Map<string, number[]>();
 
@@ -390,10 +391,11 @@ export function refineSourceBranchLanesByDirection(edges: Edge[]): Edge[] {
         if (!samePath(paths[index], bestPaths[index])) {
           paths[index] = bestPaths[index];
           nextEdges[index] = withComputedPath(nextEdges[index], bestPaths[index]);
+          changed = true;
         }
       }
     }
   }
 
-  return nextEdges;
+  return changed ? nextEdges : edges;
 }

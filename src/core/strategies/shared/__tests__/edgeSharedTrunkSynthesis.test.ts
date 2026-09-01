@@ -174,6 +174,7 @@ describe('synthesizeSharedEndpointTrunks', () => {
 
     const result = synthesizeSharedSourceTrunks(edges);
 
+    expect(result).toBe(edges);
     expect(result.map(edge => (edge.data as any).computedPath)).toEqual(
       edges.map(edge => (edge.data as any).computedPath),
     );

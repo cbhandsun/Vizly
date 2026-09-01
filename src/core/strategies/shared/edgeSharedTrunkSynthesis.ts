@@ -317,6 +317,7 @@ function applySharedEndpointTrunks(
   });
 
   const nextEdges = [...edges];
+  let changed = false;
   for (const [, indices] of groups) {
     if (indices.length < MIN_GROUP_SIZE) continue;
     const side = endpoint === 'source' ? sourceSide(paths[indices[0]]) : targetSide(paths[indices[0]]);
@@ -346,17 +347,21 @@ function applySharedEndpointTrunks(
           ? synthesizeSourcePath(paths[index], side, anchorMain, nextBranchValue)
           : synthesizeTargetPath(paths[index], side, anchorMain, nextBranchValue);
       }
+      if (subgroup.every(index => samePath(paths[index], candidatePaths[index]))) continue;
       if (crossingScore(edges, candidatePaths, groupSet) > crossingScore(edges, paths, groupSet)) continue;
 
       for (const index of subgroup) {
         const path = paths[index];
         const candidate = candidatePaths[index];
-        if (!samePath(path, candidate)) nextEdges[index] = withComputedPath(nextEdges[index], candidate);
+        if (!samePath(path, candidate)) {
+          nextEdges[index] = withComputedPath(nextEdges[index], candidate);
+          changed = true;
+        }
       }
     }
   }
 
-  return nextEdges;
+  return changed ? nextEdges : edges;
 }
 
 function repairOppositeHemisphereTargetBacktracks(

@@ -30,6 +30,7 @@ export type FinalEndpointTopologyCandidateValidation = Readonly<{
 export type FinalEndpointTopologyRepairOptions = Readonly<{
   validateCandidate?: (context: FinalEndpointTopologyCandidateValidation) => boolean;
   groupFilter?: (group: SameSideEndpointOrderMetrics['groups'][number]) => boolean;
+  evaluateEndpointOrder?: (edges: Edge[]) => SameSideEndpointOrderMetrics;
 }>;
 
 type Candidate = Readonly<{
@@ -92,7 +93,8 @@ export const acceptFinalEndpointTopologyCandidate = (
     ? reusable
     : createFinalEndpointTopologyBaselineEvaluation(current, nodes);
   const baselineOrder = evaluation.baselineOrder;
-  const candidateOrder = auditFinalSameSideEndpointOrder(candidate.edges, nodes);
+  const candidateOrder = options.evaluateEndpointOrder?.(candidate.edges)
+    ?? auditFinalSameSideEndpointOrder(candidate.edges, nodes);
   if (!improvement(baselineOrder, candidateOrder)) return null;
   if (candidateOrder.invalidEndpointCount > baselineOrder.invalidEndpointCount) return null;
   if (!preservesTrueTrunks(baselineOrder.legalSharedTrunks, candidateOrder.legalSharedTrunks)) {

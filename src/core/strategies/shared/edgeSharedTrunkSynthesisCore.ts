@@ -27,15 +27,17 @@ const asRecord = (value: unknown): Record<string, unknown> => (
     : {}
 );
 
+const isSharedTrunkEdge = (edge: unknown): edge is Edge => Boolean(
+  edge
+    && typeof edge === 'object'
+    && typeof (edge as Partial<Edge>).id === 'string'
+    && typeof (edge as Partial<Edge>).source === 'string'
+    && typeof (edge as Partial<Edge>).target === 'string',
+);
+
 export function normalizeSharedTrunkEdges(value: unknown): Edge[] {
   if (!Array.isArray(value)) return [];
-  return value.filter((edge): edge is Edge => Boolean(
-    edge
-      && typeof edge === 'object'
-      && typeof (edge as Partial<Edge>).id === 'string'
-      && typeof (edge as Partial<Edge>).source === 'string'
-      && typeof (edge as Partial<Edge>).target === 'string',
-  ));
+  return value.every(isSharedTrunkEdge) ? value : value.filter(isSharedTrunkEdge);
 }
 
 export function normalizeSharedTrunkOptions(

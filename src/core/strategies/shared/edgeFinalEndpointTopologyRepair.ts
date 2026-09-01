@@ -431,7 +431,8 @@ export const repairFinalTerminalMicroDoglegs = (
   for (let pass = 0; pass < edges.length; pass += 1) {
     const baselineMicroDoglegs = localMicroDoglegCount(current);
     if (baselineMicroDoglegs === 0) break;
-    const baselineOrder = auditFinalSameSideEndpointOrder(current, nodes);
+    const baselineOrder = options.evaluateEndpointOrder?.(current)
+      ?? auditFinalSameSideEndpointOrder(current, nodes);
     const baselinePassage = auditFinalSameSidePassageOrder(current, nodes);
     const baselineEvaluation = createFinalEndpointTopologyBaselineEvaluation(
       current,
@@ -578,7 +579,13 @@ const repairFinalSharedTerminalTrunks = (
   let current = edges;
   const nodeById = new Map(nodes.map(node => [node.id, node] as const));
   for (let pass = 0; pass < edges.length; pass += 1) {
-    const baselineOrder = auditFinalSameSideEndpointOrder(current, nodes);
+    const baselineOrder = options.evaluateEndpointOrder?.(current)
+      ?? auditFinalSameSideEndpointOrder(current, nodes);
+    const baselineEvaluation = createFinalEndpointTopologyBaselineEvaluation(
+      current,
+      nodes,
+      baselineOrder,
+    );
     const terminalTrunks = baselineOrder.legalSharedTrunks
       .filter(trunk => trunk.role === role)
       .sort((first, second) => (
@@ -670,6 +677,7 @@ const repairFinalSharedTerminalTrunks = (
             currentSide !== trunk.side && oppositeTrunkMembers.has(edge.id)
               ? MAX_DUAL_TRUNK_BACKTRACK_INCREASE
               : 0,
+            baselineEvaluation,
           );
           if (accepted) break;
         }
