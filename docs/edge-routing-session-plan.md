@@ -1,6 +1,6 @@
 # Vizly 首次打开与增量调整统一路由方案
 
-状态：质量、会话、拓扑、缺陷调度与 standalone 渲染协议主链已落地。四图各 16 项布局已有历史连线检查覆盖，四图指定主链方向切换共 20 次历史验收通过。保存恢复公共修复 `2c7c563b`、正式回归 `efc1b284` 和启动等待边界 `ec5e5fb5` 已推送；普通图回归覆盖 WMS 初始保存恢复、Logistics/Demand/TMS 编辑保存→刷新→继续 TB/LR 切换。通用泳道语义对齐、Logistics TB/LR 生产语义验收及包含折叠/展开的 10 类拓扑编辑矩阵已通过。端点候选预算修复 `215fed13` 已推送；最新远端 5 样本中 Logistics 冷路由 p95=1274/1100ms、增量 initial p95=998/750ms 仍失败，交互绘制通过。正式性能、多页图、任意跨引擎切换及导出/3D 完整验收仍未完成。
+状态：质量、会话、拓扑、缺陷调度与 standalone 渲染协议主链已落地。四图各 16 项布局、跨引擎连续切换、普通保存恢复、三页新增/复制/切换/重载、SVG/PDF 真实矢量文件及容器样式均已有 production 验收。Logistics 动态拓扑含折叠/展开的 10 类编辑矩阵通过，L-OMS 拖拽 30 个独立样本 `release-to-final p95=294/300ms`、零 fallback/abort，交互尾延迟已达门槛。当前首要未完成项为 Logistics 冷路由：最新同机 5 样本 p95=`2180/1100ms`、Worker compute p95=`2154.7ms`；3D 仅性能问题继续后置。
 适用范围：`BaseReactFlow` Canvas 最终显示路由、内置标准图、用户保存图、节点拖拽及局部编辑
 关联标准：`docs/edge-routing-goals.md`
 
@@ -1740,3 +1740,11 @@ Logistics 动态拓扑矩阵覆盖节点缩放、多节点移动、复合子树�
 用户反馈 PDF 样式不正确后，以登录态 Logistics 画布捕获真实导出 Blob，并用 Poppler 渲染而不是只检查下载成功。修复前 PDF 的节点与连线几何完整，但 external、logistics、data 三个顶层容器标题条全部退化为接近白色的通用样式，容器边框也被错误输出为默认灰色虚线。对应的同源 SVG 已经出现相同退化，因此根因不在 PDF 转换器，而在场景快照只采集了普通卡片的 DOM 样式，未采集 titleGroup、subGroup 和 swimlane 的真实容器主体与标题区域。
 
 本批让三类容器显式暴露受控导出表面，并在统一快照边界采集主体填充、边框、实线/虚线、标题填充、标题文字、标题高度和最终透明度。高级导出与快捷导出现在共享同一富化快照；场景模型和 SVG/PDF 渲染只消费经过边界归一化的样式数据，不读取任意 HTML，也没有引入新的 DOM sink。修复后的真实 PDF 恢复蓝灰、棕色、黄色域标题条及对应边框/节点强调色，仍为单页矢量文件、`0` 个图像对象和 `2` 个字体资源。下一主线回到 Logistics 冷路由 p95 与 L-OMS 尾延迟，3D 性能继续后置。
+
+## 38. L-OMS 交互尾延迟正式闭环（2026-09-01）
+
+在与当前 `dist` 入口一致的独立 production preview 上，先以 5 个样本确认 L-OMS 拖拽 `release-to-final p95=270/300ms`。随后执行默认 30 个独立样本；第一轮在完成 17 个业务样本后，第 18 次 Chrome 启动于页面加载前因 DevTools 端口持续 `ECONNREFUSED` 被既有 15 秒门禁终止。该基础设施失败保留，不扩大启动预算、不计作业务样本；按仓库允许的瞬时基础设施重试规则重新执行一次完整 30 样本。
+
+完整轮次 30/30 均为已验证增量候选，Worker start=`30`、fallback=`0`、abort=`0`。L-OMS `release-to-final` 中位 `244ms`、p95 `294ms`、最大 `302ms`；local route p95 `95ms`，Worker compute p95 `183.8ms`，Worker delivery wait p95 `18.1ms`，response-to-final p95 `13ms`。初始路由 p95 `360/750ms`，30 次均为 `validated-candidate`。锁定预算按 p95 判定，因此尾延迟正式通过，不因单个最大值 302ms 放宽或改写门禁。
+
+本批还验证并撤回了将业务节点净空候选集合/排名缓存提升到请求级 geometry context 的实验：5 样本中位 `2023→1981ms`，但 p95 `2180→2290ms`，production 路径没有给出稳定收益，源码与测试改动均已恢复。Logistics 冷路由仍是唯一首要性能缺口；当前 5 样本 route p95 `2180/1100ms`、Worker compute p95 `2154.7ms`，最大独占阶段为 finalizer `303ms`、detached overlap `136.1ms`、post-trunk obstacle `130ms` 和初始 dogleg refine `103.5ms`。后续应从跨阶段工作收敛取得结构性收益，不继续提交无证据的微缓存；3D 性能维持后置。
