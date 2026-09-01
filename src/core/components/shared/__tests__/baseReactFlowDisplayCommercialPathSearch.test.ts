@@ -1,6 +1,9 @@
 import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
-import { buildCommercialPathSearchTerminalCandidates } from '../baseReactFlowDisplayCommercialPathSearch';
+import {
+  buildCommercialPathSearchTerminalCandidates,
+  preserveCommercialPathSearchTerminalCorridor,
+} from '../baseReactFlowDisplayCommercialPathSearch';
 import { getExactDisplayHardReport } from '../baseReactFlowDisplayWorkerResponse';
 
 const nodes: Node[] = [
@@ -90,6 +93,30 @@ describe('commercial path search container geometry', () => {
     expect(buildCommercialPathSearchTerminalCandidates({ ...fixed, data: {
       ...fixed.data, sourcePortPolicy: 'forbidden',
     } }, grouped, [fixed])).toEqual([]);
+  });
+
+  it('does not let grid quantization shorten an existing terminal corridor', () => {
+    const quantized = [
+      { x: 100, y: 300 }, { x: 512, y: 300 },
+      { x: 512, y: 140 }, { x: 600, y: 140 },
+    ];
+    expect(preserveCommercialPathSearchTerminalCorridor(
+      quantized,
+      { x: 600, y: 140 },
+      { x: 460, y: 140 },
+      'left',
+      'target',
+    )).toEqual([
+      { x: 100, y: 300 }, { x: 460, y: 300 },
+      { x: 460, y: 140 }, { x: 600, y: 140 },
+    ]);
+    expect(preserveCommercialPathSearchTerminalCorridor(
+      quantized,
+      { x: 600, y: 140 },
+      { x: 460, y: 141 },
+      'left',
+      'target',
+    )).toBe(quantized);
   });
 
   it.each(['titleGroup', 'subGroup', 'group', 'domain', 'subDomain', 'swimlane'])(

@@ -35,6 +35,8 @@ import {
 const COMMERCIAL_PATH_SEARCH_GRID_SIZE = 16;
 const MAX_COMMERCIAL_PATH_SEARCH_CANDIDATES = 8;
 const MAX_COMMERCIAL_PATH_SEARCH_POINTS = 8;
+const COMMERCIAL_PATH_SEARCH_LEAD_DISTANCE = MIN_RENDER_SAFE_ENDPOINT_STUB
+  + COMMERCIAL_PATH_SEARCH_GRID_SIZE * 2;
 const TERMINAL_SIDES: readonly DisplayTerminalSide[] = ['left', 'right', 'top', 'bottom'];
 
 const terminalStub = (
@@ -48,6 +50,73 @@ const terminalStub = (
     case 'top': return { x: anchor.x, y: anchor.y - distance };
     case 'bottom': return { x: anchor.x, y: anchor.y + distance };
   }
+};
+
+const terminalAxisDistance = (
+  anchor: DisplayPoint,
+  adjacent: DisplayPoint | undefined,
+  side: DisplayTerminalSide,
+): number | null => {
+  if (!adjacent) return null;
+  const aligned = side === 'left' || side === 'right'
+    ? Math.abs(adjacent.y - anchor.y) <= 0.5
+    : Math.abs(adjacent.x - anchor.x) <= 0.5;
+  const pointsOutward = side === 'left'
+    ? adjacent.x <= anchor.x
+    : side === 'right'
+      ? adjacent.x >= anchor.x
+      : side === 'top'
+        ? adjacent.y <= anchor.y
+        : adjacent.y >= anchor.y;
+  if (!aligned || !pointsOutward) return null;
+  const distance = side === 'left' || side === 'right'
+    ? Math.abs(adjacent.x - anchor.x)
+    : Math.abs(adjacent.y - anchor.y);
+  return Number.isFinite(distance) ? distance : null;
+};
+
+const preservedTerminalLeadDistance = (
+  anchor: DisplayPoint,
+  adjacent: DisplayPoint | undefined,
+  side: DisplayTerminalSide,
+): number => Math.max(
+  COMMERCIAL_PATH_SEARCH_LEAD_DISTANCE,
+  terminalAxisDistance(anchor, adjacent, side) ?? 0,
+);
+
+export const preserveCommercialPathSearchTerminalCorridor = (
+  path: DisplayPoint[],
+  anchor: DisplayPoint,
+  baselineAdjacent: DisplayPoint | undefined,
+  side: DisplayTerminalSide,
+  role: 'source' | 'target',
+): DisplayPoint[] => {
+  const requiredDistance = terminalAxisDistance(anchor, baselineAdjacent, side);
+  if (!requiredDistance || path.length < 3) return path;
+  const adjacentIndex = role === 'source' ? 1 : path.length - 2;
+  const bendIndex = role === 'source' ? 2 : path.length - 3;
+  const adjacent = path[adjacentIndex];
+  const bend = path[bendIndex];
+  const candidateDistance = terminalAxisDistance(anchor, adjacent, side);
+  if (!adjacent || !bend || candidateDistance === null
+    || candidateDistance + 1e-6 >= requiredDistance) return path;
+  const horizontalTerminal = side === 'left' || side === 'right';
+  const bendAligned = horizontalTerminal
+    ? Math.abs(bend.x - adjacent.x) <= 0.5
+    : Math.abs(bend.y - adjacent.y) <= 0.5;
+  if (!bendAligned) return path;
+  const coordinate = horizontalTerminal
+    ? anchor.x + (side === 'left' ? -requiredDistance : requiredDistance)
+    : anchor.y + (side === 'top' ? -requiredDistance : requiredDistance);
+  const preserved = path.map(point => ({ ...point }));
+  if (horizontalTerminal) {
+    preserved[adjacentIndex].x = coordinate;
+    preserved[bendIndex].x = coordinate;
+  } else {
+    preserved[adjacentIndex].y = coordinate;
+    preserved[bendIndex].y = coordinate;
+  }
+  return preserved;
 };
 
 const commercialObstacles = (
@@ -132,6 +201,7 @@ export const buildCommercialPathSearchTerminalCandidates = (
     ...commercialObstacles(edge, nodes, nodeById),
     ...routedLineBarriers(lineObstacles),
   ];
+  const currentSourceSide = sideForHandle(edge.sourceHandle);
   const currentTargetSide = sideForHandle(edge.targetHandle);
   const candidates: Edge[] = [];
   const seen = new Set<string>();
@@ -144,7 +214,9 @@ export const buildCommercialPathSearchTerminalCandidates = (
     const sourceLead = terminalStub(
       sourceAnchor,
       sourceSide,
-      MIN_RENDER_SAFE_ENDPOINT_STUB + COMMERCIAL_PATH_SEARCH_GRID_SIZE * 2,
+      sourceSide === currentSourceSide
+        ? preservedTerminalLeadDistance(sourceAnchor, baselinePath[1], sourceSide)
+        : COMMERCIAL_PATH_SEARCH_LEAD_DISTANCE,
     );
     // The grid begins beyond the terminal stub. A blocked entry cannot be
     // repaired by its interior search and must not consume the candidate cap.
@@ -165,7 +237,13 @@ export const buildCommercialPathSearchTerminalCandidates = (
       const targetLead = terminalStub(
         targetAnchor,
         targetSide,
-        MIN_RENDER_SAFE_ENDPOINT_STUB + COMMERCIAL_PATH_SEARCH_GRID_SIZE * 2,
+        targetSide === currentTargetSide
+          ? preservedTerminalLeadDistance(
+            targetAnchor,
+            baselinePath.at(-2),
+            targetSide,
+          )
+          : COMMERCIAL_PATH_SEARCH_LEAD_DISTANCE,
       );
       if (leadIsBlocked([targetLead, targetAnchor])) continue;
       const grid = buildPathfindingGrid(
@@ -210,7 +288,25 @@ export const buildCommercialPathSearchTerminalCandidates = (
           ],
         },
       }])[0];
-      const compactedPath = getDisplayComputedPath(path);
+      let compactedPath = getDisplayComputedPath(path);
+      if (sourceSide === currentSourceSide) {
+        compactedPath = preserveCommercialPathSearchTerminalCorridor(
+          compactedPath,
+          sourceAnchor,
+          baselinePath[1],
+          sourceSide,
+          'source',
+        );
+      }
+      if (targetSide === currentTargetSide) {
+        compactedPath = preserveCommercialPathSearchTerminalCorridor(
+          compactedPath,
+          targetAnchor,
+          baselinePath.at(-2),
+          targetSide,
+          'target',
+        );
+      }
       const signature = compactedPath.map(point => `${point.x}:${point.y}`).join('|');
       if (
         compactedPath.length < 2

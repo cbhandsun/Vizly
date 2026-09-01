@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   auditBaseReactFlowDisplayCommercialQuality,
   baseReactFlowDisplayCandidateCommercialQualityIsClean,
+  baseReactFlowDisplayCommercialQualityDoesNotRegress,
   baseReactFlowDisplayCommercialQualityIsClean,
   commercialBendSimplificationLengthBudget,
 } from '../baseReactFlowDisplayCommercialQuality';
@@ -80,6 +81,30 @@ describe('baseReactFlowDisplayCommercialQuality', () => {
       'excessive-bends',
       'tiny-interior-segment',
     ]));
+  });
+
+  it('allows a restored reverse-layout route to remove but not introduce structural issues', () => {
+    const dirty = edgeWithPath('reverse', [
+      { x: 0, y: 0 }, { x: 0, y: 40 }, { x: 40, y: 40 }, { x: 40, y: 80 },
+      { x: 80, y: 80 }, { x: 80, y: 120 }, { x: 120, y: 120 }, { x: 120, y: 160 },
+      { x: 160, y: 160 }, { x: 160, y: 200 },
+    ]);
+    const clean = edgeWithPath('reverse', [
+      { x: 0, y: 0 }, { x: 0, y: 200 }, { x: 160, y: 200 },
+    ]);
+    const newlyDirty = edgeWithPath('new', [
+      { x: 0, y: 0 }, { x: 0, y: 80 }, { x: 8, y: 80 }, { x: 8, y: 160 },
+    ]);
+
+    expect(baseReactFlowDisplayCommercialQualityDoesNotRegress([dirty], [clean])).toBe(true);
+    expect(baseReactFlowDisplayCommercialQualityDoesNotRegress([clean], [newlyDirty])).toBe(false);
+    expect(baseReactFlowDisplayCommercialQualityDoesNotRegress(
+      [newlyDirty],
+      [edgeWithPath('new', [
+        { x: 0, y: 0 }, { x: 0, y: 80 }, { x: 8, y: 80 },
+        { x: 8, y: 160 }, { x: 16, y: 160 }, { x: 16, y: 240 },
+      ])],
+    )).toBe(false);
   });
 
   it('does not promote an excessive-bend candidate using transient shared-trunk intent', () => {

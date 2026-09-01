@@ -70,6 +70,23 @@ export const baseReactFlowDisplayCommercialQualityIsClean = (
   edges: readonly Edge[],
 ): boolean => auditBaseReactFlowDisplayCommercialQuality(edges).length === 0;
 
+export const baseReactFlowDisplayCommercialQualityDoesNotRegress = (
+  baselineEdges: readonly Edge[],
+  candidateEdges: readonly Edge[],
+): boolean => {
+  const unmatchedBaselineIssues = [...auditBaseReactFlowDisplayCommercialQuality(baselineEdges)];
+  for (const candidate of auditBaseReactFlowDisplayCommercialQuality(candidateEdges)) {
+    const matchingIndex = unmatchedBaselineIssues.findIndex(baseline => (
+      baseline.edgeId === candidate.edgeId
+      && baseline.kind === candidate.kind
+      && candidate.value <= baseline.value
+    ));
+    if (matchingIndex < 0) return false;
+    unmatchedBaselineIssues.splice(matchingIndex, 1);
+  }
+  return true;
+};
+
 /**
  * Keep a separately named candidate contract at the Worker trust boundary so
  * future candidate-only rules cannot silently diverge from final promotion.

@@ -6,7 +6,8 @@ import { getExactDisplayHardReport } from './baseReactFlowDisplayWorkerResponse'
 import { completeDisplayWorkerResponse } from './baseReactFlowDisplayWorkerSessionResponse';
 import { lockFinalDisplayComputedPaths } from './baseReactFlowDisplayEdgeConversions';
 import { withDisplayAbsolutePositions } from './baseReactFlowAbsolutePositions';
-import { auditBaseReactFlowDisplayCommercialQuality } from './baseReactFlowDisplayCommercialQuality';
+import { finalizeBaseReactFlowExactCommercialClearance } from './baseReactFlowDisplayFinalCommercialClearanceTransaction';
+import { baseReactFlowDisplayCommercialQualityDoesNotRegress } from './baseReactFlowDisplayCommercialQuality';
 import type {
   DisplayEdgesWorkerRepairValidateOrRouteRequest,
   DisplayEdgesWorkerRequest,
@@ -43,16 +44,47 @@ export const routeDisplayReverseLayout = (
     return !source || !edgeTerminalHandleChangeIsAllowed(source, 'source', edge.sourceHandle, { allowRuntimeHandleChange: true })
       || !edgeTerminalHandleChangeIsAllowed(source, 'target', edge.targetHandle, { allowRuntimeHandleChange: true });
   })) return null;
-  const hardReport = getExactDisplayHardReport(locked, originalNodes);
-  if (!hardReport.hardClean || JSON.stringify(auditBaseReactFlowDisplayCommercialQuality(locked))
-    !== JSON.stringify(auditBaseReactFlowDisplayCommercialQuality(canonical.edges))) return null;
+  const restoredHardReport = getExactDisplayHardReport(locked, originalNodes);
+  if (!restoredHardReport.hardClean) return null;
+  const commerciallyFinalized = finalizeBaseReactFlowExactCommercialClearance({
+    exactBaseline: {
+      requestId: request.requestId,
+      edges: locked,
+      hardClean: true,
+      hardReport: restoredHardReport,
+      routeResolution: canonical.routeResolution,
+    },
+    repairNodes: originalNodes,
+  });
+  const finalEdges = commerciallyFinalized.edges;
+  if (!commerciallyFinalized.hardClean || !finalEdges
+    || !baseReactFlowDisplayCommercialQualityDoesNotRegress(canonical.edges, finalEdges)
+    || finalEdges.some((edge, index) => {
+      const source = request.edges[index];
+      return !source
+        || !edgeTerminalHandleChangeIsAllowed(
+          source,
+          'source',
+          edge.sourceHandle,
+          { allowRuntimeHandleChange: true },
+        )
+        || !edgeTerminalHandleChangeIsAllowed(
+          source,
+          'target',
+          edge.targetHandle,
+          { allowRuntimeHandleChange: true },
+        );
+    })) return null;
   // This is a Worker-owned full-route result, not an external persistent
   // candidate. Reflection preserves the full-route structural contract; audit
   // the materialized original geometry independently, then issue its receipt.
   // Never copy authority or routing patches from the temporary coordinate frame.
   const phaseTrace = [...(canonical.phaseTrace ?? [])];
   return completeDisplayWorkerResponse({ request, phaseTrace, response: {
-    requestId: request.requestId, edges: locked, hardClean: true, hardReport,
+    requestId: request.requestId,
+    edges: finalEdges,
+    hardClean: true,
+    hardReport: commerciallyFinalized.hardReport,
     routeResolution: canonical.routeResolution, phaseTrace,
   },
   });
