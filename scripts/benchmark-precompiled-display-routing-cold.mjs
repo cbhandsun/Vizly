@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 
 import {
   assertPrecompiledDisplayRoutePerformanceBudget,
+  buildPrecompiledDisplayRouteSampleArguments,
   parsePrecompiledDisplayRouteBenchmarkPresetIds,
   parsePrecompiledDisplayRoutePerformanceResult,
   parsePrecompiledDisplayRouteSampleCount,
@@ -13,17 +14,11 @@ const MAX_CHILD_OUTPUT_BYTES = 4 * 1024 * 1024;
 
 const requestedPresetId = process.env.PRECOMPILED_ROUTE_PRESET_ID;
 const presetIds = parsePrecompiledDisplayRouteBenchmarkPresetIds(requestedPresetId);
-const focusedMeasurement = typeof requestedPresetId === 'string'
-  && requestedPresetId.trim().length > 0;
 
 const runOneSample = sampleIndex => new Promise((resolve, reject) => {
   const child = spawn(
     process.execPath,
-    [
-      'scripts/generate-precompiled-display-routes.mjs',
-      focusedMeasurement ? '--measure-only' : '--check',
-      '--machine',
-    ],
+    buildPrecompiledDisplayRouteSampleArguments(),
     {
       cwd: process.cwd(),
       env: {

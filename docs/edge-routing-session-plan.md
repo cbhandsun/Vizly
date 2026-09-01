@@ -1668,3 +1668,11 @@ WMS Process 横向泳道的 `e-qc-exec` 没有碰撞、交叉或净空缺陷，�
 production browser 的 `wms-process-flow-v1:domain-lanes-lr` 已通过：44 条边的超量折点、非正交、穿节点、严格交叉、非法重叠、短端点桩、tiny dogleg、hairpin 和商业净空违规全部为零，LR 主流程语义检查通过。预编译生成器首次成功产出该布局变体，默认生成和可复现检查现都包含布局变体，避免已提交的第 4 个 artifact 被普通生成命令静默删除。
 
 该批完成的是通用连线质量闭环。3D 性能按当前优先级继续后置；非 3D 的剩余主线仍是 Logistics 冷路由 p95 和 L-OMS 增量 release-to-final 尾延迟，不通过扩大预算宣称完成。
+
+## 29. 冷路由采样与产物复现职责隔离（2026-08-31）
+
+布局变体进入默认预编译产物后，冷路由 CI 的第一个样本在性能统计前报 `Generated precompiled route artifact set is stale`。根因不是路由性能，而是 benchmark 直接以 `--check` 调用生成器，只捕获三个初始目标，却与包含第四个布局变体的完整产物目录做精确集合比较；它绕过了 package script 中已经统一的布局参数。
+
+本批将冷路由样本统一改为生成器现有的 no-write measurement 路径。未指定 preset 时，该路径对有界的三个初始目标连续测量；指定 preset 时仍只测单个目标。性能采样不再读取、写入或比较生成产物集合，完整 artifact/manifest/loader 复现继续由独立 `generate:precompiled-routes:check` 门禁负责。这样既避免布局变体重复 preset 身份污染性能汇总，也避免每个样本无谓执行布局切换。
+
+回归覆盖完整初始目标选择、聚焦目标选择、非法 preset、measure/check 冲突及 benchmark 子进程参数。真实 production preview 的非聚焦样本已经完成三个 preset 的统计并只因 Logistics `2496/1100ms` 性能门槛失败，证明 CI 重新报告真实性能而不是产物集合假失败。

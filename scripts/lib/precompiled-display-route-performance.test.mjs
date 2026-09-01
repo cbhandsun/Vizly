@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assertPrecompiledDisplayRoutePerformanceBudget,
   buildPrecompiledDisplayRoutePerformanceResult,
+  buildPrecompiledDisplayRouteSampleArguments,
   parsePrecompiledDisplayRouteBenchmarkPresetIds,
   parsePrecompiledDisplayRouteSampleCount,
   parsePrecompiledDisplayRoutePerformanceResult,
@@ -41,6 +42,14 @@ const sample = (logisticsMs = 700) => buildPrecompiledDisplayRoutePerformanceRes
 ]);
 
 describe('precompiled display route cold performance', () => {
+  it('uses the bounded no-write path for cold samples', () => {
+    expect(buildPrecompiledDisplayRouteSampleArguments()).toEqual([
+      'scripts/generate-precompiled-display-routes.mjs',
+      '--measure-only',
+      '--machine',
+    ]);
+  });
+
   it('selects one known preset for no-write measurement mode', () => {
     const targets = [
       { presetId: 'first-route', sourcePath: 'first.json' },
@@ -48,6 +57,12 @@ describe('precompiled display route cold performance', () => {
     ];
     expect(selectPrecompiledDisplayRouteCaptureTargets({
       measureOnly: false,
+      checkMode: false,
+      presetId: undefined,
+      targets,
+    })).toBe(targets);
+    expect(selectPrecompiledDisplayRouteCaptureTargets({
+      measureOnly: true,
       checkMode: false,
       presetId: undefined,
       targets,
@@ -69,7 +84,6 @@ describe('precompiled display route cold performance', () => {
       targets,
       ...overrides,
     });
-    expect(() => select({ presetId: '' })).toThrow(/bounded lowercase preset id/);
     expect(() => select({ presetId: '../private' })).toThrow(/bounded lowercase preset id/);
     expect(() => select({ presetId: 'unknown-route' })).toThrow(/Unknown/);
     expect(() => select({ checkMode: true })).toThrow(/cannot be combined/);

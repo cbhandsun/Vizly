@@ -35,6 +35,14 @@ const boundedToken = (value, pattern) => (
   typeof value === 'string' && pattern.test(value) ? value : null
 );
 
+export const buildPrecompiledDisplayRouteSampleArguments = () => {
+  return [
+    'scripts/generate-precompiled-display-routes.mjs',
+    '--measure-only',
+    '--machine',
+  ];
+};
+
 export const selectPrecompiledDisplayRouteCaptureTargets = ({
   measureOnly,
   checkMode,
@@ -52,6 +60,7 @@ export const selectPrecompiledDisplayRouteCaptureTargets = ({
     return targets;
   }
   if (checkMode) throw new Error('--measure-only cannot be combined with --check');
+  if (!requestedPresetId) return targets;
   if (!boundedToken(requestedPresetId, PRESET_ID_PATTERN)) {
     throw new Error(
       'PRECOMPILED_ROUTE_PRESET_ID must be a bounded lowercase preset id in --measure-only mode',
