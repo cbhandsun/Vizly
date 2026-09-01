@@ -1676,3 +1676,13 @@ production browser 的 `wms-process-flow-v1:domain-lanes-lr` 已通过：44 条�
 本批将冷路由样本统一改为生成器现有的 no-write measurement 路径。未指定 preset 时，该路径对有界的三个初始目标连续测量；指定 preset 时仍只测单个目标。性能采样不再读取、写入或比较生成产物集合，完整 artifact/manifest/loader 复现继续由独立 `generate:precompiled-routes:check` 门禁负责。这样既避免布局变体重复 preset 身份污染性能汇总，也避免每个样本无谓执行布局切换。
 
 回归覆盖完整初始目标选择、聚焦目标选择、非法 preset、measure/check 冲突及 benchmark 子进程参数。真实 production preview 的非聚焦样本已经完成三个 preset 的统计并只因 Logistics `2496/1100ms` 性能门槛失败，证明 CI 重新报告真实性能而不是产物集合假失败。
+
+## 30. 拖拽终态无障碍投影身份稳定（2026-09-01）
+
+L-OMS 单节点拖拽结束后，路由 Worker 和局部重连已经满足各自预算，但 `release-to-final` 仍受主线程提交尾延迟影响。CPU 证据显示单节点移动会重新执行整图无障碍标签投影；旧实现把节点与连线合并在一个 memo 中，并为所有缺少显式 `ariaLabel` 的元素重新克隆对象。结果是一个节点变化会同时改变全部节点、全部连线及连线数组身份，触发不必要的 React Flow 广泛重渲染。
+
+本批将节点和连线投影拆开，并为每个画布实例维护只按源对象引用存活的 WeakMap 缓存。单节点移动只产生该节点的新投影；未变化节点、全部未变化连线及连线数组保持身份稳定。缓存每次仍重新解析当前标签并比较，源对象被外部原地修改时不会返回陈旧标签。无障碍名称、React Flow 输入模型和路由事务均未改变。
+
+回归覆盖不变元素身份、移动节点失效、可变标签刷新，以及组件重渲染后连线数组和未移动节点投影保持引用。相同 production build 的 10 次独立 L-OMS 拖拽中，`releaseToFinal` 中位数为 `244ms`、p95 为 `282/300ms`；`workerToFinal` p95 为 `206/300ms`，`localRoute` p95 为 `98.8/150ms`，10/10 零 fallback、零 abort，生命周期和连线质量门禁全部通过。此前 5 次基线的 `releaseToFinal` p95 为 `311/300ms`；两组不是交错 ABBA 基准，因此绝对差值只作为运行证据，身份稳定性由回归测试直接证明。
+
+SVG/PDF 登录态真实导出已完成文件级验收：PDF 为单页矢量内容，包含字体对象且无图像对象；SVG 节点和路径结构完整且无不安全元素。3D 性能继续按优先级后置。当前最高优先级未完成项仍是 Logistics 冷启动完整路由：本批前 5 个独立样本 p95 `2454/1100ms`，主要时间仍在 Worker quality/finalizer 计算，下一批继续按阶段证据削减通用重复工作，不扩大预算。

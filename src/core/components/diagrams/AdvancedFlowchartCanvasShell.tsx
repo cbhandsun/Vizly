@@ -7,7 +7,11 @@ import {
     useFlowchartDragBuffer,
     type SmartNodeDragHandler,
 } from './hooks/useFlowchartDragBuffer';
-import { addFlowchartAccessibilityLabels } from './flowchartCanvasAccessibility';
+import {
+    addFlowchartEdgeAccessibilityLabels,
+    addFlowchartNodeAccessibilityLabels,
+    createFlowchartAccessibilityProjectionCache,
+} from './flowchartCanvasAccessibility';
 import {
     buildShiftEdgeMultiSelectionChanges,
     buildShiftMultiSelectionChanges,
@@ -156,9 +160,22 @@ export const AdvancedFlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> =
         }
         return getFlowchartMarqueeEdges(displayEdges, selectionOnDrag === true);
     }, [displayEdges, editingEnabled, selectionOnDrag]);
-    const accessibleElements = useMemo(
-        () => addFlowchartAccessibilityLabels(renderedNodes, renderedEdges),
-        [renderedEdges, renderedNodes],
+    const accessibilityProjectionCacheRef = useRef(
+        createFlowchartAccessibilityProjectionCache(),
+    );
+    const accessibleNodes = useMemo(
+        () => addFlowchartNodeAccessibilityLabels(
+            renderedNodes,
+            accessibilityProjectionCacheRef.current.nodes,
+        ),
+        [renderedNodes],
+    );
+    const accessibleEdges = useMemo(
+        () => addFlowchartEdgeAccessibilityLabels(
+            renderedEdges,
+            accessibilityProjectionCacheRef.current.edges,
+        ),
+        [renderedEdges],
     );
     const shiftSelectionFrameRef = useRef<number | null>(null);
     const canvasRootRef = useRef<HTMLDivElement>(null);
@@ -212,8 +229,8 @@ export const AdvancedFlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> =
       <div ref={canvasRootRef} style={{ width: '100%', height: '100%' }}>
         <BaseReactFlow
             onInit={onInit}
-            nodes={accessibleElements.nodes}
-            edges={accessibleElements.edges}
+            nodes={accessibleNodes}
+            edges={accessibleEdges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             onNodesChange={editingEnabled ? handleNodesChange : undefined}

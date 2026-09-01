@@ -38,6 +38,7 @@ vi.mock('../../shared/BaseReactFlow', () => ({
 }));
 
 import { FlowchartCanvasShell } from '../FlowchartCanvasShell';
+import { AdvancedFlowchartCanvasShell } from '../AdvancedFlowchartCanvasShell';
 import {
   bindBaseReactFlowRendererAssistiveVisibility,
   syncBaseReactFlowRendererAssistiveVisibility,
@@ -105,6 +106,76 @@ describe('FlowchartCanvasShell', () => {
       edgesFocusable: true,
     });
     expect(baseReactFlowProps).not.toHaveBeenCalled();
+  });
+
+  it('keeps unchanged accessibility projections stable across a node move', async () => {
+    const noop = vi.fn();
+    const fixedNode: Node = {
+      id: 'fixed',
+      position: { x: 0, y: 0 },
+      data: { label: '固定节点' },
+    };
+    const movingNode: Node = {
+      id: 'moving',
+      position: { x: 100, y: 0 },
+      data: { label: '移动节点' },
+    };
+    const edges: Edge[] = [{ id: 'edge', source: 'fixed', target: 'moving' }];
+    const renderShell = (nodes: Node[]) => (
+      <AdvancedFlowchartCanvasShell
+        nodes={nodes}
+        displayEdges={edges}
+        nodeTypes={{}}
+        onInit={noop}
+        onNodesChange={noop}
+        onEdgesChange={noop}
+        onConnect={noop}
+        onConnectStart={noop}
+        onConnectEnd={noop}
+        autoRoutingEnabled
+        enableSmartEdges
+        showMinimap={false}
+        showGrid
+        gridVariant={'dots' as never}
+        onNodeDrag={noop}
+        onNodeDragStart={noop}
+        onSelectionChange={noop}
+        onPaneClick={noop}
+        onPaneDoubleClick={noop}
+        selectionMode={'partial' as never}
+        onNodeContextMenu={noop}
+        onEdgeContextMenu={noop}
+        onPaneContextMenu={noop}
+        isSpacePressed={false}
+        isConnecting={false}
+        connectPreview={null}
+        connectionMode={'loose' as never}
+        isDragging={false}
+      />
+    );
+    const view = render(renderShell([fixedNode, movingNode]));
+    await waitFor(() => expect(baseReactFlowProps).toHaveBeenCalled());
+    const initialProps = baseReactFlowProps.mock.calls.at(-1)?.[0] as {
+      nodes: Node[];
+      edges: Edge[];
+    };
+    const initialRenderCount = baseReactFlowProps.mock.calls.length;
+
+    view.rerender(renderShell([
+      fixedNode,
+      { ...movingNode, position: { x: 124, y: 0 } },
+    ]));
+    await waitFor(() => expect(baseReactFlowProps.mock.calls.length).toBeGreaterThan(
+      initialRenderCount,
+    ));
+    const movedProps = baseReactFlowProps.mock.calls.at(-1)?.[0] as {
+      nodes: Node[];
+      edges: Edge[];
+    };
+
+    expect(movedProps.edges).toBe(initialProps.edges);
+    expect(movedProps.nodes[0]).toBe(initialProps.nodes[0]);
+    expect(movedProps.nodes[1]).not.toBe(initialProps.nodes[1]);
   });
 
   it('removes a plugin-replaced default canvas from keyboard and assistive navigation', () => {
