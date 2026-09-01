@@ -10,6 +10,7 @@ import {
   buildQualityEdgeInputSnapshot,
   buildQualityInputSnapshot,
 } from '../edgePathQualityInputSnapshot';
+import { edgeRoutingExactQualityIntentToken } from '../edgeRoutingQualityIntent';
 
 const edge = (
   id: string,
@@ -128,5 +129,28 @@ describe('edgePathQualityFullScan', () => {
     expect(withoutHopScore.strictCrossings).toBe(1);
     expect(withHopScore.strictCrossings).toBe(0);
     expect(withHopScore).toEqual(calculateEdgePathQualityScoreExact(withCrossingHop));
+  });
+
+  it('keeps the allocation-light edge signature byte-compatible', () => {
+    const candidate = {
+      ...edge('signature', [{ x: -12.5, y: 0 }, { x: 4, y: 98.25 }]),
+      sourceHandle: 'source:right:1',
+      targetHandle: null,
+    };
+    const snapshot = buildQualityEdgeInputSnapshot(candidate);
+    const encode = (value: string): string => `${value.length}:${value}`;
+    const pathSignature = snapshot.path
+      .map(point => encode(`${point.x},${point.y}`))
+      .join('');
+    const expectedSignature = [
+      candidate.source,
+      candidate.target,
+      candidate.sourceHandle ?? '',
+      candidate.targetHandle ?? '',
+      edgeRoutingExactQualityIntentToken(candidate),
+      pathSignature,
+    ].map(value => encode(String(value))).join('');
+
+    expect(snapshot.signature).toBe(expectedSignature);
   });
 });

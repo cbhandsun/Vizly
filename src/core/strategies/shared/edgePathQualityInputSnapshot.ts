@@ -16,26 +16,31 @@ export type QualityEdgeInputSnapshot = Readonly<{
 
 const encodeSignatureField = (value: string): string => `${value.length}:${value}`;
 
-export const buildQualityInputSignature = (edgeSignatures: readonly string[]): string => (
-  edgeSignatures.map(signature => encodeSignatureField(signature)).join('')
-);
+export const buildQualityInputSignature = (edgeSignatures: readonly string[]): string => {
+  let signature = '';
+  for (const edgeSignature of edgeSignatures) {
+    signature += encodeSignatureField(edgeSignature);
+  }
+  return signature;
+};
 
 export const buildQualityEdgeInputSnapshot = (edge: Edge): QualityEdgeInputSnapshot => {
   const path = getEdgePath(edge);
   const intent = edgeRoutingExactQualityIntentToken(edge);
-  const pathSignature = path
-    .map(point => encodeSignatureField(`${point.x},${point.y}`))
-    .join('');
+  let pathSignature = '';
+  for (const point of path) {
+    pathSignature += encodeSignatureField(`${point.x},${point.y}`);
+  }
+  let signature = '';
+  signature += encodeSignatureField(String(edge.source));
+  signature += encodeSignatureField(String(edge.target));
+  signature += encodeSignatureField(String(edge.sourceHandle ?? ''));
+  signature += encodeSignatureField(String(edge.targetHandle ?? ''));
+  signature += encodeSignatureField(String(intent));
+  signature += encodeSignatureField(pathSignature);
   return {
     path,
-    signature: [
-      edge.source,
-      edge.target,
-      edge.sourceHandle ?? '',
-      edge.targetHandle ?? '',
-      intent,
-      pathSignature,
-    ].map(value => encodeSignatureField(String(value))).join(''),
+    signature,
   };
 };
 
