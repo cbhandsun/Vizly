@@ -16,7 +16,8 @@ export const clickLayout = async (session, layoutCase) => {
   if (!opened) throw new Error('Layout menu trigger was not found');
   await delay(300);
   const clickVisibleItem = async () => {
-    const target = await session.evaluate(`(() => {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const target = await session.evaluate(`(() => {
     const findByKey = ${findDisplayRoutingMenuElementByKey.toString()};
     const pointerTarget = ${resolveDisplayRoutingMenuPointerTarget.toString()};
     const item = findByKey(
@@ -25,23 +26,29 @@ export const clickLayout = async (session, layoutCase) => {
     );
     if (!item || item.getBoundingClientRect().width === 0) return null;
     const viewport = { width: innerWidth, height: innerHeight };
-    const popup = item.closest('.ant-dropdown-menu-submenu-popup');
-    if (popup && !pointerTarget(popup.getBoundingClientRect(), viewport)) return { inaccessible: true };
     item.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     const point = pointerTarget(item.getBoundingClientRect(), viewport);
     if (!point || !item.contains(document.elementFromPoint(point.x, point.y))) return { inaccessible: true };
     window.__vizlyRequestedLayoutLabel = item.textContent?.trim() ?? '';
     return { ...point, clickedAt: Date.now() };
   })()`);
-    if (!target) return null;
-    if (target.inaccessible) throw new Error(`${layoutCase.id} menu item is outside the viewport or covered`);
-    for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) {
-      await session.send('Input.dispatchMouseEvent', {
-        type, x: target.x, y: target.y,
-        ...(type === 'mouseMoved' ? {} : { button: 'left', clickCount: 1 }),
-      });
+      if (!target) return null;
+      if (target.inaccessible) {
+        if (attempt === 0) {
+          await delay(120);
+          continue;
+        }
+        throw new Error(`${layoutCase.id} menu item is outside the viewport or covered`);
+      }
+      for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) {
+        await session.send('Input.dispatchMouseEvent', {
+          type, x: target.x, y: target.y,
+          ...(type === 'mouseMoved' ? {} : { button: 'left', clickCount: 1 }),
+        });
+      }
+      return target.clickedAt;
     }
-    return target.clickedAt;
+    return null;
   };
   let clicked = await clickVisibleItem();
   if (!clicked) {

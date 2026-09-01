@@ -117,9 +117,19 @@ describe('display routing matrix cases', () => {
     await expect(clickLayout(session, { id: 'domain-compound-elk-bt' })).resolves.toBe(123);
     expect(session.send.mock.calls.map(call => call[1].type)).toEqual(['mouseMoved', 'mousePressed', 'mouseReleased']);
     expect(session.evaluate.mock.calls[1][0]).not.toContain('item?.click()');
-    const covered = { evaluate: vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce({ inaccessible: true }), send: vi.fn() };
+    const covered = { evaluate: vi.fn()
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce({ inaccessible: true })
+      .mockResolvedValueOnce({ inaccessible: true }), send: vi.fn() };
     await expect(clickLayout(covered, { id: 'domain-compound-elk-bt' })).rejects.toThrow('outside the viewport or covered');
     expect(covered.send).not.toHaveBeenCalled();
+
+    const scrollSettled = { evaluate: vi.fn()
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce({ inaccessible: true })
+      .mockResolvedValueOnce({ x: 140, y: 110, clickedAt: 456 }), send: vi.fn().mockResolvedValue(undefined) };
+    await expect(clickLayout(scrollSettled, { id: 'tree-tb' })).resolves.toBe(456);
+    expect(scrollSettled.send).toHaveBeenCalledTimes(3);
   });
   it('checks the applied layout in the live-session assertion', async () => {
     const correct = { evaluate: async () => ({ requested: 'Vertical swimlanes', applied: 'Auto Layout: Vertical swimlanes' }) };
