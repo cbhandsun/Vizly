@@ -1,0 +1,115 @@
+name: Display routing matrix
+
+on:
+  schedule:
+    - cron: '0 11 * * 2'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: display-routing-matrix-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PRECOMPILED_ROUTE_BASE_URL: http://127.0.0.1:4177
+
+jobs:
+  build:
+    name: Production build
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.2
+          cache: npm
+      - name: Pin npm
+        run: npm install --global npm@12.0.1
+      - name: Install dependencies
+        run: npm ci
+      - name: Build production application
+        run: npm run build
+      - name: Upload immutable production build
+        uses: actions/upload-artifact@v4
+        with:
+          name: display-routing-matrix-build
+          path: dist
+          if-no-files-found: error
+          retention-days: 7
+
+  matrix:
+    name: ${{ matrix.preset }} continuous layouts
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        preset:
+          - logistics-architecture-v1
+          - wms-demand-allocation-strategy-v2
+          - wms-process-flow-v1
+          - tms-architecture-v1
+    env:
+      DISPLAY_ROUTING_MATRIX_PRESET: ${{ matrix.preset }}
+      DISPLAY_ROUTING_MATRIX_CASE: domain-compound-elk-tb
+      DISPLAY_ROUTING_MATRIX_WARM_CASES: >-
+        domain-compound-elk-bt,domain-compound-elk-lr,domain-compound-elk-rl,
+        domain-lanes-tb,domain-lanes-bt,domain-lanes-lr,domain-lanes-rl,
+        domain-elk-tb,domain-elk-bt,domain-elk-lr,domain-elk-rl,
+        tree-tb,tree-bt,tree-lr,tree-rl
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.2
+          cache: npm
+      - name: Pin npm
+        run: npm install --global npm@12.0.1
+      - name: Install dependencies
+        run: npm ci
+      - name: Download production build
+        uses: actions/download-artifact@v4
+        with:
+          name: display-routing-matrix-build
+          path: dist
+      - name: Start isolated production preview
+        shell: pwsh
+        run: |
+          $preview = Start-Process -FilePath (Get-Command node).Source -ArgumentList @(
+            'node_modules/vite/bin/vite.js', 'preview', '--host', '127.0.0.1', '--port', '4177', '--strictPort'
+          ) -WindowStyle Hidden -PassThru
+          "ROUTING_MATRIX_PREVIEW_PID=$($preview.Id)" >> $env:GITHUB_ENV
+          for ($attempt = 1; $attempt -le 60; $attempt += 1) {
+            if ($preview.HasExited) { throw 'Display routing matrix preview exited before readiness.' }
+            try {
+              Invoke-WebRequest -Uri $env:PRECOMPILED_ROUTE_BASE_URL -UseBasicParsing -TimeoutSec 2 | Out-Null
+              exit 0
+            } catch { Start-Sleep -Seconds 1 }
+          }
+          throw 'Display routing matrix preview did not become ready.'
+      - name: Run continuous production-browser layout matrix
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path 'artifacts/display-routing-matrix' | Out-Null
+          npm run verify:display-routing-matrix 2>&1 |
+            Tee-Object -FilePath "artifacts/display-routing-matrix/$env:DISPLAY_ROUTING_MATRIX_PRESET.txt"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Stop production preview
+        if: ${{ always() }}
+        shell: pwsh
+        run: |
+          if ($env:ROUTING_MATRIX_PREVIEW_PID -match '^\d+$') {
+            Stop-Process -Id ([int]$env:ROUTING_MATRIX_PREVIEW_PID) -Force -ErrorAction SilentlyContinue
+          }
+      - name: Upload matrix report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: display-routing-matrix-${{ matrix.preset }}-${{ github.run_attempt }}
+          path: artifacts/display-routing-matrix
+          if-no-files-found: error
+          retention-days: 30

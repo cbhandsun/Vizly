@@ -67,6 +67,7 @@ describe('display routing browser geometry', () => {
       detachedTerminalFindings: [],
       shortEndpointStubEdgeIds: [],
       tinyInteriorDoglegEdgeIds: [],
+      excessiveBendEdgeIds: [],
       hairpinEdgeIds: [],
       strictCrossings: [],
       illegalOverlaps: [],
@@ -122,6 +123,7 @@ describe('display routing browser geometry', () => {
       detachedTerminalFindings: [],
       shortEndpointStubEdgeIds: [],
       tinyInteriorDoglegEdgeIds: [],
+      excessiveBendEdgeIds: [],
       hairpinEdgeIds: [],
       strictCrossings: [],
       illegalOverlaps: [],
@@ -135,6 +137,17 @@ describe('display routing browser geometry', () => {
       tinyInteriorDoglegEdgeIds: ['edge'],
       hairpinEdgeIds: ['edge'],
     });
+
+    document.querySelectorAll = () => [wrapper(
+      'M 40 20 L 80 20 L 80 80 L 120 80 L 120 140 L 160 140 L 160 80 L 200 80 L 200 20',
+    )];
+    expect(readRenderedDisplayEdgeHardGeometryAudit([edge], nodes)).toMatchObject({
+      excessiveBendEdgeIds: ['edge'],
+    });
+    expect(readRenderedDisplayEdgeHardGeometryAudit(
+      [{ ...edge, data: { sharedTrunkSynthesized: true } }],
+      nodes,
+    )).toMatchObject({ excessiveBendEdgeIds: [] });
 
     document.querySelectorAll = () => [wrapper('M 40 20 L 200 25')];
     expect(readRenderedDisplayEdgeHardGeometryAudit([edge], nodes)).toMatchObject({

@@ -105,6 +105,8 @@ export const displayRoutingFinalSvgGeometryIsClean = ({
   && hardAudit.shortEndpointStubEdgeIds.length === 0
   && Array.isArray(hardAudit.tinyInteriorDoglegEdgeIds)
   && hardAudit.tinyInteriorDoglegEdgeIds.length === 0
+  && Array.isArray(hardAudit.excessiveBendEdgeIds)
+  && hardAudit.excessiveBendEdgeIds.length === 0
   && Array.isArray(hardAudit.hairpinEdgeIds)
   && hardAudit.hairpinEdgeIds.length === 0
   && Array.isArray(hardAudit.strictCrossings)

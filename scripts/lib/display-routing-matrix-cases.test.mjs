@@ -235,6 +235,12 @@ describe('display routing matrix cases', () => {
       known,
     )).toEqual(['domain-elk-rl', 'tree-bt', 'domain-lanes-lr']);
     expect(parseDisplayRoutingMatrixCaseList('', known)).toEqual([]);
+    const fullSequence = DISPLAY_ROUTING_LAYOUT_CASES.slice(1).map(item => item.id).join(',');
+    expect(parseDisplayRoutingMatrixCaseList(
+      fullSequence,
+      known,
+      DISPLAY_ROUTING_LAYOUT_CASES.length - 1,
+    )).toHaveLength(15);
     expect(() => parseDisplayRoutingMatrixCaseList('tree-bt,tree-bt', known)).toThrow();
     expect(() => parseDisplayRoutingMatrixCaseList('unknown', known)).toThrow();
     expect(() => parseDisplayRoutingMatrixCaseList('x'.repeat(2_000), known)).toThrow();

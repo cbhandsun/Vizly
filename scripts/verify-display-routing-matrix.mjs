@@ -90,6 +90,7 @@ const WARM_LAYOUT_CASE_IDS = parseDisplayRoutingMatrixCaseList(
   process.env.DISPLAY_ROUTING_MATRIX_WARM_CASES
     ?? process.env.DISPLAY_ROUTING_MATRIX_WARM_CASE,
   new Set(DISPLAY_ROUTING_LAYOUT_CASES.map(candidate => candidate.id)),
+  DISPLAY_ROUTING_LAYOUT_CASES.length - 1,
 );
 const WARM_LAYOUT_CASES = WARM_LAYOUT_CASE_IDS.map(id => (
   DISPLAY_ROUTING_LAYOUT_CASES.find(candidate => candidate.id === id)
@@ -253,6 +254,7 @@ const auditFinalSvg = async (session, route, label) => {
       renderAuthorityStatus,
       shortEndpointStubPathCount: hardAudit?.shortEndpointStubEdgeIds?.length,
       tinyInteriorDoglegPathCount: hardAudit?.tinyInteriorDoglegEdgeIds?.length,
+      excessiveBendPathCount: hardAudit?.excessiveBendEdgeIds?.length,
       hairpinPathCount: hardAudit?.hairpinEdgeIds?.length,
       strictCrossingCount: hardAudit?.strictCrossings?.length,
       illegalOverlapCount: hardAudit?.illegalOverlaps?.length,
