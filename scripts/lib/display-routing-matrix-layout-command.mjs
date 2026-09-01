@@ -52,22 +52,42 @@ export const clickLayout = async (session, layoutCase) => {
   };
   let clicked = await clickVisibleItem();
   if (!clicked) {
-    const submenuCenter = await session.evaluate(`(() => {
+    const revealMoreLayouts = async () => {
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const target = await session.evaluate(`(() => {
       const findByKey = ${findDisplayRoutingMenuElementByKey.toString()};
+      const pointerTarget = ${resolveDisplayRoutingMenuPointerTarget.toString()};
       const item = findByKey(
         document.querySelectorAll('.flowchart-layout-menu [data-menu-id]'),
         'more-layout-engines',
       );
-      if (!item) return null;
-      const rect = item.getBoundingClientRect();
-      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+      if (!item || item.getBoundingClientRect().width === 0) return null;
+      const viewport = { width: innerWidth, height: innerHeight };
+      item.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      const point = pointerTarget(item.getBoundingClientRect(), viewport);
+      if (!point || !item.contains(document.elementFromPoint(point.x, point.y))) {
+        return { inaccessible: true };
+      }
+      return point;
     })()`);
-    if (submenuCenter) {
-      await session.send('Input.dispatchMouseEvent', {
-        type: 'mouseMoved',
-        x: submenuCenter.x,
-        y: submenuCenter.y,
-      });
+        if (!target) return false;
+        if (target.inaccessible) {
+          if (attempt === 0) {
+            await delay(120);
+            continue;
+          }
+          throw new Error('More layouts menu item is outside the viewport or covered');
+        }
+        await session.send('Input.dispatchMouseEvent', {
+          type: 'mouseMoved',
+          x: target.x,
+          y: target.y,
+        });
+        return true;
+      }
+      return false;
+    };
+    if (await revealMoreLayouts()) {
       await delay(500);
       clicked = await clickVisibleItem();
     }

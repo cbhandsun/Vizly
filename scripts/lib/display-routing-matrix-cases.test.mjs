@@ -131,6 +131,27 @@ describe('display routing matrix cases', () => {
     await expect(clickLayout(scrollSettled, { id: 'tree-tb' })).resolves.toBe(456);
     expect(scrollSettled.send).toHaveBeenCalledTimes(3);
   });
+
+  it('scrolls the more-layouts action into view before opening its submenu', async () => {
+    const session = {
+      evaluate: vi.fn()
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ inaccessible: true })
+        .mockResolvedValueOnce({ x: 180, y: 640 })
+        .mockResolvedValueOnce({ x: 420, y: 640, clickedAt: 789 }),
+      send: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await expect(clickLayout(session, { id: 'domain-lanes-rl' })).resolves.toBe(789);
+    expect(session.send.mock.calls.map(call => call[1].type)).toEqual([
+      'mouseMoved',
+      'mouseMoved',
+      'mousePressed',
+      'mouseReleased',
+    ]);
+    expect(session.evaluate.mock.calls[2][0]).toContain("item.scrollIntoView({ block: 'nearest'");
+  });
   it('checks the applied layout in the live-session assertion', async () => {
     const correct = { evaluate: async () => ({ requested: 'Vertical swimlanes', applied: 'Auto Layout: Vertical swimlanes' }) };
     await expect(assertRequestedLayoutSelected(correct, 'domain-lanes-tb')).resolves.toBeUndefined();
