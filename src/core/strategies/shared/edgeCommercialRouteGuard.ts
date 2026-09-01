@@ -38,3 +38,45 @@ export function chooseCommercialRouteCandidate<T extends Edge[]>(
       .map(item => item.candidate),
   );
 }
+
+/**
+ * Equivalent commercial selection for candidates that replace exactly one
+ * edge. The unchanged edges contribute the same obstacle score to every
+ * candidate, so rescanning them cannot affect the winner.
+ */
+export function chooseCommercialSingleEdgeRouteCandidate<T extends Edge[]>(
+  nodes: ReactFlowNode[],
+  changedEdgeIndex: number,
+  ...candidates: T[]
+): T {
+  if (candidates.length === 0) return [] as unknown as T;
+  const baseline = candidates[0];
+  const canUseIncrementalScore = Number.isSafeInteger(changedEdgeIndex)
+    && changedEdgeIndex >= 0
+    && changedEdgeIndex < baseline.length
+    && candidates.every(candidate => (
+      candidate.length === baseline.length
+      && candidate.every((edge, index) => index === changedEdgeIndex || edge === baseline[index])
+    ));
+  if (!canUseIncrementalScore) {
+    return chooseCommercialRouteCandidate(nodes, ...candidates);
+  }
+
+  const obstacles = getRoutingObstacles(nodes);
+  const uniqueCandidates = candidates.filter(
+    (candidate, index) => candidates.indexOf(candidate) === index,
+  );
+  const scored = uniqueCandidates.map(candidate => {
+    const edge = candidate[changedEdgeIndex];
+    return {
+      candidate,
+      obstacleHits: countUnrelatedObstacleHits(getEdgePath(edge), edge, obstacles),
+    };
+  });
+  const minimumObstacleHits = Math.min(...scored.map(item => item.obstacleHits));
+  return chooseFewestStrictCrossings(
+    ...scored
+      .filter(item => item.obstacleHits === minimumObstacleHits)
+      .map(item => item.candidate),
+  );
+}

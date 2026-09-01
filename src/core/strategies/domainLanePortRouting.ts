@@ -1,6 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 import { buildEndpointOrthogonalFallbackPath, lockComputedPathOnEdge } from './shared/edgeFallbackPath';
-import { chooseCommercialRouteCandidate } from './shared/edgeCommercialRouteGuard';
+import { chooseCommercialSingleEdgeRouteCandidate } from './shared/edgeCommercialRouteGuard';
 import { repairSharedTrunkAwareObstacles } from './shared/edgeRoutingWaypointRefinement';
 import { asRoutingRecord, readManualHandleLocks } from './domainDagreEdgePreparationSupport';
 import { getEdgePath } from './shared/edgeRoutingPathGeometry';
@@ -67,7 +67,7 @@ export const repairDomainLanePortRoutes = (edges: Edge[], nodes: Node[]): Edge[]
           }
         }
       }
-      current = chooseCommercialRouteCandidate(nodes, ...candidates);
+      current = chooseCommercialSingleEdgeRouteCandidate(nodes, index, ...candidates);
     }
     if (current === before) break;
   }
