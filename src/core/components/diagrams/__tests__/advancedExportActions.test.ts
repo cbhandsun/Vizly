@@ -3,9 +3,11 @@ import type { ReactFlowRenderSnapshot } from '../../../rendering/reactFlowScene'
 
 const exportRenderSceneToPngDataUrl = vi.fn(async () => 'data:image/png;base64,aGVsbG8=');
 const exportRenderSceneToSvgDataUrl = vi.fn(() => 'data:image/svg+xml;charset=utf-8,%3Csvg%3E%3C%2Fsvg%3E');
+const exportRenderSceneToPdfBlob = vi.fn(async () => new Blob(['pdf'], { type: 'application/pdf' }));
 const triggerDownload = vi.fn();
 const downloadImage = vi.fn(async () => undefined);
 const attachVizlyExportMetadata = vi.fn(async (dataUrl: string) => `${dataUrl}#metadata`);
+const safeWarn = vi.fn();
 
 vi.mock('../../../export/svgRasterExport', () => ({
   exportRenderSceneToPngDataUrl,
@@ -13,6 +15,10 @@ vi.mock('../../../export/svgRasterExport', () => ({
 
 vi.mock('../../../export/svgExport', () => ({
   exportRenderSceneToSvgDataUrl,
+}));
+
+vi.mock('../../../export/scenePdfExport', () => ({
+  exportRenderSceneToPdfBlob,
 }));
 
 vi.mock('../../shared/exportUtils', () => ({
@@ -23,6 +29,14 @@ vi.mock('../../shared/exportUtils', () => ({
 vi.mock('../../../utils/imageExporter', () => ({
   attachVizlyExportMetadata,
   downloadImage,
+}));
+
+vi.mock('../../../utils/consoleCleanup', () => ({
+  safeLog: { warn: safeWarn },
+}));
+
+vi.mock('../../../utils/logSecurity', () => ({
+  redactSensitiveLogValue: () => '[redacted]',
 }));
 
 const snapshot = {
@@ -160,7 +174,7 @@ describe('runAdvancedExport', () => {
     );
   });
 
-  it('falls back to legacy image export for unsupported formats or missing snapshots', async () => {
+  it('uses scene-based vector PDF export when a snapshot is available', async () => {
     const { runAdvancedExport } = await import('../advancedExportActions');
     const pdfResult = await runAdvancedExport({
       diagramId: 'diagram-3',
@@ -171,6 +185,49 @@ describe('runAdvancedExport', () => {
       embedMetadata: true,
       getReactFlowSnapshot: () => snapshot as unknown as ReactFlowRenderSnapshot,
     });
+
+    expect(pdfResult).toBe('scene');
+    expect(exportRenderSceneToPdfBlob).toHaveBeenCalledWith(
+      expect.objectContaining({ nodes: [expect.objectContaining({ id: 'a' })] }),
+      { title: 'diagram-3', includeBackground: false },
+    );
+    expect(triggerDownload).toHaveBeenCalledWith(
+      expect.stringMatching(/^blob:/),
+      'diagram-3.pdf',
+    );
+    expect(downloadImage).not.toHaveBeenCalled();
+  });
+
+  it('falls back to bounded raster PDF export when vector conversion fails', async () => {
+    const { runAdvancedExport } = await import('../advancedExportActions');
+    exportRenderSceneToPdfBlob.mockRejectedValueOnce(new Error('vector conversion failed'));
+
+    const result = await runAdvancedExport({
+      diagramId: 'diagram-pdf-fallback',
+      nodes: [{ id: 'legacy-node' }],
+      format: 'pdf',
+      pixelRatio: 2,
+      includeBackground: true,
+      embedMetadata: false,
+      getReactFlowSnapshot: () => snapshot as unknown as ReactFlowRenderSnapshot,
+    });
+
+    expect(result).toBe('fallback');
+    expect(safeWarn).toHaveBeenCalledWith(
+      'Vector PDF export failed; using bounded raster fallback:',
+      '[redacted]',
+    );
+    expect(downloadImage).toHaveBeenCalledWith([{ id: 'legacy-node' }], {
+      format: 'pdf',
+      pixelRatio: 2,
+      includeBackground: true,
+      embedMetadata: false,
+      fileNameBase: 'diagram-pdf-fallback',
+    });
+  });
+
+  it('falls back to legacy image export for unsupported formats or missing snapshots', async () => {
+    const { runAdvancedExport } = await import('../advancedExportActions');
     const pngFallbackResult = await runAdvancedExport({
       diagramId: 'diagram-4',
       nodes: [{ id: 'fallback-node' }],
@@ -181,15 +238,7 @@ describe('runAdvancedExport', () => {
       getReactFlowSnapshot: () => null,
     });
 
-    expect(pdfResult).toBe('fallback');
     expect(pngFallbackResult).toBe('fallback');
-    expect(downloadImage).toHaveBeenCalledWith([{ id: 'legacy-node' }], {
-      format: 'pdf',
-      pixelRatio: 3,
-      includeBackground: false,
-      embedMetadata: true,
-      fileNameBase: 'diagram-3',
-    });
     expect(downloadImage).toHaveBeenCalledWith([{ id: 'fallback-node' }], {
       format: 'png',
       pixelRatio: 1,

@@ -20,6 +20,11 @@ declare module 'virtual:vizly-elk-engine-worker-url' {
     export default workerUrl;
 }
 
+declare module 'virtual:vizly-pdf-font-url' {
+    const fontUrl: string;
+    export default fontUrl;
+}
+
 interface ImportMetaEnv {
     readonly VITE_SUPABASE_URL: string
     readonly VITE_SUPABASE_ANON_KEY: string

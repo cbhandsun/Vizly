@@ -9,6 +9,7 @@ import { jspdfRasterOnlyPlugin } from './vite-plugins/jspdfRasterOnly'
 import { sharedModuleWorkersPlugin } from './vite-plugins/sharedModuleWorkers'
 import { devCspPlugin } from './vite-plugins/devCsp'
 import { elkWorkerAssetPlugin } from './vite-plugins/elkWorkerAsset'
+import { pdfFontAssetPlugin } from './vite-plugins/pdfFontAsset'
 import {
   matchesAppSafeLoggingModule,
   matchesDisplayRoutingNeutralModule,
@@ -325,6 +326,7 @@ export default defineConfig({
     devCspPlugin(),
     jspdfRasterOnlyPlugin(),
     elkWorkerAssetPlugin(projectRoot),
+    pdfFontAssetPlugin(projectRoot),
     sharedModuleWorkersPlugin(projectRoot),
     displayRoutingChunks.plugin,
     minifyLocaleAssetsPlugin(projectRoot),

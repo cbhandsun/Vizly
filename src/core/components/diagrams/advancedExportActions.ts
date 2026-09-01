@@ -1,5 +1,6 @@
 import { exportRenderSceneToPngDataUrl } from '../../export/svgRasterExport';
 import { exportRenderSceneToSvgDataUrl } from '../../export/svgExport';
+import { exportRenderSceneToPdfBlob } from '../../export/scenePdfExport';
 import {
   buildRenderSceneFromReactFlowSnapshot,
   type ReactFlowRenderSnapshot,
@@ -13,6 +14,8 @@ import {
   downloadImage,
   type ExportOptions,
 } from '../../utils/imageExporter';
+import { safeLog } from '../../utils/consoleCleanup';
+import { redactSensitiveLogValue } from '../../utils/logSecurity';
 
 export interface RunAdvancedExportOptions {
   diagramId?: string;
@@ -25,8 +28,8 @@ export interface RunAdvancedExportOptions {
   getReactFlowSnapshot?: () => ReactFlowRenderSnapshot | null | undefined;
 }
 
-const canUseSceneExport = (format: ExportOptions['format']): format is 'png' | 'svg' => (
-  format === 'png' || format === 'svg'
+const canUseSceneExport = (format: ExportOptions['format']): format is 'png' | 'svg' | 'pdf' => (
+  format === 'png' || format === 'svg' || format === 'pdf'
 );
 
 export const runAdvancedExport = async ({
@@ -44,14 +47,28 @@ export const runAdvancedExport = async ({
   const snapshot = sceneFormat ? getReactFlowSnapshot?.() : null;
   if (snapshot && sceneFormat) {
     const scene = buildRenderSceneFromReactFlowSnapshot(snapshot, { padding: 40 });
-    const baseDataUrl = sceneFormat === 'png'
-      ? await exportRenderSceneToPngDataUrl(scene, { title, pixelRatio, includeBackground })
-      : exportRenderSceneToSvgDataUrl(scene, { title, includeBackground });
-    const dataUrl = embedMetadata
-      ? await attachVizlyExportMetadata(baseDataUrl, sceneFormat, { nodes })
-      : baseDataUrl;
-    triggerDownload(dataUrl, buildExportFileName(title, sceneFormat));
-    return 'scene';
+    if (sceneFormat === 'pdf') {
+      try {
+        const pdfBlob = await exportRenderSceneToPdfBlob(scene, { title, includeBackground });
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        triggerDownload(pdfUrl, buildExportFileName(title, 'pdf'));
+        return 'scene';
+      } catch (error) {
+        safeLog.warn(
+          'Vector PDF export failed; using bounded raster fallback:',
+          redactSensitiveLogValue(error),
+        );
+      }
+    } else {
+      const baseDataUrl = sceneFormat === 'png'
+        ? await exportRenderSceneToPngDataUrl(scene, { title, pixelRatio, includeBackground })
+        : exportRenderSceneToSvgDataUrl(scene, { title, includeBackground });
+      const dataUrl = embedMetadata
+        ? await attachVizlyExportMetadata(baseDataUrl, sceneFormat, { nodes })
+        : baseDataUrl;
+      triggerDownload(dataUrl, buildExportFileName(title, sceneFormat));
+      return 'scene';
+    }
   }
 
   await downloadImage(nodes, {
