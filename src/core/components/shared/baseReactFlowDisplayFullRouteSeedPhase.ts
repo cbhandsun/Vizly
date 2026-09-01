@@ -11,6 +11,7 @@ import {
   displayHardQualityGatesAreClean,
 } from './baseReactFlowDisplayQualityGates';
 import { doesDisplayCandidateMatchSourceGraph } from './baseReactFlowDisplayCandidateValidation';
+import { baseReactFlowDisplayCommercialQualityIsClean } from './baseReactFlowDisplayCommercialQuality';
 import {
   resolveDisplayQualityBudget,
   type BaseDisplayBoundedCandidateReport,
@@ -102,13 +103,20 @@ export const prepareBaseReactFlowFullRouteSeed = ({
       boundedFinal,
       repairNodes,
     );
-    if (boundedHardClean) {
+    if (
+      boundedHardClean
+      && baseReactFlowDisplayCommercialQualityIsClean(boundedFinal)
+    ) {
       return {
         kind: 'finalized',
         edges: markBaseDisplayFinalized(boundedFinal, inputSignature),
       };
     }
-    preparedBoundedEdges = boundedFinal;
+    // A hard-clean seed can still violate the separate commercial contract
+    // (for example, an excessive bend chain). Do not finalize or reuse that
+    // geometry as the full-route seed; start the complete quality route from
+    // the source graph so the commercial defect is not preserved by handoff.
+    preparedBoundedEdges = boundedHardClean ? null : boundedFinal;
   }
 
   const nodeById = new Map(nodes.map((node) => [node.id, node]));

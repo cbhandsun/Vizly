@@ -203,6 +203,42 @@ describe('bounded pre-display handoff', () => {
     expect(result).toEqual([]);
   });
 
+  it('does not finalize or reuse a hard-clean bounded seed with commercial defects', () => {
+    const edges: Edge[] = Array.from({ length: 25 }, (_, index) => ({
+      id: `commercial-source-${index}`,
+      source: `source-${index}`,
+      target: `target-${index}`,
+    }));
+    const commerciallyDirty = edges.map((edge, index) => ({
+      ...edge,
+      data: {
+        computedPath: Array.from({ length: 9 }, (_, pointIndex) => ({
+          x: pointIndex * 20,
+          y: pointIndex % 2 === 0 ? index * 40 : index * 40 + 20,
+        })),
+      },
+    }));
+
+    const result = prepareBaseReactFlowFullRouteSeed({
+      edges,
+      nodes: [],
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+      displayEdgeEpoch: 1,
+      skipFinalizedReuse: true,
+      createPreDisplayFinalEdges: (args) => {
+        args.onBoundedCandidate?.(hardCleanReport);
+        return commerciallyDirty;
+      },
+    });
+
+    expect(result.kind).toBe('continue');
+    if (result.kind !== 'continue') return;
+    expect(result.context.routeSeedEdges).toBe(edges);
+    expect(result.context.canReusePreparedGlobalRouting).toBe(false);
+  });
+
   it('uses the bounded seed for an explicit full-quality large-graph request', () => {
     const edges: Edge[] = Array.from({ length: 25 }, (_, index) => ({
       id: `edge-${index}`,
