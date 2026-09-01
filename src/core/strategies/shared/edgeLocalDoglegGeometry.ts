@@ -260,6 +260,28 @@ export function toSegments(points: Point[]): OrthogonalSegment[] {
   return segments;
 }
 
+class LazyLocalDoglegCandidateSnapshot implements LocalDoglegCandidateSnapshot {
+  readonly path: Point[];
+  readonly segments: readonly OrthogonalSegment[];
+  private cachedLength: number | undefined;
+  private cachedBends: number | undefined;
+
+  constructor(path: Point[], segments: readonly OrthogonalSegment[]) {
+    this.path = path;
+    this.segments = segments;
+  }
+
+  get length(): number {
+    this.cachedLength ??= pathLength(this.path);
+    return this.cachedLength;
+  }
+
+  get bends(): number {
+    this.cachedBends ??= bendCount(this.path);
+    return this.cachedBends;
+  }
+}
+
 /**
  * Prepares candidate geometry once. Length and bend metrics stay lazy so an
  * obstacle rejection retains the previous short-circuit order and cost.
@@ -267,20 +289,7 @@ export function toSegments(points: Point[]): OrthogonalSegment[] {
 export function createLocalDoglegCandidateSnapshot(points: Point[]): LocalDoglegCandidateSnapshot {
   const path = compactPath(points);
   const segments = toSegments(path);
-  let cachedLength: number | undefined;
-  let cachedBends: number | undefined;
-  return {
-    path,
-    segments,
-    get length(): number {
-      cachedLength ??= pathLength(path);
-      return cachedLength;
-    },
-    get bends(): number {
-      cachedBends ??= bendCount(path);
-      return cachedBends;
-    },
-  };
+  return new LazyLocalDoglegCandidateSnapshot(path, segments);
 }
 
 /**
