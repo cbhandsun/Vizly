@@ -16,6 +16,7 @@ import {
 } from './sharedTrunkPaint';
 import { normalizeSvgFontWeight, normalizeSvgPaint, normalizeSvgStrokeDasharray } from './styleTokens';
 import type { DiagramRenderScene, RenderBounds, RenderEdgeGeometry, RenderNodeGeometry, RenderPoint } from './types';
+import { resolveAbsoluteRenderNodePositions } from './reactFlowNodePosition';
 
 const MAX_LABEL_CHARS = 240;
 const MAX_TABLE_COLUMNS = 24;
@@ -24,8 +25,6 @@ const DEFAULT_WIDTH = 220;
 const DEFAULT_HEIGHT = 120;
 
 type RenderFlowNode = Node & {
-  positionAbsolute?: unknown;
-  internals?: { positionAbsolute?: unknown };
   measured?: { width?: unknown; height?: unknown };
   width?: unknown;
   height?: unknown;
@@ -126,12 +125,6 @@ const normalizeTableColumns = (value: unknown): RenderNodeGeometry['tableColumns
   return columns.length ? columns : undefined;
 };
 
-const nodePosition = (node: Node): RenderPoint => {
-  const renderNode = node as RenderFlowNode;
-  const raw = renderNode.positionAbsolute ?? renderNode.internals?.positionAbsolute ?? node.position;
-  return normalizeRenderPoint(raw) ?? { x: 0, y: 0 };
-};
-
 const nodeDimension = (node: Node, key: 'width' | 'height', fallback: number): number => {
   const renderNode = node as RenderFlowNode;
   const style = asRecord(node.style);
@@ -207,11 +200,10 @@ const normalizeBorderRadius = (style: unknown, shape: string | undefined): numbe
   return shape === 'note' ? 4 : shape === 'group' ? 10 : 8;
 };
 
-const buildNode = (node: Node): RenderNodeGeometry | null => {
+const buildNode = (node: Node, position: RenderPoint): RenderNodeGeometry | null => {
   const renderNode = node as RenderFlowNode;
   const nodeStyle = asRecord(node.style);
   if (!node?.id || node.hidden || nodeStyle.display === 'none') return null;
-  const position = nodePosition(node);
   const width = nodeDimension(node, 'width', DEFAULT_WIDTH);
   const height = nodeDimension(node, 'height', DEFAULT_HEIGHT);
   const data = node.data as Record<string, unknown> | undefined;
@@ -473,7 +465,13 @@ export const buildRenderSceneFromReactFlow = (
 ): DiagramRenderScene => {
   const warnings: string[] = [];
   const padding = coerceRenderNumber(options.padding, 40, 0, 400);
-  const renderNodes = nodes.map(buildNode).filter((node): node is RenderNodeGeometry => !!node);
+  const absolutePositions = resolveAbsoluteRenderNodePositions(nodes);
+  const renderNodes = nodes
+    .map(node => buildNode(
+      node,
+      absolutePositions.get(String(node.id).trim()) ?? { x: 0, y: 0 },
+    ))
+    .filter((node): node is RenderNodeGeometry => !!node);
   const nodesById = new Map(renderNodes.map(node => [node.id, node]));
   const displayEdges = applySharedTrunkPaintPlan(edges);
   const jumpsByEdge = new Map<string, IntersectionInfo[]>();

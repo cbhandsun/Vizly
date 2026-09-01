@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MarkerType, type Edge, type Node } from '@xyflow/react';
 import { buildRenderSceneFromReactFlow, buildRenderSceneFromReactFlowSnapshot } from '../../rendering/reactFlowScene';
+import { browserLogisticsNodes } from '../../components/shared/__tests__/fixtures/logisticsBrowserRoutingFixture';
 
 describe('buildRenderSceneFromReactFlow', () => {
   it('preserves deterministic stable-edge line jumps in the export scene', () => {
@@ -680,5 +681,77 @@ describe('buildRenderSceneFromReactFlow', () => {
 
     expect(scene.nodes[0].label).toBe('Snapshot node');
     expect(scene.viewport).toEqual({ x: 10, y: 20, zoom: 1.5 });
+  });
+
+  it('resolves nested parent-relative snapshot positions for SVG scene parity', () => {
+    const nodes: Node[] = [
+      { id: 'domain', position: { x: 100, y: 200 }, data: {} },
+      { id: 'lane', parentId: 'domain', position: { x: 20, y: 30 }, data: {} },
+      { id: 'child', parentId: 'lane', position: { x: 5, y: 7 }, data: {} },
+    ];
+
+    const scene = buildRenderSceneFromReactFlowSnapshot({ nodes, edges: [] });
+
+    expect(scene.nodes.find(node => node.id === 'domain')).toMatchObject({ x: 100, y: 200 });
+    expect(scene.nodes.find(node => node.id === 'lane')).toMatchObject({ x: 120, y: 230 });
+    expect(scene.nodes.find(node => node.id === 'child')).toMatchObject({ x: 125, y: 237 });
+  });
+
+  it('prefers measured absolute positions over parent-relative coordinates', () => {
+    type AbsoluteNode = Node & { internals: { positionAbsolute: { x: number; y: number } } };
+    const child: AbsoluteNode = {
+      id: 'child',
+      parentId: 'domain',
+      position: { x: 5, y: 7 },
+      internals: { positionAbsolute: { x: 405, y: 507 } },
+      data: {},
+    };
+    const scene = buildRenderSceneFromReactFlowSnapshot({
+      nodes: [
+        { id: 'domain', position: { x: 100, y: 200 }, data: {} },
+        child,
+      ],
+      edges: [],
+    });
+
+    expect(scene.nodes.find(node => node.id === 'child')).toMatchObject({ x: 405, y: 507 });
+  });
+
+  it('falls back to local positions for missing and cyclic parent chains', () => {
+    const nodes: Node[] = [
+      { id: 'orphan', parentId: 'missing', position: { x: 11, y: 12 }, data: {} },
+      { id: 'cycle-a', parentId: 'cycle-b', position: { x: 21, y: 22 }, data: {} },
+      { id: 'cycle-b', parentId: 'cycle-a', position: { x: 31, y: 32 }, data: {} },
+    ];
+
+    const scene = buildRenderSceneFromReactFlowSnapshot({ nodes, edges: [] });
+
+    expect(scene.nodes.find(node => node.id === 'orphan')).toMatchObject({ x: 11, y: 12 });
+    expect(scene.nodes.find(node => node.id === 'cycle-a')).toMatchObject({ x: 21, y: 22 });
+    expect(scene.nodes.find(node => node.id === 'cycle-b')).toMatchObject({ x: 31, y: 32 });
+  });
+
+  it('keeps the production logistics children inside their exported domains', () => {
+    const scene = buildRenderSceneFromReactFlowSnapshot({
+      nodes: browserLogisticsNodes,
+      edges: [],
+    });
+    const sceneNodes = new Map(scene.nodes.map(node => [node.id, node]));
+
+    for (const sourceNode of browserLogisticsNodes) {
+      if (!sourceNode.parentId) continue;
+      const child = sceneNodes.get(sourceNode.id);
+      const parent = sceneNodes.get(sourceNode.parentId);
+      expect(child, sourceNode.id).toBeDefined();
+      expect(parent, sourceNode.parentId).toBeDefined();
+      if (!child || !parent) continue;
+      expect(child.x, sourceNode.id).toBeGreaterThanOrEqual(parent.x);
+      expect(child.y, sourceNode.id).toBeGreaterThanOrEqual(parent.y);
+      expect(child.x + child.width, sourceNode.id).toBeLessThanOrEqual(parent.x + parent.width);
+      expect(child.y + child.height, sourceNode.id).toBeLessThanOrEqual(parent.y + parent.height);
+    }
+
+    expect(sceneNodes.get('upstream')).toMatchObject({ x: 790.113, y: 106.5 });
+    expect(sceneNodes.get('visibility')).toMatchObject({ x: 1286.338, y: 1540 });
   });
 });
