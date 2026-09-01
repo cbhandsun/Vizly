@@ -6,6 +6,7 @@ import {
   baseReactFlowDisplayCandidateCommercialQualityIsClean,
   baseReactFlowDisplayCommercialQualityDoesNotRegress,
   baseReactFlowDisplayCommercialQualityIsClean,
+  canCommitBaseReactFlowDisplayCandidateWithoutStabilization,
   commercialBendSimplificationLengthBudget,
 } from '../baseReactFlowDisplayCommercialQuality';
 import { canReuseBaseReactFlowFinalCommercialSafety } from '../baseReactFlowDisplayCommercialSafety';
@@ -117,6 +118,24 @@ describe('baseReactFlowDisplayCommercialQuality', () => {
 
     expect(baseReactFlowDisplayCommercialQualityIsClean([candidate])).toBe(true);
     expect(baseReactFlowDisplayCandidateCommercialQualityIsClean([candidate])).toBe(false);
+  });
+
+  it('commits an exact reusable candidate without repeating final stabilization', () => {
+    const clean = edgeWithPath('stable', [
+      { x: 0, y: 0 },
+      { x: 0, y: 80 },
+      { x: 120, y: 80 },
+    ]);
+    const excessive = edgeWithPath('unstable', [
+      { x: 0, y: 0 }, { x: 0, y: 40 }, { x: 40, y: 40 }, { x: 40, y: 80 },
+      { x: 80, y: 80 }, { x: 80, y: 120 }, { x: 120, y: 120 }, { x: 120, y: 160 },
+      { x: 160, y: 160 }, { x: 160, y: 200 },
+    ]);
+
+    expect(canCommitBaseReactFlowDisplayCandidateWithoutStabilization(true, [clean])).toBe(true);
+    expect(canCommitBaseReactFlowDisplayCandidateWithoutStabilization(false, [clean])).toBe(false);
+    expect(canCommitBaseReactFlowDisplayCandidateWithoutStabilization(true, [excessive])).toBe(false);
+    expect(canCommitBaseReactFlowDisplayCandidateWithoutStabilization(true, undefined)).toBe(false);
   });
 
   it('budgets a clean structural reroute by the bends it actually removes', () => {

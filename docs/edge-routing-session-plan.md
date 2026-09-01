@@ -1748,3 +1748,13 @@ Logistics 动态拓扑矩阵覆盖节点缩放、多节点移动、复合子树�
 完整轮次 30/30 均为已验证增量候选，Worker start=`30`、fallback=`0`、abort=`0`。L-OMS `release-to-final` 中位 `244ms`、p95 `294ms`、最大 `302ms`；local route p95 `95ms`，Worker compute p95 `183.8ms`，Worker delivery wait p95 `18.1ms`，response-to-final p95 `13ms`。初始路由 p95 `360/750ms`，30 次均为 `validated-candidate`。锁定预算按 p95 判定，因此尾延迟正式通过，不因单个最大值 302ms 放宽或改写门禁。
 
 本批还验证并撤回了将业务节点净空候选集合/排名缓存提升到请求级 geometry context 的实验：5 样本中位 `2023→1981ms`，但 p95 `2180→2290ms`，production 路径没有给出稳定收益，源码与测试改动均已恢复。Logistics 冷路由仍是唯一首要性能缺口；当前 5 样本 route p95 `2180/1100ms`、Worker compute p95 `2154.7ms`，最大独占阶段为 finalizer `303ms`、detached overlap `136.1ms`、post-trunk obstacle `130ms` 和初始 dogleg refine `103.5ms`。后续应从跨阶段工作收敛取得结构性收益，不继续提交无证据的微缓存；3D 性能维持后置。
+
+## 39. Exact 候选终态稳定化短路（2026-09-01）
+
+冷路由 finalizer 证据显示，同一个 14 边候选在第一次最终事务已经得到 exact hard-clean 且满足外部候选商业质量合同时，仍会因“几何发生过变化”无条件递归执行第二轮端点、障碍和商业稳定化。下一次请求本来会在候选边界直接接受这份精确几何，因此第二轮不能提高其可复用资格，只会重复完整质量计算。
+
+本批把稳定提交条件收敛为通用纯函数：只有 exact hard report 为 clean、边集合存在，并且以外部候选标准重新审计六折上限和内部短段后仍 clean，才跳过重复稳定化；不满足任一条件仍执行原有有界递归。直接关闭非大图稳定化的对照实验会让 WMS Process 横向泳道重新出现 12 折失败，已完整撤回；最终条件保留了该必要修复，没有图 ID、边 ID、布局 ID 特判，也没有降低商业质量门禁。
+
+同一 production preview 的改前 3 个独立 Logistics 诊断样本中，finalizer 为 `727–829.9ms`；改后 5 个独立冷启动样本 finalizer 中位 `333.6ms`、p95 `375.7ms`，5/5 均为一次 Worker、零 abort、`full-route-repaired`。整机其他阶段在改后样本中同步变慢，route p95 仍为 `2751/1100ms`，因此只认定重复 finalizer 已被结构性消除，不宣称整体冷路由预算达标。WMS `domain-lanes-lr` 生产矩阵继续保持 44 条边零超量折点、零硬几何缺陷且 LR 语义通过；4 个预编译产物已按新源码哈希重新生成并从 production preview 可复现。
+
+聚焦 39 项、共享 flow 519 项、Worker 边界 495 项以及物流/WMS 失败用例复验均通过；类型、TS6、架构、显式 any、Lint、DOM sink、secrets、源码规模、CI 收录、生产构建和 bundle 门禁通过。Logistics 冷路由 `1100ms` p95 仍是唯一首要性能缺口，下一批继续处理 detached overlap、post-trunk obstacle 和 dogleg 的跨阶段重复工作；3D 性能继续后置。

@@ -100,6 +100,21 @@ export const baseReactFlowDisplayCandidateCommercialQualityIsClean = (
 )));
 
 /**
+ * An exact hard-clean route that also satisfies the external candidate
+ * contract is already a stable Worker commit. Re-entering the complete
+ * endpoint/commercial pipeline cannot make it more eligible for reuse: the
+ * next request would accept this exact geometry at the candidate boundary.
+ */
+export const canCommitBaseReactFlowDisplayCandidateWithoutStabilization = (
+  hardClean: boolean,
+  edges: readonly Edge[] | undefined,
+): boolean => Boolean(
+  hardClean
+  && edges
+  && baseReactFlowDisplayCandidateCommercialQualityIsClean(edges)
+);
+
+/**
  * A hard-clean route may need a modest outer detour to replace a pathological
  * bend chain. The allowance scales only with bends actually removed and is
  * available only when the replacement satisfies the complete structural

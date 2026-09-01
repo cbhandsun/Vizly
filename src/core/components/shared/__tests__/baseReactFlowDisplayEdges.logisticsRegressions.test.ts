@@ -589,7 +589,7 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
       response.phaseTrace?.find(trace => trace.phase === 'final-evaluation-context'),
       diagnostics,
     ).toMatchObject({
-      candidateCount: result.length * 2,
+      candidateCount: result.length,
       resolution: 'hit',
     });
 

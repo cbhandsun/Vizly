@@ -173,7 +173,7 @@ describe('baseReactFlowDisplayEdges WMS and TMS regressions', () => {
       response.phaseTrace?.find(trace => trace.phase === 'final-evaluation-context'),
       diagnostics,
     ).toMatchObject({
-      candidateCount: result.length * 3,
+      candidateCount: result.length * 2,
       resolution: 'hit',
     });
 

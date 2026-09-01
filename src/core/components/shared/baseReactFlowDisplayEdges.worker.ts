@@ -13,6 +13,7 @@ import {
 import {
   baseReactFlowDisplayCandidateCommercialQualityIsClean,
   baseReactFlowDisplayCommercialQualityIsClean,
+  canCommitBaseReactFlowDisplayCandidateWithoutStabilization,
 } from './baseReactFlowDisplayCommercialQuality';
 import { createBaseReactFlowInteractiveDisplayEdges } from './baseReactFlowDisplayQualitySeedPipeline';
 import { resolveDisplayWorkerCandidate } from './baseReactFlowDisplayWorkerCandidate';
@@ -335,6 +336,13 @@ const finalizeContainerClearanceResponse = (
     finalizedResponse.edges
     && !doBaseReactFlowDisplayRoutesMatchExactly(response.edges, finalizedResponse.edges),
   );
+  const exactFinalizedResponse = withExactHardReport(finalizedResponse);
+  if (canCommitBaseReactFlowDisplayCandidateWithoutStabilization(
+    exactFinalizedResponse.hardClean === true,
+    exactFinalizedResponse.edges,
+  )) {
+    return finalizeExactCommercialResponse(exactFinalizedResponse);
+  }
   if (
     (options.commercialStabilizationPass ?? 0) < (options.isLargeGraph ? 2 : 1)
     && finalizedRoutesChanged
@@ -352,7 +360,6 @@ const finalizeContainerClearanceResponse = (
       preferredEdges: finalizedResponse.edges,
     });
     const stabilizedEdges = stabilizedResponse.edges;
-    const exactFinalizedResponse = withExactHardReport(finalizedResponse);
     const finalizedCommercialClearanceIsClean = finalizedResponse.edges
       ? displayBusinessNodeCommercialClearanceIsClean(finalizedResponse.edges, repairNodes)
       : false;
@@ -375,7 +382,7 @@ const finalizeContainerClearanceResponse = (
       : exactFinalizedResponse;
     return finalizeExactCommercialResponse(selectedResponse);
   }
-  return finalizeExactCommercialResponse(withExactHardReport(finalizedResponse));
+  return finalizeExactCommercialResponse(exactFinalizedResponse);
 };
 
 export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
