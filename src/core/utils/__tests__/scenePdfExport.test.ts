@@ -9,6 +9,7 @@ import {
   exportRenderSceneToPdfBlob,
   isValidVectorPdfFontBytes,
   normalizeVectorPdfPageGeometry,
+  resolveVectorPdfLeadingBulletDecoration,
   resolveVectorPdfSyntheticTextStrokeWidth,
   ScenePdfExportError,
 } from '../../export/scenePdfExport';
@@ -80,6 +81,38 @@ describe('resolveVectorPdfSyntheticTextStrokeWidth', () => {
       expect(resolveVectorPdfSyntheticTextStrokeWidth(weight)).toBe(0);
     },
   );
+});
+
+describe('resolveVectorPdfLeadingBulletDecoration', () => {
+  it('replaces a leading unsupported font bullet with bounded vector geometry', () => {
+    expect(resolveVectorPdfLeadingBulletDecoration({
+      content: '• 接收上游订单/拆分物流单',
+      fontSize: '16',
+      textAnchor: 'start',
+      x: '120',
+      y: '240',
+    })).toEqual({
+      circleX: 122.88,
+      circleY: 240,
+      radius: 1.68,
+      text: '接收上游订单/拆分物流单',
+      textX: 131.52,
+    });
+  });
+
+  it.each([
+    { content: '', fontSize: '16', textAnchor: 'start', x: '120', y: '240' },
+    { content: '普通文本', fontSize: '16', textAnchor: 'start', x: '120', y: '240' },
+    { content: '•', fontSize: '16', textAnchor: 'start', x: '120', y: '240' },
+    { content: '• 文本', fontSize: '0', textAnchor: 'start', x: '120', y: '240' },
+    { content: '• 文本', fontSize: '513', textAnchor: 'start', x: '120', y: '240' },
+    { content: '• 文本', fontSize: '16', textAnchor: 'middle', x: '120', y: '240' },
+    { content: '• 文本', fontSize: '16', textAnchor: 'start', x: 'NaN', y: '240' },
+    { content: '• 文本', fontSize: '16', textAnchor: 'start', x: '120', y: '50001' },
+    { content: null, fontSize: '16', textAnchor: 'start', x: '120', y: '240' },
+  ])('rejects empty, non-bullet, malformed, extreme, or incompatible input %#', input => {
+    expect(resolveVectorPdfLeadingBulletDecoration(input)).toBeNull();
+  });
 });
 
 describe('exportRenderSceneToPdfBlob', () => {
