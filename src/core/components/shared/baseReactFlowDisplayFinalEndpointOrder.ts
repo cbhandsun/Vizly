@@ -77,6 +77,9 @@ const commitPostTrunkBranchObstacleCandidate = (
       [context.changedEdgeIndex],
       options,
       evaluation,
+      false,
+      undefined,
+      context.candidateQuality,
     ),
     diagnostics,
   });

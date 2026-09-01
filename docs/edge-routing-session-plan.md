@@ -1694,3 +1694,11 @@ SVG/PDF 登录态真实导出已完成文件级验收：PDF 为单页矢量内�
 商业闭环的过长目标主干分支已经持有同一请求的最终评估会话，却仍绕过它直接计算基线和候选的完整 hard report。本批统一改为通过该会话读取报告；候选生成、接受条件、质量预算和失败回滚不变，已有报告可命中请求内缓存，新候选仍执行完整门禁。相关商业修复与最终评估 30 项通过。
 
 最终 production build 的 5 个独立 Logistics 冷样本中位 `1917ms`、p95 `2428/1100ms`，Worker compute 中位 `1893.1ms`、p95 `2395.1ms`，5/5 均为 `full-route-repaired`、零 Worker abort。该批不宣称整体耗时获得稳定改善；最新独占热点为 `final-endpoint-closure-obstacles-post-trunk` 中位 `108.2ms`/p95 `141.5ms`、`quality-global-route-detached` 中位 `113.9ms`/p95 `141.2ms`、初始 dogleg refine 中位 `88.8ms`/p95 `124.7ms` 和终端短桩闭环中位 `72ms`/p95 `92.5ms`。后续按此顺序收敛通用候选生成与重复质量评估，不提高 `1100ms` 预算。
+
+## 32. 障碍候选质量证据直传（2026-09-01）
+
+post-trunk 障碍修复原本先用增量质量上下文计算候选的完整路径质量，再由最终显示门禁对同一不可变单边替换重复执行一次边对质量扫描。本批把第一次得到的基线和候选质量作为强类型、请求内证据沿候选验证上下文传给最终门禁；changed hard report 仍验证精确变更索引、障碍、最小净空和终端合同，只跳过已经完成的同语义质量计算。没有跨请求缓存，也没有改变候选生成、排序、接受条件或失败回滚。
+
+回归验证直传质量与独立完整 hard report 完全一致，并确认该路径的第二次 `scannedEdgePairCount` 为零；障碍修复回调同时验证收到的基线和候选质量均等于独立全量计算。曾尝试只为直接进入线段净空带的节点生成候选，但已有“低折点外侧通道”回归证明远侧节点仍可能定义更优绕行，该实验已完整撤回，未通过缩窄候选集合换取速度。
+
+最终 production build 的 5 个独立 Logistics 样本仍为 `full-route-repaired`、零 abort；路由中位 `2000ms`、p95 `2465/1100ms`，未证明总体耗时改善。`final-endpoint-closure-obstacles-post-trunk` 中位 `111.8ms`、p95 `158ms`；单次全 trace 中该阶段生成 `3863` 个候选、执行 `55` 次最终评估、`scannedEdgePairCount=0`，说明重复质量扫描已经清零，剩余成本主要在候选几何、净空节点扫描与其他 hard gate。下一批优先收敛不改变候选集合的几何/净空证据复用；`quality-global-route-detached` 和初始 dogleg refine 继续作为并列后续热点，3D 维持后置。

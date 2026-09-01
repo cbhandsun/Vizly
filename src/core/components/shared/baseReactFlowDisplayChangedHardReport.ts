@@ -2,7 +2,10 @@ import type { Edge, Node } from '@xyflow/react';
 
 import { MINIMUM_BUSINESS_NODE_CLEARANCE } from '../../strategies/shared/edgeBusinessNodeClearanceRepair';
 import { shouldUseIncrementalEdgePathQualityEvaluation } from '../../strategies/shared/edgePathQualityIncrementalPolicy';
-import { createEdgePathQualityEvaluationContext } from '../../strategies/shared/edgeStrictCrossingGuard';
+import {
+  createEdgePathQualityEvaluationContext,
+  type EdgePathQualityScore,
+} from '../../strategies/shared/edgeStrictCrossingGuard';
 import { createNodeClearanceGraphEvaluationContext } from '../../strategies/shared/edgeWaypointCandidateRepair';
 import {
   createDisplayObstacleEvaluationContext,
@@ -20,6 +23,7 @@ export type BaseReactFlowChangedHardReportEvaluation = Readonly<{
     candidate: Edge[],
     changedEdgeIndexes: readonly number[],
     candidateKind: BaseDisplayBoundedCandidateReport['candidate'],
+    knownCandidateQuality?: EdgePathQualityScore,
   ) => BaseDisplayBoundedCandidateReport | null;
   readMetrics: () => Readonly<{
     evaluationCount: number;
@@ -68,15 +72,6 @@ export const createBaseReactFlowChangedHardReportEvaluation = (
   terminalSnapshot?: DisplayTerminalValidationSnapshot,
 ): BaseReactFlowChangedHardReportEvaluation => {
   const normalizedBaseline = compactDisplayEdgePaths(baseline);
-  const qualityInitialization = {
-    cacheHit: false,
-    scannedEdgePairCount: 0,
-    scannedSegmentCount: 0,
-  };
-  const quality = createEdgePathQualityEvaluationContext(
-    normalizedBaseline,
-    qualityInitialization,
-  );
   const obstacleInitialization: DisplayObstacleEvaluationInitializationMetrics = {
     cacheHit: false,
     scannedNodeCount: 0,
@@ -98,17 +93,32 @@ export const createBaseReactFlowChangedHardReportEvaluation = (
   let evaluationCount = 0;
   let scannedNodeCount = obstacleInitialization.scannedNodeCount
     + clearance.readMetrics().scannedNodeCount;
-  let scannedEdgePairCount = qualityInitialization.scannedEdgePairCount;
+  let scannedEdgePairCount = 0;
+  let quality: ReturnType<typeof createEdgePathQualityEvaluationContext> | null = null;
+  const getQuality = (): ReturnType<typeof createEdgePathQualityEvaluationContext> => {
+    if (quality) return quality;
+    const initialization = {
+      cacheHit: false,
+      scannedEdgePairCount: 0,
+      scannedSegmentCount: 0,
+    };
+    quality = createEdgePathQualityEvaluationContext(normalizedBaseline, initialization);
+    scannedEdgePairCount += initialization.scannedEdgePairCount;
+    return quality;
+  };
 
   return {
-    evaluate(candidate, changedEdgeIndexes, candidateKind) {
+    evaluate(candidate, changedEdgeIndexes, candidateKind, knownCandidateQuality) {
       const indexes = exactDeclaredChanges(baseline, candidate, changedEdgeIndexes);
       if (!indexes) return null;
       const normalizedCandidate = compactDisplayEdgePaths(candidate);
-      const qualityBefore = quality.readMetrics?.();
       const obstacleBefore = obstacleHitContext.readMetrics();
       const clearanceBefore = clearance.readMetrics();
-      const candidateQuality = quality.evaluateChanged(normalizedCandidate, indexes);
+      const qualityContext = knownCandidateQuality ? null : getQuality();
+      const qualityBefore = qualityContext?.readMetrics?.();
+      const candidateQuality = knownCandidateQuality
+        ?? qualityContext?.evaluateChanged(normalizedCandidate, indexes);
+      if (!candidateQuality) return null;
       const obstacleHits = obstacles.evaluateKnownChanges(normalizedCandidate, indexes);
       const clearanceViolations = baselineClearanceViolations.slice();
       for (const index of indexes) {
@@ -138,7 +148,7 @@ export const createBaseReactFlowChangedHardReportEvaluation = (
         minimumClearanceViolationEdgeIds: minimumClearanceViolationEdgeIds.slice(0, 32),
       };
       report.hardClean = displayHardQualityReportGeometryIsClean(report) && terminalsAnchored;
-      const qualityAfter = quality.readMetrics?.();
+      const qualityAfter = qualityContext?.readMetrics?.();
       evaluationCount += 1;
       scannedNodeCount += Math.max(
         0,

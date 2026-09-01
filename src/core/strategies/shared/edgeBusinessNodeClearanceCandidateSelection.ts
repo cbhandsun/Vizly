@@ -32,7 +32,9 @@ export const selectAcceptedBusinessNodeClearanceCandidate = ({
   rankedCandidates: Iterable<Readonly<{ candidate: Point[] }>>;
   validateCandidate?: (context: Readonly<{
     baselineEdges: Edge[];
+    baselineQuality: EdgePathQualityScore;
     candidateEdges: Edge[];
+    candidateQuality: EdgePathQualityScore;
     changedEdgeIndex: number;
   }>) => boolean;
 }>): Edge[] | null => {
@@ -54,7 +56,9 @@ export const selectAcceptedBusinessNodeClearanceCandidate = ({
     )) continue;
     if (validateCandidate && !validateCandidate({
       baselineEdges,
+      baselineQuality,
       candidateEdges,
+      candidateQuality,
       changedEdgeIndex: edgeIndex,
     })) continue;
     return candidateEdges;

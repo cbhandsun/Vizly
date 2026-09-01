@@ -808,12 +808,30 @@ describe('repairBusinessNodeClearanceRisks', () => {
       uniqueCandidateCount: 0,
     };
     const globallyValidatedEdgeIds: string[] = [];
+    const validationEvidence: Array<{
+      baselineEdges: Edge[];
+      baselineQuality: ReturnType<typeof calculateEdgePathQualityScore>;
+      candidateEdges: Edge[];
+      candidateQuality: ReturnType<typeof calculateEdgePathQualityScore>;
+    }> = [];
 
     expect(repairBusinessNodeClearanceRisks(edges, nodes, {
       diagnostics,
-      validateCandidate: ({ candidateEdges, changedEdgeIndex }) => {
+      validateCandidate: ({
+        baselineEdges,
+        baselineQuality,
+        candidateEdges,
+        candidateQuality,
+        changedEdgeIndex,
+      }) => {
         const changedEdge = candidateEdges[changedEdgeIndex];
         if (changedEdge) globallyValidatedEdgeIds.push(changedEdge.id);
+        validationEvidence.push({
+          baselineEdges,
+          baselineQuality,
+          candidateEdges,
+          candidateQuality,
+        });
         return false;
       },
     })).toBe(edges);
@@ -824,6 +842,11 @@ describe('repairBusinessNodeClearanceRisks', () => {
     expect(diagnostics.clearanceScoreCacheHitCount).toBeGreaterThan(0);
     expect(diagnostics.clearanceScannedNodeCount).toBeGreaterThan(0);
     expect(new Set(globallyValidatedEdgeIds)).toEqual(new Set(['first', 'second']));
+    expect(validationEvidence.length).toBeGreaterThan(0);
+    for (const evidence of validationEvidence) {
+      expect(evidence.baselineQuality).toEqual(calculateEdgePathQualityScore(evidence.baselineEdges));
+      expect(evidence.candidateQuality).toEqual(calculateEdgePathQualityScore(evidence.candidateEdges));
+    }
   });
 
   it('reuses request geometry without leaking candidate validation decisions', () => {

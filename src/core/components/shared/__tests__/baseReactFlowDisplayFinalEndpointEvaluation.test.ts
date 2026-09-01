@@ -2,6 +2,7 @@ import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { calculateEdgePathQualityScoreExact } from '../../../strategies/shared/edgePathQualityFullScan';
+import { createEdgePathQualityEvaluationContext } from '../../../strategies/shared/edgeStrictCrossingGuard';
 import { createBaseReactFlowFinalEndpointEvaluation } from '../baseReactFlowDisplayFinalEndpointEvaluation';
 import { startBaseReactFlowObstacleClosureTrace } from '../baseReactFlowDisplayObstacleClosureTrace';
 import type { DisplayRoutingPhaseTrace } from '../baseReactFlowDisplayRoutingTrace';
@@ -526,6 +527,33 @@ describe('createBaseReactFlowFinalEndpointEvaluation', () => {
     expect(incremental.hardReport(candidate))
       .toBe(incremental.hardReportChanged(edges, candidate, [0]));
     expect(incremental.readMetrics().evaluationCount).toBeGreaterThan(0);
+  });
+
+  it('reuses known candidate quality without repeating edge-pair scans', () => {
+    const candidate: Edge[] = edges.map((edge, index) => index === 0 ? {
+      ...edge,
+      data: {
+        ...edge.data,
+        computedPath: [
+          { x: 50, y: 60 },
+          { x: 80, y: 60 },
+          { x: 80, y: 220 },
+          { x: 50, y: 220 },
+        ],
+      },
+    } : edge);
+    const quality = createEdgePathQualityEvaluationContext(edges)
+      .evaluateChanged(candidate, [0]);
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
+    const before = evaluation.readMetrics();
+
+    const report = evaluation.hardReportChanged(edges, candidate, [0], quality);
+    const after = evaluation.readMetrics();
+
+    expect(report).toEqual(createBaseReactFlowFinalEndpointEvaluation(nodes).hardReport(candidate));
+    expect(report.quality).toEqual(quality);
+    expect(after.scannedEdgePairCount).toBe(before.scannedEdgePairCount);
+    expect(evaluation.hardReport(candidate)).toBe(report);
   });
 
   it.each([9, 21])(

@@ -28,7 +28,9 @@ type Rect = { x: number; y: number; width: number; height: number };
 
 export interface BusinessNodeClearanceCandidateValidation {
   baselineEdges: Edge[];
+  baselineQuality: EdgePathQualityScore;
   candidateEdges: Edge[];
+  candidateQuality: EdgePathQualityScore;
   changedEdgeIndex: number;
 }
 
