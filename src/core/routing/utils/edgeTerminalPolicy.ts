@@ -35,10 +35,22 @@ const roleFlagIsSet = (
   );
 };
 
-const normalizedRoleList = (value: unknown): string[] => (
-  Array.isArray(value)
-    ? value.map(item => String(item).toLowerCase())
-    : []
+const roleListIncludes = (
+  value: unknown,
+  role: EdgeTerminalRole,
+): boolean => {
+  if (!Array.isArray(value)) return false;
+  for (const item of value) {
+    if (String(item).toLowerCase() === role) return true;
+  }
+  return false;
+};
+
+const isFixedSidePolicy = (policy: string): boolean => (
+  policy === 'strong'
+  || policy === 'fixed'
+  || policy === 'fixed-side'
+  || policy === 'fixed_side'
 );
 
 const terminalHandle = (
@@ -60,18 +72,24 @@ export const readEdgeTerminalPolicy = (
   const data = edge.data && typeof edge.data === 'object' && !Array.isArray(edge.data)
     ? edge.data as Record<string, unknown>
     : {};
-  const manualSides = normalizedRoleList(data.manualHandleSides);
-  const manualPositions = normalizedRoleList(data.manualHandlePositions);
   const manualHandles = data.manualHandles ?? data._manualHandles;
   const runtimeHandleLock = data.runtimeHandleLock ?? data._runtimeHandleLock;
-  const policy = String(data[`${role}PortPolicy`] ?? data[`${role}PortConstraint`] ?? '')
-    .toLowerCase();
+  const rawPolicy = role === 'source'
+    ? data.sourcePortPolicy ?? data.sourcePortConstraint
+    : data.targetPortPolicy ?? data.targetPortConstraint;
+  const policy = rawPolicy == null ? '' : String(rawPolicy).toLowerCase();
+  const handleLocked = role === 'source'
+    ? data.sourceHandleLocked === true
+    : data.targetHandleLocked === true;
+  const handlePositionLocked = role === 'source'
+    ? data.sourceHandlePositionLocked === true
+    : data.targetHandlePositionLocked === true;
   const forbidden = policy === 'forbidden';
   const sourceExactFixed = forbidden
     || roleFlagIsSet(manualHandles, role)
-    || manualPositions.includes(role)
-    || data[`${role}HandleLocked`] === true
-    || data[`${role}HandlePositionLocked`] === true
+    || roleListIncludes(data.manualHandlePositions, role)
+    || handleLocked
+    || handlePositionLocked
     || policy === 'fixed-pos'
     || policy === 'fixed_pos';
 
@@ -81,8 +99,8 @@ export const readEdgeTerminalPolicy = (
     sourceExactFixed,
     positionFixed: sourceExactFixed,
     sideFixed: sourceExactFixed
-      || manualSides.includes(role)
-      || ['strong', 'fixed', 'fixed-side', 'fixed_side'].includes(policy),
+      || roleListIncludes(data.manualHandleSides, role)
+      || isFixedSidePolicy(policy),
   };
 };
 
