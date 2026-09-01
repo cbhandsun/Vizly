@@ -51,7 +51,18 @@ type StrictCrossingSegmentCacheState = {
   evaluationCount: number;
   candidateVisitCount: number;
   crossingCountBySegment: Map<string, number>;
+  crossingCountBySegmentRef: WeakMap<PathSegmentRef, StrictCrossingSegmentReferenceEntry>;
 };
+
+type StrictCrossingSegmentReferenceEntry = Readonly<{
+  edgeIndex: number;
+  axis: Axis;
+  ax: number;
+  ay: number;
+  bx: number;
+  by: number;
+  crossingCount: number;
+}>;
 
 const MAX_STRICT_CROSSING_SEGMENT_CACHE_ENTRIES = 32_768;
 const strictCrossingSegmentCacheByIndex = new WeakMap<
@@ -485,11 +496,26 @@ export function strictCrossingsForEdgeSegments(
       evaluationCount: 0,
       candidateVisitCount: 0,
       crossingCountBySegment: new Map(),
+      crossingCountBySegmentRef: new WeakMap(),
     };
     strictCrossingSegmentCacheByIndex.set(segmentIndex, cacheState);
   }
   let total = 0;
   for (const candidate of candidateSegments) {
+    const referenceEntry = cacheState.crossingCountBySegmentRef.get(candidate);
+    if (
+      referenceEntry
+      && referenceEntry.edgeIndex === edgeIndex
+      && referenceEntry.axis === candidate.axis
+      && referenceEntry.ax === candidate.a.x
+      && referenceEntry.ay === candidate.a.y
+      && referenceEntry.bx === candidate.b.x
+      && referenceEntry.by === candidate.b.y
+    ) {
+      cacheState.cacheHitCount += 1;
+      total += referenceEntry.crossingCount;
+      continue;
+    }
     const cacheable = Number.isSafeInteger(edgeIndex)
       && Number.isFinite(candidate.a.x)
       && Number.isFinite(candidate.a.y)
@@ -502,6 +528,15 @@ export function strictCrossingsForEdgeSegments(
       ? cacheState.crossingCountBySegment.get(cacheKey)
       : undefined;
     if (cached !== undefined && cacheable) {
+      cacheState.crossingCountBySegmentRef.set(candidate, {
+        edgeIndex,
+        axis: candidate.axis,
+        ax: candidate.a.x,
+        ay: candidate.a.y,
+        bx: candidate.b.x,
+        by: candidate.b.y,
+        crossingCount: cached,
+      });
       cacheState.cacheHitCount += 1;
       total += cached;
       continue;
@@ -522,6 +557,17 @@ export function strictCrossingsForEdgeSegments(
       < MAX_STRICT_CROSSING_SEGMENT_CACHE_ENTRIES
     ) {
       cacheState.crossingCountBySegment.set(cacheKey, segmentCrossings);
+    }
+    if (cacheable) {
+      cacheState.crossingCountBySegmentRef.set(candidate, {
+        edgeIndex,
+        axis: candidate.axis,
+        ax: candidate.a.x,
+        ay: candidate.a.y,
+        bx: candidate.b.x,
+        by: candidate.b.y,
+        crossingCount: segmentCrossings,
+      });
     }
   }
   return total;

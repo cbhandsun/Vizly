@@ -101,6 +101,29 @@ describe('detached strict-crossing incremental score parity', () => {
     });
   });
 
+  it('invalidates a reference cache entry when candidate coordinates change', () => {
+    const paths: Point[][] = [
+      [{ x: 0, y: 50 }, { x: 100, y: 50 }],
+      [{ x: 50, y: 0 }, { x: 50, y: 100 }],
+    ];
+    const edges = paths.map((path, index) => edge(`mutable-cache-${index}`, path));
+    const allSegments = extractPathSegmentRefs(paths, edges);
+    const segmentIndex = createStrictCrossingSegmentIndex(allSegments);
+    const candidate = extractPathSegmentRefsForPath(paths[0], 0, edges)[0];
+
+    expect(strictCrossingsForEdgeSegments([candidate], allSegments, 0, segmentIndex)).toBe(1);
+    expect(strictCrossingsForEdgeSegments([candidate], allSegments, 0, segmentIndex)).toBe(1);
+    const afterReferenceHit = readStrictCrossingSegmentIndexMetrics(segmentIndex);
+
+    candidate.a.x = 60;
+    expect(strictCrossingsForEdgeSegments([candidate], allSegments, 0, segmentIndex)).toBe(0);
+    expect(readStrictCrossingSegmentIndexMetrics(segmentIndex)).toEqual({
+      cacheHitCount: afterReferenceHit.cacheHitCount,
+      evaluationCount: afterReferenceHit.evaluationCount + 1,
+      candidateVisitCount: afterReferenceHit.candidateVisitCount,
+    });
+  });
+
   it('preserves source segment order while partitioning strict-crossing axes', () => {
     const paths: Point[][] = [
       [{ x: 25, y: 0 }, { x: 25, y: 100 }],
