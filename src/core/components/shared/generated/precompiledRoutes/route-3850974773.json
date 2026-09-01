@@ -1,0 +1,1211 @@
+{
+  "schema": "vizly-precompiled-display-route-v1",
+  "routingVersion": "15",
+  "sourceHash": "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
+  "inputSignature": "3850974773",
+  "inputGeometryDigest": "geometry-v1:17dedb2b9a4b4b4738cfeb41dc352f63",
+  "outputRouteSignature": "route-v2:44:167:0da09fd0df15c166",
+  "hardClean": true,
+  "patches": [
+    {
+      "id": "e-alloc-rollback",
+      "source": "allocation",
+      "target": "allocation-rollback",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1286,
+            "y": 1804
+          },
+          {
+            "x": 1286,
+            "y": 1872
+          },
+          {
+            "x": 1613,
+            "y": 1872
+          },
+          {
+            "x": 1613,
+            "y": 2335
+          },
+          {
+            "x": 2131,
+            "y": 2335
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-atp",
+      "source": "allocation",
+      "target": "atp-check",
+      "type": "stablePath",
+      "sourceHandle": "top",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1286,
+            "y": 1708
+          },
+          {
+            "x": 1286,
+            "y": 1370
+          },
+          {
+            "x": 1533,
+            "y": 1370
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-batch",
+      "source": "allocation",
+      "target": "batch-lot",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1286,
+            "y": 1804
+          },
+          {
+            "x": 1286,
+            "y": 1868
+          },
+          {
+            "x": 1618,
+            "y": 1868
+          },
+          {
+            "x": 1618,
+            "y": 1948.5
+          },
+          {
+            "x": 1879,
+            "y": 1948.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-reservation",
+      "source": "allocation",
+      "target": "reservation",
+      "type": "stablePath",
+      "sourceHandle": "top",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1286,
+            "y": 1708
+          },
+          {
+            "x": 1286,
+            "y": 1563
+          },
+          {
+            "x": 1648,
+            "y": 1563
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-slotting",
+      "source": "allocation",
+      "target": "slotting",
+      "type": "stablePath",
+      "sourceHandle": "top",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1286,
+            "y": 1708
+          },
+          {
+            "x": 1286,
+            "y": 1652
+          },
+          {
+            "x": 1856,
+            "y": 1652
+          },
+          {
+            "x": 1856,
+            "y": 1719
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-allocation-task",
+      "source": "allocation",
+      "target": "task-generate",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1286,
+            "y": 1804
+          },
+          {
+            "x": 1286,
+            "y": 3123
+          },
+          {
+            "x": 2232,
+            "y": 3123
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-wave-plan",
+      "source": "allocation",
+      "target": "wave-planning",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1286,
+            "y": 1804
+          },
+          {
+            "x": 1286,
+            "y": 1868
+          },
+          {
+            "x": 1618,
+            "y": 1868
+          },
+          {
+            "x": 1618,
+            "y": 2142
+          },
+          {
+            "x": 1993,
+            "y": 2142
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-alert-labor",
+      "source": "exception-alert",
+      "target": "labor-kpi",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 5924,
+            "y": 7173.5
+          },
+          {
+            "x": 6160.5,
+            "y": 7173.5
+          },
+          {
+            "x": 6160.5,
+            "y": 6848.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-labor-input",
+      "source": "labor-kpi",
+      "target": "labor-schedule-feedback",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 6268,
+            "y": 6800.5
+          },
+          {
+            "x": 6388,
+            "y": 6800.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-labor-alloc-fb",
+      "source": "labor-schedule-feedback",
+      "target": "allocation",
+      "type": "stablePath",
+      "sourceHandle": "top",
+      "targetHandle": "right",
+      "data": {
+        "computedPath": [
+          {
+            "x": 6489,
+            "y": 6771
+          },
+          {
+            "x": 6489,
+            "y": 1856
+          },
+          {
+            "x": 1445,
+            "y": 1856
+          },
+          {
+            "x": 1445,
+            "y": 1756
+          },
+          {
+            "x": 1389,
+            "y": 1756
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-labor-group-fb",
+      "source": "labor-schedule-feedback",
+      "target": "task-group",
+      "type": "stablePath",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 6489,
+            "y": 6770.5
+          },
+          {
+            "x": 6489,
+            "y": 4755
+          },
+          {
+            "x": 3263,
+            "y": 4755
+          },
+          {
+            "x": 3263,
+            "y": 4345.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-op-alert",
+      "source": "operation",
+      "target": "exception-alert",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4198,
+            "y": 5688.5
+          },
+          {
+            "x": 4198,
+            "y": 7174
+          },
+          {
+            "x": 5734,
+            "y": 7174
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-operation-labor",
+      "source": "operation",
+      "target": "labor-kpi",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4245.5,
+            "y": 5688.5
+          },
+          {
+            "x": 4245.5,
+            "y": 6114
+          },
+          {
+            "x": 6160.5,
+            "y": 6114
+          },
+          {
+            "x": 6160.5,
+            "y": 6752.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-loading",
+      "source": "operation",
+      "target": "loading-handover",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4405,
+            "y": 5652
+          },
+          {
+            "x": 4692.75,
+            "y": 5652
+          },
+          {
+            "x": 4692.75,
+            "y": 6012
+          },
+          {
+            "x": 5140,
+            "y": 6012
+          }
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "e-packing-exec",
+      "source": "operation",
+      "target": "packing-exec",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4405,
+            "y": 5652
+          },
+          {
+            "x": 4900,
+            "y": 5652
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-op-heat",
+      "source": "operation",
+      "target": "path-heatmap",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4245.5,
+            "y": 5688.5
+          },
+          {
+            "x": 4245.5,
+            "y": 6987
+          },
+          {
+            "x": 5616,
+            "y": 6987
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-picking-exec",
+      "source": "operation",
+      "target": "picking-exec",
+      "type": "stablePath",
+      "sourceHandle": "top",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4245.5,
+            "y": 5615.5
+          },
+          {
+            "x": 4245.5,
+            "y": 5559.5
+          },
+          {
+            "x": 4394.75,
+            "y": 5559.5
+          },
+          {
+            "x": 4394.75,
+            "y": 5079.5
+          },
+          {
+            "x": 4544,
+            "y": 5079.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-qc-exec",
+      "source": "operation",
+      "target": "qc-exec",
+      "type": "stablePath",
+      "sourceHandle": "top",
+      "targetHandle": "right",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4245.5,
+            "y": 5615.5
+          },
+          {
+            "x": 4245.5,
+            "y": 4976
+          },
+          {
+            "x": 5264,
+            "y": 4976
+          },
+          {
+            "x": 5264,
+            "y": 5832
+          },
+          {
+            "x": 5178,
+            "y": 5832
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-op-rt",
+      "source": "operation",
+      "target": "real-time-board",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4245.5,
+            "y": 5688.5
+          },
+          {
+            "x": 4245.5,
+            "y": 6588
+          },
+          {
+            "x": 5402,
+            "y": 6588
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-replenish-exec",
+      "source": "operation",
+      "target": "replenish-exec",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4405,
+            "y": 5652
+          },
+          {
+            "x": 4577,
+            "y": 5652
+          },
+          {
+            "x": 4577,
+            "y": 5365
+          },
+          {
+            "x": 4749,
+            "y": 5365
+          },
+          {
+            "x": 4749,
+            "y": 5309
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-sorting-exec",
+      "source": "operation",
+      "target": "sorting-exec",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4405,
+            "y": 5652
+          },
+          {
+            "x": 4637,
+            "y": 5652
+          },
+          {
+            "x": 4637,
+            "y": 5558
+          },
+          {
+            "x": 4869,
+            "y": 5558
+          },
+          {
+            "x": 4869,
+            "y": 5502
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-op-uph",
+      "source": "operation",
+      "target": "uph-calc",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4246,
+            "y": 5688.5
+          },
+          {
+            "x": 4246,
+            "y": 6801
+          },
+          {
+            "x": 5502,
+            "y": 6801
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-wcs",
+      "source": "operation",
+      "target": "wcs-integration",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4245.5,
+            "y": 5688.5
+          },
+          {
+            "x": 4246,
+            "y": 6198.5
+          },
+          {
+            "x": 5245,
+            "y": 6198.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-order-allocation",
+      "source": "order-input",
+      "target": "allocation",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 330,
+            "y": 622.5
+          },
+          {
+            "x": 330,
+            "y": 1755.5
+          },
+          {
+            "x": 1183,
+            "y": 1755.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-order-exception",
+      "source": "order-input",
+      "target": "order-exception",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 330,
+            "y": 622.5
+          },
+          {
+            "x": 330,
+            "y": 868
+          },
+          {
+            "x": 1166,
+            "y": 868
+          },
+          {
+            "x": 1166,
+            "y": 924
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-order-import",
+      "source": "order-input",
+      "target": "order-import",
+      "type": "stablePath",
+      "sourceHandle": "top",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 330,
+            "y": 526.5
+          },
+          {
+            "x": 330,
+            "y": 188.5
+          },
+          {
+            "x": 581,
+            "y": 188.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-order-sla",
+      "source": "order-input",
+      "target": "order-sla-classify",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 460,
+            "y": 574.5
+          },
+          {
+            "x": 830.5,
+            "y": 574.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-order-split",
+      "source": "order-input",
+      "target": "order-split-merge",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 330,
+            "y": 622.5
+          },
+          {
+            "x": 330,
+            "y": 678.5
+          },
+          {
+            "x": 914.5,
+            "y": 678.5
+          },
+          {
+            "x": 914.5,
+            "y": 767.5
+          },
+          {
+            "x": 970.5,
+            "y": 767.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-order-validate",
+      "source": "order-input",
+      "target": "order-validate",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 460,
+            "y": 574.5
+          },
+          {
+            "x": 633,
+            "y": 574.5
+          },
+          {
+            "x": 633,
+            "y": 474
+          },
+          {
+            "x": 806,
+            "y": 474
+          },
+          {
+            "x": 806,
+            "y": 418
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-heat-labor",
+      "source": "path-heatmap",
+      "target": "labor-kpi",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 5802,
+            "y": 6987
+          },
+          {
+            "x": 6160.5,
+            "y": 6987
+          },
+          {
+            "x": 6160.5,
+            "y": 6848.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-rt-labor",
+      "source": "real-time-board",
+      "target": "labor-kpi",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 5536,
+            "y": 6607.5
+          },
+          {
+            "x": 6160.5,
+            "y": 6607.5
+          },
+          {
+            "x": 6160.5,
+            "y": 6752.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-pack-task",
+      "source": "task-generate",
+      "target": "pack-task-gen",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2336,
+            "y": 3171
+          },
+          {
+            "x": 2336,
+            "y": 3227
+          },
+          {
+            "x": 2693.75,
+            "y": 3227
+          },
+          {
+            "x": 2693.75,
+            "y": 3502.5
+          },
+          {
+            "x": 3051.5,
+            "y": 3502.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-pick-task",
+      "source": "task-generate",
+      "target": "pick-task-gen",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2440,
+            "y": 3123
+          },
+          {
+            "x": 2551.5,
+            "y": 3123
+          },
+          {
+            "x": 2551.5,
+            "y": 2836
+          },
+          {
+            "x": 2663,
+            "y": 2836
+          },
+          {
+            "x": 2663,
+            "y": 2780
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-qc-task",
+      "source": "task-generate",
+      "target": "qc-task-gen",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2440,
+            "y": 3123
+          },
+          {
+            "x": 2551.5,
+            "y": 3123
+          },
+          {
+            "x": 2551.5,
+            "y": 3201
+          },
+          {
+            "x": 2899.5,
+            "y": 3201
+          },
+          {
+            "x": 2899.5,
+            "y": 3309.5
+          },
+          {
+            "x": 2955.5,
+            "y": 3309.5
+          }
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "e-replenish-task",
+      "source": "task-generate",
+      "target": "replenish-task-gen",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2440,
+            "y": 3123
+          },
+          {
+            "x": 2611.5,
+            "y": 3123
+          },
+          {
+            "x": 2611.5,
+            "y": 3029
+          },
+          {
+            "x": 2783,
+            "y": 3029
+          },
+          {
+            "x": 2783,
+            "y": 2973
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-sort-task",
+      "source": "task-generate",
+      "target": "sort-task-gen",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2440,
+            "y": 3123
+          },
+          {
+            "x": 2818,
+            "y": 3123
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-task-taskgroup",
+      "source": "task-generate",
+      "target": "task-group",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2336,
+            "y": 3171
+          },
+          {
+            "x": 2336,
+            "y": 4297.5
+          },
+          {
+            "x": 3160,
+            "y": 4297.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-container-assign",
+      "source": "task-group",
+      "target": "container-assign",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 3366,
+            "y": 4297.5
+          },
+          {
+            "x": 3798.5,
+            "y": 4297.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-cutoff",
+      "source": "task-group",
+      "target": "cutoff-grouping",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 3287,
+            "y": 4345.5
+          },
+          {
+            "x": 3287,
+            "y": 4670.5
+          },
+          {
+            "x": 4061,
+            "y": 4670.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-taskgroup-operation",
+      "source": "task-group",
+      "target": "operation",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 3215,
+            "y": 4345.5
+          },
+          {
+            "x": 3215,
+            "y": 5652
+          },
+          {
+            "x": 4086,
+            "y": 5652
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-priority-seq",
+      "source": "task-group",
+      "target": "priority-sequence",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 3366,
+            "y": 4345.5
+          },
+          {
+            "x": 3462,
+            "y": 4345.5
+          },
+          {
+            "x": 3462,
+            "y": 4382
+          },
+          {
+            "x": 3856.5,
+            "y": 4382
+          },
+          {
+            "x": 3856.5,
+            "y": 4484
+          },
+          {
+            "x": 3912.5,
+            "y": 4484
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-wave-build",
+      "source": "task-group",
+      "target": "wave-build",
+      "type": "stablePath",
+      "sourceHandle": "top",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 3263,
+            "y": 4249.5
+          },
+          {
+            "x": 3263,
+            "y": 4193.5
+          },
+          {
+            "x": 3406.75,
+            "y": 4193.5
+          },
+          {
+            "x": 3406.75,
+            "y": 3911.5
+          },
+          {
+            "x": 3550.5,
+            "y": 3911.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-zone-group",
+      "source": "task-group",
+      "target": "zone-group",
+      "type": "stablePath",
+      "sourceHandle": "top",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 3263,
+            "y": 4249.5
+          },
+          {
+            "x": 3263,
+            "y": 4193.5
+          },
+          {
+            "x": 3471.75,
+            "y": 4193.5
+          },
+          {
+            "x": 3471.75,
+            "y": 4104.5
+          },
+          {
+            "x": 3680.5,
+            "y": 4104.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-uph-labor",
+      "source": "uph-calc",
+      "target": "labor-kpi",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 5676,
+            "y": 6800.5
+          },
+          {
+            "x": 6053,
+            "y": 6800.5
+          }
+        ]
+      }
+    }
+  ]
+}

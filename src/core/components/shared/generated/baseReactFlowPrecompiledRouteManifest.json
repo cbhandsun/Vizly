@@ -2,7 +2,7 @@
   "schema": "vizly-precompiled-display-route-manifest-v3",
   "routingVersion": "15",
   "identitySourceHash": "source-v1:752776072602ff4e8a4892530e3faea55f7502310613fe616e04061f339c270a",
-  "routingSourceHash": "source-v1:9f3e170fb903758928ea1150a2423ba2fe13d2606d7c02bbefb83e332de03689",
+  "routingSourceHash": "source-v1:c9e960279d9dede5989a58010f8f7042c0e36977b856ff09a01905063ee35ad0",
   "entries": [
     {
       "presetId": "wms-process-flow-v1",
@@ -33,6 +33,16 @@
       "inputSignature": "2113580664",
       "inputGeometryDigest": "geometry-v1:959447b9afedc5b100c74395ce889f05",
       "outputRouteSignature": "route-v2:26:162:4ab70b5fedf39c25"
+    },
+    {
+      "presetId": "wms-process-flow-v1",
+      "variantId": "domain-lanes-lr",
+      "sourcePath": "src/data/standardized/WmsProcessFlowStandardData.json",
+      "artifactFile": "route-3850974773.json",
+      "sourceHash": "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
+      "inputSignature": "3850974773",
+      "inputGeometryDigest": "geometry-v1:17dedb2b9a4b4b4738cfeb41dc352f63",
+      "outputRouteSignature": "route-v2:44:167:0da09fd0df15c166"
     }
   ]
 }

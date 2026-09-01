@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   auditBaseReactFlowDisplayCommercialQuality,
   baseReactFlowDisplayCommercialQualityIsClean,
+  commercialBendSimplificationLengthBudget,
 } from '../baseReactFlowDisplayCommercialQuality';
 import { canReuseBaseReactFlowFinalCommercialSafety } from '../baseReactFlowDisplayCommercialSafety';
 
@@ -78,6 +79,34 @@ describe('baseReactFlowDisplayCommercialQuality', () => {
       'excessive-bends',
       'tiny-interior-segment',
     ]));
+  });
+
+  it('budgets a clean structural reroute by the bends it actually removes', () => {
+    const baseline = edgeWithPath('edge', [
+      { x: 0, y: 0 }, { x: 0, y: 40 }, { x: 40, y: 40 }, { x: 40, y: 80 },
+      { x: 80, y: 80 }, { x: 80, y: 120 }, { x: 120, y: 120 }, { x: 120, y: 160 },
+      { x: 160, y: 160 }, { x: 160, y: 200 }, { x: 200, y: 200 }, { x: 200, y: 240 },
+    ]);
+    const compact = edgeWithPath('edge', [
+      { x: 0, y: 0 }, { x: 0, y: 240 }, { x: 200, y: 240 },
+    ]);
+    expect(commercialBendSimplificationLengthBudget(baseline, compact)).toBe(288);
+  });
+
+  it('does not budget identity changes, incomplete cleanup or dirty candidates', () => {
+    const baseline = edgeWithPath('edge', [
+      { x: 0, y: 0 }, { x: 0, y: 40 }, { x: 40, y: 40 }, { x: 40, y: 80 },
+      { x: 80, y: 80 }, { x: 80, y: 120 }, { x: 120, y: 120 }, { x: 120, y: 160 },
+      { x: 160, y: 160 }, { x: 160, y: 200 },
+    ]);
+    const stillExcessive = edgeWithPath('edge', baseline.data?.computedPath as Array<{ x: number; y: number }>);
+    const dirty = edgeWithPath('edge', [
+      { x: 0, y: 0 }, { x: 0, y: 80 }, { x: 7, y: 80 }, { x: 7, y: 160 },
+    ]);
+    const changedIdentity = { ...dirty, id: 'other' };
+    expect(commercialBendSimplificationLengthBudget(baseline, stillExcessive)).toBe(0);
+    expect(commercialBendSimplificationLengthBudget(baseline, dirty)).toBe(0);
+    expect(commercialBendSimplificationLengthBudget(baseline, changedIdentity)).toBe(0);
   });
 
   it('allows an outer lane when graph topology may require it', () => {

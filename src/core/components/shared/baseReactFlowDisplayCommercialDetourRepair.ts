@@ -21,6 +21,10 @@ import {
 } from './baseReactFlowDisplayCommercialTerminalShortcut';
 import { buildCommercialPathSearchTerminalCandidates } from './baseReactFlowDisplayCommercialPathSearch';
 import {
+  commercialBendSimplificationLengthBudget,
+  MAX_COMMERCIAL_BEND_COUNT,
+} from './baseReactFlowDisplayCommercialQuality';
+import {
   passesBaseReactFlowFinalDisplayGate,
   type BaseReactFlowFinalEndpointOrderOptions,
 } from './baseReactFlowDisplayFinalEndpointGate';
@@ -185,9 +189,9 @@ const repairSourceTerminalOuterStairs = <T extends Edge[]>(
     if (options.eligibleEdgeIds && !options.eligibleEdgeIds.has(edges[edgeIndex].id)) continue;
     const baselinePath = getDisplayComputedPath(best[edgeIndex]);
     let edgeEvaluations = 0;
-    const hardDefectCandidates = !bestReport.hardClean
-      && !options.eligibleEdgeIds
-      && baselinePath.length === 5
+    const hasExcessiveBends = baselinePath.length - 2 > MAX_COMMERCIAL_BEND_COUNT;
+    const hardDefectCandidates = !options.eligibleEdgeIds
+      && ((!bestReport.hardClean && baselinePath.length === 5) || hasExcessiveBends)
       ? buildCommercialPathSearchTerminalCandidates(best[edgeIndex], nodes, best)
       : [];
     const shortcutCandidates = buildCommercialSourceTerminalShortcutCandidates(
@@ -225,11 +229,18 @@ const repairSourceTerminalOuterStairs = <T extends Edge[]>(
       if (!changedEdgesObstacleHitsDoNotRegress(best, candidate, [edgeIndex], nodes)) continue;
       if (evaluation.unsafeEndpointStubs(candidate) > evaluation.unsafeEndpointStubs(best)) continue;
       const candidateReport = evaluation.hardReport(candidate);
+      const structuralLengthBudget = commercialBendSimplificationLengthBudget(
+        best[edgeIndex],
+        candidate[edgeIndex],
+      );
       const allowedDetourPenalty = bestReport.quality.detourPenalty
-        + (bestReport.hardClean ? 0 : FINAL_COMMERCIAL_DETOUR_QUALITY_BUDGET);
+        + (bestReport.hardClean
+          ? structuralLengthBudget
+          : FINAL_COMMERCIAL_DETOUR_QUALITY_BUDGET);
       if (
         !candidateReport.hardClean
-        || candidateReport.quality.totalLength >= bestReport.quality.totalLength
+        || candidateReport.quality.totalLength
+          >= bestReport.quality.totalLength + structuralLengthBudget
         || candidateReport.quality.detourPenalty > allowedDetourPenalty
         || !preservesCommercialTrueTrunkMembership(
           evaluation.endpointOrder(best).legalSharedTrunks,

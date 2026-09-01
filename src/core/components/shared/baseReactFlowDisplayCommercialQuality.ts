@@ -6,7 +6,8 @@ import {
 } from './baseReactFlowDisplayGeometry';
 
 const MIN_COMMERCIAL_INTERIOR_SEGMENT = 24;
-const MAX_COMMERCIAL_BEND_COUNT = 6;
+export const MAX_COMMERCIAL_BEND_COUNT = 6;
+const COMMERCIAL_LENGTH_BUDGET_PER_REMOVED_BEND = 32;
 
 export type DisplayCommercialQualityIssueKind =
   | 'invalid-path'
@@ -68,3 +69,29 @@ export const auditBaseReactFlowDisplayCommercialQuality = (
 export const baseReactFlowDisplayCommercialQualityIsClean = (
   edges: readonly Edge[],
 ): boolean => auditBaseReactFlowDisplayCommercialQuality(edges).length === 0;
+
+/**
+ * A hard-clean route may need a modest outer detour to replace a pathological
+ * bend chain. The allowance scales only with bends actually removed and is
+ * available only when the replacement satisfies the complete structural
+ * commercial contract.
+ */
+export const commercialBendSimplificationLengthBudget = (
+  baseline: Edge,
+  candidate: Edge,
+): number => {
+  if (
+    baseline.id !== candidate.id
+    || baseline.source !== candidate.source
+    || baseline.target !== candidate.target
+  ) return 0;
+  const baselineBends = Math.max(0, getDisplayComputedPath(baseline).length - 2);
+  const candidateBends = Math.max(0, getDisplayComputedPath(candidate).length - 2);
+  if (
+    baselineBends <= MAX_COMMERCIAL_BEND_COUNT
+    || candidateBends > MAX_COMMERCIAL_BEND_COUNT
+    || candidateBends >= baselineBends
+    || !baseReactFlowDisplayCommercialQualityIsClean([candidate])
+  ) return 0;
+  return (baselineBends - candidateBends) * COMMERCIAL_LENGTH_BUDGET_PER_REMOVED_BEND;
+};
