@@ -18,6 +18,7 @@ import {
   type ReactFlowRenderSnapshot,
 } from '../rendering/reactFlowScene';
 import { exportRenderSceneToSvgDataUrl } from '../export/svgExport';
+import { exportRenderSceneToPdfBlob } from '../export/scenePdfExport';
 
 export { isSafeExportDataUrl } from '../components/shared/exportUtils';
 
@@ -169,6 +170,7 @@ export const exportDiagramToPDF = async ({
   diagramId,
   dispatchExportEvent,
   yieldToPaint,
+  getReactFlowSnapshot,
   signal,
 }: ExportActionContext) => {
   try {
@@ -182,42 +184,17 @@ export const exportDiagramToPDF = async ({
       return;
     }
 
-    const dataUrl = await temporarilyHideElements(CONTROLS_TO_HIDE, async () =>
-      exportFullDiagramByAdjustingViewportToPngDataUrl(diagramId, 40, 3)
-    );
-    throwIfExportAborted(signal);
-    if (!isSafeExportDataUrl(dataUrl)) throw new Error('Unsafe export data URL');
-
-    const img = await waitForImageLoad(dataUrl);
-    throwIfExportAborted(signal);
-    const paddedWidth = img.naturalWidth;
-    const paddedHeight = img.naturalHeight;
-    const isPortrait = paddedHeight > paddedWidth;
-    const { jsPDF } = await import('jspdf');
-    throwIfExportAborted(signal);
-    const pdf = new jsPDF({
-      orientation: isPortrait ? 'portrait' : 'landscape',
-      unit: 'px',
-      format: 'a4',
+    const snapshot = getReactFlowSnapshot?.();
+    const scene = snapshot
+      ? buildRenderSceneFromReactFlowSnapshot(snapshot, { padding: 40 })
+      : buildRenderSceneFromGlobalReactFlow({ padding: 40 });
+    const pdfBlob = await exportRenderSceneToPdfBlob(scene, {
+      includeBackground: true,
+      title: diagramId,
     });
-
-    const pdfWidth = pdf.internal.pageSize.getWidth() - 80;
-    const pdfHeight = pdf.internal.pageSize.getHeight() - 80;
-    const scale = Math.min(pdfWidth / paddedWidth, pdfHeight / paddedHeight);
-    const scaledWidth = paddedWidth * scale;
-    const scaledHeight = paddedHeight * scale;
-
-    pdf.addImage(
-      dataUrl,
-      'PNG',
-      (pdf.internal.pageSize.getWidth() - scaledWidth) / 2,
-      (pdf.internal.pageSize.getHeight() - scaledHeight) / 2,
-      scaledWidth,
-      scaledHeight
-    );
-
     throwIfExportAborted(signal);
-    pdf.save(buildExportFileName(diagramId, 'pdf'));
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    triggerDownload(pdfUrl, buildExportFileName(diagramId, 'pdf'));
     dispatchExportEvent('diagramExportComplete', { diagramId, type: 'pdf' });
   } catch (error) {
     handleExportActionFailure(

@@ -30,13 +30,31 @@ export interface RenderNodeGeometry {
   shape?: string;
   fill: string;
   stroke: string;
+  strokeWidth?: number;
   textColor: string;
   strokeDasharray?: string;
   borderRadius: number;
   fontSize: number;
   fontWeight?: string;
+  fontFamily?: string;
+  textAlign?: 'start' | 'middle';
+  paddingX?: number;
+  paddingTop?: number;
+  contentLines?: RenderNodeContentLine[];
+  accent?: RenderNodeAccent;
   tableColumns?: RenderNodeTableColumn[];
   container?: RenderNodeContainerMetadata;
+}
+
+export interface RenderNodeContentLine {
+  text: string;
+  fontWeight?: string;
+}
+
+export interface RenderNodeAccent {
+  position: 'top' | 'left';
+  size: number;
+  color: string;
 }
 
 export interface RenderNodeTableColumn {

@@ -22,6 +22,7 @@ const hasValidNodeGeometry = (node: RenderNodeGeometry): boolean => (
   && isFiniteNumber(node.height)
   && isFiniteNumber(node.borderRadius)
   && isFiniteNumber(node.fontSize)
+  && (typeof node.strokeWidth === 'undefined' || (isFiniteNumber(node.strokeWidth) && node.strokeWidth > 0))
   && node.width > 0
   && node.height > 0
   && node.borderRadius >= 0

@@ -183,6 +183,41 @@ describe('svgExport', () => {
     expect(svg).not.toContain('foreignObject');
   });
 
+  it('preserves rendered custom-card style and structured HTML lines', () => {
+    const scene = buildRenderSceneFromReactFlow([{
+      id: 'styled-card',
+      type: 'custom',
+      position: { x: 10, y: 20 },
+      measured: { width: 259, height: 118 },
+      data: {
+        label: '物流订单中心 (L-OMS)',
+        description: '<b>物流订单中心 (L-OMS)</b><br/>• 接收上游订单/拆分物流单<br/>• 全链路状态追踪与预警',
+        __vizlyExportStyle: {
+          fill: 'rgb(247, 244, 243)',
+          stroke: 'rgba(166, 126, 112, 0.55)',
+          borderRadius: 8,
+          textColor: 'rgb(42, 59, 76)',
+          fontSize: 16,
+          fontFamily: 'Arial, sans-serif',
+          textAlign: 'left',
+          paddingLeft: 16,
+          paddingTop: 26,
+          accent: { position: 'top', size: 3, color: 'rgba(161, 136, 127, 0.85)' },
+        },
+      },
+    } as Node], []);
+    const svg = exportRenderSceneToSvg(scene);
+
+    expect(svg).toContain('fill="rgb(247, 244, 243)" stroke="rgba(166, 126, 112, 0.55)"');
+    expect(svg).toContain('<rect x="10" y="20" width="259" height="3" fill="rgba(161, 136, 127, 0.85)"/>');
+    expect(svg).toContain('<text x="26"');
+    expect(svg).toContain('font-family="Arial, sans-serif" font-size="16" font-weight="700"');
+    expect(svg.match(/物流订单中心 \(L-OMS\)/gu)).toHaveLength(1);
+    expect(svg).toContain('• 接收上游订单/拆分物流单');
+    expect(svg).toContain('• 全链路状态追踪与预警');
+    expect(svg).not.toContain('text-anchor="middle"');
+  });
+
   it('renders edge labels with a readable SVG label background', () => {
     const scene = buildRenderSceneFromReactFlow(nodes, edges);
     const svg = exportRenderSceneToSvg(scene);

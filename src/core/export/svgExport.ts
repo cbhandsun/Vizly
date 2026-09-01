@@ -197,13 +197,40 @@ const textLinesToSvg = (
   fill: string,
   fontWeight?: string,
   anchor: 'middle' | 'start' = 'middle',
+  fontFamily = 'Inter, Arial, sans-serif',
 ): string => {
   if (lines.length === 0) return '';
   const lineHeight = Math.max(14, fontSize + 3);
   const startY = centerY - ((lines.length - 1) * lineHeight) / 2;
   return lines.map((line, index) => (
-    `<text${attr('x', x)}${attr('y', startY + index * lineHeight)} text-anchor="${anchor}" dominant-baseline="central" font-family="Inter, Arial, sans-serif"${attr('font-size', fontSize)}${fontWeight ? attr('font-weight', fontWeight) : ''}${attr('fill', fill)}>${escapeXml(line)}</text>`
+    `<text${attr('x', x)}${attr('y', startY + index * lineHeight)} text-anchor="${anchor}" dominant-baseline="central"${attr('font-family', fontFamily)}${attr('font-size', fontSize)}${fontWeight ? attr('font-weight', fontWeight) : ''}${attr('fill', fill)}>${escapeXml(line)}</text>`
   )).join('');
+};
+
+const structuredNodeTextToSvg = (node: RenderNodeGeometry): string => {
+  const lines = node.contentLines ?? [];
+  if (lines.length === 0) return '';
+  const paddingX = node.paddingX ?? 16;
+  const paddingTop = node.paddingTop ?? 16;
+  const lineHeight = Math.max(16, node.fontSize * 1.4);
+  const availableHeight = Math.max(lineHeight, node.height - 8);
+  const visibleCount = Math.max(1, Math.min(lines.length, Math.floor(availableHeight / lineHeight)));
+  const visible = lines.slice(0, visibleCount);
+  const contentHeight = visible.length * lineHeight;
+  const centeredTop = Math.max(4, (node.height - contentHeight) / 2);
+  const startY = node.y + Math.min(paddingTop, centeredTop) + lineHeight / 2;
+  const x = node.textAlign === 'middle' ? node.x + node.width / 2 : node.x + paddingX;
+  const anchor = node.textAlign === 'middle' ? 'middle' : 'start';
+  return visible.map((line, index) => (
+    `<text${attr('x', x)}${attr('y', startY + index * lineHeight)} text-anchor="${anchor}" dominant-baseline="central"${attr('font-family', node.fontFamily ?? 'Inter, Arial, sans-serif')}${attr('font-size', node.fontSize)}${line.fontWeight ? attr('font-weight', line.fontWeight) : ''}${attr('fill', node.textColor)}>${escapeXml(line.text)}</text>`
+  )).join('');
+};
+
+const nodeAccentToSvg = (node: RenderNodeGeometry): string => {
+  if (!node.accent) return '';
+  return node.accent.position === 'left'
+    ? `<rect${attr('x', node.x)}${attr('y', node.y)}${attr('width', node.accent.size)}${attr('height', node.height)}${attr('fill', node.accent.color)}/>`
+    : `<rect${attr('x', node.x)}${attr('y', node.y)}${attr('width', node.width)}${attr('height', node.accent.size)}${attr('fill', node.accent.color)}/>`;
 };
 
 const statusColor = (status: RenderNodeGeometry['status']): string | null => {
@@ -244,10 +271,11 @@ const databaseNodeToSvg = (node: RenderNodeGeometry, strokeDash: string): string
   const capHeight = clamp(Math.round(node.height * 0.16), 10, 24);
   const topY = node.y + capHeight / 2;
   const bottomY = node.y + node.height - capHeight / 2;
+  const strokeWidth = node.strokeWidth ?? 1.2;
   return [
-    `<path${attr('d', `M ${node.x} ${topY} C ${node.x} ${node.y - capHeight / 2} ${node.x + node.width} ${node.y - capHeight / 2} ${node.x + node.width} ${topY} V ${bottomY} C ${node.x + node.width} ${node.y + node.height + capHeight / 2} ${node.x} ${node.y + node.height + capHeight / 2} ${node.x} ${bottomY} Z`)}${attr('fill', node.fill)}${attr('stroke', node.stroke)} stroke-width="1.2"${strokeDash}/>`,
-    `<ellipse${attr('cx', node.x + node.width / 2)}${attr('cy', topY)}${attr('rx', node.width / 2)}${attr('ry', capHeight / 2)}${attr('fill', node.fill)}${attr('stroke', node.stroke)} stroke-width="1.2"${strokeDash}/>`,
-    `<path${attr('d', `M ${node.x} ${bottomY} C ${node.x} ${node.y + node.height + capHeight / 2} ${node.x + node.width} ${node.y + node.height + capHeight / 2} ${node.x + node.width} ${bottomY}`)} fill="none"${attr('stroke', node.stroke)} stroke-width="1.2" opacity="0.72"${strokeDash}/>`,
+    `<path${attr('d', `M ${node.x} ${topY} C ${node.x} ${node.y - capHeight / 2} ${node.x + node.width} ${node.y - capHeight / 2} ${node.x + node.width} ${topY} V ${bottomY} C ${node.x + node.width} ${node.y + node.height + capHeight / 2} ${node.x} ${node.y + node.height + capHeight / 2} ${node.x} ${bottomY} Z`)}${attr('fill', node.fill)}${attr('stroke', node.stroke)}${attr('stroke-width', strokeWidth)}${strokeDash}/>`,
+    `<ellipse${attr('cx', node.x + node.width / 2)}${attr('cy', topY)}${attr('rx', node.width / 2)}${attr('ry', capHeight / 2)}${attr('fill', node.fill)}${attr('stroke', node.stroke)}${attr('stroke-width', strokeWidth)}${strokeDash}/>`,
+    `<path${attr('d', `M ${node.x} ${bottomY} C ${node.x} ${node.y + node.height + capHeight / 2} ${node.x + node.width} ${node.y + node.height + capHeight / 2} ${node.x + node.width} ${bottomY}`)} fill="none"${attr('stroke', node.stroke)}${attr('stroke-width', strokeWidth)} opacity="0.72"${strokeDash}/>`,
   ].join('');
 };
 
@@ -263,7 +291,7 @@ const tableNodeToSvg = (node: RenderNodeGeometry, strokeDash: string): string =>
   const nameX = node.x + 38;
   const typeX = node.x + Math.max(104, node.width * 0.62);
   const header = [
-    `<rect${attr('x', node.x)}${attr('y', node.y)}${attr('width', node.width)}${attr('height', node.height)} rx="6"${attr('fill', node.fill)}${attr('stroke', node.stroke)} stroke-width="1.2"${strokeDash}/>`,
+    `<rect${attr('x', node.x)}${attr('y', node.y)}${attr('width', node.width)}${attr('height', node.height)} rx="6"${attr('fill', node.fill)}${attr('stroke', node.stroke)}${attr('stroke-width', node.strokeWidth ?? 1.2)}${strokeDash}/>`,
     `<path${attr('d', `M ${node.x} ${node.y + 6} Q ${node.x} ${node.y} ${node.x + 6} ${node.y} H ${node.x + node.width - 6} Q ${node.x + node.width} ${node.y} ${node.x + node.width} ${node.y + 6} V ${node.y + headerHeight} H ${node.x} Z`)}${attr('fill', node.stroke)}/>`,
     `<text${attr('x', node.x + 12)}${attr('y', node.y + headerHeight / 2)} text-anchor="start" dominant-baseline="central" font-family="Inter, Arial, sans-serif" font-size="12" font-weight="700" fill="#ffffff">${escapeXml(truncateText(node.label, 28))}</text>`,
   ].join('');
@@ -335,24 +363,27 @@ const nodeToSvg = (node: RenderNodeGeometry): string => {
   const subtitleLines = node.subtitle && node.shape !== 'group'
     ? wrapText(node.subtitle, Math.max(8, maxChars + 4), 2)
     : [];
-  const text = node.shape === 'group'
+  const text = node.contentLines?.length
+    ? structuredNodeTextToSvg(node)
+    : node.shape === 'group'
     ? textLinesToSvg(lines.slice(0, 1), node.x + horizontalPadding, node.y + 18, Math.max(11, node.fontSize - 1), node.textColor, node.fontWeight ?? '600', 'start')
     : `${textLinesToSvg(lines, node.x + node.width / 2, titleCenterY, node.fontSize, node.textColor, node.fontWeight)}${textLinesToSvg(subtitleLines, node.x + node.width / 2, titleCenterY + Math.max(18, node.fontSize + 8), Math.max(10, node.fontSize - 2), '#64748b')}`;
   const strokeDash = node.strokeDasharray ? attr('stroke-dasharray', node.strokeDasharray) : '';
+  const strokeWidth = node.strokeWidth ?? 1.2;
   const shape = node.shape === 'ellipse'
-    ? `<ellipse${attr('cx', node.x + node.width / 2)}${attr('cy', node.y + node.height / 2)}${attr('rx', node.width / 2)}${attr('ry', node.height / 2)}${attr('fill', node.fill)}${attr('stroke', node.stroke)} stroke-width="1.2"${strokeDash}/>`
+    ? `<ellipse${attr('cx', node.x + node.width / 2)}${attr('cy', node.y + node.height / 2)}${attr('rx', node.width / 2)}${attr('ry', node.height / 2)}${attr('fill', node.fill)}${attr('stroke', node.stroke)}${attr('stroke-width', strokeWidth)}${strokeDash}/>`
     : node.shape === 'diamond'
-      ? `<polygon${attr('points', `${node.x + node.width / 2},${node.y} ${node.x + node.width},${node.y + node.height / 2} ${node.x + node.width / 2},${node.y + node.height} ${node.x},${node.y + node.height / 2}`)}${attr('fill', node.fill)}${attr('stroke', node.stroke)} stroke-width="1.2"${strokeDash}/>`
+      ? `<polygon${attr('points', `${node.x + node.width / 2},${node.y} ${node.x + node.width},${node.y + node.height / 2} ${node.x + node.width / 2},${node.y + node.height} ${node.x},${node.y + node.height / 2}`)}${attr('fill', node.fill)}${attr('stroke', node.stroke)}${attr('stroke-width', strokeWidth)}${strokeDash}/>`
       : node.shape === 'database'
         ? node.tableColumns?.length ? tableNodeToSvg(node, strokeDash) : databaseNodeToSvg(node, strokeDash)
       : node.shape === 'note'
-        ? `<path${attr('d', `M ${node.x} ${node.y} H ${node.x + node.width - 16} L ${node.x + node.width} ${node.y + 16} V ${node.y + node.height} H ${node.x} Z`)}${attr('fill', node.fill)}${attr('stroke', node.stroke)} stroke-width="1.2"${strokeDash}/><path${attr('d', `M ${node.x + node.width - 16} ${node.y} V ${node.y + 16} H ${node.x + node.width} Z`)} fill="#ffffff"${attr('stroke', node.stroke)} stroke-width="1.2"/>`
-        : `<rect${attr('x', node.x)}${attr('y', node.y)}${attr('width', node.width)}${attr('height', node.height)}${attr('rx', rx)}${attr('fill', node.fill)}${attr('stroke', node.stroke)} stroke-width="1.2"${strokeDash}/>`;
+        ? `<path${attr('d', `M ${node.x} ${node.y} H ${node.x + node.width - 16} L ${node.x + node.width} ${node.y + 16} V ${node.y + node.height} H ${node.x} Z`)}${attr('fill', node.fill)}${attr('stroke', node.stroke)}${attr('stroke-width', strokeWidth)}${strokeDash}/><path${attr('d', `M ${node.x + node.width - 16} ${node.y} V ${node.y + 16} H ${node.x + node.width} Z`)} fill="#ffffff"${attr('stroke', node.stroke)}${attr('stroke-width', strokeWidth)}/>`
+        : `<rect${attr('x', node.x)}${attr('y', node.y)}${attr('width', node.width)}${attr('height', node.height)}${attr('rx', rx)}${attr('fill', node.fill)}${attr('stroke', node.stroke)}${attr('stroke-width', strokeWidth)}${strokeDash}/>`;
   const groupHeader = node.shape === 'group'
     ? `${containerNodeChromeToSvg(node)}${swimlaneDividersToSvg(node)}`
     : '';
   const contentText = node.tableColumns?.length || node.container ? '' : text;
-  return `<g${attr('data-node-id', node.id)}${node.type ? attr('data-node-type', node.type) : ''}>${shape}${groupHeader}${nodeMetadataToSvg(node)}${contentText}</g>`;
+  return `<g${attr('data-node-id', node.id)}${node.type ? attr('data-node-type', node.type) : ''}>${shape}${nodeAccentToSvg(node)}${groupHeader}${nodeMetadataToSvg(node)}${contentText}</g>`;
 };
 
 const assertExportableScene = (scene: DiagramRenderScene) => {

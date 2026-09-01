@@ -8,6 +8,12 @@ const safeLogState = vi.hoisted(() => ({
   log: vi.fn(),
 }));
 
+const scenePdfState = vi.hoisted(() => ({
+  exportRenderSceneToPdfBlob: vi.fn(async () => new Blob(['vector-pdf'], {
+    type: 'application/pdf',
+  })),
+}));
+
 vi.mock('../../utils/consoleCleanup', () => ({
   safeLog: safeLogState,
 }));
@@ -28,8 +34,14 @@ vi.mock('../../components/shared/exportUtils', () => ({
   triggerDownload: vi.fn(),
 }));
 
+vi.mock('../../export/scenePdfExport', () => scenePdfState);
+
 import * as exportUtils from '../../components/shared/exportUtils';
-import { exportDiagramToPNG, exportDiagramToSVG } from '../diagramExportActions';
+import {
+  exportDiagramToPDF,
+  exportDiagramToPNG,
+  exportDiagramToSVG,
+} from '../diagramExportActions';
 
 describe('diagramExportActions logging', () => {
   beforeEach(() => {
@@ -38,6 +50,7 @@ describe('diagramExportActions logging', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     delete (window as any).reactFlowInstance;
   });
 
@@ -119,6 +132,65 @@ describe('diagramExportActions logging', () => {
     const svg = decodeURIComponent(dataUrl.replace('data:image/svg+xml;charset=utf-8,', ''));
     expect(svg).toContain('Explicit node');
     expect(svg).not.toContain('Global node');
+  });
+
+  it('exports PDF as a vector scene without capturing a raster image', async () => {
+    const dispatchExportEvent = vi.fn();
+    const getReactFlowSnapshot = vi.fn(() => ({
+      nodes: [
+        { id: 'explicit', position: { x: 0, y: 0 }, data: { label: 'Explicit node' } },
+      ],
+      edges: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+    }));
+    const createObjectURL = vi.fn(() => 'blob:http://localhost/vector-pdf');
+    vi.stubGlobal('URL', { createObjectURL });
+
+    await exportDiagramToPDF({
+      diagramId: 'diagram-1',
+      dispatchExportEvent,
+      getReactFlowSnapshot,
+      yieldToPaint: async () => undefined,
+    });
+
+    expect(getReactFlowSnapshot).toHaveBeenCalledTimes(1);
+    expect(exportUtils.exportFullDiagramByAdjustingViewportToPngDataUrl).not.toHaveBeenCalled();
+    expect(scenePdfState.exportRenderSceneToPdfBlob).toHaveBeenCalledWith(
+      expect.objectContaining({ nodes: [expect.objectContaining({ id: 'explicit' })] }),
+      { includeBackground: true, title: 'diagram-1' },
+    );
+    expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
+    expect(exportUtils.triggerDownload).toHaveBeenCalledWith(
+      'blob:http://localhost/vector-pdf',
+      'diagram.png',
+    );
+    expect(dispatchExportEvent).toHaveBeenCalledWith('diagramExportComplete', {
+      diagramId: 'diagram-1',
+      type: 'pdf',
+    });
+  });
+
+  it('suppresses vector PDF download when cancellation arrives during conversion', async () => {
+    const controller = new AbortController();
+    const dispatchExportEvent = vi.fn();
+    scenePdfState.exportRenderSceneToPdfBlob.mockImplementationOnce(async () => {
+      controller.abort();
+      return new Blob(['cancelled-pdf'], { type: 'application/pdf' });
+    });
+
+    await expect(exportDiagramToPDF({
+      diagramId: 'diagram-1',
+      dispatchExportEvent,
+      getReactFlowSnapshot: () => ({ nodes: [], edges: [] }),
+      signal: controller.signal,
+      yieldToPaint: async () => undefined,
+    })).rejects.toMatchObject({ name: 'AbortError' });
+
+    expect(exportUtils.triggerDownload).not.toHaveBeenCalled();
+    expect(dispatchExportEvent).toHaveBeenCalledWith('diagramExportCancelled', {
+      diagramId: 'diagram-1',
+      type: 'pdf',
+    });
   });
 
   it('suppresses the download and emits cancellation when aborted after capture', async () => {

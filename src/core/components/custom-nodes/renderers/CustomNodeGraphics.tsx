@@ -76,6 +76,7 @@ const parseNodeContent = (raw: string): { title: string; body: string } => {
 };
 
 const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
+    id,
     data: d,
     selected,
     setHovered,
@@ -172,7 +173,7 @@ const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
             return (
                 <div style={contentStyle} onDoubleClick={handleDoubleClick}>
 
-                    <div style={textContainerStyle}>
+                    <div data-vizly-export-node-content="true" style={textContainerStyle}>
                         {safeLinesHtml.map((safeLineHtml, index) => (
                             <div key={index} style={getLineStyle(safeLineHtml)}>
                                 <span dangerouslySetInnerHTML={{ __html: safeLineHtml }} />
@@ -209,7 +210,7 @@ const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
         return (
             <div style={contentStyle} onDoubleClick={handleDoubleClick}>
 
-                <div style={textContainerStyle}>
+                <div data-vizly-export-node-content="true" style={textContainerStyle}>
                     {/* 标题 */}
                     <span style={titleStyle}>{title}</span>
                     {/* 描述正文（多行子弹列表支持） */}
@@ -242,13 +243,14 @@ const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
             />
 
             <div
+                data-vizly-export-node-id={id}
                 style={containerStyle}
                 className={`diagram-node-glass diagram-node-hover-glow ${selected ? 'diagram-node-selected' : ''}`.trim()}
                 onMouseEnter={() => setHovered(true)}
                 onMouseLeave={() => setHovered(false)}
             >
                 {/* 顶部主题色带：始终渲染 */}
-                <div style={accentBarProps ?? {
+                <div data-vizly-export-node-accent="true" style={accentBarProps ?? {
                     position: 'absolute',
                     left: 0, right: 0, top: 0,
                     height: '3px',

@@ -12,6 +12,8 @@ import { tryAttachDiagramSnapshot } from '@/core/utils/diagramSnapshot';
 import { invalidateRemoteDiagramPreview } from '@/services/remoteDiagramPreview';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { getFlowDataBridge, getFlowDataBridgeNodes, getStandardFlowDataBridge } from '@/core/utils/flowDataBridge';
+import { readRegisteredReactFlowSnapshot } from '@/core/rendering/reactFlowSnapshotRegistry';
+import { enrichSnapshotWithRenderedNodeStyles } from '@/core/rendering/reactFlowDomSnapshotStyles';
 import { logCloudSaveEnsureFailure, logCloudSaveFailure } from '@/components/diagrams/hooks/diagramStorageLogging';
 import { downloadFile } from '@/core/utils/downloadUtils';
 import { escapeMarkdownInlineText, escapeMarkdownTableCell, escapeMermaidLabel, toMermaidNodeId } from '@/core/utils/exportTextSecurity';
@@ -86,11 +88,14 @@ const ExportTools: React.FC<ExportToolsProps> = ({
   const { hasFeature, showUpgradeModal } = useSubscription();
   // 用于 fallback：当 dataService 无数据时从 ReactFlow 获取当前节点/边
   const reactFlowInstance = useReactFlow();
-  const getReactFlowSnapshot = useCallback(() => ({
-    nodes: reactFlowInstance.getNodes(),
-    edges: reactFlowInstance.getEdges(),
-    viewport: reactFlowInstance.getViewport(),
-  }), [reactFlowInstance]);
+  const getReactFlowSnapshot = useCallback(() => enrichSnapshotWithRenderedNodeStyles(
+    readRegisteredReactFlowSnapshot(diagramId) ?? {
+      nodes: reactFlowInstance.getNodes(),
+      edges: reactFlowInstance.getEdges(),
+      viewport: reactFlowInstance.getViewport(),
+    },
+    typeof document === 'undefined' ? undefined : document.getElementById(`diagram-${diagramId}`) ?? document,
+  ), [diagramId, reactFlowInstance]);
   const { handleFitDiagram, handleBackToTop, handleToggleFullscreen: handleFs, exportToPNG, exportToPDF, exportToSVG, exportToGIF } = useDiagramControls(
     diagramId,
     enableMainFlowAnimation,

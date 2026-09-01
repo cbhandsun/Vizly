@@ -16,6 +16,7 @@ import {
 } from './diagramControlRequest';
 import { waitForDiagramControlViewportPaint } from './diagramControlPaint';
 import { useBaseReactFlowViewportSemanticSync } from './baseReactFlowViewportSemanticContext';
+import { registerReactFlowSnapshotProvider } from '../../rendering/reactFlowSnapshotRegistry';
 
 interface DiagramControlBridgeProps {
   diagramId?: string;
@@ -78,6 +79,16 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
       }
     };
   }, [rf]);
+
+  useEffect(() => {
+    const id = resolveSelfDiagramId();
+    if (!id) return undefined;
+    return registerReactFlowSnapshotProvider(id, () => ({
+      nodes: rf.getNodes(),
+      edges: rf.getEdges(),
+      viewport: rf.getViewport(),
+    }));
+  }, [resolveSelfDiagramId, rf]);
 
   useEffect(() => {
     const pendingTimeouts = new Set<number>();

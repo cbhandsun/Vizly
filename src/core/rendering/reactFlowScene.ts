@@ -23,6 +23,7 @@ const MAX_TABLE_COLUMNS = 24;
 const MAX_COLUMN_TEXT_CHARS = 80;
 const DEFAULT_WIDTH = 220;
 const DEFAULT_HEIGHT = 120;
+const MAX_CONTENT_LINES = 12;
 
 type RenderFlowNode = Node & {
   measured?: { width?: unknown; height?: unknown };
@@ -74,6 +75,20 @@ const stripMarkup = (value: string): string => value
   .replace(/<[^>]+>/g, ' ')
   .replace(/\s+/g, ' ')
   .trim();
+
+const structuredContentLines = (value: unknown): RenderNodeGeometry['contentLines'] | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const rawLines = value.split(/<br\s*\/?>|\r?\n/gi);
+  if (rawLines.length < 2) return undefined;
+  const lines = rawLines
+    .slice(0, MAX_CONTENT_LINES)
+    .map((raw, index) => ({
+      text: textFromUnknown(raw),
+      fontWeight: index === 0 && /<(?:b|strong)(?:\s[^>]*)?>/i.test(raw) ? '700' : undefined,
+    }))
+    .filter(line => line.text.length > 0);
+  return lines.length > 1 ? lines : undefined;
+};
 
 const textFromUnknown = (value: unknown): string => {
   if (value === null || typeof value === 'undefined') return '';
@@ -144,6 +159,31 @@ const dataStyleColor = (data: Record<string, unknown> | undefined, style: unknow
   return styleColor(style, key, styleColor(dataStyle, key, fallback));
 };
 
+const normalizeFontFamily = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim();
+  return normalized && normalized.length <= 200 ? normalized : undefined;
+};
+
+const normalizeTextAlign = (value: unknown): 'start' | 'middle' | undefined => {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  if (normalized === 'left' || normalized === 'start') return 'start';
+  if (normalized === 'center' || normalized === 'middle') return 'middle';
+  return undefined;
+};
+
+const normalizeAccent = (value: unknown): RenderNodeGeometry['accent'] | undefined => {
+  const accent = asRecord(value);
+  const position = accent.position === 'left' ? 'left' : accent.position === 'top' ? 'top' : undefined;
+  const color = normalizeSvgPaint(accent.color, '');
+  if (!position || !color) return undefined;
+  return {
+    position,
+    size: coerceRenderNumber(accent.size, 3, 1, 48),
+    color,
+  };
+};
+
 const normalizeShape = (node: Node, data: Record<string, unknown> | undefined): string | undefined => {
   const raw = String(data?.shape ?? data?.nodeShape ?? node.type ?? '').toLowerCase();
   if (raw.includes('diamond') || raw.includes('decision')) return 'diamond';
@@ -209,6 +249,7 @@ const buildNode = (node: Node, position: RenderPoint): RenderNodeGeometry | null
   const data = node.data as Record<string, unknown> | undefined;
   const shape = normalizeShape(node, data);
   const dataStyle = data?.style as Record<string, unknown> | undefined;
+  const exportStyle = asRecord(data?.__vizlyExportStyle);
   const tableColumns = normalizeTableColumns(data?.columns);
   const label = firstText(data?.tableName, data?.title, data?.label, data?.description, renderNode.label, node.id);
   const subtitle = firstText(data?.subtitle, data?.caption, data?.description);
@@ -227,15 +268,24 @@ const buildNode = (node: Node, position: RenderPoint): RenderNodeGeometry | null
     status: normalizeStatus(data?.status ?? data?.state ?? data?.severity),
     type: typeof node.type === 'string' ? node.type : undefined,
     shape,
-    fill: dataStyleColor(data, node.style, 'backgroundColor', styleColor(node.style, 'background', defaultTheme.nodeFill)),
-    stroke: dataStyleColor(data, node.style, 'borderColor', defaultTheme.nodeStroke),
-    textColor: dataStyleColor(data, node.style, 'color', defaultTheme.textColor),
+    fill: normalizeSvgPaint(exportStyle.fill, dataStyleColor(data, node.style, 'backgroundColor', styleColor(node.style, 'background', defaultTheme.nodeFill))),
+    stroke: normalizeSvgPaint(exportStyle.stroke, dataStyleColor(data, node.style, 'borderColor', defaultTheme.nodeStroke)),
+    strokeWidth: coerceRenderNumber(exportStyle.strokeWidth, 1.2, 0.1, 24),
+    textColor: normalizeSvgPaint(exportStyle.textColor, dataStyleColor(data, node.style, 'color', defaultTheme.textColor)),
     strokeDasharray: shape === 'group'
       ? (normalizeSvgStrokeDasharray(nodeStyle.strokeDasharray) || normalizeSvgStrokeDasharray(dataStyle?.strokeDasharray) || '6 4')
       : (normalizeSvgStrokeDasharray(nodeStyle.strokeDasharray) || normalizeSvgStrokeDasharray(dataStyle?.strokeDasharray)),
-    borderRadius: normalizeBorderRadius(node.style ?? dataStyle, shape),
-    fontSize: coerceRenderNumber(nodeStyle.fontSize ?? dataStyle?.fontSize, 13, 8, 48),
-    fontWeight: normalizeSvgFontWeight(nodeStyle.fontWeight) || normalizeSvgFontWeight(dataStyle?.fontWeight),
+    borderRadius: coerceRenderNumber(exportStyle.borderRadius, normalizeBorderRadius(node.style ?? dataStyle, shape), 0, 80),
+    fontSize: coerceRenderNumber(exportStyle.fontSize ?? nodeStyle.fontSize ?? dataStyle?.fontSize, 13, 8, 48),
+    fontWeight: normalizeSvgFontWeight(exportStyle.fontWeight) || normalizeSvgFontWeight(nodeStyle.fontWeight) || normalizeSvgFontWeight(dataStyle?.fontWeight),
+    fontFamily: normalizeFontFamily(exportStyle.fontFamily),
+    textAlign: normalizeTextAlign(exportStyle.textAlign),
+    paddingX: coerceRenderNumber(exportStyle.paddingLeft, 16, 0, 200),
+    paddingTop: coerceRenderNumber(exportStyle.paddingTop, 16, 0, 200),
+    contentLines: String(node.type ?? '').toLowerCase() === 'custom'
+      ? structuredContentLines(data?.description)
+      : undefined,
+    accent: normalizeAccent(exportStyle.accent),
     tableColumns,
     container,
   };
