@@ -12,13 +12,15 @@ describe('createRoutingWaypointSegmentMemo', () => {
       value: { score: 12 },
       cacheHit: false,
     });
-    expect(memo.getOrCreate({
+    const firstHit = memo.getOrCreate({
       a: { ...segment.a },
       b: { ...segment.b },
-    }, create)).toEqual({
+    }, create);
+    expect(firstHit).toEqual({
       value: { score: 12 },
       cacheHit: true,
     });
+    expect(memo.getOrCreate(segment, create)).toBe(firstHit);
     expect(memo.getOrCreate({ a: segment.b, b: segment.a }, create).cacheHit).toBe(false);
     expect(create).toHaveBeenCalledTimes(2);
   });
