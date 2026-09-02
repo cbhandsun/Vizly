@@ -106,6 +106,7 @@ const projectPhaseTrace = value => {
       scannedNodeCount: boundedCounter(trace.scannedNodeCount) ?? 0,
       scannedSegmentCount: boundedCounter(trace.scannedSegmentCount) ?? 0,
       scannedEdgePairCount: boundedCounter(trace.scannedEdgePairCount) ?? 0,
+      workItemCount: boundedCounter(trace.workItemCount) ?? 0,
       candidateCount: boundedCounter(trace.candidateCount) ?? 0,
       changedEdgeCount,
       resolution,

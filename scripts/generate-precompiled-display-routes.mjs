@@ -328,6 +328,7 @@ const captureTarget = async (session, target, source, routingVersion) => {
           scannedNodeCount: trace.scannedNodeCount,
           scannedSegmentCount: trace.scannedSegmentCount,
           scannedEdgePairCount: trace.scannedEdgePairCount,
+          workItemCount: trace.workItemCount,
           resolution: trace.resolution,
         }))
       : [];

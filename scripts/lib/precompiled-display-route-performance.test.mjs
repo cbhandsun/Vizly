@@ -28,6 +28,7 @@ const capture = (presetId, routeMs, extra = {}) => ({
       exclusiveDurationMs: routeMs / 3,
       candidateCount: 14,
       changedEdgeCount: 3,
+      workItemCount: 5,
       resolution: 'accepted',
       privateNodeName: 'must-not-survive',
     }],
@@ -110,10 +111,29 @@ describe('precompiled display route cold performance', () => {
         exclusiveDurationMs: 700 / 3,
         candidateCount: 14,
         changedEdgeCount: 3,
+        workItemCount: 5,
         resolution: 'accepted',
       }],
     });
     expect(JSON.stringify(result)).not.toContain('must-not-survive');
+  });
+
+  it('keeps bounded phase work counts and rejects unsafe counter values', () => {
+    const valid = sample().presets[1].phaseTrace[0];
+    expect(valid.workItemCount).toBe(5);
+
+    const invalid = buildPrecompiledDisplayRoutePerformanceResult([
+      capture('safe', 10, {
+        phaseTrace: [{
+          phase: 'quality',
+          durationMs: 1,
+          changedEdgeCount: 0,
+          workItemCount: Number.POSITIVE_INFINITY,
+          resolution: 'accepted',
+        }],
+      }),
+    ]);
+    expect(invalid.presets[0].phaseTrace[0].workItemCount).toBe(0);
   });
 
   it('fails closed for malformed, unsafe, duplicated, or incomplete captures', () => {
