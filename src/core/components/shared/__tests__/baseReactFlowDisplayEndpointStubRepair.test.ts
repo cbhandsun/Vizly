@@ -376,6 +376,49 @@ describe('baseReactFlowDisplayEndpointStubRepair', () => {
     expect(diagnostics.residualRepairInvocationCount).toBe(0);
   });
 
+  it('does not let unrelated clearance risk trigger graph-wide strict tiers', () => {
+    const short = edgeWithPath('scoped-risk-short', [
+      { x: 0, y: 0 },
+      { x: 48, y: 0 },
+      { x: 48, y: 100 },
+      { x: 300, y: 100 },
+    ]);
+    const movableBlocker = edgeWithPath('scoped-risk-blocker', [
+      { x: 40, y: -20 },
+      { x: 52, y: -20 },
+      { x: 52, y: 20 },
+      { x: 64, y: 20 },
+    ]);
+    const unrelatedRisk = edgeWithPath('unrelated-risk', [
+      { x: 500, y: 0 },
+      { x: 500, y: 200 },
+    ]);
+    const zeroRiskContext = waypointCandidateRepair
+      .createNodeClearanceGraphEvaluationContext([]);
+    vi.spyOn(waypointCandidateRepair, 'createNodeClearanceGraphEvaluationContext')
+      .mockImplementation(() => ({
+        ...zeroRiskContext,
+        score: (_path, edge) => edge.id === unrelatedRisk.id ? 10 : 0,
+      }));
+    const diagnostics = createStrictCrossingRepairDiagnostics();
+
+    const repaired = repairRenderSafeEndpointStubs(
+      [short, movableBlocker, unrelatedRisk],
+      [],
+      64,
+      undefined,
+      undefined,
+      diagnostics,
+    );
+
+    expect(countRenderUnsafeEndpointStubs(repaired)).toBe(0);
+    expect(calculateEdgePathQualityScore(repaired).strictCrossings).toBe(0);
+    expect(repaired[2]).toBe(unrelatedRisk);
+    expect(diagnostics.strictFallbackInvocationCount).toBe(1);
+    expect(diagnostics.strictSweepInvocationCount).toBe(0);
+    expect(diagnostics.residualRepairInvocationCount).toBe(0);
+  });
+
   it('keeps the formal 48px baseline when strict fallback is disabled', () => {
     const short = edgeWithPath('commercial-preference-short', [
       { x: 0, y: 0 },

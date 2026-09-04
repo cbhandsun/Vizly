@@ -441,11 +441,13 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
         acceptedQualityState = candidateQualityState;
         acceptedCommercialRiskDelta = candidateCommercialRiskDelta;
       };
-      const acceptedCommercialRiskIsGloballyMinimal = (): boolean => {
+      const acceptedRepairRiskIsMinimal = (): boolean => {
         const acceptedEdges = accepted;
         if (!acceptedEdges) return false;
         let totalRisk = 0;
-        for (const edge of acceptedEdges) {
+        for (let index = 0; index < acceptedEdges.length; index += 1) {
+          const edge = acceptedEdges[index];
+          if (edge === current[index]) continue;
           const edgeRisk = clearance.score(
             getDisplayComputedPath(edge),
             edge,
@@ -466,7 +468,7 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
         needsStrictFallback
         && allowGlobalStrictFallback
         && evaluations < maxEvaluations
-        && !acceptedCommercialRiskIsGloballyMinimal()
+        && !acceptedRepairRiskIsMinimal()
       ) {
         considerVariant(finalStrictDisplaySweep(candidate, nodes, strictDiagnostics));
       }
@@ -474,7 +476,7 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
         needsStrictFallback
         && allowGlobalStrictFallback
         && evaluations < maxEvaluations
-        && !acceptedCommercialRiskIsGloballyMinimal()
+        && !acceptedRepairRiskIsMinimal()
       ) {
         considerVariant(repairFinalResidualStrictCrossings(candidate, nodes, strictDiagnostics));
       }
