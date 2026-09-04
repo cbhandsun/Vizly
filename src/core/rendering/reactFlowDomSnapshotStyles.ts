@@ -60,6 +60,7 @@ const captureSurfaceStyle = (surface: HTMLElement): Record<string, unknown> => {
       || surfaceStyle.borderTopLeftRadius
       || surfaceStyle.borderRadius,
     ),
+    shadow: surfaceStyle.boxShadow.match(/rgba?\([^)]+\)/i)?.[0],
     textColor: contentStyle.color,
     fontSize: finiteCssPixel(contentStyle.fontSize),
     fontWeight: contentStyle.fontWeight,

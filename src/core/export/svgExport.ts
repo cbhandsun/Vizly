@@ -427,7 +427,10 @@ const nodeToSvg = (node: RenderNodeGeometry, namespace: string): string => {
     ? `${containerNodeChromeToSvg(node, namespace)}${swimlaneDividersToSvg(node)}`
     : '';
   const contentText = node.tableColumns?.length || node.container ? '' : text;
-  return `<g${attr('data-node-id', node.id)}${node.type ? attr('data-node-type', node.type) : ''}>${shape}${nodeAccentToSvg(node)}${groupHeader}${nodeMetadataToSvg(node)}${contentText}</g>`;
+  const shadow = node.shadow
+    ? `<rect x="${node.x - 5}" y="${node.y - 1}" width="${node.width + 10}" height="${node.height + 10}" rx="${node.borderRadius + 5}" fill="${node.shadow}" opacity=".5"/>`
+    : '';
+  return `<g${attr('data-node-id', node.id)}${node.type ? attr('data-node-type', node.type) : ''}>${shadow}${shape}${nodeAccentToSvg(node)}${groupHeader}${nodeMetadataToSvg(node)}${contentText}</g>`;
 };
 
 const isContainerNode = (node: RenderNodeGeometry): boolean => (

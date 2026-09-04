@@ -304,6 +304,7 @@ const buildNode = (node: Node, position: RenderPoint): RenderNodeGeometry | null
       ? structuredContentLines(data?.description)
       : undefined,
     accent: normalizeAccent(exportStyle.accent),
+    shadow: normalizeSvgPaint(exportStyle.shadow, ''),
     tableColumns,
     container,
   };

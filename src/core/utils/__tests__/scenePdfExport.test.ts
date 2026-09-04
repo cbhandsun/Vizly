@@ -148,7 +148,17 @@ describe('exportRenderSceneToPdfBlob', () => {
           },
         },
       },
-      { id: 'source', position: { x: 0, y: 0 }, measured: { width: 140, height: 72 }, data: { label: '订单中心' } },
+      {
+        id: 'source',
+        position: { x: 0, y: 0 },
+        measured: { width: 140, height: 72 },
+        data: {
+          label: '订单中心',
+          __vizlyExportStyle: {
+            shadow: 'rgba(0, 0, 0, 0.14)',
+          },
+        },
+      },
       { id: 'target', position: { x: 260, y: 0 }, measured: { width: 140, height: 72 }, data: { label: '仓储管理' } },
     ];
     const edges: Edge[] = [{

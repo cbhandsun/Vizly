@@ -203,12 +203,14 @@ describe('svgExport', () => {
           paddingLeft: 16,
           paddingTop: 26,
           accent: { position: 'top', size: 3, color: 'rgba(161, 136, 127, 0.85)' },
+          shadow: 'rgba(0, 0, 0, 0.12)',
         },
       },
     } as Node], []);
     const svg = exportRenderSceneToSvg(scene);
 
     expect(svg).toContain('fill="rgb(247, 244, 243)" stroke="rgba(166, 126, 112, 0.55)"');
+    expect(svg).toContain('<rect x="5" y="19" width="269" height="128" rx="13" fill="rgba(0, 0, 0, 0.12)" opacity=".5"/>');
     expect(svg).toContain('<rect x="10" y="20" width="259" height="3" fill="rgba(161, 136, 127, 0.85)"/>');
     expect(svg).toContain('<text x="26"');
     expect(svg).toContain('font-family="Arial, sans-serif" font-size="16" font-weight="700"');
@@ -225,6 +227,17 @@ describe('svgExport', () => {
     expect(svg).toContain('class="vizly-export-edge-label"');
     expect(svg).toContain('<rect x=');
     expect(svg).toContain('opacity="0.92"');
+  });
+
+  it('drops forged shadow paint before it reaches SVG output', () => {
+    const scene = buildRenderSceneFromReactFlow([{
+      id: 'unsafe-shadow',
+      position: { x: 0, y: 0 },
+      data: { label: 'Safe', __vizlyExportStyle: { shadow: 'url(javascript:alert(1))' } },
+    } as Node], []);
+
+    expect(scene.nodes[0].shadow).toBe('');
+    expect(exportRenderSceneToSvg(scene)).not.toContain('opacity=".5"');
   });
 
   it('paints container backgrounds below edges and foreground nodes', () => {

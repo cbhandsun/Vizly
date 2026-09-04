@@ -57,7 +57,7 @@ describe('enrichSnapshotWithRenderedNodeStyles', () => {
   it('captures bounded rendered custom-node styles without mutating the source snapshot', () => {
     document.body.innerHTML = `
       <div id="diagram-test">
-        <div data-vizly-export-node-id="node-1" style="background-color: rgb(247, 244, 243); border: 1px solid rgba(166, 126, 112, 0.55); border-radius: 8px; padding: 26px 16px 23px">
+        <div data-vizly-export-node-id="node-1" style="background-color: rgb(247, 244, 243); border: 1px solid rgba(166, 126, 112, 0.55); border-radius: 8px; box-shadow: rgba(0, 0, 0, 0.12) 0px 4px 12px; padding: 26px 16px 23px">
           <div data-vizly-export-node-accent="true" style="position:absolute;left:0;right:0;top:0;height:3px;background-color:rgba(161,136,127,.85)"></div>
           <div data-vizly-export-node-content="true" style="color:rgb(42,59,76);font:400 16px/1.4 Arial;text-align:left"></div>
         </div>
@@ -76,6 +76,7 @@ describe('enrichSnapshotWithRenderedNodeStyles', () => {
         stroke: 'rgba(166, 126, 112, 0.55)',
         strokeWidth: 1,
         borderRadius: 8,
+        shadow: 'rgba(0, 0, 0, 0.12)',
         textColor: 'rgb(42, 59, 76)',
         fontSize: 16,
         textAlign: 'left',

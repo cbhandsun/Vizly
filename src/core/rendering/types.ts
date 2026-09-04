@@ -42,6 +42,7 @@ export interface RenderNodeGeometry {
   paddingTop?: number;
   contentLines?: RenderNodeContentLine[];
   accent?: RenderNodeAccent;
+  shadow?: string;
   tableColumns?: RenderNodeTableColumn[];
   container?: RenderNodeContainerMetadata;
 }
