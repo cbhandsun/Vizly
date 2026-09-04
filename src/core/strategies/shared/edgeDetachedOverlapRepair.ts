@@ -496,13 +496,6 @@ export function separateDetachedParallelOverlaps(
 
           for (const candidatePath of candidatePathsForSegment) {
             if (qualityBudget.exhausted()) break;
-            const candidateEdgeCrossings = strictCrossingsForEdgeSegments(
-              extractPathSegmentRefsForPath(candidatePath, segment.edgeIndex, edges),
-              currentSegments,
-              segment.edgeIndex,
-              strictCrossingSegmentIndex,
-            );
-            if (candidateEdgeCrossings > currentEdgeCrossings) continue;
             const candidatePaths = replaceDetachedPathAtIndex(
               paths,
               segment.edgeIndex,
@@ -512,7 +505,16 @@ export function separateDetachedParallelOverlaps(
               candidatePaths,
               [segment.edgeIndex],
               narrowSmallOverlapSearch ? 'narrow' : 'regular',
-              () => routingObstacleGate(paths, candidatePaths, [segment.edgeIndex]),
+              // Crossing and obstacle checks are both deterministic for this
+              // immutable baseline. Keep them inside exact-geometry dedup so
+              // repeated lane candidates do not rescan the segment index.
+              () => strictCrossingsForEdgeSegments(
+                extractPathSegmentRefsForPath(candidatePath, segment.edgeIndex, edges),
+                currentSegments,
+                segment.edgeIndex,
+                strictCrossingSegmentIndex,
+              ) <= currentEdgeCrossings
+                && routingObstacleGate(paths, candidatePaths, [segment.edgeIndex]),
               () => qualityBudget.evaluateChanged(
                 edgesWithPaths(currentEdges, candidatePaths, [segment.edgeIndex]),
                 qualityEvaluationContext,
@@ -710,14 +712,6 @@ function repairResidualReverseOrUnrelatedOverlap(
 
         for (const candidatePath of candidatePathsForSegment) {
           if (qualityBudget.exhausted()) break;
-          const candidateSegments = extractPathSegmentRefsForPath(candidatePath, segment.edgeIndex, edges);
-          if (strictCrossingsForEdgeSegments(
-            candidateSegments,
-            currentSegments,
-            segment.edgeIndex,
-            strictCrossingSegmentIndex,
-          ) > currentEdgeCrossings) continue;
-
           const candidatePaths = replaceDetachedPathAtIndex(
             paths,
             segment.edgeIndex,
@@ -727,7 +721,15 @@ function repairResidualReverseOrUnrelatedOverlap(
             candidatePaths,
             [segment.edgeIndex],
             'regular',
-            () => routingObstacleGate(paths, candidatePaths, [segment.edgeIndex]),
+            // Residual deltas intentionally revisit some fixed candidates.
+            // Cache their complete safety rejection before quality scoring.
+            () => strictCrossingsForEdgeSegments(
+              extractPathSegmentRefsForPath(candidatePath, segment.edgeIndex, edges),
+              currentSegments,
+              segment.edgeIndex,
+              strictCrossingSegmentIndex,
+            ) <= currentEdgeCrossings
+              && routingObstacleGate(paths, candidatePaths, [segment.edgeIndex]),
             () => qualityBudget.evaluateChanged(
               edgesWithPaths(currentEdges, candidatePaths, [segment.edgeIndex]),
               qualityEvaluationContext,

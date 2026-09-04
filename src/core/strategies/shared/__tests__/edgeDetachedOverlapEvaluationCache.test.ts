@@ -227,9 +227,11 @@ describe('createDetachedOverlapCandidateDedup', () => {
     expect(consumeCachedRequest).not.toHaveBeenCalled();
   });
 
-  it('reuses an exact obstacle rejection without charging the quality budget', () => {
+  it('reuses an exact crossing rejection before obstacle and quality work', () => {
     const dedup = createDetachedOverlapCandidateDedup<{ value: number }>();
-    const evaluateObstacle = vi.fn(() => false);
+    const evaluateCrossings = vi.fn(() => false);
+    const evaluateObstacle = vi.fn(() => true);
+    const evaluateSafety = () => evaluateCrossings() && evaluateObstacle();
     const evaluateQuality = vi.fn(() => ({ value: 1 }));
     const consumeCachedRequest = vi.fn(() => true);
     const paths = [[{ x: 0, y: 0 }, { x: 100, y: 0 }]];
@@ -237,14 +239,15 @@ describe('createDetachedOverlapCandidateDedup', () => {
       paths,
       [0],
       'regular',
-      evaluateObstacle,
+      evaluateSafety,
       evaluateQuality,
       consumeCachedRequest,
     );
 
     expect(evaluate()).toEqual({ obstacleAccepted: false, quality: null });
     expect(evaluate()).toEqual({ obstacleAccepted: false, quality: null });
-    expect(evaluateObstacle).toHaveBeenCalledTimes(1);
+    expect(evaluateCrossings).toHaveBeenCalledTimes(1);
+    expect(evaluateObstacle).not.toHaveBeenCalled();
     expect(evaluateQuality).not.toHaveBeenCalled();
     expect(consumeCachedRequest).not.toHaveBeenCalled();
   });
