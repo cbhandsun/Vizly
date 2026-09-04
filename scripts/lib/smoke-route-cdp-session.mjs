@@ -8,6 +8,14 @@ const fail = (message, details) => {
   throw error;
 };
 
+export const createCdpSessionEnableCommands = () => [
+  { method: 'Runtime.enable' },
+  { method: 'Page.enable' },
+  { method: 'Log.enable' },
+  { method: 'Network.enable' },
+  { method: 'Network.setCacheDisabled', params: { cacheDisabled: true } },
+];
+
 export class CdpSession {
   constructor(browserUrl, targetId, { viewport = null, isMobile = false } = {}) {
     this.browserUrl = browserUrl;
@@ -49,12 +57,9 @@ export class CdpSession {
     }, 10000, false);
     this.sessionId = attachResult.sessionId;
 
-    await Promise.all([
-      this.send('Runtime.enable'),
-      this.send('Page.enable'),
-      this.send('Log.enable'),
-      this.send('Network.enable'),
-    ]);
+    await Promise.all(createCdpSessionEnableCommands().map(({ method, params }) => (
+      this.send(method, params)
+    )));
     await this.send('Runtime.evaluate', {
       expression: `
         (function () {

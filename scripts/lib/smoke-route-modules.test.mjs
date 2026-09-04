@@ -5,7 +5,7 @@ import {
   createSmokeRouteCatalog,
   isManagementTemplatesReady,
 } from './smoke-route-catalog.mjs';
-import { CdpSession } from './smoke-route-cdp-session.mjs';
+import { CdpSession, createCdpSessionEnableCommands } from './smoke-route-cdp-session.mjs';
 import { waitForRouteReadiness } from './smoke-route-readiness.mjs';
 import {
   aggregateRouteSamples,
@@ -167,6 +167,20 @@ describe('smoke route modules', () => {
     expect(session.isMobile).toBe(true);
     expect(session.logs).toEqual([]);
     expect(session.networkIssues).toEqual([]);
+  });
+
+  it('uses cold browser samples for route asset budgets and repeats them in CI', () => {
+    expect(createCdpSessionEnableCommands()).toContainEqual({
+      method: 'Network.setCacheDisabled',
+      params: { cacheDisabled: true },
+    });
+
+    const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
+    const smokeStep = workflow
+      .split('- name: Run route smoke checks')[1]
+      ?.split('- name: Run mobile route smoke checks')[0];
+    expect(smokeStep).toContain('SMOKE_REPEAT: 3');
+    expect(smokeStep).not.toContain('continue-on-error');
   });
 
   it('timestamps readiness in the same browser evaluation, before unrelated long tasks', async () => {

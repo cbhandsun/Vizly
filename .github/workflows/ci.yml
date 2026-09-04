@@ -37,6 +37,8 @@ jobs:
         run: npm run verify:static
 
       - name: Run route smoke checks
+        env:
+          SMOKE_REPEAT: 3
         run: npm run smoke:routes:budget
 
       - name: Run mobile route smoke checks
