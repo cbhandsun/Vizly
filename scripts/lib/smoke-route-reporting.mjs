@@ -31,6 +31,22 @@ export const dedupeRouteAssets = (assets) => {
   return [...byFile.values()];
 };
 
+export const partitionRouteAssetsByReadyTime = (assets, readyAt) => {
+  const criticalAssets = [];
+  const backgroundAssets = [];
+  const criticalCutoff = Number.isFinite(readyAt) ? Math.max(0, readyAt) : 0;
+
+  for (const asset of Array.isArray(assets) ? assets : []) {
+    if (asset && Number.isFinite(asset.startTime) && asset.startTime <= criticalCutoff) {
+      criticalAssets.push(asset);
+    } else {
+      backgroundAssets.push(asset);
+    }
+  }
+
+  return { criticalCutoff, criticalAssets, backgroundAssets };
+};
+
 export const getRouteAssetReport = async (session, readyAt) => session.evaluate(`(() => {
   const readyAt = ${Number.isFinite(readyAt) ? readyAt : 0};
   const rawAssets = performance.getEntriesByType('resource')
@@ -46,9 +62,9 @@ export const getRouteAssetReport = async (session, readyAt) => session.evaluate(
   const assets = (${dedupeRouteAssets.toString()})(rawAssets)
     .sort((a, b) => b.decodedBodySize - a.decodedBodySize || a.file.localeCompare(b.file));
 
-  const criticalCutoff = readyAt + 50;
-  const criticalAssets = assets.filter((asset) => asset.startTime <= criticalCutoff);
-  const backgroundAssets = assets.filter((asset) => asset.startTime > criticalCutoff);
+  const { criticalCutoff, criticalAssets, backgroundAssets } = (
+    ${partitionRouteAssetsByReadyTime.toString()}
+  )(assets, readyAt);
   const decodedKB = (items) => Math.round(items.reduce((sum, asset) => sum + asset.decodedBodySize, 0) / 102.4) / 10;
   const storageAssetPattern = /storage|supabase|share|event-streams|UnifiedStorageService|StorageService|SupabaseStorage|DataService/i;
   const layoutAssetPattern = /layout|dagre|elk|LayoutAlgorithms|LayoutRefinement|Domain.*LayoutStrategy|designerUtils/i;

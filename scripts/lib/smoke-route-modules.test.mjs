@@ -12,6 +12,7 @@ import {
   collectBudgetViolations,
   dedupeRouteAssets,
   getUnexpectedLogs,
+  partitionRouteAssetsByReadyTime,
 } from './smoke-route-reporting.mjs';
 import { isEnterpriseDisplayRoutingSettled } from '../smokeRouteBudgetUtils.mjs';
 
@@ -390,6 +391,32 @@ describe('smoke route modules', () => {
       encodedBodySize: 120_000,
       decodedBodySize: 587_000,
     }]);
+  });
+
+  it('partitions route assets at the observed ready boundary without a timing grace window', () => {
+    const before = { file: 'before.js', startTime: 999 };
+    const boundary = { file: 'boundary.js', startTime: 1_000 };
+    const after = { file: 'after.js', startTime: 1_001 };
+
+    expect(partitionRouteAssetsByReadyTime([before, boundary, after], 1_000)).toEqual({
+      criticalCutoff: 1_000,
+      criticalAssets: [before, boundary],
+      backgroundAssets: [after],
+    });
+  });
+
+  it('keeps malformed asset timing out of the critical startup closure', () => {
+    const malformed = { file: 'malformed.js', startTime: Number.NaN };
+    expect(partitionRouteAssetsByReadyTime([malformed], Number.POSITIVE_INFINITY)).toEqual({
+      criticalCutoff: 0,
+      criticalAssets: [],
+      backgroundAssets: [malformed],
+    });
+    expect(partitionRouteAssetsByReadyTime(null, -200)).toEqual({
+      criticalCutoff: 0,
+      criticalAssets: [],
+      backgroundAssets: [],
+    });
   });
 
   it('aggregates repeated samples with upper medians and preserves the worst report', () => {
