@@ -74,6 +74,12 @@ export const summarizeDisplayRoutingWaitState = (
       ? value
       : undefined
   );
+  const routeSignature = value => (
+    typeof value === 'string'
+      && /^route-v2:\d{1,5}:\d{1,6}:[0-9a-f]{16}$/i.test(value)
+      ? value
+      : undefined
+  );
   const opaqueFingerprint = value => {
     let hash = 2166136261;
     const text = JSON.stringify(value);
@@ -140,6 +146,7 @@ export const summarizeDisplayRoutingWaitState = (
       requestKind: requestKind(routing.requestId),
       renderAuthorityStatus: token(routing.renderAuthorityStatus),
       workerResolution: token(routing.workerResolution),
+      outputRouteSignature: routeSignature(routing.outputRouteSignature),
       nodeCount: integer(routing.nodeCount),
       edgeCount: integer(routing.edgeCount),
       workerStartCount: integer(routing.workerStartCount),
@@ -186,6 +193,7 @@ export const summarizeDisplayRoutingWaitState = (
         error: workerError(candidate.error),
         routeResolution: token(candidate.routeResolution),
         hardClean: typeof candidate.hardClean === 'boolean' ? candidate.hardClean : undefined,
+        outputRouteSignature: routeSignature(candidate.outputRouteSignature),
         inputSignature: identityToken(identity.inputSignature),
         inputGeometryDigest: identityToken(identity.inputGeometryDigest),
         edgeRouteFingerprint: edgeRouteFingerprint(candidate.edges),
@@ -235,6 +243,7 @@ export const summarizeDisplayRoutingWaitState = (
       error: workerError(response.error),
       routeResolution: token(response.routeResolution),
       hardClean: typeof response.hardClean === 'boolean' ? response.hardClean : undefined,
+      outputRouteSignature: routeSignature(response.outputRouteSignature),
       workerDurationMs: finite(response.workerDurationMs),
       hardReport: {
         hardClean: typeof report.hardClean === 'boolean' ? report.hardClean : undefined,

@@ -45,6 +45,7 @@ import {
 } from './lib/display-routing-browser-diagnostics.mjs';
 import {
   findDisplayRoutingRequestForResponse,
+  isDisplayRoutingWorkerSessionContinuous,
   resolveDisplayRoutingFinalRouteSnapshot,
 } from './lib/display-routing-matrix-final-route.mjs';
 import {
@@ -152,6 +153,7 @@ const readFinalRouteExpression = (
   const responses = window.__vizlyRoutingResponses || [];
   const renderedEdgeCount = document.querySelectorAll('.react-flow__edge').length;
   const findDisplayRoutingRequestForResponse = ${findDisplayRoutingRequestForResponse.toString()};
+  const committedEdgesMatchWorkerPatches = ${displayRoutingCommittedEdgesMatchWorkerPatches.toString()};
   const resolveFinalRoute = ${resolveDisplayRoutingFinalRouteSnapshot.toString()};
   return resolveFinalRoute({
     routing,
@@ -162,6 +164,7 @@ const readFinalRouteExpression = (
     renderedEdgeCount,
     expectedRequestPrefix: ${JSON.stringify(expectedRequestPrefix)},
     minimumExclusiveLayoutJobId: ${JSON.stringify(minimumExclusiveLayoutJobId)},
+    committedEdgesMatchWorkerPatches,
   });
 })()`;
 
@@ -568,10 +571,12 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
   assertDisplayRoutingLayoutProgressTimeline(visualTimeline, layoutCase.id);
   assertDisplayRoutingLayoutFitTimeline(visualTimeline, layoutCase.id);
   await assertRequestedLayoutSelected(session, layoutCase.id);
-  if (route.routing.workerStartCount !== initialRoute.routing.workerStartCount) {
-    throw new Error(`${layoutCase.id} started a duplicate Canvas display Worker: ${JSON.stringify({
-      before: initialRoute.routing.workerStartCount,
-      after: route.routing.workerStartCount,
+  if (!isDisplayRoutingWorkerSessionContinuous(initialRoute, route)) {
+    throw new Error(`${layoutCase.id} did not preserve its Canvas routing session: ${JSON.stringify({
+      beforeStartCount: initialRoute.routing.workerStartCount,
+      afterStartCount: route.routing.workerStartCount,
+      beforeWorkerInstanceId: initialRoute.request?.__browserWorkerInstanceId,
+      afterWorkerInstanceId: route.request?.__browserWorkerInstanceId,
     })}`);
   }
   const mounted = await session.evaluate(`(() => ({
@@ -588,6 +593,7 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
   const layoutAudit = await auditFinalSvg(session, route, layoutCase.id);
   const semanticAudit = await auditDisplayRoutingLayoutSemantics(session, layoutCase, target.semanticChains);
   const warmLayoutSwitches = [];
+  let previousCompletedRoute = route;
   for (const warmLayoutCase of WARM_LAYOUT_CASES) {
     await session.evaluate(`(() => {
       window.__vizlyRoutingRequests = [];
@@ -619,8 +625,8 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
         `${layoutCase.id} warm repeat exceeded ${MAX_LAYOUT_ROUTE_MS}ms: ${warmTotalRouteMs}`,
       );
     }
-    if (warmRoute.routing.workerStartCount !== initialRoute.routing.workerStartCount) {
-      throw new Error(`${layoutCase.id} warm repeat started a duplicate Canvas display Worker`);
+    if (!isDisplayRoutingWorkerSessionContinuous(previousCompletedRoute, warmRoute)) {
+      throw new Error(`${layoutCase.id} warm repeat did not preserve its Canvas routing session`);
     }
     const warmFirstRequestAt = await session.evaluate(`Math.min(
       ...(window.__vizlyRoutingRequests || [])
@@ -659,6 +665,7 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
         `${layoutCase.id} to ${warmLayoutCase.id} warm layout`,
       )),
     });
+    previousCompletedRoute = warmRoute;
   }
   const warmLayoutSwitch = warmLayoutSwitches[0] ?? null;
   const savedRoundtrip = SAVED_RELOAD_MODE === 'layout'
@@ -704,13 +711,13 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
     if (
       incremental.request?.operation !== 'incremental-route'
       || incremental.response.routeResolution !== 'incremental-route'
-      || incremental.routing.workerStartCount !== initialRoute.routing.workerStartCount + 1
+      || incremental.routing.workerStartCount !== previousCompletedRoute.routing.workerStartCount + 1
     ) {
       throw new Error(`${layoutCase.id} did not preserve its incremental Worker session: ${JSON.stringify({
         requestOperation: incremental.request?.operation,
         nodeId: dragNodeId,
         routeResolution: incremental.response.routeResolution,
-        initialWorkerStartCount: initialRoute.routing.workerStartCount,
+        initialWorkerStartCount: previousCompletedRoute.routing.workerStartCount,
         finalWorkerStartCount: incremental.routing.workerStartCount,
         incrementalPlanStatus: incremental.routing.incrementalPlanStatus,
         incrementalBaselineSignature: incremental.routing.incrementalBaselineSignature,

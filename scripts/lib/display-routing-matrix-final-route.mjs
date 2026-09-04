@@ -27,6 +27,31 @@ export const findDisplayRoutingRequestForResponse = (requests, response) => {
   )) ?? null;
 };
 
+/**
+ * Layout may require one post-render routing pass after React Flow normalizes
+ * compound geometry. That is still the same long-lived Worker session; a new
+ * Worker instance or an unbounded number of follow-up jobs is not.
+ */
+export const isDisplayRoutingWorkerSessionContinuous = (
+  beforeRoute,
+  afterRoute,
+  maxAdditionalRoutingStarts = 1,
+) => {
+  const beforeInstanceId = beforeRoute?.request?.__browserWorkerInstanceId;
+  const afterInstanceId = afterRoute?.request?.__browserWorkerInstanceId;
+  const beforeStartCount = beforeRoute?.routing?.workerStartCount;
+  const afterStartCount = afterRoute?.routing?.workerStartCount;
+  return typeof beforeInstanceId === 'string'
+    && beforeInstanceId.length > 0
+    && beforeInstanceId === afterInstanceId
+    && Number.isSafeInteger(beforeStartCount)
+    && Number.isSafeInteger(afterStartCount)
+    && Number.isSafeInteger(maxAdditionalRoutingStarts)
+    && maxAdditionalRoutingStarts >= 0
+    && afterStartCount >= beforeStartCount
+    && afterStartCount <= beforeStartCount + maxAdditionalRoutingStarts;
+};
+
 export const resolveDisplayRoutingFinalRouteSnapshot = ({
   routing,
   requests,
@@ -36,15 +61,9 @@ export const resolveDisplayRoutingFinalRouteSnapshot = ({
   renderedEdgeCount,
   expectedRequestPrefix,
   minimumExclusiveLayoutJobId,
+  committedEdgesMatchWorkerPatches,
 }) => {
   const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value);
-  const requestMatchesPrefix = request => (
-    isRecord(request)
-    && typeof request.requestId === 'string'
-    && (expectedRequestPrefix
-      ? request.requestId.startsWith(expectedRequestPrefix)
-      : true)
-  );
   const requestMatchesCommittedShape = request => (
     isRecord(request)
     && Array.isArray(request.nodes)
@@ -72,30 +91,90 @@ export const resolveDisplayRoutingFinalRouteSnapshot = ({
   if (expectedRequestPrefix === 'layout:' && minimumExclusiveLayoutJobId !== undefined) {
     const jobId = routing.layoutTransactionJobId;
     const requestPrefix = `layout:${jobId}`;
+    const routingClaimsLayoutRequest = routing.requestId.startsWith('layout:');
     if (!Number.isSafeInteger(minimumExclusiveLayoutJobId) || minimumExclusiveLayoutJobId < 0
       || !Number.isSafeInteger(jobId) || jobId <= minimumExclusiveLayoutJobId
       || routing.layoutTransactionStatus !== 'committed'
-      || (routing.requestId !== requestPrefix && !routing.requestId.startsWith(`${requestPrefix}:`))) {
+      || (routingClaimsLayoutRequest
+        && routing.requestId !== requestPrefix
+        && !routing.requestId.startsWith(`${requestPrefix}:`))) {
       return null;
     }
   }
   const safeRequests = Array.isArray(requests) ? requests : [];
   const safeResponses = Array.isArray(responses) ? responses : [];
-  const response = [...safeResponses].reverse().find(item => (
+  const committedLayoutPrefix = expectedRequestPrefix === 'layout:'
+    && Number.isSafeInteger(routing.layoutTransactionJobId)
+    ? `layout:${routing.layoutTransactionJobId}`
+    : null;
+  const routingUsesCommittedLayoutRequest = Boolean(
+    committedLayoutPrefix
+    && (routing.requestId === committedLayoutPrefix
+      || routing.requestId.startsWith(`${committedLayoutPrefix}:`)),
+  );
+  const requestMatchesPrefix = request => (
+    isRecord(request)
+    && typeof request.requestId === 'string'
+    && (committedLayoutPrefix
+      ? request.requestId === committedLayoutPrefix
+        || request.requestId.startsWith(`${committedLayoutPrefix}:`)
+      : expectedRequestPrefix
+        ? request.requestId.startsWith(expectedRequestPrefix)
+        : true)
+  );
+  const responseMatchesExpectedRequest = item => (
     isRecord(item)
     && typeof item.requestId === 'string'
-    && item.requestId === routing.requestId
-    && (!expectedRequestPrefix || item.requestId.startsWith(expectedRequestPrefix))
+    && (committedLayoutPrefix
+      ? item.requestId === routing.requestId
+        || item.requestId === committedLayoutPrefix
+        || item.requestId.startsWith(`${committedLayoutPrefix}:`)
+      : !expectedRequestPrefix || item.requestId.startsWith(expectedRequestPrefix))
+  );
+  const responseMatchesCommittedOutput = item => (
+    typeof item?.outputRouteSignature === 'string'
+    && typeof routing.outputRouteSignature === 'string'
+    && item.outputRouteSignature === routing.outputRouteSignature
+  );
+  const response = [...safeResponses].reverse().find(item => (
+    responseMatchesExpectedRequest(item)
     && item.hardClean === true
-    && Array.isArray(item.edges)
+    && (Array.isArray(item.edges) || Array.isArray(item.routingPatches))
     && isRecord(item.hardReport)
     && item.hardReport.hardClean === true
+    && (
+      item.requestId === routing.requestId
+        && (
+          !committedLayoutPrefix
+          || routingUsesCommittedLayoutRequest
+          || responseMatchesCommittedOutput(item)
+          || (
+            typeof committedEdgesMatchWorkerPatches === 'function'
+            && committedEdgesMatchWorkerPatches(currentEdges, item.routingPatches ?? item.edges)
+          )
+        )
+      || (
+        committedLayoutPrefix
+        && typeof committedEdgesMatchWorkerPatches === 'function'
+        && committedEdgesMatchWorkerPatches(currentEdges, item.routingPatches ?? item.edges)
+      )
+    )
   ));
   if (response) {
     const request = findDisplayRoutingRequestForResponse(safeRequests, response);
+    const responseEdges = Array.isArray(response.edges) ? response.edges : currentEdges;
     return requestMatchesCommittedShape(request)
-      && renderedEdgeCount === response.edges.length
-      ? { routing, request, response, renderedEdgeCount }
+      && Array.isArray(responseEdges)
+      && responseEdges.length === request.edges.length
+      && renderedEdgeCount === responseEdges.length
+      ? {
+        routing,
+        request,
+        response: Array.isArray(response.edges)
+          ? response
+          : { ...response, edges: responseEdges, source: 'current-edges-for-routing-patches' },
+        renderedEdgeCount,
+      }
       : null;
   }
 

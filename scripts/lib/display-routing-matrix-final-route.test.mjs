@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   findDisplayRoutingRequestForResponse,
+  isDisplayRoutingWorkerSessionContinuous,
   resolveDisplayRoutingFinalRouteSnapshot,
 } from './display-routing-matrix-final-route.mjs';
 
@@ -75,6 +76,28 @@ it('pairs reused request ids by request ordinal and Worker instance', () => {
   })).toBeNull();
 });
 
+it('distinguishes a bounded follow-up route from a duplicate Worker instance', () => {
+  const before = {
+    request: { __browserWorkerInstanceId: 'worker-1' },
+    routing: { workerStartCount: 1 },
+  };
+  expect(isDisplayRoutingWorkerSessionContinuous(before, {
+    request: { __browserWorkerInstanceId: 'worker-1' },
+    routing: { workerStartCount: 2 },
+  })).toBe(true);
+  expect(isDisplayRoutingWorkerSessionContinuous(before, {
+    request: { __browserWorkerInstanceId: 'worker-2' },
+    routing: { workerStartCount: 2 },
+  })).toBe(false);
+  expect(isDisplayRoutingWorkerSessionContinuous(before, {
+    request: { __browserWorkerInstanceId: 'worker-1' },
+    routing: { workerStartCount: 3 },
+  })).toBe(false);
+  expect(isDisplayRoutingWorkerSessionContinuous(before, {
+    request: {}, routing: { workerStartCount: 1 },
+  })).toBe(false);
+});
+
 it('accepts a hard-clean Worker response for the expected layout request', () => {
   const response = {
     requestId: 'layout:7',
@@ -127,6 +150,125 @@ it('uses captured Worker and request ordinals when one job id has multiple attem
     expectedRequestPrefix: 'layout:',
   });
   expect(result?.request).toBe(committedRequest);
+});
+
+it('accepts the committed layout response after a matching display route replaces global debug identity', () => {
+  const currentEdges = [{
+    id: 'a-b', source: 'a', target: 'b',
+    data: { computedPath: [{ x: 0, y: 0 }, { x: 10, y: 0 }] },
+  }];
+  const response = {
+    requestId: 'layout:7',
+    hardClean: true,
+    hardReport: { hardClean: true },
+    edges: currentEdges,
+  };
+  const parity = (edges, patches) => edges === currentEdges && patches === response.edges;
+  const result = resolveDisplayRoutingFinalRouteSnapshot({
+    routing: {
+      stage: 'final-applied', requestId: 'display:9', renderAuthorityStatus: 'accepted',
+      layoutTransactionJobId: 7, layoutTransactionStatus: 'committed', ...committedShape,
+    },
+    requests: [request],
+    responses: [response],
+    currentEdges,
+    renderedEdgeCount: 1,
+    expectedRequestPrefix: 'layout:',
+    minimumExclusiveLayoutJobId: 6,
+    committedEdgesMatchWorkerPatches: parity,
+  });
+  expect(result?.request).toBe(request);
+  expect(result?.response).toBe(response);
+});
+
+it('accepts the clean current display response that reroutes committed layout geometry', () => {
+  const currentEdges = [{
+    id: 'a-b', source: 'a', target: 'b',
+    data: { computedPath: [{ x: 0, y: 0 }, { x: 20, y: 0 }] },
+  }];
+  const displayRequest = { ...request, requestId: 'display:9', edges: currentEdges };
+  const displayResponse = {
+    requestId: 'display:9', hardClean: true, hardReport: { hardClean: true }, edges: currentEdges,
+    outputRouteSignature: 'route-v2:1:2:0123456789abcdef',
+  };
+  const result = resolveDisplayRoutingFinalRouteSnapshot({
+    routing: {
+      stage: 'final-applied', requestId: 'display:9', renderAuthorityStatus: 'accepted',
+      layoutTransactionJobId: 7, layoutTransactionStatus: 'committed', ...committedShape,
+      outputRouteSignature: displayResponse.outputRouteSignature,
+    },
+    requests: [request, displayRequest],
+    responses: [
+      { requestId: 'layout:7', hardClean: true, hardReport: { hardClean: true }, edges: request.edges },
+      displayResponse,
+    ],
+    currentEdges,
+    renderedEdgeCount: 1,
+    expectedRequestPrefix: 'layout:',
+    minimumExclusiveLayoutJobId: 6,
+    committedEdgesMatchWorkerPatches: () => false,
+  });
+  expect(result?.request).toBe(displayRequest);
+  expect(result?.response).toBe(displayResponse);
+});
+
+it('materializes a clean current incremental response from committed edges', () => {
+  const currentEdges = [{
+    id: 'a-b', source: 'a', target: 'b',
+    data: { computedPath: [{ x: 0, y: 0 }, { x: 20, y: 0 }] },
+  }];
+  const displayRequest = { ...request, requestId: 'display:9', edges: currentEdges };
+  const routingPatches = [{
+    id: 'a-b', data: { computedPath: currentEdges[0].data.computedPath },
+  }];
+  const displayResponse = {
+    requestId: 'display:9', hardClean: true, hardReport: { hardClean: true }, routingPatches,
+    outputRouteSignature: 'route-v2:1:2:0123456789abcdef',
+  };
+  const result = resolveDisplayRoutingFinalRouteSnapshot({
+    routing: {
+      stage: 'final-applied', requestId: 'display:9', renderAuthorityStatus: 'accepted',
+      layoutTransactionJobId: 7, layoutTransactionStatus: 'committed', ...committedShape,
+      outputRouteSignature: displayResponse.outputRouteSignature,
+    },
+    requests: [request, displayRequest],
+    responses: [displayResponse],
+    currentEdges,
+    renderedEdgeCount: 1,
+    expectedRequestPrefix: 'layout:',
+    minimumExclusiveLayoutJobId: 6,
+    committedEdgesMatchWorkerPatches: (edges, patches) => (
+      edges === currentEdges && patches === routingPatches
+    ),
+  });
+  expect(result?.request).toBe(displayRequest);
+  expect(result?.response).toMatchObject({
+    source: 'current-edges-for-routing-patches',
+    edges: currentEdges,
+  });
+});
+
+it('rejects a stale layout response after display routing when committed edge parity is missing', () => {
+  const currentEdges = [{ id: 'a-b', source: 'a', target: 'b' }];
+  const input = {
+    routing: {
+      stage: 'final-applied', requestId: 'display:9', renderAuthorityStatus: 'accepted',
+      layoutTransactionJobId: 7, layoutTransactionStatus: 'committed', ...committedShape,
+    },
+    requests: [request],
+    responses: [{
+      requestId: 'layout:7', hardClean: true, hardReport: { hardClean: true }, edges: request.edges,
+    }],
+    currentEdges,
+    renderedEdgeCount: 1,
+    expectedRequestPrefix: 'layout:',
+    minimumExclusiveLayoutJobId: 6,
+  };
+  expect(resolveDisplayRoutingFinalRouteSnapshot(input)).toBeNull();
+  expect(resolveDisplayRoutingFinalRouteSnapshot({
+    ...input,
+    committedEdgesMatchWorkerPatches: () => false,
+  })).toBeNull();
 });
 
 it('reconstructs a candidate-validation hit that commits without a Worker response', () => {

@@ -23,6 +23,7 @@ describe('display routing matrix wait-state summary', () => {
     const summary = summarizeDisplayRoutingWaitState({
       stage: 'worker-response',
       requestId: 'layout:2',
+      outputRouteSignature: 'route-v2:17:61:0123456789abcdef',
       renderAuthorityStatus: 'accepted',
       stagedLayoutPrimarySignature: '123456',
       stagedLayoutPrimaryGeometryDigest: 'geometry-v1:0123456789abcdef0123456789abcdef',
@@ -59,6 +60,7 @@ describe('display routing matrix wait-state summary', () => {
       }],
     }, [{
       requestId: 'route-v2:opaque:4',
+      outputRouteSignature: 'route-v2:17:61:0123456789abcdef',
       routeResolution: 'full-route-repaired',
       hardClean: false,
       edges: [{ data: { computedPath: [{ x: 1, y: 2 }] }, label: 'private edge label' }],
@@ -102,6 +104,7 @@ describe('display routing matrix wait-state summary', () => {
       routing: {
         stage: 'worker-response',
         requestId: 'layout:2',
+        outputRouteSignature: 'route-v2:17:61:0123456789abcdef',
         renderAuthorityStatus: 'accepted',
         requestKind: 'layout',
         stagedLayoutPrimarySignature: '123456',
@@ -133,6 +136,7 @@ describe('display routing matrix wait-state summary', () => {
       responseCount: 1,
       responseTrace: [{
         requestId: 'route-v2:opaque:4',
+        outputRouteSignature: 'route-v2:17:61:0123456789abcdef',
         requestKind: 'display',
         routeResolution: 'full-route-repaired',
         hardClean: false,
@@ -165,6 +169,7 @@ describe('display routing matrix wait-state summary', () => {
       }],
       lastResponse: {
         requestId: 'route-v2:opaque:4',
+        outputRouteSignature: 'route-v2:17:61:0123456789abcdef',
         requestKind: 'display',
         routeResolution: 'full-route-repaired',
         hardClean: false,
