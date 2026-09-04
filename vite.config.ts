@@ -67,6 +67,11 @@ const vendorChunkRules: Array<[string, string[]]> = [
   ['vendor-collab', ['yjs', 'y-websocket', 'lib0']],
   ['vendor-pdf-core', [
     'jspdf',
+    'svg2pdf.js',
+    'cssesc',
+    'font-family-papandreou',
+    'specificity',
+    'svgpath',
   ]],
   ['vendor-canvas-export', [
     'html2canvas',

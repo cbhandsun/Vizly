@@ -1,6 +1,5 @@
 import { exportRenderSceneToPngDataUrl } from '../../export/svgRasterExport';
 import { exportRenderSceneToSvgDataUrl } from '../../export/svgExport';
-import { exportRenderSceneToPdfBlob } from '../../export/scenePdfExport';
 import {
   buildRenderSceneFromReactFlowSnapshot,
   type ReactFlowRenderSnapshot,
@@ -59,6 +58,7 @@ export const runAdvancedExport = async ({
   if (snapshot && sceneFormat) {
     const scene = buildRenderSceneFromReactFlowSnapshot(snapshot, { padding: 40 });
     if (sceneFormat === 'pdf') {
+      const { exportRenderSceneToPdfBlob } = await import('../../export/scenePdfExport');
       const pdfBlob = await exportRenderSceneToPdfBlob(scene, { title, includeBackground });
       const pdfUrl = URL.createObjectURL(pdfBlob);
       triggerDownload(pdfUrl, buildExportFileName(title, 'pdf'));

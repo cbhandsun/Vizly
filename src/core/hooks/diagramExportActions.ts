@@ -18,7 +18,6 @@ import {
   type ReactFlowRenderSnapshot,
 } from '../rendering/reactFlowScene';
 import { exportRenderSceneToSvgDataUrl } from '../export/svgExport';
-import { exportRenderSceneToPdfBlob } from '../export/scenePdfExport';
 
 export { isSafeExportDataUrl } from '../components/shared/exportUtils';
 
@@ -188,6 +187,7 @@ export const exportDiagramToPDF = async ({
     const scene = snapshot
       ? buildRenderSceneFromReactFlowSnapshot(snapshot, { padding: 40 })
       : buildRenderSceneFromGlobalReactFlow({ padding: 40 });
+    const { exportRenderSceneToPdfBlob } = await import('../export/scenePdfExport');
     const pdfBlob = await exportRenderSceneToPdfBlob(scene, {
       includeBackground: true,
       title: diagramId,

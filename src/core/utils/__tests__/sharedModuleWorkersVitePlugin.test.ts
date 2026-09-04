@@ -291,6 +291,30 @@ const worker = new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', impor
     expect(workerSource).toContain("request.operation === 'repair'");
   });
 
+  it('co-loads the small synchronous scene snapshot modules with designer startup', () => {
+    expect(matchesFlowchartDesignerMicroModule(
+      'C:\\repo\\src\\core\\rendering\\reactFlowDomSnapshotStyles.ts',
+    )).toBe(true);
+    expect(matchesFlowchartDesignerMicroModule(
+      'C:/repo/src/core/rendering/reactFlowSnapshotRegistry.ts',
+    )).toBe(true);
+    expect(matchesFlowchartDesignerMicroModule(
+      'C:/repo/src/core/rendering/renderLinearGradient.ts',
+    )).toBe(true);
+    expect(matchesFlowchartDesignerMicroModule(
+      'C:/repo/src/core/export/scenePdfExport.ts',
+    )).toBe(false);
+
+    for (const modulePath of [
+      'src/core/components/diagrams/advancedExportActions.ts',
+      'src/core/hooks/diagramExportActions.ts',
+    ]) {
+      const source = readFileSync(resolve(process.cwd(), modulePath), 'utf8');
+      expect(source).toMatch(/await import\(['"](?:\.\.\/)+export\/scenePdfExport['"]\)/u);
+      expect(source).not.toMatch(/import \{ exportRenderSceneToPdfBlob \} from/u);
+    }
+  });
+
   it('starts the display worker from the canvas lifecycle instead of module evaluation', () => {
     const clientSource = readFileSync(resolve(
       process.cwd(),

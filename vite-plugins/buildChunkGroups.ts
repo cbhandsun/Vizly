@@ -108,6 +108,9 @@ const FLOWCHART_DESIGNER_MICRO_MODULES = new Set([
   '/src/core/components/diagrams/designerUtilsLogging.ts',
   '/src/core/components/diagrams/designerUtils.ts',
   '/src/core/utils/nodeValidation.ts',
+  '/src/core/rendering/reactFlowDomSnapshotStyles.ts',
+  '/src/core/rendering/reactFlowSnapshotRegistry.ts',
+  '/src/core/rendering/renderLinearGradient.ts',
 ]);
 
 const basename = (id: string): string => {

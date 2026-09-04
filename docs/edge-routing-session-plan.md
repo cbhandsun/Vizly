@@ -1,6 +1,6 @@
 # Vizly 首次打开与增量调整统一路由方案
 
-状态：质量、会话、拓扑、缺陷调度与 standalone 渲染协议主链已落地。四图各 16 项布局、跨引擎连续切换、普通保存恢复、三页新增/复制/切换/重载、SVG/PDF 真实矢量文件及容器样式均已有 production 验收。Logistics 动态拓扑含折叠/展开的 10 类编辑矩阵通过，L-OMS 拖拽 30 个独立样本 `release-to-final p95=294/300ms`、零 fallback/abort，交互尾延迟已达门槛。当前首要未完成项为 Logistics 冷路由：最新远端 5 样本 route p95=`1237/1100ms`、Worker compute p95=`1217.2/1100ms`；前一轮同源码分别为 `1138ms`、`1117.7ms`，仍存在明显运行波动。3D 仅性能问题继续后置。
+状态：质量、会话、拓扑、缺陷调度与 standalone 渲染协议主链已落地。四图各 16 项布局、跨引擎连续切换、普通保存恢复、三页新增/复制/切换/重载、SVG/PDF 真实矢量文件及容器样式均已有 production 验收。Logistics 动态拓扑含折叠/展开的 10 类编辑矩阵通过，L-OMS 拖拽 30 个独立样本 `release-to-final p95=294/300ms`、零 fallback/abort，交互尾延迟已达门槛。当前首要未完成项为 Logistics 冷路由：最新远端 5 样本 route p95=`2016/1100ms`、Worker compute p95=`1182.5/1100ms`，其中 route-side overhead p95=`833.5ms`；前两轮 route/Worker p95 分别为 `1237/1217.2ms`、`1138/1117.7ms`，仍存在明显运行波动。3D 仅性能问题继续后置。
 适用范围：`BaseReactFlow` Canvas 最终显示路由、内置标准图、用户保存图、节点拖拽及局部编辑
 关联标准：`docs/edge-routing-goals.md`
 
@@ -8,6 +8,10 @@
 
 ### 2026-09-04：PDF 标题渐变保真与 finalizer 工作量归因
 
+- `a591af47` 的完整 CI 已证明精确 audit 重试有效：依赖安装与 static/build 全部通过，五组测试和覆盖率也全部成功；随后 smoke 揭示矢量 PDF 接入后的独立首屏分块回归。`svg2pdf.js` 及四个专属解析依赖原先落入通用 vendor chunk，使约 `550KB` 被九条路由首屏共同加载；现把 PDF 实现改为点击导出时动态加载，并归入现有 PDF vendor chunk，同时将三个同步、小型场景快照模块与 designer micro chunk 合并。管理页从 `2454.3KB/36` 回到 `1887.4KB/35`，WMS/企业图从 `109/110` 个关键资源降为 `107/105`，解码体积 `4867.5/4745.5KB`，未提高预算；最终九路由 production smoke 全部通过。矢量 PDF 行为回归 26 项通过。
+- 同一远端性能任务的增量和交互专项成功，Logistics 五个冷样本仍为 `full-route-repaired`、零 abort；Worker 中位 `1081.3ms`、p95 `1182.5ms`，但一次 `833.5ms` route-side 尾部把 route p95 拉到 `2016ms`。commercial evaluation p95 为 `133.9ms`。该批在依赖安装和其他并行任务上也出现显著外部延迟，因此保留原预算与失败结论，同时把 Worker 内商业闭环和 route-side 尾部作为两个不同问题追踪，不把单个 runner 样本解释成算法退化。
+- normal full-route 的 commercial detour 现在与 closure 快路径使用同一组子阶段追踪，且不改变候选顺序、128 次预算、质量门禁或最终路径。一次真实 Logistics production 样本中，四类外层修复合计约 `63.9ms`，而 `final-commercial-evaluation` 总计 `239ms`、独占仍约 `175.1ms`；重新构建后的可复现采样中该父阶段为 `96.2ms`、独占 `62.5ms`。证据表明后续优化应继续进入 loop shortcut/评估闭环，而不是削减净距或端点修复。四项子阶段协议回归、33 项相关 jsdom 测试、类型、Lint、架构、生产构建与 bundle `9499.80/9500KB` 均通过，四项预编译路径不变，仅同步 source hash。
+- 对最终同侧端点顺序审计做了独立微基准：真实 Logistics 输入 2,000 次约 `103ms`（单次约 `0.05ms`），收益上限过小，不进入生产改动。另尝试将 obstacle 构建提升到 loop shortcut 事务外复用，但 3+3 个 production 样本没有改善，整体与 commercial 独占耗时反而同时升高，已完整撤回；不以噪声样本提交推测性优化。
 - `b46c497f` 的远端性能任务确认增量路由和交互绘制继续通过，三个 production 浏览器分片均正常启动，未触发新的单次启动重试。Logistics 五个冷样本 route 中位 `1173ms`、p95 `1237/1100ms`，Worker 中位 `1155.7ms`、p95 `1217.2ms`，五次均为 `full-route-repaired` 且零 abort；与同源码前一轮 `1138ms` p95 相比是环境波动，但两轮都高于预算，仍不能关闭性能项。本轮最大公开阶段依次为 commercial evaluation p95 `123.2ms`、初始 dogleg refine `95.6ms`、waypoint `82.2ms`、初始 global refine `74.8ms` 和 trunk dogleg `72.8ms`，下一步只针对能证明重复工作的公共热点，不削减质量门禁。
 - 同轮完整 CI 的五组测试与覆盖率全部成功，static 在进入构建和浏览器 smoke 前由 npm 安全公告接口 5 分钟网络超时终止。该故障已多次阻断主分支，现将 audit 门禁收敛为一次精确基础设施重试：只有非零退出、无 signal、同时出现 npm 的 `audit network timeout` 与 `audit endpoint returned an error` 才重试；漏洞结果、进程失败、其他网络/解析错误及第二次超时均继续失败。入口通过校验后的 npm CLI 路径以无 shell 方式执行，输出仍原样呈现。5 项边界回归、Node CI 入口 453 项、Lint、TS6、secrets、CI 收录和真实 `0 vulnerabilities` 审计通过。
 - `52fbe3a8` 远端五个独立冷样本将 Logistics route 收敛到中位 `1093ms`、p95 `1138/1100ms`，Worker 中位 `1081.9ms`、p95 `1117.7ms`，route overhead p95 仅 `20.3ms`，五次均为 `full-route-repaired` 且零 abort。交互绘制和增量路由任务成功；冷路由只差 `38ms`，但仍按原预算失败，不能记作性能完成。候选商业绕行分的差分缓存实验未改善同机 commercial 阶段且使 bundle 超限 `0.27KB`，已完整撤回；下一批不再投入该低收益点，继续聚焦候选全图质量与主干审计。
