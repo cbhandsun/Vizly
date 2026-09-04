@@ -18,6 +18,11 @@ const withoutAbsolutePosition = (node: Node): Node => {
   return { ...rest, parentId: undefined, extent: undefined };
 };
 
+const moveAlong = (node: Node, axis: 'x' | 'y', value: number): Node => ({
+  ...node, position: { ...node.position, [axis]: value },
+});
+const geometryBoundsError = () => Error('Swimlane bounds');
+
 /** Shared process ranks and bounded per-peer corridors, before any edge routing. */
 export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: SemanticLaneFlowOptions): Node[] => {
   const { direction, nodeToSubGroup, domainOrder = [], subDomainOrder } = options;
@@ -30,14 +35,14 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
   const flowGap = horizontal ? horizontalGap : verticalGap;
   const crossGap = horizontal ? verticalGap : horizontalGap;
   const leaves = nodes.filter(node => !isDomainDagreGroupNode(node) && !isDomainDagreNodeHidden(node));
-  if (leaves.length === 0) return nodes;
+  if (!leaves.length) return nodes;
   if (leaves.some(node => !Number.isFinite(node.position.x) || !Number.isFinite(node.position.y))) {
-    throw new Error('Semantic swimlane layout exceeds supported geometry bounds');
+    throw geometryBoundsError();
   }
   const globalPositions = new Map(layoutWithDagre(leaves, edges, horizontal ? 'LR' : 'TB', crossGap, flowGap)
     .map(position => [position.id, position]));
   const domains = nodes.filter(node => node.type === 'titleGroup' && !isDomainDagreNodeHidden(node));
-  if (domains.length === 0) return nodes;
+  if (!domains.length) return nodes;
   const rank = (domain: Node) => Math.min(...leaves.filter(node => domainDagreDomainOf(node) === domainDagreDomainOf(domain))
     .map(node => globalPositions.get(node.id)?.[flow] ?? Infinity));
   const explicitRank = new Map(domainOrder.map((key, index) => [key, index]));
@@ -58,7 +63,8 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
   const flowEnd = Math.max(...leaves.map(node => (globalPositions.get(node.id)?.[flow] ?? 0) + flowSize(node))) + 232;
   let domainCross = 0;
   for (const domain of orderedDomains) {
-    const members = leaves.filter(node => domainDagreDomainOf(node) === domainDagreDomainOf(domain));
+    const domainKey = domainDagreDomainOf(domain);
+    const members = leaves.filter(node => domainDagreDomainOf(node) === domainKey);
     const buckets = new Map<string, Node[]>();
     for (const node of members) {
       const parent = originals.get(nodeToSubGroup?.get(node.id) ?? node.parentId ?? '');
@@ -69,8 +75,8 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
     }
     let bucketCross = domainCross + (horizontal ? 88 : 32);
     const orderedBuckets = [...buckets].sort(([a], [b]) =>
-      getDomainDagreSubDomainOrderIndex(subDomainOrder, domainDagreDomainOf(domain), originals.get(a)?.data.subDomain)
-      - getDomainDagreSubDomainOrderIndex(subDomainOrder, domainDagreDomainOf(domain), originals.get(b)?.data.subDomain));
+      getDomainDagreSubDomainOrderIndex(subDomainOrder, domainKey, originals.get(a)?.data.subDomain)
+      - getDomainDagreSubDomainOrderIndex(subDomainOrder, domainKey, originals.get(b)?.data.subDomain));
     for (const [id, bucket] of orderedBuckets) {
       const minCross = Math.min(...bucket.map(node => node.position[cross]));
       const maxCross = Math.max(...bucket.map(node => node.position[cross] + crossSize(node)));
@@ -108,14 +114,19 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
     layers.set(key, layer);
   }
   const neighbors = new Map<string, string[]>();
+  const addNeighbor = (source: string, target: string) => {
+    const adjacent = neighbors.get(source);
+    if (adjacent) adjacent.push(target);
+    else neighbors.set(source, [target]);
+  };
   for (const edge of edges) {
-    neighbors.set(edge.source, [...(neighbors.get(edge.source) ?? []), edge.target]);
-    neighbors.set(edge.target, [...(neighbors.get(edge.target) ?? []), edge.source]);
+    addNeighbor(edge.source, edge.target);
+    addNeighbor(edge.target, edge.source);
   }
   const center = (node: Node) => node.position[cross] + crossSize(node) / 2;
   // Local-only branch ordering cannot see a target in an adjacent domain.
   // Keep ranks and lane bounds, but order peers using all incident endpoints.
-  for (let sweep = 0; sweep < 4; sweep += 1) {
+  for (let sweep = 0; sweep < 4; sweep++) {
     for (const layer of layers.values()) {
       const slots = layer.map(node => replacements.get(node.id) ?? node)
         .sort((a, b) => a.position[cross] - b.position[cross]);
@@ -136,7 +147,7 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
       let cursor = slots[0].position[cross];
       ordered.forEach((node, index) => {
         const current = replacements.get(node.id) ?? node;
-        replacements.set(node.id, { ...current, position: { ...current.position, [cross]: cursor } });
+        replacements.set(node.id, moveAlong(current, cross, cursor));
         cursor += crossSize(current) + (gaps[index] ?? 0);
       });
     }
@@ -151,30 +162,37 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
     flowRanks.set(rankCenter, peers);
   }
   let flowOffset = 0;
+  let flowReduction = 0;
+  let occupiedEnd: number | undefined;
   for (const [, peers] of [...flowRanks].sort(([a], [b]) => a - b)) {
     const ordered = peers.toSorted((a, b) => center(replacements.get(a.id) ?? a) - center(replacements.get(b.id) ?? b));
-    ordered.forEach((node, index) => {
+    const positioned = ordered.map((node, index) => {
       const current = replacements.get(node.id) ?? node;
-      replacements.set(node.id, { ...current, position: { ...current.position, [flow]: current.position[flow] + flowOffset + index * flowGap } });
+      return moveAlong(current, flow, current.position[flow] + flowOffset + index * flowGap);
     });
-    flowOffset += Math.max(0, ordered.length - 1) * flowGap;
+    const bandStart = Math.min(...positioned.map(node => node.position[flow]));
+    const bandEnd = Math.max(...positioned.map(node => node.position[flow] + flowSize(node)));
+    if (occupiedEnd !== undefined) flowReduction += Math.max(0, bandStart - occupiedEnd - 96);
+    for (const node of positioned) replacements.set(node.id, moveAlong(node, flow, node.position[flow] - flowReduction));
+    occupiedEnd = bandEnd;
+    flowOffset += (ordered.length - 1) * flowGap;
   }
   for (const node of replacements.values()) {
     if (!isDomainDagreGroupNode(node)) continue;
-    replacements.set(node.id, resize(node, node.position[cross], node.position[flow], crossSize(node), flowSize(node) + flowOffset));
+    replacements.set(node.id, resize(node, node.position[cross], node.position[flow], crossSize(node), flowSize(node) + flowOffset - flowReduction));
   }
   if (reversed) {
     const visible = leaves.map(node => replacements.get(node.id) ?? node);
     const mirror = Math.min(...visible.map(node => node.position[flow]))
       + Math.max(...visible.map(node => node.position[flow] + flowSize(node)));
     for (const node of visible) {
-      replacements.set(node.id, { ...node, position: { ...node.position, [flow]: mirror - node.position[flow] - flowSize(node) } });
+      replacements.set(node.id, moveAlong(node, flow, mirror - node.position[flow] - flowSize(node)));
     }
   }
   if ([...replacements.values()].some(node => !Number.isFinite(node.position.x) || !Number.isFinite(node.position.y)
     || Math.abs(node.position.x) + getNodeDimensions(node).width > 1_000_000
     || Math.abs(node.position.y) + getNodeDimensions(node).height > 1_000_000)) {
-    throw new Error('Semantic swimlane layout exceeds supported geometry bounds');
+    throw geometryBoundsError();
   }
   return nodes.map(node => replacements.get(node.id) ?? node);
 };

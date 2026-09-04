@@ -70,6 +70,30 @@ describe('semantic swimlane process geometry', () => {
     })).toEqual(arranged);
   });
 
+  it.each(['TB', 'LR'] as const)('compacts empty %s bands while preserving peer corridors and equal lane extents', direction => {
+    const arranged = alignDomainDagreLaneFlow(nodes, edges, {
+      direction,
+      nodeToSubGroup: membership,
+      domainOrder: ['a', 'b'],
+    });
+    const byId = new Map(arranged.map(node => [node.id, node]));
+    const flow = direction === 'LR' ? 'x' : 'y';
+
+    expect(Math.abs((byId.get('left')?.position[flow] ?? NaN) - (byId.get('right')?.position[flow] ?? NaN))).toBe(120);
+    const intervals = arranged.filter(node => !isDomainDagreGroupNode(node)).map(node => ({
+      start: node.position[flow],
+      end: node.position[flow] + getNodeDimensions(node)[direction === 'LR' ? 'width' : 'height'],
+    })).sort((a, b) => a.start - b.start || a.end - b.end);
+    let occupiedEnd = intervals[0]?.end ?? 0;
+    for (const interval of intervals.slice(1)) {
+      if (interval.start > occupiedEnd) expect(interval.start - occupiedEnd).toBeLessThanOrEqual(96);
+      occupiedEnd = Math.max(occupiedEnd, interval.end);
+    }
+    const domains = arranged.filter(node => node.type === 'titleGroup');
+    const flowExtents = domains.map(node => getNodeDimensions(node)[direction === 'LR' ? 'width' : 'height']);
+    expect(new Set(flowExtents).size).toBe(1);
+  });
+
   it('handles empty, hidden and ungrouped nodes without losing graph data', () => {
     expect(alignDomainDagreLaneFlow([], [], { direction: 'TB' })).toEqual([]);
     const emptyDomains = nodes.slice(0, 2);

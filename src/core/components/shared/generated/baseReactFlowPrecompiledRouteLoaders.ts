@@ -48,7 +48,7 @@ const generatedPrecompiledRouteDescriptor2: GeneratedBaseReactFlowPrecompiledRou
 };
 
 const generatedPrecompiledRouteAsset3 = new URL(
-  './precompiledRoutes/route-3850974773.json',
+  './precompiledRoutes/route-2454613794.json',
   import.meta.url,
 );
 
@@ -56,7 +56,7 @@ const generatedPrecompiledRouteDescriptor3: GeneratedBaseReactFlowPrecompiledRou
   presetId: "wms-process-flow-v1",
   variantId: "domain-lanes-lr",
   sourceHash: "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
-  geometryDigest: "geometry-v1:17dedb2b9a4b4b4738cfeb41dc352f63",
+  geometryDigest: "geometry-v1:502a67a699fd158a746819845976250e",
   load: () => loadBaseReactFlowPrecompiledRouteAsset(generatedPrecompiledRouteAsset3),
 };
 
@@ -68,7 +68,7 @@ export const GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_LOADERS: Record<
   "1417152958": generatedPrecompiledRouteDescriptor0,
   "1553610876": generatedPrecompiledRouteDescriptor1,
   "2113580664": generatedPrecompiledRouteDescriptor2,
-  "3850974773": generatedPrecompiledRouteDescriptor3,
+  "2454613794": generatedPrecompiledRouteDescriptor3,
 };
 
 /**
