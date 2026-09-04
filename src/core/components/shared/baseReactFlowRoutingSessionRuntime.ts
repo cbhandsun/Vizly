@@ -141,12 +141,23 @@ export const createBaseReactFlowRoutingSessionRuntime = (
   };
 };
 
+const pendingDevelopmentDisposals = new WeakSet<BaseReactFlowRoutingSessionRuntime>();
+
 /** Uses an injected Canvas runtime or owns a local one for standalone canvases. */
 export const useBaseReactFlowRoutingSessionRuntime = (
   externalRuntime?: BaseReactFlowRoutingSessionRuntime,
 ): BaseReactFlowRoutingSessionRuntime => {
   const [ownedRuntime] = useState(createBaseReactFlowRoutingSessionRuntime);
   const runtime = externalRuntime ?? ownedRuntime;
-  useEffect(() => () => ownedRuntime.dispose(), [ownedRuntime]);
+  useEffect(() => {
+    if (!import.meta.env.DEV) return () => ownedRuntime.dispose();
+    pendingDevelopmentDisposals.delete(ownedRuntime);
+    return () => {
+      pendingDevelopmentDisposals.add(ownedRuntime);
+      queueMicrotask(() => {
+        if (pendingDevelopmentDisposals.delete(ownedRuntime)) ownedRuntime.dispose();
+      });
+    };
+  }, [ownedRuntime]);
   return runtime;
 };
