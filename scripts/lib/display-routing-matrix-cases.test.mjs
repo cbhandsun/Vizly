@@ -177,6 +177,31 @@ describe('display routing matrix cases', () => {
     expect(session.evaluate).toHaveBeenCalledTimes(2);
   });
 
+  it('uses the stable toolbar layout key when translated status text has not settled', async () => {
+    const session = { evaluate: vi.fn().mockResolvedValue({
+      requested: '泳道 · 域左右并列（域内上→下）',
+      applied: '自动布局',
+      appliedKey: 'domain-lanes-tb',
+    }) };
+
+    await expect(assertRequestedLayoutSelected(session, 'domain-lanes-tb'))
+      .resolves.toBeUndefined();
+    expect(session.evaluate).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a recognized wrong toolbar layout key without waiting', async () => {
+    const session = { evaluate: vi.fn().mockResolvedValue({
+      requested: '复杂流程（保留域·上→下）',
+      applied: '自动布局',
+      appliedKey: 'domain-lanes-lr',
+    }) };
+
+    await expect(assertRequestedLayoutSelected(session, 'domain-compound-elk-tb')).rejects.toThrow(
+      'requested=domain-compound-elk-tb, applied=domain-lanes-lr',
+    );
+    expect(session.evaluate).toHaveBeenCalledTimes(1);
+  });
+
   it('reports only known layout ids when selection verification fails', async () => {
     const mismatch = { evaluate: async () => ({
       requested: '泳道 · 域左右并列（域内上→下）',

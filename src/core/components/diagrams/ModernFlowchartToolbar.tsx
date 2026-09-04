@@ -534,6 +534,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                         <DropdownMenuTriggerButton
                             ref={layoutDropdown.triggerRef}
                             ariaLabel={layoutTriggerLabel}
+                            data-flowchart-layout-selection={layoutMenuModel.selectedKeys[0]}
                             busy={layoutBusy}
                             disabled={layoutBusy}
                             open={layoutDropdown.open}

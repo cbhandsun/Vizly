@@ -103,6 +103,9 @@ export const assertRequestedLayoutSelected = async (session, caseId) => {
   const knownSelection = value => DISPLAY_ROUTING_LAYOUT_CASES.find(candidate => (
     displayRoutingLayoutSelectionMatches(candidate.label, value)
   ))?.id ?? 'unrecognized';
+  const knownSelectionKey = value => DISPLAY_ROUTING_LAYOUT_CASES.some(candidate => (
+    candidate.id === value
+  )) ? value : 'unrecognized';
   let requested = 'unrecognized';
   let applied = 'unrecognized';
   for (let attempt = 0; attempt < 20; attempt += 1) {
@@ -111,10 +114,18 @@ export const assertRequestedLayoutSelected = async (session, caseId) => {
       applied: Array.from(document.querySelectorAll('button'))
         .find(button => /自动布局|layout/i.test(button.getAttribute('aria-label') || ''))
         ?.getAttribute('aria-label'),
+      appliedKey: Array.from(document.querySelectorAll('button'))
+        .find(button => button.hasAttribute('data-flowchart-layout-selection'))
+        ?.getAttribute('data-flowchart-layout-selection'),
     }))()`);
     requested = knownSelection(selection?.requested);
-    applied = knownSelection(selection?.applied);
-    if (displayRoutingLayoutSelectionMatches(selection?.requested, selection?.applied)) return;
+    const appliedKey = knownSelectionKey(selection?.appliedKey);
+    applied = appliedKey === 'unrecognized' ? knownSelection(selection?.applied) : appliedKey;
+    if (appliedKey !== 'unrecognized') {
+      if (requested === applied && requested !== 'unrecognized') return;
+    } else if (displayRoutingLayoutSelectionMatches(selection?.requested, selection?.applied)) {
+      return;
+    }
     // A recognized, different layout is a real fallback and must fail now.
     // Only an uncommitted toolbar label may settle after the page canvas.
     if (requested === 'unrecognized' || applied !== 'unrecognized') break;
