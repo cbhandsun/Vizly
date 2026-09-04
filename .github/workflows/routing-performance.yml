@@ -16,6 +16,7 @@ on:
       - 'scripts/*display-routing*'
       - 'scripts/lib/display-routing-*'
       - 'scripts/lib/precompiled-display-route-*'
+      - 'scripts/lib/routing-performance-*'
   schedule:
     - cron: '0 9 * * 1'
   workflow_dispatch:

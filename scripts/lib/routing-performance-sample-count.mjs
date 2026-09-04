@@ -1,5 +1,8 @@
 const DEFAULT_PERFORMANCE_SAMPLE_COUNT = 30;
-const MAIN_PUSH_SAMPLE_COUNT = 5;
+// The incremental benchmark captures three independent initial-route cases per
+// browser profile. Ten profiles produce 30 initial-route observations, so the
+// nearest-rank p95 no longer collapses to a single CI scheduling maximum.
+const MAIN_PUSH_SAMPLE_COUNT = 10;
 const MAX_PERFORMANCE_SAMPLE_COUNT = 100;
 
 export const resolveRoutingPerformanceSampleCount = ({

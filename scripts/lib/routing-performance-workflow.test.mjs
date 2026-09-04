@@ -6,13 +6,13 @@ const workflow = readFileSync('.github/workflows/routing-performance.yml', 'utf8
 const occurrences = value => workflow.split(value).length - 1;
 
 describe('routing performance workflow', () => {
-  it('runs short main samples and independent scheduled or manual 30-sample jobs', () => {
+  it('runs statistically usable main samples and independent scheduled or manual 30-sample jobs', () => {
     expect(workflow).toContain('push:');
     expect(workflow).toContain("- cron: '0 9 * * 1'");
     expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).toContain('default: 30');
     expect(occurrences('node scripts/resolve-routing-performance-sample-count.mjs')).toBe(3);
-    expect(resolveRoutingPerformanceSampleCount({ eventName: 'push' })).toBe(5);
+    expect(resolveRoutingPerformanceSampleCount({ eventName: 'push' })).toBe(10);
     expect(resolveRoutingPerformanceSampleCount({ eventName: 'schedule' })).toBe(30);
     expect(resolveRoutingPerformanceSampleCount({
       eventName: 'workflow_dispatch',
@@ -36,6 +36,7 @@ describe('routing performance workflow', () => {
     expect(workflow).toContain('npm run benchmark:display-routing-cold');
     expect(workflow).toContain('DISPLAY_ROUTING_SAMPLE_COUNT');
     expect(workflow).toContain('npm run benchmark:display-routing-browser');
+    expect(workflow).toContain("'scripts/lib/routing-performance-*'");
     expect(workflow).toContain('Run independent interaction-paint samples');
     expect(workflow).toContain(
       'node scripts/verify-display-routing-browser.mjs --interaction-only',
