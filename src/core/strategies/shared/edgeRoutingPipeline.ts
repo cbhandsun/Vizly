@@ -22,7 +22,6 @@ import {
   distributePortConnections,
   globalOptimizeEdgeRouting,
   layerBasedEdgeRouting,
-  optimizeEdgeLabelPositions,
   optimizeTreeBusRouting,
   separateParallelEdges,
 } from '../../utils/HandlePicker';
@@ -467,11 +466,6 @@ export async function runEdgeRoutingPipeline(
   finalEdges = sanitizeComputedPaths(finalEdges);
   finalEdges = repairSharedTrunkAwareObstacles(finalEdges, nodes, 18);
   finalEdges = sanitizeComputedPaths(finalEdges);
-
-  finalEdges = optimizeEdgeLabelPositions(finalEdges, pipelineNodes, {
-    enabled: true,
-    labelPadding: 8,
-  });
 
   const useElkRouting = configBoolean(extendedEdgeConfig, 'useElkRouting', false);
   if (useElkRouting && finalEdges.length > 0) {

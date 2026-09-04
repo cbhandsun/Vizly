@@ -409,6 +409,24 @@ describe('StablePathEdge', () => {
     expect(label.getAttribute('tabindex')).toBe('-1');
   });
 
+  it('anchors labels to the rendered path after layout changes', () => {
+    renderStablePathEdge({
+      label: 'Reflowed route',
+      sourceX: 0,
+      sourceY: 0,
+      targetX: 200,
+      targetY: 0,
+      data: {
+        computedPath: [{ x: 0, y: 0 }, { x: 200, y: 0 }],
+        labelPosition: { x: 100, y: 1800, adjusted: true },
+      },
+    });
+
+    const label = screen.getByText('Reflowed route');
+    expect(label.style.transform).toContain('translate(100px,21px)');
+    expect(label.style.transform).not.toContain('1800px');
+  });
+
   it('marks semantic main-route and selected labels for low-zoom restoration', () => {
     renderStablePathEdge({
       label: 'Main route',

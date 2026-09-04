@@ -1868,3 +1868,11 @@ Hook 现在只在开发态把 effect 清理登记为可撤销的微任务释放�
 完整布局策略分片 `25` 文件、`141` 项通过，覆盖物流、WMS Process、生产实测节点尺寸、四方向业务顺序、容器包含和最终 hard-clean 质量。全新 production build 又完成 WMS Demand Allocation 的 TB/BT/LR/RL 连续切换，以及 Logistics Architecture 的 TB/LR 跨图验证；所有结果均为语义通过、DOM 几何零偏差、障碍/最小净距/商业净距风险为零，最终渲染无 fallback。该实现遵循 [yFiles Tables and Swimlanes](https://docs.yworks.com/yfiles-html/dguide/layout-table_layout/) 与 [TableLayoutConfigurator compaction](https://docs.yworks.com/yfiles-html/api/TableLayoutConfigurator.html) 所体现的 grid、minimum size、padding/inset 和组级 compaction 模型：泳道共享结构尺寸，自动布局可以收缩空白但不能低于内容与最小空间。后续不以逐泳道独立压缩破坏等宽/等高原则。
 
 本批生产构建与 bundle 门禁通过，但总 JS 原始体积已恰好为 `9500.00KB`。该总量包含首屏、懒加载和 Worker 资源，不等同于用户首屏下载；继续为几十字节压缩业务实现不具工程价值。下一批单列 bundle 治理：按首屏、按需 chunk、Worker 和总体依赖分账，处理构建已报告的无效动态导入与真实重复依赖，释放可持续余量；不直接提高现有预算，也不让布局修复继续承担无关的代码高尔夫。
+
+## 50. 泳道重排后的边标签路径同步（2026-09-04）
+
+用户提供的 WMS Demand Allocation 截图显示多枚边标签散落在泳道大块空白中。production DOM 测量确认这不是单纯留白观感：例如 `基础数据` 的最终线段位于画布 `y=488–584`，标签仍停留在 `y=1876`；`修正需求 (Q*Rate)` 的线段位于 `y=872–968`，标签位于 `y=2388`。根因是路由管线在最终路径修复完成前按节点端点生成绝对 `labelPosition`，渲染器随后无条件用该旧坐标覆盖从最终 `computedPath` 算出的路径标签锚点。泳道压缩使这条历史缺陷变得显著，但它并不局限于某一张图或泳道布局。
+
+现在生产管线不再生成这份与最终路径生命周期不一致的绝对标签坐标；稳定路径渲染统一以最终授权路径计算标签位置，再使用既有节点/标签避障偏移。用户显式的 `labelOffset` 与 `absoluteLabelX/Y` 编辑语义保持不变。回归测试构造路径 `y=0`、陈旧标签 `y=1800` 的重排场景，锁定最终标签回到路径附近；同一 production build 的真实 WMS 页面复验中，上述五条代表边的标签均重新落在对应线段上。相关组件 `98` 文件/`623` 项、路由质量 `99` 文件/`679` 项以及类型、Lint、架构、安全、CI 收录、构建和 bundle 门禁通过。
+
+删除失效阶段后总 JS 为 `9498.88KB`，比前一批自然减少 `1.12KB`；这不是后续继续代码高尔夫的理由。远端和本地路由 smoke 对同一 enterprise 构建分别得到 `109/108` 与 `108/108` 个关键资源，波动项位于 ready 边界附近，说明需要把首屏闭包与 ready 后启动的 Worker/后台资源明确分账。与此同时，5 次独立 Logistics 冷路由为 route p95 `2246/1100ms`、Worker compute p95 `1897.6ms`，主要成本在质量修复和 finalizer，而非资源加载。下一主线按优先级处理冷路由跨阶段重复工作和首屏资源口径稳定性；不提高预算，3D 性能继续后置。

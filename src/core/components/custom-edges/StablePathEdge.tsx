@@ -43,7 +43,6 @@ import {
 interface StablePathEdgeData {
     computedPath?: unknown;
     _layoutEpoch?: unknown;
-    labelPosition?: unknown;
     labelOffset?: unknown;
     absoluteLabelX?: unknown;
     absoluteLabelY?: unknown;
@@ -281,12 +280,6 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
     const initialLabelPosition = getSmartLabelPosition([...(automaticLabelPath ?? renderPath)]);
     let labelX = initialLabelPosition.x;
     let labelY = initialLabelPosition.y;
-
-    const dataLabelPosition = readPoint(edgeData?.labelPosition);
-    if (dataLabelPosition && !sharedTrunkPlan?.hiddenRanges.length) {
-        labelX = dataLabelPosition.x;
-        labelY = dataLabelPosition.y;
-    }
 
     const labelOffset = readPoint(edgeData?.labelOffset);
     const hasManualLabelPosition = !!labelOffset
