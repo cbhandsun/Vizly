@@ -441,98 +441,66 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
     }
     return current;
   };
+  const runCommercialPhase = (
+    phase: 'final-commercial-clearance'
+      | 'final-commercial-terminal-preserving'
+      | 'final-commercial-source-stairs'
+      | 'final-commercial-terminal-changing',
+    candidateEdges: T,
+    repair: (current: T) => T,
+  ): T => {
+    const timer = startDisplayRoutingPhaseTrace({
+      phase,
+      candidateCount: candidateEdges.length,
+      onTrace: options.onPhaseTrace,
+    });
+    const repaired = repair(candidateEdges);
+    timer.finish(repaired === candidateEdges ? 'skip' : 'accepted');
+    return repaired;
+  };
+  const preserveOuterStairs = (candidateEdges: T): T => runCommercialPhase(
+    'final-commercial-terminal-preserving',
+    candidateEdges,
+    current => repairTerminalPreservingOuterStairs(current, nodes, options, evaluation),
+  );
+  const repairSourceStairs = (candidateEdges: T): T => runCommercialPhase(
+    'final-commercial-source-stairs',
+    candidateEdges,
+    current => repairSourceTerminalOuterStairs(current, nodes, options, evaluation),
+  );
+  const repairChangingStairs = (candidateEdges: T): T => runCommercialPhase(
+    'final-commercial-terminal-changing',
+    candidateEdges,
+    current => repairTerminalChangingOuterStairs(current, nodes, options, evaluation),
+  );
+  const repairCommercialClearance = (candidateEdges: T): T => runCommercialPhase(
+    'final-commercial-clearance',
+    candidateEdges,
+    repairClearanceToBoundedFixedPoint,
+  );
   if (options.skipLoopShortcut) {
-    const clearanceTimer = startDisplayRoutingPhaseTrace({
-      phase: 'final-commercial-clearance',
-      candidateCount: baseline.length,
-      onTrace: options.onPhaseTrace,
-    });
-    const clearanceCandidate = repairClearanceToBoundedFixedPoint(baseline);
-    clearanceTimer.finish(clearanceCandidate === baseline ? 'skip' : 'accepted');
-    const preservingTimer = startDisplayRoutingPhaseTrace({
-      phase: 'final-commercial-terminal-preserving',
-      candidateCount: baseline.length,
-      onTrace: options.onPhaseTrace,
-    });
-    const preservingCandidate = repairTerminalPreservingOuterStairs(
-      clearanceCandidate,
-      nodes,
-      options,
-      evaluation,
-    );
-    preservingTimer.finish(
-      preservingCandidate === clearanceCandidate ? 'skip' : 'accepted',
-    );
+    const preservingCandidate = preserveOuterStairs(repairCommercialClearance(baseline));
     // A preserving shortcut can expose a source corridor. Repair that source
     // before moving its target and thereby invalidating the newly viable route.
-    const sourceTimer = startDisplayRoutingPhaseTrace({
-      phase: 'final-commercial-source-stairs',
-      candidateCount: baseline.length,
-      onTrace: options.onPhaseTrace,
-    });
-    const sourceCandidate = repairSourceTerminalOuterStairs(
-      preservingCandidate,
-      nodes,
-      options,
-      evaluation,
-    );
-    sourceTimer.finish(sourceCandidate === preservingCandidate ? 'skip' : 'accepted');
-    const changingTimer = startDisplayRoutingPhaseTrace({
-      phase: 'final-commercial-terminal-changing',
-      candidateCount: baseline.length,
-      onTrace: options.onPhaseTrace,
-    });
-    const changingCandidate = repairTerminalChangingOuterStairs(
-      sourceCandidate,
-      nodes,
-      options,
-      evaluation,
-    );
-    changingTimer.finish(changingCandidate === sourceCandidate ? 'skip' : 'accepted');
-    return finish(changingCandidate);
+    return finish(repairChangingStairs(repairSourceStairs(preservingCandidate)));
   }
-  baseline = repairTerminalPreservingOuterStairs(
-    baseline,
-    nodes,
-    options,
-    evaluation,
-  );
+  baseline = preserveOuterStairs(baseline);
   const beforeSourceStairs = baseline;
   // Keep the same source-before-target order as the traced closure above.
-  baseline = repairSourceTerminalOuterStairs(
-    baseline,
-    nodes,
-    options,
-    evaluation,
-  );
+  baseline = repairSourceStairs(baseline);
   const sourceStairsChanged = baseline !== beforeSourceStairs;
-  baseline = repairTerminalChangingOuterStairs(
-    baseline,
-    nodes,
-    options,
-    evaluation,
-  );
+  baseline = repairChangingStairs(baseline);
   // A hard-defect source reroute can establish the first clean baseline. Give
   // the cheaper terminal-preserving/changing shortcuts one bounded pass over
   // that clean graph so unrelated outer rectangles are not stranded.
   if (sourceStairsChanged) {
-    baseline = repairTerminalPreservingOuterStairs(
-      baseline,
-      nodes,
-      options,
-      evaluation,
-    );
-    baseline = repairTerminalChangingOuterStairs(
-      baseline,
-      nodes,
-      options,
-      evaluation,
-    );
+    baseline = preserveOuterStairs(baseline);
+    baseline = repairChangingStairs(baseline);
   }
   // Clearance and detour shortening are independent soft-quality dimensions.
   // Establish the commercial node gap before ranking loop shortcuts so a
   // successful shortcut cannot make the clearance pass conditional.
-  baseline = repairClearanceToBoundedFixedPoint(baseline);
+  baseline = repairCommercialClearance(baseline);
   const clearanceRepairedEdgeIds = new Set(baseline.flatMap(edge => (
     edge.data?.displayNodeClearanceRepaired === true
       && (!options.eligibleEdgeIds || options.eligibleEdgeIds.has(edge.id))
@@ -540,11 +508,15 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
       : []
   )));
   if (clearanceRepairedEdgeIds.size > 0) {
-    baseline = repairTerminalPreservingOuterStairs(
+    baseline = runCommercialPhase(
+      'final-commercial-terminal-preserving',
       baseline,
-      nodes,
-      { ...options, eligibleEdgeIds: clearanceRepairedEdgeIds },
-      evaluation,
+      current => repairTerminalPreservingOuterStairs(
+        current,
+        nodes,
+        { ...options, eligibleEdgeIds: clearanceRepairedEdgeIds },
+        evaluation,
+      ),
     );
   }
 

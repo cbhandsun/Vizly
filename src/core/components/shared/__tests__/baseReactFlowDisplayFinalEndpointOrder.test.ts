@@ -164,6 +164,12 @@ describe('base React Flow final endpoint order transaction', () => {
     expect(
       (evaluationTrace?.evaluationCount ?? 0) + (evaluationTrace?.cacheHitCount ?? 0),
     ).toBeGreaterThan(0);
+    expect([...new Set(traces.map(trace => trace.phase))]).toEqual(expect.arrayContaining([
+      'final-commercial-clearance',
+      'final-commercial-terminal-preserving',
+      'final-commercial-source-stairs',
+      'final-commercial-terminal-changing',
+    ]));
   });
 
   it('does not certify an empty route as closure-ready', () => {
