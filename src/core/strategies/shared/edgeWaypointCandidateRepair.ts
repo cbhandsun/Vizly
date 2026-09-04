@@ -62,6 +62,7 @@ const SEVERE_DETOUR_RATIO = 2.5;
 const SOFT_DETOUR_RATIO = 1.8;
 const EXCESSIVE_BENDS = 6;
 const MAX_CLEARANCE_SEGMENT_MEMOS_PER_EDGE = 16;
+const MAX_CLEARANCE_TERMINAL_CONTEXTS = 512;
 const CONTAINER_NODE_TYPES = new Set([
   'titleGroup',
   'subGroup',
@@ -209,10 +210,8 @@ export function createNodeClearanceGraphEvaluationContext(
       string,
       ReturnType<typeof createRoutingWaypointSegmentMemo<SegmentClearanceScore>>
     >;
-    sourceId: string;
-    targetId: string;
   };
-  const memoByEdge = new WeakMap<Edge, EdgeClearanceMemoContext>();
+  const memoByTerminals = new Map<string, EdgeClearanceMemoContext>();
   const scoreSegments = (
     path: Point[],
     edge: Edge,
@@ -222,18 +221,15 @@ export function createNodeClearanceGraphEvaluationContext(
     let firstRisk = 0;
     let secondRisk = 0;
     let hardMinimumRisk = 0;
-    let memoContext = memoByEdge.get(edge);
-    if (
-      !memoContext
-      || memoContext.sourceId !== edge.source
-      || memoContext.targetId !== edge.target
-    ) {
+    const terminalKey = JSON.stringify([edge.source, edge.target]);
+    let memoContext = memoByTerminals.get(terminalKey);
+    if (!memoContext) {
       memoContext = {
         memoByClearance: new Map(),
-        sourceId: edge.source,
-        targetId: edge.target,
       };
-      memoByEdge.set(edge, memoContext);
+      if (memoByTerminals.size < MAX_CLEARANCE_TERMINAL_CONTEXTS) {
+        memoByTerminals.set(terminalKey, memoContext);
+      }
     }
     const { memoByClearance } = memoContext;
     const clearanceKey = `${firstRequiredClearance},${secondRequiredClearance}`;
