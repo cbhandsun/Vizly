@@ -585,6 +585,10 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
     const dualTarget = targetTrunks.find(trunk => trunk.edgeIds.includes(dualRoleEdgeIds[0] ?? ''));
     expect(dualRoleEdgeIds, diagnostics).not.toEqual([]);
     expect([dualSource, dualTarget].every(trunk => (trunk?.commonStemLength ?? 0) >= 48), diagnostics).toBe(true);
+    expect(response.phaseTrace?.filter(trace => (
+      trace.phase === 'final-safety-repair-order'
+      && trace.parentPhase === 'final-commercial-safety-closure'
+    )), diagnostics).toEqual([]);
     expect(
       response.phaseTrace?.find(trace => trace.phase === 'final-evaluation-context'),
       diagnostics,

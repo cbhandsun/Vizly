@@ -277,10 +277,17 @@ const finalizeContainerClearanceResponse = (
         ),
     },
   );
-  // Commercial shortening is soft quality. If it reopens a strict crossing
-  // after the atomic endpoint/trunk closure, retain the last hard-clean route
-  // instead of asking a later local repair to break that newly restored trunk.
-  const commercialEdges = finalHardQualityIsClean(commercialCandidate)
+  // Commercial shortening is soft quality. When the preceding atomic closure
+  // specifically repaired passage order, do not accept a shortening candidate
+  // that reopens that same structural contract. Other defect families retain
+  // the established repair path because their commercial candidate can be a
+  // necessary seed for the final safety closure.
+  const commercialCandidateIsStructurallyClosed = commercialClosureReady
+    && commercialEvaluationEdges === commercialCandidate;
+  const reopensClosedPassageOrder = safetyAudit.defect === 'passage-order'
+    && !commercialCandidateIsStructurallyClosed;
+  const commercialEdges = !reopensClosedPassageOrder
+    && finalHardQualityIsClean(commercialCandidate)
     ? commercialCandidate
     : latePolishBaseline;
   // Endpoint/trunk restoration and commercial detour shortening are allowed

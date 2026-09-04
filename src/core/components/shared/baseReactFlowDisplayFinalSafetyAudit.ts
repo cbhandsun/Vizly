@@ -15,6 +15,7 @@ import {
 
 export type BaseReactFlowFinalSafetyAudit = Readonly<{
   canSkip: boolean;
+  defect: 'none' | 'hard' | 'stubs' | 'endpoint-order' | 'passage-order';
   endpointDefectOnly: boolean;
 }>;
 
@@ -39,7 +40,9 @@ export const auditBaseReactFlowFinalSafetyClosure = (
       ? diffBaseReactFlowEvaluationMetrics(hardGateMetricsBefore, evaluation.readMetrics())
       : undefined,
   );
-  if (!report.hardClean) return { canSkip: false, endpointDefectOnly: false };
+  if (!report.hardClean) {
+    return { canSkip: false, defect: 'hard', endpointDefectOnly: false };
+  }
 
   const stubTimer = timer('final-safety-stubs');
   const stubMetricsBefore = evaluation?.readMetrics();
@@ -54,7 +57,9 @@ export const auditBaseReactFlowFinalSafetyClosure = (
     0,
     { ...stubMetrics, workItemCount: unsafeStubCount },
   );
-  if (!stubsClean) return { canSkip: false, endpointDefectOnly: false };
+  if (!stubsClean) {
+    return { canSkip: false, defect: 'stubs', endpointDefectOnly: false };
+  }
 
   const endpointTimer = timer('final-safety-endpoint-order');
   const endpointMetricsBefore = evaluation?.readMetrics();
@@ -72,7 +77,7 @@ export const auditBaseReactFlowFinalSafetyClosure = (
   );
   if (!endpointClean) {
     timer('final-safety-passage-order').finish('skip');
-    return { canSkip: false, endpointDefectOnly: true };
+    return { canSkip: false, defect: 'endpoint-order', endpointDefectOnly: true };
   }
 
   const passageTimer = timer('final-safety-passage-order');
@@ -88,5 +93,9 @@ export const auditBaseReactFlowFinalSafetyClosure = (
       ? diffBaseReactFlowEvaluationMetrics(passageMetricsBefore, evaluation.readMetrics())
       : undefined,
   );
-  return { canSkip: passageClean, endpointDefectOnly: false };
+  return {
+    canSkip: passageClean,
+    defect: passageClean ? 'none' : 'passage-order',
+    endpointDefectOnly: false,
+  };
 };

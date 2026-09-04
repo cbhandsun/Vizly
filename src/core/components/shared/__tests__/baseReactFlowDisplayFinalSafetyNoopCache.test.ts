@@ -124,7 +124,7 @@ describe('baseReactFlow final safety no-op cache', () => {
       baselineNodes,
       createBaseReactFlowFinalEndpointEvaluation(baselineNodes),
       trace => traces.push(trace),
-    )).toEqual({ canSkip: false, endpointDefectOnly: false });
+    )).toEqual({ canSkip: false, defect: 'stubs', endpointDefectOnly: false });
     expect(traces.find(trace => trace.phase === 'final-safety-stubs')).toMatchObject({
       candidateCount: 1,
       resolution: 'rejected',

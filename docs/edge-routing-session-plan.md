@@ -1876,3 +1876,11 @@ Hook 现在只在开发态把 effect 清理登记为可撤销的微任务释放�
 现在生产管线不再生成这份与最终路径生命周期不一致的绝对标签坐标；稳定路径渲染统一以最终授权路径计算标签位置，再使用既有节点/标签避障偏移。用户显式的 `labelOffset` 与 `absoluteLabelX/Y` 编辑语义保持不变。回归测试构造路径 `y=0`、陈旧标签 `y=1800` 的重排场景，锁定最终标签回到路径附近；同一 production build 的真实 WMS 页面复验中，上述五条代表边的标签均重新落在对应线段上。相关组件 `98` 文件/`623` 项、路由质量 `99` 文件/`679` 项以及类型、Lint、架构、安全、CI 收录、构建和 bundle 门禁通过。
 
 删除失效阶段后总 JS 为 `9498.88KB`，比前一批自然减少 `1.12KB`；这不是后续继续代码高尔夫的理由。远端和本地路由 smoke 对同一 enterprise 构建分别得到 `109/108` 与 `108/108` 个关键资源，波动项位于 ready 边界附近，说明需要把首屏闭包与 ready 后启动的 Worker/后台资源明确分账。与此同时，5 次独立 Logistics 冷路由为 route p95 `2246/1100ms`、Worker compute p95 `1897.6ms`，主要成本在质量修复和 finalizer，而非资源加载。下一主线按优先级处理冷路由跨阶段重复工作和首屏资源口径稳定性；不提高预算，3D 性能继续后置。
+
+## 51. 通道语义修复后的商业候选回退（2026-09-04）
+
+Logistics 的完整 trace 显示，第一次最终安全闭包已经把唯一的通道顺序缺陷修复为可提交几何，后续软性的 commercial detour 又产生未闭合候选，迫使 `final-commercial-safety-closure` 再执行一次完整端点顺序、共享干线、障碍和终端闭包。该第二轮约 `227–250ms`，最终并没有形成应当优先于前一份已闭合路径的语义收益。直接把所有未闭合 commercial 候选回退会使 Demand Allocation 的池汇聚由 2 折回退到 4 折，并改变 WMS 大图的必要修复种子；该过宽实验已撤回。
+
+最终实现把安全审计结果扩展为明确缺陷族：`hard`、`stubs`、`endpoint-order`、`passage-order` 或 `none`。只有前一阶段明确修复的是 `passage-order`，且 commercial 候选重新无法通过完整结构闭包时，才保留前一份已闭合路径；其他缺陷族继续走既有联动修复。该规则基于质量证据，不使用图、边、布局 ID 或规模阈值。Logistics 回归锁定最终商业阶段不再出现第二次 `final-safety-repair-order`，同时 WMS Process、Demand Allocation、物流增量、预编译幂等和 Worker 边界全部保持原合同。
+
+同一 production build 的代表 trace 中，finalizer 从上一批约 `943ms` 降到 `693–715ms`，最终商业安全闭包为直接命中，结构性减少约 `230–250ms`。5 个独立 Logistics 冷样本 route 中位 `1739ms`、p95 `2350/1100ms`，仍受前段 quality 搜索抖动影响，不能宣称总预算达标。路由影响门禁共 `127` 个文件、`1098` 项通过；生产构建、bundle `9499.01KB`、架构、类型、Lint、DOM sink、secrets 和 CI 收录门禁通过。4 个预编译目标已按新源码哈希重新生成。下一批优先收敛 `quality-crossing-sweeps` 中重复的 global refine / final candidates 工作，并独立修正首屏关键资产 `ready+50ms` 的边界口径与增量 Worker delivery 尾部；不提高现有预算，3D 性能继续后置。
