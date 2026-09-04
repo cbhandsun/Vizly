@@ -3,9 +3,7 @@ import type { Node } from '@xyflow/react';
 import { computeBaseDisplayInputSignature } from './baseReactFlowDisplayEdgeCore';
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
 import {
-  createBaseReactFlowDisplayExactReport,
   finalizeBaseReactFlowDisplayEdgesWithReport,
-  type BaseReactFlowDisplayExactReport,
 } from './baseReactFlowDisplayFinalizer';
 import { closeBaseReactFlowFinalDisplayRoute } from './baseReactFlowDisplayFinalRouteClosure';
 import { closeBaseReactFlowDisplayWorkerEndpointContract } from './baseReactFlowDisplayWorkerEndpointClosure';
@@ -70,7 +68,6 @@ export const runBaseReactFlowDisplayWorkerFullRoute = ({
     evaluation: fullRouteEvaluation,
     hardQualityIsClean: edges => fullRouteEvaluation.hardReport(edges).hardClean,
   };
-  let fullRouteExactReport: BaseReactFlowDisplayExactReport | undefined;
   const fullRouteEdges = createBaseReactFlowFullRouteEdges({
     ...commonInput,
     forceFullQuality: request.qualityMode === 'full' || escalatedFromInteractive,
@@ -78,24 +75,13 @@ export const runBaseReactFlowDisplayWorkerFullRoute = ({
     onPhaseTrace,
     evaluationSession: fullRouteEvaluation,
     createPreDisplayFinalEdges: (preDisplayArgs) => {
-      let boundedReport: BaseDisplayBoundedCandidateReport | undefined;
-      const boundedEdges = createBaseReactFlowPreDisplayFinalEdges({
+      return createBaseReactFlowPreDisplayFinalEdges({
         ...preDisplayArgs,
         onBoundedCandidate: (report) => {
-          boundedReport = report;
           preDisplayArgs.onBoundedCandidate?.(report);
           onBoundedCandidate?.(report);
         },
       });
-      if (boundedReport) {
-        fullRouteExactReport = createBaseReactFlowDisplayExactReport(
-          boundedEdges,
-          request.nodes,
-          repairNodes,
-          boundedReport,
-        );
-      }
-      return boundedEdges;
     },
   });
   const exactReport = fullRouteSession.exactReport(fullRouteEdges);
@@ -118,7 +104,7 @@ export const runBaseReactFlowDisplayWorkerFullRoute = ({
       routedEdges: closureSeed,
       repairNodes,
       inputSignature,
-      exactReport: closureSeed === fullRouteEdges ? fullRouteExactReport : undefined,
+      exactReport: closureSeed === fullRouteEdges ? exactReport : undefined,
     });
     const endpointClosedEdges = closeBaseReactFlowDisplayWorkerEndpointContract(
       closedEdges,

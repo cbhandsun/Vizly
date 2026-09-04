@@ -88,7 +88,7 @@ export const createBaseReactFlowDisplayExactReport = (
     : undefined;
 };
 
-const resolveTrustedInitialEvaluation = (
+export const resolveBaseReactFlowDisplayExactReport = (
   edges: Edge[],
   nodes: Node[],
   exactReport?: BaseReactFlowDisplayExactReport,
@@ -114,7 +114,7 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
   allowCompoundMeasuredResidualClosure = true,
   evaluation?: BaseReactFlowFinalEndpointEvaluation,
 ): BaseReactFlowDisplayFinalizerOutcome<T> => {
-  const trustedEvaluation = resolveTrustedInitialEvaluation(
+  const trustedEvaluation = resolveBaseReactFlowDisplayExactReport(
     fullRouteEdges,
     nodes,
     exactReport,

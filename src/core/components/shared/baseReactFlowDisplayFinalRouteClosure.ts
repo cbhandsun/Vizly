@@ -24,6 +24,7 @@ import { closeBaseReactFlowDisplayFinalHardContract } from './baseReactFlowDispl
 import { repairBaseReactFlowFinalSafetyClosure } from './baseReactFlowDisplayFinalSafetyClosure';
 import {
   finalizeBaseReactFlowDisplayEdges,
+  resolveBaseReactFlowDisplayExactReport,
   type BaseReactFlowDisplayExactReport,
 } from './baseReactFlowDisplayFinalizer';
 import { repairCrossedSpineWithOuterSkirt } from './baseReactFlowDisplayCrossedSpineSkirtRepair';
@@ -61,8 +62,20 @@ export const closeBaseReactFlowFinalDisplayRoute = ({
     onTrace: args.onPhaseTrace,
   });
   const finalizerMetricsBefore = evaluationSession.readMetrics();
-  const preFinalizerEdges = repairCrossedSpineWithOuterSkirt(routedEdges, repairNodes);
-  const preFinalizerReport = evaluationSession.hardReport(preFinalizerEdges);
+  const trustedExactReport = resolveBaseReactFlowDisplayExactReport(
+    routedEdges,
+    args.nodes,
+    exactReport,
+  );
+  const exactReportMatchesRepairGeometry = trustedExactReport?.repairNodes === repairNodes;
+  const canReuseCrossedSpineEvaluation = exactReportMatchesRepairGeometry
+    && trustedExactReport.report.quality.strictCrossings === 0;
+  const preFinalizerEdges = canReuseCrossedSpineEvaluation
+    ? routedEdges
+    : repairCrossedSpineWithOuterSkirt(routedEdges, repairNodes);
+  const preFinalizerReport = canReuseCrossedSpineEvaluation
+    ? trustedExactReport.report
+    : evaluationSession.hardReport(preFinalizerEdges);
   const canReusePreFinalizer = preFinalizerReport.hardClean
     && countRenderUnsafeEndpointStubs(preFinalizerEdges) === 0;
   const finalizedEdges = isBaseDisplayFinalized(preFinalizerEdges, inputSignature)

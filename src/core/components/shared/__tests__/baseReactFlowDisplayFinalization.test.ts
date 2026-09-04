@@ -11,7 +11,10 @@ import { computeBaseReactFlowDisplayEdgesWorkerResponse } from '../baseReactFlow
 import * as endpointStubRepair from '../baseReactFlowDisplayEndpointStubRepair';
 import { createBaseReactFlowFinalEndpointEvaluation } from '../baseReactFlowDisplayFinalEndpointEvaluation';
 import * as displayFinalizer from '../baseReactFlowDisplayFinalizer';
-import { createBaseReactFlowDisplayExactReport } from '../baseReactFlowDisplayFinalizer';
+import {
+  createBaseReactFlowDisplayExactReport,
+  resolveBaseReactFlowDisplayExactReport,
+} from '../baseReactFlowDisplayFinalizer';
 import * as fullRoutePipeline from '../baseReactFlowDisplayFullRoutePipeline';
 import * as measuredDisplayRepair from '../baseReactFlowDisplayMeasuredRepair';
 import { getDisplayHardQualityGateReport } from '../baseReactFlowDisplayQualityGates';
@@ -53,6 +56,36 @@ afterEach(() => {
 });
 
 describe('baseReactFlowDisplay finalization boundaries', () => {
+  it('reuses an exact report only for its signed route and node snapshot', () => {
+    const repairNodes = withDisplayAbsolutePositions(
+      routeNodes,
+      new Map(routeNodes.map(node => [node.id, node] as const)),
+    );
+    const exactReport = createBaseReactFlowDisplayExactReport(
+      cleanEdges,
+      routeNodes,
+      repairNodes,
+      getDisplayHardQualityGateReport(cleanEdges, repairNodes, 'polished'),
+    );
+    expect(exactReport).toBeDefined();
+
+    expect(resolveBaseReactFlowDisplayExactReport(
+      cleanEdges,
+      routeNodes,
+      exactReport,
+    )).toBe(exactReport);
+    expect(resolveBaseReactFlowDisplayExactReport(
+      dirtyEdges,
+      routeNodes,
+      exactReport,
+    )).toBeUndefined();
+    expect(resolveBaseReactFlowDisplayExactReport(
+      cleanEdges,
+      [...routeNodes],
+      exactReport,
+    )).toBeUndefined();
+  });
+
   it('reuses the request evaluation session for repeated render-safe stub finalization', () => {
     const edges: Edge[] = [{
       ...cleanEdges[0],
