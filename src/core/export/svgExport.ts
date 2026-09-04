@@ -1,4 +1,4 @@
-import type { DiagramRenderScene, RenderEdgeGeometry, RenderEdgeMarker, RenderNodeGeometry } from '../rendering/types';
+import type { DiagramRenderScene, RenderEdgeGeometry, RenderEdgeMarker, RenderLinearGradient, RenderNodeGeometry } from '../rendering/types';
 import { resolveEdgeContrastPaint } from '../rendering/edgeContrastPaint';
 import { getSvgMarkerId } from '../rendering/svgMarkerIds';
 import { isSafeSvgPathData } from './svgPathSafety';
@@ -53,6 +53,34 @@ const collectMarkers = (scene: DiagramRenderScene): RenderEdgeMarker[] => {
   });
   return [...map.values()];
 };
+
+const stableIdHash = (value: string): string => {
+  let hash = 2_166_136_261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16_777_619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+};
+
+const gradientId = (namespace: string, nodeId: string, role: 'fill' | 'header'): string => (
+  `vizly-gradient-${stableIdHash(`${namespace}:${nodeId}:${role}`)}`
+);
+
+const linearGradientDef = (id: string, gradient: RenderLinearGradient): string => {
+  const stops = gradient.map((color, index) => (
+    `<stop${attr('offset', `${[0, 60, 100][index]}%`)}${attr('stop-color', color)}/>`
+  )).join('');
+  return `<linearGradient${attr('id', id)} x1="0.5" y1="0" x2="0.5" y2="1">${stops}</linearGradient>`;
+};
+
+const collectGradientDefs = (scene: DiagramRenderScene, namespace: string): string[] => (
+  scene.nodes.flatMap(node => [
+    node.container?.headerGradient
+      ? linearGradientDef(gradientId(namespace, node.id, 'header'), node.container.headerGradient)
+      : '',
+  ].filter(Boolean))
+);
 
 const markerShape = (
   marker: RenderEdgeMarker,
@@ -267,19 +295,19 @@ const nodeMetadataToSvg = (node: RenderNodeGeometry): string => {
   return `${icon}${statusDot}`;
 };
 
-const databaseNodeToSvg = (node: RenderNodeGeometry, strokeDash: string): string => {
+const databaseNodeToSvg = (node: RenderNodeGeometry, strokeDash: string, fill: string): string => {
   const capHeight = clamp(Math.round(node.height * 0.16), 10, 24);
   const topY = node.y + capHeight / 2;
   const bottomY = node.y + node.height - capHeight / 2;
   const strokeWidth = node.strokeWidth ?? 1.2;
   return [
-    `<path${attr('d', `M ${node.x} ${topY} C ${node.x} ${node.y - capHeight / 2} ${node.x + node.width} ${node.y - capHeight / 2} ${node.x + node.width} ${topY} V ${bottomY} C ${node.x + node.width} ${node.y + node.height + capHeight / 2} ${node.x} ${node.y + node.height + capHeight / 2} ${node.x} ${bottomY} Z`)}${attr('fill', node.fill)}${attr('stroke', node.stroke)}${attr('stroke-width', strokeWidth)}${strokeDash}/>`,
-    `<ellipse${attr('cx', node.x + node.width / 2)}${attr('cy', topY)}${attr('rx', node.width / 2)}${attr('ry', capHeight / 2)}${attr('fill', node.fill)}${attr('stroke', node.stroke)}${attr('stroke-width', strokeWidth)}${strokeDash}/>`,
+    `<path${attr('d', `M ${node.x} ${topY} C ${node.x} ${node.y - capHeight / 2} ${node.x + node.width} ${node.y - capHeight / 2} ${node.x + node.width} ${topY} V ${bottomY} C ${node.x + node.width} ${node.y + node.height + capHeight / 2} ${node.x} ${node.y + node.height + capHeight / 2} ${node.x} ${bottomY} Z`)}${attr('fill', fill)}${attr('stroke', node.stroke)}${attr('stroke-width', strokeWidth)}${strokeDash}/>`,
+    `<ellipse${attr('cx', node.x + node.width / 2)}${attr('cy', topY)}${attr('rx', node.width / 2)}${attr('ry', capHeight / 2)}${attr('fill', fill)}${attr('stroke', node.stroke)}${attr('stroke-width', strokeWidth)}${strokeDash}/>`,
     `<path${attr('d', `M ${node.x} ${bottomY} C ${node.x} ${node.y + node.height + capHeight / 2} ${node.x + node.width} ${node.y + node.height + capHeight / 2} ${node.x + node.width} ${bottomY}`)} fill="none"${attr('stroke', node.stroke)}${attr('stroke-width', strokeWidth)} opacity="0.72"${strokeDash}/>`,
   ].join('');
 };
 
-const tableNodeToSvg = (node: RenderNodeGeometry, strokeDash: string): string => {
+const tableNodeToSvg = (node: RenderNodeGeometry, strokeDash: string, fill: string): string => {
   const headerHeight = clamp(Math.round(node.height * 0.22), 28, 38);
   const rowHeight = 18;
   const visibleSlots = Math.max(1, Math.floor((node.height - headerHeight - 8) / rowHeight));
@@ -291,7 +319,7 @@ const tableNodeToSvg = (node: RenderNodeGeometry, strokeDash: string): string =>
   const nameX = node.x + 38;
   const typeX = node.x + Math.max(104, node.width * 0.62);
   const header = [
-    `<rect${attr('x', node.x)}${attr('y', node.y)}${attr('width', node.width)}${attr('height', node.height)} rx="6"${attr('fill', node.fill)}${attr('stroke', node.stroke)}${attr('stroke-width', node.strokeWidth ?? 1.2)}${strokeDash}/>`,
+    `<rect${attr('x', node.x)}${attr('y', node.y)}${attr('width', node.width)}${attr('height', node.height)} rx="6"${attr('fill', fill)}${attr('stroke', node.stroke)}${attr('stroke-width', node.strokeWidth ?? 1.2)}${strokeDash}/>`,
     `<path${attr('d', `M ${node.x} ${node.y + 6} Q ${node.x} ${node.y} ${node.x + 6} ${node.y} H ${node.x + node.width - 6} Q ${node.x + node.width} ${node.y} ${node.x + node.width} ${node.y + 6} V ${node.y + headerHeight} H ${node.x} Z`)}${attr('fill', node.stroke)}/>`,
     `<text${attr('x', node.x + 12)}${attr('y', node.y + headerHeight / 2)} text-anchor="start" dominant-baseline="central" font-family="Inter, Arial, sans-serif" font-size="12" font-weight="700" fill="#ffffff">${escapeXml(truncateText(node.label, 28))}</text>`,
   ].join('');
@@ -312,11 +340,13 @@ const tableNodeToSvg = (node: RenderNodeGeometry, strokeDash: string): string =>
   return `${header}${rows}${more}`;
 };
 
-const containerNodeChromeToSvg = (node: RenderNodeGeometry): string => {
+const containerNodeChromeToSvg = (node: RenderNodeGeometry, namespace: string): string => {
   if (!node.container) return '';
   const headerHeight = node.container.headerHeight
     ?? (node.container.isLane ? 30 : node.container.isSwimlane ? 40 : 34);
-  const headerFill = node.container.headerColor || (node.container.isSwimlane ? node.stroke : '#f8fafc');
+  const headerFill = node.container.headerGradient
+    ? `url(#${gradientId(namespace, node.id, 'header')})`
+    : node.container.headerColor || (node.container.isSwimlane ? node.stroke : '#f8fafc');
   const titleFill = node.container.headerTextColor
     || (node.container.isSwimlane ? '#ffffff' : node.textColor);
   const headerOpacity = node.container.headerOpacity
@@ -365,7 +395,7 @@ const swimlaneDividersToSvg = (node: RenderNodeGeometry): string => {
   return lines.join('');
 };
 
-const nodeToSvg = (node: RenderNodeGeometry): string => {
+const nodeToSvg = (node: RenderNodeGeometry, namespace: string): string => {
   const rx = Math.min(node.borderRadius, node.width / 2, node.height / 2);
   const horizontalPadding = clamp(Math.round(node.width * 0.08), 10, 24);
   const maxChars = Math.max(6, Math.floor((node.width - horizontalPadding * 2) / Math.max(6, node.fontSize * 0.58)));
@@ -383,17 +413,18 @@ const nodeToSvg = (node: RenderNodeGeometry): string => {
     : `${textLinesToSvg(lines, node.x + node.width / 2, titleCenterY, node.fontSize, node.textColor, node.fontWeight)}${textLinesToSvg(subtitleLines, node.x + node.width / 2, titleCenterY + Math.max(18, node.fontSize + 8), Math.max(10, node.fontSize - 2), '#64748b')}`;
   const strokeDash = node.strokeDasharray ? attr('stroke-dasharray', node.strokeDasharray) : '';
   const strokeWidth = node.strokeWidth ?? 1.2;
+  const fill = node.fill;
   const shape = node.shape === 'ellipse'
-    ? `<ellipse${attr('cx', node.x + node.width / 2)}${attr('cy', node.y + node.height / 2)}${attr('rx', node.width / 2)}${attr('ry', node.height / 2)}${attr('fill', node.fill)}${attr('stroke', node.stroke)}${attr('stroke-width', strokeWidth)}${strokeDash}/>`
+    ? `<ellipse${attr('cx', node.x + node.width / 2)}${attr('cy', node.y + node.height / 2)}${attr('rx', node.width / 2)}${attr('ry', node.height / 2)}${attr('fill', fill)}${attr('stroke', node.stroke)}${attr('stroke-width', strokeWidth)}${strokeDash}/>`
     : node.shape === 'diamond'
-      ? `<polygon${attr('points', `${node.x + node.width / 2},${node.y} ${node.x + node.width},${node.y + node.height / 2} ${node.x + node.width / 2},${node.y + node.height} ${node.x},${node.y + node.height / 2}`)}${attr('fill', node.fill)}${attr('stroke', node.stroke)}${attr('stroke-width', strokeWidth)}${strokeDash}/>`
+      ? `<polygon${attr('points', `${node.x + node.width / 2},${node.y} ${node.x + node.width},${node.y + node.height / 2} ${node.x + node.width / 2},${node.y + node.height} ${node.x},${node.y + node.height / 2}`)}${attr('fill', fill)}${attr('stroke', node.stroke)}${attr('stroke-width', strokeWidth)}${strokeDash}/>`
       : node.shape === 'database'
-        ? node.tableColumns?.length ? tableNodeToSvg(node, strokeDash) : databaseNodeToSvg(node, strokeDash)
+        ? node.tableColumns?.length ? tableNodeToSvg(node, strokeDash, fill) : databaseNodeToSvg(node, strokeDash, fill)
       : node.shape === 'note'
-        ? `<path${attr('d', `M ${node.x} ${node.y} H ${node.x + node.width - 16} L ${node.x + node.width} ${node.y + 16} V ${node.y + node.height} H ${node.x} Z`)}${attr('fill', node.fill)}${attr('stroke', node.stroke)}${attr('stroke-width', strokeWidth)}${strokeDash}/><path${attr('d', `M ${node.x + node.width - 16} ${node.y} V ${node.y + 16} H ${node.x + node.width} Z`)} fill="#ffffff"${attr('stroke', node.stroke)}${attr('stroke-width', strokeWidth)}/>`
-        : `<rect${attr('x', node.x)}${attr('y', node.y)}${attr('width', node.width)}${attr('height', node.height)}${attr('rx', rx)}${attr('fill', node.fill)}${attr('stroke', node.stroke)}${attr('stroke-width', strokeWidth)}${strokeDash}/>`;
+        ? `<path${attr('d', `M ${node.x} ${node.y} H ${node.x + node.width - 16} L ${node.x + node.width} ${node.y + 16} V ${node.y + node.height} H ${node.x} Z`)}${attr('fill', fill)}${attr('stroke', node.stroke)}${attr('stroke-width', strokeWidth)}${strokeDash}/><path${attr('d', `M ${node.x + node.width - 16} ${node.y} V ${node.y + 16} H ${node.x + node.width} Z`)} fill="#ffffff"${attr('stroke', node.stroke)}${attr('stroke-width', strokeWidth)}/>`
+        : `<rect${attr('x', node.x)}${attr('y', node.y)}${attr('width', node.width)}${attr('height', node.height)}${attr('rx', rx)}${attr('fill', fill)}${attr('stroke', node.stroke)}${attr('stroke-width', strokeWidth)}${strokeDash}/>`;
   const groupHeader = node.shape === 'group'
-    ? `${containerNodeChromeToSvg(node)}${swimlaneDividersToSvg(node)}`
+    ? `${containerNodeChromeToSvg(node, namespace)}${swimlaneDividersToSvg(node)}`
     : '';
   const contentText = node.tableColumns?.length || node.container ? '' : text;
   return `<g${attr('data-node-id', node.id)}${node.type ? attr('data-node-type', node.type) : ''}>${shape}${nodeAccentToSvg(node)}${groupHeader}${nodeMetadataToSvg(node)}${contentText}</g>`;
@@ -429,15 +460,16 @@ export const exportRenderSceneToSvg = (scene: DiagramRenderScene, options: SvgEx
     ? '#ffffff'
     : scene.theme.background;
   const markers = collectMarkers(scene);
-  const defs = markers.length
-    ? `<defs>${markers.map(marker => markerDef(namespace, marker, contrastCanvasBackground)).join('')}</defs>`
+  const gradientDefs = collectGradientDefs(scene, namespace);
+  const defs = markers.length || gradientDefs.length
+    ? `<defs>${markers.map(marker => markerDef(namespace, marker, contrastCanvasBackground)).join('')}${gradientDefs.join('')}</defs>`
     : '';
   const title = options.title ? `<title>${escapeXml(options.title)}</title>` : '';
   const background = options.includeBackground === false
     ? ''
     : `<rect${attr('x', scene.bounds.minX)}${attr('y', scene.bounds.minY)}${attr('width', scene.bounds.width)}${attr('height', scene.bounds.height)}${attr('fill', scene.theme.background)}/>`;
-  const containerNodes = scene.nodes.filter(isContainerNode).map(nodeToSvg).join('');
-  const foregroundNodes = scene.nodes.filter(node => !isContainerNode(node)).map(nodeToSvg).join('');
+  const containerNodes = scene.nodes.filter(isContainerNode).map(node => nodeToSvg(node, namespace)).join('');
+  const foregroundNodes = scene.nodes.filter(node => !isContainerNode(node)).map(node => nodeToSvg(node, namespace)).join('');
   const edges = scene.edges.map(edge => edgeToSvg(edge, namespace, contrastCanvasBackground)).join('');
   const svg = [
     '<?xml version="1.0" encoding="UTF-8"?>',

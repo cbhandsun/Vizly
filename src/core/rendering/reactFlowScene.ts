@@ -17,6 +17,7 @@ import {
 import { normalizeSvgFontWeight, normalizeSvgPaint, normalizeSvgStrokeDasharray } from './styleTokens';
 import type { DiagramRenderScene, RenderBounds, RenderEdgeGeometry, RenderNodeGeometry, RenderPoint } from './types';
 import { resolveAbsoluteRenderNodePositions } from './reactFlowNodePosition';
+import { normalizeRenderLinearGradient } from './renderLinearGradient';
 
 const MAX_LABEL_CHARS = 240;
 const MAX_TABLE_COLUMNS = 24;
@@ -233,6 +234,7 @@ const normalizeContainerMetadata = (
       exportStyle.headerFill ?? data?.themeColor ?? dataStyle?.backgroundColor ?? dataStyle?.borderColor,
       '',
     ),
+    headerGradient: normalizeRenderLinearGradient(exportStyle.headerGradient),
     headerTextColor: normalizeSvgPaint(exportStyle.headerTextColor, ''),
     headerHeight: coerceRenderNumber(exportStyle.headerHeight, isLane ? 30 : isSwimlane ? 40 : 34, 1, 200),
     headerOpacity: coerceRenderNumber(exportStyle.headerOpacity, isSwimlane ? 0.95 : 0.72, 0, 1),

@@ -4,6 +4,54 @@ import { describe, expect, it } from 'vitest';
 import type { Node } from '@xyflow/react';
 
 import { enrichSnapshotWithRenderedNodeStyles } from '../reactFlowDomSnapshotStyles';
+import {
+  normalizeRenderLinearGradient,
+  parseRenderedLinearGradient,
+} from '../renderLinearGradient';
+
+describe('parseRenderedLinearGradient', () => {
+  it('captures a bounded computed CSS gradient behind another background layer', () => {
+    expect(parseRenderedLinearGradient(
+      'url("data:image/svg+xml,noise"), linear-gradient(color(srgb 0.618824 0.696471 0.767059) 0%, rgb(147, 169, 189) 60%, color(srgb 0.530353 0.609726 0.681882) 100%)',
+    )).toEqual([
+      'rgb(158, 178, 196)',
+      'rgb(147, 169, 189)',
+      'rgb(135, 155, 174)',
+    ]);
+  });
+
+  it('normalizes a computed vertical three-stop title gradient', () => {
+    expect(parseRenderedLinearGradient('linear-gradient(#123456 0%, #456789 60%, rgba(1, 2, 3, 0.4) 100%)')).toEqual([
+      '#123456',
+      '#456789',
+      'rgba(1, 2, 3, 0.4)',
+    ]);
+  });
+
+  it.each([
+    undefined,
+    '',
+    'repeating-linear-gradient(red 0%, blue 100%)',
+    'linear-gradient(red)',
+    'linear-gradient(color(srgb 2 0 0) 0%, green 60%, blue 100%)',
+    'linear-gradient(red 0%, green, blue 100%)',
+    'linear-gradient(red 80%, blue 20%)',
+    'linear-gradient(red, blue, green, white, black)',
+    `linear-gradient(red, blue)${' '.repeat(4_100)}`,
+    'url(javascript:alert(1))',
+  ])('rejects empty, unsupported, malformed, extreme, or unsafe input %#', value => {
+    expect(parseRenderedLinearGradient(value)).toBeUndefined();
+  });
+
+  it('rejects forged scene gradient objects at the model boundary', () => {
+    expect(normalizeRenderLinearGradient([
+      '#fff',
+      '#eee',
+      'url(javascript:alert(1))',
+    ])).toBeUndefined();
+    expect(normalizeRenderLinearGradient([])).toBeUndefined();
+  });
+});
 
 describe('enrichSnapshotWithRenderedNodeStyles', () => {
   it('captures bounded rendered custom-node styles without mutating the source snapshot', () => {
@@ -64,7 +112,7 @@ describe('enrichSnapshotWithRenderedNodeStyles', () => {
     document.body.innerHTML = `
       <div data-vizly-export-node-id="domain" style="border:0.56px solid rgb(133,164,192);border-radius:6px">
         <div data-vizly-export-node-header="true" data-vizly-export-node-content="true"
-          style="height:50px;background:linear-gradient(rgb(158,178,196),rgb(147,169,189));color:rgb(31,41,55);font-size:16px;font-weight:700;text-transform:uppercase"></div>
+          style="height:50px;background:linear-gradient(rgb(158,178,196) 0%,rgb(147,169,189) 60%,rgb(135,155,174) 100%);color:rgb(31,41,55);font-size:16px;font-weight:700;text-transform:uppercase"></div>
         <div data-vizly-export-node-body="true" style="background-color:rgb(255,255,255)"></div>
       </div>`;
     const result = enrichSnapshotWithRenderedNodeStyles({
@@ -78,6 +126,11 @@ describe('enrichSnapshotWithRenderedNodeStyles', () => {
       strokeWidth: 1,
       strokeDasharray: '',
       headerFill: 'rgb(158, 178, 196)',
+      headerGradient: [
+        'rgb(158, 178, 196)',
+        'rgb(147, 169, 189)',
+        'rgb(135, 155, 174)',
+      ],
       headerTextColor: 'rgb(31, 41, 55)',
       headerHeight: 50,
       headerOpacity: 1,

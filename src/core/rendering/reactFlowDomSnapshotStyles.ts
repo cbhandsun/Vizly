@@ -1,6 +1,7 @@
 import type { Node } from '@xyflow/react';
 
 import type { ReactFlowRenderSnapshot } from './reactFlowScene';
+import { parseRenderedLinearGradient } from './renderLinearGradient';
 
 const EXPORT_STYLE_KEY = '__vizlyExportStyle';
 const MAX_FONT_FAMILY_CHARS = 200;
@@ -68,6 +69,9 @@ const captureSurfaceStyle = (surface: HTMLElement): Record<string, unknown> => {
     paddingTop: finiteCssPixel(surfaceStyle.paddingTop),
     headerFill: headerStyle
       ? firstComputedPaint(headerStyle) || firstComputedPaint(bodyStyle) || firstComputedPaint(surfaceStyle)
+      : undefined,
+    headerGradient: headerStyle
+      ? parseRenderedLinearGradient(headerStyle.backgroundImage)
       : undefined,
     headerTextColor: headerStyle?.color,
     headerHeight: headerStyle ? finiteCssPixel(headerStyle.height) : undefined,

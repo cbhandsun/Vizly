@@ -73,6 +73,7 @@ export interface RenderNodeContainerMetadata {
   laneCount: number;
   laneDirection: 'horizontal' | 'vertical';
   headerColor?: string;
+  headerGradient?: RenderLinearGradient;
   headerTextColor?: string;
   headerHeight?: number;
   headerOpacity?: number;
@@ -80,6 +81,8 @@ export interface RenderNodeContainerMetadata {
   headerFontWeight?: number;
   headerTextTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
 }
+
+export type RenderLinearGradient = [string, string, string];
 
 export interface RenderEdgeMarker {
   kind: 'arrow' | 'openArrow' | 'diamond' | 'circle' | 'none';

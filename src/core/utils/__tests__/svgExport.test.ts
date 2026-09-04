@@ -602,6 +602,11 @@ describe('svgExport', () => {
           strokeDasharray: '',
           textColor: 'rgb(31, 41, 55)',
           headerFill: 'rgb(147, 169, 189)',
+          headerGradient: [
+            'rgb(158, 178, 196)',
+            'rgb(147, 169, 189)',
+            'rgb(135, 155, 174)',
+          ],
           headerTextColor: 'rgb(31, 41, 55)',
           headerHeight: 50,
           headerOpacity: 1,
@@ -614,7 +619,11 @@ describe('svgExport', () => {
     const svg = exportRenderSceneToSvg(scene);
 
     expect(svg).toContain('<rect x="0" y="0" width="280" height="180" rx="10" fill="rgb(255, 255, 255)" stroke="rgb(133, 164, 192)" stroke-width="1"/>');
-    expect(svg).toContain('<rect x="0" y="0" width="280" height="50" fill="rgb(147, 169, 189)" opacity="1"/>');
+    expect(svg).toContain('<linearGradient id="vizly-gradient-');
+    expect(svg).toContain('x1="0.5" y1="0" x2="0.5" y2="1"');
+    expect(svg).toContain('<stop offset="0%" stop-color="rgb(158, 178, 196)"/>');
+    expect(svg).toContain('<stop offset="60%" stop-color="rgb(147, 169, 189)"/>');
+    expect(svg).toMatch(/<rect x="0" y="0" width="280" height="50" fill="url\(#vizly-gradient-[0-9a-f]{8}\)" opacity="1"\/>/u);
     expect(svg).toContain('y="25" text-anchor="start"');
     expect(svg).toContain('font-size="16" font-weight="700" fill="rgb(31, 41, 55)">DOMAIN</text>');
   });

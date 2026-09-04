@@ -130,6 +130,24 @@ describe('exportRenderSceneToPdfBlob', () => {
     })));
 
     const nodes: Node[] = [
+      {
+        id: 'domain',
+        type: 'titleGroup',
+        position: { x: -40, y: -40 },
+        measured: { width: 480, height: 160 },
+        data: {
+          label: 'LOGISTICS',
+          __vizlyExportStyle: {
+            fill: '#ffffff',
+            headerFill: 'rgb(147, 169, 189)',
+            headerGradient: [
+              'rgb(158, 178, 196)',
+              'rgb(147, 169, 189)',
+              'rgb(135, 155, 174)',
+            ],
+          },
+        },
+      },
       { id: 'source', position: { x: 0, y: 0 }, measured: { width: 140, height: 72 }, data: { label: '订单中心' } },
       { id: 'target', position: { x: 260, y: 0 }, measured: { width: 140, height: 72 }, data: { label: '仓储管理' } },
     ];
@@ -185,5 +203,6 @@ describe('exportRenderSceneToPdfBlob', () => {
     expect(pdfSource.match(/\/Type\s*\/Font\b/g)?.length).toBeGreaterThan(0);
     expect(pdfSource.match(/\/FontFile(?:2|3)?\b/g)?.length).toBeGreaterThan(0);
     expect(pdfSource.match(/\/Subtype\s*\/Image\b/g)).toBeNull();
+    expect(pdfSource.match(/\/ShadingType\s+2\b/g)?.length).toBeGreaterThan(0);
   });
 });
