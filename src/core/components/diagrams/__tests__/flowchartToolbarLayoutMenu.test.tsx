@@ -10,6 +10,7 @@ import {
   createCustomDomainLayoutCommand,
   isGlobalFullGraphLayoutStrategy,
   resolveCustomDomainLayoutDirection,
+  resolveDomainLaneSpacing,
   resolveDomainLayoutRoutingQuality,
   resolveLayoutDomainOrder,
   shouldPromoteDomainDagreRouteCandidate,
@@ -83,6 +84,10 @@ describe('flowchartToolbarLayoutMenu', () => {
       .toEqual(['scan-a', 'scan-b']);
     expect(resolveDomainLayoutRoutingQuality('domain-lanes')).toBe('interactive');
     expect(resolveDomainLayoutRoutingQuality('domain-dagre')).toBeUndefined();
+    expect(resolveDomainLaneSpacing('TB')).toEqual({ horizontal: 120, vertical: 50 });
+    expect(resolveDomainLaneSpacing('BT')).toEqual({ horizontal: 120, vertical: 50 });
+    expect(resolveDomainLaneSpacing('LR')).toEqual({ horizontal: 50, vertical: 120 });
+    expect(resolveDomainLaneSpacing('RL')).toEqual({ horizontal: 50, vertical: 120 });
     expect(shouldPromoteDomainDagreRouteCandidate('domain-lanes')).toBe(true);
     expect(shouldPromoteDomainDagreRouteCandidate('domain-dagre')).toBe(true);
     expect(shouldRetryRejectedDomainLayoutWithCompoundElk({

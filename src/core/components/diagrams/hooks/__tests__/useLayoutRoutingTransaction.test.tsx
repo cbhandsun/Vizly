@@ -234,6 +234,14 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
 
     expect(mocks.stageLayoutRouting).toHaveBeenCalledTimes(1);
     expect(mocks.calculateLayeredLayoutWithReverse).toHaveBeenCalledTimes(1);
+    expect(mocks.calculateLayeredLayoutWithReverse.mock.calls[0]?.[3]).toEqual(
+      expect.objectContaining({
+        direction,
+        spacing: direction === 'LR'
+          ? { horizontal: 50, vertical: 120 }
+          : { horizontal: 120, vertical: 50 },
+      }),
+    );
     expect(mocks.loadDomainCompoundElkStrategy).not.toHaveBeenCalled();
     expect(mocks.loadDomainElkStrategy).not.toHaveBeenCalled();
     expect(options.setNodes).not.toHaveBeenCalled();

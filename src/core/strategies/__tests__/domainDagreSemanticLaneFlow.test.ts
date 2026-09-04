@@ -95,6 +95,36 @@ describe('semantic swimlane process geometry', () => {
     expect(new Set(flowExtents).size).toBe(1);
   });
 
+  it.each([
+    { direction: 'TB' as const, horizontalGap: 180, verticalGap: 36, expectedFlowGap: 36 },
+    { direction: 'LR' as const, horizontalGap: 48, verticalGap: 180, expectedFlowGap: 48 },
+  ])('honors configured flow-axis density in $direction without changing equal lane extents', ({
+    direction,
+    horizontalGap,
+    verticalGap,
+    expectedFlowGap,
+  }) => {
+    const arranged = alignDomainDagreLaneFlow(nodes, edges, {
+      direction,
+      nodeToSubGroup: membership,
+      domainOrder: ['a', 'b'],
+      horizontalGap,
+      verticalGap,
+    });
+    const byId = new Map(arranged.map(node => [node.id, node]));
+    const flow = direction === 'LR' ? 'x' : 'y';
+    const flowDimension = direction === 'LR' ? 'width' : 'height';
+
+    expect(Math.abs(
+      (byId.get('left')?.position[flow] ?? NaN)
+      - (byId.get('right')?.position[flow] ?? NaN),
+    )).toBe(expectedFlowGap);
+    const laneExtents = arranged
+      .filter(node => node.type === 'titleGroup')
+      .map(node => getNodeDimensions(node)[flowDimension]);
+    expect(new Set(laneExtents).size).toBe(1);
+  });
+
   it('handles empty, hidden and ungrouped nodes without losing graph data', () => {
     expect(alignDomainDagreLaneFlow([], [], { direction: 'TB' })).toEqual([]);
     const emptyDomains = nodes.slice(0, 2);

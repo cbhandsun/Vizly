@@ -36,11 +36,23 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
   const reversed = direction === 'BT' || direction === 'RL';
   const flow = horizontal ? 'x' : 'y';
   const cross = horizontal ? 'y' : 'x';
-  const maxFlowBandGap = horizontal ? MAX_HORIZONTAL_FLOW_BAND_GAP : MAX_VERTICAL_FLOW_BAND_GAP;
-  const horizontalGap = boundedDomainDagreNumber(options.horizontalGap, 120, 120, 5000);
-  const verticalGap = boundedDomainDagreNumber(options.verticalGap, 120, 120, 5000);
-  const flowGap = horizontal ? horizontalGap : verticalGap;
-  const crossGap = horizontal ? verticalGap : horizontalGap;
+  // Flow-axis spacing controls process density, while cross-axis spacing keeps
+  // adjacent lanes and their orthogonal connectors apart. Treating both as a
+  // 120px lane gap silently discarded the validated 30/40px layout settings
+  // and made long workflows substantially taller/wider than requested.
+  const requestedFlowGap = horizontal ? options.horizontalGap : options.verticalGap;
+  const requestedCrossGap = horizontal ? options.verticalGap : options.horizontalGap;
+  const flowGap = boundedDomainDagreNumber(
+    requestedFlowGap,
+    120,
+    horizontal ? 40 : 30,
+    5000,
+  );
+  const crossGap = boundedDomainDagreNumber(requestedCrossGap, 120, 120, 5000);
+  const maxFlowBandGap = Math.min(
+    horizontal ? MAX_HORIZONTAL_FLOW_BAND_GAP : MAX_VERTICAL_FLOW_BAND_GAP,
+    flowGap,
+  );
   const leaves = nodes.filter(node => !isDomainDagreGroupNode(node) && !isDomainDagreNodeHidden(node));
   if (!leaves.length) return nodes;
   if (leaves.some(node => !Number.isFinite(node.position.x) || !Number.isFinite(node.position.y))) {

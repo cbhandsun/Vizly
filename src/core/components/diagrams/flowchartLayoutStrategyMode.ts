@@ -93,6 +93,19 @@ export const resolveDomainLayoutRoutingQuality = (
     isOrderedDomainLaneLayoutStrategy(strategyName) ? 'interactive' : undefined
 );
 
+/**
+ * Keep the cross-lane corridor spacious while using the compact process gap on
+ * the actual flow axis. Applying 120px to both axes needlessly lengthens every
+ * rank in a swimlane diagram and ignores the direction selected by the user.
+ */
+export const resolveDomainLaneSpacing = (
+    direction: FlowchartLayoutDirection,
+): { horizontal: number; vertical: number } => (
+    direction === 'LR' || direction === 'RL'
+        ? { horizontal: 50, vertical: 120 }
+        : { horizontal: 120, vertical: 50 }
+);
+
 /** Layout routes are candidates only; the hidden transaction still hard-gates them. */
 export const shouldPromoteDomainDagreRouteCandidate = (
     _strategyName?: string,

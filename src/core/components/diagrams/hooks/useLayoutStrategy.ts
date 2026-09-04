@@ -35,6 +35,7 @@ import {
 import {
     isGlobalFullGraphLayoutStrategy,
     isOrderedDomainLaneLayoutStrategy,
+    resolveDomainLaneSpacing,
     resolveDomainLayoutRoutingQuality,
     resolveLayoutDomainOrder,
     shouldPromoteDomainDagreRouteCandidate,
@@ -416,7 +417,7 @@ export function useLayoutStrategy({
                     spacing: isDomainElk || isDomainCompoundElk
                         ? { horizontal: 120, vertical: 120 }
                         : isDomainLane
-                            ? { horizontal: 120, vertical: 120 }
+                            ? resolveDomainLaneSpacing(dir)
                             : { horizontal: 50, vertical: 50 },
                     edgeRouting: isDomainElk || isDomainCompoundElk ? 'ORTHOGONAL' : undefined,
                     edgeRoutingQuality: resolveDomainLayoutRoutingQuality(strategyName),
