@@ -133,14 +133,13 @@ const dedupeDisplayPaths = (paths: DisplayPoint[][]): DisplayPoint[][] => {
 };
 
 const preservesLoopShortcutTrueTrunks = (
-  baseline: readonly Edge[],
+  baselineTrunks: ReturnType<typeof auditFinalSameSideEndpointOrder>['legalSharedTrunks'],
   candidate: readonly Edge[],
   nodes: Node[],
   allowCommercialStemReduction = false,
 ): boolean => {
-  const before = auditFinalSameSideEndpointOrder(baseline, nodes).legalSharedTrunks;
   const after = auditFinalSameSideEndpointOrder(candidate, nodes).legalSharedTrunks;
-  return before.every(trunk => after.some(next => (
+  return baselineTrunks.every(trunk => after.some(next => (
     next.nodeId === trunk.nodeId
     && next.role === trunk.role
     && next.side === trunk.side
@@ -219,6 +218,7 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
     && !hasExcessiveDetour
   ) return edges;
 
+  const baselineTrunks = auditFinalSameSideEndpointOrder(edges, nodes).legalSharedTrunks;
   const baselineObstacleHits = obstacleContext.evaluate(edges);
   const baselineExactObstacleHits = countDisplayObstacleHits(edges, nodes);
   const baselineTerminalReport = getDisplayTerminalValidationReport(edges, terminalSnapshot);
@@ -294,7 +294,7 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
     const candidateScore = loopDefectScore(candidateQuality, candidate);
     if (candidateScore >= bestScore) return false;
     if (
-      !preservesLoopShortcutTrueTrunks(edges, candidate, nodes, detourPolishMode)
+      !preservesLoopShortcutTrueTrunks(baselineTrunks, candidate, nodes, detourPolishMode)
       || !preservesLoopShortcutFixedTerminals(edges, candidate)
     ) return false;
     if (obstacleContext.evaluateKnownChanges(candidate, allChangedIndexes) > baselineObstacleHits) return false;
@@ -354,7 +354,7 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
     strictClosureEvaluations += 1;
     const renderClosed = closeStrictCandidate(candidate);
     if (
-      !preservesLoopShortcutTrueTrunks(edges, renderClosed, nodes, detourPolishMode)
+      !preservesLoopShortcutTrueTrunks(baselineTrunks, renderClosed, nodes, detourPolishMode)
       || !preservesLoopShortcutFixedTerminals(edges, renderClosed)
     ) return false;
     const closedChangedIndexes = renderClosed.flatMap((edge, index) => (

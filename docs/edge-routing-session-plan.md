@@ -1,6 +1,6 @@
 # Vizly 首次打开与增量调整统一路由方案
 
-状态：质量、会话、拓扑、缺陷调度与 standalone 渲染协议主链已落地。四图各 16 项布局、跨引擎连续切换、普通保存恢复、三页新增/复制/切换/重载、SVG/PDF 真实矢量文件及容器样式均已有 production 验收。Logistics 动态拓扑含折叠/展开的 10 类编辑矩阵通过，L-OMS 拖拽 30 个独立样本 `release-to-final p95=294/300ms`、零 fallback/abort，交互尾延迟已达门槛。当前首要未完成项为 Logistics 冷路由：最新远端 5 样本 route p95=`1728/1100ms`、Worker compute p95=`1217.7/1100ms`；3D 仅性能问题继续后置。
+状态：质量、会话、拓扑、缺陷调度与 standalone 渲染协议主链已落地。四图各 16 项布局、跨引擎连续切换、普通保存恢复、三页新增/复制/切换/重载、SVG/PDF 真实矢量文件及容器样式均已有 production 验收。Logistics 动态拓扑含折叠/展开的 10 类编辑矩阵通过，L-OMS 拖拽 30 个独立样本 `release-to-final p95=294/300ms`、零 fallback/abort，交互尾延迟已达门槛。当前首要未完成项为 Logistics 冷路由：最新远端 5 样本 route p95=`2052/1100ms`、Worker compute p95=`1572.9/1100ms`；3D 仅性能问题继续后置。
 适用范围：`BaseReactFlow` Canvas 最终显示路由、内置标准图、用户保存图、节点拖拽及局部编辑
 关联标准：`docs/edge-routing-goals.md`
 
@@ -10,6 +10,7 @@
 
 - 远端 static 失败已确认不是导出或路由代码回归，而是审计库新增的 3 项传递依赖公告：`@humanfs/node <0.16.8`、`browserslist <=4.28.6`、`fflate` 的受影响版本。独立锁文件补丁已解析到 `0.16.8`、`4.28.8`、`0.8.3/0.6.11`，npm 12 审计为 0 漏洞；类型、strict-core、Lint、生产构建和 bundle 均通过。临时目录的第二次干净安装因 npm registry 长时间无输出被中止，仍需由提交后的远端干净安装门禁给出最终确认。
 - `d02bbe8b` 的完整 CI 进一步暴露观测层回归：commercial evaluation 包围的四个子阶段仍被声明成 finalizer 的直接子阶段，导致嵌套耗时作为兄弟阶段重复计入，冷路由拒绝“trace 独占总和大于 Worker 总时长”；Worker pipeline 的精确阶段序列也漏掉新阶段。现已把四个子阶段归入 `final-commercial-evaluation`、更新精确协议断言，并增加 140ms 三层嵌套总账回归；本地 52 项相关测试和四个 production 预编译目标的生成/复现通过，路径产物不变、仅 source hash 更新。该修复只校正性能记账，不改变路由候选或图形结果。
+- commercial loop shortcut 的每次候选评估原先都会重新审计完全不变的 baseline shared trunks；现将 baseline 审计提升到同一 repair 事务内复用，候选顺序、128 次预算、固定端点、障碍、终端与 hard-quality gate 均不变。5+5 个独立 production 冷样本中，Logistics commercial 中位 `158.4→133.5ms`、p95 `215→201.8ms`；WMS demand 中位基本持平且 p95 `239→208.8ms`；WMS process 中位 `440.5→426.2ms`、p95 受噪声影响 `611.1→643.2ms`。这是可解释的公共重复计算消除，但整体 Logistics route 仍为 `1694ms` 中位、`2057/1100ms` p95，不能记作预算达标。
 - `d65e0610` 已进入并推送 `main`：导出快照、场景模型、SVG 与 PDF 现在保留 titleGroup 的受控三段纵向渐变，不再把画布上的渐变标题条压平成单色。真实 Logistics production 导出包含 3 个渐变定义和 3 个渐变填充；PDF 二进制包含矢量 shading、嵌入字体且无图像对象，Poppler 渲染复核颜色、中文、节点和连线均保留。聚焦 79 项、静态快速门禁、生产构建和 bundle 通过，未扩大 `9500KB` 总预算；远端五组测试与覆盖率通过，static job 的依赖审计失败由上一条锁文件补丁处理。
 - 上一提交 `9e25bf1e` 的完整 CI 唯一失败是 GitHub runner 访问 npm audit registry 超时；五组测试与覆盖率均通过，不归类为产品代码失败，也不通过跳过 audit 制造绿色结果。对应性能专项仍真实失败：Logistics route 中位 `1094ms`、p95 `1728/1100ms`，Worker 中位 `1080.5ms`、p95 `1217.7ms`，另有一个约 `510.3ms` 的 route-side 尾部样本；预算保持不变。
 - finalizer 父阶段过去只报告耗时、工作量恒为零，无法判断剩余独占时间来自何处。父阶段现输出同一请求级评估会话的差分指标，随后补齐正常完整路由缺失的 `final-commercial-evaluation` 边界；同机样本中 finalizer 独占由约 `151.7ms` 收敛为 `21–22.5ms`，缺失时间已归因到 commercial detour（单次 `187.8–469.5ms`）。该阶段固定出现 `64` 次请求级评估、`66` 次缓存命中、`1044` 次节点扫描和 `336` 次边对扫描，下一批直接处理其候选闭环，不再从 finalizer 外层猜测。
