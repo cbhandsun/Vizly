@@ -66,6 +66,7 @@ describe('display routing matrix wait-state summary', () => {
         hardClean: false,
         obstacleHits: 2,
         minimumClearanceViolations: 1,
+        commercialClearanceViolations: 2,
         minimumClearanceViolationEdgeIds: ['private-edge-id'],
         quality: { strictCrossings: 3, tinyInteriorDoglegs: 1 },
       },
@@ -170,6 +171,7 @@ describe('display routing matrix wait-state summary', () => {
         hardReport: {
           obstacleHits: 2,
           minimumClearanceViolations: 1,
+          commercialClearanceViolations: 2,
           quality: { strictCrossings: 3, tinyInteriorDoglegs: 1 },
         },
         phaseTrace: [{ phase: 'strict', durationMs: 12.5, scannedEdgePairCount: 325 }],

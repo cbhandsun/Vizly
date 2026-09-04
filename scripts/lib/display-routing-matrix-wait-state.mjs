@@ -244,6 +244,7 @@ export const summarizeDisplayRoutingWaitState = (
         terminalsAnchored: typeof report.terminalsAnchored === 'boolean'
           ? report.terminalsAnchored : undefined,
         minimumClearanceViolations: integer(report.minimumClearanceViolations),
+        commercialClearanceViolations: integer(report.commercialClearanceViolations),
         quality: {
           nonOrthogonalSegments: metric('nonOrthogonalSegments'),
           strictCrossings: metric('strictCrossings'),
