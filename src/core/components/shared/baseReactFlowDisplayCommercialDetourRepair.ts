@@ -12,7 +12,10 @@ import {
   changedEdgesObstacleHitsDoNotRegress,
   visualPolishHardQualityDoesNotRegress,
 } from './baseReactFlowDisplayEvaluation';
-import { createBaseReactFlowFinalEndpointEvaluation } from './baseReactFlowDisplayFinalEndpointEvaluation';
+import {
+  createBaseReactFlowFinalEndpointEvaluation,
+  diffBaseReactFlowEvaluationMetrics,
+} from './baseReactFlowDisplayFinalEndpointEvaluation';
 import { commercialEdgeDetoursDoNotRegress } from './baseReactFlowDisplayCommercialDetourGuard';
 import {
   buildCommercialBranchedTerminalShortcutCandidates,
@@ -282,6 +285,12 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
   }
   const evaluation = options.evaluation
     ?? createBaseReactFlowFinalEndpointEvaluation(nodes);
+  const evaluationMetricsBefore = evaluation.readMetrics();
+  const evaluationTimer = startDisplayRoutingPhaseTrace({
+    phase: 'final-commercial-evaluation',
+    candidateCount: edges.length,
+    onTrace: options.onPhaseTrace,
+  });
   const finish = (candidate: T): T => {
     const stableCandidate = candidate !== edges
       && commercialRepairOutputIsEquivalent(edges, candidate)
@@ -302,6 +311,11 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
           && passageOrder.nearTrunkOpportunities === 0,
       });
     }
+    evaluationTimer.finish(
+      stableCandidate === edges ? 'skip' : 'accepted',
+      0,
+      diffBaseReactFlowEvaluationMetrics(evaluationMetricsBefore, evaluation.readMetrics()),
+    );
     return stableCandidate;
   };
   // Endpoint closure owns compound crossing repairs. Commercial shortening may
@@ -475,14 +489,7 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
       evaluation,
     );
     changingTimer.finish(changingCandidate === sourceCandidate ? 'skip' : 'accepted');
-    const evaluationTimer = startDisplayRoutingPhaseTrace({
-      phase: 'final-commercial-evaluation',
-      candidateCount: baseline.length,
-      onTrace: options.onPhaseTrace,
-    });
-    const result = finish(changingCandidate);
-    evaluationTimer.finish(result === baseline ? 'skip' : 'accepted');
-    return result;
+    return finish(changingCandidate);
   }
   baseline = repairTerminalPreservingOuterStairs(
     baseline,

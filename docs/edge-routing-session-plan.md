@@ -10,7 +10,7 @@
 
 - `d65e0610` 已进入并推送 `main`：导出快照、场景模型、SVG 与 PDF 现在保留 titleGroup 的受控三段纵向渐变，不再把画布上的渐变标题条压平成单色。真实 Logistics production 导出包含 3 个渐变定义和 3 个渐变填充；PDF 二进制包含矢量 shading、嵌入字体且无图像对象，Poppler 渲染复核颜色、中文、节点和连线均保留。聚焦 79 项、静态快速门禁、生产构建和 bundle 通过，未扩大 `9500KB` 总预算；远端完整 CI 尚未结束，其中 static job 已失败，须在 run 终态日志可用后分类，不能先记为代码回退或基础设施故障。
 - 上一提交 `9e25bf1e` 的完整 CI 唯一失败是 GitHub runner 访问 npm audit registry 超时；五组测试与覆盖率均通过，不归类为产品代码失败，也不通过跳过 audit 制造绿色结果。对应性能专项仍真实失败：Logistics route 中位 `1094ms`、p95 `1728/1100ms`，Worker 中位 `1080.5ms`、p95 `1217.7ms`，另有一个约 `510.3ms` 的 route-side 尾部样本；预算保持不变。
-- finalizer 父阶段过去只报告耗时、工作量恒为零，无法判断剩余独占时间来自何处。现在父阶段输出同一请求级评估会话的差分指标；production 单次 Logistics trace 为 `671.4ms`，其中 `220` 次评估、`322` 次缓存命中、`3171` 次节点扫描、`425` 次边对扫描、`2` 个工作项，仍有约 `280.4ms` 未归属到现有子阶段。下一批先给这部分增加更细的阶段边界，再依据占比删除重复计算；不继续做无证据微缓存。
+- finalizer 父阶段过去只报告耗时、工作量恒为零，无法判断剩余独占时间来自何处。父阶段现输出同一请求级评估会话的差分指标，随后补齐正常完整路由缺失的 `final-commercial-evaluation` 边界；同机样本中 finalizer 独占由约 `151.7ms` 收敛为 `21–22.5ms`，缺失时间已归因到 commercial detour（单次 `187.8–469.5ms`）。该阶段固定出现 `64` 次请求级评估、`66` 次缓存命中、`1044` 次节点扫描和 `336` 次边对扫描，下一批直接处理其候选闭环，不再从 finalizer 外层猜测。
 - 路由路径产物本身未变化；因观测源码属于路由 hash 范围，四项预编译 manifest 的 `routingSourceHash` 已同步更新并重新通过可复现检查。当前唯一首要性能缺口仍是 Logistics 冷路由 p95；3D 按用户优先级后置。
 
 ### 2026-09-03：复用最终质量证据与净距评分，补齐预编译发布产物
@@ -1804,3 +1804,9 @@ Logistics 动态拓扑矩阵覆盖节点缩放、多节点移动、复合子树�
 新增回归以受控净距上下文构造“局部 companion 已零风险、无关边仍有风险”的场景，确认短桩修复成功、无关边引用不变，且 strict sweep 和 residual repair 均不再启动。一次把可修改边集合下推 residual 的对照实验没有改变 Logistics 指标，已完整撤回，未保留无收益复杂度。
 
 同一 production build 的三次独立 Logistics trace 中，`final-endpoint-closure-terminal-stubs` 从此前约 `75–109ms`、`7` 次评估、`178` 次缓存命中、`3332` 段扫描和 `555` 边对扫描，稳定降为 `6.6–9ms`、`5` 次评估、`8` 次缓存命中、段扫描 `0`、边对扫描 `0`；三次均为一次 Worker、零 abort、`full-route-repaired`，并保持 2 条接受变更。整条冷路由仍受其他阶段与整机波动影响，当前不宣称 `1100ms` p95 已达标；下一批优先转向 finalizer 独占工作与 post-trunk 障碍候选，3D 性能继续后置。
+
+## 44. Commercial detour 全路径阶段归因（2026-09-04）
+
+`final-commercial-evaluation` 过去只包住 `skipLoopShortcut=true` 的末尾结果检查；Logistics 正常完整路由执行候选生成、端点修复和质量评估时没有对应阶段，因此数百毫秒被错误记为 finalizer 独占时间。本批把已有阶段计时提升到 commercial detour 的共享入口，并由唯一 `finish` 出口提交耗时和请求级评估差分；空图仍按原快速返回，不创建无意义 trace。正常、空输入和 TMS 反向复合路线回归保持原结果。
+
+production trace 现在把 finalizer 独占从约 `151.7ms` 收敛为 `21–22.5ms`，并明确 commercial detour 单次耗时在 `187.8–469.5ms` 波动；其确定性工作量为 `64` 次评估、`66` 次缓存命中、`1044` 次节点扫描和 `336` 次边对扫描。尝试删除 loop-shortcut 中紧邻请求内障碍计算的完整障碍复核后，5+5 独立样本没有显示阶段收益（保留实现 commercial 中位约 `220.6ms`，实验实现约 `259.2ms`），因此实验及附带测试已撤回，不以整体 route 的同步波动冒充收益。下一批聚焦 commercial detour 内固定的 64 次评估及候选终端修复，不调整候选预算或质量门禁。

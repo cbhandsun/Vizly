@@ -33,6 +33,7 @@ import { repairBaseReactFlowResidualOverlapAxisClosure } from '../baseReactFlowD
 import { parseBaseReactFlowPrecompiledRouteArtifact } from '../baseReactFlowPrecompiledRouteArtifact';
 import { displayTerminalRoleNeedsDeclaredAxisRepair } from '../baseReactFlowDisplayTerminalPortCandidates';
 import { preservesCommercialTrueTrunkMembership } from '../baseReactFlowDisplayTrueTrunkContract';
+import type { DisplayRoutingPhaseTrace } from '../baseReactFlowDisplayRoutingTrace';
 import {
   createDisplayTerminalValidationSnapshot,
   getDisplayTerminalValidationReport,
@@ -142,8 +143,10 @@ describe('base React Flow final endpoint order transaction', () => {
     }];
     let closureReady = false;
     let evaluatedEdges: readonly Edge[] | undefined;
+    const traces: DisplayRoutingPhaseTrace[] = [];
 
     const repaired = repairBaseReactFlowFinalCommercialDetours(edges, nodes, {
+      onPhaseTrace: trace => traces.push(trace),
       onFinalEvaluation: evaluation => {
         evaluatedEdges = evaluation.edges;
         closureReady = evaluation.closureReady;
@@ -153,6 +156,14 @@ describe('base React Flow final endpoint order transaction', () => {
     expect(repaired).toBe(edges);
     expect(evaluatedEdges).toBe(repaired);
     expect(closureReady).toBe(true);
+    const evaluationTrace = traces.find(trace => trace.phase === 'final-commercial-evaluation');
+    expect(evaluationTrace).toMatchObject({
+      candidateCount: 1,
+      resolution: 'skip',
+    });
+    expect(
+      (evaluationTrace?.evaluationCount ?? 0) + (evaluationTrace?.cacheHitCount ?? 0),
+    ).toBeGreaterThan(0);
   });
 
   it('does not certify an empty route as closure-ready', () => {
