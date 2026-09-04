@@ -8,6 +8,7 @@ import { compactOrthogonalPath } from './baseReactFlowDisplayEdgeCore';
 import {
   calculateEdgePathQualityScore,
   createEdgePathQualityEvaluationContext,
+  type EdgePathQualityScore,
 } from '../../strategies/shared/edgeStrictCrossingGuard';
 import { buildStrictLoopShortcutCandidates } from './baseReactFlowDisplayStrictLoopShortcutCandidates';
 import {
@@ -192,13 +193,13 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
     diagnostics.candidateEdgeCount = 0;
     diagnostics.qualityEvaluationCount = 0;
   }
-  if (maxQualityEvaluations <= 0 || edges.length === 0) return edges;
+  if (maxQualityEvaluations < 1 || !edges.length) return edges;
   const qualityContext = createEdgePathQualityEvaluationContext(edges);
   const obstacleContext = createDisplayObstacleEvaluationContext(edges, nodes);
   const terminalSnapshot = createDisplayTerminalValidationSnapshot(nodes);
   const nodeById = new Map(nodes.map(node => [node.id, node] as const));
   const baselineQuality = qualityContext.evaluate(edges);
-  if (diagnostics) diagnostics.qualityEvaluationCount += 1;
+  if (diagnostics) diagnostics.qualityEvaluationCount++;
   const hasExcessiveDetour = hasCommerciallyExcessiveDetour(edges);
   const detourPolishMode = hasExcessiveDetour
     && baselineQuality.nonOrthogonalSegments === 0
@@ -224,8 +225,8 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
   const baselineTerminalReport = getDisplayTerminalValidationReport(edges, terminalSnapshot);
   const overlapHitsByEdge = new Map<number, number>();
   const graphSegments = extractDisplaySegments(edges);
-  for (let firstIndex = 0; firstIndex < graphSegments.length; firstIndex += 1) {
-    for (let secondIndex = firstIndex + 1; secondIndex < graphSegments.length; secondIndex += 1) {
+  for (let firstIndex = 0; firstIndex < graphSegments.length; firstIndex++) {
+    for (let secondIndex = firstIndex + 1; secondIndex < graphSegments.length; secondIndex++) {
       const first = graphSegments[firstIndex];
       const second = graphSegments[secondIndex];
       if (first.edgeIndex === second.edgeIndex || first.axis !== second.axis) continue;
@@ -284,12 +285,24 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
       )),
     ])]
   );
-  const considerCandidate = (candidate: T, changedIndexes: number[]): boolean => {
-    if (evaluations >= maxQualityEvaluations) return false;
-    evaluations += 1;
-    if (diagnostics) diagnostics.qualityEvaluationCount += 1;
+  const evaluateCandidateQuality = (
+    candidate: T,
+    changedIndexes: number[],
+  ): readonly [number[], EdgePathQualityScore] => {
     const allChangedIndexes = collectChangedIndexes(candidate, changedIndexes);
-    const candidateQuality = qualityContext.evaluateChanged(candidate, allChangedIndexes);
+    const quality = qualityContext.evaluateChanged(candidate, allChangedIndexes);
+    if (diagnostics) diagnostics.qualityEvaluationCount++;
+    return [allChangedIndexes, quality];
+  };
+  const considerCandidate = (
+    candidate: T,
+    changedIndexes: number[],
+    knownEvaluation?: readonly [number[], EdgePathQualityScore],
+  ): boolean => {
+    if (evaluations >= maxQualityEvaluations) return false;
+    evaluations++;
+    const [allChangedIndexes, candidateQuality] = knownEvaluation
+      ?? evaluateCandidateQuality(candidate, changedIndexes);
     if (!hardLoopDefectsDoNotRegress(baselineQuality, candidateQuality)) return false;
     const candidateScore = loopDefectScore(candidateQuality, candidate);
     if (candidateScore >= bestScore) return false;
@@ -328,17 +341,14 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
   };
   const considerStrictClosedShortcut = (
     candidate: T,
-    changedIndexes: number[],
+    knownEvaluation: readonly [number[], EdgePathQualityScore],
   ): boolean => {
     if (
       !detourPolishMode
       || !closeStrictCandidate
-      || strictClosureEvaluations >= 2
-      || evaluations >= maxQualityEvaluations
+      || strictClosureEvaluations > 1
     ) return false;
-    const allChangedIndexes = collectChangedIndexes(candidate, changedIndexes);
-    const candidateQuality = qualityContext.evaluateChanged(candidate, allChangedIndexes);
-    if (diagnostics) diagnostics.qualityEvaluationCount += 1;
+    const [, candidateQuality] = knownEvaluation;
     if (
       candidateQuality.strictCrossings <= baselineQuality.strictCrossings
       || candidateQuality.strictCrossings > baselineQuality.strictCrossings + 2
@@ -351,7 +361,7 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
       || candidateQuality.tinyInteriorDoglegs > baselineQuality.tinyInteriorDoglegs
       || candidateQuality.hairpins > baselineQuality.hairpins
     ) return false;
-    strictClosureEvaluations += 1;
+    strictClosureEvaluations++;
     const renderClosed = closeStrictCandidate(candidate);
     if (
       !preservesLoopShortcutTrueTrunks(baselineTrunks, renderClosed, nodes, detourPolishMode)
@@ -362,6 +372,15 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
     ));
     return closedChangedIndexes.length > 0
       && considerCandidate(renderClosed, closedChangedIndexes);
+  };
+  const considerCandidateWithStrictClosure = (
+    candidate: T,
+    changedIndexes: number[],
+  ): boolean => {
+    if (evaluations >= maxQualityEvaluations) return false;
+    const knownEvaluation = evaluateCandidateQuality(candidate, changedIndexes);
+    return considerStrictClosedShortcut(candidate, knownEvaluation)
+      || considerCandidate(candidate, changedIndexes, knownEvaluation);
   };
 
   const reservedPortEvaluations = Math.min(16, Math.max(4, maxQualityEvaluations / 2));
@@ -459,8 +478,7 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
           ? withDisplayComputedPath(candidateEdge, candidatePath)
           : candidateEdge
       )) as T;
-      if (considerStrictClosedShortcut(candidate, [edgeIndex])) return best;
-      if (considerCandidate(candidate, [edgeIndex])) return best;
+      if (considerCandidateWithStrictClosure(candidate, [edgeIndex])) return best;
     }
     edgeCandidateSearch: for (const candidatePath of shortcutCandidates) {
       // All batches use the same immutable baseline as the former eager array,
@@ -501,15 +519,14 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
                 : edge
           )) as T;
           const changedIndexes = paired ? [edgeIndex, paired.edgeIndex] : [edgeIndex];
-          if (considerStrictClosedShortcut(candidate, changedIndexes)) return best;
-          if (considerCandidate(candidate, changedIndexes)) return best;
+          if (considerCandidateWithStrictClosure(candidate, changedIndexes)) return best;
         }
       }
     }
   }
 
   const routingObstacleRects = [...buildDisplayRoutingObstacles(nodes).values()];
-  const outerBounds = routingObstacleRects.length > 0
+  const outerBounds = routingObstacleRects.length
     ? {
       left: Math.min(...routingObstacleRects.map(rect => rect.x)),
       right: Math.max(...routingObstacleRects.map(rect => rect.x + rect.width)),

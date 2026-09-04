@@ -1,6 +1,6 @@
 # Vizly 首次打开与增量调整统一路由方案
 
-状态：质量、会话、拓扑、缺陷调度与 standalone 渲染协议主链已落地。四图各 16 项布局、跨引擎连续切换、普通保存恢复、三页新增/复制/切换/重载、SVG/PDF 真实矢量文件及容器样式均已有 production 验收。Logistics 动态拓扑含折叠/展开的 10 类编辑矩阵通过，L-OMS 拖拽 30 个独立样本 `release-to-final p95=294/300ms`、零 fallback/abort，交互尾延迟已达门槛。当前首要未完成项为 Logistics 冷路由：最新远端 5 样本 route p95=`2016/1100ms`、Worker compute p95=`1182.5/1100ms`，其中 route-side overhead p95=`833.5ms`；前两轮 route/Worker p95 分别为 `1237/1217.2ms`、`1138/1117.7ms`，仍存在明显运行波动。3D 仅性能问题继续后置。
+状态：质量、会话、拓扑、缺陷调度与 standalone 渲染协议主链已落地。四图各 16 项布局、跨引擎连续切换、普通保存恢复、三页新增/复制/切换/重载、SVG/PDF 真实矢量文件及容器样式均已有 production 验收。Logistics 动态拓扑含折叠/展开的 10 类编辑矩阵通过，L-OMS 拖拽 30 个独立样本 `release-to-final p95=294/300ms`、零 fallback/abort，交互尾延迟已达门槛。当前首要未完成项仍是 Logistics 冷路由：最新远端 5 样本 route p95=`2016/1100ms`、Worker compute p95=`1182.5/1100ms`，其中 route-side overhead p95=`833.5ms`；本地同一 production preview 的最新结构性优化把 loop-shortcut 质量计算从 `153` 次降到 `129` 次，5 样本 route 中位由 `2353ms` 降到 `2248ms`，但有 `4050ms` 尾部样本，不能据此关闭 p95。3D 仅性能问题继续后置。
 适用范围：`BaseReactFlow` Canvas 最终显示路由、内置标准图、用户保存图、节点拖拽及局部编辑
 关联标准：`docs/edge-routing-goals.md`
 
@@ -8,6 +8,8 @@
 
 ### 2026-09-04：PDF 标题渐变保真与 finalizer 工作量归因
 
+- `9e5839a1` 已进入并推送 `main`：矢量导出快照现在采集受控节点阴影，SVG 使用过滤器、PDF 使用透明度受限的矢量偏移轮廓恢复画布节点层次；真实 Logistics PDF 无图像对象，节点、连线、中文字体和容器样式保持。该提交本地 80 项聚焦测试、静态、TS6、生产构建与 bundle 通过；远端完整 CI 的独立失败为 `KeyboardShortcutPanel` 4 个可访问性查询未找到，以及 enterprise smoke 关键资产偶发 `109/108`，因此不记录为远端全绿，后续分别修复测试隔离/可访问性和首屏资产抖动。
+- commercial loop-shortcut 的严格闭合预检和普通接受判定原先会对同一候选重复执行完整质量计算。现在同一候选共享一次 changed-quality 结果，再分别进入两套判定；候选顺序、质量预算、障碍、固定端点、主干和 hard gate 均不变。确定性诊断从 `153` 次质量计算降至 `129` 次，正好消除 24 次重复；同一 preview 的 3 个基线与 5 个修改后样本中，commercial 中位 `268.5→231.9ms`、独占中位 `189→156.8ms`、route 中位 `2353→2248ms`。一次将 shared-trunk audit 延后到便宜门禁之后的实验收益不足且噪声明显，已完整撤回。最终实现的 43 项聚焦回归、TS6、生产构建、四项预编译重放和未提高的 `9500KB` bundle 门禁通过；冷路由尾延迟仍未达标。
 - `a591af47` 的完整 CI 已证明精确 audit 重试有效：依赖安装与 static/build 全部通过，五组测试和覆盖率也全部成功；随后 smoke 揭示矢量 PDF 接入后的独立首屏分块回归。`svg2pdf.js` 及四个专属解析依赖原先落入通用 vendor chunk，使约 `550KB` 被九条路由首屏共同加载；现把 PDF 实现改为点击导出时动态加载，并归入现有 PDF vendor chunk，同时将三个同步、小型场景快照模块与 designer micro chunk 合并。管理页从 `2454.3KB/36` 回到 `1887.4KB/35`，WMS/企业图从 `109/110` 个关键资源降为 `107/105`，解码体积 `4867.5/4745.5KB`，未提高预算；最终九路由 production smoke 全部通过。矢量 PDF 行为回归 26 项通过。
 - 同一远端性能任务的增量和交互专项成功，Logistics 五个冷样本仍为 `full-route-repaired`、零 abort；Worker 中位 `1081.3ms`、p95 `1182.5ms`，但一次 `833.5ms` route-side 尾部把 route p95 拉到 `2016ms`。commercial evaluation p95 为 `133.9ms`。该批在依赖安装和其他并行任务上也出现显著外部延迟，因此保留原预算与失败结论，同时把 Worker 内商业闭环和 route-side 尾部作为两个不同问题追踪，不把单个 runner 样本解释成算法退化。
 - normal full-route 的 commercial detour 现在与 closure 快路径使用同一组子阶段追踪，且不改变候选顺序、128 次预算、质量门禁或最终路径。一次真实 Logistics production 样本中，四类外层修复合计约 `63.9ms`，而 `final-commercial-evaluation` 总计 `239ms`、独占仍约 `175.1ms`；重新构建后的可复现采样中该父阶段为 `96.2ms`、独占 `62.5ms`。证据表明后续优化应继续进入 loop shortcut/评估闭环，而不是削减净距或端点修复。四项子阶段协议回归、33 项相关 jsdom 测试、类型、Lint、架构、生产构建与 bundle `9499.80/9500KB` 均通过，四项预编译路径不变，仅同步 source hash。
@@ -1822,3 +1824,11 @@ Logistics 动态拓扑矩阵覆盖节点缩放、多节点移动、复合子树�
 `final-commercial-evaluation` 过去只包住 `skipLoopShortcut=true` 的末尾结果检查；Logistics 正常完整路由执行候选生成、端点修复和质量评估时没有对应阶段，因此数百毫秒被错误记为 finalizer 独占时间。本批把已有阶段计时提升到 commercial detour 的共享入口，并由唯一 `finish` 出口提交耗时和请求级评估差分；空图仍按原快速返回，不创建无意义 trace。正常、空输入和 TMS 反向复合路线回归保持原结果。
 
 production trace 现在把 finalizer 独占从约 `151.7ms` 收敛为 `21–22.5ms`，并明确 commercial detour 单次耗时在 `187.8–469.5ms` 波动；其确定性工作量为 `64` 次评估、`66` 次缓存命中、`1044` 次节点扫描和 `336` 次边对扫描。尝试删除 loop-shortcut 中紧邻请求内障碍计算的完整障碍复核后，5+5 独立样本没有显示阶段收益（保留实现 commercial 中位约 `220.6ms`，实验实现约 `259.2ms`），因此实验及附带测试已撤回，不以整体 route 的同步波动冒充收益。下一批聚焦 commercial detour 内固定的 64 次评估及候选终端修复，不调整候选预算或质量门禁。
+
+## 45. Loop shortcut 候选质量评估复用（2026-09-04）
+
+进一步下钻 commercial detour 后确认，`repairDisplayLoopShortcuts` 在启用 detour polish 和严格闭合回调时，会先为严格闭合预检计算候选质量；预检未接受后，普通候选接受路径又对同一个候选和同一 changed-index 集合重复计算。该重复没有增加公开的 32 次候选预算，却真实执行了第二次全图质量工作，因此此前请求级 `64` 次 commercial evaluation 之外还隐藏着 loop-shortcut 内部质量成本。
+
+现在候选在预算内只生成一次 changed-quality 结果，并把同一只读结果交给严格闭合与普通接受判定；严格闭合产生新的闭合候选时仍独立评估，预算耗尽和所有失败路径保持原行为。回归在 Logistics 同构的固定端点、shared-trunk、严格闭合与 hard-clean 场景中锁定质量计算不超过预算加两次基线开销，防止重新出现双算。
+
+临时诊断显示同一 Logistics production 输入的 loop-shortcut 质量计算由 `153` 降为 `129`，消除 24 次完全重复评估。3 个修改前与 5 个修改后独立样本中，commercial 总耗时中位 `268.5→231.9ms`，独占中位 `189→156.8ms`，route 中位 `2353→2248ms`；所有样本均为一次 Worker、`full-route-repaired`，预编译路径签名不变。修改后仍出现 `4050ms` route 尾部，说明结构性重复已消除但 `1100ms` p95 目标尚未完成。下一批继续沿 commercial detour 的固定 64 次请求级评估和 route-side 尾部追踪；enterprise 首屏资产 `109/108` 的 CI 抖动作为独立发布门禁问题处理，3D 性能继续后置。

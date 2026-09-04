@@ -391,6 +391,7 @@ describe('display loop shortcut repair', () => {
       baselineTrunks: feasibleTrunks,
       feasibleTrunks,
     });
+    const diagnostics = createDisplayLoopShortcutRepairDiagnostics();
     const repaired = repairDisplayLoopShortcuts(
       edges,
       nodes,
@@ -404,6 +405,7 @@ describe('display loop shortcut repair', () => {
         nodes,
         16,
       ),
+      diagnostics,
     );
     const customsPath = (repaired[0].data as {
       computedPath: Array<{ x: number; y: number }>;
@@ -427,5 +429,6 @@ describe('display loop shortcut repair', () => {
     );
     expect(terminalReport.allAnchored).toBe(true);
     expect(getDisplayHardQualityGateReport(repaired, nodes, 'polished').hardClean).toBe(true);
+    expect(diagnostics.qualityEvaluationCount).toBeLessThanOrEqual(34);
   });
 });
