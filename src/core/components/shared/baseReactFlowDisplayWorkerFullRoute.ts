@@ -10,6 +10,7 @@ import { closeBaseReactFlowDisplayWorkerEndpointContract } from './baseReactFlow
 import { createBaseReactFlowFullRouteEdges } from './baseReactFlowDisplayFullRoutePipeline';
 import type { BaseReactFlowDisplayEdgesArgs } from './baseReactFlowDisplayFullRouteTypes';
 import { createBaseReactFlowFullRouteEvaluationSession } from './baseReactFlowDisplayFullRouteEvaluationSession';
+import { diffBaseReactFlowEvaluationMetrics } from './baseReactFlowDisplayFinalEndpointEvaluation';
 import { repairBaseReactFlowMeasuredDisplayEdgesWithReport } from './baseReactFlowDisplayMeasuredRepair';
 import { createBaseReactFlowPreDisplayFinalEdges } from './baseReactFlowDisplayPreDisplayPipeline';
 import type {
@@ -121,6 +122,20 @@ export const runBaseReactFlowDisplayWorkerFullRoute = ({
     candidateCount: fullRouteEdges.length,
     onTrace: onPhaseTrace,
   });
+  const finalizerMetricsBefore = fullRouteEvaluation.readMetrics();
+  const completeFullRouteFinalization = (
+    response: DisplayEdgesWorkerResponse,
+  ): DisplayEdgesWorkerResponse => completeResponse(
+    finishDisplayWorkerFinalization(
+      finalizerTimer,
+      closeFinalContract(response),
+      undefined,
+      diffBaseReactFlowEvaluationMetrics(
+        finalizerMetricsBefore,
+        fullRouteEvaluation.readMetrics(),
+      ),
+    ),
+  );
   const finalized = finalizeBaseReactFlowDisplayEdgesWithReport(
     fullRouteEdges,
     request.nodes,
@@ -140,10 +155,6 @@ export const runBaseReactFlowDisplayWorkerFullRoute = ({
           onTrace: onPhaseTrace,
         }).finish('hit', 0, {
           cacheHitCount: 1,
-          evaluationCount: 0,
-          scannedEdgePairCount: 0,
-          scannedNodeCount: 0,
-          scannedSegmentCount: 0,
         });
         return finalized;
       })()
@@ -186,10 +197,7 @@ export const runBaseReactFlowDisplayWorkerFullRoute = ({
       onPhaseTrace,
       preferredEdges: request.edges,
     });
-    return completeResponse(finishDisplayWorkerFinalization(
-      finalizerTimer,
-      closeFinalContract(repairedResponse),
-    ));
+    return completeFullRouteFinalization(repairedResponse);
   }
   const finalizedResponse = finalizeResponse({
     requestId: request.requestId,
@@ -206,8 +214,5 @@ export const runBaseReactFlowDisplayWorkerFullRoute = ({
     onPhaseTrace,
     preferredEdges: request.edges,
   });
-  return completeResponse(finishDisplayWorkerFinalization(
-    finalizerTimer,
-    closeFinalContract(finalizedResponse),
-  ));
+  return completeFullRouteFinalization(finalizedResponse);
 };

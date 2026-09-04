@@ -341,6 +341,9 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
     expect(finalizerTrace?.durationMs ?? 0).toBeGreaterThanOrEqual(
       finalizerTrace?.exclusiveDurationMs ?? 0,
     );
+    expect(
+      (finalizerTrace?.evaluationCount ?? 0) + (finalizerTrace?.cacheHitCount ?? 0),
+    ).toBeGreaterThan(0);
     expect(workerResponse.phaseTrace?.find(
       trace => trace.phase === 'final-evaluation-context',
     )).toMatchObject({ resolution: 'hit' });

@@ -8,6 +8,7 @@ import {
 } from './baseReactFlowDisplayFinalEndpointEvaluation';
 import {
   startDisplayRoutingPhaseTrace,
+  type DisplayRoutingPhaseMetrics,
   type DisplayRoutingPhaseTrace,
 } from './baseReactFlowDisplayRoutingTrace';
 import type {
@@ -119,10 +120,12 @@ export const finishDisplayWorkerFinalization = (
   timer: ReturnType<typeof startDisplayRoutingPhaseTrace>,
   response: DisplayEdgesWorkerResponse,
   changedEdgeCount = response.edges?.length ?? 0,
+  metrics?: DisplayRoutingPhaseMetrics,
 ): DisplayEdgesWorkerResponse => {
   timer.finish(
     response.hardClean === true ? 'accepted' : 'fallback',
     changedEdgeCount,
+    metrics,
   );
   return response;
 };
