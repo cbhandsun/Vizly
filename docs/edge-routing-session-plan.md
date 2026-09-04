@@ -1,6 +1,6 @@
 # Vizly 首次打开与增量调整统一路由方案
 
-状态：质量、会话、拓扑、缺陷调度与 standalone 渲染协议主链已落地。四图各 16 项布局、跨引擎连续切换、普通保存恢复、三页新增/复制/切换/重载、SVG/PDF 真实矢量文件及容器样式均已有 production 验收。Logistics 动态拓扑含折叠/展开的 10 类编辑矩阵通过，L-OMS 拖拽 30 个独立样本 `release-to-final p95=294/300ms`、零 fallback/abort，交互尾延迟已达门槛。当前首要未完成项为 Logistics 冷路由：最新远端 5 样本 route p95=`1138/1100ms`、Worker compute p95=`1117.7/1100ms`；3D 仅性能问题继续后置。
+状态：质量、会话、拓扑、缺陷调度与 standalone 渲染协议主链已落地。四图各 16 项布局、跨引擎连续切换、普通保存恢复、三页新增/复制/切换/重载、SVG/PDF 真实矢量文件及容器样式均已有 production 验收。Logistics 动态拓扑含折叠/展开的 10 类编辑矩阵通过，L-OMS 拖拽 30 个独立样本 `release-to-final p95=294/300ms`、零 fallback/abort，交互尾延迟已达门槛。当前首要未完成项为 Logistics 冷路由：最新远端 5 样本 route p95=`1237/1100ms`、Worker compute p95=`1217.2/1100ms`；前一轮同源码分别为 `1138ms`、`1117.7ms`，仍存在明显运行波动。3D 仅性能问题继续后置。
 适用范围：`BaseReactFlow` Canvas 最终显示路由、内置标准图、用户保存图、节点拖拽及局部编辑
 关联标准：`docs/edge-routing-goals.md`
 
@@ -8,6 +8,8 @@
 
 ### 2026-09-04：PDF 标题渐变保真与 finalizer 工作量归因
 
+- `b46c497f` 的远端性能任务确认增量路由和交互绘制继续通过，三个 production 浏览器分片均正常启动，未触发新的单次启动重试。Logistics 五个冷样本 route 中位 `1173ms`、p95 `1237/1100ms`，Worker 中位 `1155.7ms`、p95 `1217.2ms`，五次均为 `full-route-repaired` 且零 abort；与同源码前一轮 `1138ms` p95 相比是环境波动，但两轮都高于预算，仍不能关闭性能项。本轮最大公开阶段依次为 commercial evaluation p95 `123.2ms`、初始 dogleg refine `95.6ms`、waypoint `82.2ms`、初始 global refine `74.8ms` 和 trunk dogleg `72.8ms`，下一步只针对能证明重复工作的公共热点，不削减质量门禁。
+- 同轮完整 CI 的五组测试与覆盖率全部成功，static 在进入构建和浏览器 smoke 前由 npm 安全公告接口 5 分钟网络超时终止。该故障已多次阻断主分支，现将 audit 门禁收敛为一次精确基础设施重试：只有非零退出、无 signal、同时出现 npm 的 `audit network timeout` 与 `audit endpoint returned an error` 才重试；漏洞结果、进程失败、其他网络/解析错误及第二次超时均继续失败。入口通过校验后的 npm CLI 路径以无 shell 方式执行，输出仍原样呈现。5 项边界回归、Node CI 入口 453 项、Lint、TS6、secrets、CI 收录和真实 `0 vulnerabilities` 审计通过。
 - `52fbe3a8` 远端五个独立冷样本将 Logistics route 收敛到中位 `1093ms`、p95 `1138/1100ms`，Worker 中位 `1081.9ms`、p95 `1117.7ms`，route overhead p95 仅 `20.3ms`，五次均为 `full-route-repaired` 且零 abort。交互绘制和增量路由任务成功；冷路由只差 `38ms`，但仍按原预算失败，不能记作性能完成。候选商业绕行分的差分缓存实验未改善同机 commercial 阶段且使 bundle 超限 `0.27KB`，已完整撤回；下一批不再投入该低收益点，继续聚焦候选全图质量与主干审计。
 - 同一完整 CI 的五组业务测试中 foundation/core/flow/routing 成功，UI 仍由 ShareDialog 旧删除请求跨图回归撞到原 15 秒上限；该用例单独本地实际耗时约 `10.2s`。现直接通过实际 mutation hook 验证“旧请求 → scope 切换 → 新列表 → 旧请求完成”的生命周期，保留状态与无成功提示断言，执行降到约 `19ms`，没有提高超时；远端同配置 17 文件 shard 本地 72/72、类型、Lint 和 CI 收录通过，已作为 `a980227b` 推送。
 - Chrome 进程存活、零 stdout/stderr、无错误标记且 `/json/version` 持续 `ECONNREFUSED` 的 15 秒启动态已在独立 CI 浏览器任务重复出现，同时同轮其他 Chrome 任务正常完成，现按已识别基础设施瞬态处理：仅该精确诊断允许一次全新 profile 启动，预编译入口同时重新分配端口；进程退出、spawn/锁/输出/非法响应及页面或业务失败均不重试。66 项启动生命周期与安全诊断测试、TS6、`verify:static:fast`、生产构建与 bundle `9499.99/9500KB` 通过，两个真实浏览器入口正常启动与清理通过。
