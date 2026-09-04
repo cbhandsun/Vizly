@@ -64,13 +64,14 @@ describe('isValidVectorPdfFontBytes', () => {
 
 describe('resolveVectorPdfSyntheticTextStrokeWidth', () => {
   it.each([
-    ['normal', 0],
-    ['400', 0],
-    ['600', 0.28],
-    ['700', 0.45],
-    ['900', 0.45],
-    ['bold', 0.45],
-    [' bolder ', 0.45],
+    ['normal', 0.24],
+    ['400', 0.24],
+    ['500', 0.36],
+    ['600', 0.7],
+    ['700', 1.15],
+    ['900', 1.15],
+    ['bold', 1.15],
+    [' bolder ', 1.15],
   ])('maps supported font weight %s to a bounded PDF text stroke', (weight, expected) => {
     expect(resolveVectorPdfSyntheticTextStrokeWidth(weight)).toBe(expected);
   });

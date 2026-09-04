@@ -62,7 +62,7 @@ export const normalizeVectorPdfPageGeometry = (
   ) {
     throw new ScenePdfExportError(
       'PDF_EXPORT_INVALID_DIMENSIONS',
-      'Vector PDF dimensions must be finite and positive',
+      'Invalid vector PDF dimensions',
     );
   }
   const scale = Math.min(1, MAX_PDF_PAGE_SIDE_PT / Math.max(width, height));
@@ -113,7 +113,7 @@ const parsePdfSvgElement = (markup: string): SVGSVGElement => {
     || root.localName.toLowerCase() !== 'svg'
     || root.namespaceURI !== 'http://www.w3.org/2000/svg'
   ) {
-    throw new ScenePdfExportError('PDF_EXPORT_INVALID_SVG', 'Vector PDF source SVG is invalid');
+    throw new ScenePdfExportError('PDF_EXPORT_INVALID_SVG', 'Invalid vector PDF SVG');
   }
   root.querySelectorAll('text').forEach(text => {
     const bullet = resolveVectorPdfLeadingBulletDecoration({
@@ -140,7 +140,7 @@ const parsePdfSvgElement = (markup: string): SVGSVGElement => {
     }
     text.setAttribute('font-family', PDF_FONT_FAMILY);
     const syntheticStrokeWidth = resolveVectorPdfSyntheticTextStrokeWidth(
-      text.getAttribute('font-weight'),
+      text.getAttribute('font-weight') ?? '400',
     );
     if (syntheticStrokeWidth > 0 && fill && fill !== 'none' && fill !== 'transparent') {
       text.setAttribute('stroke', fill);
@@ -203,13 +203,13 @@ export const resolveVectorPdfLeadingBulletDecoration = ({
 export const resolveVectorPdfSyntheticTextStrokeWidth = (fontWeight: unknown): number => {
   if (typeof fontWeight !== 'string') return 0;
   const normalized = fontWeight.trim().toLowerCase();
-  if (normalized === 'bold' || normalized === 'bolder') return 0.45;
-  if (!/^\d{3}$/u.test(normalized)) return 0;
-  const numericWeight = Number(normalized);
-  if (numericWeight > 900) return 0;
-  if (numericWeight >= 700) return 0.45;
-  if (numericWeight >= 600) return 0.28;
-  return 0;
+  const numericWeight = normalized === 'normal'
+    ? 400
+    : normalized === 'bold' || normalized === 'bolder'
+      ? 700
+      : /^\d{3}$/u.test(normalized) ? Number(normalized) : 0;
+  if (numericWeight < 400 || numericWeight > 900) return 0;
+  return [0.24, 0.36, 0.7, 1.15][Math.min(3, Math.floor((numericWeight - 400) / 100))];
 };
 
 export const exportRenderSceneToPdfBlob = async (
@@ -248,7 +248,7 @@ export const exportRenderSceneToPdfBlob = async (
   if (!(bytes instanceof ArrayBuffer) || bytes.byteLength <= 0 || bytes.byteLength > MAX_PDF_OUTPUT_BYTES) {
     throw new ScenePdfExportError(
       'PDF_EXPORT_OUTPUT_LIMIT',
-      'Vector PDF output is empty or exceeds the size limit',
+      'Invalid vector PDF output size',
     );
   }
   return new Blob([bytes], { type: 'application/pdf' });
