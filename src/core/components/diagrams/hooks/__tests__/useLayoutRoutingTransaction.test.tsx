@@ -238,8 +238,8 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
       expect.objectContaining({
         direction,
         spacing: direction === 'LR'
-          ? { horizontal: 50, vertical: 120 }
-          : { horizontal: 120, vertical: 50 },
+          ? { horizontal: 96, vertical: 120 }
+          : { horizontal: 120, vertical: 96 },
       }),
     );
     expect(mocks.loadDomainCompoundElkStrategy).not.toHaveBeenCalled();
