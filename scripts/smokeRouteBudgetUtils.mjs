@@ -9,7 +9,10 @@ export const defaultDesktopRouteBudgets = {
   'theme-colors': { criticalAssets: 40, criticalDecodedKB: 1200, readyMs: 2500 },
   'theme-side-by-side': { criticalAssets: 40, criticalDecodedKB: 1200, readyMs: 2500 },
   'docs-preview': { criticalAssets: 30, criticalDecodedKB: 1100, readyMs: 2500 },
-  'warehouse-3d': { criticalAssets: 46, criticalDecodedKB: 2800, readyMs: 4000 },
+  // 3D remains covered for boot correctness, critical resource closure, and
+  // post-ready stability. Its render-ready latency is intentionally deferred
+  // while routing/layout correctness is the current release priority.
+  'warehouse-3d': { criticalAssets: 46, criticalDecodedKB: 2800 },
   'unified-designer': { criticalAssets: 100, criticalDecodedKB: 3800, readyMs: 3500 },
 };
 

@@ -449,4 +449,36 @@ describe('smoke route modules', () => {
     expect(result.worstReport.readyAt).toBe(300);
     expect(collectBudgetViolations([result])).toEqual([]);
   });
+
+  it('defers only warehouse 3D ready latency while preserving its resource budgets', () => {
+    const result = {
+      name: 'warehouse-3d',
+      assetReport: {
+        readyAt: 12_000,
+        criticalAssets: 47,
+        criticalDecodedKB: 2_801,
+      },
+    };
+
+    expect(collectBudgetViolations([result], { enabled: true })).toEqual([
+      {
+        route: 'warehouse-3d',
+        metric: 'criticalAssets',
+        actual: 47,
+        max: 46,
+        unit: 'assets',
+        sampleCount: 1,
+        worstReadyMs: undefined,
+      },
+      {
+        route: 'warehouse-3d',
+        metric: 'criticalDecodedKB',
+        actual: 2_801,
+        max: 2_800,
+        unit: 'KB decoded',
+        sampleCount: 1,
+        worstReadyMs: undefined,
+      },
+    ]);
+  });
 });

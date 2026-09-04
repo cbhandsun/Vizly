@@ -298,7 +298,10 @@ export const printBudgetSummary = (
     const sampleSummary = result.sampleCount > 1 && result.worstReport
       ? `, samples ${result.sampleCount}, worst ready ${result.worstReport.readyAt} ms`
       : '';
-    log(`- ${result.name}: critical assets ${report.criticalAssets}/${budget.criticalAssets}, decoded ${report.criticalDecodedKB}/${budget.criticalDecodedKB} KB, ready ${report.readyAt}/${budget.readyMs} ms${sampleSummary}`);
+    const readyBudget = typeof budget.readyMs === 'number'
+      ? `${budget.readyMs} ms`
+      : 'deferred';
+    log(`- ${result.name}: critical assets ${report.criticalAssets}/${budget.criticalAssets}, decoded ${report.criticalDecodedKB}/${budget.criticalDecodedKB} KB, ready ${report.readyAt}/${readyBudget}${sampleSummary}`);
     if (result.stabilityReport) {
       const stability = result.stabilityReport;
       log(`  stability ${stability.durationMs} ms: long tasks ${stability.longTaskCount}, max ${stability.maxLongTaskMs} ms, heap ${stability.heapGrowthKB} KB, workers ${stability.activeWorkers}/${stability.queuedTasks}`);

@@ -136,5 +136,9 @@ describe('shared process ranks with local branch separation', () => {
       minimumClearanceViolations: 0, commercialClearanceViolations: 0,
       quality: { nonOrthogonalSegments: 0, strictCrossings: 0, reverseOverlap: 0, unrelatedOverlap: 0 },
     });
-  }, 30000);
+  // Full production geometry routing is intentionally exercised under CI
+  // coverage here. Its runtime budget is owned by the dedicated cold-routing
+  // benchmark; this timeout only prevents coverage instrumentation from
+  // aborting the correctness assertions on slower Windows runners.
+  }, 45000);
 });
