@@ -275,6 +275,8 @@ type DisplayRoutingPhaseTimer = Readonly<{
   ) => void;
 }>;
 
+const FINAL_COMMERCIAL_EVALUATION_PHASE = 'final-commercial-evaluation';
+
 const DISPLAY_ROUTING_PHASE_PARENTS: Readonly<
   Partial<Record<DisplayRoutingPhaseName, DisplayRoutingPhaseName>>
 > = Object.freeze({
@@ -451,10 +453,10 @@ const DISPLAY_ROUTING_PHASE_PARENTS: Readonly<
   'final-safety-repair-order-strict': 'final-safety-closure',
   'final-safety-repair-order-finish': 'final-safety-closure',
   'final-safety-repair-terminal': 'final-safety-closure',
-  'final-commercial-clearance': 'finalizer',
-  'final-commercial-terminal-preserving': 'finalizer',
-  'final-commercial-terminal-changing': 'finalizer',
-  'final-commercial-source-stairs': 'finalizer',
+  'final-commercial-clearance': FINAL_COMMERCIAL_EVALUATION_PHASE,
+  'final-commercial-terminal-preserving': FINAL_COMMERCIAL_EVALUATION_PHASE,
+  'final-commercial-terminal-changing': FINAL_COMMERCIAL_EVALUATION_PHASE,
+  'final-commercial-source-stairs': FINAL_COMMERCIAL_EVALUATION_PHASE,
   'final-commercial-evaluation': 'finalizer',
   'final-commercial-safety-closure': 'finalizer',
   'final-exact-hard-report': 'finalizer',

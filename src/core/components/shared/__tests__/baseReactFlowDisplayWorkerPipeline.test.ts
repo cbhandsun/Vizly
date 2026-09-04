@@ -328,6 +328,7 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       'final-safety-endpoint-order',
       'final-safety-passage-order',
       'final-safety-closure',
+      'final-commercial-evaluation',
       'final-commercial-safety-closure',
       'final-exact-hard-report',
       'finalizer',
