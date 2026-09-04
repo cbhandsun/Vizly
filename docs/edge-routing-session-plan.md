@@ -1,6 +1,6 @@
 # Vizly 首次打开与增量调整统一路由方案
 
-状态：质量、会话、拓扑、缺陷调度与 standalone 渲染协议主链已落地。四图各 16 项布局、跨引擎连续切换、普通保存恢复、三页新增/复制/切换/重载、SVG/PDF 真实矢量文件及容器样式均已有 production 验收。Logistics 动态拓扑含折叠/展开的 10 类编辑矩阵通过，L-OMS 拖拽 30 个独立样本 `release-to-final p95=294/300ms`、零 fallback/abort，交互尾延迟已达门槛。当前首要未完成项为 Logistics 冷路由：最新远端 5 样本 route p95=`2052/1100ms`、Worker compute p95=`1572.9/1100ms`；3D 仅性能问题继续后置。
+状态：质量、会话、拓扑、缺陷调度与 standalone 渲染协议主链已落地。四图各 16 项布局、跨引擎连续切换、普通保存恢复、三页新增/复制/切换/重载、SVG/PDF 真实矢量文件及容器样式均已有 production 验收。Logistics 动态拓扑含折叠/展开的 10 类编辑矩阵通过，L-OMS 拖拽 30 个独立样本 `release-to-final p95=294/300ms`、零 fallback/abort，交互尾延迟已达门槛。当前首要未完成项为 Logistics 冷路由：最新远端 5 样本 route p95=`1138/1100ms`、Worker compute p95=`1117.7/1100ms`；3D 仅性能问题继续后置。
 适用范围：`BaseReactFlow` Canvas 最终显示路由、内置标准图、用户保存图、节点拖拽及局部编辑
 关联标准：`docs/edge-routing-goals.md`
 
@@ -8,6 +8,9 @@
 
 ### 2026-09-04：PDF 标题渐变保真与 finalizer 工作量归因
 
+- `52fbe3a8` 远端五个独立冷样本将 Logistics route 收敛到中位 `1093ms`、p95 `1138/1100ms`，Worker 中位 `1081.9ms`、p95 `1117.7ms`，route overhead p95 仅 `20.3ms`，五次均为 `full-route-repaired` 且零 abort。交互绘制和增量路由任务成功；冷路由只差 `38ms`，但仍按原预算失败，不能记作性能完成。候选商业绕行分的差分缓存实验未改善同机 commercial 阶段且使 bundle 超限 `0.27KB`，已完整撤回；下一批不再投入该低收益点，继续聚焦候选全图质量与主干审计。
+- 同一完整 CI 的五组业务测试中 foundation/core/flow/routing 成功，UI 仍由 ShareDialog 旧删除请求跨图回归撞到原 15 秒上限；该用例单独本地实际耗时约 `10.2s`。现直接通过实际 mutation hook 验证“旧请求 → scope 切换 → 新列表 → 旧请求完成”的生命周期，保留状态与无成功提示断言，执行降到约 `19ms`，没有提高超时；远端同配置 17 文件 shard 本地 72/72、类型、Lint 和 CI 收录通过，已作为 `a980227b` 推送。
+- Chrome 进程存活、零 stdout/stderr、无错误标记且 `/json/version` 持续 `ECONNREFUSED` 的 15 秒启动态已在独立 CI 浏览器任务重复出现，同时同轮其他 Chrome 任务正常完成，现按已识别基础设施瞬态处理：仅该精确诊断允许一次全新 profile 启动，预编译入口同时重新分配端口；进程退出、spawn/锁/输出/非法响应及页面或业务失败均不重试。66 项启动生命周期与安全诊断测试、TS6、`verify:static:fast`、生产构建与 bundle `9499.99/9500KB` 通过，两个真实浏览器入口正常启动与清理通过。
 - 远端 static 失败已确认不是导出或路由代码回归，而是审计库新增的 3 项传递依赖公告：`@humanfs/node <0.16.8`、`browserslist <=4.28.6`、`fflate` 的受影响版本。独立锁文件补丁已解析到 `0.16.8`、`4.28.8`、`0.8.3/0.6.11`，npm 12 审计为 0 漏洞；类型、strict-core、Lint、生产构建和 bundle 均通过。临时目录的第二次干净安装因 npm registry 长时间无输出被中止，仍需由提交后的远端干净安装门禁给出最终确认。
 - `d02bbe8b` 的完整 CI 进一步暴露观测层回归：commercial evaluation 包围的四个子阶段仍被声明成 finalizer 的直接子阶段，导致嵌套耗时作为兄弟阶段重复计入，冷路由拒绝“trace 独占总和大于 Worker 总时长”；Worker pipeline 的精确阶段序列也漏掉新阶段。现已把四个子阶段归入 `final-commercial-evaluation`、更新精确协议断言，并增加 140ms 三层嵌套总账回归；本地 52 项相关测试和四个 production 预编译目标的生成/复现通过，路径产物不变、仅 source hash 更新。该修复只校正性能记账，不改变路由候选或图形结果。
 - commercial loop shortcut 的每次候选评估原先都会重新审计完全不变的 baseline shared trunks；现将 baseline 审计提升到同一 repair 事务内复用，候选顺序、128 次预算、固定端点、障碍、终端与 hard-quality gate 均不变。5+5 个独立 production 冷样本中，Logistics commercial 中位 `158.4→133.5ms`、p95 `215→201.8ms`；WMS demand 中位基本持平且 p95 `239→208.8ms`；WMS process 中位 `440.5→426.2ms`、p95 受噪声影响 `611.1→643.2ms`。这是可解释的公共重复计算消除，但整体 Logistics route 仍为 `1694ms` 中位、`2057/1100ms` p95，不能记作预算达标。

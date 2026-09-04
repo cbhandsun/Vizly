@@ -6,7 +6,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import WebSocket from 'ws';
-import { waitForBrowserDevTools } from './precompiled-display-route-browser-startup.mjs';
+import {
+  runBrowserDevToolsStartupWithSingleRetry,
+  waitForBrowserDevTools,
+} from './precompiled-display-route-browser-startup.mjs';
 
 const DEFAULT_CDP_COMMAND_TIMEOUT_MS = 30_000;
 
@@ -242,29 +245,44 @@ export class CdpPageSession {
 export const withPrecompiledRouteBrowser = async (run) => {
   const browserPath = findBrowserExecutable();
   if (!browserPath) throw new Error('Chrome or Edge was not found');
-  const port = await findAvailablePort();
-  const profile = await mkdtemp(join(tmpdir(), 'vizly-precompiled-routes-'));
-  const browser = spawn(browserPath, [
-    '--headless=new',
-    '--disable-gpu',
-    '--disable-gpu-compositing',
-    '--disable-gpu-sandbox',
-    '--disable-dev-shm-usage',
-    '--disable-background-timer-throttling',
-    '--disable-backgrounding-occluded-windows',
-    '--disable-renderer-backgrounding',
-    '--disable-features=CalculateNativeWinOcclusion',
-    '--no-sandbox',
-    '--no-first-run',
-    '--no-default-browser-check',
-    '--remote-allow-origins=*',
-    `--remote-debugging-port=${port}`,
-    `--user-data-dir=${profile}`,
-    'about:blank',
-  ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  let port = 0;
+  let profile = '';
+  let browser = null;
   let session = null;
   try {
-    await waitForBrowserDevTools(browser, port);
+    await runBrowserDevToolsStartupWithSingleRetry(async () => {
+      port = await findAvailablePort();
+      profile = await mkdtemp(join(tmpdir(), 'vizly-precompiled-routes-'));
+      browser = spawn(browserPath, [
+        '--headless=new',
+        '--disable-gpu',
+        '--disable-gpu-compositing',
+        '--disable-gpu-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+        '--disable-features=CalculateNativeWinOcclusion',
+        '--no-sandbox',
+        '--no-first-run',
+        '--no-default-browser-check',
+        '--remote-allow-origins=*',
+        `--remote-debugging-port=${port}`,
+        `--user-data-dir=${profile}`,
+        'about:blank',
+      ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+      try {
+        await waitForBrowserDevTools(browser, port);
+      } catch (error) {
+        await closePrecompiledRouteBrowser(null, browser);
+        await retryPrecompiledRouteBrowserProfileCleanup(() => (
+          rm(profile, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+        ), delay, 12);
+        browser = null;
+        profile = '';
+        throw error;
+      }
+    }, async () => {});
     const targetResponse = await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, {
       method: 'PUT',
     });
@@ -279,9 +297,11 @@ export const withPrecompiledRouteBrowser = async (run) => {
     await session.send('Runtime.enable');
     return await run(session);
   } finally {
-    await closePrecompiledRouteBrowser(session, browser);
-    await retryPrecompiledRouteBrowserProfileCleanup(() => (
-      rm(profile, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
-    ), delay, 12);
+    if (browser) await closePrecompiledRouteBrowser(session, browser);
+    if (profile) {
+      await retryPrecompiledRouteBrowserProfileCleanup(() => (
+        rm(profile, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+      ), delay, 12);
+    }
   }
 };

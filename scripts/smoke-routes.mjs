@@ -10,7 +10,10 @@ import WebSocket from 'ws';
 import { createSmokeRouteCatalog } from './lib/smoke-route-catalog.mjs';
 import { CdpSession } from './lib/smoke-route-cdp-session.mjs';
 import { waitForRouteReadiness } from './lib/smoke-route-readiness.mjs';
-import { waitForBrowserDevTools } from './lib/precompiled-display-route-browser-startup.mjs';
+import {
+  runBrowserDevToolsStartupWithSingleRetry,
+  waitForBrowserDevTools,
+} from './lib/precompiled-display-route-browser-startup.mjs';
 import {
   aggregateRouteSamples,
   attachInitiators,
@@ -97,7 +100,10 @@ const parseSmokeProfileMaxAgeMs = () => {
   return parsedValue;
 };
 const STALE_PROFILE_MAX_AGE_MS = parseSmokeProfileMaxAgeMs();
-const browserProfileDir = resolve(WORKSPACE_ROOT, `${SMOKE_PROFILE_PREFIX}${process.pid}`);
+const browserProfileDirs = [
+  resolve(WORKSPACE_ROOT, `${SMOKE_PROFILE_PREFIX}${process.pid}`),
+  resolve(WORKSPACE_ROOT, `${SMOKE_PROFILE_PREFIX}${process.pid}-retry`),
+];
 
 const allowedWarningPatterns = [
   /\[DataRegistry\] Failed to fetch remote templates/,
@@ -298,7 +304,7 @@ const startAppServer = async () => {
   return child;
 };
 
-const launchBrowser = async (browserPath) => {
+const launchBrowserAttempt = async (browserPath, browserProfileDir) => {
   log(`Launching browser: ${browserPath}`);
   const browserArgs = [
     '--headless=new',
@@ -339,6 +345,17 @@ const launchBrowser = async (browserPath) => {
   child.browserWebSocketDebuggerUrl = version.webSocketDebuggerUrl;
 
   return child;
+};
+
+const launchBrowser = async (browserPath) => {
+  return runBrowserDevToolsStartupWithSingleRetry(
+    attempt => launchBrowserAttempt(browserPath, browserProfileDirs[attempt]),
+    async () => {
+      log('Browser DevTools stayed unavailable without process output; retrying one fresh startup.');
+      await removeDirectoryWithRetries(browserProfileDirs[0]);
+      if (!HAS_EXPLICIT_DEBUG_PORT) DEBUG_PORT = await findAvailablePort(DEBUG_PORT + 1);
+    },
+  );
 };
 
 const createTarget = async (url = 'about:blank') => {
@@ -546,8 +563,10 @@ const cleanup = async (...processes) => {
     await killProcessTree(browserProcess);
   }
 
-  if (!(await removeDirectoryWithRetries(browserProfileDir))) {
-    log(`Warning: smoke browser profile directory was not removed: ${browserProfileDir}`);
+  for (const profile of browserProfileDirs) {
+    if (!(await removeDirectoryWithRetries(profile))) {
+      log('Warning: a smoke browser profile directory was not removed.');
+    }
   }
 };
 

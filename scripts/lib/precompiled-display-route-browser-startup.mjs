@@ -12,6 +12,33 @@ const OUTPUT_MARKERS = [
   ['sandbox-failure', /No usable sandbox|sandbox.*initialization failed/i],
 ];
 
+export const isRetryableBrowserDevToolsStartupFailure = error => {
+  const diagnostic = error?.browserStartupDiagnostic;
+  return diagnostic?.reason === 'deadline'
+    && diagnostic.lastProbe === 'request-failed'
+    && diagnostic.probeErrorCode === 'ECONNREFUSED'
+    && diagnostic.processSpawned === true
+    && diagnostic.exitCode === null
+    && diagnostic.signal === null
+    && diagnostic.stdoutBytes === 0
+    && diagnostic.stderrBytes === 0
+    && Array.isArray(diagnostic.outputMarkers)
+    && diagnostic.outputMarkers.length === 0;
+};
+
+export const runBrowserDevToolsStartupWithSingleRetry = async (
+  start,
+  prepareRetry,
+) => {
+  try {
+    return await start(0);
+  } catch (error) {
+    if (!isRetryableBrowserDevToolsStartupFailure(error)) throw error;
+    await prepareRetry();
+    return start(1);
+  }
+};
+
 const readBoundedJson = async (response) => {
   const reader = response.body?.getReader();
   if (!reader) throw new Error('invalid-response');
@@ -86,8 +113,8 @@ export const waitForBrowserDevTools = async (
       if (pattern.test(stderrTail)) markers.add(name);
     }
   };
-  const failure = (reason, code = null) => new Error(
-    `Browser DevTools startup failed: ${JSON.stringify({
+  const failure = (reason, code = null) => {
+    const diagnostic = {
       reason,
       elapsedMs: Math.max(0, Date.now() - startedAt),
       attempts,
@@ -101,8 +128,11 @@ export const waitForBrowserDevTools = async (
       stdoutBytes,
       stderrBytes,
       outputMarkers: [...markers].sort(),
-    })}`,
-  );
+    };
+    const error = new Error(`Browser DevTools startup failed: ${JSON.stringify(diagnostic)}`);
+    Object.defineProperty(error, 'browserStartupDiagnostic', { value: diagnostic });
+    return error;
+  };
   let rejectStartup;
   let timeoutId;
   const interrupted = new Promise((_, reject) => { rejectStartup = reject; });
