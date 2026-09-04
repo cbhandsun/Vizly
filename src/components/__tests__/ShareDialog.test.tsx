@@ -191,6 +191,7 @@ import ShareDialog from '../diagrams/ShareDialog';
 import { createShareDialogOperationGate } from '@/components/shareDialogOperationGate';
 import { createShareDialogItemMutationGate } from '@/components/shareDialogItemMutationGate';
 import { useShareDialogItemMutations } from '@/components/diagrams/useShareDialogItemMutations';
+import type { CollaboratorRecord } from '@/services/ShareService';
 import {
   getShareExpiresAt,
   isCloudDiagramId,
@@ -521,48 +522,73 @@ describe('ShareDialog commercial failure handling', () => {
   });
 
   it('keeps the current collaborator list when an old removal finishes after switching diagrams', async () => {
-    authMocks.user = { id: USER_ID };
     const targetUserId = '44444444-4444-4444-8444-444444444444';
     const nextDiagramId = '55555555-5555-4555-8555-555555555555';
     let finishOldRemoval: (() => void) | undefined;
     serviceMocks.removeCollaborator.mockImplementationOnce(() => new Promise<void>((resolve) => {
       finishOldRemoval = resolve;
     }));
-    serviceMocks.listCollaborators
-      .mockResolvedValueOnce([
-        createCollaborator(DIAGRAM_ID, targetUserId, 'old-diagram@example.com'),
-      ])
-      .mockResolvedValueOnce([
-        createCollaborator(nextDiagramId, targetUserId, 'current-diagram@example.com'),
-      ]);
-    const onClose = vi.fn();
-    const onEnsureSaved = vi.fn(async () => savedDiagram());
-    const { rerender } = render(
-      <ShareDialog open onClose={onClose} diagramId={DIAGRAM_ID} onEnsureSaved={onEnsureSaved} />,
-    );
-
-    expect(await screen.findByText('old-diagram@example.com')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '移除' }));
-    expect(await screen.findByText('确认移除此协作者？')).toBeTruthy();
-    const confirmationButtons = document.querySelector('.ant-popconfirm-buttons') as HTMLElement | null;
-    expect(confirmationButtons).toBeTruthy();
-    if (!confirmationButtons) return;
-    fireEvent.click(within(confirmationButtons).getByRole('button', { name: /移\s*除/ }));
-    await waitFor(() => {
-      expect(serviceMocks.removeCollaborator).toHaveBeenCalledWith(DIAGRAM_ID, targetUserId);
+    const pendingCreatedSharesRef = { current: [] };
+    const { result, rerender } = renderHook(({
+      effectiveDiagramId,
+      scopeKey,
+    }: {
+      effectiveDiagramId: string;
+      scopeKey: string;
+    }) => {
+      const { t } = useTranslation();
+      const [collaborators, setCollaborators] = React.useState<{
+        scopeKey: string | null;
+        records: CollaboratorRecord[];
+      }>({
+        scopeKey: DIAGRAM_ID,
+        records: [createCollaborator(DIAGRAM_ID, targetUserId, 'old-diagram@example.com')],
+      });
+      const mutations = useShareDialogItemMutations({
+        collaborators: setCollaborators,
+        effectiveDiagramId,
+        open: true,
+        pendingCreatedSharesRef,
+        scopeKey,
+        shares: vi.fn(),
+        t,
+      });
+      return { ...mutations, collaborators, setCollaborators };
+    }, {
+      initialProps: { effectiveDiagramId: DIAGRAM_ID, scopeKey: DIAGRAM_ID },
     });
 
-    rerender(
-      <ShareDialog open onClose={onClose} diagramId={nextDiagramId} onEnsureSaved={onEnsureSaved} />,
-    );
-    expect(await screen.findByText('current-diagram@example.com')).toBeTruthy();
+    let oldRemoval: Promise<void> | undefined;
+    await act(async () => {
+      oldRemoval = result.current.handleRemoveCollaborator(targetUserId);
+      await Promise.resolve();
+    });
+    expect(serviceMocks.removeCollaborator).toHaveBeenCalledWith(DIAGRAM_ID, targetUserId);
+
+    rerender({ effectiveDiagramId: nextDiagramId, scopeKey: nextDiagramId });
+    act(() => result.current.setCollaborators({
+      scopeKey: nextDiagramId,
+      records: [createCollaborator(
+        nextDiagramId,
+        targetUserId,
+        'current-diagram@example.com',
+      )],
+    }));
 
     await act(async () => {
       finishOldRemoval?.();
+      await oldRemoval;
     });
-    expect(screen.getByText('current-diagram@example.com')).toBeTruthy();
+    expect(result.current.collaborators).toEqual({
+      scopeKey: nextDiagramId,
+      records: [createCollaborator(
+        nextDiagramId,
+        targetUserId,
+        'current-diagram@example.com',
+      )],
+    });
     expect(messageMocks.success).not.toHaveBeenCalled();
-  }, 15_000);
+  });
 
   it('keeps a created link visible when clipboard permission is denied', async () => {
     authMocks.user = { id: USER_ID };
