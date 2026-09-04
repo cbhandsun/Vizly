@@ -2,6 +2,9 @@ import type { Node, Edge } from '@xyflow/react';
 import type { Point } from './pathfinding';
 import { getJumpPoints } from './smartEdgeGeometryCore';
 
+const LONG_LABEL_SEGMENT_THRESHOLD = 480;
+const LONG_LABEL_SOURCE_DISTANCE = 180;
+
 
 export function createRoundedPathWithJumps(
     points: Point[],
@@ -232,6 +235,22 @@ export function getSmartLabelPosition(points: Point[]): { x: number, y: number }
             bestScore = totalScore;
             bestCandidate = seg;
         }
+    }
+
+    // A connector label at the geometric midpoint of an oversized swimlane
+    // backbone looks detached from the decision that owns it. Keep the normal
+    // midpoint for ordinary segments, but bound the reading distance on very
+    // long segments. The candidate direction follows source -> target, so the
+    // label remains close enough to its semantic origin while still sitting on
+    // the routed path for obstacle avoidance and interaction.
+    if (bestCandidate.len > LONG_LABEL_SEGMENT_THRESHOLD) {
+        const start = points[bestCandidate.index];
+        const end = points[bestCandidate.index + 1];
+        const ratio = LONG_LABEL_SOURCE_DISTANCE / bestCandidate.len;
+        return {
+            x: start.x + (end.x - start.x) * ratio,
+            y: start.y + (end.y - start.y) * ratio,
+        };
     }
 
     return { x: bestCandidate.mid.x, y: bestCandidate.mid.y };

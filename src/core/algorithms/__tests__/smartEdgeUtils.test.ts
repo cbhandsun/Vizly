@@ -167,6 +167,19 @@ describe('smartEdgeUtils geometry primitives', () => {
     expect(getClosestDistanceToPath({ x: 0, y: 0 }, [])).toBe(Infinity);
   });
 
+  it('keeps labels on oversized swimlane backbones near their semantic source', () => {
+    expect(getSmartLabelPosition([
+      { x: 100, y: 80 },
+      { x: 100, y: 1_280 },
+      { x: 360, y: 1_280 },
+    ])).toEqual({ x: 100, y: 260 });
+
+    expect(getSmartLabelPosition([
+      { x: 900, y: 300 },
+      { x: 100, y: 300 },
+    ])).toEqual({ x: 720, y: 300 });
+  });
+
   it('repairs short diagonal segments and leaves long diagonals for orthogonalization', () => {
     expect(removeShortDiagonals([
       { x: 0, y: 0 },
