@@ -8,7 +8,9 @@
 
 ### 2026-09-04：PDF 标题渐变保真与 finalizer 工作量归因
 
-- `d65e0610` 已进入并推送 `main`：导出快照、场景模型、SVG 与 PDF 现在保留 titleGroup 的受控三段纵向渐变，不再把画布上的渐变标题条压平成单色。真实 Logistics production 导出包含 3 个渐变定义和 3 个渐变填充；PDF 二进制包含矢量 shading、嵌入字体且无图像对象，Poppler 渲染复核颜色、中文、节点和连线均保留。聚焦 79 项、静态快速门禁、生产构建和 bundle 通过，未扩大 `9500KB` 总预算；远端完整 CI 尚未结束，其中 static job 已失败，须在 run 终态日志可用后分类，不能先记为代码回退或基础设施故障。
+- 远端 static 失败已确认不是导出或路由代码回归，而是审计库新增的 3 项传递依赖公告：`@humanfs/node <0.16.8`、`browserslist <=4.28.6`、`fflate` 的受影响版本。独立锁文件补丁已解析到 `0.16.8`、`4.28.8`、`0.8.3/0.6.11`，npm 12 审计为 0 漏洞；类型、strict-core、Lint、生产构建和 bundle 均通过。临时目录的第二次干净安装因 npm registry 长时间无输出被中止，仍需由提交后的远端干净安装门禁给出最终确认。
+- `d02bbe8b` 的完整 CI 进一步暴露观测层回归：commercial evaluation 包围的四个子阶段仍被声明成 finalizer 的直接子阶段，导致嵌套耗时作为兄弟阶段重复计入，冷路由拒绝“trace 独占总和大于 Worker 总时长”；Worker pipeline 的精确阶段序列也漏掉新阶段。现已把四个子阶段归入 `final-commercial-evaluation`、更新精确协议断言，并增加 140ms 三层嵌套总账回归；本地 52 项相关测试和四个 production 预编译目标的生成/复现通过，路径产物不变、仅 source hash 更新。该修复只校正性能记账，不改变路由候选或图形结果。
+- `d65e0610` 已进入并推送 `main`：导出快照、场景模型、SVG 与 PDF 现在保留 titleGroup 的受控三段纵向渐变，不再把画布上的渐变标题条压平成单色。真实 Logistics production 导出包含 3 个渐变定义和 3 个渐变填充；PDF 二进制包含矢量 shading、嵌入字体且无图像对象，Poppler 渲染复核颜色、中文、节点和连线均保留。聚焦 79 项、静态快速门禁、生产构建和 bundle 通过，未扩大 `9500KB` 总预算；远端五组测试与覆盖率通过，static job 的依赖审计失败由上一条锁文件补丁处理。
 - 上一提交 `9e25bf1e` 的完整 CI 唯一失败是 GitHub runner 访问 npm audit registry 超时；五组测试与覆盖率均通过，不归类为产品代码失败，也不通过跳过 audit 制造绿色结果。对应性能专项仍真实失败：Logistics route 中位 `1094ms`、p95 `1728/1100ms`，Worker 中位 `1080.5ms`、p95 `1217.7ms`，另有一个约 `510.3ms` 的 route-side 尾部样本；预算保持不变。
 - finalizer 父阶段过去只报告耗时、工作量恒为零，无法判断剩余独占时间来自何处。父阶段现输出同一请求级评估会话的差分指标，随后补齐正常完整路由缺失的 `final-commercial-evaluation` 边界；同机样本中 finalizer 独占由约 `151.7ms` 收敛为 `21–22.5ms`，缺失时间已归因到 commercial detour（单次 `187.8–469.5ms`）。该阶段固定出现 `64` 次请求级评估、`66` 次缓存命中、`1044` 次节点扫描和 `336` 次边对扫描，下一批直接处理其候选闭环，不再从 finalizer 外层猜测。
 - 路由路径产物本身未变化；因观测源码属于路由 hash 范围，四项预编译 manifest 的 `routingSourceHash` 已同步更新并重新通过可复现检查。当前唯一首要性能缺口仍是 Logistics 冷路由 p95；3D 按用户优先级后置。
