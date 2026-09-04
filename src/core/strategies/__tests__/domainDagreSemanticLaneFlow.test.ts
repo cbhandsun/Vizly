@@ -78,6 +78,7 @@ describe('semantic swimlane process geometry', () => {
     });
     const byId = new Map(arranged.map(node => [node.id, node]));
     const flow = direction === 'LR' ? 'x' : 'y';
+    const maximumFlowGap = direction === 'LR' ? 96 : 64;
 
     expect(Math.abs((byId.get('left')?.position[flow] ?? NaN) - (byId.get('right')?.position[flow] ?? NaN))).toBe(120);
     const intervals = arranged.filter(node => !isDomainDagreGroupNode(node)).map(node => ({
@@ -86,7 +87,7 @@ describe('semantic swimlane process geometry', () => {
     })).sort((a, b) => a.start - b.start || a.end - b.end);
     let occupiedEnd = intervals[0]?.end ?? 0;
     for (const interval of intervals.slice(1)) {
-      if (interval.start > occupiedEnd) expect(interval.start - occupiedEnd).toBeLessThanOrEqual(96);
+      if (interval.start > occupiedEnd) expect(interval.start - occupiedEnd).toBeLessThanOrEqual(maximumFlowGap);
       occupiedEnd = Math.max(occupiedEnd, interval.end);
     }
     const domains = arranged.filter(node => node.type === 'titleGroup');

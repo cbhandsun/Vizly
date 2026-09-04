@@ -21,7 +21,13 @@ const withoutAbsolutePosition = (node: Node): Node => {
 const moveAlong = (node: Node, axis: 'x' | 'y', value: number): Node => ({
   ...node, position: { ...node.position, [axis]: value },
 });
-const geometryBoundsError = () => Error('Swimlane bounds');
+const geometryBoundsError = () => Error('Semantic swimlane layout exceeds supported geometry bounds');
+// Keep enough room for an orthogonal connector, arrowhead and compact label,
+// without carrying Dagre's presentation spacing through every process rank.
+// This is a group-level flow-axis compaction: peer lanes still share one
+// extent and individual lanes are never resized independently.
+const MAX_VERTICAL_FLOW_BAND_GAP = 64;
+const MAX_HORIZONTAL_FLOW_BAND_GAP = 96;
 
 /** Shared process ranks and bounded per-peer corridors, before any edge routing. */
 export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: SemanticLaneFlowOptions): Node[] => {
@@ -30,6 +36,7 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
   const reversed = direction === 'BT' || direction === 'RL';
   const flow = horizontal ? 'x' : 'y';
   const cross = horizontal ? 'y' : 'x';
+  const maxFlowBandGap = horizontal ? MAX_HORIZONTAL_FLOW_BAND_GAP : MAX_VERTICAL_FLOW_BAND_GAP;
   const horizontalGap = boundedDomainDagreNumber(options.horizontalGap, 120, 120, 5000);
   const verticalGap = boundedDomainDagreNumber(options.verticalGap, 120, 120, 5000);
   const flowGap = horizontal ? horizontalGap : verticalGap;
@@ -172,7 +179,9 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
     });
     const bandStart = Math.min(...positioned.map(node => node.position[flow]));
     const bandEnd = Math.max(...positioned.map(node => node.position[flow] + flowSize(node)));
-    if (occupiedEnd !== undefined) flowReduction += Math.max(0, bandStart - occupiedEnd - 96);
+    if (occupiedEnd !== undefined) {
+      flowReduction += Math.max(0, bandStart - occupiedEnd - maxFlowBandGap);
+    }
     for (const node of positioned) replacements.set(node.id, moveAlong(node, flow, node.position[flow] - flowReduction));
     occupiedEnd = bandEnd;
     flowOffset += (ordered.length - 1) * flowGap;
