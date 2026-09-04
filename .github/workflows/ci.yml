@@ -42,6 +42,8 @@ jobs:
         run: npm run smoke:routes:budget
 
       - name: Run mobile route smoke checks
+        env:
+          SMOKE_REPEAT: 3
         run: npm run smoke:routes:mobile
 
       - name: Verify ordinary saved diagram recovery

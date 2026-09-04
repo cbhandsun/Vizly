@@ -179,8 +179,13 @@ describe('smoke route modules', () => {
     const smokeStep = workflow
       .split('- name: Run route smoke checks')[1]
       ?.split('- name: Run mobile route smoke checks')[0];
+    const mobileSmokeStep = workflow
+      .split('- name: Run mobile route smoke checks')[1]
+      ?.split('- name: Verify ordinary saved diagram recovery')[0];
     expect(smokeStep).toContain('SMOKE_REPEAT: 3');
     expect(smokeStep).not.toContain('continue-on-error');
+    expect(mobileSmokeStep).toContain('SMOKE_REPEAT: 3');
+    expect(mobileSmokeStep).not.toContain('continue-on-error');
   });
 
   it('timestamps readiness in the same browser evaluation, before unrelated long tasks', async () => {
