@@ -2,6 +2,10 @@ import { existsSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
+import {
+  collectStaticJsAssetPaths,
+  parseViteModuleEntry,
+} from './lib/bundle-static-import-graph.mjs';
 
 const projectRoot = resolve(process.cwd());
 const assetsDir = resolve(projectRoot, 'dist/assets');
@@ -24,6 +28,8 @@ const limits = {
   maxJsGzipChunkKB: parsePositiveNumberEnv('BUNDLE_MAX_JS_GZIP_CHUNK_KB', 475),
   maxCssGzipChunkKB: parsePositiveNumberEnv('BUNDLE_MAX_CSS_GZIP_CHUNK_KB', 24),
   maxTotalJsKB: parsePositiveNumberEnv('BUNDLE_MAX_TOTAL_JS_KB', 9500),
+  maxStartupJsKB: parsePositiveNumberEnv('BUNDLE_MAX_STARTUP_JS_KB', 650),
+  maxStartupJsGzipKB: parsePositiveNumberEnv('BUNDLE_MAX_STARTUP_JS_GZIP_KB', 220),
 };
 
 const formatKB = (bytes) => `${(bytes / 1024).toFixed(2)} KB`;
@@ -49,12 +55,23 @@ for (const entry of entries) {
     type: entry.name.endsWith('.js') ? 'js' : 'css',
     bytes: fileStats.size,
     gzipBytes: gzipSync(contents).byteLength,
+    source: entry.name.endsWith('.js') ? contents.toString('utf8') : undefined,
   });
 }
 
 const jsAssets = assets.filter((asset) => asset.type === 'js');
 const cssAssets = assets.filter((asset) => asset.type === 'css');
 const totalJsBytes = jsAssets.reduce((total, asset) => total + asset.bytes, 0);
+const moduleEntry = parseViteModuleEntry(await readFile(resolve(projectRoot, 'dist/index.html'), 'utf8'));
+const jsAssetByPath = new Map(jsAssets.map(asset => [`assets/${asset.name}`, asset]));
+const startupJsPaths = collectStaticJsAssetPaths(
+  moduleEntry,
+  new Map(jsAssets.map(asset => [`assets/${asset.name}`, asset.source])),
+);
+const startupJsAssets = startupJsPaths.map(path => jsAssetByPath.get(path));
+if (startupJsAssets.some(asset => !asset)) throw new Error('Static bundle asset metadata was not found');
+const startupJsBytes = startupJsAssets.reduce((total, asset) => total + asset.bytes, 0);
+const startupJsGzipBytes = startupJsAssets.reduce((total, asset) => total + asset.gzipBytes, 0);
 
 const violations = [];
 const displayWorkerAssets = jsAssets.filter(asset => (
@@ -98,6 +115,12 @@ for (const asset of cssAssets) {
 if (totalJsBytes > limits.maxTotalJsKB * 1024) {
   violations.push(`total JS raw ${formatKB(totalJsBytes)} > ${limits.maxTotalJsKB} KB`);
 }
+if (startupJsBytes > limits.maxStartupJsKB * 1024) {
+  violations.push(`startup JS raw ${formatKB(startupJsBytes)} > ${limits.maxStartupJsKB} KB`);
+}
+if (startupJsGzipBytes > limits.maxStartupJsGzipKB * 1024) {
+  violations.push(`startup JS gzip ${formatKB(startupJsGzipBytes)} > ${limits.maxStartupJsGzipKB} KB`);
+}
 
 if (violations.length > 0) {
   console.error([
@@ -105,7 +128,8 @@ if (violations.length > 0) {
     ...violations.map((violation) => `  - ${violation}`),
     '',
     'Override limits with BUNDLE_MAX_JS_CHUNK_KB, BUNDLE_MAX_JS_GZIP_CHUNK_KB,',
-    'BUNDLE_MAX_CSS_CHUNK_KB, BUNDLE_MAX_CSS_GZIP_CHUNK_KB, or BUNDLE_MAX_TOTAL_JS_KB.',
+    'BUNDLE_MAX_CSS_CHUNK_KB, BUNDLE_MAX_CSS_GZIP_CHUNK_KB, BUNDLE_MAX_TOTAL_JS_KB,',
+    'BUNDLE_MAX_STARTUP_JS_KB, or BUNDLE_MAX_STARTUP_JS_GZIP_KB.',
   ].join('\n'));
   process.exit(1);
 }
@@ -113,6 +137,7 @@ if (violations.length > 0) {
 const largestJs = [...jsAssets].sort((a, b) => b.bytes - a.bytes).slice(0, 5);
 console.log([
   `Bundle budget passed (${jsAssets.length} JS assets, ${cssAssets.length} CSS assets, total JS ${formatKB(totalJsBytes)}).`,
+  `Startup static JS: ${startupJsAssets.length} assets, raw ${formatKB(startupJsBytes)}, gzip ${formatKB(startupJsGzipBytes)}.`,
   'Largest JS chunks:',
   ...largestJs.map((asset) => `  - ${asset.name}: raw ${formatKB(asset.bytes)}, gzip ${formatKB(asset.gzipBytes)}`),
 ].join('\n'));
