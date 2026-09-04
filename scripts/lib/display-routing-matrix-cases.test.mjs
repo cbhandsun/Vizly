@@ -155,9 +155,15 @@ describe('display routing matrix cases', () => {
     expect(session.evaluate.mock.calls[2][0]).toContain("item.scrollIntoView({ block: 'nearest'");
   });
   it('checks the applied layout in the live-session assertion', async () => {
-    const correct = { evaluate: async () => ({ requested: 'Vertical swimlanes', applied: 'Auto Layout: Vertical swimlanes' }) };
+    const correct = { evaluate: async () => ({
+      requested: '泳道 · 域左右并列（域内上→下）',
+      applied: '自动布局：泳道 · 域左右并列（域内上→下）',
+    }) };
     await expect(assertRequestedLayoutSelected(correct, 'domain-lanes-tb')).resolves.toBeUndefined();
-    const fallback = { evaluate: vi.fn().mockResolvedValue({ requested: 'Vertical swimlanes', applied: 'Auto Layout: Complex process' }) };
+    const fallback = { evaluate: vi.fn().mockResolvedValue({
+      requested: '泳道 · 域左右并列（域内上→下）',
+      applied: '自动布局：复杂流程（保留域·上→下）',
+    }) };
     await expect(assertRequestedLayoutSelected(fallback, 'domain-lanes-tb')).rejects.toThrow('different layout');
     await expect(assertRequestedLayoutSelected(fallback, 'domain-compound-elk-bt')).rejects.toThrow('different layout');
     expect(fallback.evaluate).toHaveBeenCalledTimes(2);
@@ -212,8 +218,20 @@ describe('display routing matrix cases', () => {
     );
     const unknown = { evaluate: async () => ({ requested: 'private diagram token=secret', applied: null }) };
     await expect(assertRequestedLayoutSelected(unknown, 'domain-lanes-tb')).rejects.toThrow(
-      'domain-lanes-tb committed a different layout than requested (requested=unrecognized, applied=unrecognized)',
+      'domain-lanes-tb committed a different layout than requested (requested=domain-lanes-tb, applied=unrecognized)',
     );
+  });
+
+  it('uses the requested case id when the clicked menu label is unavailable', async () => {
+    const session = { evaluate: vi.fn().mockResolvedValue({
+      requested: undefined,
+      applied: '自动布局',
+      appliedKey: 'domain-lanes-tb',
+    }) };
+
+    await expect(assertRequestedLayoutSelected(session, 'domain-lanes-tb'))
+      .resolves.toBeUndefined();
+    expect(session.evaluate).toHaveBeenCalledTimes(1);
   });
 
   it('fails the command when no toolbar trigger exists', async () => {

@@ -106,7 +106,7 @@ export const assertRequestedLayoutSelected = async (session, caseId) => {
   const knownSelectionKey = value => DISPLAY_ROUTING_LAYOUT_CASES.some(candidate => (
     candidate.id === value
   )) ? value : 'unrecognized';
-  let requested = 'unrecognized';
+  const requested = knownSelectionKey(caseId);
   let applied = 'unrecognized';
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const selection = await session.evaluate(`(() => ({
@@ -118,17 +118,21 @@ export const assertRequestedLayoutSelected = async (session, caseId) => {
         .find(button => button.hasAttribute('data-flowchart-layout-selection'))
         ?.getAttribute('data-flowchart-layout-selection'),
     }))()`);
-    requested = knownSelection(selection?.requested);
     const appliedKey = knownSelectionKey(selection?.appliedKey);
     applied = appliedKey === 'unrecognized' ? knownSelection(selection?.applied) : appliedKey;
     if (appliedKey !== 'unrecognized') {
-      if (requested === applied && requested !== 'unrecognized') return;
-    } else if (displayRoutingLayoutSelectionMatches(selection?.requested, selection?.applied)) {
+      if (requested === applied) return;
+      break;
+    }
+    if (applied !== 'unrecognized') {
+      if (requested === applied) return;
+      break;
+    }
+    if (displayRoutingLayoutSelectionMatches(selection?.requested, selection?.applied)) {
       return;
     }
-    // A recognized, different layout is a real fallback and must fail now.
-    // Only an uncommitted toolbar label may settle after the page canvas.
-    if (requested === 'unrecognized' || applied !== 'unrecognized') break;
+    // The toolbar may render before its stable key and translated status text
+    // settle after a page switch. Only recognized mismatches fail immediately.
     await delay(50);
   }
   throw new Error(`${caseId} committed a different layout than requested`
