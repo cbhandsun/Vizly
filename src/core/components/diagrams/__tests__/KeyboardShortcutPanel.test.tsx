@@ -36,14 +36,14 @@ describe('KeyboardShortcutPanel', () => {
     it('focuses the shortcut search when the panel opens', async () => {
         render(<KeyboardShortcutPanel visible onClose={vi.fn()} />);
 
-        const search = screen.getByRole('textbox', { name: '搜索快捷键或动作' });
+        const search = await screen.findByRole('textbox', { name: '搜索快捷键或动作' });
         await waitFor(() => expect(document.activeElement).toBe(search));
     });
 
-    it('makes canvas search shortcuts discoverable through the live menu panel', () => {
+    it('makes canvas search shortcuts discoverable through the live menu panel', async () => {
         render(<KeyboardShortcutPanel visible onClose={vi.fn()} />);
 
-        const search = screen.getByRole('textbox', { name: '搜索快捷键或动作' });
+        const search = await screen.findByRole('textbox', { name: '搜索快捷键或动作' });
         expect(screen.getByText('搜索画布内容')).toBeTruthy();
         expect(screen.getByText('查找并替换画布文本')).toBeTruthy();
 
@@ -55,10 +55,10 @@ describe('KeyboardShortcutPanel', () => {
         expect(screen.getByRole('status').textContent).toContain('未找到匹配的快捷键');
     });
 
-    it('includes the workspace shortcuts formerly exposed by the command entry', () => {
+    it('includes the workspace shortcuts formerly exposed by the command entry', async () => {
         render(<KeyboardShortcutPanel visible onClose={vi.fn()} />);
 
-        expect(screen.getByText('聚焦左侧菜单搜索')).toBeTruthy();
+        expect(await screen.findByText('聚焦左侧菜单搜索')).toBeTruthy();
         expect(screen.getByText('展开/收起左侧菜单')).toBeTruthy();
         expect(screen.getByText('显示/隐藏调试面板')).toBeTruthy();
         expect(screen.getByText('打开更多设置')).toBeTruthy();
@@ -97,11 +97,7 @@ describe('KeyboardShortcutPanel', () => {
         const onClose = vi.fn();
         render(<KeyboardShortcutPanel visible onClose={onClose} />);
 
-        await act(async () => {
-            await Promise.resolve();
-        });
-
-        const search = screen.getByRole('textbox', { name: '搜索快捷键或动作' });
+        const search = await screen.findByRole('textbox', { name: '搜索快捷键或动作' });
         search.focus();
         fireEvent.keyDown(search, { key: '?' });
 

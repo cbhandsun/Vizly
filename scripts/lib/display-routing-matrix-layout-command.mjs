@@ -100,17 +100,26 @@ export const assertRequestedLayoutSelected = async (session, caseId) => {
   // Other legacy engines still have intentional topology fallbacks. Explicit
   // swimlane and compound commands must preserve the requested arrangement.
   if (!caseId.startsWith('domain-lanes-') && !caseId.startsWith('domain-compound-elk-')) return;
-  const selection = await session.evaluate(`(() => ({
-    requested: window.__vizlyRequestedLayoutLabel,
-    applied: Array.from(document.querySelectorAll('button'))
-      .find(button => /自动布局|layout/i.test(button.getAttribute('aria-label') || ''))
-      ?.getAttribute('aria-label'),
-  }))()`);
-  if (!displayRoutingLayoutSelectionMatches(selection.requested, selection.applied)) {
-    const knownSelection = value => DISPLAY_ROUTING_LAYOUT_CASES.find(candidate => (
-      displayRoutingLayoutSelectionMatches(candidate.label, value)
-    ))?.id ?? 'unrecognized';
-    throw new Error(`${caseId} committed a different layout than requested`
-      + ` (requested=${knownSelection(selection.requested)}, applied=${knownSelection(selection.applied)})`);
+  const knownSelection = value => DISPLAY_ROUTING_LAYOUT_CASES.find(candidate => (
+    displayRoutingLayoutSelectionMatches(candidate.label, value)
+  ))?.id ?? 'unrecognized';
+  let requested = 'unrecognized';
+  let applied = 'unrecognized';
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const selection = await session.evaluate(`(() => ({
+      requested: window.__vizlyRequestedLayoutLabel,
+      applied: Array.from(document.querySelectorAll('button'))
+        .find(button => /自动布局|layout/i.test(button.getAttribute('aria-label') || ''))
+        ?.getAttribute('aria-label'),
+    }))()`);
+    requested = knownSelection(selection?.requested);
+    applied = knownSelection(selection?.applied);
+    if (displayRoutingLayoutSelectionMatches(selection?.requested, selection?.applied)) return;
+    // A recognized, different layout is a real fallback and must fail now.
+    // Only an uncommitted toolbar label may settle after the page canvas.
+    if (requested === 'unrecognized' || applied !== 'unrecognized') break;
+    await delay(50);
   }
+  throw new Error(`${caseId} committed a different layout than requested`
+    + ` (requested=${requested}, applied=${applied})`);
 };

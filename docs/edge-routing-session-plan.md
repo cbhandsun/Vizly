@@ -1,6 +1,6 @@
 # Vizly 首次打开与增量调整统一路由方案
 
-状态：质量、会话、拓扑、缺陷调度与 standalone 渲染协议主链已落地。四图各 16 项布局、跨引擎连续切换、普通保存恢复、三页新增/复制/切换/重载、SVG/PDF 真实矢量文件及容器样式均已有 production 验收。Logistics 动态拓扑含折叠/展开的 10 类编辑矩阵通过，L-OMS 拖拽 30 个独立样本 `release-to-final p95=294/300ms`、零 fallback/abort，交互尾延迟已达门槛。当前首要未完成项仍是 Logistics 冷路由：最新远端 5 样本 route p95=`2016/1100ms`、Worker compute p95=`1182.5/1100ms`，其中 route-side overhead p95=`833.5ms`；本地同一 production preview 的最新结构性优化把 loop-shortcut 质量计算从 `153` 次降到 `129` 次，5 样本 route 中位由 `2353ms` 降到 `2248ms`，但有 `4050ms` 尾部样本，不能据此关闭 p95。3D 仅性能问题继续后置。
+状态：质量、会话、拓扑、缺陷调度与 standalone 渲染协议主链已落地。四图各 16 项布局、跨引擎连续切换、普通保存恢复、三页新增/复制/切换/重载、SVG/PDF 真实矢量文件及容器样式均已有 production 验收。Logistics 动态拓扑含折叠/展开的 10 类编辑矩阵通过，L-OMS 拖拽 30 个独立样本 `release-to-final p95=294/300ms`、零 fallback/abort，交互尾延迟已达门槛。`ab437cd4` 的首轮远端 5 样本让 Logistics 冷路由首次通过：route p95=`1070/1100ms`、Worker compute p95=`1035.4/1100ms`、route overhead p95=`89.6ms`，5/5 `full-route-repaired`、零 abort；仍需下一独立远端轮次确认稳定性。当前性能任务的剩余失败转为增量矩阵初始装载的 Worker 消息投递尾延迟，单个 WMS 样本 delivery wait=`2039.1ms`，而 Worker compute 仅 `35.6ms`。3D 仅性能问题继续后置。
 适用范围：`BaseReactFlow` Canvas 最终显示路由、内置标准图、用户保存图、节点拖拽及局部编辑
 关联标准：`docs/edge-routing-goals.md`
 
@@ -8,6 +8,8 @@
 
 ### 2026-09-04：PDF 标题渐变保真与 finalizer 工作量归因
 
+- `ab437cd4` 的远端冷路由任务首次在原预算内通过：Logistics route 中位 `1062ms`、p95 `1070/1100ms`，Worker compute 中位 `1009.3ms`、p95 `1035.4/1100ms`，route overhead p95 `89.6ms`；5 次均为 `full-route-repaired`、一次 Worker、零 abort。commercial evaluation 中位 `62ms`、p95 `73ms`，与候选质量复用的结构性减算一致。该结果先记为首轮达标，等待下一次独立远端运行确认，不用单轮绿灯抹去此前波动。
+- 同一性能工作流的增量路由与交互本体仍通过：三个拖拽目标各 5 次均为 `validated-candidate`，零 fallback/abort，release-to-final p95 `142ms`、Worker compute p95 `88ms`。任务失败来自初始装载聚合 p95 `2088/750ms`；最慢 WMS 样本 Worker compute 仅 `35.6ms`，但 Worker delivery wait 达 `2039.1ms`，L-OMS/TMS 也出现 `738.4/583.7ms` 投递尾部。下一步把它作为主线程/runner 调度尾延迟单独处理，不回退已达标的交互结论，也不放宽预算。
 - `9e5839a1` 已进入并推送 `main`：矢量导出快照现在采集受控节点阴影，SVG 使用过滤器、PDF 使用透明度受限的矢量偏移轮廓恢复画布节点层次；真实 Logistics PDF 无图像对象，节点、连线、中文字体和容器样式保持。该提交本地 80 项聚焦测试、静态、TS6、生产构建与 bundle 通过；远端完整 CI 的独立失败为 `KeyboardShortcutPanel` 4 个可访问性查询未找到，以及 enterprise smoke 关键资产偶发 `109/108`，因此不记录为远端全绿，后续分别修复测试隔离/可访问性和首屏资产抖动。
 - commercial loop-shortcut 的严格闭合预检和普通接受判定原先会对同一候选重复执行完整质量计算。现在同一候选共享一次 changed-quality 结果，再分别进入两套判定；候选顺序、质量预算、障碍、固定端点、主干和 hard gate 均不变。确定性诊断从 `153` 次质量计算降至 `129` 次，正好消除 24 次重复；同一 preview 的 3 个基线与 5 个修改后样本中，commercial 中位 `268.5→231.9ms`、独占中位 `189→156.8ms`、route 中位 `2353→2248ms`。一次将 shared-trunk audit 延后到便宜门禁之后的实验收益不足且噪声明显，已完整撤回。最终实现的 43 项聚焦回归、TS6、生产构建、四项预编译重放和未提高的 `9500KB` bundle 门禁通过；冷路由尾延迟仍未达标。
 - `a591af47` 的完整 CI 已证明精确 audit 重试有效：依赖安装与 static/build 全部通过，五组测试和覆盖率也全部成功；随后 smoke 揭示矢量 PDF 接入后的独立首屏分块回归。`svg2pdf.js` 及四个专属解析依赖原先落入通用 vendor chunk，使约 `550KB` 被九条路由首屏共同加载；现把 PDF 实现改为点击导出时动态加载，并归入现有 PDF vendor chunk，同时将三个同步、小型场景快照模块与 designer micro chunk 合并。管理页从 `2454.3KB/36` 回到 `1887.4KB/35`，WMS/企业图从 `109/110` 个关键资源降为 `107/105`，解码体积 `4867.5/4745.5KB`，未提高预算；最终九路由 production smoke 全部通过。矢量 PDF 行为回归 26 项通过。
@@ -1832,3 +1834,11 @@ production trace 现在把 finalizer 独占从约 `151.7ms` 收敛为 `21–22.5
 现在候选在预算内只生成一次 changed-quality 结果，并把同一只读结果交给严格闭合与普通接受判定；严格闭合产生新的闭合候选时仍独立评估，预算耗尽和所有失败路径保持原行为。回归在 Logistics 同构的固定端点、shared-trunk、严格闭合与 hard-clean 场景中锁定质量计算不超过预算加两次基线开销，防止重新出现双算。
 
 临时诊断显示同一 Logistics production 输入的 loop-shortcut 质量计算由 `153` 降为 `129`，消除 24 次完全重复评估。3 个修改前与 5 个修改后独立样本中，commercial 总耗时中位 `268.5→231.9ms`，独占中位 `189→156.8ms`，route 中位 `2353→2248ms`；所有样本均为一次 Worker、`full-route-repaired`，预编译路径签名不变。修改后仍出现 `4050ms` route 尾部，说明结构性重复已消除但 `1100ms` p95 目标尚未完成。下一批继续沿 commercial detour 的固定 64 次请求级评估和 route-side 尾部追踪；enterprise 首屏资产 `109/108` 的 CI 抖动作为独立发布门禁问题处理，3D 性能继续后置。
+
+## 46. 异步 UI 提交门禁收敛与首轮冷路由达标（2026-09-04）
+
+`ab437cd4` 的完整 CI 五组测试与覆盖率全部通过，上一轮 `KeyboardShortcutPanel` 的 4 个失败由此确认是 Modal 异步挂载时序抖动：失败 DOM 只有空 React 根节点，测试却立即执行同步查询。相关用例改为等待真实可访问元素出现，不增加默认超时。单文件 11 项和与矩阵脚本组合的 33 项回归通过。
+
+同轮 static/build/smoke 已完成前置构建与路由检查，最终在多页恢复后切回第一页时失败。画布节点/边数量、持久化页面状态、render authority、路径质量和布局语义已经全部通过，只有工具栏布局标签在 React 页面切换提交前被同步读为 `unrecognized`。布局选择断言现在仅在“请求标签是已知布局、应用标签尚未提交”时做最长 1 秒的条件轮询；一旦应用为另一个已知布局便立即失败，未知请求也立即失败，不会把真实布局回退变成绿色。新增回归覆盖延迟提交、已知错误布局和未知输入，本地 1024×600 production 三页新增/复制/布局/重载/往返矩阵完整通过。
+
+远端冷路由首轮正式结果为 Logistics route p95 `1070/1100ms`、Worker p95 `1035.4/1100ms`、5/5 `full-route-repaired` 且零 abort。增量矩阵的拖拽阶段全部达标，但初始装载出现非计算型投递尾延迟：WMS 最慢样本 Worker compute `35.6ms`、delivery wait `2039.1ms`。下一提交触发的独立运行用于同时确认冷路由稳定性、异步 UI 门禁和该投递尾部；若尾部重复，再沿主线程 long-task/消息投递证据优化，绝不提高 `750ms` 初始预算。enterprise 资产本轮不再失败，继续观察而不做无证据改动；3D 性能保持后置。

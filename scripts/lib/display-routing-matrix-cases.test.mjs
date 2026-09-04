@@ -157,10 +157,24 @@ describe('display routing matrix cases', () => {
   it('checks the applied layout in the live-session assertion', async () => {
     const correct = { evaluate: async () => ({ requested: 'Vertical swimlanes', applied: 'Auto Layout: Vertical swimlanes' }) };
     await expect(assertRequestedLayoutSelected(correct, 'domain-lanes-tb')).resolves.toBeUndefined();
-    const fallback = { evaluate: async () => ({ requested: 'Vertical swimlanes', applied: 'Auto Layout: Complex process' }) };
+    const fallback = { evaluate: vi.fn().mockResolvedValue({ requested: 'Vertical swimlanes', applied: 'Auto Layout: Complex process' }) };
     await expect(assertRequestedLayoutSelected(fallback, 'domain-lanes-tb')).rejects.toThrow('different layout');
     await expect(assertRequestedLayoutSelected(fallback, 'domain-compound-elk-bt')).rejects.toThrow('different layout');
+    expect(fallback.evaluate).toHaveBeenCalledTimes(2);
     await expect(assertRequestedLayoutSelected({}, 'tree-tb')).resolves.toBeUndefined();
+  });
+
+  it('waits for the toolbar selection to commit after a restored page switch', async () => {
+    const session = { evaluate: vi.fn()
+      .mockResolvedValueOnce({ requested: '复杂流程（保留域·上→下）', applied: null })
+      .mockResolvedValueOnce({
+        requested: '复杂流程（保留域·上→下）',
+        applied: '自动布局：复杂流程（保留域·上→下）',
+      }) };
+
+    await expect(assertRequestedLayoutSelected(session, 'domain-compound-elk-tb'))
+      .resolves.toBeUndefined();
+    expect(session.evaluate).toHaveBeenCalledTimes(2);
   });
 
   it('reports only known layout ids when selection verification fails', async () => {
