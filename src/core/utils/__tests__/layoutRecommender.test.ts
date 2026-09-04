@@ -47,6 +47,59 @@ describe('recommendLayout', () => {
     });
   });
 
+  it('recommends horizontal swimlanes for a long cross-domain process', () => {
+    const nodes = Array.from({ length: 11 }, (_, index) => (
+      node(`step-${index}`, index < 5 ? 'Planning' : index < 8 ? 'Allocation' : 'Execution')
+    ));
+    const edges = nodes.slice(1).map((current, index) => (
+      edge(`step-${index}-${index + 1}`, nodes[index].id, current.id)
+    ));
+
+    expect(recommendLayout(nodes, edges)).toMatchObject({
+      domainStrategy: 'domain-lanes',
+      nodeLayout: 'dagre',
+      direction: 'LR',
+      confidence: 0.9,
+    });
+  });
+
+  it('uses the longest branch depth instead of the shortest merge path', () => {
+    const nodes = Array.from({ length: 12 }, (_, index) => (
+      node(`step-${index}`, index < 6 ? 'Planning' : 'Execution')
+    ));
+    const edges = [
+      edge('short-merge', 'step-0', 'step-10'),
+      ...Array.from({ length: 10 }, (_, index) => (
+        edge(`long-${index}`, `step-${index}`, `step-${index + 1}`)
+      )),
+      edge('finish', 'step-10', 'step-11'),
+    ];
+
+    expect(recommendLayout(nodes, edges)).toMatchObject({
+      domainStrategy: 'domain-lanes',
+      direction: 'LR',
+    });
+  });
+
+  it('ignores duplicate and missing-endpoint edges when measuring process depth', () => {
+    const nodes = Array.from({ length: 10 }, (_, index) => (
+      node(`step-${index}`, index < 5 ? 'Planning' : 'Execution')
+    ));
+    const chain = nodes.slice(1).map((current, index) => (
+      edge(`step-${index}-${index + 1}`, nodes[index].id, current.id)
+    ));
+
+    expect(recommendLayout(nodes, [
+      ...chain,
+      edge('duplicate', 'step-0', 'step-1'),
+      edge('missing-source', 'missing', 'step-4'),
+      edge('missing-target', 'step-4', 'missing'),
+    ])).toMatchObject({
+      domainStrategy: 'domain-lanes',
+      direction: 'LR',
+    });
+  });
+
   it('selects compound layout directly for nested multi-domain DAGs', () => {
     const nodes = [
       node('a1', 'A'), node('a2', 'A'), node('b', 'B'), node('c1', 'C'), node('c2', 'C'),

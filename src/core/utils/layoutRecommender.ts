@@ -133,24 +133,34 @@ function analyzeGraph(nodes: Node[], edges: Edge[]): GraphMetrics {
     const roots = normalNodes.filter(n => (inDegree.get(n.id) || 0) === 0);
     const isTree = !hasCycles && roots.length === 1 && edges.length === normalNodes.length - 1;
 
-    // 最大深度（BFS from roots）
+    // 最大深度（DAG 最长路径）。普通 BFS 只会得到最短到达深度，
+    // 会低估带有分支汇聚的长业务流程并推荐出过高的纵向泳道。
     let maxDepth = 0;
-    if (roots.length > 0) {
-        const adj = new Map<string, string[]>();
-        edges.forEach(e => {
-            if (!adj.has(e.source)) adj.set(e.source, []);
-            adj.get(e.source)!.push(e.target);
-        });
-        const visited = new Set<string>();
-        const queue: [string, number][] = roots.map(r => [r.id, 0]);
-        while (queue.length > 0) {
-            const [id, depth] = queue.shift()!;
-            if (visited.has(id)) continue;
-            visited.add(id);
+    if (!hasCycles && normalNodes.length > 0) {
+        const adjacency = new Map<string, Set<string>>();
+        const remainingInDegree = new Map(normalNodes.map(current => [current.id, 0]));
+        for (const [source, target] of normalPairs) {
+            const targets = adjacency.get(source) ?? new Set<string>();
+            if (targets.has(target)) continue;
+            targets.add(target);
+            adjacency.set(source, targets);
+            remainingInDegree.set(target, (remainingInDegree.get(target) ?? 0) + 1);
+        }
+        const queue = normalNodes
+            .filter(current => (remainingInDegree.get(current.id) ?? 0) === 0)
+            .map(current => current.id);
+        const depthById = new Map(queue.map(id => [id, 0]));
+        for (let cursor = 0; cursor < queue.length; cursor += 1) {
+            const id = queue[cursor];
+            if (!id) continue;
+            const depth = depthById.get(id) ?? 0;
             maxDepth = Math.max(maxDepth, depth);
-            (adj.get(id) || []).forEach(child => {
-                if (!visited.has(child)) queue.push([child, depth + 1]);
-            });
+            for (const target of adjacency.get(id) ?? []) {
+                depthById.set(target, Math.max(depthById.get(target) ?? 0, depth + 1));
+                const nextInDegree = (remainingInDegree.get(target) ?? 0) - 1;
+                remainingInDegree.set(target, nextInDegree);
+                if (nextInDegree === 0) queue.push(target);
+            }
         }
     }
 
@@ -193,6 +203,15 @@ export function recommendLayout(nodes: Node[], edges: Edge[]): LayoutRecommendat
                 direction: 'LR',
                 reason: `${m.domainCount} 个域且存在反馈环，循环流程泳道可避免分层布局反复回退`,
                 confidence: 0.92,
+            };
+        }
+        if (m.maxDepth >= 8) {
+            return {
+                domainStrategy: 'domain-lanes',
+                nodeLayout: 'dagre',
+                direction: 'LR',
+                reason: `${m.domainCount} 个域且主流程深度为 ${m.maxDepth}，横向泳道可限制长流程画布高度`,
+                confidence: 0.9,
             };
         }
         if (m.containerCount > m.domainCount || m.edgeCount > m.nodeCount) {
