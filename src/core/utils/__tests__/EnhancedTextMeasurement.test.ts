@@ -27,6 +27,19 @@ describe('EnhancedTextMeasurement', () => {
     });
   });
 
+  it('does not create a canvas until the shared measurement runtime is used', async () => {
+    const createElementSpy = vi.spyOn(document, 'createElement');
+
+    const { enhancedTextMeasurement } = await import('../EnhancedTextMeasurement');
+
+    expect(createElementSpy).not.toHaveBeenCalledWith('canvas');
+
+    enhancedTextMeasurement.measureNodeContent('Deferred canvas');
+
+    expect(createElementSpy).toHaveBeenCalledWith('canvas');
+    enhancedTextMeasurement.dispose();
+  });
+
   afterEach(() => {
     Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
       configurable: true,
