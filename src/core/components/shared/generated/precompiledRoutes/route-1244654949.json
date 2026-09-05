@@ -2,9 +2,9 @@
   "schema": "vizly-precompiled-display-route-v1",
   "routingVersion": "15",
   "sourceHash": "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
-  "inputSignature": "4667022",
-  "inputGeometryDigest": "geometry-v1:913d9f804aed7ecca1c47faaf9b89978",
-  "outputRouteSignature": "route-v2:44:138:86029268b0c9ac9a",
+  "inputSignature": "1244654949",
+  "inputGeometryDigest": "geometry-v1:6fc82359f727b529b89368553580824d",
+  "outputRouteSignature": "route-v2:44:146:4fc3d1b93f9228c3",
   "hardClean": true,
   "patches": [
     {
@@ -17,15 +17,15 @@
       "data": {
         "computedPath": [
           {
-            "x": 865,
-            "y": 1804
+            "x": 679,
+            "y": 1803.5
           },
           {
-            "x": 865,
+            "x": 679,
             "y": 2335
           },
           {
-            "x": 1267,
+            "x": 2312,
             "y": 2335
           }
         ]
@@ -36,21 +36,25 @@
       "source": "allocation",
       "target": "atp-check",
       "type": "stablePath",
-      "sourceHandle": "top",
+      "sourceHandle": "right",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 865,
-            "y": 1708
+            "x": 758,
+            "y": 1755.5
           },
           {
-            "x": 865,
-            "y": 1370
+            "x": 1295.75,
+            "y": 1755.5
           },
           {
-            "x": 1018,
-            "y": 1370
+            "x": 1295.75,
+            "y": 1369.5
+          },
+          {
+            "x": 1833.5,
+            "y": 1369.5
           }
         ]
       }
@@ -60,31 +64,29 @@
       "source": "allocation",
       "target": "batch-lot",
       "type": "stablePath",
-      "sourceHandle": "bottom",
+      "sourceHandle": "right",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 865,
-            "y": 1803.5
+            "x": 758,
+            "y": 1755.5
           },
           {
-            "x": 865,
-            "y": 1851.5
+            "x": 1295.75,
+            "y": 1755.5
           },
           {
-            "x": 1008,
-            "y": 1851.5
+            "x": 1295.75,
+            "y": 1948.5
           },
           {
-            "x": 1008,
-            "y": 1949
-          },
-          {
-            "x": 1155,
-            "y": 1949
+            "x": 2108,
+            "y": 1948.5
           }
-        ]
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -92,21 +94,25 @@
       "source": "allocation",
       "target": "reservation",
       "type": "stablePath",
-      "sourceHandle": "top",
+      "sourceHandle": "right",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 865,
-            "y": 1708
+            "x": 758,
+            "y": 1755.5
           },
           {
-            "x": 865,
-            "y": 1563
+            "x": 1341.5,
+            "y": 1755.5
           },
           {
-            "x": 1064,
-            "y": 1563
+            "x": 1341.5,
+            "y": 1562.5
+          },
+          {
+            "x": 1925,
+            "y": 1562.5
           }
         ]
       }
@@ -116,25 +122,17 @@
       "source": "allocation",
       "target": "slotting",
       "type": "stablePath",
-      "sourceHandle": "top",
-      "targetHandle": "top",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 865,
-            "y": 1708
+            "x": 758,
+            "y": 1755.5
           },
           {
-            "x": 865,
-            "y": 1647
-          },
-          {
-            "x": 1202,
-            "y": 1647
-          },
-          {
-            "x": 1202,
-            "y": 1719
+            "x": 2014,
+            "y": 1755.5
           }
         ]
       }
@@ -144,20 +142,24 @@
       "source": "allocation",
       "target": "task-generate",
       "type": "stablePath",
-      "sourceHandle": "bottom",
+      "sourceHandle": "left",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 865,
-            "y": 1804
+            "x": 552,
+            "y": 1755.5
           },
           {
-            "x": 865,
+            "x": 496,
+            "y": 1755.5
+          },
+          {
+            "x": 496,
             "y": 3123
           },
           {
-            "x": 1298,
+            "x": 552,
             "y": 3123
           }
         ]
@@ -173,16 +175,16 @@
       "data": {
         "computedPath": [
           {
-            "x": 865,
-            "y": 1804
+            "x": 679,
+            "y": 1803.5
           },
           {
-            "x": 865,
-            "y": 2142
+            "x": 679,
+            "y": 2141.5
           },
           {
-            "x": 1199,
-            "y": 2142
+            "x": 2198,
+            "y": 2141.5
           }
         ]
       }
@@ -197,16 +199,16 @@
       "data": {
         "computedPath": [
           {
-            "x": 3280,
-            "y": 7174
+            "x": 742,
+            "y": 7173.5
           },
           {
-            "x": 3438,
-            "y": 7174
+            "x": 945.5,
+            "y": 7173.5
           },
           {
-            "x": 3438,
-            "y": 6849
+            "x": 945.5,
+            "y": 6848.5
           }
         ]
       }
@@ -221,12 +223,12 @@
       "data": {
         "computedPath": [
           {
-            "x": 3545,
-            "y": 6801
+            "x": 1053,
+            "y": 6800.5
           },
           {
-            "x": 3595,
-            "y": 6801
+            "x": 3677,
+            "y": 6800.5
           }
         ]
       }
@@ -237,36 +239,24 @@
       "target": "allocation",
       "type": "stablePath",
       "sourceHandle": "top",
-      "targetHandle": "right",
+      "targetHandle": "bottom",
       "data": {
         "computedPath": [
           {
-            "x": 3696,
+            "x": 3778,
             "y": 6771
           },
           {
-            "x": 3696,
-            "y": 1756
+            "x": 3778,
+            "y": 2659
           },
           {
-            "x": 1344.5,
-            "y": 1756
+            "x": 655,
+            "y": 2659
           },
           {
-            "x": 1344.5,
-            "y": 1840
-          },
-          {
-            "x": 1058.5,
-            "y": 1840
-          },
-          {
-            "x": 1058.5,
-            "y": 1756
-          },
-          {
-            "x": 968,
-            "y": 1756
+            "x": 655,
+            "y": 1804
           }
         ]
       }
@@ -281,31 +271,23 @@
       "data": {
         "computedPath": [
           {
-            "x": 3696,
-            "y": 6771
+            "x": 3778,
+            "y": 6770.5
           },
           {
-            "x": 3696,
-            "y": 4382
+            "x": 3778,
+            "y": 3827
           },
           {
-            "x": 2375.5,
-            "y": 4382
+            "x": 814,
+            "y": 3827
           },
           {
-            "x": 2375.5,
-            "y": 4213
-          },
-          {
-            "x": 2043.5,
-            "y": 4213
-          },
-          {
-            "x": 2043.5,
+            "x": 814,
             "y": 4274
           },
           {
-            "x": 1995.5,
+            "x": 758,
             "y": 4274
           }
         ]
@@ -316,21 +298,25 @@
       "source": "operation",
       "target": "exception-alert",
       "type": "stablePath",
-      "sourceHandle": "bottom",
+      "sourceHandle": "left",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 2391,
-            "y": 5689
+            "x": 552,
+            "y": 5652
           },
           {
-            "x": 2391,
-            "y": 7174
+            "x": 244,
+            "y": 5652
           },
           {
-            "x": 3090,
-            "y": 7174
+            "x": 244,
+            "y": 7173.5
+          },
+          {
+            "x": 552,
+            "y": 7173.5
           }
         ]
       }
@@ -340,25 +326,21 @@
       "source": "operation",
       "target": "labor-kpi",
       "type": "stablePath",
-      "sourceHandle": "bottom",
+      "sourceHandle": "right",
       "targetHandle": "top",
       "data": {
         "computedPath": [
           {
-            "x": 2391,
-            "y": 5689
+            "x": 871,
+            "y": 5652
           },
           {
-            "x": 2391,
-            "y": 6697
+            "x": 927,
+            "y": 5652
           },
           {
-            "x": 3438,
-            "y": 6697
-          },
-          {
-            "x": 3438,
-            "y": 6753
+            "x": 927,
+            "y": 6752.5
           }
         ]
       }
@@ -368,20 +350,24 @@
       "source": "operation",
       "target": "loading-handover",
       "type": "stablePath",
-      "sourceHandle": "bottom",
+      "sourceHandle": "right",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 2391,
-            "y": 5689
+            "x": 871,
+            "y": 5652
           },
           {
-            "x": 2391,
+            "x": 2142.5,
+            "y": 5652
+          },
+          {
+            "x": 2142.5,
             "y": 6012
           },
           {
-            "x": 2846,
+            "x": 3414,
             "y": 6012
           }
         ]
@@ -397,11 +383,11 @@
       "data": {
         "computedPath": [
           {
-            "x": 2550,
+            "x": 871,
             "y": 5652
           },
           {
-            "x": 2746,
+            "x": 3222,
             "y": 5652
           }
         ]
@@ -412,20 +398,24 @@
       "source": "operation",
       "target": "path-heatmap",
       "type": "stablePath",
-      "sourceHandle": "bottom",
+      "sourceHandle": "left",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 2391,
-            "y": 5689
+            "x": 552,
+            "y": 5652
           },
           {
-            "x": 2391,
+            "x": 244,
+            "y": 5652
+          },
+          {
+            "x": 244,
             "y": 6987
           },
           {
-            "x": 3042,
+            "x": 458,
             "y": 6987
           }
         ]
@@ -436,21 +426,25 @@
       "source": "operation",
       "target": "picking-exec",
       "type": "stablePath",
-      "sourceHandle": "top",
+      "sourceHandle": "right",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 2391,
-            "y": 5616
+            "x": 871,
+            "y": 5652
           },
           {
-            "x": 2391,
-            "y": 5080
+            "x": 1904.5,
+            "y": 5652
           },
           {
-            "x": 2600,
-            "y": 5080
+            "x": 1904.5,
+            "y": 5079.5
+          },
+          {
+            "x": 2938,
+            "y": 5079.5
           }
         ]
       }
@@ -460,20 +454,24 @@
       "source": "operation",
       "target": "qc-exec",
       "type": "stablePath",
-      "sourceHandle": "bottom",
+      "sourceHandle": "right",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 2391,
-            "y": 5689
+            "x": 871,
+            "y": 5652
           },
           {
-            "x": 2391,
+            "x": 2191,
+            "y": 5652
+          },
+          {
+            "x": 2191,
             "y": 5832
           },
           {
-            "x": 2816,
+            "x": 3338,
             "y": 5832
           }
         ]
@@ -484,23 +482,25 @@
       "source": "operation",
       "target": "real-time-board",
       "type": "stablePath",
-      "sourceHandle": "bottom",
-      "targetHandle": "left",
+      "sourceHandle": "left",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {
-            "x": 2391,
-            "y": 5689
+            "x": 552,
+            "y": 5652
           },
           {
-            "x": 2391,
-            "y": 6608
+            "x": 359,
+            "y": 5652
           },
           {
-            "x": 2968,
-            "y": 6608
+            "x": 359,
+            "y": 6571
           }
-        ]
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -508,21 +508,25 @@
       "source": "operation",
       "target": "replenish-exec",
       "type": "stablePath",
-      "sourceHandle": "top",
+      "sourceHandle": "right",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 2391,
-            "y": 5616
+            "x": 871,
+            "y": 5652
           },
           {
-            "x": 2391,
-            "y": 5273
+            "x": 1953.25,
+            "y": 5652
           },
           {
-            "x": 2652,
-            "y": 5273
+            "x": 1953.25,
+            "y": 5272.5
+          },
+          {
+            "x": 3035.5,
+            "y": 5272.5
           }
         ]
       }
@@ -532,21 +536,25 @@
       "source": "operation",
       "target": "sorting-exec",
       "type": "stablePath",
-      "sourceHandle": "top",
+      "sourceHandle": "right",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 2391,
-            "y": 5616
+            "x": 871,
+            "y": 5652
           },
           {
-            "x": 2391,
-            "y": 5466
+            "x": 2001.25,
+            "y": 5652
           },
           {
-            "x": 2702,
-            "y": 5466
+            "x": 2001.25,
+            "y": 5465.5
+          },
+          {
+            "x": 3131.5,
+            "y": 5465.5
           }
         ]
       }
@@ -556,21 +564,29 @@
       "source": "operation",
       "target": "uph-calc",
       "type": "stablePath",
-      "sourceHandle": "bottom",
-      "targetHandle": "left",
+      "sourceHandle": "left",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {
-            "x": 2391,
-            "y": 5689
+            "x": 552,
+            "y": 5652
           },
           {
-            "x": 2391,
-            "y": 6801
+            "x": 244,
+            "y": 5652
           },
           {
-            "x": 2998,
-            "y": 6801
+            "x": 244,
+            "y": 6708
+          },
+          {
+            "x": 455,
+            "y": 6708
+          },
+          {
+            "x": 455,
+            "y": 6764
           }
         ]
       }
@@ -580,21 +596,25 @@
       "source": "operation",
       "target": "wcs-integration",
       "type": "stablePath",
-      "sourceHandle": "bottom",
+      "sourceHandle": "right",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 2391,
-            "y": 5689
+            "x": 871,
+            "y": 5652
           },
           {
-            "x": 2391,
-            "y": 6199
+            "x": 2119,
+            "y": 5652
           },
           {
-            "x": 2881,
-            "y": 6199
+            "x": 2119,
+            "y": 6198.5
+          },
+          {
+            "x": 3495,
+            "y": 6198.5
           }
         ]
       }
@@ -605,20 +625,24 @@
       "target": "allocation",
       "type": "stablePath",
       "sourceHandle": "bottom",
-      "targetHandle": "left",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {
-            "x": 330,
-            "y": 623
+            "x": 682,
+            "y": 622.5
           },
           {
-            "x": 330,
-            "y": 1756
+            "x": 682,
+            "y": 1165
           },
           {
-            "x": 762,
-            "y": 1756
+            "x": 655,
+            "y": 1165
+          },
+          {
+            "x": 655,
+            "y": 1707.5
           }
         ]
       }
@@ -633,16 +657,16 @@
       "data": {
         "computedPath": [
           {
-            "x": 330,
-            "y": 623
+            "x": 682,
+            "y": 622.5
           },
           {
-            "x": 330,
-            "y": 961
+            "x": 682,
+            "y": 960.5
           },
           {
-            "x": 720,
-            "y": 961
+            "x": 2807,
+            "y": 960.5
           }
         ]
       }
@@ -657,16 +681,16 @@
       "data": {
         "computedPath": [
           {
-            "x": 330,
-            "y": 527
+            "x": 682,
+            "y": 526.5
           },
           {
-            "x": 330,
-            "y": 189
+            "x": 682,
+            "y": 188.5
           },
           {
-            "x": 510,
-            "y": 189
+            "x": 2413,
+            "y": 188.5
           }
         ]
       }
@@ -681,12 +705,12 @@
       "data": {
         "computedPath": [
           {
-            "x": 460,
-            "y": 575
+            "x": 812,
+            "y": 574.5
           },
           {
-            "x": 620,
-            "y": 575
+            "x": 2614.5,
+            "y": 574.5
           }
         ]
       }
@@ -701,16 +725,16 @@
       "data": {
         "computedPath": [
           {
-            "x": 330,
-            "y": 623
+            "x": 682,
+            "y": 622.5
           },
           {
-            "x": 330,
-            "y": 768
+            "x": 682,
+            "y": 767.5
           },
           {
-            "x": 690,
-            "y": 768
+            "x": 2730.5,
+            "y": 767.5
           }
         ]
       }
@@ -725,16 +749,16 @@
       "data": {
         "computedPath": [
           {
-            "x": 330,
-            "y": 527
+            "x": 682,
+            "y": 526.5
           },
           {
-            "x": 330,
-            "y": 382
+            "x": 682,
+            "y": 381.5
           },
           {
-            "x": 559,
-            "y": 382
+            "x": 2508,
+            "y": 381.5
           }
         ]
       }
@@ -749,16 +773,16 @@
       "data": {
         "computedPath": [
           {
-            "x": 3228,
+            "x": 644,
             "y": 6987
           },
           {
-            "x": 3438,
+            "x": 945.5,
             "y": 6987
           },
           {
-            "x": 3438,
-            "y": 6849
+            "x": 945.5,
+            "y": 6848.5
           }
         ]
       }
@@ -769,20 +793,24 @@
       "target": "labor-kpi",
       "type": "stablePath",
       "sourceHandle": "right",
-      "targetHandle": "top",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 3102,
-            "y": 6608
+            "x": 426,
+            "y": 6607.5
           },
           {
-            "x": 3438,
-            "y": 6608
+            "x": 632,
+            "y": 6607.5
           },
           {
-            "x": 3438,
-            "y": 6753
+            "x": 632,
+            "y": 6800.5
+          },
+          {
+            "x": 838,
+            "y": 6800.5
           }
         ]
       }
@@ -797,16 +825,16 @@
       "data": {
         "computedPath": [
           {
-            "x": 1402,
+            "x": 667,
             "y": 3171
           },
           {
-            "x": 1402,
-            "y": 3503
+            "x": 667,
+            "y": 3502.5
           },
           {
-            "x": 1751,
-            "y": 3503
+            "x": 1304,
+            "y": 3502.5
           }
         ]
       }
@@ -821,16 +849,16 @@
       "data": {
         "computedPath": [
           {
-            "x": 1402,
+            "x": 656,
             "y": 3075
           },
           {
-            "x": 1402,
-            "y": 2744
+            "x": 656,
+            "y": 2743.5
           },
           {
-            "x": 1556,
-            "y": 2744
+            "x": 924.5,
+            "y": 2743.5
           }
         ]
       }
@@ -845,16 +873,16 @@
       "data": {
         "computedPath": [
           {
-            "x": 1402,
+            "x": 667,
             "y": 3171
           },
           {
-            "x": 1402,
-            "y": 3310
+            "x": 667,
+            "y": 3309.5
           },
           {
-            "x": 1725,
-            "y": 3310
+            "x": 1232,
+            "y": 3309.5
           }
         ]
       }
@@ -869,16 +897,16 @@
       "data": {
         "computedPath": [
           {
-            "x": 1402,
+            "x": 656,
             "y": 3075
           },
           {
-            "x": 1402,
-            "y": 2937
+            "x": 656,
+            "y": 2936.5
           },
           {
-            "x": 1617,
-            "y": 2937
+            "x": 1032,
+            "y": 2936.5
           }
         ]
       }
@@ -893,11 +921,11 @@
       "data": {
         "computedPath": [
           {
-            "x": 1506,
+            "x": 760,
             "y": 3123
           },
           {
-            "x": 1658,
+            "x": 1118.5,
             "y": 3123
           }
         ]
@@ -909,20 +937,16 @@
       "target": "task-group",
       "type": "stablePath",
       "sourceHandle": "bottom",
-      "targetHandle": "left",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {
-            "x": 1402,
+            "x": 655,
             "y": 3171
           },
           {
-            "x": 1402,
-            "y": 4298
-          },
-          {
-            "x": 1790,
-            "y": 4298
+            "x": 655,
+            "y": 4250
           }
         ]
       }
@@ -937,12 +961,12 @@
       "data": {
         "computedPath": [
           {
-            "x": 1996,
-            "y": 4298
+            "x": 758,
+            "y": 4297.5
           },
           {
-            "x": 2154,
-            "y": 4298
+            "x": 1566,
+            "y": 4297.5
           }
         ]
       }
@@ -957,16 +981,16 @@
       "data": {
         "computedPath": [
           {
-            "x": 1893,
-            "y": 4346
+            "x": 655,
+            "y": 4345.5
           },
           {
-            "x": 1893,
-            "y": 4671
+            "x": 655,
+            "y": 4670.5
           },
           {
-            "x": 2276,
-            "y": 4671
+            "x": 1780.5,
+            "y": 4670.5
           }
         ]
       }
@@ -977,20 +1001,24 @@
       "target": "operation",
       "type": "stablePath",
       "sourceHandle": "bottom",
-      "targetHandle": "left",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {
-            "x": 1893,
-            "y": 4346
+            "x": 655,
+            "y": 4345.5
           },
           {
-            "x": 1893,
-            "y": 5652
+            "x": 655,
+            "y": 4980.5
           },
           {
-            "x": 2231,
-            "y": 5652
+            "x": 711.5,
+            "y": 4980.5
+          },
+          {
+            "x": 711.5,
+            "y": 5615.5
           }
         ]
       }
@@ -1005,15 +1033,15 @@
       "data": {
         "computedPath": [
           {
-            "x": 1893,
-            "y": 4346
+            "x": 655,
+            "y": 4345.5
           },
           {
-            "x": 1893,
+            "x": 655,
             "y": 4484
           },
           {
-            "x": 2198,
+            "x": 1656,
             "y": 4484
           }
         ]
@@ -1024,21 +1052,25 @@
       "source": "task-group",
       "target": "wave-build",
       "type": "stablePath",
-      "sourceHandle": "top",
+      "sourceHandle": "right",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 1893,
-            "y": 4250
+            "x": 758,
+            "y": 4297.5
           },
           {
-            "x": 1893,
-            "y": 3912
+            "x": 1062,
+            "y": 4297.5
           },
           {
-            "x": 2046,
-            "y": 3912
+            "x": 1062,
+            "y": 3911.5
+          },
+          {
+            "x": 1366,
+            "y": 3911.5
           }
         ]
       }
@@ -1048,21 +1080,25 @@
       "source": "task-group",
       "target": "zone-group",
       "type": "stablePath",
-      "sourceHandle": "top",
+      "sourceHandle": "right",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 1893,
-            "y": 4250
+            "x": 758,
+            "y": 4297.5
           },
           {
-            "x": 1893,
-            "y": 4105
+            "x": 1115,
+            "y": 4297.5
           },
           {
-            "x": 2106,
-            "y": 4105
+            "x": 1115,
+            "y": 4104.5
+          },
+          {
+            "x": 1472,
+            "y": 4104.5
           }
         ]
       }
@@ -1077,12 +1113,12 @@
       "data": {
         "computedPath": [
           {
-            "x": 3172,
-            "y": 6801
+            "x": 542,
+            "y": 6800.5
           },
           {
-            "x": 3330,
-            "y": 6801
+            "x": 838,
+            "y": 6800.5
           }
         ]
       }
