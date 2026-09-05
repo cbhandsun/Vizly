@@ -90,8 +90,10 @@ const repairSharedLaneClearance = (edges: Edge[], nodes: ClosureNode[]): Edge[] 
     const groupEdge = current.find(edge => group.edgeIds.includes(edge.id));
     if (!groupEdge) continue;
     const groupPath = getEdgePath(groupEdge);
-    const oldCoordinate = (group.role === 'source' ? groupPath[1] : groupPath[groupPath.length - 2])?.[axis];
-    if (oldCoordinate === undefined) continue;
+    const terminal = (group.role === 'source' ? groupPath[0] : groupPath[groupPath.length - 1])?.[axis];
+    if (terminal === undefined) continue;
+    const sign = group.side === 'left' || group.side === 'top' ? -1 : 1;
+    const oldCoordinate = terminal + sign * group.commonStemLength;
     const coordinates = [...new Set(businessNodes(nodes).flatMap(node => {
       return [node.position[axis] - 48, node.position[axis] + (axis === 'x' ? node.width : node.height) + 48];
     }))].filter(coordinate => Math.abs(coordinate - oldCoordinate) <= 192)
@@ -107,11 +109,13 @@ const repairSharedLaneClearance = (edges: Edge[], nodes: ClosureNode[]): Edge[] 
         const path = getEdgePath(edge);
         const oriented = group.role === 'source' ? path : path.toReversed();
         if (oriented.length < 3) return edge;
-        const old = oriented[1][axis];
+        // Longer stems share this segment but turn at a different branch.
+        // Moving their own bends would collapse independent branch depths.
+        if (Math.abs(oriented[1][axis] - oldCoordinate) > 0.5) return edge;
         let contiguous = true;
         const moved = oriented.map((point, index) => {
           if (index === 0) return point;
-          if (Math.abs(point[axis] - old) > 0.5) contiguous = false;
+          if (Math.abs(point[axis] - oldCoordinate) > 0.5) contiguous = false;
           return contiguous ? { ...point, [axis]: coordinate } : point;
         });
         const next = { ...edge, data: { ...edge.data } };
