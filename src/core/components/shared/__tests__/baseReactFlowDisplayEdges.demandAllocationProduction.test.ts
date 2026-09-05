@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import productionRequestJson from './fixtures/demandAllocationProductionWorkerRequest.json';
 import regeneratedRequestJson from './fixtures/demandAllocationRegeneratedWorkerRequest.json';
+import compactRequestJson from './fixtures/demandAllocationCompactWorkerRequest.json';
 import { auditBaseReactFlowDisplayCommercialQuality } from '../baseReactFlowDisplayCommercialQuality';
 import { computeBaseReactFlowDisplayEdgesWorkerResponse } from '../baseReactFlowDisplayEdges.worker';
 import {
@@ -22,6 +23,20 @@ const pathLength = (path: Array<{ x: number; y: number }>): number => path
   ), 0);
 
 describe('demand-allocation production display routing', () => {
+  it('closes the compact lane route without preserving a shared stem through a business node', () => {
+    const request = parseDisplayEdgesWorkerRequest(compactRequestJson);
+    if (!request) throw new Error('Invalid compact route fixture');
+    const response = computeBaseReactFlowDisplayEdgesWorkerResponse(request);
+    expect(response.error).toBeUndefined();
+    expect(response.hardClean, JSON.stringify(response.hardReport)).toBe(true);
+    const edges = response.edges;
+    if (!edges) throw new Error('Missing compact route result');
+    expect(getDisplayHardQualityGateReport(edges, request.nodes, 'polished').hardClean).toBe(true);
+    expect(response.hardReport?.commercialClearanceViolations).toBe(0);
+    expect(edges.map(edge => [edge.id, edge.source, edge.target]))
+      .toEqual(request.edges.map(edge => [edge.id, edge.source, edge.target]));
+  }, 30_000);
+
   it('keeps the regenerated initial route within the production bend contract', () => {
     const request = parseDisplayEdgesWorkerRequest(regeneratedRequestJson);
     if (!request) throw new Error('Invalid production capture');
