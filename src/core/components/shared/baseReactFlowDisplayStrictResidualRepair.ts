@@ -664,7 +664,7 @@ export const repairFinalResidualStrictCrossings = <T extends Edge[]>(
       }
     }
 
-    if (best === current && current.length <= 24 && baselineQuality.strictCrossings > 0) {
+    if (best === current && baselineQuality.strictCrossings > 0) {
       const clusterCandidate = repairBoundedMultiEdgeResidualStrictCrossings(current, nodes) as T;
       if (
         clusterCandidate !== current

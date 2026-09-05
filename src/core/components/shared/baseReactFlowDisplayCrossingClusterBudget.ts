@@ -3,7 +3,7 @@ export type DisplayCrossingClusterCandidateBudget = Readonly<{
   maxSidePairCandidates: number;
 }>;
 
-const MAX_CLUSTER_EDGES = 24;
+export const DISPLAY_CROSSING_CLUSTER_MAX_EDGES = 24;
 const COMPLEX_CLUSTER_EDGE_THRESHOLD = 16;
 
 const STANDARD_BUDGET: DisplayCrossingClusterCandidateBudget = Object.freeze({
@@ -23,7 +23,7 @@ const COMPLEX_BUDGET: DisplayCrossingClusterCandidateBudget = Object.freeze({
 export const resolveDisplayCrossingClusterCandidateBudget = (
   edgeCount: number,
 ): DisplayCrossingClusterCandidateBudget | null => {
-  if (!Number.isInteger(edgeCount) || edgeCount <= 0 || edgeCount > MAX_CLUSTER_EDGES) {
+  if (!Number.isInteger(edgeCount) || edgeCount <= 0 || edgeCount > DISPLAY_CROSSING_CLUSTER_MAX_EDGES) {
     return null;
   }
   return edgeCount > COMPLEX_CLUSTER_EDGE_THRESHOLD ? COMPLEX_BUDGET : STANDARD_BUDGET;

@@ -7,7 +7,7 @@ import {
 } from '../../strategies/shared/edgeStrictCrossingGuard';
 import { createRoutingObstacleEvaluationContext } from '../../strategies/shared/edgeWaypointCandidateRepair';
 import { compactOrthogonalPath } from './baseReactFlowDisplayEdgeCore';
-import { resolveDisplayCrossingClusterCandidateBudget } from './baseReactFlowDisplayCrossingClusterBudget';
+import { resolveDisplayCrossingClusterSearch } from './baseReactFlowDisplayCrossingClusterScope';
 import {
   buildDisplayRoutingObstacles,
   createDisplayCandidateInteractionContext,
@@ -46,7 +46,6 @@ import {
   displayCrossingClusterPathSignature,
   displayCrossingClusterPointOnSide,
   displayCrossingClusterSideAxis,
-  firstDisplayCrossingClusterStrictHits,
   selectDisplayCrossingClusterOtherSegments,
 } from './baseReactFlowDisplayCrossingClusterGeometry';
 
@@ -573,14 +572,14 @@ const selectDiverseBeamStates = <T extends Edge[]>(states: BeamState<T>[]): Beam
 
 /**
  * Last-resort bounded search for residual crossing clusters that require moving
- * several edges together. It deliberately never runs on normal/large graphs.
+ * several edges together. Larger graphs use a bounded crossing component as
+ * the moving scope, while all nodes and edges remain in the quality context.
  */
 export const repairBoundedMultiEdgeResidualStrictCrossings = <T extends Edge[]>(
   edges: T,
   nodes: Node[],
 ): T => {
-  const candidateBudget = resolveDisplayCrossingClusterCandidateBudget(edges.length);
-  if (!candidateBudget) return edges;
+  if (edges.length === 0) return edges;
   const qualityContext = createEdgePathQualityEvaluationContext(edges);
   const baselineQuality = qualityContext.evaluate(edges);
   if (baselineQuality.strictCrossings === 0 || hasDisplayCrossingClusterFixedPoint(edges, nodes)) return edges;
@@ -604,7 +603,11 @@ export const repairBoundedMultiEdgeResidualStrictCrossings = <T extends Edge[]>(
     const nextStates: BeamState<T>[] = [];
     const nextSignatures = new Set<string>();
     for (const state of beam) {
-      const hits = firstDisplayCrossingClusterStrictHits(state.segments);
+      // Recompute after every candidate: crossings can migrate to an edge
+      // outside the original component. Keep the same total search budget.
+      const search = resolveDisplayCrossingClusterSearch(state.segments, edges.length);
+      if (!search) continue;
+      const { budget: candidateBudget, hits } = search;
       if (hits.length === 0) continue;
       const candidatesByMover = new Map<number, DisplayCrossingClusterRankedCandidate[]>();
       for (const hit of hits) {
