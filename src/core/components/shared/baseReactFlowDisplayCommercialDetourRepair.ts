@@ -19,6 +19,7 @@ import {
 import { commercialEdgeDetoursDoNotRegress } from './baseReactFlowDisplayCommercialDetourGuard';
 import {
   buildCommercialBranchedTerminalShortcutCandidates,
+  buildCommercialExteriorSourceShortcutCandidates,
   buildCommercialSourceTerminalShortcutCandidates,
   buildCommercialTerminalShortcutCandidates,
 } from './baseReactFlowDisplayCommercialTerminalShortcut';
@@ -203,7 +204,9 @@ const repairSourceTerminalOuterStairs = <T extends Edge[]>(
       ...buildCommercialBranchedTerminalShortcutCandidates(candidate),
       candidate,
     ]);
-    for (const candidateEdge of [...hardDefectCandidates, ...shortcutCandidates]) {
+    const exteriorCandidates = hasExcessiveBends
+      ? buildCommercialExteriorSourceShortcutCandidates(best[edgeIndex], nodes) : [];
+    for (const candidateEdge of [...exteriorCandidates, ...hardDefectCandidates, ...shortcutCandidates]) {
       if (evaluations >= FINAL_COMMERCIAL_SOURCE_SHORTCUT_EVALUATIONS) return best;
       if (edgeEvaluations >= FINAL_COMMERCIAL_SOURCE_SHORTCUT_EVALUATIONS_PER_EDGE) break;
       evaluations += 1;

@@ -8,6 +8,36 @@ import {
 } from '../baseReactFlowDisplayCommercialQuality';
 import { getExactDisplayHardReport } from '../baseReactFlowDisplayWorkerResponse';
 import { finalizeBaseReactFlowExactCommercialClearance } from '../baseReactFlowDisplayFinalCommercialClearanceTransaction';
+import compoundBtCapture from './fixtures/tmsCompoundBtCommercialRoute.json';
+import { parseDisplayEdgesWorkerRequest } from '../baseReactFlowDisplayWorkerProtocol';
+import { getDisplayComputedPath } from '../baseReactFlowDisplayGeometry';
+import { buildCommercialExteriorSourceShortcutCandidates } from '../baseReactFlowDisplayCommercialTerminalShortcut';
+
+it('shortens a compound BT staircase through an exterior source corridor without losing its target trunk', () => {
+  const request = parseDisplayEdgesWorkerRequest(compoundBtCapture);
+  if (!request) throw new Error('invalid compound BT fixture');
+  const before = structuredClone(request);
+  const baseline = getExactDisplayHardReport(request.edges, request.nodes);
+  const repaired = repairBaseReactFlowFinalCommercialDetours(request.edges, request.nodes, {
+    preferredEdges: request.edges, skipLoopShortcut: true,
+  });
+  const report = getExactDisplayHardReport(repaired, request.nodes);
+  expect(report.hardClean).toBe(true);
+  expect(auditBaseReactFlowDisplayCommercialQuality(repaired)).toEqual([]);
+  expect(report.quality.totalLength).toBeLessThan(baseline.quality.totalLength);
+  const target = repaired.find(edge => edge.id === 'edge-wms-tms-planning');
+  expect(target).toBeDefined();
+  if (!target) return;
+  expect(getDisplayComputedPath(target).length - 2).toBe(3);
+  expect(getDisplayComputedPath(target).slice(-2)).toEqual([{ x: 1626, y: 2669 }, { x: 1626, y: 2573 }]);
+  expect(target.targetHandle).toBe('bottom');
+  expect(request).toEqual(before);
+  const original = request.edges.find(edge => edge.id === target.id);
+  if (!original) throw new Error('missing original edge');
+  expect(buildCommercialExteriorSourceShortcutCandidates(original, [])).toEqual([]);
+  expect(buildCommercialExteriorSourceShortcutCandidates({ ...original, data: { ...original.data, sourcePortPolicy: 'forbidden' } }, request.nodes)).toEqual([]);
+  expect(buildCommercialExteriorSourceShortcutCandidates({ ...original, data: { computedPath: [{ x: NaN, y: 0 }] } }, request.nodes)).toEqual([]);
+});
 
 type Point = Readonly<{ x: number; y: number }>;
 

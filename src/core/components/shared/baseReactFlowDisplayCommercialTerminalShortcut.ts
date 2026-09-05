@@ -60,6 +60,52 @@ const isStrictlyBetween = (value: number, first: number, second: number): boolea
   value > Math.min(first, second) && value < Math.max(first, second)
 );
 
+/** An alternate source side can make an exterior corridor shorter than an
+ * interior staircase. Preserve the old target suffix for shared-trunk checks.
+ */
+export const buildCommercialExteriorSourceShortcutCandidates = (edge: Edge, nodes: Node[]): Edge[] => {
+  const path = getDisplayComputedPath(edge);
+  const targetSide = sideForHandle(edge.targetHandle);
+  if (!targetSide || path.length < 5) return [];
+  const byId = new Map(nodes.map(node => [node.id, node] as const));
+  const sourceRect = getNodeRect(byId.get(edge.source), byId);
+  const rects = nodes.filter(node => !node.hidden && !CONTAINER_NODE_TYPES.has(node.type ?? ''))
+    .flatMap(node => { const rect = getNodeRect(node, byId); return rect ? [rect] : []; });
+  if (!sourceRect || !rects.length) return [];
+  const clearance = COMMERCIAL_BUSINESS_NODE_CLEARANCE;
+  const lanes = {
+    left: Math.min(...rects.map(rect => rect.x)) - clearance,
+    right: Math.max(...rects.map(rect => rect.x + rect.width)) + clearance,
+    top: Math.min(...rects.map(rect => rect.y)) - clearance,
+    bottom: Math.max(...rects.map(rect => rect.y + rect.height)) + clearance,
+  };
+  const candidates: Edge[] = [];
+  const seen = new Set<string>();
+  for (const side of TERMINAL_SIDES) {
+    if (!displayTerminalSideCanSwitch(edge, 'source', side)) continue;
+    const lane = lanes[side];
+    if (!Number.isFinite(lane) || Math.abs(lane) > 1_000_000) continue;
+    const start = anchorForHandle(sourceRect, resolveDisplayTerminalHandleForSide(edge, 'source', side));
+    const horizontal = side === 'left' || side === 'right';
+    for (let index = 2; index < path.length - 1; index += 1) {
+      const join = path[index];
+      const candidate = compactOrthogonalPath([
+        start,
+        horizontal ? { x: lane, y: start.y } : { x: start.x, y: lane },
+        horizontal ? { x: lane, y: join.y } : { x: join.x, y: lane },
+        ...path.slice(index),
+      ]);
+      if (candidate.length >= path.length || displayPathLength(candidate) >= displayPathLength(path) - 0.5) continue;
+      const key = `${side}:${pathSignature(candidate)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      candidates.push(withDisplayPortBridge(edge, candidate, side, targetSide));
+    }
+  }
+  return candidates.sort((a, b) => displayPathLength(getDisplayComputedPath(a)) - displayPathLength(getDisplayComputedPath(b)))
+    .slice(0, MAX_TERMINAL_SHORTCUT_CANDIDATES);
+};
+
 /**
  * Replaces a materially overlong layout route with the shortest facing-port
  * route. Geometry normalization may leave automatic terminals on mixed sides,
