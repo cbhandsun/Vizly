@@ -7,7 +7,7 @@ export const tmsReverseHorizontalLayoutRequest = {
   isLargeGraph: false,
   displayEdgeEpoch: 0,
   qualityMode: "full",
-  inputIdentity: {"routingVersion":"15","visualVersion":"commercial-hard-gate-v1","inputSignature":"4183352479","inputGeometryDigest":"geometry-v1:a572d1d14a96e315f4e8e39bd49e3be9"},
+  inputIdentity: {"routingVersion":"16","visualVersion":"commercial-hard-gate-v1","inputSignature":"3222007208","inputGeometryDigest":"geometry-v1:e2cbc0b3711ed17f3a8ff04587ae43b3"},
   candidateSource: "persistent",
   stopAfterObstacleFailure: false,
   nodes: [

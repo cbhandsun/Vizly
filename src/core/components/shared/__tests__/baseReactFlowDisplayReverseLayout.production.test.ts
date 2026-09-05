@@ -5,12 +5,20 @@ import { tmsReverseHorizontalLayoutRequest } from './fixtures/tmsReverseHorizont
 import { parseDisplayEdgesWorkerRequest } from '../baseReactFlowDisplayWorkerProtocol';
 import { computeBaseReactFlowDisplayEdgesWorkerResponse } from '../baseReactFlowDisplayEdges.worker';
 import { getExactDisplayHardReport } from '../baseReactFlowDisplayWorkerResponse';
+import { EDGE_ROUTING_CACHE_VERSION } from '../../../routing/routingVersion';
+import { computeBaseReactFlowDisplayInputIdentityBundle } from '../baseReactFlowDisplayInputIdentity';
 
 it.each([
   ['BT', tmsReverseLayoutRequest], ['RL', tmsReverseHorizontalLayoutRequest],
 ] as const)('commits the real TMS %s layout through the complete Worker transaction within its unchanged deadline', (direction, fixture) => {
+  expect(fixture.inputIdentity.routingVersion).toBe(EDGE_ROUTING_CACHE_VERSION);
   const request = parseDisplayEdgesWorkerRequest(structuredClone(fixture));
-  if (!request) throw new Error('Invalid production regression fixture');
+  if (!request || request.operation !== 'repair-validate-or-route') {
+    throw new Error('Invalid production regression fixture');
+  }
+  const identity = computeBaseReactFlowDisplayInputIdentityBundle(request);
+  expect(fixture.inputIdentity.inputSignature).toBe(identity.cacheSignature);
+  expect(fixture.inputIdentity.inputGeometryDigest).toBe(identity.geometryDigest);
   const before = structuredClone(request);
   const start = performance.now();
   const result = computeBaseReactFlowDisplayEdgesWorkerResponse(request);
