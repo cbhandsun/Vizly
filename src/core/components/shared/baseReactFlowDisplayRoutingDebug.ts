@@ -170,6 +170,10 @@ export const updateDisplayLayoutTransactionState = ({
 export const classifyDisplayLayoutTransactionError = (
   error: unknown,
 ): DisplayLayoutTransactionErrorCode => {
+  if (
+    (error instanceof Error || (typeof DOMException !== 'undefined' && error instanceof DOMException))
+    && error.name === 'AbortError'
+  ) return 'cancelled';
   if (!(error instanceof Error)) return 'strategy-failed';
   if (error.message === 'layout-routing-cancelled') return 'cancelled';
   if (error.message === 'display-edge-worker-timeout') return 'worker-timeout';

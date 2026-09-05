@@ -11,6 +11,9 @@ import {
   useBaseReactFlowResolvedOrDragFallbackEdges,
 } from './useBaseReactFlowDisplayCandidateBootstrap';
 import { useBaseReactFlowActiveRenderAuthority } from './useBaseReactFlowDisplayRenderAuthority';
+import { displayFailureMatchesInput, type BaseReactFlowDisplayFailure } from './baseReactFlowDisplayFailure';
+
+const FAILED_DISPLAY_EDGES: Edge[] = [];
 
 /** Resolves the exact committed/fallback geometry and its matching render proof. */
 export const useBaseReactFlowDisplayRoutingResult = ({
@@ -25,6 +28,7 @@ export const useBaseReactFlowDisplayRoutingResult = ({
   dragFallbackPending,
   nodeDragFallbackIds,
   committedRenderAuthority,
+  failure = null,
 }: {
   sourceEdges: Edge[];
   inputSignature: string;
@@ -37,6 +41,7 @@ export const useBaseReactFlowDisplayRoutingResult = ({
   dragFallbackPending: boolean;
   nodeDragFallbackIds: readonly string[];
   committedRenderAuthority: DisplayRoutingRenderAuthority | null;
+  failure?: BaseReactFlowDisplayFailure | null;
 }): UseBaseReactFlowDisplayRoutingResult => {
   const resolvedEdges = useBaseReactFlowResolvedDisplayEdges({
     edges: sourceEdges,
@@ -54,13 +59,18 @@ export const useBaseReactFlowDisplayRoutingResult = ({
     dragFallbackPending,
     nodeDragFallbackIds,
   });
-  return {
-    edges: displayedEdges,
-    renderAuthority: useBaseReactFlowActiveRenderAuthority({
+  const activeFailure = !isNodeDragging && displayFailureMatchesInput(failure, { inputSignature, inputGeometryDigest })
+    ? failure : null;
+  const finalEdges = activeFailure ? FAILED_DISPLAY_EDGES : displayedEdges;
+  const renderAuthority = useBaseReactFlowActiveRenderAuthority({
       committedRenderAuthority,
       inputSignature,
       inputGeometryDigest,
-      displayedEdges,
-    }),
+      displayedEdges: finalEdges,
+    });
+  return {
+    edges: finalEdges,
+    renderAuthority: activeFailure ? null : renderAuthority,
+    failure: activeFailure,
   };
 };

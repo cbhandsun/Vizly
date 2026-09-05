@@ -74,7 +74,7 @@ import type { BaseReactFlowProps } from './baseReactFlowTypes';
 import { useBaseReactFlowFitController } from './useBaseReactFlowFitController';
 import { RoutingSessionEdgeRenderProvider } from '../custom-edges/RoutingSessionEdgeRenderProvider';
 import { resolveBaseReactFlowRoutingComputation } from './baseReactFlowDragRoutingFreeze';
-import { BaseReactFlowInitializationOverlay } from './BaseReactFlowInitializationOverlay';
+import { BaseReactFlowDisplayStatusOverlay } from './BaseReactFlowDisplayStatusOverlay';
 import { applySharedTrunkPaintPlan } from '../../rendering/sharedTrunkPaint';
 import { buildDisplayRoutingObstacles } from './baseReactFlowDisplayGeometry';
 import { EdgeLabelObstacleContext } from '../custom-edges/edgeLabelObstacleContext';
@@ -400,7 +400,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     });
   }, [edgeTypes]);
 
-  const { edges: displayEdges, renderAuthority: displayRenderAuthority } = useBaseReactFlowDisplayRouting({
+  const { edges: displayEdges, renderAuthority: displayRenderAuthority, failure } = useBaseReactFlowDisplayRouting({
     edges: routingEdges,
     routingNodes,
     routingGeometryReady,
@@ -679,7 +679,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
         </EdgeLabelObstacleContext.Provider>
         </BaseReactFlowViewportSemanticContext.Provider>
       </div>
-      {!isContainerReady && <BaseReactFlowInitializationOverlay />}
+      <BaseReactFlowDisplayStatusOverlay isContainerReady={isContainerReady} failure={failure} />
     </div>
   );
 };
