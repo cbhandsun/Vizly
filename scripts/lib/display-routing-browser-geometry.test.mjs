@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   displayRoutingFinalSvgGeometryIsClean,
@@ -51,9 +51,18 @@ const style = (overrides = {}) => ({
   ...overrides,
 });
 
+beforeEach(() => {
+  vi.stubGlobal('getComputedStyle', () => style());
+  vi.stubGlobal('window', { reactFlowInstance: { getNodes: () => (
+    [...document.querySelectorAll('.react-flow__node[data-id]')]
+      .map(element => ({ id: element.getAttribute('data-id'), type: 'custom' }))
+  ) } });
+});
+
 describe('display routing browser geometry', () => {
   it('requires both minimum and 48px commercial SVG clearance to be clean', () => {
     const cleanAudit = {
+      nodeScanComplete: true,
       auditedPathCount: 2,
       invalidEdgeIds: [],
       intersections: [],
@@ -388,6 +397,7 @@ describe('display routing browser geometry', () => {
     ])).toEqual({
       inputNodeCount: 2,
       comparedNodeCount: 1,
+      excludedNodeCount: 0, omittedNodeCount: 1, omittedNodeIds: ['parent'], nodeScanComplete: false,
       positionMismatchCount: 0,
       sizeMismatchCount: 0,
       maxPositionDelta: 0,
@@ -657,6 +667,9 @@ describe('display routing browser geometry', () => {
       { id: 'edge-1', source: 'source', target: 'target' },
       { id: '', source: 'source', target: 'target' },
     ])).toEqual({
+      inputNodeCount: 1, domNodeCount: 1, scannedNodeCount: 1,
+      excludedContainerCount: 0, hiddenModelNodeCount: 0, invalidModelNodeCount: 0,
+      unmatchedDomNodeCount: 0, omittedNodeCount: 0, omittedNodeIds: [], nodeScanComplete: true,
       edgeCount: 2,
       auditedPathCount: 1,
       invalidEdgeIds: ['<missing>'],
@@ -693,10 +706,11 @@ describe('display routing browser geometry', () => {
       getBoundingClientRect: () => rect(100, 100, 80, 22),
     };
     const node = {
+      getAttribute: name => name === 'data-id' ? 'node' : null,
       getBoundingClientRect: () => rect(300, 300, 100, 80),
     };
     vi.stubGlobal('window', {
-      reactFlowInstance: { getViewport: () => ({ x: 0, y: 0, zoom: 0.5 }) },
+      reactFlowInstance: { getNodes: () => [{ id: 'node', type: 'custom' }], getViewport: () => ({ x: 0, y: 0, zoom: 0.5 }) },
       __vizlyBaseReactFlowDisplayRouting: { outputRouteSignature: 'route-v2:test' },
     });
     vi.stubGlobal('getComputedStyle', element => (
@@ -722,6 +736,10 @@ describe('display routing browser geometry', () => {
     });
 
     expect(readDisplayRoutingVisualScaleAudit()).toEqual({
+      inputNodeCount: 1, domNodeCount: 1, scannedNodeCount: 1,
+      excludedContainerCount: 0, hiddenModelNodeCount: 0, invalidModelNodeCount: 0,
+      unmatchedDomNodeCount: 0, omittedNodeCount: 0, omittedNodeIds: [], nodeScanComplete: true,
+      labelLabelOverlapCount: 0, labelLabelOverlaps: [],
       zoom: 0.5,
       rootBackground: { r: 255, g: 255, b: 255 },
       routeSignature: 'route-v2:test',
