@@ -1,0 +1,4714 @@
+{
+  "operation": "repair-validate-or-route",
+  "requestId": "layout:5",
+  "edges": [
+    {
+      "id": "e-alloc-rollback",
+      "source": "allocation",
+      "target": "allocation-rollback",
+      "sourceHandle": "right",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "回滚/重算",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-atp",
+      "source": "allocation",
+      "target": "atp-check",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "type": "advanced-smart-step",
+      "label": "ATP校验",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-batch",
+      "source": "allocation",
+      "target": "batch-lot",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "批次/效期",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-reservation",
+      "source": "allocation",
+      "target": "reservation",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "type": "advanced-smart-step",
+      "label": "库存预留",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-slotting",
+      "source": "allocation",
+      "target": "slotting",
+      "sourceHandle": "left",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "label": "库位选择",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-allocation-task",
+      "source": "allocation",
+      "target": "task-generate",
+      "sourceHandle": "bottom",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "库存锁定→任务生成",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-wave-plan",
+      "source": "allocation",
+      "target": "wave-planning",
+      "sourceHandle": "right",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "波次规划",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-alert-labor",
+      "source": "exception-alert",
+      "target": "labor-kpi",
+      "sourceHandle": "top",
+      "targetHandle": "right",
+      "type": "advanced-smart-step",
+      "label": "异常统计",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-labor-input",
+      "source": "labor-kpi",
+      "target": "labor-schedule-feedback",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "统计→排班",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-labor-alloc-fb",
+      "source": "labor-schedule-feedback",
+      "target": "allocation",
+      "sourceHandle": "left",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "产能/人力→分配策略",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT",
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": true
+      }
+    },
+    {
+      "id": "e-labor-group-fb",
+      "source": "labor-schedule-feedback",
+      "target": "task-group",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "type": "advanced-smart-step",
+      "label": "人力→编组/并发",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT",
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": true
+      }
+    },
+    {
+      "id": "e-op-alert",
+      "source": "operation",
+      "target": "exception-alert",
+      "sourceHandle": "right",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "异常事件",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT",
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": true
+      }
+    },
+    {
+      "id": "e-operation-labor",
+      "source": "operation",
+      "target": "labor-kpi",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "label": "作业数据回传",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT",
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": true
+      }
+    },
+    {
+      "id": "e-loading",
+      "source": "operation",
+      "target": "loading-handover",
+      "sourceHandle": "right",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "装车/交接",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-packing-exec",
+      "source": "operation",
+      "target": "packing-exec",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "打包",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-op-heat",
+      "source": "operation",
+      "target": "path-heatmap",
+      "sourceHandle": "right",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "路径",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT",
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": true
+      }
+    },
+    {
+      "id": "e-picking-exec",
+      "source": "operation",
+      "target": "picking-exec",
+      "sourceHandle": "top",
+      "targetHandle": "right",
+      "type": "advanced-smart-step",
+      "label": "拣选",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-qc-exec",
+      "source": "operation",
+      "target": "qc-exec",
+      "sourceHandle": "right",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "质检/复核",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-op-rt",
+      "source": "operation",
+      "target": "real-time-board",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "label": "实时数据",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-replenish-exec",
+      "source": "operation",
+      "target": "replenish-exec",
+      "sourceHandle": "top",
+      "targetHandle": "right",
+      "type": "advanced-smart-step",
+      "label": "补货",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-sorting-exec",
+      "source": "operation",
+      "target": "sorting-exec",
+      "sourceHandle": "top",
+      "targetHandle": "right",
+      "type": "advanced-smart-step",
+      "label": "分拣/集货",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-op-uph",
+      "source": "operation",
+      "target": "uph-calc",
+      "sourceHandle": "right",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "计时/产出",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT",
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": true
+      }
+    },
+    {
+      "id": "e-wcs",
+      "source": "operation",
+      "target": "wcs-integration",
+      "sourceHandle": "right",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "自动化接口",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-order-allocation",
+      "source": "order-input",
+      "target": "allocation",
+      "sourceHandle": "bottom",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "订单进入分配",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-order-exception",
+      "source": "order-input",
+      "target": "order-exception",
+      "sourceHandle": "right",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "异常处理",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-order-import",
+      "source": "order-input",
+      "target": "order-import",
+      "sourceHandle": "left",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "订单来源",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-order-sla",
+      "source": "order-input",
+      "target": "order-sla-classify",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "优先级策略",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-order-split",
+      "source": "order-input",
+      "target": "order-split-merge",
+      "sourceHandle": "right",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "拆并策略",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-order-validate",
+      "source": "order-input",
+      "target": "order-validate",
+      "sourceHandle": "left",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "业务校验",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-heat-labor",
+      "source": "path-heatmap",
+      "target": "labor-kpi",
+      "sourceHandle": "left",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "路径分析",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-rt-labor",
+      "source": "real-time-board",
+      "target": "labor-kpi",
+      "sourceHandle": "top",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "label": "看板汇总",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-pack-task",
+      "source": "task-generate",
+      "target": "pack-task-gen",
+      "sourceHandle": "right",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "打包任务",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-pick-task",
+      "source": "task-generate",
+      "target": "pick-task-gen",
+      "sourceHandle": "left",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "拣选任务",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-qc-task",
+      "source": "task-generate",
+      "target": "qc-task-gen",
+      "sourceHandle": "right",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "质检任务",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-replenish-task",
+      "source": "task-generate",
+      "target": "replenish-task-gen",
+      "sourceHandle": "left",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "补货任务",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-sort-task",
+      "source": "task-generate",
+      "target": "sort-task-gen",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "分拣/集货",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-task-taskgroup",
+      "source": "task-generate",
+      "target": "task-group",
+      "sourceHandle": "bottom",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "任务整理分组",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-container-assign",
+      "source": "task-group",
+      "target": "container-assign",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "容器分配",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-cutoff",
+      "source": "task-group",
+      "target": "cutoff-grouping",
+      "sourceHandle": "right",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "截单",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-taskgroup-operation",
+      "source": "task-group",
+      "target": "operation",
+      "sourceHandle": "bottom",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "label": "下发到作业",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-priority-seq",
+      "source": "task-group",
+      "target": "priority-sequence",
+      "sourceHandle": "right",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "优先级/节拍",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-wave-build",
+      "source": "task-group",
+      "target": "wave-build",
+      "sourceHandle": "left",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "组建波次",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-zone-group",
+      "source": "task-group",
+      "target": "zone-group",
+      "sourceHandle": "left",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "分区编组",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    },
+    {
+      "id": "e-uph-labor",
+      "source": "uph-calc",
+      "target": "labor-kpi",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "效率计算",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "id": "titlegroup-order",
+      "type": "titleGroup",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "positionAbsolute": {
+        "x": 0,
+        "y": 0
+      },
+      "width": 1562,
+      "height": 2084,
+      "measured": {
+        "width": 1562,
+        "height": 2084
+      },
+      "style": {
+        "width": 1562,
+        "height": 2084
+      },
+      "data": {}
+    },
+    {
+      "id": "titlegroup-allocation",
+      "type": "titleGroup",
+      "position": {
+        "x": 1682.0000000000005,
+        "y": 0
+      },
+      "positionAbsolute": {
+        "x": 1682.0000000000005,
+        "y": 0
+      },
+      "width": 1831,
+      "height": 2084,
+      "measured": {
+        "width": 1831,
+        "height": 2084
+      },
+      "style": {
+        "width": 1831,
+        "height": 2084
+      },
+      "data": {}
+    },
+    {
+      "id": "titlegroup-task",
+      "type": "titleGroup",
+      "position": {
+        "x": 3633.0000000000005,
+        "y": 0
+      },
+      "positionAbsolute": {
+        "x": 3633.0000000000005,
+        "y": 0
+      },
+      "width": 1421,
+      "height": 2084,
+      "measured": {
+        "width": 1421,
+        "height": 2084
+      },
+      "style": {
+        "width": 1421,
+        "height": 2084
+      },
+      "data": {}
+    },
+    {
+      "id": "titlegroup-task-group",
+      "type": "titleGroup",
+      "position": {
+        "x": 5174,
+        "y": 0
+      },
+      "positionAbsolute": {
+        "x": 5174,
+        "y": 0
+      },
+      "width": 1457,
+      "height": 2084,
+      "measured": {
+        "width": 1457,
+        "height": 2084
+      },
+      "style": {
+        "width": 1457,
+        "height": 2084
+      },
+      "data": {}
+    },
+    {
+      "id": "titlegroup-operation",
+      "type": "titleGroup",
+      "position": {
+        "x": 6751,
+        "y": 0
+      },
+      "positionAbsolute": {
+        "x": 6751,
+        "y": 0
+      },
+      "width": 2054,
+      "height": 2084,
+      "measured": {
+        "width": 2054,
+        "height": 2084
+      },
+      "style": {
+        "width": 2054,
+        "height": 2084
+      },
+      "data": {}
+    },
+    {
+      "id": "titlegroup-analytics",
+      "type": "titleGroup",
+      "position": {
+        "x": 8925,
+        "y": 0
+      },
+      "positionAbsolute": {
+        "x": 8925,
+        "y": 0
+      },
+      "width": 1172,
+      "height": 2084,
+      "measured": {
+        "width": 1172,
+        "height": 2084
+      },
+      "style": {
+        "width": 1172,
+        "height": 2084
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-order-order",
+      "type": "subGroup",
+      "parentId": "titlegroup-order",
+      "position": {
+        "x": 32,
+        "y": 88
+      },
+      "positionAbsolute": {
+        "x": 32,
+        "y": 88
+      },
+      "width": 1498,
+      "height": 1964,
+      "measured": {
+        "width": 1498,
+        "height": 1964
+      },
+      "style": {
+        "width": 1498.0000000000005,
+        "height": 1964
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-allocation-allocation",
+      "type": "subGroup",
+      "parentId": "titlegroup-allocation",
+      "position": {
+        "x": 32,
+        "y": 88
+      },
+      "positionAbsolute": {
+        "x": 1714.0000000000005,
+        "y": 88
+      },
+      "width": 1767,
+      "height": 1964,
+      "measured": {
+        "width": 1767,
+        "height": 1964
+      },
+      "style": {
+        "width": 1767,
+        "height": 1964
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-task-task",
+      "type": "subGroup",
+      "parentId": "titlegroup-task",
+      "position": {
+        "x": 32,
+        "y": 88
+      },
+      "positionAbsolute": {
+        "x": 3665.0000000000005,
+        "y": 88
+      },
+      "width": 1357,
+      "height": 1964,
+      "measured": {
+        "width": 1357,
+        "height": 1964
+      },
+      "style": {
+        "width": 1357,
+        "height": 1964
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-task-group-task-group",
+      "type": "subGroup",
+      "parentId": "titlegroup-task-group",
+      "position": {
+        "x": 32,
+        "y": 88
+      },
+      "positionAbsolute": {
+        "x": 5206,
+        "y": 88
+      },
+      "width": 1393,
+      "height": 1964,
+      "measured": {
+        "width": 1393,
+        "height": 1964
+      },
+      "style": {
+        "width": 1393,
+        "height": 1964
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-operation-operation",
+      "type": "subGroup",
+      "parentId": "titlegroup-operation",
+      "position": {
+        "x": 32,
+        "y": 88
+      },
+      "positionAbsolute": {
+        "x": 6783,
+        "y": 88
+      },
+      "width": 1990,
+      "height": 1964,
+      "measured": {
+        "width": 1990,
+        "height": 1964
+      },
+      "style": {
+        "width": 1990,
+        "height": 1964
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-analytics-analytics",
+      "type": "subGroup",
+      "parentId": "titlegroup-analytics",
+      "position": {
+        "x": 32,
+        "y": 88
+      },
+      "positionAbsolute": {
+        "x": 8957,
+        "y": 88
+      },
+      "width": 1108,
+      "height": 1964,
+      "measured": {
+        "width": 1108,
+        "height": 1964
+      },
+      "style": {
+        "width": 1108,
+        "height": 1964
+      },
+      "data": {}
+    },
+    {
+      "id": "order-input",
+      "type": "custom",
+      "parentId": "subgroup-order-order",
+      "position": {
+        "x": 659.5,
+        "y": 1516
+      },
+      "positionAbsolute": {
+        "x": 691.5,
+        "y": 1604
+      },
+      "width": 260,
+      "height": 96,
+      "measured": {
+        "width": 260,
+        "height": 96
+      },
+      "style": {
+        "width": 260,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "allocation",
+      "type": "custom",
+      "parentId": "subgroup-allocation-allocation",
+      "position": {
+        "x": 606.9999999999995,
+        "y": 1516
+      },
+      "positionAbsolute": {
+        "x": 2321,
+        "y": 1604
+      },
+      "width": 206,
+      "height": 96,
+      "measured": {
+        "width": 206,
+        "height": 96
+      },
+      "style": {
+        "width": 206,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "task-generate",
+      "type": "custom",
+      "parentId": "subgroup-task-task",
+      "position": {
+        "x": 577.9999999999995,
+        "y": 1516
+      },
+      "positionAbsolute": {
+        "x": 4243,
+        "y": 1604
+      },
+      "width": 208,
+      "height": 96,
+      "measured": {
+        "width": 208,
+        "height": 96
+      },
+      "style": {
+        "width": 208,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "task-group",
+      "type": "custom",
+      "parentId": "subgroup-task-group-task-group",
+      "position": {
+        "x": 616,
+        "y": 1516
+      },
+      "positionAbsolute": {
+        "x": 5822,
+        "y": 1604
+      },
+      "width": 206,
+      "height": 96,
+      "measured": {
+        "width": 206,
+        "height": 96
+      },
+      "style": {
+        "width": 206,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "operation",
+      "type": "custom",
+      "parentId": "subgroup-operation-operation",
+      "position": {
+        "x": 825.5,
+        "y": 1891
+      },
+      "positionAbsolute": {
+        "x": 7608.5,
+        "y": 1979
+      },
+      "width": 319,
+      "height": 73,
+      "measured": {
+        "width": 319,
+        "height": 73
+      },
+      "style": {
+        "width": 319,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "labor-kpi",
+      "type": "custom",
+      "parentId": "subgroup-analytics-analytics",
+      "position": {
+        "x": 265.5,
+        "y": 780
+      },
+      "positionAbsolute": {
+        "x": 9222.5,
+        "y": 868
+      },
+      "width": 215,
+      "height": 96,
+      "measured": {
+        "width": 215,
+        "height": 96
+      },
+      "style": {
+        "width": 215,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "order-import",
+      "type": "custom",
+      "parentId": "subgroup-order-order",
+      "position": {
+        "x": 32,
+        "y": 716
+      },
+      "positionAbsolute": {
+        "x": 64,
+        "y": 804
+      },
+      "width": 210,
+      "height": 73,
+      "measured": {
+        "width": 210,
+        "height": 73
+      },
+      "style": {
+        "width": 210,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "order-validate",
+      "type": "custom",
+      "parentId": "subgroup-order-order",
+      "position": {
+        "x": 362,
+        "y": 620
+      },
+      "positionAbsolute": {
+        "x": 394,
+        "y": 708
+      },
+      "width": 212,
+      "height": 73,
+      "measured": {
+        "width": 212,
+        "height": 73
+      },
+      "style": {
+        "width": 212,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "order-sla-classify",
+      "type": "custom",
+      "parentId": "subgroup-order-order",
+      "position": {
+        "x": 694,
+        "y": 524
+      },
+      "positionAbsolute": {
+        "x": 726,
+        "y": 612
+      },
+      "width": 191,
+      "height": 73,
+      "measured": {
+        "width": 191,
+        "height": 73
+      },
+      "style": {
+        "width": 191,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "order-split-merge",
+      "type": "custom",
+      "parentId": "subgroup-order-order",
+      "position": {
+        "x": 1005,
+        "y": 428
+      },
+      "positionAbsolute": {
+        "x": 1037,
+        "y": 516
+      },
+      "width": 151,
+      "height": 73,
+      "measured": {
+        "width": 151,
+        "height": 73
+      },
+      "style": {
+        "width": 151,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "order-exception",
+      "type": "custom",
+      "parentId": "subgroup-order-order",
+      "position": {
+        "x": 1276,
+        "y": 332
+      },
+      "positionAbsolute": {
+        "x": 1308,
+        "y": 420
+      },
+      "width": 190,
+      "height": 73,
+      "measured": {
+        "width": 190,
+        "height": 73
+      },
+      "style": {
+        "width": 190,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "atp-check",
+      "type": "custom",
+      "parentId": "subgroup-allocation-allocation",
+      "position": {
+        "x": 31.999999999999545,
+        "y": 716
+      },
+      "positionAbsolute": {
+        "x": 1746,
+        "y": 804
+      },
+      "width": 167,
+      "height": 73,
+      "measured": {
+        "width": 167,
+        "height": 73
+      },
+      "style": {
+        "width": 167,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "reservation",
+      "type": "custom",
+      "parentId": "subgroup-allocation-allocation",
+      "position": {
+        "x": 318.99999999999955,
+        "y": 620
+      },
+      "positionAbsolute": {
+        "x": 2033,
+        "y": 708
+      },
+      "width": 176,
+      "height": 73,
+      "measured": {
+        "width": 176,
+        "height": 73
+      },
+      "style": {
+        "width": 176,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "slotting",
+      "type": "custom",
+      "parentId": "subgroup-allocation-allocation",
+      "position": {
+        "x": 614.9999999999995,
+        "y": 524
+      },
+      "positionAbsolute": {
+        "x": 2329,
+        "y": 612
+      },
+      "width": 190,
+      "height": 73,
+      "measured": {
+        "width": 190,
+        "height": 73
+      },
+      "style": {
+        "width": 190,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "batch-lot",
+      "type": "custom",
+      "parentId": "subgroup-allocation-allocation",
+      "position": {
+        "x": 924.9999999999995,
+        "y": 428
+      },
+      "positionAbsolute": {
+        "x": 2639,
+        "y": 516
+      },
+      "width": 194,
+      "height": 73,
+      "measured": {
+        "width": 194,
+        "height": 73
+      },
+      "style": {
+        "width": 194,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "wave-planning",
+      "type": "custom",
+      "parentId": "subgroup-allocation-allocation",
+      "position": {
+        "x": 1238.9999999999995,
+        "y": 332
+      },
+      "positionAbsolute": {
+        "x": 2953,
+        "y": 420
+      },
+      "width": 206,
+      "height": 73,
+      "measured": {
+        "width": 206,
+        "height": 73
+      },
+      "style": {
+        "width": 206,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "allocation-rollback",
+      "type": "custom",
+      "parentId": "subgroup-allocation-allocation",
+      "position": {
+        "x": 1564.9999999999995,
+        "y": 236
+      },
+      "positionAbsolute": {
+        "x": 3279,
+        "y": 324
+      },
+      "width": 170,
+      "height": 73,
+      "measured": {
+        "width": 170,
+        "height": 73
+      },
+      "style": {
+        "width": 170,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "pick-task-gen",
+      "type": "custom",
+      "parentId": "subgroup-task-task",
+      "position": {
+        "x": 31.999999999999545,
+        "y": 716
+      },
+      "positionAbsolute": {
+        "x": 3697,
+        "y": 804
+      },
+      "width": 174,
+      "height": 73,
+      "measured": {
+        "width": 174,
+        "height": 73
+      },
+      "style": {
+        "width": 174,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "replenish-task-gen",
+      "type": "custom",
+      "parentId": "subgroup-task-task",
+      "position": {
+        "x": 325.99999999999955,
+        "y": 620
+      },
+      "positionAbsolute": {
+        "x": 3991,
+        "y": 708
+      },
+      "width": 151,
+      "height": 73,
+      "measured": {
+        "width": 151,
+        "height": 73
+      },
+      "style": {
+        "width": 151,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "sort-task-gen",
+      "type": "custom",
+      "parentId": "subgroup-task-task",
+      "position": {
+        "x": 596.9999999999995,
+        "y": 530.5
+      },
+      "positionAbsolute": {
+        "x": 4262,
+        "y": 618.5
+      },
+      "width": 170,
+      "height": 60,
+      "measured": {
+        "width": 170,
+        "height": 60
+      },
+      "style": {
+        "width": 170,
+        "height": 60
+      },
+      "data": {}
+    },
+    {
+      "id": "qc-task-gen",
+      "type": "custom",
+      "parentId": "subgroup-task-task",
+      "position": {
+        "x": 886.9999999999995,
+        "y": 428
+      },
+      "positionAbsolute": {
+        "x": 4552,
+        "y": 516
+      },
+      "width": 135,
+      "height": 73,
+      "measured": {
+        "width": 135,
+        "height": 73
+      },
+      "style": {
+        "width": 135,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "pack-task-gen",
+      "type": "custom",
+      "parentId": "subgroup-task-task",
+      "position": {
+        "x": 1141.9999999999995,
+        "y": 332
+      },
+      "positionAbsolute": {
+        "x": 4807,
+        "y": 420
+      },
+      "width": 183,
+      "height": 73,
+      "measured": {
+        "width": 183,
+        "height": 73
+      },
+      "style": {
+        "width": 183,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "wave-build",
+      "type": "custom",
+      "parentId": "subgroup-task-group-task-group",
+      "position": {
+        "x": 32,
+        "y": 716
+      },
+      "positionAbsolute": {
+        "x": 5238,
+        "y": 804
+      },
+      "width": 190,
+      "height": 73,
+      "measured": {
+        "width": 190,
+        "height": 73
+      },
+      "style": {
+        "width": 190,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "zone-group",
+      "type": "custom",
+      "parentId": "subgroup-task-group-task-group",
+      "position": {
+        "x": 342,
+        "y": 620
+      },
+      "positionAbsolute": {
+        "x": 5548,
+        "y": 708
+      },
+      "width": 170,
+      "height": 73,
+      "measured": {
+        "width": 170,
+        "height": 73
+      },
+      "style": {
+        "width": 170,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "container-assign",
+      "type": "custom",
+      "parentId": "subgroup-task-group-task-group",
+      "position": {
+        "x": 632,
+        "y": 524
+      },
+      "positionAbsolute": {
+        "x": 5838,
+        "y": 612
+      },
+      "width": 174,
+      "height": 73,
+      "measured": {
+        "width": 174,
+        "height": 73
+      },
+      "style": {
+        "width": 174,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "priority-sequence",
+      "type": "custom",
+      "parentId": "subgroup-task-group-task-group",
+      "position": {
+        "x": 926,
+        "y": 434.5
+      },
+      "positionAbsolute": {
+        "x": 6132,
+        "y": 522.5
+      },
+      "width": 186,
+      "height": 60,
+      "measured": {
+        "width": 186,
+        "height": 60
+      },
+      "style": {
+        "width": 186,
+        "height": 60
+      },
+      "data": {}
+    },
+    {
+      "id": "cutoff-grouping",
+      "type": "custom",
+      "parentId": "subgroup-task-group-task-group",
+      "position": {
+        "x": 1232,
+        "y": 332
+      },
+      "positionAbsolute": {
+        "x": 6438,
+        "y": 420
+      },
+      "width": 129,
+      "height": 73,
+      "measured": {
+        "width": 129,
+        "height": 73
+      },
+      "style": {
+        "width": 129,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "picking-exec",
+      "type": "custom",
+      "parentId": "subgroup-operation-operation",
+      "position": {
+        "x": 32,
+        "y": 1379
+      },
+      "positionAbsolute": {
+        "x": 6815,
+        "y": 1467
+      },
+      "width": 170,
+      "height": 73,
+      "measured": {
+        "width": 170,
+        "height": 73
+      },
+      "style": {
+        "width": 170,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "replenish-exec",
+      "type": "custom",
+      "parentId": "subgroup-operation-operation",
+      "position": {
+        "x": 322,
+        "y": 1283
+      },
+      "positionAbsolute": {
+        "x": 7105,
+        "y": 1371
+      },
+      "width": 167,
+      "height": 73,
+      "measured": {
+        "width": 167,
+        "height": 73
+      },
+      "style": {
+        "width": 167,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "sorting-exec",
+      "type": "custom",
+      "parentId": "subgroup-operation-operation",
+      "position": {
+        "x": 609,
+        "y": 1187
+      },
+      "positionAbsolute": {
+        "x": 7392,
+        "y": 1275
+      },
+      "width": 167,
+      "height": 73,
+      "measured": {
+        "width": 167,
+        "height": 73
+      },
+      "style": {
+        "width": 167,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "packing-exec",
+      "type": "custom",
+      "parentId": "subgroup-operation-operation",
+      "position": {
+        "x": 896,
+        "y": 1097.5
+      },
+      "positionAbsolute": {
+        "x": 7679,
+        "y": 1185.5
+      },
+      "width": 178,
+      "height": 60,
+      "measured": {
+        "width": 178,
+        "height": 60
+      },
+      "style": {
+        "width": 178,
+        "height": 60
+      },
+      "data": {}
+    },
+    {
+      "id": "qc-exec",
+      "type": "custom",
+      "parentId": "subgroup-operation-operation",
+      "position": {
+        "x": 1194,
+        "y": 1001.5
+      },
+      "positionAbsolute": {
+        "x": 7977,
+        "y": 1089.5
+      },
+      "width": 138,
+      "height": 60,
+      "measured": {
+        "width": 138,
+        "height": 60
+      },
+      "style": {
+        "width": 138,
+        "height": 60
+      },
+      "data": {}
+    },
+    {
+      "id": "loading-handover",
+      "type": "custom",
+      "parentId": "subgroup-operation-operation",
+      "position": {
+        "x": 1452,
+        "y": 905.5
+      },
+      "positionAbsolute": {
+        "x": 8235,
+        "y": 993.5
+      },
+      "width": 178,
+      "height": 60,
+      "measured": {
+        "width": 178,
+        "height": 60
+      },
+      "style": {
+        "width": 178,
+        "height": 60
+      },
+      "data": {}
+    },
+    {
+      "id": "wcs-integration",
+      "type": "custom",
+      "parentId": "subgroup-operation-operation",
+      "position": {
+        "x": 1750,
+        "y": 803
+      },
+      "positionAbsolute": {
+        "x": 8533,
+        "y": 891
+      },
+      "width": 208,
+      "height": 73,
+      "measured": {
+        "width": 208,
+        "height": 73
+      },
+      "style": {
+        "width": 208,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "real-time-board",
+      "type": "custom",
+      "parentId": "subgroup-analytics-analytics",
+      "position": {
+        "x": 32,
+        "y": 1827
+      },
+      "positionAbsolute": {
+        "x": 8989,
+        "y": 1915
+      },
+      "width": 134,
+      "height": 73,
+      "measured": {
+        "width": 134,
+        "height": 73
+      },
+      "style": {
+        "width": 134,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "uph-calc",
+      "type": "custom",
+      "parentId": "subgroup-analytics-analytics",
+      "position": {
+        "x": 286,
+        "y": 1731
+      },
+      "positionAbsolute": {
+        "x": 9243,
+        "y": 1819
+      },
+      "width": 174,
+      "height": 73,
+      "measured": {
+        "width": 174,
+        "height": 73
+      },
+      "style": {
+        "width": 174,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "path-heatmap",
+      "type": "custom",
+      "parentId": "subgroup-analytics-analytics",
+      "position": {
+        "x": 580,
+        "y": 1641.5
+      },
+      "positionAbsolute": {
+        "x": 9537,
+        "y": 1729.5
+      },
+      "width": 186,
+      "height": 60,
+      "measured": {
+        "width": 186,
+        "height": 60
+      },
+      "style": {
+        "width": 186,
+        "height": 60
+      },
+      "data": {}
+    },
+    {
+      "id": "exception-alert",
+      "type": "custom",
+      "parentId": "subgroup-analytics-analytics",
+      "position": {
+        "x": 886,
+        "y": 1539
+      },
+      "positionAbsolute": {
+        "x": 9843,
+        "y": 1627
+      },
+      "width": 190,
+      "height": 73,
+      "measured": {
+        "width": 190,
+        "height": 73
+      },
+      "style": {
+        "width": 190,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "labor-schedule-feedback",
+      "type": "custom",
+      "parentId": "subgroup-analytics-analytics",
+      "position": {
+        "x": 272,
+        "y": 112
+      },
+      "positionAbsolute": {
+        "x": 9229,
+        "y": 200
+      },
+      "width": 202,
+      "height": 60,
+      "measured": {
+        "width": 202,
+        "height": 60
+      },
+      "style": {
+        "width": 202,
+        "height": 60
+      },
+      "data": {}
+    }
+  ],
+  "enableSmartEdges": true,
+  "smartEdgePadding": 20,
+  "isLargeGraph": false,
+  "displayEdgeEpoch": 0,
+  "qualityMode": "full",
+  "inputIdentity": {
+    "routingVersion": "16",
+    "visualVersion": "commercial-hard-gate-v1",
+    "inputSignature": "3753570760",
+    "inputGeometryDigest": "geometry-v1:8918e06f1e458edf3e49aabf243b968b"
+  },
+  "candidatePatches": [
+    {
+      "id": "e-alloc-rollback",
+      "source": "allocation",
+      "target": "allocation-rollback",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2527,
+            "y": 1652
+          },
+          {
+            "x": 3364,
+            "y": 1652
+          },
+          {
+            "x": 3364,
+            "y": 397
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-atp",
+      "source": "allocation",
+      "target": "atp-check",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2321,
+            "y": 1652
+          },
+          {
+            "x": 2081,
+            "y": 1652
+          },
+          {
+            "x": 2081,
+            "y": 841
+          },
+          {
+            "x": 1913,
+            "y": 841
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-batch",
+      "source": "allocation",
+      "target": "batch-lot",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2424,
+            "y": 1604
+          },
+          {
+            "x": 2424,
+            "y": 933
+          },
+          {
+            "x": 2736,
+            "y": 933
+          },
+          {
+            "x": 2736,
+            "y": 589
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-reservation",
+      "source": "allocation",
+      "target": "reservation",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2321,
+            "y": 1652
+          },
+          {
+            "x": 2265,
+            "y": 1652
+          },
+          {
+            "x": 2265,
+            "y": 745
+          },
+          {
+            "x": 2209,
+            "y": 745
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-slotting",
+      "source": "allocation",
+      "target": "slotting",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2321,
+            "y": 1652
+          },
+          {
+            "x": 2273,
+            "y": 1652
+          },
+          {
+            "x": 2273,
+            "y": 649
+          },
+          {
+            "x": 2329,
+            "y": 649
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-allocation-task",
+      "source": "allocation",
+      "target": "task-generate",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2424,
+            "y": 1700
+          },
+          {
+            "x": 2424,
+            "y": 1756
+          },
+          {
+            "x": 4347,
+            "y": 1756
+          },
+          {
+            "x": 4347,
+            "y": 1700
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-wave-plan",
+      "source": "allocation",
+      "target": "wave-planning",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2527,
+            "y": 1652
+          },
+          {
+            "x": 3056,
+            "y": 1652
+          },
+          {
+            "x": 3056,
+            "y": 493
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-alert-labor",
+      "source": "exception-alert",
+      "target": "labor-kpi",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 9938,
+            "y": 1627
+          },
+          {
+            "x": 9938,
+            "y": 916
+          },
+          {
+            "x": 9438,
+            "y": 916
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-labor-input",
+      "source": "labor-kpi",
+      "target": "labor-schedule-feedback",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 9330,
+            "y": 868
+          },
+          {
+            "x": 9330,
+            "y": 260
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-labor-alloc-fb",
+      "source": "labor-schedule-feedback",
+      "target": "allocation",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 9229,
+            "y": 230
+          },
+          {
+            "x": 2424,
+            "y": 230
+          },
+          {
+            "x": 2424,
+            "y": 588
+          },
+          {
+            "x": 2543,
+            "y": 588
+          },
+          {
+            "x": 2543,
+            "y": 728
+          },
+          {
+            "x": 2424,
+            "y": 728
+          },
+          {
+            "x": 2424,
+            "y": 1604
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "hairpinBridgeWidened": true
+      }
+    },
+    {
+      "id": "e-labor-group-fb",
+      "source": "labor-schedule-feedback",
+      "target": "task-group",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 9229,
+            "y": 230
+          },
+          {
+            "x": 6084,
+            "y": 230
+          },
+          {
+            "x": 6084,
+            "y": 1652
+          },
+          {
+            "x": 6028,
+            "y": 1652
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-op-alert",
+      "source": "operation",
+      "target": "exception-alert",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 7928,
+            "y": 2016
+          },
+          {
+            "x": 9938,
+            "y": 2016
+          },
+          {
+            "x": 9938,
+            "y": 1700
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-operation-labor",
+      "source": "operation",
+      "target": "labor-kpi",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 7928,
+            "y": 2016
+          },
+          {
+            "x": 9167,
+            "y": 2016
+          },
+          {
+            "x": 9167,
+            "y": 916
+          },
+          {
+            "x": 9223,
+            "y": 916
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-loading",
+      "source": "operation",
+      "target": "loading-handover",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 7928,
+            "y": 2016
+          },
+          {
+            "x": 8324,
+            "y": 2016
+          },
+          {
+            "x": 8324,
+            "y": 1054
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-packing-exec",
+      "source": "operation",
+      "target": "packing-exec",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 7768,
+            "y": 1979
+          },
+          {
+            "x": 7768,
+            "y": 1246
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-op-heat",
+      "source": "operation",
+      "target": "path-heatmap",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 7928,
+            "y": 2016
+          },
+          {
+            "x": 9630,
+            "y": 2016
+          },
+          {
+            "x": 9630,
+            "y": 1790
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-picking-exec",
+      "source": "operation",
+      "target": "picking-exec",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 7768,
+            "y": 1979
+          },
+          {
+            "x": 7768,
+            "y": 1504
+          },
+          {
+            "x": 6985,
+            "y": 1504
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-qc-exec",
+      "source": "operation",
+      "target": "qc-exec",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 7928,
+            "y": 2016
+          },
+          {
+            "x": 8046,
+            "y": 2016
+          },
+          {
+            "x": 8046,
+            "y": 1150
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-op-rt",
+      "source": "operation",
+      "target": "real-time-board",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 7928,
+            "y": 2016
+          },
+          {
+            "x": 8933,
+            "y": 2016
+          },
+          {
+            "x": 8933,
+            "y": 1952
+          },
+          {
+            "x": 8989,
+            "y": 1952
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-replenish-exec",
+      "source": "operation",
+      "target": "replenish-exec",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 7768,
+            "y": 1979
+          },
+          {
+            "x": 7768,
+            "y": 1408
+          },
+          {
+            "x": 7272,
+            "y": 1408
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-sorting-exec",
+      "source": "operation",
+      "target": "sorting-exec",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 7768,
+            "y": 1979
+          },
+          {
+            "x": 7768,
+            "y": 1312
+          },
+          {
+            "x": 7559,
+            "y": 1312
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-op-uph",
+      "source": "operation",
+      "target": "uph-calc",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 7928,
+            "y": 2016
+          },
+          {
+            "x": 9330,
+            "y": 2016
+          },
+          {
+            "x": 9330,
+            "y": 1892
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-wcs",
+      "source": "operation",
+      "target": "wcs-integration",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 7928,
+            "y": 2016
+          },
+          {
+            "x": 8637,
+            "y": 2016
+          },
+          {
+            "x": 8637,
+            "y": 964
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-order-allocation",
+      "source": "order-input",
+      "target": "allocation",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 822,
+            "y": 1700
+          },
+          {
+            "x": 822,
+            "y": 1756
+          },
+          {
+            "x": 2424,
+            "y": 1756
+          },
+          {
+            "x": 2424,
+            "y": 1700
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-order-exception",
+      "source": "order-input",
+      "target": "order-exception",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 952,
+            "y": 1652
+          },
+          {
+            "x": 1403,
+            "y": 1652
+          },
+          {
+            "x": 1403,
+            "y": 493
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-order-import",
+      "source": "order-input",
+      "target": "order-import",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 692,
+            "y": 1652
+          },
+          {
+            "x": 169,
+            "y": 1652
+          },
+          {
+            "x": 169,
+            "y": 877
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-order-sla",
+      "source": "order-input",
+      "target": "order-sla-classify",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 822,
+            "y": 1604
+          },
+          {
+            "x": 822,
+            "y": 685
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-order-split",
+      "source": "order-input",
+      "target": "order-split-merge",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 952,
+            "y": 1652
+          },
+          {
+            "x": 1113,
+            "y": 1652
+          },
+          {
+            "x": 1113,
+            "y": 589
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-order-validate",
+      "source": "order-input",
+      "target": "order-validate",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 692,
+            "y": 1652
+          },
+          {
+            "x": 500,
+            "y": 1652
+          },
+          {
+            "x": 500,
+            "y": 781
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-heat-labor",
+      "source": "path-heatmap",
+      "target": "labor-kpi",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 9537,
+            "y": 1760
+          },
+          {
+            "x": 9330,
+            "y": 1760
+          },
+          {
+            "x": 9330,
+            "y": 964
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-rt-labor",
+      "source": "real-time-board",
+      "target": "labor-kpi",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 9056,
+            "y": 1915
+          },
+          {
+            "x": 9056,
+            "y": 916
+          },
+          {
+            "x": 9223,
+            "y": 916
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-pack-task",
+      "source": "task-generate",
+      "target": "pack-task-gen",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4451,
+            "y": 1652
+          },
+          {
+            "x": 4899,
+            "y": 1652
+          },
+          {
+            "x": 4899,
+            "y": 493
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-pick-task",
+      "source": "task-generate",
+      "target": "pick-task-gen",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4243,
+            "y": 1652
+          },
+          {
+            "x": 3784,
+            "y": 1652
+          },
+          {
+            "x": 3784,
+            "y": 877
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-qc-task",
+      "source": "task-generate",
+      "target": "qc-task-gen",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4451,
+            "y": 1652
+          },
+          {
+            "x": 4620,
+            "y": 1652
+          },
+          {
+            "x": 4620,
+            "y": 589
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-replenish-task",
+      "source": "task-generate",
+      "target": "replenish-task-gen",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4243,
+            "y": 1652
+          },
+          {
+            "x": 4067,
+            "y": 1652
+          },
+          {
+            "x": 4067,
+            "y": 781
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-sort-task",
+      "source": "task-generate",
+      "target": "sort-task-gen",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4347,
+            "y": 1604
+          },
+          {
+            "x": 4347,
+            "y": 679
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-task-taskgroup",
+      "source": "task-generate",
+      "target": "task-group",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4347,
+            "y": 1700
+          },
+          {
+            "x": 4347,
+            "y": 1756
+          },
+          {
+            "x": 5925,
+            "y": 1756
+          },
+          {
+            "x": 5925,
+            "y": 1700
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-container-assign",
+      "source": "task-group",
+      "target": "container-assign",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 5925,
+            "y": 1604
+          },
+          {
+            "x": 5925,
+            "y": 685
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-cutoff",
+      "source": "task-group",
+      "target": "cutoff-grouping",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 6028,
+            "y": 1652
+          },
+          {
+            "x": 6503,
+            "y": 1652
+          },
+          {
+            "x": 6503,
+            "y": 493
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-taskgroup-operation",
+      "source": "task-group",
+      "target": "operation",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 5925,
+            "y": 1700
+          },
+          {
+            "x": 5925,
+            "y": 2016
+          },
+          {
+            "x": 7609,
+            "y": 2016
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-priority-seq",
+      "source": "task-group",
+      "target": "priority-sequence",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 6028,
+            "y": 1652
+          },
+          {
+            "x": 6225,
+            "y": 1652
+          },
+          {
+            "x": 6225,
+            "y": 583
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-wave-build",
+      "source": "task-group",
+      "target": "wave-build",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 5822,
+            "y": 1652
+          },
+          {
+            "x": 5333,
+            "y": 1652
+          },
+          {
+            "x": 5333,
+            "y": 877
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-zone-group",
+      "source": "task-group",
+      "target": "zone-group",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 5822,
+            "y": 1652
+          },
+          {
+            "x": 5633,
+            "y": 1652
+          },
+          {
+            "x": 5633,
+            "y": 781
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-uph-labor",
+      "source": "uph-calc",
+      "target": "labor-kpi",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 9330,
+            "y": 1819
+          },
+          {
+            "x": 9330,
+            "y": 964
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    }
+  ],
+  "fallbackCandidatePatches": [
+    {
+      "id": "e-alloc-rollback",
+      "source": "allocation",
+      "target": "allocation-rollback",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2527,
+            "y": 1652
+          },
+          {
+            "x": 2945.5,
+            "y": 1652
+          },
+          {
+            "x": 2945.5,
+            "y": 397
+          },
+          {
+            "x": 3364,
+            "y": 397
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-atp",
+      "source": "allocation",
+      "target": "atp-check",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2321,
+            "y": 1652
+          },
+          {
+            "x": 2117,
+            "y": 1652
+          },
+          {
+            "x": 2117,
+            "y": 840.5
+          },
+          {
+            "x": 1913,
+            "y": 840.5
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-batch",
+      "source": "allocation",
+      "target": "batch-lot",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2424,
+            "y": 1604
+          },
+          {
+            "x": 2424,
+            "y": 1096.5
+          },
+          {
+            "x": 2736,
+            "y": 1096.5
+          },
+          {
+            "x": 2736,
+            "y": 589
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-reservation",
+      "source": "allocation",
+      "target": "reservation",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2321,
+            "y": 1652
+          },
+          {
+            "x": 2265,
+            "y": 1652
+          },
+          {
+            "x": 2265,
+            "y": 744.5
+          },
+          {
+            "x": 2209,
+            "y": 744.5
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-slotting",
+      "source": "allocation",
+      "target": "slotting",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2321,
+            "y": 1652
+          },
+          {
+            "x": 2273,
+            "y": 1652
+          },
+          {
+            "x": 2273,
+            "y": 648.5
+          },
+          {
+            "x": 2329,
+            "y": 648.5
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "terminalPortBridgeRepaired": true
+      }
+    },
+    {
+      "id": "e-allocation-task",
+      "source": "allocation",
+      "target": "task-generate",
+      "sourceHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2527,
+            "y": 1652
+          },
+          {
+            "x": 2575,
+            "y": 1652
+          },
+          {
+            "x": 2575,
+            "y": 1748
+          },
+          {
+            "x": 4347,
+            "y": 1748
+          },
+          {
+            "x": 4347,
+            "y": 1700
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "terminalPortBridgeRepaired": true
+      }
+    },
+    {
+      "id": "e-wave-plan",
+      "source": "allocation",
+      "target": "wave-planning",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2527,
+            "y": 1652
+          },
+          {
+            "x": 2791.5,
+            "y": 1652
+          },
+          {
+            "x": 2791.5,
+            "y": 493
+          },
+          {
+            "x": 3056,
+            "y": 493
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-alert-labor",
+      "source": "exception-alert",
+      "target": "labor-kpi",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 9938,
+            "y": 1627
+          },
+          {
+            "x": 9938,
+            "y": 1579
+          },
+          {
+            "x": 9687.75,
+            "y": 1579
+          },
+          {
+            "x": 9687.75,
+            "y": 916
+          },
+          {
+            "x": 9437.5,
+            "y": 916
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-labor-input",
+      "source": "labor-kpi",
+      "target": "labor-schedule-feedback",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 9330,
+            "y": 868
+          },
+          {
+            "x": 9330,
+            "y": 260
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-labor-alloc-fb",
+      "source": "labor-schedule-feedback",
+      "target": "allocation",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 9229,
+            "y": 230
+          },
+          {
+            "x": 2400,
+            "y": 230
+          },
+          {
+            "x": 2400,
+            "y": 1604
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "terminalPortBridgeRepaired": true
+      }
+    },
+    {
+      "id": "e-labor-group-fb",
+      "source": "labor-schedule-feedback",
+      "target": "task-group",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 9229,
+            "y": 230
+          },
+          {
+            "x": 7628.5,
+            "y": 230
+          },
+          {
+            "x": 7628.5,
+            "y": 1652
+          },
+          {
+            "x": 6028,
+            "y": 1652
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-op-alert",
+      "source": "operation",
+      "target": "exception-alert",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 7927.5,
+            "y": 2015.5
+          },
+          {
+            "x": 8932.75,
+            "y": 2015.5
+          },
+          {
+            "x": 8932.75,
+            "y": 1700
+          },
+          {
+            "x": 9938,
+            "y": 1700
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-operation-labor",
+      "source": "operation",
+      "target": "labor-kpi",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 7927.5,
+            "y": 2015.5
+          },
+          {
+            "x": 8575,
+            "y": 2015.5
+          },
+          {
+            "x": 8575,
+            "y": 916
+          },
+          {
+            "x": 9222.5,
+            "y": 916
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-loading",
+      "source": "operation",
+      "target": "loading-handover",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 7927.5,
+            "y": 2015.5
+          },
+          {
+            "x": 8125.75,
+            "y": 2015.5
+          },
+          {
+            "x": 8125.75,
+            "y": 1053.5
+          },
+          {
+            "x": 8324,
+            "y": 1053.5
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-packing-exec",
+      "source": "operation",
+      "target": "packing-exec",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 7768,
+            "y": 1979
+          },
+          {
+            "x": 7768,
+            "y": 1245.5
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-op-heat",
+      "source": "operation",
+      "target": "path-heatmap",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 7927.5,
+            "y": 2015.5
+          },
+          {
+            "x": 8778.75,
+            "y": 2015.5
+          },
+          {
+            "x": 8778.75,
+            "y": 1789.5
+          },
+          {
+            "x": 9630,
+            "y": 1789.5
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-picking-exec",
+      "source": "operation",
+      "target": "picking-exec",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 7768,
+            "y": 1979
+          },
+          {
+            "x": 7376.5,
+            "y": 1979
+          },
+          {
+            "x": 7376.5,
+            "y": 1503.5
+          },
+          {
+            "x": 6985,
+            "y": 1503.5
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-qc-exec",
+      "source": "operation",
+      "target": "qc-exec",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 7927.5,
+            "y": 2015.5
+          },
+          {
+            "x": 7986.75,
+            "y": 2015.5
+          },
+          {
+            "x": 7986.75,
+            "y": 1197.5
+          },
+          {
+            "x": 8046,
+            "y": 1197.5
+          },
+          {
+            "x": 8046,
+            "y": 1149.5
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-op-rt",
+      "source": "operation",
+      "target": "real-time-board",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 7927.5,
+            "y": 2015.5
+          },
+          {
+            "x": 8458.25,
+            "y": 2015.5
+          },
+          {
+            "x": 8458.25,
+            "y": 1951.5
+          },
+          {
+            "x": 8989,
+            "y": 1951.5
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-replenish-exec",
+      "source": "operation",
+      "target": "replenish-exec",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 7768,
+            "y": 1979
+          },
+          {
+            "x": 7520,
+            "y": 1979
+          },
+          {
+            "x": 7520,
+            "y": 1407.5
+          },
+          {
+            "x": 7272,
+            "y": 1407.5
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-sorting-exec",
+      "source": "operation",
+      "target": "sorting-exec",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 7768,
+            "y": 1979
+          },
+          {
+            "x": 7663.5,
+            "y": 1979
+          },
+          {
+            "x": 7663.5,
+            "y": 1311.5
+          },
+          {
+            "x": 7559,
+            "y": 1311.5
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-op-uph",
+      "source": "operation",
+      "target": "uph-calc",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 7927.5,
+            "y": 2015.5
+          },
+          {
+            "x": 8628.75,
+            "y": 2015.5
+          },
+          {
+            "x": 8628.75,
+            "y": 1892
+          },
+          {
+            "x": 9330,
+            "y": 1892
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-wcs",
+      "source": "operation",
+      "target": "wcs-integration",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 7927.5,
+            "y": 2015.5
+          },
+          {
+            "x": 8282.25,
+            "y": 2015.5
+          },
+          {
+            "x": 8282.25,
+            "y": 964
+          },
+          {
+            "x": 8637,
+            "y": 964
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-order-allocation",
+      "source": "order-input",
+      "target": "allocation",
+      "sourceHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 951.5,
+            "y": 1652
+          },
+          {
+            "x": 999.5,
+            "y": 1652
+          },
+          {
+            "x": 999.5,
+            "y": 1748
+          },
+          {
+            "x": 2424,
+            "y": 1748
+          },
+          {
+            "x": 2424,
+            "y": 1700
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "terminalPortBridgeRepaired": true
+      }
+    },
+    {
+      "id": "e-order-exception",
+      "source": "order-input",
+      "target": "order-exception",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 951.5,
+            "y": 1652
+          },
+          {
+            "x": 1177.25,
+            "y": 1652
+          },
+          {
+            "x": 1177.25,
+            "y": 493
+          },
+          {
+            "x": 1403,
+            "y": 493
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-order-import",
+      "source": "order-input",
+      "target": "order-import",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 691.5,
+            "y": 1652
+          },
+          {
+            "x": 430.25,
+            "y": 1652
+          },
+          {
+            "x": 430.25,
+            "y": 925
+          },
+          {
+            "x": 169,
+            "y": 925
+          },
+          {
+            "x": 169,
+            "y": 877
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-order-sla",
+      "source": "order-input",
+      "target": "order-sla-classify",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 821.5,
+            "y": 1604
+          },
+          {
+            "x": 821.5,
+            "y": 685
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-order-split",
+      "source": "order-input",
+      "target": "order-split-merge",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 951.5,
+            "y": 1652
+          },
+          {
+            "x": 1032,
+            "y": 1652
+          },
+          {
+            "x": 1032,
+            "y": 637
+          },
+          {
+            "x": 1112.5,
+            "y": 637
+          },
+          {
+            "x": 1112.5,
+            "y": 589
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-order-validate",
+      "source": "order-input",
+      "target": "order-validate",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 691.5,
+            "y": 1652
+          },
+          {
+            "x": 595.75,
+            "y": 1652
+          },
+          {
+            "x": 595.75,
+            "y": 829
+          },
+          {
+            "x": 500,
+            "y": 829
+          },
+          {
+            "x": 500,
+            "y": 781
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-heat-labor",
+      "source": "path-heatmap",
+      "target": "labor-kpi",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 9537,
+            "y": 1759.5
+          },
+          {
+            "x": 9433.5,
+            "y": 1759.5
+          },
+          {
+            "x": 9433.5,
+            "y": 964
+          },
+          {
+            "x": 9330,
+            "y": 964
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-rt-labor",
+      "source": "real-time-board",
+      "target": "labor-kpi",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 9056,
+            "y": 1915
+          },
+          {
+            "x": 9139.25,
+            "y": 1915
+          },
+          {
+            "x": 9139.25,
+            "y": 916
+          },
+          {
+            "x": 9222.5,
+            "y": 916
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-pack-task",
+      "source": "task-generate",
+      "target": "pack-task-gen",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4451,
+            "y": 1652
+          },
+          {
+            "x": 4674.75,
+            "y": 1652
+          },
+          {
+            "x": 4674.75,
+            "y": 493
+          },
+          {
+            "x": 4898.5,
+            "y": 493
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-pick-task",
+      "source": "task-generate",
+      "target": "pick-task-gen",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4243,
+            "y": 1652
+          },
+          {
+            "x": 4013.5,
+            "y": 1652
+          },
+          {
+            "x": 4013.5,
+            "y": 877
+          },
+          {
+            "x": 3784,
+            "y": 877
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-qc-task",
+      "source": "task-generate",
+      "target": "qc-task-gen",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4451,
+            "y": 1652
+          },
+          {
+            "x": 4535.25,
+            "y": 1652
+          },
+          {
+            "x": 4535.25,
+            "y": 589
+          },
+          {
+            "x": 4619.5,
+            "y": 589
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-replenish-task",
+      "source": "task-generate",
+      "target": "replenish-task-gen",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4243,
+            "y": 1652
+          },
+          {
+            "x": 4154.75,
+            "y": 1652
+          },
+          {
+            "x": 4154.75,
+            "y": 781
+          },
+          {
+            "x": 4066.5,
+            "y": 781
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-sort-task",
+      "source": "task-generate",
+      "target": "sort-task-gen",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4347,
+            "y": 1604
+          },
+          {
+            "x": 4347,
+            "y": 678.5
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-task-taskgroup",
+      "source": "task-generate",
+      "target": "task-group",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4347,
+            "y": 1700
+          },
+          {
+            "x": 5925,
+            "y": 1700
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-container-assign",
+      "source": "task-group",
+      "target": "container-assign",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 5925,
+            "y": 1604
+          },
+          {
+            "x": 5925,
+            "y": 685
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-cutoff",
+      "source": "task-group",
+      "target": "cutoff-grouping",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 6028,
+            "y": 1652
+          },
+          {
+            "x": 6265.25,
+            "y": 1652
+          },
+          {
+            "x": 6265.25,
+            "y": 493
+          },
+          {
+            "x": 6502.5,
+            "y": 493
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-taskgroup-operation",
+      "source": "task-group",
+      "target": "operation",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 5925,
+            "y": 1700
+          },
+          {
+            "x": 5925,
+            "y": 1748
+          },
+          {
+            "x": 6766.75,
+            "y": 1748
+          },
+          {
+            "x": 6766.75,
+            "y": 2015.5
+          },
+          {
+            "x": 7608.5,
+            "y": 2015.5
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-priority-seq",
+      "source": "task-group",
+      "target": "priority-sequence",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 6028,
+            "y": 1652
+          },
+          {
+            "x": 6126.5,
+            "y": 1652
+          },
+          {
+            "x": 6126.5,
+            "y": 630.5
+          },
+          {
+            "x": 6225,
+            "y": 630.5
+          },
+          {
+            "x": 6225,
+            "y": 582.5
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-wave-build",
+      "source": "task-group",
+      "target": "wave-build",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 5822,
+            "y": 1652
+          },
+          {
+            "x": 5577.5,
+            "y": 1652
+          },
+          {
+            "x": 5577.5,
+            "y": 877
+          },
+          {
+            "x": 5333,
+            "y": 877
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-zone-group",
+      "source": "task-group",
+      "target": "zone-group",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 5822,
+            "y": 1652
+          },
+          {
+            "x": 5727.5,
+            "y": 1652
+          },
+          {
+            "x": 5727.5,
+            "y": 781
+          },
+          {
+            "x": 5633,
+            "y": 781
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-uph-labor",
+      "source": "uph-calc",
+      "target": "labor-kpi",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 9330,
+            "y": 1819
+          },
+          {
+            "x": 9330,
+            "y": 964
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    }
+  ],
+  "candidateSource": "persistent",
+  "stopAfterObstacleFailure": false,
+  "__browserCloneMs": 0.800000011920929,
+  "__browserCapturedAt": 1788601211941,
+  "__browserWorkerInstanceId": "worker-1",
+  "__browserRequestOrdinal": 5,
+  "__browserAttemptOrdinal": 1,
+  "__browserLayoutSeedAudit": {
+    "terminalsAttached": true,
+    "terminalsAnchored": true,
+    "obstacleHits": 0,
+    "strictCrossings": 0
+  },
+  "__browserRoutingVersion": "16"
+}

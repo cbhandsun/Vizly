@@ -37,4 +37,34 @@ describe('business-node clearance rect context', () => {
     ]);
     expect(context.containerRects).toEqual([]);
   });
+  it('keeps enclosing boundaries without turning nested visual groups into hard walls', () => {
+    const outer = node('outer', 0, 'titleGroup', { width: 500, height: 300 });
+    const nested = node('inner', 32, 'subGroup', { width: 436, height: 250 });
+    const overlap = node('overlap', 450, 'subGroup', { width: 200, height: 100 });
+    const business = node('business', 100);
+    const context = createBusinessNodeClearanceRectContext([nested, outer, overlap, business]);
+    expect(context.containerRects).toEqual([
+      { x: 0, y: 20, width: 500, height: 300 },
+      { x: 450, y: 20, width: 200, height: 100 },
+    ]);
+    expect([...context.obstacles.keys()]).toEqual(['business']);
+    expect(createBusinessNodeClearanceRectContext([outer, nested, business]).containerRects)
+      .toEqual(createBusinessNodeClearanceRectContext([nested, outer, business]).containerRects);
+  });
+
+  it('retains one boundary for coincident groups and retains disjoint containers', () => {
+    const context = createBusinessNodeClearanceRectContext([
+      node('one', 0, 'group'), node('duplicate', 0, 'subGroup'), node('separate', 100, 'domain'), node('business', 0),
+    ]);
+    expect(context.containerRects).toHaveLength(2);
+    expect(createBusinessNodeClearanceRectContext([]).containerRects).toEqual([]);
+  });
+  it('preserves nested boundaries that partition different business nodes', () => {
+    const context = createBusinessNodeClearanceRectContext([
+      node('outer', 0, 'titleGroup', { width: 500, height: 300 }),
+      node('inner', 0, 'subGroup', { width: 200, height: 200 }),
+      node('inside', 20), node('outside', 300),
+    ]);
+    expect(context.containerRects).toHaveLength(2);
+  });
 });

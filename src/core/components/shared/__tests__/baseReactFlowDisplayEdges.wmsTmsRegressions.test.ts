@@ -1,3 +1,5 @@
+import warmBtRequestJson from './fixtures/wmsWarmBtWorkerRequest.json';
+import { parseDisplayEdgesWorkerRequest } from '../baseReactFlowDisplayWorkerProtocol';
 import type { Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
@@ -341,3 +343,18 @@ describe('baseReactFlowDisplayEdges WMS and TMS regressions', () => {
     expect(Math.abs(targetClearance - sourceClearance), diagnostics).toBeLessThanOrEqual(1);
   }, 60_000);
 });
+
+
+it('routes WMS BT after compound and full layouts retain nested visual containers', () => {
+  const request = parseDisplayEdgesWorkerRequest(warmBtRequestJson);
+  if (!request) throw new Error('Invalid WMS warm BT fixture');
+  const response = computeBaseReactFlowDisplayEdgesWorkerResponse(request);
+  expect(response.error).toBeUndefined();
+  expect(response.hardClean, JSON.stringify(response.hardReport)).toBe(true);
+  expect(response.hardReport?.minimumClearanceViolations).toBe(0);
+  expect(response.hardReport?.commercialClearanceViolations).toBe(0);
+  if (!response.edges) throw new Error('Missing WMS warm BT routes');
+  expect(getDisplayHardQualityGateReport(response.edges, request.nodes, 'polished').hardClean).toBe(true);
+  expect(response.edges.map(edge => [edge.id, edge.source, edge.target]))
+    .toEqual(request.edges.map(edge => [edge.id, edge.source, edge.target]));
+}, 30_000);
