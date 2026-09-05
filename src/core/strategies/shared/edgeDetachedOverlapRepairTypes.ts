@@ -21,6 +21,8 @@ export interface StrictCrossingMazeContext {
   penaltyEdgeIndex: number;
   /** Nodes whose boundaries should contribute candidate grid coordinates. */
   gridNodes?: ReactFlowNode[];
+  /** Retained geometry immediately before/after a routed middle section. */
+  terminalCaps?: { startPredecessor: Point; endSuccessor: Point };
   /** Optional caller-owned object populated without logging route contents. */
   diagnostics?: StrictCrossingMazeDiagnostics;
 }

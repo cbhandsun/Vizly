@@ -1,4 +1,5 @@
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
+import { mazeDirectionsReverse, resolveMazeTerminalCaps, type MazeDirection } from './edgeStrictCrossingMazeTerminals';
 
 import type {
   StrictCrossingMazeContext,
@@ -89,6 +90,11 @@ export function routeStrictCrossingMazeCandidate(
   }
   const start = path[0];
   const end = path[path.length - 1];
+  const terminalCaps = resolveMazeTerminalCaps(context?.terminalCaps, start, end);
+  if (terminalCaps === null) {
+    recordDiagnostics('invalid');
+    return null;
+  }
   const penaltyPaths = context?.penaltyPaths ?? paths;
   const penaltyEdges = context?.penaltyEdges ?? edges;
   const penaltyEdgeIndex = context?.penaltyEdgeIndex ?? edgeIndex;
@@ -166,7 +172,7 @@ export function routeStrictCrossingMazeCandidate(
   }
 
   // Arrival direction distinguishes a straight crossing from a touch/turn.
-  type DirectionState = 0 | 1 | 2 | 3 | 4;
+  type DirectionState = MazeDirection;
   type QueueItem = { cost: number; xIndex: number; yIndex: number; direction: DirectionState };
   const keyOf = (xIndex: number, yIndex: number, direction: DirectionState) => `${xIndex}:${yIndex}:${direction}`;
   const pointOf = (xIndex: number, yIndex: number): Point => ({ x: allX[xIndex], y: allY[yIndex] });
@@ -211,6 +217,7 @@ export function routeStrictCrossingMazeCandidate(
   // storage. Straight-through crossings must use a distinct penalty slot.
   const blockedSteps = new Uint8Array(allX.length * allY.length * 4);
   const stepPenalties = new Float64Array(allX.length * allY.length * 8).fill(Number.NaN);
+  const terminalPenalties = new Float64Array(5).fill(Number.NaN);
 
   const isSegmentBlockedByNode = (segment: Segment): boolean => {
     for (const [nodeId, rect] of obstacles) {
@@ -237,10 +244,15 @@ export function routeStrictCrossingMazeCandidate(
       { xIndex: current.xIndex, yIndex: current.yIndex + 1, direction: 4 as DirectionState },
     ];
     const from = pointOf(current.xIndex, current.yIndex);
+    const incomingDirection = current.direction === 0
+      ? terminalCaps?.incomingDirection ?? 0 : current.direction;
     for (const next of neighbors) {
       if (next.xIndex < 0 || next.xIndex >= allX.length || next.yIndex < 0 || next.yIndex >= allY.length) {
         continue;
       }
+      if (mazeDirectionsReverse(incomingDirection, next.direction)) continue;
+      const reachesEnd = next.xIndex === endX && next.yIndex === endY;
+      if (reachesEnd && terminalCaps && mazeDirectionsReverse(next.direction, terminalCaps.outgoingDirection)) continue;
       const to = pointOf(next.xIndex, next.yIndex);
       const axis = axisOf(from, to);
       if (!axis) continue;
@@ -251,10 +263,10 @@ export function routeStrictCrossingMazeCandidate(
       }
       if (blockedSteps[stepIndex] === 2) continue;
       const length = Math.abs(from.x - to.x) + Math.abs(from.y - to.y);
-      const turnPenalty = current.direction !== 0
-        && (current.direction <= 2) !== (next.direction <= 2) ? 40 : 0;
-      const continuation = current.direction === next.direction ? {
-        a: pointOf(
+      const turnPenalty = incomingDirection !== 0
+        && (incomingDirection <= 2) !== (next.direction <= 2) ? 40 : 0;
+      const continuation = incomingDirection === next.direction ? {
+        a: current.direction === 0 && terminalCaps ? terminalCaps.incoming.a : pointOf(
           current.xIndex + (current.direction === 1 ? 1 : current.direction === 2 ? -1 : 0),
           current.yIndex + (current.direction === 3 ? 1 : current.direction === 4 ? -1 : 0),
         ),
@@ -263,14 +275,28 @@ export function routeStrictCrossingMazeCandidate(
       } : undefined;
       const penaltyIndex = stepIndex * 2 + Number(Boolean(continuation));
       let penalty = stepPenalties[penaltyIndex];
-      if (Number.isNaN(penalty)) {
+      const isCapStart = current.direction === 0 && terminalCaps !== undefined;
+      if (isCapStart || Number.isNaN(penalty)) {
         penalty = segmentPenaltyAgainstOtherEdges(segment, otherSegments, edge, penaltyEdges, continuation);
-        stepPenalties[penaltyIndex] = penalty;
+        if (!isCapStart) stepPenalties[penaltyIndex] = penalty;
+      }
+      let terminalPenalty = 0;
+      if (reachesEnd && terminalCaps) {
+        terminalPenalty = terminalPenalties[next.direction];
+        if (Number.isNaN(terminalPenalty)) {
+          terminalPenalty = (next.direction <= 2) !== (terminalCaps.outgoingDirection <= 2) ? 40 : 0;
+          if (next.direction === terminalCaps.outgoingDirection) {
+            const cap = terminalCaps.outgoing;
+            terminalPenalty += segmentPenaltyAgainstOtherEdges(cap, otherSegments, edge, penaltyEdges, { ...cap, a: from })
+              - segmentPenaltyAgainstOtherEdges(cap, otherSegments, edge, penaltyEdges);
+          }
+          terminalPenalties[next.direction] = terminalPenalty;
+        }
       }
       const nextCost = current.cost
         + length
         + turnPenalty
-        + penalty;
+        + penalty + terminalPenalty;
       const nextKey = keyOf(next.xIndex, next.yIndex, next.direction);
       if (nextCost + EPS >= (distByKey.get(nextKey) ?? Number.POSITIVE_INFINITY)) continue;
       distByKey.set(nextKey, nextCost);

@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it, vi } from 'vitest';
 import * as mazeGeometry from '../edgeDetachedOverlapCandidates';
+import { resolveMazeTerminalCaps } from '../edgeStrictCrossingMazeTerminals';
 
 import { buildBoundedResidualOverlapMazeCandidate } from '../edgeDetachedResidualOverlapMaze';
 import { routeStrictCrossingMazeCandidate } from '../edgeDetachedStrictCrossingMaze';
@@ -19,6 +20,57 @@ function edge(id: string, path: Point[]): Edge {
 }
 
 describe('routeStrictCrossingMazeCandidate penalty context', () => {
+  it('validates retained cap geometry before using it as search state', () => {
+    const start = { x: 0, y: 0 };
+    const end = { x: 100, y: 0 };
+    expect(resolveMazeTerminalCaps(undefined, start, end)).toBeUndefined();
+    for (const value of [null, {}, 'invalid',
+      { startPredecessor: { x: Number.NaN, y: 0 }, endSuccessor: { x: 200, y: 0 } },
+      { startPredecessor: { x: -10, y: 10 }, endSuccessor: { x: 200, y: 0 } },
+      { startPredecessor: start, endSuccessor: { x: 200, y: 0 } },
+      { startPredecessor: { x: -100, y: 0 }, endSuccessor: end },
+    ]) expect(resolveMazeTerminalCaps(value, start, end)).toBeNull();
+  });
+
+  it.each([0, 100])('counts the retained-cap crossing at seam x=%i before accepting a route', (seamX) => {
+    const path: Point[] = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
+    const blockerPath: Point[] = [{ x: seamX, y: -100 }, { x: seamX, y: 100 }];
+    const moving = edge('moving', path);
+    const blocker = edge('blocker', blockerPath);
+    const caps = { startPredecessor: { x: -100, y: 0 }, endSuccessor: { x: 200, y: 0 } };
+    const candidate = routeStrictCrossingMazeCandidate(path, 0, [path, blockerPath], [moving, blocker], [], {
+      penaltyPaths: [path, blockerPath], penaltyEdges: [moving, blocker], penaltyEdgeIndex: 0, terminalCaps: caps,
+    });
+    expect(candidate).not.toBeNull();
+    if (!candidate) throw new Error('expected the seam crossing to affect routing');
+    const joined = mazeGeometry.compactPath([caps.startPredecessor, ...candidate, caps.endSuccessor]);
+    expect(countStrictEdgeCrossings([edge('moving', joined), blocker])).toBe(0);
+  });
+
+  it.each(['LR', 'RL', 'TB', 'BT'])('preserves terminal caps and right-angle seam turns in %s', (direction) => {
+    const sign = direction === 'RL' || direction === 'BT' ? -1 : 1;
+    const vertical = direction === 'TB' || direction === 'BT';
+    const transform = ({ x, y }: Point): Point => vertical ? { x: y, y: sign * x || 0 } : { x: sign * x || 0, y };
+    const normalize = ({ x, y }: Point): Point => vertical ? { x: sign * y || 0, y: x } : { x: sign * x || 0, y };
+    const original: Point[] = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 200, y: 100 }];
+    const path = original.map(transform);
+    const blockerPath: Point[] = [{ x: 50, y: 50 }, { x: 150, y: 50 }].map(transform);
+    const blocker = edge('blocker', blockerPath);
+    const candidate = buildBoundedResidualOverlapMazeCandidate(
+      [edge('moving', path), blocker], [], 0, [1],
+    );
+    expect(candidate).not.toBeNull();
+    if (!candidate) throw new Error('expected a cap-preserving detour');
+    const normalized = candidate.map(normalize);
+    expect(normalized[0]).toEqual(original[0]);
+    expect(normalized[normalized.length - 1]).toEqual(original[original.length - 1]);
+    expect(normalized[1].y).toBe(0);
+    expect(normalized[1].x).toBeGreaterThanOrEqual(100);
+    expect(normalized[normalized.length - 2].y).toBe(100);
+    expect(normalized[normalized.length - 2].x).toBeLessThanOrEqual(100);
+    expect(countStrictEdgeCrossings([edge('moving', candidate), blocker])).toBe(0);
+  });
+
   it('checks each directed grid step against a node only once per search', () => {
     const directPath: Point[] = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
     const blockerPath: Point[] = [{ x: 50, y: -100 }, { x: 50, y: 100 }];
@@ -217,8 +269,14 @@ describe('routeStrictCrossingMazeCandidate penalty context', () => {
     });
 
     expect(candidate).not.toBeNull();
-    expect(candidate?.slice(0, 2)).toEqual(directPath.slice(0, 2));
-    expect(candidate?.slice(-2)).toEqual(directPath.slice(-2));
+    if (!candidate) throw new Error('expected a cap-preserving candidate');
+    // Compaction may extend a retained cap, but must not shorten or reverse it.
+    expect(candidate[0]).toEqual(directPath[0]);
+    expect(candidate[1].y).toBe(0);
+    expect(candidate[1].x).toBeGreaterThanOrEqual(20);
+    expect(candidate[candidate.length - 1]).toEqual(directPath[3]);
+    expect(candidate[candidate.length - 2].y).toBe(0);
+    expect(candidate[candidate.length - 2].x).toBeLessThanOrEqual(80);
     expect(countStrictEdgeCrossings([
       edge('moving', candidate!),
       edges[2],
