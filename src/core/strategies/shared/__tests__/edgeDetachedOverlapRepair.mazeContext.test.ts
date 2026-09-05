@@ -18,6 +18,36 @@ function edge(id: string, path: Point[]): Edge {
 }
 
 describe('routeStrictCrossingMazeCandidate penalty context', () => {
+  it.each(['LR', 'RL', 'TB', 'BT'])('charges an internal grid vertex crossing in %s before path compaction', (direction) => {
+    const transform = ({ x, y }: Point): Point => {
+      const sign = direction === 'RL' || direction === 'BT' ? -1 : 1;
+      const along = x === 0 ? 0 : sign * x;
+      return direction === 'TB' || direction === 'BT' ? { x: y, y: along } : { x: along, y };
+    };
+    const directPath: Point[] = [{ x: 0, y: 0 }, { x: 100, y: 0 }].map(transform);
+    const blockerPath: Point[] = [{ x: 50, y: -100 }, { x: 50, y: 100 }].map(transform);
+    const moving = edge('moving', directPath);
+    const blocker = edge('blocker', blockerPath);
+    const candidate = routeStrictCrossingMazeCandidate(
+      directPath, 0, [directPath, blockerPath], [moving, blocker], [],
+    );
+    expect(candidate).not.toBeNull();
+    if (!candidate) throw new Error('expected a crossing-free detour');
+    expect(countStrictEdgeCrossings([edge('moving', candidate), blocker])).toBe(0);
+    expect(candidate[0]).toEqual(directPath[0]);
+    expect(candidate[candidate.length - 1]).toEqual(directPath[1]);
+  });
+
+  it('does not charge a perpendicular shared source as a straight-through crossing', () => {
+    const directPath: Point[] = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
+    const peerPath: Point[] = [{ x: 0, y: 0 }, { x: 0, y: 100 }];
+    const moving = edge('moving', directPath);
+    const peer = { ...edge('peer', peerPath), source: moving.source };
+    expect(routeStrictCrossingMazeCandidate(
+      directPath, 0, [directPath, peerPath], [moving, peer], [],
+    )).toBeNull();
+  });
+
   it('keeps a bounded local grid while scoring crossings against the full graph', () => {
     const directPath: Point[] = [
       { x: 0, y: 0 },

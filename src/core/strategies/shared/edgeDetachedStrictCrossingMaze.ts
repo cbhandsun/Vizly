@@ -29,10 +29,16 @@ function segmentPenaltyAgainstOtherEdges(
   otherSegments: PathSegmentRef[],
   edge: Edge,
   edges: Edge[],
+  continuation?: Segment,
 ): number {
   let penalty = 0;
   for (const other of otherSegments) {
-    if (strictCross(segment, other)) {
+    // A grid vertex is not a route endpoint. Charge a straight-through
+    // crossing there once, on departure, before final path compaction.
+    const crossesAtDeparture = continuation && segment.axis !== other.axis
+      && Math.abs(other.axis === 'v' ? other.a.x - segment.a.x : other.a.y - segment.a.y) <= EPS
+      && strictCross(continuation, other);
+    if (strictCross(segment, other) || crossesAtDeparture) {
       penalty += 100000;
       continue;
     }
@@ -159,9 +165,10 @@ export function routeStrictCrossingMazeCandidate(
     return null;
   }
 
-  type AxisState = 0 | 1 | 2;
-  type QueueItem = { cost: number; xIndex: number; yIndex: number; axis: AxisState };
-  const keyOf = (xIndex: number, yIndex: number, axis: AxisState) => `${xIndex}:${yIndex}:${axis}`;
+  // Arrival direction distinguishes a straight crossing from a touch/turn.
+  type DirectionState = 0 | 1 | 2 | 3 | 4;
+  type QueueItem = { cost: number; xIndex: number; yIndex: number; direction: DirectionState };
+  const keyOf = (xIndex: number, yIndex: number, direction: DirectionState) => `${xIndex}:${yIndex}:${direction}`;
   const pointOf = (xIndex: number, yIndex: number): Point => ({ x: allX[xIndex], y: allY[yIndex] });
   const queue: QueueItem[] = [];
   const pushQueue = (item: QueueItem) => {
@@ -196,7 +203,7 @@ export function routeStrictCrossingMazeCandidate(
     }
     return first;
   };
-  pushQueue({ cost: 0, xIndex: startX, yIndex: startY, axis: 0 });
+  pushQueue({ cost: 0, xIndex: startX, yIndex: startY, direction: 0 });
   const distByKey = new Map<string, number>([[keyOf(startX, startY, 0), 0]]);
   const prevByKey = new Map<string, string>();
 
@@ -211,7 +218,7 @@ export function routeStrictCrossingMazeCandidate(
   let bestEndKey: string | null = null;
   while (queue.length > 0) {
     const current = popQueue()!;
-    const currentKey = keyOf(current.xIndex, current.yIndex, current.axis);
+    const currentKey = keyOf(current.xIndex, current.yIndex, current.direction);
     if ((distByKey.get(currentKey) ?? Number.POSITIVE_INFINITY) < current.cost - EPS) continue;
     if (current.xIndex === endX && current.yIndex === endY) {
       bestEndKey = currentKey;
@@ -219,10 +226,10 @@ export function routeStrictCrossingMazeCandidate(
     }
 
     const neighbors = [
-      { xIndex: current.xIndex - 1, yIndex: current.yIndex, axis: 1 as AxisState },
-      { xIndex: current.xIndex + 1, yIndex: current.yIndex, axis: 1 as AxisState },
-      { xIndex: current.xIndex, yIndex: current.yIndex - 1, axis: 2 as AxisState },
-      { xIndex: current.xIndex, yIndex: current.yIndex + 1, axis: 2 as AxisState },
+      { xIndex: current.xIndex - 1, yIndex: current.yIndex, direction: 1 as DirectionState },
+      { xIndex: current.xIndex + 1, yIndex: current.yIndex, direction: 2 as DirectionState },
+      { xIndex: current.xIndex, yIndex: current.yIndex - 1, direction: 3 as DirectionState },
+      { xIndex: current.xIndex, yIndex: current.yIndex + 1, direction: 4 as DirectionState },
     ];
     const from = pointOf(current.xIndex, current.yIndex);
     for (const next of neighbors) {
@@ -235,16 +242,25 @@ export function routeStrictCrossingMazeCandidate(
       const segment = { a: from, b: to, axis };
       if (isSegmentBlockedByNode(segment)) continue;
       const length = Math.abs(from.x - to.x) + Math.abs(from.y - to.y);
-      const turnPenalty = current.axis !== 0 && current.axis !== next.axis ? 40 : 0;
+      const turnPenalty = current.direction !== 0
+        && (current.direction <= 2) !== (next.direction <= 2) ? 40 : 0;
+      const continuation = current.direction === next.direction ? {
+        a: pointOf(
+          current.xIndex + (current.direction === 1 ? 1 : current.direction === 2 ? -1 : 0),
+          current.yIndex + (current.direction === 3 ? 1 : current.direction === 4 ? -1 : 0),
+        ),
+        b: to,
+        axis,
+      } : undefined;
       const nextCost = current.cost
         + length
         + turnPenalty
-        + segmentPenaltyAgainstOtherEdges(segment, otherSegments, edge, penaltyEdges);
-      const nextKey = keyOf(next.xIndex, next.yIndex, next.axis);
+        + segmentPenaltyAgainstOtherEdges(segment, otherSegments, edge, penaltyEdges, continuation);
+      const nextKey = keyOf(next.xIndex, next.yIndex, next.direction);
       if (nextCost + EPS >= (distByKey.get(nextKey) ?? Number.POSITIVE_INFINITY)) continue;
       distByKey.set(nextKey, nextCost);
       prevByKey.set(nextKey, currentKey);
-      pushQueue({ cost: nextCost, xIndex: next.xIndex, yIndex: next.yIndex, axis: next.axis });
+      pushQueue({ cost: nextCost, xIndex: next.xIndex, yIndex: next.yIndex, direction: next.direction });
     }
   }
 
