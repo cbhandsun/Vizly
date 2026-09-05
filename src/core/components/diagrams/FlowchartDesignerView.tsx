@@ -1,4 +1,5 @@
 import React from 'react';
+import { layoutSelectionToolbarProps } from './ui/designerHeaderMemoState';
 import { ConnectionMode } from '@xyflow/react';
 
 import { LiveCursors } from './collaboration/LiveCursors';
@@ -152,9 +153,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         customDomainLayoutAvailable,
         jsonEditorVisible,
         jumpTo,
-        lastDomainDirection,
-        lastDomainStrategy,
-        lastNodeLayout,
+        layoutSelection,
         layerSyncedNodes,
         layoutPresentationPreview,
         leftDrawerOpen,
@@ -445,9 +444,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                 onStrategyLayout: handleStrategyLayout,
                                 onSmartLayout: handleSmartLayout,
                                 customDomainLayoutAvailable,
-                                lastDomainStrategy,
-                                lastDomainDirection,
-                                lastNodeLayout,
+                                ...layoutSelectionToolbarProps(layoutSelection),
                                 layoutBusy: isLayoutBusy,
                                 showRuler,
                                 toggleRuler: () => setShowRuler((previous: boolean) => !previous),

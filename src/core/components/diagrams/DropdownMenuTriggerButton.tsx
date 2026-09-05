@@ -12,6 +12,8 @@ interface DropdownMenuTriggerButtonProps extends Omit<
     'data-advanced-export-focus-return'?: 'true';
     'data-cloud-save-focus-return'?: 'true';
     'data-flowchart-layout-selection'?: string;
+    'data-flowchart-lane-rank-preference'?: string;
+    'data-flowchart-lane-rank-applied'?: string;
     busy?: boolean;
     disabled?: boolean;
     icon: React.ReactNode;
@@ -33,6 +35,8 @@ export const DropdownMenuTriggerButton = React.forwardRef<
             data-advanced-export-focus-return={triggerProps['data-advanced-export-focus-return']}
             data-cloud-save-focus-return={triggerProps['data-cloud-save-focus-return']}
             data-flowchart-layout-selection={triggerProps['data-flowchart-layout-selection']}
+            data-flowchart-lane-rank-preference={triggerProps['data-flowchart-lane-rank-preference']}
+            data-flowchart-lane-rank-applied={triggerProps['data-flowchart-lane-rank-applied']}
             type="text"
             aria-label={ariaLabel}
             aria-haspopup="menu"

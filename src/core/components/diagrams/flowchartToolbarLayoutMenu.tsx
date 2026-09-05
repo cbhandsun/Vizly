@@ -8,6 +8,7 @@ import {
     usesSelectableDomainNodeArrangement,
     type FlowchartLayoutDirection,
 } from './flowchartLayoutStrategyMode';
+import type { LaneRankDecision, LaneRankPreference } from '../../types/domainLaneRank';
 
 type ToolbarMenuItem = Extract<
     NonNullable<NonNullable<MenuProps['items']>[number]>,
@@ -30,7 +31,10 @@ interface BuildFlowchartLayoutMenuModelOptions {
         strategyName: string,
         nodeLayout?: string,
         direction?: FlowchartLayoutDirection,
+        laneRankPreference?: LaneRankPreference,
     ) => void;
+    laneRankPreference?: LaneRankPreference;
+    laneRankDecision?: LaneRankDecision;
     translate: TranslateLayoutLabel;
 }
 
@@ -38,6 +42,7 @@ export interface FlowchartLayoutMenuModel {
     items: NonNullable<MenuProps['items']>;
     selectedKeys: string[];
     statusText?: string;
+    tooltipText?: string;
 }
 
 const radioMenuItem = (item: LayoutRadioMenuItem): LayoutRadioMenuItem => item;
@@ -85,6 +90,8 @@ export const buildFlowchartLayoutMenuModel = ({
     lastNodeLayout,
     onSmartLayout,
     onStrategyLayout,
+    laneRankPreference = 'auto',
+    laneRankDecision,
     translate,
 }: BuildFlowchartLayoutMenuModelOptions): FlowchartLayoutMenuModel => {
     const activeDomainKey = resolveActiveDomainLayoutKey(lastDomainStrategy, lastDomainDirection);
@@ -173,6 +180,27 @@ export const buildFlowchartLayoutMenuModel = ({
         nodeHorizontal: translate('designer.flowchart.layout.nodeHorizontal', '水平排列'),
         nodeVertical: translate('designer.flowchart.layout.nodeVertical', '垂直排列'),
         nodeDagre: translate('designer.flowchart.layout.nodeDagre', '自动分层（推荐）'),
+        laneRankGroup: translate('designer.flowchart.layout.laneRankGroup', '泳道阶段'),
+        laneRankAuto: translate('designer.flowchart.layout.laneRankAuto', '自动决定'),
+        laneRankGlobal: translate('designer.flowchart.layout.laneRankGlobal', '固定全局阶段'),
+        laneRankCompact: translate('designer.flowchart.layout.laneRankCompact', '固定域内紧凑'),
+    };
+
+    const laneRankStatus = laneRankPreference === 'auto'
+        ? (laneRankDecision?.applied === 'compact'
+            ? '自动 · 域内紧凑'
+            : laneRankDecision?.applied === 'global'
+                ? '自动 · 全局阶段'
+                : '自动（下次布局评估）')
+        : laneRankPreference === 'global' ? '固定 · 全局阶段' : '固定 · 域内紧凑';
+    const laneRankReasonText: Record<LaneRankDecision['reason'], string> = {
+        'manual-global': '已按固定全局阶段完成布局',
+        'manual-compact': '已按固定域内紧凑完成布局',
+        'compact-benefit': '域内紧凑保留了足够的流向长度收益',
+        'global-preserved': '全局阶段保留跨域流程顺序',
+        hysteresis: '保留上次成功模式以避免临界输入切换',
+        'unchanged-connected-flow': '连接流程未变化，保留上次成功模式',
+        'alternative-invalid': '另一候选未通过布局约束，保留可用模式',
     };
 
     const domainItem = (
@@ -252,6 +280,9 @@ export const buildFlowchartLayoutMenuModel = ({
     const selectedKeys = customDomainLayoutActive
         ? [activeDomainKey, activeNodeKey].filter(Boolean) as string[]
         : [activeDomainKey].filter(Boolean) as string[];
+    const supportsLaneRank = lastDomainStrategy === 'domain-dagre'
+        || (lastDomainStrategy === 'domain-lanes' && lastNodeLayout === 'dagre');
+    if (supportsLaneRank) selectedKeys.push(`lane-rank-${laneRankPreference}`);
     const statusParts = selectedKeys
         .map((key) => labelByKey[key])
         .filter((label): label is string => Boolean(label))
@@ -268,6 +299,24 @@ export const buildFlowchartLayoutMenuModel = ({
         nodeItem('node-horizontal', labels.nodeHorizontal, 'horizontal'),
         nodeItem('node-vertical', labels.nodeVertical, 'vertical'),
     ];
+    const laneRankItems: NonNullable<MenuProps['items']> = ([
+        ['auto', labels.laneRankAuto],
+        ['global', labels.laneRankGlobal],
+        ['compact', labels.laneRankCompact],
+    ] as const).map(([preference, label]) => radioMenuItem({
+        key: `lane-rank-${preference}`,
+        label,
+        role: 'menuitemradio',
+        'aria-checked': laneRankPreference === preference,
+        onClick: () => onStrategyLayout?.(
+            // Ranked lane semantics are implemented by the ordered lane engine.
+            // Its Dagre arrangement is required even when another node arrangement was saved.
+            'domain-lanes',
+            'dagre',
+            lastDomainDirection ?? 'TB',
+            preference,
+        ),
+    }));
 
     const primaryTopBottomItem = customDomainLayoutAvailable
         ? domainItem(
@@ -421,6 +470,12 @@ export const buildFlowchartLayoutMenuModel = ({
             ],
         },
         { type: 'divider' as const },
+        ...(supportsLaneRank ? [{
+            key: 'group-lane-rank',
+            label: labels.laneRankGroup,
+            type: 'group' as const,
+            children: laneRankItems,
+        }, { type: 'divider' as const }] : []),
         {
             key: 'group-custom-combination',
             label: customDomainLayoutAvailable || lastDomainStrategy === 'domain-lanes'
@@ -453,11 +508,14 @@ export const buildFlowchartLayoutMenuModel = ({
         },
     ];
 
+    const baseStatusText = statusParts.length > 0
+        ? `${customDomainLayoutActive ? `${labels.customCombination}：` : ''}${statusParts.join(' + ')}`
+        : undefined;
     return {
         items,
         selectedKeys,
-        statusText: statusParts.length > 0
-            ? `${customDomainLayoutActive ? `${labels.customCombination}：` : ''}${statusParts.join(' + ')}`
-            : undefined,
+        statusText: [baseStatusText, ...(supportsLaneRank ? [laneRankStatus] : [])]
+            .filter((value): value is string => Boolean(value)).join(' + ') || undefined,
+        tooltipText: laneRankDecision ? laneRankReasonText[laneRankDecision.reason] : undefined,
     };
 };

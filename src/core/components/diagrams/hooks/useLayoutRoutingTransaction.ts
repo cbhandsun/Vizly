@@ -20,6 +20,7 @@ type LayoutRoutingTransactionRequest = Readonly<{
   edges: Edge[];
   routingJob: BaseReactFlowRoutingSessionJob;
   beforePreviewRelease?: () => Promise<unknown>;
+  commitSelection?: () => void;
   rejectObstacleDirtyBoundedCandidate?: boolean;
   rejectUnanchoredFlatElkCandidate?: boolean;
   candidateRepairPolicy?: 'default' | 'skip-exact-clean';
@@ -66,6 +67,7 @@ export const useLayoutRoutingTransaction = ({
     edges,
     routingJob,
     beforePreviewRelease,
+    commitSelection,
     rejectObstacleDirtyBoundedCandidate,
     rejectUnanchoredFlatElkCandidate,
     candidateRepairPolicy,
@@ -151,6 +153,7 @@ export const useLayoutRoutingTransaction = ({
         // React 18 batches these state updates under the same routing epoch.
         setNodes(targetNodes);
         setEdges(committedEdges);
+        commitSelection?.();
       });
       const commitResult = diagnostics
         ? diagnostics.measurePhaseSync('state-commit', commit)

@@ -37,9 +37,11 @@ vi.mock('../useSmartRoutingConfig', () => ({
 }));
 
 import { useAutoRouting } from '../useAutoRouting';
+import type { DisplayLayoutTransactionErrorCode } from '../../../shared/baseReactFlowDisplayRoutingDebug';
 import type { BaseReactFlowRoutingSessionJob } from '../../../shared/baseReactFlowRoutingSessionRuntime';
 
 type LayoutPreviewCallbacks = Readonly<{
+    onLayoutFailure: (code: DisplayLayoutTransactionErrorCode) => void;
     publishLayoutPreview: (request: {
         nodes: Node[];
         routingJob: BaseReactFlowRoutingSessionJob;
@@ -87,6 +89,27 @@ describe('useAutoRouting layout preference coordination', () => {
         mocks.syncAutoPathSelection.mockReset();
         mocks.applyRoutingProfile.mockReset();
         mocks.layoutOptions = undefined;
+    });
+
+    it.each<DisplayLayoutTransactionErrorCode>([
+        'hard-quality-rejected', 'worker-timeout', 'strategy-failed', 'no-layoutable-nodes',
+    ])('presents a bounded %s reason through the canvas message context', code => {
+        const messageApi = { open: vi.fn() };
+        renderHook(() => useAutoRouting({ ...createOptions(), messageApi }));
+        act(() => getLayoutPreviewCallbacks().onLayoutFailure(code));
+        expect(messageApi.open).toHaveBeenCalledExactlyOnceWith({
+            key: 'flowchart.layout-failure',
+            type: code === 'no-layoutable-nodes' ? 'info' : 'error',
+            content: expect.stringContaining(code === 'no-layoutable-nodes' ? '没有可布局' : '已保留原画布'),
+            duration: 5,
+        });
+    });
+
+    it('does not present normal cancellation as an error', () => {
+        const messageApi = { open: vi.fn() };
+        renderHook(() => useAutoRouting({ ...createOptions(), messageApi }));
+        act(() => getLayoutPreviewCallbacks().onLayoutFailure('cancelled'));
+        expect(messageApi.open).not.toHaveBeenCalled();
     });
 
     it('synchronizes an explicit preference change without a second cache owner', async () => {

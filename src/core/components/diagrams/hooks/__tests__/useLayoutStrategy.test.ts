@@ -30,7 +30,16 @@ describe('persisted layout selection', () => {
     const saved = { multiPage: { version: 1 }, layoutSelection: { version: 1, strategy: 'domain-lanes', direction: 'LR', nodeLayout: 'grid' } };
     act(() => expect(result.current.restoreAutoSaveMetadata(saved)).toBe(page));
     expect(restorePages).toHaveBeenCalledWith(saved);
-    expect(result.current.getAutoSaveMetadata()).toEqual(saved);
+    expect(result.current.getAutoSaveMetadata()).toEqual({
+      ...saved,
+      layoutSelection: {
+        version: 2,
+        strategy: 'domain-lanes',
+        direction: 'LR',
+        nodeLayout: 'grid',
+        laneRankPreference: 'auto',
+      },
+    });
     expect(result.current.lastDomainDirection).toBe('LR');
   });
   it.each(['TB', 'LR', 'BT', 'RL'] as const)('restores %s without running layout and isolates another diagram', direction => {
@@ -47,6 +56,26 @@ describe('persisted layout selection', () => {
     expect(result.current.lastDomainDirection).toBe('RL');
     act(() => result.current.restoreLayoutSelection(null));
     expect(result.current.lastDomainDirection).toBe('TB');
+  });
+  it('only changes the persisted lane mode when the caller commits a successful complete selection', () => {
+    const { result } = renderHook(() => usePersistedLayoutSelection('first'));
+    expect(result.current.layoutSelection.laneRankPreference).toBe('auto');
+    act(() => result.current.setLastDomainDirection('LR'));
+    expect(result.current.layoutSelection.laneRankPreference).toBe('auto');
+    act(() => result.current.commitLayoutSelection({
+      version: 2, strategy: 'domain-dagre', direction: 'LR', nodeLayout: 'dagre',
+      laneRankPreference: 'compact',
+      laneRankDecision: {
+        version: 1, policyVersion: 1, requested: 'compact', applied: 'compact',
+        reason: 'manual-compact', direction: 'LR', connectedInputFingerprint: 'safe',
+        metrics: { compact: { flowLength: 100, whitespaceRatio: 0.5, backwardTravel: 0, backwardEdgeCount: 0 } },
+      },
+    }));
+    expect(result.current.layoutSelection.laneRankPreference).toBe('compact');
+    expect(result.current.layoutSelection.laneRankDecision?.applied).toBe('compact');
+    expect(parsePersistedLayoutSelection(JSON.parse(JSON.stringify({
+      layoutSelection: result.current.layoutSelection,
+    })))).toEqual(result.current.layoutSelection);
   });
   it.each([null, {}, [], { layoutSelection: null }, { layoutSelection: { version: 2 } },
     { layoutSelection: { version: 1, strategy: '<img onerror=alert(1)>', direction: 'TB', nodeLayout: 'dagre' } },

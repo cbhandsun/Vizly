@@ -5,7 +5,7 @@ import {
     createMultiPageMetadata,
     parseMultiPageMetadata,
 } from '../multiPagePersistence';
-import { DEFAULT_LAYOUT_SELECTION } from '../layoutSelectionPersistence';
+import { DEFAULT_LAYOUT_SELECTION, parseLayoutSelection } from '../layoutSelectionPersistence';
 import { createAutoSavePayload, parseAutoSavePayload } from '../../../utils/autoSaveStorage';
 
 const node = (id: string): Node => ({
@@ -44,11 +44,12 @@ describe('multiPagePersistence', () => {
     });
 
     it('round-trips independent layout selections for each page', () => {
-        const horizontalSelection = {
-            version: 1 as const,
+    const horizontalSelection = {
+            version: 2 as const,
             strategy: 'domain-lanes',
             direction: 'LR' as const,
             nodeLayout: 'horizontal',
+            laneRankPreference: 'compact' as const,
         };
         const metadata = createMultiPageMetadata([
             {
@@ -101,6 +102,39 @@ describe('multiPagePersistence', () => {
                 }],
             },
         })).toBeNull();
+    });
+
+    it('migrates v1 selections to unknown auto mode without guessing a historic applied mode', () => {
+        expect(parseLayoutSelection({
+            version: 1,
+            strategy: 'domain-dagre',
+            direction: 'TB',
+            nodeLayout: 'dagre',
+        })).toEqual({
+            version: 2,
+            strategy: 'domain-dagre',
+            direction: 'TB',
+            nodeLayout: 'dagre',
+            laneRankPreference: 'auto',
+        });
+    });
+
+    it.each([
+        { laneRankPreference: 'diagonal' },
+        { laneRankDecision: { version: 2 } },
+        { laneRankDecision: { version: 1, policyVersion: 1, requested: 'auto', applied: 'global', reason: 'compact-benefit', direction: 'TB', connectedInputFingerprint: 'x'.repeat(257), metrics: { global: { flowLength: 1, whitespaceRatio: 0, backwardTravel: 0, backwardEdgeCount: 0 } } } },
+        { laneRankDecision: { version: 1, policyVersion: 1, requested: 'compact', applied: 'global', reason: 'compact-benefit', direction: 'TB', connectedInputFingerprint: 'safe', metrics: { global: { flowLength: Infinity, whitespaceRatio: 0, backwardTravel: 0, backwardEdgeCount: 0 } } } },
+        { laneRankDecision: { version: 1, policyVersion: 1, requested: 'auto', applied: 'global', reason: 'untrusted user text', direction: 'TB', connectedInputFingerprint: 'safe', metrics: { global: { flowLength: 1, whitespaceRatio: 1.1, backwardTravel: 0, backwardEdgeCount: 0 } } } },
+    ])('keeps a valid v2 selection but drops unsafe optional decision %#', patch => {
+        const parsed = parseLayoutSelection({
+            version: 2, strategy: 'domain-dagre', direction: 'TB', nodeLayout: 'dagre',
+            laneRankPreference: 'auto', ...patch,
+        });
+        if ('laneRankPreference' in patch) expect(parsed).toBeNull();
+        else expect(parsed).toEqual({
+            version: 2, strategy: 'domain-dagre', direction: 'TB', nodeLayout: 'dagre',
+            laneRankPreference: 'auto',
+        });
     });
 
     it('accepts a valid empty active page without discarding populated sibling pages', () => {

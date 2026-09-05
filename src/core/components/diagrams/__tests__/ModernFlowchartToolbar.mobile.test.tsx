@@ -646,6 +646,8 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
             name: /自动布局：标准流程.*上→下/,
         });
         expect(trigger.getAttribute('data-flowchart-layout-selection')).toBe('domain-dagre-tb');
+        expect(trigger.getAttribute('data-flowchart-lane-rank-preference')).toBe('auto');
+        expect(trigger.getAttribute('data-flowchart-lane-rank-applied')).toBe('unknown');
         fireEvent.click(trigger);
 
         const domainLayout = await screen.findByRole('menuitemradio', {

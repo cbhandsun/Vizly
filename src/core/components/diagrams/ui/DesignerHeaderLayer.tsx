@@ -82,6 +82,8 @@ export interface DesignerHeaderLayerProps {
         lastDomainStrategy?: string;
         lastDomainDirection?: string;
         lastNodeLayout?: string;
+        laneRankPreference?: ToolbarProps['laneRankPreference'];
+        laneRankDecision?: ToolbarProps['laneRankDecision'];
         layoutBusy?: boolean;
         showRuler: boolean;
         toggleRuler: () => void;
@@ -229,6 +231,8 @@ export const DesignerHeaderLayer = React.memo(
                     lastDomainStrategy={toolbar.lastDomainStrategy}
                     lastDomainDirection={toolbar.lastDomainDirection as ToolbarProps['lastDomainDirection']}
                     lastNodeLayout={toolbar.lastNodeLayout}
+                    laneRankPreference={toolbar.laneRankPreference}
+                    laneRankDecision={toolbar.laneRankDecision}
                     layoutBusy={toolbar.layoutBusy}
                     showRuler={toolbar.showRuler}
                     toggleRuler={toolbar.toggleRuler}

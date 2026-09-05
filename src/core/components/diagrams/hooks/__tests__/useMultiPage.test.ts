@@ -19,10 +19,11 @@ const node = (id: string): Node => ({
 describe('useMultiPage', () => {
   it('stores and restores layout selection independently for each page', () => {
     const horizontalSelection: LayoutSelection = {
-      version: 1,
+      version: 2,
       strategy: 'domain-lanes',
       direction: 'LR',
       nodeLayout: 'horizontal',
+      laneRankPreference: 'compact',
     };
     let currentSelection: LayoutSelection = DEFAULT_LAYOUT_SELECTION;
     const restoreLayoutSelection = vi.fn((selection: LayoutSelection) => {
@@ -65,10 +66,11 @@ describe('useMultiPage', () => {
 
   it('inherits the source layout selection when duplicating a page', () => {
     const horizontalSelection: LayoutSelection = {
-      version: 1,
+      version: 2,
       strategy: 'domain-horizontal',
       direction: 'LR',
       nodeLayout: 'horizontal',
+      laneRankPreference: 'auto',
     };
     const restoreLayoutSelection = vi.fn();
     const { result } = renderHook(() => useMultiPage(

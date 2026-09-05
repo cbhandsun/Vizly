@@ -15,6 +15,9 @@ import {
 import { clearBaseReactFlowLayoutEdgeRoutingData } from '../../shared/baseReactFlowLayoutEdgeRoutingData';
 import type { BaseReactFlowRoutingSessionRuntime } from '../../shared/baseReactFlowRoutingSessionRuntime';
 import { createLayoutRoutingTransactionDiagnostics } from './layoutRoutingTransactionDiagnostics';
+import type { DisplayLayoutTransactionErrorCode } from '../../shared/baseReactFlowDisplayRoutingDebug';
+import { reportLayoutFailure } from './layoutFailureFeedback';
+import { getNodeAbsolutePosition } from './diagramNodeParenting';
 import { normalizeLayoutVisibilityNodes } from './layoutVisibilityNodes';
 import { isDirectedForestLayoutGraph } from './treeLayoutTopology';
 import { commitCyclicTreeLayeredLayout } from './cyclicTreeLayeredLayout';
@@ -25,12 +28,12 @@ import {
 } from './layeredLayoutEdgePreparation';
 import type { ILayoutStrategy } from '../../../types/layout-strategy';
 import type { LayoutOptions } from '../../../types/layout';
+import type { LaneRankDecision, LaneRankPreference } from '../../../types/domainLaneRank';
 import type { ElkLayoutExecutor } from '../../../ports/elkLayoutExecutor';
 import {
     logLayoutNoLayoutableNodes,
     logLayoutStrategyDomainPreservingFallback,
     logLayoutStrategySafetyFallback,
-    logLayoutStrategyFailure,
 } from './diagramInteractionLogging';
 import {
     isGlobalFullGraphLayoutStrategy,
@@ -82,6 +85,7 @@ interface UseLayoutStrategyParams {
     reactFlowInstance: ReactFlowInstance | null;
     diagramId?: string;
     loadLayoutPresetMap?: () => Promise<Record<string, unknown>>;
+    onLayoutFailure?: (code: DisplayLayoutTransactionErrorCode) => void;
     setLayoutStable?: React.Dispatch<React.SetStateAction<boolean>>;
     routingSessionRuntime: BaseReactFlowRoutingSessionRuntime;
     publishLayoutPreview?: (request: LayoutPresentationPreviewRequest) => void;
@@ -99,13 +103,14 @@ export function useLayoutStrategy({
     reactFlowInstance,
     diagramId,
     loadLayoutPresetMap,
+    onLayoutFailure,
     setLayoutStable,
     routingSessionRuntime,
     publishLayoutPreview,
     clearLayoutPreview,
 }: UseLayoutStrategyParams) {
-    const { lastDomainStrategy, setLastDomainStrategy, lastDomainDirection, setLastDomainDirection,
-        lastNodeLayout, setLastNodeLayout, layoutSelection, restoreLayoutSelection } = usePersistedLayoutSelection(diagramId);
+    const { lastDomainStrategy, lastDomainDirection, lastNodeLayout, commitLayoutSelection,
+        layoutSelection, restoreLayoutSelection } = usePersistedLayoutSelection(diagramId);
     const elkLayoutExecutorRef = useRef<ElkLayoutExecutor | null>(null);
     const layoutFitControllerRef = useRef<AbortController | null>(null);
 
@@ -144,6 +149,7 @@ export function useLayoutStrategy({
         strategyName: string,
         nodeLayout?: string,
         direction?: FlowchartLayoutDirection,
+        laneRankPreference: LaneRankPreference = layoutSelection.laneRankPreference,
     ) => {
         // The layout intent must own the Canvas routing epoch before any
         // asynchronous strategy/ELK work starts. Otherwise a stale layout
@@ -172,6 +178,7 @@ export function useLayoutStrategy({
         const axisDirection = dir === 'LR' || dir === 'RL' ? 'LR' : 'TB';
         let appliedStrategyName = strategyName;
         let appliedNodeLayout = nodeLayout;
+        let laneRankDecision: LaneRankDecision | undefined;
 
         try {
             transactionDiagnostics.beginPhase('input-preparation');
@@ -187,27 +194,13 @@ export function useLayoutStrategy({
             );
 
             // ═══ 前处理：过滤容器、转绝对坐标、清除 parentId ═══
-            const nodeById = new Map(allNodes.map(n => [n.id, n]));
-            const toAbsolutePosition = (node: Node): { x: number; y: number } => {
-                let x = node.position?.x ?? 0;
-                let y = node.position?.y ?? 0;
-                let pid = node.parentId;
-                while (pid) {
-                    const parent = nodeById.get(pid);
-                    if (!parent) break;
-                    x += parent.position?.x ?? 0;
-                    y += parent.position?.y ?? 0;
-                    pid = parent.parentId;
-                }
-                return { x, y };
-            };
             const containerTypes = new Set(['titleGroup', 'subGroup', 'domain', 'group']);
             const nonLayoutTypes = new Set(['mindmap', 'mindmap-boundary', 'sticky-note']);
             const excludedTypes = new Set([...containerTypes, ...nonLayoutTypes]);
             const plainNodes = allNodes.filter(n => !excludedTypes.has(n.type || ''));
             const layoutNodes = plainNodes.map(n => clearLayoutRuntimeAbsolutePosition({
                 ...n,
-                position: toAbsolutePosition(n),
+                position: getNodeAbsolutePosition(n, allNodes),
                 parentId: undefined,
                 extent: undefined,
             }));
@@ -216,6 +209,7 @@ export function useLayoutStrategy({
             if (layoutNodes.length === 0) {
                 logLayoutNoLayoutableNodes();
                 transactionDiagnostics.noLayoutableNodes();
+                onLayoutFailure?.('no-layoutable-nodes');
                 return false;
             }
             transactionDiagnostics.finishPhase('input-preparation');
@@ -225,7 +219,12 @@ export function useLayoutStrategy({
             ): Promise<void> => {
                 transactionDiagnostics.finishPhase('layout-calculation');
                 transactionDiagnostics.beginAttempt();
-                await commitLayout({ ...request, diagnostics: transactionDiagnostics });
+                await commitLayout({ ...request, diagnostics: transactionDiagnostics,
+                    commitSelection: () => commitLayoutSelection({ version: 2,
+                        strategy: appliedStrategyName, direction: appliedDirection,
+                        nodeLayout: appliedNodeLayout && !isGlobalFullGraphLayoutStrategy(appliedStrategyName)
+                            ? appliedNodeLayout : lastNodeLayout, laneRankPreference, laneRankDecision }),
+                });
             };
 
             transactionDiagnostics.beginPhase('layout-calculation');
@@ -345,6 +344,7 @@ export function useLayoutStrategy({
                 const finalNodeLayout = isDomainDagre && !isDomainLane
                     ? 'dagre'
                     : (nodeLayout || 'dagre');
+                appliedNodeLayout = finalNodeLayout;
                 // Explicit semantic order wins. Ordinary domain layouts retain
                 // the legacy scan-order fallback; cyclic swimlanes leave an
                 // absent order unset so their bounded net-flow sweep can run.
@@ -425,6 +425,8 @@ export function useLayoutStrategy({
                     ...generatedGroupOptions,
                     fitDomainContent: true,
                     domainPlacement: isDomainLane ? 'ordered-lanes' : 'topology',
+                    laneRankPreference,
+                    previousLaneRankDecision: layoutSelection.laneRankDecision,
                     domainOrder,
                     subDomainOrder,
                     domainSubGroupDirection: strategyName === 'domain-dagre-sub-horizontal'
@@ -582,6 +584,7 @@ export function useLayoutStrategy({
                                 type: clearLayoutEdgeRoutingType(edge),
                                 data: clearBaseReactFlowLayoutEdgeRoutingData(edge.data),
                             }));
+                        laneRankDecision = candidate.metadata?.laneRankDecision;
                         await commitLayoutAttempt({
                             nodes: finalNodes,
                             edges: finalEdges,
@@ -640,16 +643,17 @@ export function useLayoutStrategy({
                     }
                 }
             }
-            setLastDomainStrategy(appliedStrategyName);
-            setLastDomainDirection(appliedDirection);
-            if (appliedNodeLayout && !isGlobalFullGraphLayoutStrategy(appliedStrategyName)) {
-                setLastNodeLayout(appliedNodeLayout);
-            }
             transactionDiagnostics.committed();
             return true;
         } catch (err) {
             transactionDiagnostics.failed(err);
-            logLayoutStrategyFailure(strategyName, err);
+            reportLayoutFailure({
+                error: err,
+                strategyName,
+                isCurrent: routingSessionRuntime.isCurrentJob(routingJob)
+                    && !layoutFitController.signal.aborted,
+                onFailure: onLayoutFailure,
+            });
             return false;
         } finally {
             if (routingSessionRuntime.isCurrentJob(routingJob)) {
@@ -667,14 +671,15 @@ export function useLayoutStrategy({
         commitLayout,
         diagramId,
         loadLayoutPresetMap,
+        onLayoutFailure,
         reactFlowInstance,
         nodesRef,
         edgesRef,
         routingSessionRuntime,
         setLayoutStable,
-        setLastDomainStrategy,
-        setLastDomainDirection,
-        setLastNodeLayout,
+        commitLayoutSelection,
+        layoutSelection,
+        lastNodeLayout,
     ]);
 
     return {

@@ -59,8 +59,10 @@ vi.mock('../../../../strategies/DomainDagreLayoutStrategy', () => ({
 
 import { useLayoutRoutingTransaction } from '../useLayoutRoutingTransaction';
 import { useLayoutStrategy } from '../useLayoutStrategy';
+import * as interactionLogging from '../diagramInteractionLogging';
 import { createBaseReactFlowRoutingSessionRuntime } from '../../../shared/baseReactFlowRoutingSessionRuntime';
 import { readDisplayRoutingDebugState } from '../../../shared/baseReactFlowDisplayRoutingDebug';
+import type { LaneRankDecision } from '../../../../types/domainLaneRank';
 
 const nodes: Node[] = [
   { id: 'source', position: { x: 0, y: 0 }, data: {} },
@@ -85,6 +87,12 @@ const createOptions = () => {
     publishLayoutPreview: vi.fn(),
     clearLayoutPreview: vi.fn(),
   };
+};
+
+const compactDecision: LaneRankDecision = {
+  version: 1, policyVersion: 1, requested: 'auto', applied: 'compact',
+  reason: 'compact-benefit', direction: 'TB', connectedInputFingerprint: 'test-connected-flow',
+  metrics: { compact: { flowLength: 400, whitespaceRatio: 0.4, backwardTravel: 0, backwardEdgeCount: 0 } },
 };
 
 describe('useLayoutRoutingTransaction shared routing runtime', () => {
@@ -114,6 +122,64 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
       .__vizlyBaseReactFlowDisplayRouting;
   });
 
+  it.each([
+    ['layout-routing-hard-quality-rejected', 'hard-quality-rejected'],
+    ['display-edge-worker-timeout', 'worker-timeout'],
+    ['private provider payload must not reach the UI', 'strategy-failed'],
+  ])('reports %s once without changing the previous canvas or selection', async (error, code) => {
+    const logFailure = vi.spyOn(interactionLogging, 'logLayoutStrategyFailure').mockImplementation(() => undefined);
+    mocks.calculateLayeredLayoutWithReverse.mockRejectedValueOnce(new Error(error));
+    const options = { ...createOptions(), onLayoutFailure: vi.fn() };
+    const { result } = renderHook(() => useLayoutStrategy({ ...options, reactFlowInstance: null }));
+    const previousSelection = result.current.layoutSelection;
+    await act(async () => {
+      expect(await result.current.handleStrategyLayout('domain-elk')).toBe(false);
+    });
+    expect(options.onLayoutFailure).toHaveBeenCalledExactlyOnceWith(code);
+    expect(options.setNodes).not.toHaveBeenCalled();
+    expect(options.setEdges).not.toHaveBeenCalled();
+    expect(result.current.layoutSelection).toEqual(previousSelection);
+    expect(logFailure).toHaveBeenCalledExactlyOnceWith('domain-elk', new Error(code));
+    logFailure.mockRestore();
+  });
+
+  it('reports an empty layout without claiming that a selection committed', async () => {
+    const options = { ...createOptions(), onLayoutFailure: vi.fn() };
+    options.nodesRef.current = [];
+    const { result } = renderHook(() => useLayoutStrategy({ ...options, reactFlowInstance: null }));
+    await act(async () => {
+      expect(await result.current.handleStrategyLayout('domain-elk')).toBe(false);
+    });
+    expect(options.onLayoutFailure).toHaveBeenCalledExactlyOnceWith('no-layoutable-nodes');
+    expect(options.setNodes).not.toHaveBeenCalled();
+  });
+
+  it.each(['cancelled', 'aborted', 'dom-aborted', 'superseded', 'unmounted'])(
+    'does not notify a %s layout failure', async termination => {
+      let rejectLayout: (error: Error) => void = () => undefined;
+      mocks.calculateLayeredLayoutWithReverse.mockReturnValueOnce(new Promise((_, reject) => {
+        rejectLayout = reject;
+      }));
+      const options = { ...createOptions(), onLayoutFailure: vi.fn() };
+      const { result, unmount } = renderHook(() => useLayoutStrategy({ ...options, reactFlowInstance: null }));
+      let pending: Promise<boolean> = Promise.resolve(false);
+      act(() => { pending = result.current.handleStrategyLayout('domain-elk'); });
+      await waitFor(() => expect(mocks.calculateLayeredLayoutWithReverse).toHaveBeenCalled());
+      if (termination === 'superseded') options.routingSessionRuntime.beginJob('layout');
+      if (termination === 'unmounted') unmount();
+      await act(async () => {
+        const standardError = new Error(termination === 'cancelled' ? 'layout-routing-cancelled' : 'failed');
+        if (termination === 'aborted') standardError.name = 'AbortError';
+        const error = termination === 'dom-aborted'
+          ? new DOMException('operation aborted', 'AbortError')
+          : standardError;
+        rejectLayout(error);
+        await pending;
+      });
+      expect(options.onLayoutFailure).not.toHaveBeenCalled();
+    },
+  );
+
   it('publishes a committed job-level outcome after layout routing succeeds', async () => {
     mocks.calculateLayeredLayoutWithReverse.mockResolvedValueOnce({ nodes, edges });
     const options = createOptions();
@@ -132,6 +198,48 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
       layoutTransactionAttemptCount: 1,
       layoutTransactionErrorCode: undefined,
     });
+  });
+
+  it('commits the requested preference and actual decision with the accepted canvas', async () => {
+    mocks.calculateLayeredLayoutWithReverse.mockResolvedValue({
+      nodes, edges, metadata: { laneRankDecision: compactDecision },
+    });
+    const options = createOptions();
+    const { result } = renderHook(() => useLayoutStrategy({ ...options, reactFlowInstance: null }));
+    await act(async () => {
+      expect(await result.current.handleStrategyLayout('domain-lanes', 'dagre', 'TB', 'auto')).toBe(true);
+    });
+    expect(result.current.layoutSelection).toEqual({
+      version: 2, strategy: 'domain-lanes', direction: 'TB', nodeLayout: 'dagre',
+      laneRankPreference: 'auto', laneRankDecision: compactDecision,
+    });
+    expect(options.setNodes).toHaveBeenCalledOnce();
+    expect(options.setEdges).toHaveBeenCalledOnce();
+    mocks.stageLayoutRouting.mockRejectedValueOnce(new Error('layout-routing-hard-quality-rejected'));
+    await act(async () => {
+      expect(await result.current.handleStrategyLayout('domain-lanes', 'dagre', 'LR', 'global')).toBe(false);
+    });
+    expect(result.current.layoutSelection.laneRankDecision).toBe(compactDecision);
+    expect(result.current.layoutSelection.laneRankPreference).toBe('auto');
+    expect(result.current.layoutSelection.direction).toBe('TB');
+    expect(mocks.calculateLayeredLayoutWithReverse.mock.lastCall?.[3]).toMatchObject({
+      laneRankPreference: 'global', previousLaneRankDecision: compactDecision,
+    });
+  });
+
+  it('commits selection before post-commit rendering yields to another layout', async () => {
+    const options = createOptions();
+    const commitSelection = vi.fn();
+    const { result } = renderHook(() => useLayoutRoutingTransaction(options));
+    const routingJob = options.routingSessionRuntime.beginJob('layout');
+    await act(async () => result.current({
+      nodes, edges, routingJob, commitSelection,
+      beforePreviewRelease: async () => {
+        expect(commitSelection).toHaveBeenCalledOnce();
+        options.routingSessionRuntime.beginJob('layout');
+      },
+    }));
+    expect(commitSelection).toHaveBeenCalledOnce();
   });
 
   it('routes cyclic reverse-tree layouts through the shared reverse geometry adapter', async () => {
