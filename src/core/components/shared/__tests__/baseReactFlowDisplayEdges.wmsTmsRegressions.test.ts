@@ -19,6 +19,7 @@ import {
 } from '../baseReactFlowDisplayEdgeCore';
 import type { DisplayRoutingPhaseTrace } from '../baseReactFlowDisplayRoutingTrace';
 import { getDisplayHardQualityGateReport } from '../baseReactFlowDisplayQualityGates';
+import { countDisplayBusinessNodeCommercialClearanceViolations } from '../baseReactFlowDisplayBusinessNodeClearance';
 import { projectBaseReactFlowDisplayWorkerInput } from '../baseReactFlowDisplayWorkerClient';
 import {
   createDisplayTerminalValidationSnapshot,
@@ -84,6 +85,7 @@ describe('baseReactFlowDisplayEdges WMS and TMS regressions', () => {
       const length = lengths.reduce((total, segment) => total + segment, 0);
       return {
         id: edge.id,
+        commercialClearanceViolations: countDisplayBusinessNodeCommercialClearanceViolations([edge], absoluteNodes),
         bends: Math.max(0, path.length - 2),
         length,
         detourRatio: direct > 0 ? Number((length / direct).toFixed(3)) : 1,
@@ -95,6 +97,7 @@ describe('baseReactFlowDisplayEdges WMS and TMS regressions', () => {
       durationMs,
       routeResolution: response.routeResolution,
       hardClean: response.hardClean,
+      hardReport: response.hardReport,
       quality,
       metrics,
       phaseTrace: response.phaseTrace,

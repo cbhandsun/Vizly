@@ -1,5 +1,7 @@
 **Vizly 布局与连线迭代计划 / Agent 调度规则**
 
+最新检查点（2026-09-05，需求分配商业净距）：完整 Worker 回归暴露 e7 距 check-limit 为 40px（要求 48px）。单边移到边界会与相邻 e8 产生 352px 非法重叠；新增按障碍边界和既有 24px 通道间距生成的双边原子候选，仅在全图硬检查、共享主干保留、总长度及折点不增加时接受，不依赖图或边 ID。完整 WMS/TMS/需求分配 5 项回归通过，局部闭合 18 项通过；verify:static（含生产构建）、TS6、CI 覆盖检查通过；5374 独立生产浏览器需求分配 domain-lanes-lr 切换通过。证据 implementation/demand-paired-*.log。本批未重跑完整 test:ci，不将历史全量失败记为通过。TMS 跨引擎 8 折点问题和完整 I5 验收仍未完成。
+
 状态：实施中，分支 codex/layout-routing-iterations；尚未完成 I0–I5 全部验收；已按用户要求分批本地提交，未推送。本文件是任务与验收契约，不是后台调度器，不改变全局 Codex 配置。
 
 合成边界补充（2026-09-05）：7 个既有布局测试文件的 71 项用例通过。完整 DomainDagreLayoutStrategy 入口新增四方向空图、单节点无边及 12:1 分布嵌套无边泳道验证（4 个参数化用例，各含 3 种输入），检查业务节点不丢失、无边结果、有限坐标、节点互不重叠、同组等宽/等高及输入不变；全部通过，并进入既有 CI 文件。类型、文件规模、定向 Lint 与 CI 收录检查通过。证据 implementation/i5-synthetic-layout-tests.log、i5-edgeless-strategy.log；这些是算法/入口测试，不能替代对应场景的全部浏览器交互证明。

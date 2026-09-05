@@ -9,6 +9,7 @@ import { auditFinalSameSideEndpointOrder } from '../../strategies/shared/edgeFin
 import { getDisplayNodeRect, isDisplayContainerNode } from './baseReactFlowDisplayGeometry';
 import { getExactDisplayHardReport } from './baseReactFlowDisplayWorkerResponse';
 import { segmentIntersectsClearanceRect } from '../../strategies/shared/edgeNodeClearanceGeometry';
+import { pairedDisplayClearanceCandidates } from './baseReactFlowDisplayPairedClearanceCandidates';
 
 const MAX_EDGES = 48;
 const MAX_NODES = 128;
@@ -157,6 +158,16 @@ export const repairBaseReactFlowDisplayPerimeterClosure = (edges: Edge[], nodes:
   if (absoluteNodes.length !== nodes.length) return edges;
   if (absoluteNodes.some(node => Math.abs(node.position.x) + node.width + 64 > 1_000_000
     || Math.abs(node.position.y) + node.height + 64 > 1_000_000)) return edges;
+  const baseline = getExactDisplayHardReport(edges, nodes);
+  // Bound exact graph evaluations, not eligibility by a diagram identity.
+  let pairedEvaluations = 0;
+  for (const paired of pairedDisplayClearanceCandidates(edges, absoluteNodes)) {
+    if (pairedEvaluations++ >= 32) break;
+    const report = getExactDisplayHardReport(paired, nodes);
+    if (report.hardClean && report.quality.bends <= baseline.quality.bends
+      && report.quality.totalLength <= baseline.quality.totalLength
+      && preservesSharedBuddies(edges, paired, absoluteNodes)) return paired;
+  }
   const shared = repairSharedLaneClearance(edges, absoluteNodes);
   if (getExactDisplayHardReport(shared, nodes).hardClean) return shared;
   const perimeter = repairPerimeter(shared, absoluteNodes);

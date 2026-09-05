@@ -7,6 +7,7 @@ import { finalizeBaseReactFlowExactCommercialClearance } from '../baseReactFlowD
 import { getEdgePath } from '../../../strategies/shared/edgeRoutingPathGeometry';
 import { segmentIntersectsClearanceRect } from '../../../strategies/shared/edgeNodeClearanceGeometry';
 import { auditFinalSameSideEndpointOrder } from '../../../strategies/shared/edgeFinalSameSideEndpointOrderRepair';
+import { pairedDisplayClearanceCandidates } from '../baseReactFlowDisplayPairedClearanceCandidates';
 
 const node = (id: string, x: number, y: number): Node => ({ id, position: { x, y }, data: {}, width: 80, height: 60 });
 const nodes = [node('source', 0, 0), node('obstacle', 140, 68), node('target', 300, 0)];
@@ -14,6 +15,46 @@ const edges: Edge[] = [{ id: 'edge', source: 'source', target: 'target', sourceH
   data: { computedPath: [{ x: 80, y: 30 }, { x: 300, y: 30 }] } }];
 
 describe('bounded Worker perimeter closure', () => {
+  it.each([false, true])('moves neighbouring clearance lanes atomically (transposed=%s)', transposed => {
+    const pairedNodes: Node[] = [
+      { ...node('first', 599, 1956), width: 198, height: 96 },
+      { ...node('second', 599, 2212), width: 198, height: 96 },
+      { ...node('sink', 1048, 1444), width: 216, height: 96 },
+      { ...node('blocker', 599, 1700), width: 216, height: 96 },
+    ];
+    const pairedEdges: Edge[] = [
+      { id: 'first-link', source: 'first', target: 'sink', sourceHandle: 'right', targetHandle: 'bottom', data: {
+        computedPath: [{ x: 797, y: 2004 }, { x: 855, y: 2004 }, { x: 855, y: 1596 }, { x: 1156, y: 1596 }, { x: 1156, y: 1540 }],
+      } },
+      { id: 'second-link', source: 'second', target: 'sink', sourceHandle: 'right', targetHandle: 'bottom', data: {
+        computedPath: [{ x: 797, y: 2260 }, { x: 863, y: 2260 }, { x: 863, y: 1652 }, { x: 1156, y: 1652 }, { x: 1156, y: 1540 }],
+      } },
+    ];
+    if (transposed) {
+      for (const item of pairedNodes) {
+        item.position = { x: item.position.y, y: item.position.x };
+        [item.width, item.height] = [item.height, item.width];
+      }
+      for (const edge of pairedEdges) {
+        edge.sourceHandle = 'bottom';
+        edge.targetHandle = 'right';
+        edge.data = { ...edge.data, computedPath: getEdgePath(edge).map(point => ({ x: point.y, y: point.x })) };
+      }
+    }
+    const before = structuredClone({ pairedNodes, pairedEdges });
+    const baseline = getExactDisplayHardReport(pairedEdges, pairedNodes);
+    expect(baseline.commercialClearanceViolations).toBe(1);
+    const repaired = repairBaseReactFlowDisplayPerimeterClosure(pairedEdges, pairedNodes);
+    const report = getExactDisplayHardReport(repaired, pairedNodes);
+    expect(report.hardClean).toBe(true);
+    expect(report.quality.bends).toBe(baseline.quality.bends);
+    expect(report.quality.totalLength).toBe(baseline.quality.totalLength);
+    expect({ pairedNodes, pairedEdges }).toEqual(before);
+    expect(repairBaseReactFlowDisplayPerimeterClosure(repaired, pairedNodes)).toBe(repaired);
+    const forbidden = pairedEdges.map(edge => ({ ...edge, data: { ...edge.data, sourcePortPolicy: 'forbidden', targetPortPolicy: 'forbidden' } }));
+    expect([...pairedDisplayClearanceCandidates(forbidden, pairedNodes)]).toEqual([]);
+  });
+
   it('closes a trapped corridor without mutating input or traversing endpoint interiors', () => {
     const before = structuredClone({ nodes, edges });
     const repaired = repairBaseReactFlowDisplayPerimeterClosure(edges, nodes);
