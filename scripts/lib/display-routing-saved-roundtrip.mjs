@@ -40,6 +40,26 @@ export const readSavedDisplayRoutingState = (raw, nodes, edges, markedEdgeId = n
     }
     return result;
   };
+  const annotations = values => {
+    const coordinate = value => typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= 1_000_000;
+    const point = value => record(value) && coordinate(value.x) && coordinate(value.y);
+    const result = [];
+    for (const edge of values) {
+      const data = edge.data ?? {};
+      if (!record(data) || (edge.label != null && (typeof edge.label !== 'string' || edge.label.length > 8192))) return null;
+      const manualPosition = record(data.labelPosition) && !('adjusted' in data.labelPosition)
+        ? data.labelPosition : undefined;
+      if ((manualPosition !== undefined && !point(manualPosition))
+        || (data.labelOffset !== undefined && !point(data.labelOffset))
+        || (data.absoluteLabelX !== undefined && !coordinate(data.absoluteLabelX))
+        || (data.absoluteLabelY !== undefined && !coordinate(data.absoluteLabelY))) return null;
+      result.push([edge.id, edge.label ?? null,
+        manualPosition ? [manualPosition.x, manualPosition.y] : null,
+        data.labelOffset ? [data.labelOffset.x, data.labelOffset.y] : null,
+        data.absoluteLabelX ?? null, data.absoluteLabelY ?? null]);
+    }
+    return JSON.stringify(result);
+  };
   if (typeof raw !== 'string' || raw.length > 2 * 1024 * 1024) return null;
   let saved;
   try { saved = JSON.parse(raw); } catch { return null; }
@@ -49,6 +69,8 @@ export const readSavedDisplayRoutingState = (raw, nodes, edges, markedEdgeId = n
   const savedTopology = topology(saved.edges);
   const currentTopology = topology(edges);
   if (!savedGeometry || !currentGeometry || !savedTopology || !currentTopology) return null;
+  const savedAnnotations = annotations(saved.edges);
+  if (savedAnnotations === null || savedAnnotations !== annotations(edges)) return null;
   if (JSON.stringify(savedGeometry) !== JSON.stringify(currentGeometry)
     || JSON.stringify(savedTopology) !== JSON.stringify(currentTopology)) return null;
   const nodeIds = new Set(savedGeometry.map(node => node[0]));
@@ -56,7 +78,7 @@ export const readSavedDisplayRoutingState = (raw, nodes, edges, markedEdgeId = n
   if (markedEdgeId !== null && (!token(markedEdgeId)
     || !saved.edges.some(edge => edge.id === markedEdgeId && edge.label === 'saved-check')
     || !edges.some(edge => edge.id === markedEdgeId && edge.label === 'saved-check'))) return null;
-  return { geometry: JSON.stringify(savedGeometry), topology: JSON.stringify(savedTopology),
+  return { geometry: JSON.stringify(savedGeometry), topology: JSON.stringify(savedTopology), annotations: savedAnnotations,
     nodeCount: savedGeometry.length, edgeCount: savedTopology.length };
 };
 
@@ -85,7 +107,8 @@ export const verifySavedDisplayRoutingRoundtrip = async ({
   const restoredRoute = await waitForValue(session, readFinalRouteExpression(''), 'saved final route');
   const restoredAudit = await auditFinalSvg(session, restoredRoute, 'saved final route');
   const after = await session.evaluate(stateExpression);
-  if (!after || before.geometry !== after.geometry || before.topology !== after.topology) {
+  if (!after || before.geometry !== after.geometry || before.topology !== after.topology
+    || before.annotations !== after.annotations) {
     throw new Error('Saved graph geometry, topology, routing snapshot or edited label was not retained');
   }
   const restoredSemantics = savedLayoutCase
