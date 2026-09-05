@@ -202,6 +202,7 @@ describe('edge label avoidance', () => {
     it('uses a medium retreat to fit a label between adjacent endpoint nodes', () => {
         const labelPoint = { x: 1139, y: 349 };
         const labelText = '承运商协同';
+        const measuredSize = { width: 70, height: 22 };
         const obstacles = [
             { x: 761, y: 290, width: 282, height: 118 },
             { x: 1163, y: 290, width: 211, height: 118 },
@@ -212,13 +213,15 @@ describe('edge label avoidance', () => {
             labelText,
             [],
             obstacles,
+            1,
+            measuredSize,
         );
         const rect = estimateEdgeLabelRect({
             x: labelPoint.x + offset.x,
             y: labelPoint.y + offset.y,
-        }, labelText);
+        }, labelText, 1, measuredSize);
 
-        expect(offset.x).toBe(-32);
+        expect(offset.x).toBe(-35);
         for (const obstacle of obstacles) {
             expect(
                 rect.x + rect.width <= obstacle.x
@@ -255,6 +258,10 @@ describe('edge label avoidance', () => {
             `${'超长标签'.repeat(100)}<img src=x onerror=alert(1)>`,
         );
 
-        expect(rect).toEqual({ x: -110, y: -13, width: 220, height: 26 });
+        expect(rect.width).toBe(220);
+        expect(rect.height).toBeGreaterThan(26);
+        expect(rect.x).toBe(-rect.width / 2);
+        expect(rect.y).toBe(-rect.height / 2);
+        expect(Number.isFinite(rect.height)).toBe(true);
     });
 });

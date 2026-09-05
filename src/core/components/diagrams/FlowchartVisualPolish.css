@@ -564,7 +564,12 @@
     border-radius: 4px;
     font-size: 11px;
     font-weight: 600;
-    white-space: nowrap;
+    /* Full condition text wraps; avoidance uses the measured border box. */
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    box-sizing: border-box;
+    width: max-content;
+    max-width: 220px;
     transition:
         opacity 130ms ease,
         border-color 130ms ease,
@@ -594,6 +599,15 @@
 .diagram-root .stable-path-edge-label:focus-visible {
     outline: 2px solid var(--flow-visual-accent);
     outline-offset: 2px;
+}
+
+.diagram-root .stable-path-edge-label[data-edge-label-placement='unresolved'] {
+    outline: 1px dashed #b45309;
+    outline-offset: 2px;
+}
+
+.diagram-zoomed-out .stable-path-edge-label-leader[data-edge-label-priority='detail'][data-edge-trace-state='idle'] {
+    display: none;
 }
 
 .diagram-root .edge-label-premium:hover {

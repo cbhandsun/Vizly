@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestDisplayRoutingRenderAuthority } from '../../../routing/__tests__/displayRoutingRenderAuthorityTestFixture';
 
@@ -13,7 +13,8 @@ import {
   type SmartEdgeRoutingRenderAdapter,
 } from '../smartEdgeRoutingRenderAdapter';
 
-const { useLineJumpsMock, reactFlowStoreMock } = vi.hoisted(() => ({
+const { useLineJumpsMock, reactFlowStoreMock, getStateMock } = vi.hoisted(() => ({
+  getStateMock: vi.fn(),
   useLineJumpsMock: vi.fn(() => ({ jumps: [], jumpPath: null })),
   reactFlowStoreMock: {
     edges: [],
@@ -56,6 +57,7 @@ vi.mock('@xyflow/react', async () => {
     }),
     EdgeLabelRenderer: ({ children }: { children: React.ReactNode }) => ReactModule.createElement(ReactModule.Fragment, null, children),
     useStore: (selector: (state: typeof reactFlowStoreMock) => unknown) => selector(reactFlowStoreMock),
+    useStoreApi: () => ReactModule.useMemo(() => ({ getState: getStateMock }), []),
   };
 });
 
@@ -409,7 +411,7 @@ describe('StablePathEdge', () => {
     expect(label.getAttribute('tabindex')).toBe('-1');
   });
 
-  it('anchors labels to the rendered path after layout changes', () => {
+  it.each([true, false])('anchors generated labels to the rendered path after layout changes (adjusted=%s)', adjusted => {
     renderStablePathEdge({
       label: 'Reflowed route',
       sourceX: 0,
@@ -418,13 +420,75 @@ describe('StablePathEdge', () => {
       targetY: 0,
       data: {
         computedPath: [{ x: 0, y: 0 }, { x: 200, y: 0 }],
-        labelPosition: { x: 100, y: 1800, adjusted: true },
+        labelPosition: { x: 100, y: 1800, adjusted },
+        absoluteLabelX: Number.NaN,
+        absoluteLabelY: Number.POSITIVE_INFINITY,
       },
     });
 
     const label = screen.getByText('Reflowed route');
     expect(label.style.transform).toContain('translate(100px,21px)');
     expect(label.style.transform).not.toContain('1800px');
+  });
+
+  it('preserves an explicit manual labelPosition and offset through rerenders', async () => {
+    const props = { label: 'Manual condition', data: {
+      computedPath: [{ x: 0, y: 0 }, { x: 80, y: 0 }, { x: 80, y: 40 }],
+      labelPosition: { x: 37, y: 59 }, labelOffset: { x: 5, y: -9 },
+    } };
+    const view = renderStablePathEdge(props);
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.getByText('Manual condition').style.transform).toContain('translate(42px,50px)');
+    view.rerender(createStablePathEdgeElement({ ...props, selected: true }));
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.getByText('Manual condition').style.transform).toContain('translate(42px,50px)');
+  });
+
+  it('globally separates two actual measured labels sharing a final route without losing text', async () => {
+    const width = vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(220);
+    const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(134);
+    const text = '完整审批条件'.repeat(24);
+    try {
+      const view = render(<>{['first', 'second'].map(id => <React.Fragment key={id}>
+        {createStablePathEdgeElement({ id, label: `${id}${text}`, sourceX: 0, sourceY: 0,
+          targetX: 300, targetY: 0, data: { computedPath: [{ x: 0, y: 0 }, { x: 300, y: 0 }] } })}
+      </React.Fragment>)}</>);
+      await act(async () => { await Promise.resolve(); });
+      const labels = [...view.container.querySelectorAll<HTMLElement>('.stable-path-edge-label')];
+      expect(labels).toHaveLength(2);
+      expect(labels.map(element => element.dataset.edgeLabelPlacement)).toEqual(['placed', 'placed']);
+      expect(labels[0].style.transform).not.toBe(labels[1].style.transform);
+      const centers = labels.map(element => {
+        const match = element.style.transform.match(/translate\((-?[\d.]+)px,(-?[\d.]+)px\)/);
+        expect(match).not.toBeNull();
+        return { x: Number(match?.[1]), y: Number(match?.[2]) };
+      });
+      expect(Math.abs(centers[0].x - centers[1].x) >= 229
+        || Math.abs(centers[0].y - centers[1].y) >= 143).toBe(true);
+      expect(labels.every(element => element.textContent?.includes(text))).toBe(true);
+      expect(view.container.querySelectorAll('[data-edge-label-leader]')).toHaveLength(2);
+      view.unmount();
+      await act(async () => { await Promise.resolve(); });
+    } finally { width.mockRestore(); height.mockRestore(); }
+  });
+
+  it('keeps the full long condition wrapped while preserving manual placement and the committed path', () => {
+    const text = '条件'.repeat(70) + '<待审核>';
+    renderStablePathEdge({
+      label: text,
+      sourceX: 0, sourceY: 0, targetX: 200, targetY: 0,
+      data: {
+        computedPath: [{ x: 0, y: 0 }, { x: 200, y: 0 }],
+        labelOffset: { x: 12, y: -8 },
+      },
+    });
+    const label = screen.getByText(text);
+    expect(label.textContent).toBe(text);
+    expect(label.style.maxWidth).toBe('220px');
+    expect(label.style.whiteSpace).toBe('pre-wrap');
+    expect(label.style.overflowWrap).toBe('anywhere');
+    expect(label.style.transform).toContain('translate(112px,-8px)');
+    expect(screen.getByTestId('base-edge').getAttribute('d')).toBe('M 0 0 L 200 0');
   });
 
   it('marks semantic main-route and selected labels for low-zoom restoration', () => {
@@ -676,7 +740,7 @@ describe('StablePathEdge', () => {
     expect(trace?.getAttribute('marker-end')).toBeNull();
   });
 
-  it('uses one full active trace across dual-role ranges and suppresses the idle backbone label', () => {
+  it('uses one full active trace across dual-role ranges and preserves the idle condition label', () => {
     const sharedPlan = {
       hiddenRanges: [
         { from: 0, to: 70, role: 'source', ownerEdgeId: 'source-owner' },
@@ -697,7 +761,7 @@ describe('StablePathEdge', () => {
       },
     });
 
-    expect(screen.queryByText('Fully canonical bridge')).toBeNull();
+    expect(screen.getByText('Fully canonical bridge')).toBeTruthy();
     expect(idle.container.querySelector('.shared-trunk-accent-trace')?.getAttribute('style'))
       .toContain('opacity: 0');
     idle.unmount();

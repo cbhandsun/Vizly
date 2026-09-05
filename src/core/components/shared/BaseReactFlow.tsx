@@ -76,7 +76,7 @@ import { RoutingSessionEdgeRenderProvider } from '../custom-edges/RoutingSession
 import { resolveBaseReactFlowRoutingComputation } from './baseReactFlowDragRoutingFreeze';
 import { BaseReactFlowDisplayStatusOverlay } from './BaseReactFlowDisplayStatusOverlay';
 import { applySharedTrunkPaintPlan } from '../../rendering/sharedTrunkPaint';
-import { buildDisplayRoutingObstacles } from './baseReactFlowDisplayGeometry';
+import { buildEdgeLabelObstacles } from '../custom-edges/edgeLabelObstacles';
 import { EdgeLabelObstacleContext } from '../custom-edges/edgeLabelObstacleContext';
 import { applyBaseReactFlowEdgePresentation } from './baseReactFlowEdgePresentation';
 import { useLayoutStability } from '../../context/LayoutStabilityContext';
@@ -276,7 +276,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   ), [visibleNodes, internalFlowNodes]);
   const routingEdges = useBaseReactFlowRoutableEdges(edges, routingNodes);
   const edgeLabelObstacles = useMemo(
-    () => [...buildDisplayRoutingObstacles(routingNodes).values()],
+    () => buildEdgeLabelObstacles(routingNodes),
     [routingNodes],
   );
 
