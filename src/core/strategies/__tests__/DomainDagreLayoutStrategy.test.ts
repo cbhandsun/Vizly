@@ -75,6 +75,43 @@ const absolutePositionOf = (node: ReactFlowNode, nodes: ReactFlowNode[]) => {
 };
 
 describe('DomainDagreLayoutStrategy', () => {
+    it.each(['TB', 'LR', 'BT', 'RL'] as const)('keeps empty, singleton and uneven edgeless domains valid in %s', async direction => {
+        const fixtures: ReactFlowNode[][] = [
+            [],
+            [makeNode('single', 'only-domain', '')],
+            Array.from({ length: 13 }, (_, index) => makeNode(
+                'isolated-' + index,
+                index === 12 ? 'sparse' : 'dense',
+                index === 12 ? 'one' : index < 6 ? 'first' : 'second',
+            )),
+        ];
+        for (const nodes of fixtures) {
+            const before = structuredClone(nodes);
+            const result = await new DomainDagreLayoutStrategy().calculateLayout(nodes, [], {
+                type: LayoutType.SWIMLANE, direction,
+                domainPlacement: 'ordered-lanes', generateDomainGroups: true, generateSubDomainGroups: true,
+            });
+            expect(result.edges ?? []).toEqual([]);
+            const originalIds = new Set(nodes.map(node => node.id));
+            const leaves = result.nodes.filter(node => originalIds.has(node.id));
+            expect(leaves.map(node => node.id).sort()).toEqual([...originalIds].sort());
+            expect(result.nodes.every(node => Number.isFinite(node.position.x) && Number.isFinite(node.position.y))).toBe(true);
+            for (let i = 0; i < leaves.length; i += 1) for (let j = i + 1; j < leaves.length; j += 1) {
+                const a = absolutePositionOf(leaves[i], result.nodes), b = absolutePositionOf(leaves[j], result.nodes);
+                const as = sizeOf(leaves[i]), bs = sizeOf(leaves[j]);
+                expect(a.x + as.width <= b.x || b.x + bs.width <= a.x
+                    || a.y + as.height <= b.y || b.y + bs.height <= a.y).toBe(true);
+            }
+            const domains = result.nodes.filter(node => node.type === 'titleGroup');
+            const flowSize = direction === 'TB' || direction === 'BT' ? 'height' : 'width';
+            if (nodes.length > 1) {
+                expect(domains).toHaveLength(2);
+                expect(new Set(domains.map(node => sizeOf(node)[flowSize])).size).toBe(1);
+            }
+            expect(nodes).toEqual(before);
+        }
+    });
+
     it('composes horizontal swimlanes with selectable vertical node layout and equal domain widths', async () => {
         const nodes: ReactFlowNode[] = [
             makeNode('a-1', 'domain-a', 'sub-a1'),
