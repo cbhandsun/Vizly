@@ -14,11 +14,15 @@ const chainFixture = (count: number, ids: string[], isolatedDomain: string, inse
   return { nodes, edges, ids };
 };
 
-it.each(['TB', 'BT', 'LR', 'RL'] as const)('preserves the declared main chain across size and identifier boundaries in %s', direction => {
+const boundaryCases = (['TB', 'BT', 'LR', 'RL'] as const).flatMap(direction => (
+  [22, 23, 24, 25].map(count => ({ direction, count }))
+));
+
+it.each(boundaryCases)('preserves the declared main chain at $count nodes in $direction', ({ direction, count }) => {
   const axis = direction === 'LR' || direction === 'RL' ? 'x' : 'y';
   const size = axis === 'x' ? 160 : 80;
   const sign = direction === 'BT' || direction === 'RL' ? -1 : 1;
-  for (const count of [22, 23, 24, 25]) for (const ids of [
+  for (const ids of [
     ['a0', 'a1', 'a2', 'b0', 'b1'], ['50', '40', '30', '20', '10'],
     ['__proto__', '<svg>', 'constructor', 'a->b', '\\'],
   ]) for (const cycle of [false, true]) for (const isolatedDomain of ['a', 'b', 'c', '']) for (const insertion of [0, 5, 8]) {

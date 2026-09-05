@@ -2,15 +2,43 @@ import { expect } from 'vitest';
 
 import type { DisplayEdgesWorkerResponse } from '../baseReactFlowDisplayWorkerProtocol';
 
+const terminalTraceExpectedParents: Readonly<Record<string, string>> = {
+  'terminal-attachment-axis': 'terminal',
+  'terminal-anchor': 'terminal',
+  'terminal-polish': 'terminal',
+  'terminal-finalize': 'terminal',
+  'terminal-finalize-orthogonal': 'terminal-finalize',
+  'terminal-finalize-axis': 'terminal-finalize',
+  'terminal-finalize-outer-port': 'terminal-finalize',
+  'terminal-finalize-fail-closed': 'terminal-finalize',
+  'terminal-fail-closed-normalize': 'terminal-finalize-fail-closed',
+  'terminal-fail-closed-overlap': 'terminal-finalize-fail-closed',
+  'terminal-fail-closed-local': 'terminal-finalize-fail-closed',
+  'terminal-fail-closed-strict': 'terminal-finalize-fail-closed',
+  'terminal-fail-closed-selection': 'terminal-finalize-fail-closed',
+  'terminal-fail-closed-micro': 'terminal-finalize-fail-closed',
+  'terminal-fail-closed-gate': 'terminal-finalize-fail-closed',
+};
+
 export const expectDisplayRoutingTraceChildren = (
   phaseTrace: DisplayEdgesWorkerResponse['phaseTrace'],
   diagnostics: string,
   parentPhase: string,
   childPrefix: string,
 ): void => {
-  expect(phaseTrace?.filter(trace => trace.phase.startsWith(childPrefix)).every(trace => (
-    trace.parentPhase === parentPhase && Number.isFinite(trace.exclusiveDurationMs)
-  )), diagnostics).toBe(true);
+  expect(phaseTrace, diagnostics).toBeDefined();
+  const matchingTraces = phaseTrace?.filter(trace => trace.phase.startsWith(childPrefix)) ?? [];
+  const expectedParents = parentPhase === 'terminal' && childPrefix === 'terminal-'
+    ? terminalTraceExpectedParents
+    : undefined;
+  expect(matchingTraces.every(trace => {
+    const expectedParent = expectedParents?.[trace.phase] ?? parentPhase;
+    return (
+      trace.parentPhase === expectedParent
+      && Number.isFinite(trace.exclusiveDurationMs)
+      && (!expectedParents || trace.phase in expectedParents)
+    );
+  }), diagnostics).toBe(true);
 };
 
 export const expectCompleteLogisticsIncrementalPhaseTrace = (

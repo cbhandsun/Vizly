@@ -14,6 +14,7 @@ import {
 import { createDisplayRoutingIdentity } from '../baseReactFlowDisplayRoutingSession';
 import { createDisplayEdgesTransportResponse } from '../baseReactFlowDisplayWorkerScope';
 import { resolveDisplayWorkerCandidate } from '../baseReactFlowDisplayWorkerCandidate';
+import { expectDisplayRoutingTraceChildren } from './baseReactFlowDisplayLogisticsPhaseTrace.testUtils';
 import {
   TEST_DISPLAY_WORKER_NODES as nodes,
   TEST_DISPLAY_WORKER_REPAIR_REQUEST as validRepairRequest,
@@ -24,6 +25,52 @@ import {
 const cleanHardReport = createTestDisplayHardReport();
 
 describe('baseReactFlowDisplayWorkerProtocol', () => {
+  it('validates the explicit terminal trace hierarchy and rejects an incorrect nested parent', () => {
+    const trace = (
+      phase: DisplayRoutingPhaseTrace['phase'],
+      parentPhase: DisplayRoutingPhaseTrace['parentPhase'],
+    ): DisplayRoutingPhaseTrace => ({
+      phase,
+      parentPhase,
+      durationMs: 10,
+      exclusiveDurationMs: 10,
+      candidateCount: 1,
+      changedEdgeCount: 0,
+      resolution: 'skip',
+    });
+    const validTrace = [
+      trace('terminal-attachment-axis', 'terminal'),
+      trace('terminal-finalize', 'terminal'),
+      trace('terminal-finalize-orthogonal', 'terminal-finalize'),
+      trace('terminal-finalize-fail-closed', 'terminal-finalize'),
+      trace('terminal-fail-closed-local', 'terminal-finalize-fail-closed'),
+    ];
+
+    expect(() => expectDisplayRoutingTraceChildren(
+      validTrace,
+      'terminal hierarchy',
+      'terminal',
+      'terminal-',
+    )).not.toThrow();
+    expect(() => expectDisplayRoutingTraceChildren(
+      [
+        ...validTrace.slice(0, -1),
+        trace('terminal-fail-closed-local', 'terminal-finalize'),
+      ],
+      'terminal hierarchy',
+      'terminal',
+      'terminal-',
+    )).toThrow();
+    for (const invalidTrace of [
+      undefined,
+      [{ ...validTrace[0], exclusiveDurationMs: Number.NaN }],
+    ]) {
+      expect(() => expectDisplayRoutingTraceChildren(
+        invalidTrace, 'invalid terminal trace', 'terminal', 'terminal-',
+      )).toThrow();
+    }
+  });
+
   it('keeps document router intent through the Worker boundary without widening browser cache authority', () => {
     const candidate = { ...validRepairRequest.edges[0], data: {
       computedPath: [{ x: 100, y: 30 }, { x: 300, y: 30 }],
