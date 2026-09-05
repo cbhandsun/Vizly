@@ -1,7 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
-import { compareBeamStates, MAX_BEAM_WIDTH, selectDiverseBeamStates, type BeamState } from './baseReactFlowDisplayCrossingClusterBeam';
-import { createDisplayCrossingClusterMazePool } from './baseReactFlowDisplayCrossingClusterMazePool';
+import { compareBeamStates, selectDiverseBeamStates, type BeamState } from './baseReactFlowDisplayCrossingClusterBeam';
+import { repairDisplayCrossingClusterMazeFallback } from './baseReactFlowDisplayCrossingClusterMazeFallback';
 
 import { normalizeHandle } from '../../routing/utils/handleUtils';
 import {
@@ -523,11 +523,16 @@ const buildMoverCandidates = (
 export const repairBoundedMultiEdgeResidualStrictCrossings = <T extends Edge[]>(
   edges: T,
   nodes: Node[],
+  options: {
+    /** Invariants required of every intermediate and returned candidate. */
+    acceptCandidate?: (candidate: T) => boolean;
+  } = {},
 ): T => {
   if (edges.length === 0) return edges;
   const qualityContext = createEdgePathQualityEvaluationContext(edges);
   const baselineQuality = qualityContext.evaluate(edges);
-  if (baselineQuality.strictCrossings === 0 || hasDisplayCrossingClusterFixedPoint(edges, nodes)) return edges;
+  if (baselineQuality.strictCrossings === 0
+    || (!options.acceptCandidate && hasDisplayCrossingClusterFixedPoint(edges, nodes))) return edges;
   const obstacleContext = createDisplayObstacleEvaluationContext(edges, nodes);
   const baselineObstacleHits = obstacleContext.evaluate(edges);
   const nodesById = new Map(nodes.map(node => [node.id, node]));
@@ -543,8 +548,6 @@ export const repairBoundedMultiEdgeResidualStrictCrossings = <T extends Edge[]>(
   let beam = [baselineState];
   let best: BeamState<T> | null = null;
   let evaluations = 0;
-  const mazeCandidateFor = createDisplayCrossingClusterMazePool(edges, nodes, baselineState.segments);
-  let mazeTierEnabled = false;
 
   for (let depth = 0; depth < MAX_SEARCH_DEPTH && evaluations < MAX_QUALITY_EVALUATIONS; depth += 1) {
     const nextStates: BeamState<T>[] = [];
@@ -555,7 +558,6 @@ export const repairBoundedMultiEdgeResidualStrictCrossings = <T extends Edge[]>(
       const search = resolveDisplayCrossingClusterSearch(state.segments, edges.length);
       if (!search) continue;
       const { budget: candidateBudget, hits } = search;
-      if (hits.length === 0) continue;
       const candidatesByMover = new Map<number, Edge[]>();
       for (const hit of hits) {
         for (const [segment, other] of [[hit.a, hit.b], [hit.b, hit.a]] as const) {
@@ -571,13 +573,9 @@ export const repairBoundedMultiEdgeResidualStrictCrossings = <T extends Edge[]>(
             candidateBudget.maxLocalCandidates,
             candidateBudget.maxSidePairCandidates,
           ).map(candidate => candidate.edge);
-          const mazeCandidate = mazeTierEnabled ? mazeCandidateFor(segment.edgeIndex) : null;
-          candidatesByMover.set(segment.edgeIndex, mazeCandidate
-            ? [mazeCandidate, ...candidates].slice(0, 8)
-            : candidates);
+          candidatesByMover.set(segment.edgeIndex, candidates);
         }
       }
-
       const moverEntries = [...candidatesByMover.entries()].sort(([firstIndex], [secondIndex]) => (
         Number(state.changedIndexes.includes(firstIndex)) - Number(state.changedIndexes.includes(secondIndex))
       ));
@@ -602,17 +600,18 @@ export const repairBoundedMultiEdgeResidualStrictCrossings = <T extends Edge[]>(
 
       for (const { moverIndex, candidate } of scheduled) {
         if (evaluations >= MAX_QUALITY_EVALUATIONS) break;
-        evaluations += 1;
         const candidateEdges = state.edges.map((edge, edgeIndex) => (
           edgeIndex === moverIndex ? candidate : edge
         )) as T;
         const changedIndexes = [...new Set([...state.changedIndexes, moverIndex])].sort((a, b) => a - b);
         const signature = displayCrossingClusterEdgeStateSignature(candidateEdges, changedIndexes);
         if (nextSignatures.has(signature)) continue;
+        evaluations += 1;
         const candidateQuality = qualityContext.evaluateChanged(candidateEdges, changedIndexes);
         if (!qualityWithinIntermediateBaseline(baselineQuality, candidateQuality)) continue;
         const candidateObstacleHits = obstacleContext.evaluateKnownChanges(candidateEdges, changedIndexes);
         if (candidateObstacleHits > baselineObstacleHits) continue;
+        if (options.acceptCandidate && !options.acceptCandidate(candidateEdges)) continue;
         const nextState: BeamState<T> = {
           edges: candidateEdges,
           segments: extractDisplaySegments(candidateEdges),
@@ -633,18 +632,14 @@ export const repairBoundedMultiEdgeResidualStrictCrossings = <T extends Edge[]>(
         }
       }
     }
-    // Try the distinct local maze family only when the cheap first layer failed.
-    if (depth === 0 && !best) {
-      mazeTierEnabled = true;
-      // Cached alternatives were generated from this geometry. Keep its joint
-      // search branch alongside intermediate bridge states, within width eight.
-      beam = [baselineState, ...selectDiverseBeamStates(nextStates).slice(0, MAX_BEAM_WIDTH - 1)];
-      continue;
-    }
     if (nextStates.length === 0) break;
     beam = selectDiverseBeamStates(nextStates);
   }
 
-  if (!best) rememberDisplayCrossingClusterFixedPoint(edges, nodes);
-  return best?.edges ?? edges;
+  if (best) return best.edges;
+  const fallback = repairDisplayCrossingClusterMazeFallback(
+    edges, nodes, MAX_QUALITY_EVALUATIONS - evaluations, options.acceptCandidate,
+  );
+  if (fallback === edges && !options.acceptCandidate) rememberDisplayCrossingClusterFixedPoint(edges, nodes);
+  return fallback;
 };

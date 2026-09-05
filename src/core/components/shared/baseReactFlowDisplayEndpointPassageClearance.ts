@@ -5,6 +5,7 @@ import {
   MINIMUM_BUSINESS_NODE_CLEARANCE,
 } from '../../strategies/shared/edgeBusinessNodeClearanceRepair';
 import { createNodeClearanceGraphEvaluationContext } from '../../strategies/shared/edgeWaypointCandidateRepair';
+import { TINY_INTERIOR_SEGMENT } from '../../strategies/shared/edgeDisplayMicroCleanupGeometry';
 import { createAtomicRouteTransactionEvaluation } from './baseReactFlowDisplayAtomicTransactionEvaluation';
 import { createDisplayDeclaredAxisMismatchCounter } from './baseReactFlowDisplayDeclaredAxisTransaction';
 import {
@@ -57,18 +58,20 @@ const pathIsBounded = (path: readonly DisplayPoint[]): boolean => path.length >=
   && path.length <= MAX_PATH_POINTS
   && path.every(point => Number.isFinite(point.x) && Number.isFinite(point.y));
 
-const rangesOverlap = (firstA: number, firstB: number, secondA: number, secondB: number): boolean => (
-  Math.max(Math.min(firstA, firstB), Math.min(secondA, secondB))
-    < Math.min(Math.max(firstA, firstB), Math.max(secondA, secondB)) - EPSILON
-);
-
 const shiftedLaneForRect = (
   first: DisplayPoint,
   second: DisplayPoint,
   rect: DisplayRect,
 ): Readonly<{ axis: 'h' | 'v'; lane: number }> | null => {
   const axis = displayAxisOf(first, second);
-  if (axis === 'h' && rangesOverlap(first.x, second.x, rect.x, rect.x + rect.width)) {
+  const gapX = Math.max(rect.x - Math.max(first.x, second.x),
+    Math.min(first.x, second.x) - (rect.x + rect.width), 0);
+  const gapY = Math.max(rect.y - Math.max(first.y, second.y),
+    Math.min(first.y, second.y) - (rect.y + rect.height), 0);
+  // A segment can violate clearance around a corner without overlapping either
+  // rectangle projection. Use the same Euclidean safety region in both cases.
+  if (Math.hypot(gapX, gapY) >= COMMERCIAL_BUSINESS_NODE_CLEARANCE - EPSILON) return null;
+  if (axis === 'h') {
     const bottom = rect.y + rect.height;
     if (first.y < rect.y - EPSILON
       && rect.y - first.y < COMMERCIAL_BUSINESS_NODE_CLEARANCE - EPSILON) {
@@ -79,7 +82,7 @@ const shiftedLaneForRect = (
       return { axis, lane: bottom + COMMERCIAL_BUSINESS_NODE_CLEARANCE };
     }
   }
-  if (axis === 'v' && rangesOverlap(first.y, second.y, rect.y, rect.y + rect.height)) {
+  if (axis === 'v') {
     const right = rect.x + rect.width;
     if (first.x < rect.x - EPSILON
       && rect.x - first.x < COMMERCIAL_BUSINESS_NODE_CLEARANCE - EPSILON) {
@@ -165,10 +168,9 @@ const totalClearanceRisk = (
 ), 0);
 
 /**
- * Builds bounded two-edge transactions for the case where clearing a business
- * node moves a corridor across a sibling endpoint ladder. The risky corridor
- * and sibling bridge are committed together; neither transient geometry is
- * observable outside this function.
+ * Builds bounded clearance transactions around node sides and corners. A safe
+ * single-edge shift uses the same gate as a paired shift across a sibling
+ * endpoint ladder; no intermediate geometry is observable by the renderer.
  */
 export const buildBaseReactFlowDisplayEndpointPassageClearanceCandidates = <
   T extends Edge[],
@@ -219,6 +221,35 @@ export const buildBaseReactFlowDisplayEndpointPassageClearanceCandidates = <
   )).slice(0, MAX_RISK_EDGES);
   const accepted: T[] = [];
   let generated = 0;
+  const acceptCandidate = (candidate: T, changedIndexes: number[]): void => {
+    const candidateCommercial = totalClearanceRisk(
+      candidate,
+      clearance,
+      COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+    );
+    const candidateMinimum = totalClearanceRisk(
+      candidate,
+      clearance,
+      MINIMUM_BUSINESS_NODE_CLEARANCE,
+    );
+    if (
+      candidateCommercial >= baselineCommercial - EPSILON
+      || candidateMinimum > baselineMinimum + EPSILON
+      || changedIndexes.some(index => (
+        countAxisMismatches(candidate[index]) > baselineAxis[index]
+      ))
+    ) return;
+    const evaluation = atomic.evaluate(candidate, changedIndexes);
+    if (
+      !evaluation.hardQualityDoesNotRegress
+      || !evaluation.obstacleHitsDoNotRegress
+      || !evaluation.terminalsAnchored
+      || !evaluation.trunksPreserved
+      || !getDisplayHardQualityGateReport(candidate, nodes, 'polished').hardClean
+    ) return;
+    accepted.push(candidate);
+    if (options.diagnostics) options.diagnostics.acceptedCandidateCount += 1;
+  };
 
   for (const riskIndex of riskyIndexes) {
     const riskEdge = edges[riskIndex];
@@ -252,7 +283,11 @@ export const buildBaseReactFlowDisplayEndpointPassageClearanceCandidates = <
             crossings.length,
           );
         }
-        if (crossings.length === 0 || crossings.length > 2) continue;
+        if (crossings.length === 0) {
+          acceptCandidate(shifted, [riskIndex]);
+          continue;
+        }
+        if (crossings.length > 2) continue;
         const peerSegments = crossings.flatMap(crossing => {
           if (crossing.a.edgeIndex === riskIndex && crossing.b.edgeIndex !== riskIndex) {
             return [crossing.b];
@@ -270,6 +305,7 @@ export const buildBaseReactFlowDisplayEndpointPassageClearanceCandidates = <
         ) continue;
         if (options.diagnostics) options.diagnostics.singlePeerCrossingCandidateCount += 1;
         const peerEdge = edges[peerIndex];
+        if (options.eligibleEdgeIds && !options.eligibleEdgeIds.has(peerEdge.id)) continue;
         const role = sharedEndpointRole(riskEdge, peerEdge);
         if (!role) continue;
         if (options.diagnostics) options.diagnostics.sharedEndpointCandidateCount += 1;
@@ -280,38 +316,37 @@ export const buildBaseReactFlowDisplayEndpointPassageClearanceCandidates = <
             peerSegment.segmentIndex,
           )
         ), null);
-        if (!bridgedPeer) continue;
-        if (options.diagnostics) options.diagnostics.ladderCandidateCount += 1;
-        const candidate = shifted.slice() as T;
-        candidate[peerIndex] = bridgedPeer;
         const changedIndexes = [riskIndex, peerIndex].sort((first, second) => first - second);
-        const candidateCommercial = totalClearanceRisk(
-          candidate,
-          clearance,
-          COMMERCIAL_BUSINESS_NODE_CLEARANCE,
-        );
-        const candidateMinimum = totalClearanceRisk(
-          candidate,
-          clearance,
-          MINIMUM_BUSINESS_NODE_CLEARANCE,
-        );
-        if (
-          candidateCommercial >= baselineCommercial - EPSILON
-          || candidateMinimum > baselineMinimum + EPSILON
-          || changedIndexes.some(index => (
-            countAxisMismatches(candidate[index]) > baselineAxis[index]
-          ))
-        ) continue;
-        const evaluation = atomic.evaluate(candidate, changedIndexes);
-        if (
-          !evaluation.hardQualityDoesNotRegress
-          || !evaluation.obstacleHitsDoNotRegress
-          || !evaluation.terminalsAnchored
-          || !evaluation.trunksPreserved
-          || !getDisplayHardQualityGateReport(candidate, nodes, 'polished').hardClean
-        ) continue;
-        accepted.push(candidate);
-        if (options.diagnostics) options.diagnostics.acceptedCandidateCount += 1;
+        const acceptedBefore = accepted.length;
+        if (bridgedPeer) {
+          if (options.diagnostics) options.diagnostics.ladderCandidateCount += 1;
+          const candidate = shifted.slice() as T;
+          candidate[peerIndex] = bridgedPeer;
+          acceptCandidate(candidate, changedIndexes);
+        }
+        if (accepted.length > acceptedBefore) continue;
+        // Collapsing a ladder may restore an unsafe old lane. Move only its
+        // crossed segment beyond the risk corridor, preserving remote bends.
+        peerRelocation: for (const crossing of crossings) {
+          const moving = crossing.a.edgeIndex === riskIndex ? crossing.a : crossing.b;
+          const peer = crossing.a.edgeIndex === peerIndex ? crossing.a : crossing.b;
+          const coordinate = peer.axis === 'v' ? 'x' : 'y';
+          const lanes = [
+            Math.min(moving.a[coordinate], moving.b[coordinate]) - TINY_INTERIOR_SEGMENT,
+            Math.max(moving.a[coordinate], moving.b[coordinate]) + TINY_INTERIOR_SEGMENT,
+          ].sort((a, b) => Math.abs(a - peer.a[coordinate]) - Math.abs(b - peer.a[coordinate]));
+          for (const lane of lanes) {
+            if (generated >= MAX_SHIFT_CANDIDATES) break peerRelocation;
+            generated += 1;
+            if (options.diagnostics) options.diagnostics.generatedShiftCandidateCount += 1;
+            const relocatedPeer = shiftSegmentToLane(peerEdge, peer.segmentIndex, peer.axis, lane);
+            if (!relocatedPeer) continue;
+            const candidate = shifted.slice() as T;
+            candidate[peerIndex] = relocatedPeer;
+            acceptCandidate(candidate, changedIndexes);
+            if (accepted.length > acceptedBefore) break peerRelocation;
+          }
+        }
       }
     }
   }

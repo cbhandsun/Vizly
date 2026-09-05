@@ -234,6 +234,8 @@ describe('baseReactFlowDisplayEdges WMS cold performance', () => {
       { x: 4231.6, y: 1395 }, { x: 4231.6, y: 1809 },
       { x: 4433.4, y: 1809 },
     ]);
-    expect(finalOutputRouteSignature).toBe('route-v2:44:174:065ac410d5a8527e');
+    // Bounded maze and peer-segment alternatives change the final geometry;
+    // all quality, deterministic work, and time ceilings above remain unchanged.
+    expect(finalOutputRouteSignature).toBe('route-v2:44:177:29943608d7155e42');
   }, 60_000);
 });

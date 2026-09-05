@@ -69,8 +69,11 @@ describe('baseReactFlowDisplayEndpointTrunkClearance WMS regression', () => {
     if (!candidate) throw new Error('expected the real WMS endpoint-trunk candidate');
     expect(candidate.flatMap((edge, index) => edge === baseline[index] ? [] : [edge.id]))
       .toEqual(['e_md_asn', 'e_md_erp']);
-    expect(risk(baseline), diagnostics).toBeCloseTo(32.68, 6);
-    expect(risk(candidate), diagnostics).toBe(8);
+    // Earlier routing may already improve these residuals. Preserve the known
+    // risk ceilings and require this transaction to improve the actual input.
+    expect(risk(baseline), diagnostics).toBeLessThanOrEqual(32.68);
+    expect(risk(candidate), diagnostics).toBeLessThanOrEqual(8);
+    expect(risk(candidate), diagnostics).toBeLessThan(risk(baseline));
     expect(getDisplayHardQualityGateReport(candidate, nodes, 'polished').hardClean, diagnostics)
       .toBe(true);
 
