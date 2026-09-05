@@ -2901,10 +2901,10 @@
   "displayEdgeEpoch": 3456645517,
   "qualityMode": "full",
   "inputIdentity": {
-    "routingVersion": "15",
+    "routingVersion": "16",
     "visualVersion": "commercial-hard-gate-v1",
-    "inputSignature": "2113580664",
-    "inputGeometryDigest": "geometry-v1:959447b9afedc5b100c74395ce889f05"
+    "inputSignature": "4086987199",
+    "inputGeometryDigest": "geometry-v1:2e1759de8cda686673876746e4cf882a"
   },
   "operation": "route"
 }

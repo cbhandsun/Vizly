@@ -1,47 +1,47 @@
 {
   "schema": "vizly-precompiled-display-route-manifest-v3",
-  "routingVersion": "15",
+  "routingVersion": "16",
   "identitySourceHash": "source-v1:752776072602ff4e8a4892530e3faea55f7502310613fe616e04061f339c270a",
-  "routingSourceHash": "source-v1:df2bb13c942a2083e1643595e92b47ef8a69743b4c58d308ca0bdfb6ea6bab0d",
+  "routingSourceHash": "source-v1:372e51a19f3622512a9107cd12caf5910f92743a40948e4c22a74bcd982b5b11",
   "entries": [
+    {
+      "presetId": "logistics-architecture-v1",
+      "variantId": "initial",
+      "sourcePath": "src/data/standardized/LogisticsStandardData.json",
+      "artifactFile": "route-1245388535.json",
+      "sourceHash": "source-v1:da286fbefa1a0d0a3ba3bf5a6589d2edba849af0f477ddb910ecad4d91649986",
+      "inputSignature": "1245388535",
+      "inputGeometryDigest": "geometry-v1:b28b16122875f2c608938c807ce77baa",
+      "outputRouteSignature": "route-v2:14:61:7cb06f918279772f"
+    },
     {
       "presetId": "wms-process-flow-v1",
       "variantId": "domain-lanes-lr",
       "sourcePath": "src/data/standardized/WmsProcessFlowStandardData.json",
-      "artifactFile": "route-1244654949.json",
+      "artifactFile": "route-1842147988.json",
       "sourceHash": "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
-      "inputSignature": "1244654949",
-      "inputGeometryDigest": "geometry-v1:6fc82359f727b529b89368553580824d",
+      "inputSignature": "1842147988",
+      "inputGeometryDigest": "geometry-v1:bd06fc16b91976c6dc2fe1f68c47495a",
       "outputRouteSignature": "route-v2:44:146:4fc3d1b93f9228c3"
     },
     {
       "presetId": "wms-process-flow-v1",
       "variantId": "initial",
       "sourcePath": "src/data/standardized/WmsProcessFlowStandardData.json",
-      "artifactFile": "route-1417152958.json",
+      "artifactFile": "route-2688578987.json",
       "sourceHash": "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
-      "inputSignature": "1417152958",
-      "inputGeometryDigest": "geometry-v1:6933a4d0ae9ed2a8b4f4b14092ba34c4",
+      "inputSignature": "2688578987",
+      "inputGeometryDigest": "geometry-v1:804d309fc805ac7fa55d72fbe2abc45b",
       "outputRouteSignature": "route-v2:44:179:6ee711e77d5b4179"
-    },
-    {
-      "presetId": "logistics-architecture-v1",
-      "variantId": "initial",
-      "sourcePath": "src/data/standardized/LogisticsStandardData.json",
-      "artifactFile": "route-1553610876.json",
-      "sourceHash": "source-v1:da286fbefa1a0d0a3ba3bf5a6589d2edba849af0f477ddb910ecad4d91649986",
-      "inputSignature": "1553610876",
-      "inputGeometryDigest": "geometry-v1:0cb0f24303d795fb7a123befd3e20fc7",
-      "outputRouteSignature": "route-v2:14:61:7cb06f918279772f"
     },
     {
       "presetId": "wms-demand-allocation-strategy-v2",
       "variantId": "initial",
       "sourcePath": "src/data/standardized/DeamndAllocation.json",
-      "artifactFile": "route-2113580664.json",
+      "artifactFile": "route-4086987199.json",
       "sourceHash": "source-v1:ea82c502ab6535b5c8f8367c591861e540396a41955a15c6b5f94f922264b7de",
-      "inputSignature": "2113580664",
-      "inputGeometryDigest": "geometry-v1:959447b9afedc5b100c74395ce889f05",
+      "inputSignature": "4086987199",
+      "inputGeometryDigest": "geometry-v1:2e1759de8cda686673876746e4cf882a",
       "outputRouteSignature": "route-v2:26:172:fce3ad772ada13a5"
     }
   ]

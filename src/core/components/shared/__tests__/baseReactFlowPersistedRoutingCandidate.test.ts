@@ -7,6 +7,7 @@ import {
   parseBaseReactFlowPersistedRoutingCandidate,
 } from '../baseReactFlowPersistedRoutingCandidate';
 import { ROUTING_IDENTIFIER_MAX_LENGTH } from '../../../routing/routingBoundaryLimits';
+import { EDGE_ROUTING_CACHE_VERSION } from '../../../routing/routingVersion';
 
 const routingVersion = 'routing-test-v1';
 const inputSignature = '12345';
@@ -27,6 +28,16 @@ const patches: Edge[] = [{
 const expectation = { routingVersion, inputSignature, inputGeometryDigest };
 
 describe('persisted routing-only candidate boundary', () => {
+  it('rejects version 15 routes after the clearance-staged routing release', () => {
+    const oldCandidate = createBaseReactFlowPersistedRoutingCandidate({
+      routingVersion: '15', inputSignature, inputGeometryDigest,
+      outputRouteSignature, patches, writtenAt: 123,
+    });
+    expect(oldCandidate).not.toBeNull();
+    expect(parseBaseReactFlowPersistedRoutingCandidate(oldCandidate, {
+      ...expectation, routingVersion: EDGE_ROUTING_CACHE_VERSION,
+    })).toBeNull();
+  });
   it('creates a versioned clone and parses it only for the bound identity', () => {
     const candidate = createBaseReactFlowPersistedRoutingCandidate({
       routingVersion,

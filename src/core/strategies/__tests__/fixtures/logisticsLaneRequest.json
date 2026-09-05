@@ -744,10 +744,10 @@
   "displayEdgeEpoch": 0,
   "qualityMode": "full",
   "inputIdentity": {
-    "routingVersion": "15",
+    "routingVersion": "16",
     "visualVersion": "commercial-hard-gate-v1",
-    "inputSignature": "3603121192",
-    "inputGeometryDigest": "geometry-v1:d06d5e9c143ff780ebeb51b6f97add54"
+    "inputSignature": "3629095640",
+    "inputGeometryDigest": "geometry-v1:fb22ecd961eb7e299edd8139bf32db2d"
   },
   "candidatePatches": [
     {

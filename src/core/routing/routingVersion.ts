@@ -1,4 +1,4 @@
-export const EDGE_ROUTING_CACHE_VERSION = '15';
+export const EDGE_ROUTING_CACHE_VERSION = '16';
 
 /**
  * Version of the renderer-facing commercial quality contract. Keep this
