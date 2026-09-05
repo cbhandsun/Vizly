@@ -88,18 +88,30 @@ const leaderEnd = (anchor: Point, center: Point, rect: Rect): Point | undefined 
   return { x: center.x + dx / ratio, y: center.y + dy / ratio };
 };
 
-const candidatesFor = (input: EdgeLabelArrangementInput): Point[] => {
+const candidatesFor = (input: EdgeLabelArrangementInput, obstacleBoundaries = false): Point[] => {
   if (input.manual) return [input.preferredCenter];
   const rect = estimateEdgeLabelRect(input.anchor, input.text, input.scale, input.size);
   const segments = input.labelPath.slice(1).map((b, index) => {
     const a = input.labelPath[index];
     return { a, b, near: project(input.anchor, a, b) };
   }).sort((a, b) => distance(a.near, input.anchor) - distance(b.near, input.anchor)).slice(0, 8);
-  const candidates = [input.preferredCenter];
+  const candidates: Point[] = obstacleBoundaries ? [] : [input.preferredCenter];
   for (const { a, b, near } of segments) {
     const vertical = Math.abs(a.x - b.x) < Math.abs(a.y - b.y);
     const halfCross = (vertical ? rect.width : rect.height) / 2;
-    for (const anchor of [near, project({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, a, b), a, b]) {
+    const halfAlong = (vertical ? rect.height : rect.width) / 2;
+    const boundaryAnchors = obstacleBoundaries ? input.obstacles.filter(validRect).flatMap(obstacle => {
+      const start = vertical ? obstacle.y : obstacle.x;
+      const end = start + (vertical ? obstacle.height : obstacle.width);
+      return [start - halfAlong - 10, end + halfAlong + 10].map(value => project(
+        vertical ? { x: near.x, y: value } : { x: value, y: near.y }, a, b,
+      ));
+    }) : [];
+    const anchors = obstacleBoundaries
+      ? [...new Map(boundaryAnchors.map(point => [`${point.x},${point.y}`, point])).values()]
+        .sort((first, second) => distance(first, input.anchor) - distance(second, input.anchor)).slice(0, 8)
+      : [near, project({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, a, b), a, b];
+    for (const anchor of anchors) {
       for (const retreat of [0, 40, 100, 200, 320]) {
         for (const side of [1, -1]) {
           candidates.push(vertical
@@ -114,7 +126,8 @@ const candidatesFor = (input: EdgeLabelArrangementInput): Point[] => {
 
 /** Bounded deterministic greedy packing. It never modifies routes or hides text.
  * Manual labels reserve space first; automatic labels use up to eight nearby
- * semantic segments and a 320px retreat. Exhaustion is an unresolved result,
+ * semantic segments and a 320px retreat. If fixed anchors fail, each segment
+ * also tries its eight nearest obstacle-boundary anchors. Exhaustion is unresolved,
  * not a claim that an arbitrary dense graph is collision-free. */
 export const arrangeEdgeLabels = (inputs: readonly EdgeLabelArrangementInput[]): ReadonlyMap<string, EdgeLabelPlacement> => {
   const valid = inputs.filter(input => input.id && validPoint(input.anchor) && validPoint(input.preferredCenter)
@@ -132,29 +145,34 @@ export const arrangeEdgeLabels = (inputs: readonly EdgeLabelArrangementInput[]):
   for (const input of labels) {
     let best: EdgeLabelPlacement | undefined;
     let bestCost = Infinity;
-    for (const center of candidatesFor(input)) {
-      const rect = estimateEdgeLabelRect(center, input.text, input.scale, input.size);
-      const anchor = nearestAnchor(center, input.labelPath);
-      const end = leaderEnd(anchor, center, rect);
-      const nodeConflicts = nodes.filter(node => edgeLabelRectsConflict(rect, node, 10)).length;
-      const labelConflicts = occupied.filter(other => edgeLabelRectsConflict(rect, other.rect)).length;
-      const terminalConflicts = terminals.filter(terminal => edgeLabelRectsConflict(rect, terminal, 4)).length;
-      const pathConflicts = paths.filter(path => pathHits(path, expand(rect, 8))).length;
-      const blockedLeader = end && nodes.some(node => edgeLabelSegmentIntersectsRect(anchor, end, expand(node, 2)));
-      const leaderLabelConflicts = occupied.filter(other => (
-        (end && edgeLabelSegmentIntersectsRect(anchor, end, expand(other.rect, 2)))
-        || (other.leaderEnd && edgeLabelSegmentIntersectsRect(other.anchor, other.leaderEnd, expand(rect, 2)))
-      )).length;
-      const conflicts = nodeConflicts + labelConflicts + terminalConflicts + pathConflicts
-        + Number(Boolean(blockedLeader)) + leaderLabelConflicts;
-      const cost = conflicts * 1_000_000 + distance(center, input.preferredCenter)
-        + distance(anchor, input.anchor) * 0.25;
-      if (cost < bestCost) {
-        bestCost = cost;
-        best = { center, rect, anchor, leaderEnd: blockedLeader ? undefined : end,
-          status: input.manual ? 'manual' : conflicts ? 'unresolved' : 'placed', conflicts };
+    // Search obstacle-adjacent intervals only when the cheaper fixed anchors
+    // cannot place this label. Keep the same collision checks and manual intent.
+    for (const obstacleBoundaries of [false, true]) {
+      if (obstacleBoundaries && (input.manual || best?.conflicts === 0)) break;
+      for (const center of candidatesFor(input, obstacleBoundaries)) {
+        const rect = estimateEdgeLabelRect(center, input.text, input.scale, input.size);
+        const anchor = nearestAnchor(center, input.labelPath);
+        const end = leaderEnd(anchor, center, rect);
+        const nodeConflicts = nodes.filter(node => edgeLabelRectsConflict(rect, node, 10)).length;
+        const labelConflicts = occupied.filter(other => edgeLabelRectsConflict(rect, other.rect)).length;
+        const terminalConflicts = terminals.filter(terminal => edgeLabelRectsConflict(rect, terminal, 4)).length;
+        const pathConflicts = paths.filter(path => pathHits(path, expand(rect, 8))).length;
+        const blockedLeader = end && nodes.some(node => edgeLabelSegmentIntersectsRect(anchor, end, expand(node, 2)));
+        const leaderLabelConflicts = occupied.filter(other => (
+          (end && edgeLabelSegmentIntersectsRect(anchor, end, expand(other.rect, 2)))
+          || (other.leaderEnd && edgeLabelSegmentIntersectsRect(other.anchor, other.leaderEnd, expand(rect, 2)))
+        )).length;
+        const conflicts = nodeConflicts + labelConflicts + terminalConflicts + pathConflicts
+          + Number(Boolean(blockedLeader)) + leaderLabelConflicts;
+        const cost = conflicts * 1_000_000 + distance(center, input.preferredCenter)
+          + distance(anchor, input.anchor) * 0.25;
+        if (cost < bestCost) {
+          bestCost = cost;
+          best = { center, rect, anchor, leaderEnd: blockedLeader ? undefined : end,
+            status: input.manual ? 'manual' : conflicts ? 'unresolved' : 'placed', conflicts };
+        }
+        if (conflicts === 0 && distance(center, input.preferredCenter) < 0.01) break;
       }
-      if (conflicts === 0 && distance(center, input.preferredCenter) < 0.01) break;
     }
     if (best) { result.set(input.id, best); occupied.push(best); }
   }

@@ -9,6 +9,22 @@ const input = (id: string, y = 0): EdgeLabelArrangementInput => ({
 });
 
 describe('global edge label arrangement regression', () => {
+  it.each([false, true])('finds a free interval between obstacles when fixed anchors are blocked (transpose=%s)', transpose => {
+    const point = (x: number, y: number) => transpose ? { x: y, y: x } : { x, y };
+    const entry: EdgeLabelArrangementInput = {
+      id: 'gap', path: [point(0, 0), point(1000, 0)], labelPath: [point(0, 0), point(1000, 0)],
+      anchor: point(500, 0), preferredCenter: point(500, 30), text: 'condition',
+      size: { width: transpose ? 20 : 80, height: transpose ? 80 : 20 }, scale: 1, manual: false,
+      obstacles: [-100, 400, 900].map(x => transpose
+        ? { x: -500, y: x, width: 1000, height: 200 }
+        : { x, y: -500, width: 200, height: 1000 }),
+    };
+    const placement = arrangeEdgeLabels([entry]).get(entry.id);
+    expect(placement?.status).toBe('placed');
+    expect(placement?.conflicts).toBe(0);
+    expect(placement && entry.obstacles.some(obstacle => edgeLabelRectsConflict(placement.rect, obstacle))).toBe(false);
+  });
+
   it.each([0, 96])('separates measured long labels on collapsed or parallel branches (y=%s)', y => {
     const plan = arrangeEdgeLabels([input('a'), input('b', y)]);
     const a = plan.get('a');
