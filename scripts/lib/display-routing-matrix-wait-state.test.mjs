@@ -1,4 +1,37 @@
 import { describe, expect, it } from 'vitest';
+import { createDisplayRoutingMatrixWaiter } from './display-routing-matrix-wait.mjs';
+
+describe('matrix waiter', () => {
+  it('returns a ready value without querying diagnostics', async () => {
+    let calls = 0;
+    const value = { ready: true };
+    const result = await createDisplayRoutingMatrixWaiter(1000)({
+      evaluate: async () => { calls += 1; return value; },
+    }, 'ready', 'layout');
+    expect(result).toBe(value);
+    expect(calls).toBe(1);
+  });
+
+  it('fails immediately when routing reaches a terminal failure', async () => {
+    const values = [null, { routing: { stage: 'worker-timeout' } }];
+    await expect(createDisplayRoutingMatrixWaiter(1000)({
+      evaluate: async () => values.shift(),
+    }, 'ready', 'layout')).rejects.toThrow('Routing failed while waiting for layout');
+    expect(values).toHaveLength(0);
+  });
+
+  it('reports diagnostics when the deadline is reached', async () => {
+    await expect(createDisplayRoutingMatrixWaiter(0)({
+      evaluate: async () => ({ routing: { stage: 'worker-start' } }),
+    }, 'ready', 'layout')).rejects.toThrow('Timed out waiting for layout');
+  });
+
+  it('propagates browser evaluation failures', async () => {
+    await expect(createDisplayRoutingMatrixWaiter(1000)({
+      evaluate: async () => { throw new Error('browser disconnected'); },
+    }, 'ready', 'layout')).rejects.toThrow('browser disconnected');
+  });
+});
 
 import {
   displayRoutingWaitStateHasTerminalFailure,

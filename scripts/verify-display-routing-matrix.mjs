@@ -30,10 +30,7 @@ import {
   parseDisplayRoutingMatrixViewport,
   resolveDisplayRoutingConnectedDragDelta,
 } from './lib/display-routing-matrix-cases.mjs';
-import {
-  displayRoutingWaitStateHasTerminalFailure,
-  summarizeDisplayRoutingWaitState,
-} from './lib/display-routing-matrix-wait-state.mjs';
+import { createDisplayRoutingMatrixWaiter } from './lib/display-routing-matrix-wait.mjs';
 import { assertDisplayRoutingVisualScaleAudit } from './lib/display-routing-browser-visual-audit.mjs';
 import {
   displayRoutingCommittedEdgesMatchWorkerPatches,
@@ -101,36 +98,7 @@ const WARM_LAYOUT_CASES = WARM_LAYOUT_CASE_IDS.map(id => (
   DISPLAY_ROUTING_LAYOUT_CASES.find(candidate => candidate.id === id)
 )).filter(Boolean);
 
-const waitForValue = async (session, expression, label) => {
-  const deadline = Date.now() + WAIT_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    const value = await session.evaluate(expression);
-    if (value) return value;
-    const state = await session.evaluate(`(() => {
-      const summarize = ${summarizeDisplayRoutingWaitState.toString()};
-      return summarize(
-        window.__vizlyBaseReactFlowDisplayRouting || {},
-        window.__vizlyRoutingResponses || [],
-        document.querySelectorAll('.react-flow__edge').length,
-        window.__vizlyRoutingRequests || [],
-      );
-    })()`);
-    if (displayRoutingWaitStateHasTerminalFailure(state)) {
-      throw new Error(`Routing failed while waiting for ${label}:\n${JSON.stringify(state, null, 2)}`);
-    }
-    await delay(100);
-  }
-  const state = await session.evaluate(`(() => {
-    const summarize = ${summarizeDisplayRoutingWaitState.toString()};
-    return summarize(
-      window.__vizlyBaseReactFlowDisplayRouting || {},
-      window.__vizlyRoutingResponses || [],
-      document.querySelectorAll('.react-flow__edge').length,
-      window.__vizlyRoutingRequests || [],
-    );
-  })()`);
-  throw new Error(`Timed out waiting for ${label}:\n${JSON.stringify(state, null, 2)}`);
-};
+const waitForValue = createDisplayRoutingMatrixWaiter(WAIT_TIMEOUT_MS);
 
 const prepareSession = async session => {
   await session.send('Emulation.setDeviceMetricsOverride', {
