@@ -65,7 +65,6 @@ const BOUNDED_CROSSING_JUNCTION_LENGTH = 24;
 const VISUAL_PARALLEL_LANE_TOLERANCE = 4;
 const SHARED_TRUNK_COORDINATE_EPS = VISUAL_PARALLEL_LANE_TOLERANCE;
 const SHORT_ENDPOINT_STUB = 32;
-const TINY_INTERIOR_SEGMENT = 24;
 const HAIRPIN_BRIDGE = 140;
 
 export function getEdgePath(edge: Edge): Point[] {
@@ -706,3 +705,4 @@ export function calculateEdgePairQuality(
 export function hasPairContribution(score: PairQualityContribution): boolean {
   return PAIR_SCORE_KEYS.some(key => score[key] !== 0);
 }
+import { TINY_INTERIOR_SEGMENT } from './edgePathReadabilityThresholds';

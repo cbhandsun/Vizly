@@ -1,4 +1,5 @@
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
+import { resolveMazeRunDestination } from './edgeStrictCrossingMazeSteps';
 import { mazeDirectionsReverse, resolveMazeTerminalCaps, type MazeDirection } from './edgeStrictCrossingMazeTerminals';
 
 import type {
@@ -215,8 +216,8 @@ export function routeStrictCrossingMazeCandidate(
   // The same directed grid step is revisited with different arrival states.
   // Keep geometry costs local to this search; the existing cell budget bounds
   // storage. Straight-through crossings must use a distinct penalty slot.
-  const blockedSteps = new Uint8Array(allX.length * allY.length * 4);
-  const stepPenalties = new Float64Array(allX.length * allY.length * 8).fill(Number.NaN);
+  const blockedSteps = new Uint8Array(allX.length * allY.length * 8);
+  const stepPenalties = new Float64Array(allX.length * allY.length * 16).fill(Number.NaN);
   const terminalPenalties = new Float64Array(5).fill(Number.NaN);
 
   const isSegmentBlockedByNode = (segment: Segment): boolean => {
@@ -247,6 +248,25 @@ export function routeStrictCrossingMazeCandidate(
     const incomingDirection = current.direction === 0
       ? terminalCaps?.incomingDirection ?? 0 : current.direction;
     for (const next of neighbors) {
+      const turns = incomingDirection !== 0 && (incomingDirection <= 2) !== (next.direction <= 2);
+      if (turns) {
+        const horizontal = next.direction <= 2;
+        const coordinates = horizontal ? allX : allY;
+        const originIndex = horizontal ? current.xIndex : current.yIndex;
+        const sign = next.direction === 1 || next.direction === 3 ? -1 : 1;
+        // A short last piece is allowed only when it merges forward into the
+        // retained suffix and the resulting straight run meets the same limit.
+        const endIndex = horizontal ? endX : endY;
+        const endOnRay = (horizontal ? current.yIndex === endY : current.xIndex === endX)
+          && (endIndex - originIndex) * sign > 0;
+        const retainedEnd = endOnRay && terminalCaps?.outgoingDirection === next.direction ? {
+          index: endIndex,
+          extension: Math.abs(terminalCaps.outgoing.b.x - end.x) + Math.abs(terminalCaps.outgoing.b.y - end.y),
+        } : undefined;
+        const destination = resolveMazeRunDestination(coordinates, originIndex, sign, retainedEnd);
+        if (horizontal) next.xIndex = destination;
+        else next.yIndex = destination;
+      }
       if (next.xIndex < 0 || next.xIndex >= allX.length || next.yIndex < 0 || next.yIndex >= allY.length) {
         continue;
       }
@@ -257,7 +277,8 @@ export function routeStrictCrossingMazeCandidate(
       const axis = axisOf(from, to);
       if (!axis) continue;
       const segment = { a: from, b: to, axis };
-      const stepIndex = (current.yIndex * allX.length + current.xIndex) * 4 + next.direction - 1;
+      const skipsGridVertices = Math.abs(next.xIndex - current.xIndex) + Math.abs(next.yIndex - current.yIndex) > 1;
+      const stepIndex = ((current.yIndex * allX.length + current.xIndex) * 4 + next.direction - 1) * 2 + Number(skipsGridVertices);
       if (blockedSteps[stepIndex] === 0) {
         blockedSteps[stepIndex] = isSegmentBlockedByNode(segment) ? 2 : 1;
       }

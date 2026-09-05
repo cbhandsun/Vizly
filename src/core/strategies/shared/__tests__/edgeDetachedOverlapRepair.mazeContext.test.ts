@@ -2,11 +2,12 @@ import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it, vi } from 'vitest';
 import * as mazeGeometry from '../edgeDetachedOverlapCandidates';
 import { resolveMazeTerminalCaps } from '../edgeStrictCrossingMazeTerminals';
+import { resolveMazeRunDestination } from '../edgeStrictCrossingMazeSteps';
 
 import { buildBoundedResidualOverlapMazeCandidate } from '../edgeDetachedResidualOverlapMaze';
 import { routeStrictCrossingMazeCandidate } from '../edgeDetachedStrictCrossingMaze';
 import type { StrictCrossingMazeDiagnostics } from '../edgeDetachedOverlapRepairTypes';
-import { countStrictEdgeCrossings } from '../edgeStrictCrossingGuard';
+import { calculateEdgePathQualityScore, countStrictEdgeCrossings } from '../edgeStrictCrossingGuard';
 
 type Point = { x: number; y: number };
 
@@ -20,6 +21,37 @@ function edge(id: string, path: Point[]): Edge {
 }
 
 describe('routeStrictCrossingMazeCandidate penalty context', () => {
+  it('skips short turn runs, except where a retained suffix completes the run', () => {
+    const coordinates = [0, 16, 32, 48];
+    expect(resolveMazeRunDestination(coordinates, 0, 1)).toBe(2);
+    expect(resolveMazeRunDestination(coordinates, 3, -1)).toBe(1);
+    expect(resolveMazeRunDestination(coordinates, 0, 1, { index: 1, extension: 8 })).toBe(1);
+    expect(resolveMazeRunDestination(coordinates, 0, 1, { index: 1, extension: 7 })).toBe(2);
+    expect(resolveMazeRunDestination(coordinates, 0, 1, { index: 1, extension: Number.NaN })).toBe(2);
+    expect(resolveMazeRunDestination([], 0, 1)).toBe(-1);
+    expect(resolveMazeRunDestination(coordinates, 3, 1)).toBe(-1);
+    expect(resolveMazeRunDestination(coordinates, -1, 1)).toBe(-1);
+  });
+
+  it('checks the whole long step when obstacle coordinates are absent from the grid', () => {
+    const path: Point[] = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }];
+    const moving = edge('moving', path);
+    const rect = { x: 40, y: -15, width: 1, height: 30 };
+    const nodes: Node[] = [{ id: 'thin-wall', position: { x: rect.x, y: rect.y }, width: rect.width, height: rect.height, data: {} }];
+    const candidate = routeStrictCrossingMazeCandidate(path, 0, [path], [moving], nodes, {
+      penaltyPaths: [path], penaltyEdges: [moving], penaltyEdgeIndex: 0, gridNodes: [],
+    });
+    expect(candidate).not.toBeNull();
+    if (!candidate) throw new Error('expected an obstacle-free alternative');
+    for (let index = 1; index < candidate.length; index += 1) {
+      const a = candidate[index - 1];
+      const b = candidate[index];
+      const axis = mazeGeometry.axisOf(a, b);
+      if (!axis) throw new Error('expected an orthogonal step');
+      expect(mazeGeometry.segmentIntersectsRect({ a, b, axis }, rect, 12)).toBe(false);
+    }
+  });
+
   it('validates retained cap geometry before using it as search state', () => {
     const start = { x: 0, y: 0 };
     const end = { x: 100, y: 0 };
@@ -69,6 +101,7 @@ describe('routeStrictCrossingMazeCandidate penalty context', () => {
     expect(normalized[normalized.length - 2].y).toBe(100);
     expect(normalized[normalized.length - 2].x).toBeLessThanOrEqual(100);
     expect(countStrictEdgeCrossings([edge('moving', candidate), blocker])).toBe(0);
+    expect(calculateEdgePathQualityScore([edge('moving', candidate)]).tinyInteriorDoglegs).toBe(0);
   });
 
   it('checks each directed grid step against a node only once per search', () => {
