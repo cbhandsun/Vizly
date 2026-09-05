@@ -97,6 +97,24 @@ export const readDisplayRoutingMultiPageState = (raw, tabs, currentNodes, curren
     }
     return ids.sort();
   };
+  const readSafeLabelOffsets = values => {
+    if (!Array.isArray(values) || values.length > 300) return null;
+    const offsets = [];
+    for (const edge of values) {
+      if (!isRecord(edge) || !safeToken(edge.id)) return null;
+      if (typeof edge.data === 'undefined' || !isRecord(edge.data)) {
+        if (typeof edge.data !== 'undefined') return null;
+        continue;
+      }
+      if (typeof edge.data.labelOffset === 'undefined') continue;
+      const offset = edge.data.labelOffset;
+      if (!isRecord(offset) || ![offset.x, offset.y].every(value => (
+        typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= 1000
+      ))) return null;
+      offsets.push({ edgeId: edge.id, x: offset.x, y: offset.y });
+    }
+    return offsets.sort((left, right) => left.edgeId.localeCompare(right.edgeId));
+  };
   const readSafeLayout = value => {
     if (!isRecord(value) || !strategies.has(value.strategy)
       || !['TB', 'BT', 'LR', 'RL'].includes(value.direction) || !nodeLayouts.has(value.nodeLayout)) return null;
@@ -143,7 +161,8 @@ export const readDisplayRoutingMultiPageState = (raw, tabs, currentNodes, curren
     const nodeIds = readSafeIds(page.nodes, 5000);
     const edgeIds = readSafeIds(page.edges, 300);
     const layout = readSafeLayout(page.layoutSelection);
-    if (!nodeIds || !edgeIds || !layout) return null;
+    const labelOffsets = readSafeLabelOffsets(page.edges);
+    if (!nodeIds || !edgeIds || !layout || !labelOffsets) return null;
     const nodeIdSet = new Set(nodeIds);
     if (page.edges.some(edge => !isRecord(edge) || !safeToken(edge.source) || !safeToken(edge.target)
       || !nodeIdSet.has(edge.source) || !nodeIdSet.has(edge.target))) return null;
@@ -154,6 +173,7 @@ export const readDisplayRoutingMultiPageState = (raw, tabs, currentNodes, curren
       selected: tab.selected,
       nodeIds,
       edgeIds,
+      labelOffsets,
       layout,
       markers: page.edges.flatMap(edge => safeToken(edge?.label) ? [edge.label] : [])
         .filter(label => markerValues.has(label)),
@@ -164,9 +184,12 @@ export const readDisplayRoutingMultiPageState = (raw, tabs, currentNodes, curren
     || pages[activeIndex]?.selected !== true) return null;
   const currentNodeIds = readSafeIds(currentNodes, 5000);
   const currentEdgeIds = readSafeIds(currentEdges, 300);
+  const currentLabelOffsets = readSafeLabelOffsets(currentEdges);
   if (!currentNodeIds || !currentEdgeIds
+    || !currentLabelOffsets
     || JSON.stringify(currentNodeIds) !== JSON.stringify(pages[activeIndex].nodeIds)
-    || JSON.stringify(currentEdgeIds) !== JSON.stringify(pages[activeIndex].edgeIds)) return null;
+    || JSON.stringify(currentEdgeIds) !== JSON.stringify(pages[activeIndex].edgeIds)
+    || JSON.stringify(currentLabelOffsets) !== JSON.stringify(pages[activeIndex].labelOffsets)) return null;
   return { activeIndex, pages };
 };
 
@@ -177,6 +200,9 @@ export const displayRoutingMultiPageStateIsExpected = state => Boolean(
   && state.pages[0]?.layout?.laneRankPreference === 'auto'
   && state.pages[0]?.layout?.laneRankApplied === 'unknown'
   && state.pages[0]?.markers?.includes('multi-page-first')
+  && state.pages[0]?.labelOffsets?.length === 1
+  && state.pages[0]?.labelOffsets[0]?.x === 12
+  && state.pages[0]?.labelOffsets[0]?.y === -4
   && !state.pages[0]?.markers?.includes('multi-page-copy')
   && state.pages[1]?.layout?.strategy === 'domain-lanes'
   && state.pages[1]?.layout?.direction === 'LR'
@@ -184,6 +210,9 @@ export const displayRoutingMultiPageStateIsExpected = state => Boolean(
   && ['global', 'compact'].includes(state.pages[1]?.layout?.laneRankApplied)
   && state.pages[1]?.layout?.laneRankDecision?.requested === 'auto'
   && state.pages[1]?.markers?.includes('multi-page-copy')
+  && state.pages[1]?.labelOffsets?.length === 1
+  && state.pages[1]?.labelOffsets[0]?.x === -8
+  && state.pages[1]?.labelOffsets[0]?.y === 6
   && !state.pages[1]?.markers?.includes('multi-page-first')
   && state.pages[1]?.nodeIds?.length === state.pages[0]?.nodeIds?.length
   && state.pages[1]?.edgeIds?.length === state.pages[0]?.edgeIds?.length
@@ -256,17 +285,26 @@ const waitForCurrentRenderAuthority = (waitForValue, session, label) => waitForV
     : null;
 })()`, label);
 
-const markFirstEdge = async (session, marker) => {
-  const marked = await session.evaluate(`(() => {
+const setFirstEdgeLabelOffset = async (session, marker, offset) => {
+  const updated = await session.evaluate(`(() => {
     const instance = window.reactFlowInstance;
     const edge = instance?.getEdges?.()[0];
     if (!edge) return false;
     instance.setEdges(edges => edges.map(item => item.id === edge.id
-      ? { ...item, label: ${JSON.stringify(marker)} } : item));
+      ? { ...item, label: ${JSON.stringify(marker)}, data: { ...(item.data || {}), labelOffset: ${JSON.stringify(offset)} } }
+      : item));
     return true;
   })()`);
-  if (!marked) throw new Error(`Could not mark active multi-page edge: ${marker}`);
+  if (!updated) throw new Error(`Could not set active multi-page label offset: ${marker}`);
 };
+
+const assertCurrentEdgeLabelOffset = async (waitForValue, session, expected, label) => waitForValue(
+  session, `(() => {
+    const offset = window.reactFlowInstance?.getEdges?.()[0]?.data?.labelOffset;
+    return offset && Number.isFinite(offset.x) && Number.isFinite(offset.y)
+      && offset.x === ${JSON.stringify(expected.x)} && offset.y === ${JSON.stringify(expected.y)}
+      ? { x: offset.x, y: offset.y } : null;
+  })()`, label);
 
 const selectLayout = async ({ session, layoutCase, waitForLayoutRoute, auditFinalSvg }) => {
   const previousJobId = await session.evaluate(
@@ -317,7 +355,7 @@ export const verifyDisplayRoutingMultiPageMatrix = async ({
   const copyLayout = DISPLAY_ROUTING_LAYOUT_CASES.find(item => item.id === COPY_LAYOUT_ID);
   if (!firstLayout || !copyLayout) throw new Error('Multi-page layout case is unavailable');
   await selectLayout({ session, layoutCase: firstLayout, waitForLayoutRoute, auditFinalSvg });
-  await markFirstEdge(session, MARKERS.first);
+  await setFirstEdgeLabelOffset(session, MARKERS.first, { x: 12, y: -4 });
 
   await clickPageElement(session, '.page-tabs__duplicate');
   await waitForPageCanvas(waitForValue, session, {
@@ -325,7 +363,9 @@ export const verifyDisplayRoutingMultiPageMatrix = async ({
   });
   await waitForCurrentRenderAuthority(waitForValue, session, 'duplicated page route authority');
   await auditCurrentCanvas(session, auditFinalSvg, 'duplicated page route');
-  await markFirstEdge(session, MARKERS.copy);
+  await assertCurrentEdgeLabelOffset(waitForValue, session, { x: 12, y: -4 }, 'duplicated page inherited');
+  await setFirstEdgeLabelOffset(session, MARKERS.copy, { x: -8, y: 6 });
+  await assertCurrentEdgeLabelOffset(waitForValue, session, { x: -8, y: 6 }, 'duplicated page edited');
   await selectLayout({ session, layoutCase: copyLayout, waitForLayoutRoute, auditFinalSvg });
 
   await clickPageElement(session, '.page-tabs__add');
@@ -354,6 +394,7 @@ export const verifyDisplayRoutingMultiPageMatrix = async ({
     'durable multi-page state',
   );
   const copyAudit = await auditCurrentCanvas(session, auditFinalSvg, 'restored copy page');
+  await assertCurrentEdgeLabelOffset(waitForValue, session, { x: -8, y: 6 }, 'restored copy page');
 
   await session.evaluate(`window.__vizlyRequestedLayoutLabel = ${JSON.stringify(firstLayout.label)}`);
   await clickPageElement(session, '.page-tabs__tab', 0);
@@ -363,6 +404,7 @@ export const verifyDisplayRoutingMultiPageMatrix = async ({
   await waitForCurrentRenderAuthority(waitForValue, session, 'restored first page authority');
   await assertRequestedLayoutSelected(session, FIRST_LAYOUT_ID);
   const firstAudit = await auditCurrentCanvas(session, auditFinalSvg, 'restored first page');
+  await assertCurrentEdgeLabelOffset(waitForValue, session, { x: 12, y: -4 }, 'restored first page isolation');
 
   await session.evaluate(`window.__vizlyRequestedLayoutLabel = ${JSON.stringify(copyLayout.label)}`);
   await clickPageElement(session, '.page-tabs__tab', 1);

@@ -37,14 +37,16 @@ const createFixture = () => {
       id: 'page-1',
       name: 'Page 1',
       nodes: [node('first-a'), node('first-b')],
-      edges: [edge('first-edge', 'first-a', 'first-b', 'multi-page-first')],
+      edges: [{ ...edge('first-edge', 'first-a', 'first-b', 'multi-page-first'),
+        data: { labelOffset: { x: 12, y: -4 } } }],
       layoutSelection: layout('domain-compound-elk', 'TB'),
     },
     {
       id: 'page-2',
       name: 'Page 1 copy',
       nodes: [node('copy-a'), node('copy-b')],
-      edges: [edge('copy-edge', 'copy-a', 'copy-b', 'multi-page-copy')],
+      edges: [{ ...edge('copy-edge', 'copy-a', 'copy-b', 'multi-page-copy'),
+        data: { labelOffset: { x: -8, y: 6 } } }],
       layoutSelection: { ...layout('domain-lanes', 'LR'), laneRankDecision: decision('LR') },
     },
     {
@@ -134,6 +136,41 @@ describe('display routing browser multi-page matrix', () => {
     const duplicate = structuredClone(JSON.parse(fixture.raw));
     duplicate.metadata.multiPage.pages[1].nodes[1].id = 'copy-a';
     expect(read(JSON.stringify(duplicate))).toBeNull();
+  });
+
+  it('keeps bounded label offsets isolated per page and fails closed on corruption', () => {
+    const fixture = createFixture();
+    const read = (raw, nodes = fixture.pages[1].nodes, edges = fixture.pages[1].edges) => (
+      readDisplayRoutingMultiPageState(raw, fixture.tabs, nodes, edges)
+    );
+    const persisted = JSON.parse(fixture.raw);
+    expect(read(fixture.raw)?.pages.map(page => page.labelOffsets)).toEqual([
+      [{ edgeId: 'first-edge', x: 12, y: -4 }],
+      [{ edgeId: 'copy-edge', x: -8, y: 6 }],
+      [],
+    ]);
+    expect(read(fixture.raw)?.pages[1].labelOffsets).not.toEqual(
+      read(fixture.raw)?.pages[0].labelOffsets,
+    );
+
+    const missing = structuredClone(persisted);
+    delete missing.metadata.multiPage.pages[1].edges[0].data.labelOffset;
+    const missingCurrentEdges = structuredClone(fixture.pages[1].edges);
+    delete missingCurrentEdges[0].data.labelOffset;
+    expect(read(JSON.stringify(missing), fixture.pages[1].nodes, missingCurrentEdges)).not.toBeNull();
+    for (const labelOffset of [null, { x: 'bad', y: 6 }, { x: NaN, y: 6 }, { x: 1001, y: 0 }]) {
+      const corrupt = structuredClone(persisted);
+      corrupt.metadata.multiPage.pages[1].edges[0].data.labelOffset = labelOffset;
+      expect(read(JSON.stringify(corrupt))).toBeNull();
+    }
+    const malformedId = structuredClone(persisted);
+    malformedId.metadata.multiPage.pages[1].edges[0].id = { bad: true };
+    expect(() => read(JSON.stringify(malformedId))).not.toThrow();
+    expect(read(JSON.stringify(malformedId))).toBeNull();
+
+    const polluted = structuredClone(persisted);
+    polluted.metadata.multiPage.pages[1].edges[0].data.labelOffset = { x: 12, y: -4 };
+    expect(read(JSON.stringify(polluted))).toBeNull();
   });
 
   it('fails closed for malformed, empty, oversized and invalid layout input', () => {
