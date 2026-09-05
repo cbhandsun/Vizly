@@ -37,8 +37,8 @@ interface MeasurementCache {
  * 提供高性能的文本尺寸测量，支持缓存和批量处理
  */
 export class EnhancedTextMeasurement {
-  private canvas: HTMLCanvasElement | null = null;
-  private context: CanvasRenderingContext2D | null = null;
+  private canvas: HTMLCanvasElement;
+  private ctx: CanvasRenderingContext2D;
   private cache: MeasurementCache = {};
   private cacheMaxAge = 5 * 60 * 1000; // 5分钟缓存（自适应调节）
   private cacheMaxSize = 1000; // 最大缓存条目数
@@ -56,18 +56,13 @@ export class EnhancedTextMeasurement {
     padding: { horizontal: 16, vertical: 12 }
   };
 
-  private get ctx(): CanvasRenderingContext2D {
-    if (this.context) return this.context;
-    if (typeof document === 'undefined') {
-      throw new Error('当前环境不支持Canvas文本测量');
-    }
+  constructor() {
     this.canvas = document.createElement('canvas');
     const context = this.canvas.getContext('2d');
     if (!context) {
       throw new Error('无法创建Canvas 2D上下文');
     }
-    this.context = context;
-    return context;
+    this.ctx = context;
   }
 
   private startCacheMaintenance(): void {

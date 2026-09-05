@@ -27,7 +27,6 @@ import {
 import type { StandardDiagramData } from '../../../models/DiagramModels';
 import { createBaseReactFlowRoutingOnlyDocumentSnapshot } from '../../shared/baseReactFlowDisplayCommittedSnapshot';
 import type { BaseReactFlowRoutingSessionRuntime } from '../../shared/baseReactFlowRoutingSessionRuntime';
-import { LayoutOptimizer } from '../../layout/LayoutOptimizer';
 
 export interface UseDesignerSystemSyncProps {
     id?: string;
@@ -175,7 +174,7 @@ export function useDesignerSystemSync({
                     const { id: incomingId, label, type: incomingType, shape = 'rectangle', parentId, position } = args;
                     const id = incomingId || `node_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
                     
-                    const layoutOptimizer = LayoutOptimizer.getInstance();
+                    const layoutOptimizer = (await import('../../layout/LayoutOptimizer')).LayoutOptimizer.getInstance();
                     const width = layoutOptimizer.calculateNodeWidth(label);
 
                     // 默认类型映射逻辑
@@ -284,7 +283,7 @@ export function useDesignerSystemSync({
                 value: async (id: string, data: Record<string, unknown>) => {
                     const label = typeof data.label === 'string' ? data.label : undefined;
                     const layoutOptimizer = label
-                        ? LayoutOptimizer.getInstance()
+                        ? (await import('../../layout/LayoutOptimizer')).LayoutOptimizer.getInstance()
                         : null;
                     setNodes((nds) => nds.map((n) => {
                         if (n.id === id) {

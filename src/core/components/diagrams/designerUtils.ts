@@ -9,7 +9,6 @@ import { appendBaseReactFlowEdgeSemanticClassName } from '../shared/baseReactFlo
 import { downloadFile } from '../../utils/downloadUtils';
 import { validateAndFixNodes } from '../../utils/nodeValidation';
 import { expandHandle } from '../../routing/utils/handleUtils';
-import { LayoutOptimizer } from '../layout/LayoutOptimizer';
 import {
     logDesignerUtilsDomainLayoutFailure,
     logDesignerUtilsMigrationFailure,
@@ -354,6 +353,7 @@ export const standardDataToCanvas = async (
 
     let nodes: Node[] = [];
     const edges: Edge[] = [];
+    const { LayoutOptimizer } = await import('../layout/LayoutOptimizer');
     const optimizer = LayoutOptimizer.getInstance();
 
     // ═══ 检测是否有已保存坐标 ═══
