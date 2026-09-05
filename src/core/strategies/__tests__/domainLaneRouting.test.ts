@@ -13,6 +13,7 @@ import { clearBaseReactFlowLayoutEdgeRoutingData } from '../../components/shared
 import browserRequest from './fixtures/logisticsLaneRequest.json';
 import { parseDisplayEdgesWorkerRequest } from '../../components/shared/baseReactFlowDisplayWorkerProtocol';
 import { prepareDomainDagreEdges } from '../DomainDagreEdgePreparation';
+import { resolveDomainLaneSpacing } from '../../components/diagrams/flowchartLayoutStrategyMode';
 
 const sizes = [
   [210, 73], [259, 118], [282, 118], [298, 118], [282, 118], [282, 96],
@@ -84,7 +85,7 @@ describe('ordered Logistics swimlane routing', () => {
       // The two common-scenario menu entries request automatic Dagre layering.
       // FLOW is a separate wrapping arrangement, not the menu's node layout.
       type: LayoutType.DAGRE, direction, nodeLayout: LayoutType.DAGRE,
-      spacing: { horizontal: 120, vertical: 120 },
+      spacing: resolveDomainLaneSpacing(direction),
       padding: { top: 40, right: 20, bottom: 20, left: 20 },
       generateDomainGroups: true, generateSubDomainGroups: true,
       fitDomainContent: true, domainPlacement: 'ordered-lanes',

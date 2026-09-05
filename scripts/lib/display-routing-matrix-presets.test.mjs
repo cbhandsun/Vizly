@@ -59,8 +59,9 @@ describe('rendered business flow semantics', () => {
       getBoundingClientRect: () => ({ x: -25, y: 40, width: 120, height: 60 }),
     }]);
     vi.stubGlobal('document', { querySelectorAll: query });
+    vi.stubGlobal('window', { reactFlowInstance: { getNodes: () => [{ id, data: { domain: 'safe-domain' } }] } });
     try {
-      expect(readDisplayRoutingSemanticNodes()).toEqual([{ id, x: -25, y: 40, width: 120, height: 60 }]);
+      expect(readDisplayRoutingSemanticNodes()).toEqual([{ id, domain: 'safe-domain', x: -25, y: 40, width: 120, height: 60 }]);
       expect(query).toHaveBeenCalledWith('.react-flow__node[data-id]');
     } finally {
       vi.unstubAllGlobals();
@@ -80,6 +81,26 @@ describe('rendered business flow semantics', () => {
     const input = semanticInput();
     input.nodes[1].y = 30;
     expect(() => assertDisplayRoutingSemanticFlow(input)).toThrow('contradicts');
+  });
+
+  it.each(['TB', 'BT', 'LR', 'RL'])('uses the lane axis across domains and the flow axis inside a domain in %s', direction => {
+    const horizontal = direction === 'LR' || direction === 'RL';
+    const reverse = direction === 'BT' || direction === 'RL';
+    const input = {
+      direction,
+      chains: [['start', 'handoff', 'finish']],
+      nodes: [
+        { id: 'start', domain: 'a', x: 0, y: 0, width: 80, height: 60 },
+        { id: 'handoff', domain: 'b', x: horizontal ? 0 : 200, y: horizontal ? 200 : 0, width: 80, height: 60 },
+        {
+          id: 'finish', domain: 'b', width: 80, height: 60,
+          x: horizontal ? (reverse ? -200 : 200) : 200,
+          y: horizontal ? 200 : (reverse ? -200 : 200),
+        },
+      ],
+      edges: [{ source: 'start', target: 'handoff' }, { source: 'handoff', target: 'finish' }],
+    };
+    expect(assertDisplayRoutingSemanticFlow(input)).toMatchObject({ status: 'passed', checkedStepCount: 2 });
   });
 
   it('supports multiple branches and safely treats hostile identifiers as data', () => {

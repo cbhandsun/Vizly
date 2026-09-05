@@ -62,6 +62,7 @@ export function prepareDomainDagreInteractiveEdges({
   nodeById,
 }: DomainDagreInteractiveEdgePreparationInput): Edge[] {
   const layoutDirection = String(options.direction || 'TB').toUpperCase();
+  const horizontal = layoutDirection === 'LR' || layoutDirection === 'RL';
   const orderedLanes = options.domainPlacement === 'ordered-lanes';
   const interactiveEdges = edges.map(edge => {
     const source = nodeById.get(edge.source);
@@ -69,8 +70,8 @@ export function prepareDomainDagreInteractiveEdges({
     if (!source || !target) {
       return {
         ...edge,
-        sourceHandle: edge.sourceHandle || (layoutDirection === 'LR' || layoutDirection === 'RL' ? 'right' : 'bottom'),
-        targetHandle: edge.targetHandle || (layoutDirection === 'LR' || layoutDirection === 'RL' ? 'left' : 'top'),
+        sourceHandle: edge.sourceHandle || (horizontal ? 'right' : 'bottom'),
+        targetHandle: edge.targetHandle || (horizontal ? 'left' : 'top'),
         data: {
           ...(edge.data || {}),
           algorithm: 'domain-dagre-interactive',
@@ -127,7 +128,9 @@ export function prepareDomainDagreInteractiveEdges({
   const trunkEdges = repairSharedTargetEntryCrossings(
     synthesizeSharedEndpointTrunks(interactiveEdges, { nodes }),
   );
-  return (orderedLanes ? repairDomainLanePortRoutes(trunkEdges, nodes) : trunkEdges).map(edge => ({
+  return (orderedLanes ? repairDomainLanePortRoutes(
+    trunkEdges, nodes, horizontal ? 4 : 2,
+  ) : trunkEdges).map(edge => ({
     ...edge,
     data: {
       ...(edge.data || {}),

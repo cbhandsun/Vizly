@@ -21,13 +21,14 @@ const withoutAbsolutePosition = (node: Node): Node => {
 const moveAlong = (node: Node, axis: 'x' | 'y', value: number): Node => ({
   ...node, position: { ...node.position, [axis]: value },
 });
+const appendGrouped = <K, V>(groups: Map<K, V[]>, key: K, value: V): void => {
+  groups.set(key, [...(groups.get(key) ?? []), value]);
+};
 const geometryBoundsError = () => Error('Semantic swimlane layout exceeds supported geometry bounds');
 // Keep enough room for an orthogonal connector, arrowhead and compact label,
 // without carrying Dagre's presentation spacing through every process rank.
 // This is a group-level flow-axis compaction: peer lanes still share one
 // extent and individual lanes are never resized independently.
-const MAX_VERTICAL_FLOW_BAND_GAP = 64;
-const MAX_HORIZONTAL_FLOW_BAND_GAP = 96;
 
 /** Shared process ranks and bounded per-peer corridors, before any edge routing. */
 export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: SemanticLaneFlowOptions): Node[] => {
@@ -50,7 +51,7 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
   );
   const crossGap = boundedDomainDagreNumber(requestedCrossGap, 120, 120, 5000);
   const maxFlowBandGap = Math.min(
-    horizontal ? MAX_HORIZONTAL_FLOW_BAND_GAP : MAX_VERTICAL_FLOW_BAND_GAP,
+    horizontal ? 96 : 64,
     flowGap,
   );
   const leaves = nodes.filter(node => !isDomainDagreGroupNode(node) && !isDomainDagreNodeHidden(node));
@@ -58,8 +59,26 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
   if (leaves.some(node => !Number.isFinite(node.position.x) || !Number.isFinite(node.position.y))) {
     throw geometryBoundsError();
   }
-  const globalPositions = new Map(layoutWithDagre(leaves, edges, horizontal ? 'LR' : 'TB', crossGap, flowGap)
-    .map(position => [position.id, position]));
+  // Small diagrams benefit from globally aligned process stages. On dense
+  // diagrams the same global ranks duplicate cross-domain progression on the
+  // flow axis and create mostly empty, extremely long lanes, so rank each lane
+  // independently while keeping the shared lane extent and routing bands.
+  const compactLaneRanks = leaves.length > 23;
+  const positionScopes = new Map<string, Node[]>();
+  for (const node of leaves) {
+    const key = compactLaneRanks ? domainDagreDomainOf(node) : '';
+    appendGrouped(positionScopes, key, node);
+  }
+  const globalPositions = new Map<string, { id: string; x: number; y: number }>();
+  for (const members of positionScopes.values()) {
+    const memberIds = new Set(members.map(node => node.id));
+    const scopedEdges = edges.filter(edge => memberIds.has(edge.source) && memberIds.has(edge.target));
+    for (const position of layoutWithDagre(
+      members, scopedEdges, horizontal ? 'LR' : 'TB', crossGap, flowGap,
+    )) {
+      globalPositions.set(position.id, position);
+    }
+  }
   const domains = nodes.filter(node => node.type === 'titleGroup' && !isDomainDagreNodeHidden(node));
   if (!domains.length) return nodes;
   const rank = (domain: Node) => Math.min(...leaves.filter(node => domainDagreDomainOf(node) === domainDagreDomainOf(domain))
@@ -88,9 +107,7 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
     for (const node of members) {
       const parent = originals.get(nodeToSubGroup?.get(node.id) ?? node.parentId ?? '');
       const key = parent?.type === 'subGroup' ? parent.id : domain.id;
-      const bucket = buckets.get(key) ?? [];
-      bucket.push(node);
-      buckets.set(key, bucket);
+      appendGrouped(buckets, key, node);
     }
     let bucketCross = domainCross + (horizontal ? 88 : 32);
     const orderedBuckets = [...buckets].sort(([a], [b]) =>
@@ -128,19 +145,12 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
   for (const node of leaves) {
     const rankCenter = (globalPositions.get(node.id)?.[flow] ?? 0) + flowSize(node) / 2;
     const key = JSON.stringify([nodeToSubGroup?.get(node.id) ?? node.parentId ?? domainDagreDomainOf(node), rankCenter]);
-    const layer = layers.get(key) ?? [];
-    layer.push(node);
-    layers.set(key, layer);
+    appendGrouped(layers, key, node);
   }
   const neighbors = new Map<string, string[]>();
-  const addNeighbor = (source: string, target: string) => {
-    const adjacent = neighbors.get(source);
-    if (adjacent) adjacent.push(target);
-    else neighbors.set(source, [target]);
-  };
   for (const edge of edges) {
-    addNeighbor(edge.source, edge.target);
-    addNeighbor(edge.target, edge.source);
+    appendGrouped(neighbors, edge.source, edge.target);
+    appendGrouped(neighbors, edge.target, edge.source);
   }
   const center = (node: Node) => node.position[cross] + crossSize(node) / 2;
   // Local-only branch ordering cannot see a target in an adjacent domain.
@@ -176,19 +186,32 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
   const flowRanks = new Map<number, Node[]>();
   for (const node of leaves) {
     const rankCenter = (globalPositions.get(node.id)?.[flow] ?? 0) + flowSize(node) / 2;
-    const peers = flowRanks.get(rankCenter) ?? [];
-    peers.push(node);
-    flowRanks.set(rankCenter, peers);
+    appendGrouped(flowRanks, rankCenter, node);
   }
   let flowOffset = 0;
   let flowReduction = 0;
   let occupiedEnd: number | undefined;
   for (const [, peers] of [...flowRanks].sort(([a], [b]) => a - b)) {
-    const ordered = peers.toSorted((a, b) => center(replacements.get(a.id) ?? a) - center(replacements.get(b.id) ?? b));
-    const positioned = ordered.map((node, index) => {
-      const current = replacements.get(node.id) ?? node;
-      return moveAlong(current, flow, current.position[flow] + flowOffset + index * flowGap);
-    });
+    let peerGroups = [peers];
+    if (compactLaneRanks) {
+      const peersByDomain = new Map<string, Node[]>();
+      for (const node of peers) {
+        const key = domainDagreDomainOf(node);
+        appendGrouped(peersByDomain, key, node);
+      }
+      peerGroups = [...peersByDomain.values()];
+    }
+    let maximumPeerOffset = 0;
+    const positioned = peerGroups.flatMap(domainPeers => (
+      domainPeers
+        .toSorted((a, b) => center(replacements.get(a.id) ?? a) - center(replacements.get(b.id) ?? b))
+        .map((node, index) => {
+          const current = replacements.get(node.id) ?? node;
+          const peerOffset = index * flowGap + (compactLaneRanks && domainPeers.length > 3 ? 64 : 0);
+          maximumPeerOffset = Math.max(maximumPeerOffset, peerOffset);
+          return moveAlong(current, flow, current.position[flow] + flowOffset + peerOffset);
+        })
+    ));
     const bandStart = Math.min(...positioned.map(node => node.position[flow]));
     const bandEnd = Math.max(...positioned.map(node => node.position[flow] + flowSize(node)));
     if (occupiedEnd !== undefined) {
@@ -196,7 +219,7 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
     }
     for (const node of positioned) replacements.set(node.id, moveAlong(node, flow, node.position[flow] - flowReduction));
     occupiedEnd = bandEnd;
-    flowOffset += (ordered.length - 1) * flowGap;
+    flowOffset += maximumPeerOffset;
   }
   for (const node of replacements.values()) {
     if (!isDomainDagreGroupNode(node)) continue;

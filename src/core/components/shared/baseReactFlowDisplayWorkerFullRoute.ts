@@ -1,6 +1,7 @@
 import type { Node } from '@xyflow/react';
 
 import { computeBaseDisplayInputSignature } from './baseReactFlowDisplayEdgeCore';
+import { baseReactFlowDisplayCommercialQualityIsClean } from './baseReactFlowDisplayCommercialQuality';
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
 import {
   finalizeBaseReactFlowDisplayEdgesWithReport,
@@ -94,7 +95,11 @@ export const runBaseReactFlowDisplayWorkerFullRoute = ({
     isLargeGraph: request.isLargeGraph,
   });
   const closeFinalContract = (response: DisplayEdgesWorkerResponse): DisplayEdgesWorkerResponse => {
-    if (response.hardClean === true) return response;
+    if (
+      response.hardClean === true
+      && response.edges
+      && baseReactFlowDisplayCommercialQualityIsClean(response.edges)
+    ) return response;
     const closureSeed = resolveBaseReactFlowFullRouteClosureSeed(response, fullRouteEdges);
     const closedEdges = closeBaseReactFlowFinalDisplayRoute({
       args: {
@@ -115,7 +120,11 @@ export const runBaseReactFlowDisplayWorkerFullRoute = ({
       ...response,
       edges: endpointClosedEdges,
     }, repairNodes);
-    return closedResponse.hardClean === true ? closedResponse : response;
+    return closedResponse.hardClean === true
+      && closedResponse.edges
+      && baseReactFlowDisplayCommercialQualityIsClean(closedResponse.edges)
+      ? closedResponse
+      : response;
   };
   const finalizerTimer = startDisplayRoutingPhaseTrace({
     phase: 'finalizer',

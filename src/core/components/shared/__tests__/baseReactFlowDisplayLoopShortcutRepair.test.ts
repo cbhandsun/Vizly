@@ -81,6 +81,20 @@ describe('display loop shortcut repair', () => {
     expect(buildTerminalPreservingInteriorShortcutCandidates(path, 0)).toEqual([]);
     expect(buildTerminalPreservingInteriorShortcutCandidates(path.slice(0, 5))).toEqual([]);
 
+    const outerCorner = [
+      { x: 9229, y: 2022 }, { x: 4323, y: 2022 },
+      { x: 4323, y: 2068 }, { x: 322, y: 2068 },
+      { x: 322, y: 1496 }, { x: 16, y: 1496 },
+      { x: 16, y: -96 }, { x: 6004, y: -96 },
+      { x: 6004, y: 552 },
+    ];
+    expect(buildTerminalPreservingInteriorShortcutCandidates(outerCorner)).toContainEqual([
+      { x: 9229, y: 2022 }, { x: 4323, y: 2022 },
+      { x: 4323, y: 2068 }, { x: 16, y: 2068 },
+      { x: 16, y: -96 }, { x: 6004, y: -96 },
+      { x: 6004, y: 552 },
+    ]);
+
     const targetStair = [
       { x: 4245.5, y: 5615.5 }, { x: 4245.5, y: 5559.5 },
       { x: 4381, y: 5559.5 }, { x: 4381, y: 4995 },
@@ -111,8 +125,7 @@ describe('display loop shortcut repair', () => {
       targetEdge, targetStair, targetNodes,
     )[0]).toEqual([
       { x: 4245.5, y: 5615.5 }, { x: 4245.5, y: 5559.5 },
-      { x: 4381, y: 5559.5 }, { x: 4381, y: 4995 },
-      { x: 5133, y: 4995 }, { x: 5133, y: 5722 },
+      { x: 5133, y: 5559.5 }, { x: 5133, y: 5722 },
       { x: 5109, y: 5722 }, { x: 5109, y: 5802 },
     ]);
   });

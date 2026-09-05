@@ -16,7 +16,8 @@ export const assertDisplayRoutingSemanticFlow = ({ direction, chains, nodes, edg
   for (const node of nodes) {
     if (!isRecord(node) || !validId(node.id) || nodeById.has(node.id)
       || ![node.x, node.y, node.width, node.height].every(boundedNumber)
-      || node.width <= 0 || node.height <= 0) {
+      || node.width <= 0 || node.height <= 0
+      || (node.domain !== undefined && (typeof node.domain !== 'string' || node.domain.length > 500))) {
       throw new Error('Invalid semantic flow node geometry');
     }
     nodeById.set(node.id, node);
@@ -34,6 +35,8 @@ export const assertDisplayRoutingSemanticFlow = ({ direction, chains, nodes, edg
   const reverse = direction === 'BT' || direction === 'RL';
   const axis = horizontal ? 'x' : 'y';
   const dimension = horizontal ? 'width' : 'height';
+  const crossAxis = horizontal ? 'y' : 'x';
+  const crossDimension = horizontal ? 'height' : 'width';
   let checkedStepCount = 0;
   let minimumForwardGap = Infinity;
   for (const [chainIndex, chain] of chains.entries()) {
@@ -45,9 +48,15 @@ export const assertDisplayRoutingSemanticFlow = ({ direction, chains, nodes, edg
       }
       // Actual rendered rectangles, so parent offsets and viewport zoom are
       // already accounted for; a correct Worker request alone cannot pass.
-      const gap = reverse
-        ? source[axis] - target[axis] - target[dimension]
-        : target[axis] - source[axis] - source[dimension];
+      const crossDomain = source.domain && target.domain && source.domain !== target.domain;
+      const gap = crossDomain
+        ? Math.max(
+          target[crossAxis] - source[crossAxis] - source[crossDimension],
+          source[crossAxis] - target[crossAxis] - target[crossDimension],
+        )
+        : reverse
+          ? source[axis] - target[axis] - target[dimension]
+          : target[axis] - source[axis] - source[dimension];
       if (gap <= 0) {
         throw new Error(`Semantic flow chain ${chainIndex} step ${step} contradicts ${direction}`);
       }
@@ -59,10 +68,18 @@ export const assertDisplayRoutingSemanticFlow = ({ direction, chains, nodes, edg
 };
 
 export const readDisplayRoutingSemanticNodes = () => (
-  [...document.querySelectorAll('.react-flow__node[data-id]')].map(element => {
-    const rect = element.getBoundingClientRect();
-    return { id: element.getAttribute('data-id'), x: rect.x, y: rect.y, width: rect.width, height: rect.height };
-  })
+  (() => {
+    const modelNodes = window.reactFlowInstance?.getNodes?.() ?? [];
+    const domainById = new Map(modelNodes.map(node => [
+      node.id,
+      typeof node.data?.domain === 'string' ? node.data.domain : '',
+    ]));
+    return [...document.querySelectorAll('.react-flow__node[data-id]')].map(element => {
+      const rect = element.getBoundingClientRect();
+      const id = element.getAttribute('data-id');
+      return { id, domain: domainById.get(id) ?? '', x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+    });
+  })()
 );
 
 export const auditDisplayRoutingLayoutSemantics = async (session, layoutCase, chains) => {

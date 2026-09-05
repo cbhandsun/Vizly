@@ -26,7 +26,7 @@ const pointsOutward = (
 };
 
 /** Choose escape sides against all business-node obstacles, not just endpoints. */
-export const repairDomainLanePortRoutes = (edges: Edge[], nodes: Node[]): Edge[] => {
+export const repairDomainLanePortRoutes = (edges: Edge[], nodes: Node[], maxPasses = 2): Edge[] => {
   // This is only seed preparation. Keep its main-thread work bounded; larger
   // graphs still go through the Worker-owned full routing and hard gates.
   if (
@@ -36,7 +36,7 @@ export const repairDomainLanePortRoutes = (edges: Edge[], nodes: Node[]): Edge[]
   ) return edges;
   const nodeById = new Map(nodes.map(node => [node.id, node]));
   let current = edges;
-  for (let pass = 0; pass < 2; pass += 1) {
+  for (let pass = 0; pass < maxPasses; pass += 1) {
     const before = current;
     for (let index = 0; index < current.length; index += 1) {
       const edge = current[index];

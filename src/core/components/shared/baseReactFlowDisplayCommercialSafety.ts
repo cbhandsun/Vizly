@@ -137,7 +137,10 @@ export const commitBaseReactFlowFinalCommercialSafety = ({
     : repairTerminalPreservingOuterStairs(
       lockedEdges,
       repairNodes,
-      { eligibleEdgeIds, evaluation: finalEvaluation },
+      // The final structural contract audits every rendered edge. Restricting
+      // its repair to an incremental eligible set can leave an already locked
+      // non-eligible edge in a state that the same contract rejects.
+      { evaluation: finalEvaluation },
       finalEvaluation,
     );
   const relockedEdges = lockFinalDisplayComputedPaths(commerciallyClosedEdges, repairNodes);
