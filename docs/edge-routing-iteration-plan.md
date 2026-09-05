@@ -2,6 +2,8 @@
 
 状态：实施中，分支 codex/layout-routing-iterations；尚未完成 I0–I5 全部验收；已按用户要求分批本地提交，未推送。本文件是任务与验收契约，不是后台调度器，不改变全局 Codex 配置。
 
+缩放标签修复（2026-09-05）：WMS 50% 的短分支标签冲突已解决。不是尺寸换算错误，而是障碍边界候选中心被投影裁回仅 48px 的语义段，漏掉段外的可用空隙。保留原有限候选数量、碰撞检查与手动标签位置，允许中心在既有 320px 退让范围内沿路径方向移出段端；引导线锚点仍落在原语义路径。三分支一节点的最小反例覆盖横向/纵向，相关排布/Store/Hook 28 项通过。四代表图 × 50/100/150% 的 12 项生产 DOM 验收全通过，路由签名未变、标签互遮挡/节点遮挡均为 0；WMS 50% 截图与数据为 implementation/wms-halfzoom-fixed.json、wms-label-fixed-wms-process-flow-v1-0.5.png。verify:static、TS6、1100 测试文件 CI 收录通过。先前 11/12 记录为修复前证据，TMS 路由折点问题与其余 I5 收口仍待完成。
+
 I5 补充（2026-09-05，48624bd1 工作区）：物流拓扑编辑浏览器矩阵 10 项通过，包括节点缩放、多节点/子树移动、节点与边增删、端口策略、折叠/展开；折叠走受支持的 full fallback，其余为 incremental-route。四代表图初始布局在 50/100/150% 的 12 个实际 DOM 标签检查中 11 项通过；WMS 50% 下 e-order-allocation 与 e-order-sla 重叠，100/150% 正常。检查覆盖所有已挂载标签的几何，不能表述为全部标签同时位于屏幕内。证据 implementation/i5-topology-edit-cycle.json、i5-label-zoom.json 与 WMS 50% 截图。TMS 泳道 BT → 复合 BT 仍有 8 折点商业质量失败：直接缩为 4 折违反 48px 商业净距；已确认的 6 折外绕增加 374px，超出现有长度预算。未放宽任何门禁；这两项及合成边界、完整集成收口继续待办。
 
 标签补充：物流图复杂流程 BT → 泳道 RL → 全图 LR 时，运输数据标签因固定候选锚点遗漏中间空隙而遮挡关务节点。仅在原候选无法无冲突排布时，增加由障碍边界推导的有限路径锚点，保持原冲突检查、手动位置与最终路由不变。生产复验中标签由 unresolved 转为 placed，原 89% 缩放下 14 个标签可见、标签互遮挡及节点遮挡均为 0；26 项排布/Store/Hook 回归通过。证据为 implementation/logistics-label-fixed-repro.png、logistics-label-fixed-dom.json 及 i5-logistics-cross-engine-label-fixed.json。剩余验收不能由这一局部结果外推。

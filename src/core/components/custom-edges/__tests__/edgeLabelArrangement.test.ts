@@ -1,3 +1,4 @@
+import shortBranchInputs from './shortBranchLabelArrangement.json';
 import { describe, expect, it } from 'vitest';
 import { arrangeEdgeLabels, edgeLabelRectsConflict, edgeLabelSegmentIntersectsRect,
   type EdgeLabelArrangementInput } from '../edgeLabelArrangement';
@@ -9,6 +10,27 @@ const input = (id: string, y = 0): EdgeLabelArrangementInput => ({
 });
 
 describe('global edge label arrangement regression', () => {
+  it.each([false, true])('places a scaled short-branch callout outside the segment while keeping its anchor (transpose=%s)', transpose => {
+    const point = (p: { x: number; y: number }) => transpose ? { x: p.y, y: p.x } : p;
+    const entries = shortBranchInputs.map(entry => ({ ...entry,
+      path: entry.path.map(point), labelPath: entry.labelPath.map(point),
+      anchor: point(entry.anchor), preferredCenter: point(entry.preferredCenter),
+      size: transpose ? { width: entry.size.height, height: entry.size.width } : entry.size,
+      obstacles: entry.obstacles.map(rect => transpose
+        ? { x: rect.y, y: rect.x, width: rect.height, height: rect.width } : rect),
+    }));
+    const before = structuredClone(entries);
+    const result = arrangeEdgeLabels(entries);
+    expect([...result.values()].every(placement => placement.status === 'placed')).toBe(true);
+    const short = result.get('e-order-sla');
+    expect(short?.conflicts).toBe(0);
+    expect(short?.leaderEnd).toBeDefined();
+    expect(transpose ? short?.anchor.x : short?.anchor.y).toBe(1582);
+    expect(transpose ? short?.anchor.y : short?.anchor.x).toBeGreaterThanOrEqual(574.5);
+    expect(transpose ? short?.anchor.y : short?.anchor.x).toBeLessThanOrEqual(622.5);
+    expect(entries).toEqual(before);
+  });
+
   it.each([false, true])('finds a free interval between obstacles when fixed anchors are blocked (transpose=%s)', transpose => {
     const point = (x: number, y: number) => transpose ? { x: y, y: x } : { x, y };
     const entry: EdgeLabelArrangementInput = {

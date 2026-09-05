@@ -103,9 +103,11 @@ const candidatesFor = (input: EdgeLabelArrangementInput, obstacleBoundaries = fa
     const boundaryAnchors = obstacleBoundaries ? input.obstacles.filter(validRect).flatMap(obstacle => {
       const start = vertical ? obstacle.y : obstacle.x;
       const end = start + (vertical ? obstacle.height : obstacle.width);
-      return [start - halfAlong - 10, end + halfAlong + 10].map(value => project(
-        vertical ? { x: near.x, y: value } : { x: value, y: near.y }, a, b,
-      ));
+      // A short semantic segment may not contain enough room for the label.
+      // Bound the center's retreat; nearestAnchor still pins its leader to it.
+      return [start - halfAlong - 10, end + halfAlong + 10]
+        .map(value => vertical ? { x: near.x, y: value } : { x: value, y: near.y })
+        .filter(point => distance(point, project(point, a, b)) <= 320);
     }) : [];
     const anchors = obstacleBoundaries
       ? [...new Map(boundaryAnchors.map(point => [`${point.x},${point.y}`, point])).values()]
@@ -127,7 +129,8 @@ const candidatesFor = (input: EdgeLabelArrangementInput, obstacleBoundaries = fa
 /** Bounded deterministic greedy packing. It never modifies routes or hides text.
  * Manual labels reserve space first; automatic labels use up to eight nearby
  * semantic segments and a 320px retreat. If fixed anchors fail, each segment
- * also tries its eight nearest obstacle-boundary anchors. Exhaustion is unresolved,
+ * also tries eight nearby obstacle-boundary centers within a 320px along-axis
+ * retreat. Their leaders stay on the semantic path. Exhaustion is unresolved,
  * not a claim that an arbitrary dense graph is collision-free. */
 export const arrangeEdgeLabels = (inputs: readonly EdgeLabelArrangementInput[]): ReadonlyMap<string, EdgeLabelPlacement> => {
   const valid = inputs.filter(input => input.id && validPoint(input.anchor) && validPoint(input.preferredCenter)
