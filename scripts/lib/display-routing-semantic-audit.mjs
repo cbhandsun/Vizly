@@ -2,6 +2,43 @@ const isRecord = value => value !== null && typeof value === 'object' && !Array.
 const validId = value => typeof value === 'string' && value.length > 0 && value.length <= 500;
 const boundedNumber = value => typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= 10_000_000;
 
+export const assertDisplayRoutingLaneDimensions = (direction, lanes) => {
+  if (!['TB', 'BT', 'LR', 'RL'].includes(direction) || !Array.isArray(lanes)
+    || lanes.length === 0 || lanes.length > 5000) throw new Error('Invalid lane dimension audit input');
+  const dimension = direction === 'LR' || direction === 'RL' ? 'width' : 'height';
+  const ids = new Set();
+  const groups = new Map();
+  for (const lane of lanes) {
+    if (!isRecord(lane) || !validId(lane.id) || ids.has(lane.id)
+      || typeof lane.parentId !== 'string' || lane.parentId.length > 500
+      || !boundedNumber(lane.width) || !boundedNumber(lane.height)
+      || lane.width <= 0 || lane.height <= 0) throw new Error('Missing or invalid rendered lane geometry');
+    ids.add(lane.id);
+    const group = groups.get(lane.parentId) ?? [];
+    group.push(lane[dimension]);
+    groups.set(lane.parentId, group);
+  }
+  let comparedGroups = 0;
+  for (const values of groups.values()) {
+    if (values.length < 2) continue;
+    comparedGroups += 1;
+    // DOM rectangles are measured in CSS pixels; allow subpixel rounding only.
+    if (Math.max(...values) - Math.min(...values) > 0.5) throw new Error(`Unequal sibling lane ${dimension}`);
+  }
+  return { status: 'passed', dimension, laneCount: lanes.length, comparedGroups };
+};
+
+export const readDisplayRoutingLaneDimensions = () => {
+  const elements = new Map([...document.querySelectorAll('.react-flow__node[data-id]')]
+    .map(element => [element.getAttribute('data-id'), element]));
+  return (window.reactFlowInstance?.getNodes?.() ?? [])
+    .filter(node => node.type === 'titleGroup' && node.hidden !== true && node.data?.hidden !== true)
+    .map(node => {
+      const rect = elements.get(node.id)?.getBoundingClientRect();
+      return { id: node.id, parentId: node.parentId ?? '', width: rect?.width ?? null, height: rect?.height ?? null };
+    });
+};
+
 /** Explicit business chains, not every directed edge: feedback remains legal. */
 export const assertDisplayRoutingSemanticFlow = ({ direction, chains, nodes, edges, appliedMode = 'global' }) => {
   if (!['TB', 'BT', 'LR', 'RL'].includes(direction)
@@ -112,7 +149,9 @@ export const auditDisplayRoutingLayoutSemantics = async (session, layoutCase, ch
   const edges = await session.evaluate(`window.reactFlowInstance?.getEdges?.().map(edge => ({
     source: edge.source, target: edge.target,
   }))`);
-  return assertDisplayRoutingSemanticFlow({
+  const semantic = assertDisplayRoutingSemanticFlow({
     direction: layoutCase.id.slice('domain-lanes-'.length).toUpperCase(), appliedMode, chains, nodes, edges,
   });
+  const lanes = await session.evaluate(`(${readDisplayRoutingLaneDimensions.toString()})()`);
+  return { ...semantic, laneDimensions: assertDisplayRoutingLaneDimensions(semantic.direction, lanes) };
 };

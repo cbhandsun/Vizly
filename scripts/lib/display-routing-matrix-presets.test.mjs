@@ -3,9 +3,29 @@ import { readFile } from 'node:fs/promises';
 
 import { DISPLAY_ROUTING_MATRIX_PRESET_TARGETS } from './display-routing-matrix-presets.mjs';
 import { assertDisplayRoutingSemanticFlow, auditDisplayRoutingLayoutSemantics,
+  assertDisplayRoutingLaneDimensions, readDisplayRoutingLaneDimensions,
   readDisplayRoutingSemanticNodes } from './display-routing-semantic-audit.mjs';
 
 describe('display routing matrix presets', () => {
+  it.each(['TB', 'BT', 'LR', 'RL'])('checks rendered sibling lane dimensions in %s', direction => {
+    const lanes = [
+      { id: 'a', parentId: '', width: 400, height: 300 },
+      { id: 'b', parentId: '', width: 400, height: 300 },
+      { id: 'nested', parentId: 'a', width: 200, height: 100 },
+    ];
+    expect(assertDisplayRoutingLaneDimensions(direction, lanes)).toMatchObject({ comparedGroups: 1, laneCount: 3 });
+    const dimension = ['LR', 'RL'].includes(direction) ? 'width' : 'height';
+    expect(() => assertDisplayRoutingLaneDimensions(direction, lanes.map((lane, i) => i === 1
+      ? { ...lane, [dimension]: lane[dimension] - 20 } : lane))).toThrow('Unequal sibling');
+  });
+
+  it.each([[], null, [{ id: 'a', parentId: '', width: null, height: 1 }],
+    [{ id: 'a', parentId: '', width: Infinity, height: 1 }],
+    [{ id: 'a', parentId: '', width: 0, height: 1 }],
+    [{ id: 'a', parentId: '', width: '400', height: 1 }]])('rejects missing or invalid lane geometry %#', lanes => {
+    expect(() => assertDisplayRoutingLaneDimensions('LR', lanes)).toThrow();
+  });
+
   it('includes Logistics alongside both WMS fixtures and TMS', () => {
     expect(DISPLAY_ROUTING_MATRIX_PRESET_TARGETS.map(target => target.presetId)).toEqual([
       'logistics-architecture-v1',
@@ -177,11 +197,15 @@ describe('rendered business flow semantics', () => {
       const session = { evaluate: async expression => {
         expressions.push(expression);
         if (expression.includes('data-flowchart-lane-rank-applied')) return 'global';
+        if (expression.includes(readDisplayRoutingLaneDimensions.toString())) return [
+          { id: 'lane-a', parentId: '', width: 400, height: 300 },
+          { id: 'lane-b', parentId: '', width: 400, height: 300 },
+        ];
         return expression.includes(readDisplayRoutingSemanticNodes.toString()) ? input.nodes : input.edges;
       } };
       expect(await auditDisplayRoutingLayoutSemantics(session, { id: `domain-lanes-${direction.toLowerCase()}` }, input.chains))
         .toMatchObject({ status: 'passed', direction });
-      expect(expressions).toHaveLength(3);
+      expect(expressions).toHaveLength(4);
       await expect(auditDisplayRoutingLayoutSemantics(session, { id: 'domain-lanes-tb' }, [])).rejects.toThrow();
     }
   });
