@@ -7,6 +7,7 @@ import type { BaseReactFlowFinalEndpointEvaluation } from './baseReactFlowDispla
 import { passesBaseReactFlowCommercialFinalDisplayGate, type BaseReactFlowFinalEndpointOrderOptions } from './baseReactFlowDisplayFinalEndpointGate';
 import { buildCommercialParallelTerminalCorridorShortcutPaths, buildCommercialSameSideRectangularShortcutPaths } from './baseReactFlowDisplayCommercialTerminalShortcut';
 import { MAX_COMMERCIAL_BEND_COUNT } from './baseReactFlowDisplayCommercialQuality';
+import { displayBusinessNodeCommercialClearanceIsClean } from './baseReactFlowDisplayBusinessNodeClearance';
 import {
   buildTerminalPreservingDirectShortcutCandidates,
 } from './baseReactFlowDisplayLoopShortcutRepair';
@@ -30,8 +31,9 @@ export const rankCommercialInteriorShortcutCandidates = (
   edge: Edge,
   path: ReturnType<typeof getDisplayComputedPath>,
   nodes: Node[],
-): ReturnType<typeof getDisplayComputedPath>[] => (
-  buildTerminalPreservingInteriorShortcutCandidates(path)
+  includeCorners = true,
+): ReturnType<typeof getDisplayComputedPath>[] => {
+  return buildTerminalPreservingInteriorShortcutCandidates(path, includeCorners ? 32 : 8, includeCorners)
     .map((candidatePath, originalIndex) => {
       const candidateEdge = withTerminalPreservingOuterStairPath(edge, candidatePath);
       return {
@@ -52,8 +54,8 @@ export const rankCommercialInteriorShortcutCandidates = (
       || first.length - second.length
       || first.originalIndex - second.originalIndex
     ))
-    .map(candidate => candidate.candidatePath)
-);
+    .map(candidate => candidate.candidatePath);
+};
 
 export const repairTerminalPreservingOuterStairs = <T extends Edge[]>(
   edges: T,
@@ -65,6 +67,9 @@ export const repairTerminalPreservingOuterStairs = <T extends Edge[]>(
   let bestReport = evaluation.hardReport(best);
   if (!bestReport.hardClean) return edges;
   let evaluations = 0;
+  // Corner shortcuts can occupy corridors still needed by clearance repair.
+  // Enable them only after the whole graph has reached the clearance target.
+  const includeCorners = displayBusinessNodeCommercialClearanceIsClean(edges, nodes);
   const rankedEdgeIndexes = edges.map((edge, edgeIndex) => {
     const path = getDisplayComputedPath(edge);
     const first = path[0];
@@ -101,7 +106,7 @@ export const repairTerminalPreservingOuterStairs = <T extends Edge[]>(
     candidates: (function* () {
       const path = getDisplayComputedPath(best[edgeIndex]);
       yield* rankCommercialInteriorShortcutCandidates(
-        best[edgeIndex], path, nodes,
+        best[edgeIndex], path, nodes, includeCorners,
       );
       yield* buildTerminalPreservingDirectShortcutCandidates(path);
       yield* buildCommercialParallelTerminalCorridorShortcutPaths(path, nodes, best[edgeIndex]);

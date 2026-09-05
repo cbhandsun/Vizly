@@ -122,6 +122,14 @@ describe('display loop shortcut repair', () => {
       { id: 'packing', position: { x: 4900, y: 5622 }, width: 178, height: 60, data: {} },
     ];
     expect(rankCommercialInteriorShortcutCandidates(
+      targetEdge, targetStair, targetNodes, false,
+    )[0]).toEqual([
+      { x: 4245.5, y: 5615.5 }, { x: 4245.5, y: 5559.5 },
+      { x: 4381, y: 5559.5 }, { x: 4381, y: 4995 },
+      { x: 5133, y: 4995 }, { x: 5133, y: 5722 },
+      { x: 5109, y: 5722 }, { x: 5109, y: 5802 },
+    ]);
+    expect(rankCommercialInteriorShortcutCandidates(
       targetEdge, targetStair, targetNodes,
     )[0]).toEqual([
       { x: 4245.5, y: 5615.5 }, { x: 4245.5, y: 5559.5 },

@@ -161,9 +161,6 @@ describe('baseReactFlowDisplayEdges WMS cold performance', () => {
     expect(edgeNodeObstacleHits(result, absoluteNodes), JSON.stringify(paths, null, 2)).toEqual([]);
     expect(displayEdgesHaveNodeAttachedTerminals(result, absoluteNodes), terminalDiagnostics).toBe(true);
     expect(displayEdgesHaveNodeAnchoredTerminals(result, absoluteNodes), terminalDiagnostics).toBe(true);
-    // Fair shortcut scheduling and source-before-target repair remove redundant waypoints.
-    // Keep the geometry fingerprint alongside the unchanged quality/work budgets.
-    expect(finalOutputRouteSignature).toBe('route-v2:44:176:f3bd1036a9318e20');
     expect(result.some(edge => (
       edge.data?.sharedTrunkAware === true || edge.data?.sharedTrunkSynthesized === true
     ))).toBe(true);
@@ -228,5 +225,15 @@ describe('baseReactFlowDisplayEdges WMS cold performance', () => {
       durationMs,
       JSON.stringify({ durationMs, quality, workDiagnostics }, null, 2),
     ).toBeLessThan(25_000);
+    // Check the fingerprint after all quality/work budgets so a geometry change
+    // cannot hide an independent performance regression.
+    // Clearance-staged corner shortcuts remove two e-op-heat bends; two other
+    // corridors move while retaining their endpoints and all quality gates.
+    expect(paths.find(route => route.id === 'e-op-heat')?.path).toEqual([
+      { x: 3712, y: 850 }, { x: 3712, y: 1395 },
+      { x: 4231.6, y: 1395 }, { x: 4231.6, y: 1809 },
+      { x: 4433.4, y: 1809 },
+    ]);
+    expect(finalOutputRouteSignature).toBe('route-v2:44:174:065ac410d5a8527e');
   }, 60_000);
 });

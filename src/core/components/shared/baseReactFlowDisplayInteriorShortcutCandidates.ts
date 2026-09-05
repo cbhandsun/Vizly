@@ -8,6 +8,7 @@ import type { DisplayPoint } from './baseReactFlowDisplayGeometry';
 export const buildTerminalPreservingInteriorShortcutCandidates = (
   path: DisplayPoint[],
   maxCandidates = 32,
+  includeCorners = true,
 ): DisplayPoint[][] => {
   if (path.length < 6 || maxCandidates <= 0) return [];
   const candidates: Array<Readonly<{
@@ -23,6 +24,7 @@ export const buildTerminalPreservingInteriorShortcutCandidates = (
       const end = path[endIndex];
       const interval = path.slice(startIndex, endIndex + 1);
       const aligned = start.x === end.x || start.y === end.y;
+      if (!aligned && !includeCorners) continue;
       const prefix = path.slice(0, startIndex + 1);
       const suffix = path.slice(endIndex);
       const seeds = aligned ? (() => {
