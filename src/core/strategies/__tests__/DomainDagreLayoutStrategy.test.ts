@@ -406,6 +406,12 @@ describe('DomainDagreLayoutStrategy', () => {
             subDomainOrder: presetLayout.subDomainOrder,
         } as unknown as import('../../types/layout').LayoutOptions);
 
+        const visibleLeaves = result.nodes.filter(node => !['titleGroup', 'subGroup', 'group', 'domain'].includes(String(node.type ?? '')));
+        const absoluteLeaves = visibleLeaves.map(node => ({ node, position: absolutePositionOf(node, result.nodes) }));
+        const minimumY = Math.min(...absoluteLeaves.map(({ position }) => position.y));
+        const maximumY = Math.max(...absoluteLeaves.map(({ node, position }) => position.y + sizeOf(node).height));
+        expect(maximumY - minimumY).toBeLessThan(3_000);
+
         const fixQuota = result.nodes.find(n => n.id === 'fix-quota')!;
         const outgoing = result.edges.filter(e => e.source === 'fix-quota');
         expect(fixQuota).toBeTruthy();

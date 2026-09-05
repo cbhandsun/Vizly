@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Edge, Node } from '@xyflow/react';
 import logistics from '../../../data/standardized/LogisticsStandardData.json';
 import wmsProcess from '../../../data/standardized/WmsProcessFlowStandardData.json';
+import demandAllocation from '../../../data/standardized/DeamndAllocation.json';
 import { DomainDagreLayoutStrategy } from '../DomainDagreLayoutStrategy';
 import { LayoutType } from '../../types/layout';
 import { withDisplayAbsolutePositions } from '../../components/shared/baseReactFlowDisplayEdgeCore';
@@ -44,11 +45,12 @@ describe('shared process ranks with local branch separation', () => {
     'labor-schedule-feedback': [202,60],
   };
   const cases = [
-    ...(['TB', 'LR', 'BT', 'RL'] as const).map(direction => ({ name: 'logistics', preset: logistics, direction, productionGeometry: false })),
-    ...(['TB', 'LR'] as const).map(direction => ({ name: 'wms-process', preset: wmsProcess, direction, productionGeometry: false })),
-    ...(['TB', 'LR'] as const).map(direction => ({ name: 'wms-production', preset: wmsProcess, direction, productionGeometry: true })),
+    ...(['TB', 'LR', 'BT', 'RL'] as const).map(direction => ({ name: 'logistics', preset: logistics, direction, productionGeometry: false, preserveSubDomain: false })),
+    ...(['TB', 'LR'] as const).map(direction => ({ name: 'wms-process', preset: wmsProcess, direction, productionGeometry: false, preserveSubDomain: false })),
+    ...(['TB', 'LR'] as const).map(direction => ({ name: 'wms-production', preset: wmsProcess, direction, productionGeometry: true, preserveSubDomain: false })),
+    ...(['TB', 'LR'] as const).map(direction => ({ name: 'demand-allocation', preset: demandAllocation, direction, productionGeometry: false, preserveSubDomain: true })),
   ];
-  it.each(cases)('preserves business order and full routing quality in $name $direction', async ({ name, preset, direction, productionGeometry }) => {
+  it.each(cases)('preserves business order and full routing quality in $name $direction', async ({ name, preset, direction, productionGeometry, preserveSubDomain }) => {
     const dimensionsByDescription = new Map(preset.nodes.map(node => [node.description.trim(), wmsDimensions[node.id]]));
     const widthSpy = productionGeometry ? vi.spyOn(LayoutOptimizer.getInstance(), 'calculateNodeWidth')
       .mockImplementation(description => dimensionsByDescription.get(description)?.[0] ?? 240) : undefined;
@@ -61,7 +63,7 @@ describe('shared process ranks with local branch separation', () => {
       const height = dimensions?.[1] ?? 96;
       return {
         id: node.id, type: 'custom', position: { x: 0, y: 0 },
-        data: productionGeometry ? { ...node } : { ...node, subDomain: node.domain },
+        data: productionGeometry || preserveSubDomain ? { ...node } : { ...node, subDomain: node.domain },
         width, height, measured: { width, height },
         ...(productionGeometry ? { style: { width, height } } : {}),
       };
@@ -92,7 +94,11 @@ describe('shared process ranks with local branch separation', () => {
     const cross = horizontal ? 'y' : 'x';
     const sign = direction === 'BT' || direction === 'RL' ? -1 : 1;
     const byId = new Map(arranged.map(node => [node.id, node]));
-    const chain = name === 'logistics' ? ['upstream', 'l-oms', 'visibility', 'downstream'] : ['order-input', 'allocation'];
+    const chain = name === 'logistics'
+      ? ['upstream', 'l-oms', 'visibility', 'downstream']
+      : name === 'demand-allocation'
+        ? ['start-calc', 'init-data']
+        : ['order-input', 'allocation'];
     for (let index = 1; index < chain.length; index += 1) {
       const source = byId.get(chain[index - 1]);
       const target = byId.get(chain[index]);
