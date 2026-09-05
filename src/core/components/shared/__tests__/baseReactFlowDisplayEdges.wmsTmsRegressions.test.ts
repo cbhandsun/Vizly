@@ -173,7 +173,8 @@ describe('baseReactFlowDisplayEdges WMS and TMS regressions', () => {
       response.phaseTrace?.find(trace => trace.phase === 'final-evaluation-context'),
       diagnostics,
     ).toMatchObject({
-      candidateCount: result.length * 2,
+      // The reused final-evaluation scope visits the response once, not twice.
+      candidateCount: result.length,
       resolution: 'hit',
     });
 
