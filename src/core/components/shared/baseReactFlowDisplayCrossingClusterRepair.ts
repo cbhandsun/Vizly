@@ -263,7 +263,11 @@ const buildMoverCandidates = (
   const sourceRect = sourceNode ? getDisplayNodeRect(sourceNode) : null;
   const targetRect = targetNode ? getDisplayNodeRect(targetNode) : null;
   if (path.length < 2 || !sourceRect || !targetRect) return [];
-  const routingObstacleContext = createRoutingObstacleEvaluationContext(edge, obstacles);
+  // Each candidate owns fresh interior points. Retain bounded coordinate reuse,
+  // without allocating reference-cache entries for these short-lived paths.
+  const routingObstacleContext = createRoutingObstacleEvaluationContext(edge, obstacles, {
+    cachePointReferences: false,
+  });
   const primaryCorridorAxis = displayCrossingClusterSideAxis(
     displayCrossingClusterFacingSidePair(sourceRect, targetRect)[0],
   ) === 'v'

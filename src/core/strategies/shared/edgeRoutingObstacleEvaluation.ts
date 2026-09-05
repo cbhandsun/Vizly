@@ -208,6 +208,7 @@ const countPathRectHits = (
 export function createRoutingObstacleEvaluationContext(
   edge: Edge,
   obstacles: Map<string, Rect>,
+  options: { cachePointReferences?: boolean } = {},
 ): RoutingObstacleEvaluationContext {
   let scannedNodeCount = 0;
   let cacheHitCount = 0;
@@ -227,9 +228,12 @@ export function createRoutingObstacleEvaluationContext(
   const unrelatedSegmentHits = new Map<string, number>();
   const endpointSegmentHits = new Map<string, number>();
   const routingSegmentHits = new Map<string, number>();
-  const unrelatedSegmentHitsByReference: SegmentHitReferenceCache = new WeakMap();
-  const endpointSegmentHitsByReference: SegmentHitReferenceCache = new WeakMap();
-  const routingSegmentHitsByReference: SegmentHitReferenceCache = new WeakMap();
+  const referenceCache = (): SegmentHitReferenceCache | undefined => (
+    options.cachePointReferences === false ? undefined : new WeakMap()
+  );
+  const unrelatedSegmentHitsByReference = referenceCache();
+  const endpointSegmentHitsByReference = referenceCache();
+  const routingSegmentHitsByReference = referenceCache();
   const recordNodeScans = (count: number) => {
     scannedNodeCount += count;
   };

@@ -1,3 +1,4 @@
+import { expectDisplayRoutingTraceChildren } from './baseReactFlowDisplayLogisticsPhaseTrace.testUtils';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { DisplayRoutingPhaseTrace } from '../baseReactFlowDisplayRoutingTrace';
@@ -7,6 +8,53 @@ import {
 } from '../baseReactFlowDisplayWorkerTraceRecorder';
 
 describe('display Worker trace recorder', () => {
+  it('validates the explicit terminal trace hierarchy and rejects an incorrect nested parent', () => {
+    const trace = (
+      phase: DisplayRoutingPhaseTrace['phase'],
+      parentPhase: DisplayRoutingPhaseTrace['parentPhase'],
+    ): DisplayRoutingPhaseTrace => ({
+      phase,
+      parentPhase,
+      durationMs: 10,
+      exclusiveDurationMs: 10,
+      candidateCount: 1,
+      changedEdgeCount: 0,
+      resolution: 'skip',
+    });
+    const validTrace = [
+      trace('terminal-attachment-axis', 'terminal'),
+      trace('terminal-finalize', 'terminal'),
+      trace('terminal-finalize-orthogonal', 'terminal-finalize'),
+      trace('terminal-finalize-fail-closed', 'terminal-finalize'),
+      trace('terminal-fail-closed-local', 'terminal-finalize-fail-closed'),
+    ];
+
+    expect(() => expectDisplayRoutingTraceChildren(
+      validTrace,
+      'terminal hierarchy',
+      'terminal',
+      'terminal-',
+    )).not.toThrow();
+    expect(() => expectDisplayRoutingTraceChildren(
+      [
+        ...validTrace.slice(0, -1),
+        trace('terminal-fail-closed-local', 'terminal-finalize'),
+      ],
+      'terminal hierarchy',
+      'terminal',
+      'terminal-',
+    )).toThrow();
+    for (const invalidTrace of [
+      undefined,
+      [{ ...validTrace[0], exclusiveDurationMs: Number.NaN }],
+    ]) {
+      expect(() => expectDisplayRoutingTraceChildren(
+        invalidTrace, 'invalid terminal trace', 'terminal', 'terminal-',
+      )).toThrow();
+    }
+  });
+
+
   it('can publish bounded incremental phase progress without graph payloads', () => {
     const phaseTrace: DisplayRoutingPhaseTrace[] = [];
     const publish = vi.fn();
