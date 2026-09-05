@@ -1,5 +1,6 @@
-import type { Edge } from '@xyflow/react';
-import { describe, expect, it } from 'vitest';
+import type { Edge, Node } from '@xyflow/react';
+import { describe, expect, it, vi } from 'vitest';
+import * as mazeGeometry from '../edgeDetachedOverlapCandidates';
 
 import { buildBoundedResidualOverlapMazeCandidate } from '../edgeDetachedResidualOverlapMaze';
 import { routeStrictCrossingMazeCandidate } from '../edgeDetachedStrictCrossingMaze';
@@ -18,6 +19,41 @@ function edge(id: string, path: Point[]): Edge {
 }
 
 describe('routeStrictCrossingMazeCandidate penalty context', () => {
+  it('checks each directed grid step against a node only once per search', () => {
+    const directPath: Point[] = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
+    const blockerPath: Point[] = [{ x: 50, y: -100 }, { x: 50, y: 100 }];
+    const nodes: Node[] = [{ id: 'obstacle', position: { x: 40, y: -20 }, width: 20, height: 40, data: {} }];
+    const checks = new Map<string, number>();
+    const intersects = mazeGeometry.segmentIntersectsRect;
+    const spy = vi.spyOn(mazeGeometry, 'segmentIntersectsRect').mockImplementation((segment, rect, padding) => {
+      const key = `${segment.a.x}:${segment.a.y}:${segment.b.x}:${segment.b.y}`;
+      checks.set(key, (checks.get(key) ?? 0) + 1);
+      return intersects(segment, rect, padding);
+    });
+    try {
+      const candidate = routeStrictCrossingMazeCandidate(
+        directPath, 0, [directPath, blockerPath], [edge('moving', directPath), edge('blocker', blockerPath)], nodes,
+      );
+      expect(candidate).not.toBeNull();
+      expect(checks.size).toBeGreaterThan(0);
+      expect(Math.max(...checks.values())).toBe(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('does not retain edge penalties after a search ends', () => {
+    const path: Point[] = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
+    const blockerPath: Point[] = [{ x: 50, y: -100 }, { x: 50, y: 100 }];
+    const moving = edge('moving', path);
+    const blocker = edge('blocker', blockerPath);
+    const context = { penaltyPaths: [path, blockerPath], penaltyEdges: [moving, blocker], penaltyEdgeIndex: 0 };
+    expect(routeStrictCrossingMazeCandidate(path, 0, [path], [moving], [], context)).not.toBeNull();
+    context.penaltyPaths = [path];
+    context.penaltyEdges = [moving];
+    expect(routeStrictCrossingMazeCandidate(path, 0, [path], [moving], [], context)).toBeNull();
+  });
+
   it.each(['LR', 'RL', 'TB', 'BT'])('charges an internal grid vertex crossing in %s before path compaction', (direction) => {
     const transform = ({ x, y }: Point): Point => {
       const sign = direction === 'RL' || direction === 'BT' ? -1 : 1;

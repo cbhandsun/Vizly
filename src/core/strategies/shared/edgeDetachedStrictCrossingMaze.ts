@@ -206,6 +206,11 @@ export function routeStrictCrossingMazeCandidate(
   pushQueue({ cost: 0, xIndex: startX, yIndex: startY, direction: 0 });
   const distByKey = new Map<string, number>([[keyOf(startX, startY, 0), 0]]);
   const prevByKey = new Map<string, string>();
+  // The same directed grid step is revisited with different arrival states.
+  // Keep geometry costs local to this search; the existing cell budget bounds
+  // storage. Straight-through crossings must use a distinct penalty slot.
+  const blockedSteps = new Uint8Array(allX.length * allY.length * 4);
+  const stepPenalties = new Float64Array(allX.length * allY.length * 8).fill(Number.NaN);
 
   const isSegmentBlockedByNode = (segment: Segment): boolean => {
     for (const [nodeId, rect] of obstacles) {
@@ -240,7 +245,11 @@ export function routeStrictCrossingMazeCandidate(
       const axis = axisOf(from, to);
       if (!axis) continue;
       const segment = { a: from, b: to, axis };
-      if (isSegmentBlockedByNode(segment)) continue;
+      const stepIndex = (current.yIndex * allX.length + current.xIndex) * 4 + next.direction - 1;
+      if (blockedSteps[stepIndex] === 0) {
+        blockedSteps[stepIndex] = isSegmentBlockedByNode(segment) ? 2 : 1;
+      }
+      if (blockedSteps[stepIndex] === 2) continue;
       const length = Math.abs(from.x - to.x) + Math.abs(from.y - to.y);
       const turnPenalty = current.direction !== 0
         && (current.direction <= 2) !== (next.direction <= 2) ? 40 : 0;
@@ -252,10 +261,16 @@ export function routeStrictCrossingMazeCandidate(
         b: to,
         axis,
       } : undefined;
+      const penaltyIndex = stepIndex * 2 + Number(Boolean(continuation));
+      let penalty = stepPenalties[penaltyIndex];
+      if (Number.isNaN(penalty)) {
+        penalty = segmentPenaltyAgainstOtherEdges(segment, otherSegments, edge, penaltyEdges, continuation);
+        stepPenalties[penaltyIndex] = penalty;
+      }
       const nextCost = current.cost
         + length
         + turnPenalty
-        + segmentPenaltyAgainstOtherEdges(segment, otherSegments, edge, penaltyEdges, continuation);
+        + penalty;
       const nextKey = keyOf(next.xIndex, next.yIndex, next.direction);
       if (nextCost + EPS >= (distByKey.get(nextKey) ?? Number.POSITIVE_INFINITY)) continue;
       distByKey.set(nextKey, nextCost);
