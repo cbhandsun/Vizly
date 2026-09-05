@@ -564,20 +564,23 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
                     strokeWidth={20}
                 />
                 {shouldRenderLabel && labelPlacement?.leaderEnd && (
-                    <path
+                    <g
                         className="stable-path-edge-label-leader"
                         data-edge-label-leader={id}
                         data-edge-label-priority={isPrimaryLabel ? 'primary' : 'detail'}
                         data-edge-trace-state={isTraceActive ? 'active' : 'idle'}
                         aria-hidden="true"
-                        d={`M ${labelPlacement.anchor.x} ${labelPlacement.anchor.y} L ${labelPlacement.leaderEnd.x} ${labelPlacement.leaderEnd.y}`}
-                        fill="none"
-                        stroke={typeof style?.stroke === 'string' ? style.stroke : '#64748b'}
-                        strokeWidth={1.25}
-                        strokeDasharray="2 3"
-                        vectorEffect="non-scaling-stroke"
-                        pointerEvents="none"
-                    />
+                    >
+                        <ContrastSafeBaseEdge
+                            id={`${id}-label-leader`}
+                            path={`M ${labelPlacement.anchor.x} ${labelPlacement.anchor.y} L ${labelPlacement.leaderEnd.x} ${labelPlacement.leaderEnd.y}`}
+                            canvasBackground={canvasBackground}
+                            interactionWidth={0}
+                            vectorEffect="non-scaling-stroke"
+                            style={{ stroke: typeof style?.stroke === 'string' ? style.stroke : '#64748b',
+                                strokeWidth: 1.25, strokeDasharray: '2 3', pointerEvents: 'none' }}
+                        />
+                    </g>
                 )}
             </g>
             {shouldRenderLabel && (

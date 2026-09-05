@@ -451,7 +451,8 @@ describe('StablePathEdge', () => {
     try {
       const view = render(<>{['first', 'second'].map(id => <React.Fragment key={id}>
         {createStablePathEdgeElement({ id, label: `${id}${text}`, sourceX: 0, sourceY: 0,
-          targetX: 300, targetY: 0, data: { computedPath: [{ x: 0, y: 0 }, { x: 300, y: 0 }] } })}
+          targetX: 300, targetY: 0, style: { stroke: '#47CACC' },
+          data: { computedPath: [{ x: 0, y: 0 }, { x: 300, y: 0 }] } })}
       </React.Fragment>)}</>);
       await act(async () => { await Promise.resolve(); });
       const labels = [...view.container.querySelectorAll<HTMLElement>('.stable-path-edge-label')];
@@ -467,6 +468,15 @@ describe('StablePathEdge', () => {
         || Math.abs(centers[0].y - centers[1].y) >= 143).toBe(true);
       expect(labels.every(element => element.textContent?.includes(text))).toBe(true);
       expect(view.container.querySelectorAll('[data-edge-label-leader]')).toHaveLength(2);
+      for (const leader of view.container.querySelectorAll('[data-edge-label-leader]')) {
+        const underlay = leader.querySelector('.vizly-edge-contrast-underlay');
+        expect(underlay?.getAttribute('stroke')).toBe('#334155');
+        expect(underlay?.getAttribute('stroke-dasharray')).toBe('2 3');
+        const paint = leader.querySelector<SVGElement>('[data-testid="base-edge"]');
+        expect(paint?.style.stroke).toMatch(/#47cacc|rgb\(71, 202, 204\)/i);
+        expect(paint?.getAttribute('data-interaction-width')).toBe('0');
+        expect(paint?.hasAttribute('markerEnd')).toBe(false);
+      }
       view.unmount();
       await act(async () => { await Promise.resolve(); });
     } finally { width.mockRestore(); height.mockRestore(); }
