@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
+import { evaluateTotalJsBudget, TOTAL_JS_HARD_LIMIT_KIB } from './lib/bundle-total-budget.mjs';
 import {
   collectStaticJsAssetPaths,
   parseViteModuleEntry,
@@ -27,7 +28,7 @@ const limits = {
   maxCssChunkKB: parsePositiveNumberEnv('BUNDLE_MAX_CSS_CHUNK_KB', 150),
   maxJsGzipChunkKB: parsePositiveNumberEnv('BUNDLE_MAX_JS_GZIP_CHUNK_KB', 475),
   maxCssGzipChunkKB: parsePositiveNumberEnv('BUNDLE_MAX_CSS_GZIP_CHUNK_KB', 24),
-  maxTotalJsKB: parsePositiveNumberEnv('BUNDLE_MAX_TOTAL_JS_KB', 9500),
+  maxTotalJsKB: parsePositiveNumberEnv('BUNDLE_MAX_TOTAL_JS_KB', TOTAL_JS_HARD_LIMIT_KIB),
   maxStartupJsKB: parsePositiveNumberEnv('BUNDLE_MAX_STARTUP_JS_KB', 650),
   maxStartupJsGzipKB: parsePositiveNumberEnv('BUNDLE_MAX_STARTUP_JS_GZIP_KB', 220),
 };
@@ -112,8 +113,12 @@ for (const asset of cssAssets) {
   }
 }
 
-if (totalJsBytes > limits.maxTotalJsKB * 1024) {
+const totalJsBudget = evaluateTotalJsBudget(totalJsBytes, limits.maxTotalJsKB);
+if (totalJsBudget.status === 'fail') {
   violations.push(`total JS raw ${formatKB(totalJsBytes)} > ${limits.maxTotalJsKB} KB`);
+}
+if (totalJsBudget.status === 'warn') {
+  console.warn(`Bundle total JS warning: ${formatKB(totalJsBytes)} >= ${totalJsBudget.warningKiB} KiB; review dependency/loading growth before adding large dependencies. Hard limit: ${limits.maxTotalJsKB} KiB. Startup and route budgets remain independent.`);
 }
 if (startupJsBytes > limits.maxStartupJsKB * 1024) {
   violations.push(`startup JS raw ${formatKB(startupJsBytes)} > ${limits.maxStartupJsKB} KB`);

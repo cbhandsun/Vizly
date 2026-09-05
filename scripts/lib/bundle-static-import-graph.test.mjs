@@ -1,4 +1,34 @@
 import { describe, expect, it } from 'vitest';
+import { evaluateTotalJsBudget } from './bundle-total-budget.mjs';
+
+describe('reviewed aggregate JS budget', () => {
+  it.each([
+    [0, 'pass'], [9500 * 1024 + 20, 'pass'],
+    [9750 * 1024 - 1, 'pass'], [9750 * 1024, 'warn'],
+    [10000 * 1024, 'warn'], [10000 * 1024 + 1, 'fail'],
+    [Number.MAX_SAFE_INTEGER, 'fail'],
+  ])('classifies %s bytes as %s', (bytes, status) => {
+    expect(evaluateTotalJsBudget(bytes)).toEqual({ status, warningKiB: 9750 });
+  });
+
+  it.each([undefined, null, '', '100', -1, 0.5, NaN, Infinity, {}, Number.MAX_SAFE_INTEGER + 1])(
+    'rejects invalid byte input %s', bytes => {
+      expect(() => evaluateTotalJsBudget(bytes)).toThrow();
+    },
+  );
+
+  it.each([null, '', '10000', 0, -1, NaN, Infinity, {}, Number.MAX_SAFE_INTEGER])(
+    'rejects invalid hard limit %s', limit => {
+      expect(() => evaluateTotalJsBudget(0, limit)).toThrow();
+    },
+  );
+
+  it('preserves stricter overrides and adjusts their warning boundary', () => {
+    expect(evaluateTotalJsBudget(9500 * 1024 + 1, 9500).status).toBe('fail');
+    expect(evaluateTotalJsBudget(9500 * 1024, 9500))
+      .toEqual({ status: 'warn', warningKiB: 9262.5 });
+  });
+});
 
 import {
   collectStaticJsAssetPaths,

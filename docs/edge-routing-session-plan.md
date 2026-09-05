@@ -9,8 +9,9 @@
 ### 发布收口：当前待办与产物同步
 
 - 最新本地证据：商业转角捷径提前占用净距修复通道是 WMS Standard 的回归原因；仅在全图商业净距已达标后启用该类捷径，保留未达标时的对齐捷径。26 项完整质量、捷径和泳道回归通过，严格 Core、TS6、Lint 与 1090 个测试文件 CI 收录检查通过。生产修复尚未提交，预编译产物仍需同步，不记为发布完成。
-- WMS Process 扩大验证：四个 WMS/TMS 用例有三个通过，大图用例的真实 hard-clean、障碍、端点检查通过，失败来自旧的双次评估计数断言；生产 trace 明确以响应边数量计数。冷路由精确指纹由 176 点变为 174 点，尚待几何核对，不能直接更新指纹后宣称通过全部性能预算。
-- 总 JS 预算评估：233 个 JS 合计 9500.02 KiB，入口静态 512.24 KiB raw / 163.42 KiB gzip；动态路由资源不包含在入口静态账内。总量超过现行 9500 KiB 约 20 字节，不具有已证明的体验影响。建议单独审查 9750 KiB 预警、10000 KiB 硬上限，同时保留入口、单块和真实路由性能门禁；当前未调整预算，仍如实记录 bundle 失败。停止零碎体积打磨，优先完成净距修复、产物复现与完整 CI。参考 https://web.dev/articles/reduce-javascript-payloads-with-code-splitting 与 https://developer.mozilla.org/en-US/docs/Web/Performance/Guides/Performance_budgets 。
+- WMS Process 扩大验证：旧双次评估计数断言已在 `373287af` 修正并独立通过。冷路由指纹对照旧候选生成器复现原 176 点签名，当前为 174 点；44 条边仅三条路径变化，端点保持，折弯 88→86，总长 44396→44769（约 +0.84%）。新增具体捷径路径断言，并把指纹放在全部质量、重放、确定性工作量及 25 秒预算之后；独立复验通过，没有放宽预算。
+- 当前生产修复的四项预编译产物已重新生成，并经独立 production `--check` 全部复现；源码签名为 `df2bb13c942a2083e1643595e92b47ef8a69743b4c58d308ca0bdfb6ea6bab0d`。只有 Logistics 回线路径调整（外侧 x=-160→-16），WMS initial/LR 与需求分配几何不变。源码规模、显式 any、DOM sink、secrets 及预编译清单门禁通过；完整发布验证仍未宣称完成。
+- 总 JS 预算经用户明确确认后调整：233 个 JS 合计 9500.02 KiB，入口静态 512.24 KiB raw / 163.42 KiB gzip；动态路由资源不包含在入口静态账内。旧 9500 KiB 门禁因约 20 字节失败已如实记录，现采用 9750 KiB 预警（含边界）、10000 KiB 硬上限（超出才失败），不自动上涨。更严格的环境覆盖继续有效，预警随之下调为上限的 97.5%；入口、单块、CSS、Worker 与真实路由性能门禁均保持原值。34 项预算边界/依赖图测试、Lint、CI 收录和当前构建 bundle 检查通过；此政策通过不等于连线质量或运行时性能通过。停止零碎体积打磨，优先完成净距修复、产物复现与完整 CI。参考 https://web.dev/articles/reduce-javascript-payloads-with-code-splitting 与 https://developer.mozilla.org/en-US/docs/Web/Performance/Guides/Performance_budgets 。
 
 - `31df6418` 已推送：矩阵等待生命周期提取到独立模块，源码规模门禁恢复，33 项相关回归通过。
 - Bundle 导入时序实验已撤回（`bdd99b4b` / `84e544c1`），总量维持约 9499.96KB；后续暂停零碎体积优化。撤回后的 main 独立生成仍出现相同产物变化，不能把此前变化归因于该实验。
