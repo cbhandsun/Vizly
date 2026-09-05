@@ -58,18 +58,30 @@ export function layoutWithDagre(
     if (safeNodes.length === 0) return [];
 
     const g = new dagre.graphlib.Graph();
+    // Non-integer internal keys preserve declaration order through graphlib's
+    // object enumeration (including DFS cycle breaking). Model IDs stay intact.
+    const internalIds = new Map(safeNodes.map((node, index) => [node.id, `node:${index}`]));
+    const declarationIndex = new Map(safeNodes.map((node, index) => [node.id, index]));
+    const seenRelations = new Set<string>();
+    const rankingEdges = safeEdges.filter(edge => {
+        const key = JSON.stringify([edge.source, edge.target]);
+        if (!internalIds.has(edge.source) || !internalIds.has(edge.target) || seenRelations.has(key)) return false;
+        seenRelations.add(key);
+        return true;
+    }).sort((a, b) => (declarationIndex.get(a.source) ?? 0) - (declarationIndex.get(b.source) ?? 0)
+        || (declarationIndex.get(a.target) ?? 0) - (declarationIndex.get(b.target) ?? 0));
 
     // 分析边的连接模式，确定最佳对齐策略
-    const outDegree: Record<string, number> = {};
-    const inDegree: Record<string, number> = {};
-    safeEdges.forEach(e => {
-        outDegree[e.source] = (outDegree[e.source] || 0) + 1;
-        inDegree[e.target] = (inDegree[e.target] || 0) + 1;
+    const outDegree = new Map<string, number>();
+    const inDegree = new Map<string, number>();
+    rankingEdges.forEach(e => {
+        outDegree.set(e.source, (outDegree.get(e.source) ?? 0) + 1);
+        inDegree.set(e.target, (inDegree.get(e.target) ?? 0) + 1);
     });
 
     // 检测是否有一对多或多对一的模式
-    const hasOneToMany = Object.values(outDegree).some(d => d > 1);
-    const hasManyToOne = Object.values(inDegree).some(d => d > 1);
+    const hasOneToMany = [...outDegree.values()].some(d => d > 1);
+    const hasManyToOne = [...inDegree.values()].some(d => d > 1);
 
     // 根据连接模式选择对齐策略
     // - 一对多模式：使用 'DL' (down-left) 让目标节点向下展开
@@ -105,20 +117,23 @@ export function layoutWithDagre(
         const w = dims.width;
         const h = dims.height;
 
-        g.setNode(node.id, { width: w, height: h });
+        const internalId = internalIds.get(node.id);
+        if (internalId !== undefined) g.setNode(internalId, { width: w, height: h });
     });
 
     // 添加边（带权重和最小层级跨度）
-    safeEdges.forEach(edge => {
-        if (g.hasNode(edge.source) && g.hasNode(edge.target)) {
+    rankingEdges.forEach(edge => {
+        const source = internalIds.get(edge.source);
+        const target = internalIds.get(edge.target);
+        if (source !== undefined && target !== undefined) {
             // 计算边的权重：一对多的边权重较低，让目标节点更分散
-            const sourceOutDegree = outDegree[edge.source] || 1;
-            const targetInDegree = inDegree[edge.target] || 1;
+            const sourceOutDegree = outDegree.get(edge.source) || 1;
+            const targetInDegree = inDegree.get(edge.target) || 1;
 
             // 权重计算：连接度越高，权重越低（允许更灵活的布局）
             const weight = 1 / Math.max(sourceOutDegree, targetInDegree);
 
-            g.setEdge(edge.source, edge.target, {
+            g.setEdge(source, target, {
                 weight: weight,
                 minlen: 1,  // 最小层级跨度
             });
@@ -131,7 +146,8 @@ export function layoutWithDagre(
     // 收集结果
     const result: { id: string; x: number; y: number }[] = [];
     safeNodes.forEach(node => {
-        const nodeWithPos = g.node(node.id);
+        const internalId = internalIds.get(node.id);
+        const nodeWithPos = internalId === undefined ? undefined : g.node(internalId);
         if (nodeWithPos) {
             const dims = resolveDimensions(node, resolveNodeDimensions);
             const w = dims.width;

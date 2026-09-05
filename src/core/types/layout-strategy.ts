@@ -1,6 +1,13 @@
 import type { Edge, Node } from '@xyflow/react';
 import type { ElkLayoutRunner } from '../ports/elkLayoutExecutor';
 import type { LayoutOptions } from './layout';
+import type { LaneRankDecision } from './domainLaneRank';
+
+export interface LayoutResult {
+  nodes: Node[];
+  edges: Edge[];
+  metadata?: { laneRankDecision?: LaneRankDecision };
+}
 
 export interface LayoutCalculationContext {
   elkLayoutRunner?: ElkLayoutRunner;
@@ -14,7 +21,7 @@ export interface ILayoutStrategy {
     edges: Edge[],
     options?: LayoutOptions,
     context?: LayoutCalculationContext,
-  ): Promise<{ nodes: Node[]; edges: Edge[] }> | { nodes: Node[]; edges: Edge[] };
+  ): Promise<LayoutResult> | LayoutResult;
   getName(): string;
   getDescription(): string;
   isApplicable(nodes: Node[], edges: Edge[]): boolean;

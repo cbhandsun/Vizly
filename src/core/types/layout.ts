@@ -4,6 +4,7 @@
 
 import { Position, Size } from './common';
 import { NodeData } from './common';
+import type { LaneRankDecision, LaneRankPreference } from './domainLaneRank';
 
 // 布局类型枚举
 export enum LayoutType {
@@ -38,6 +39,9 @@ export enum AlignmentType {
 
 // 布局选项接口
 export interface LayoutOptions {
+  /** Explicit lane semantics; auto compares geometry rather than graph size. */
+  laneRankPreference?: LaneRankPreference;
+  previousLaneRankDecision?: LaneRankDecision;
   /** 布局类型 */
   type: LayoutType;
   /** 节点布局类型（用于域/子域内节点排布） */

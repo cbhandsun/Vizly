@@ -1,5 +1,7 @@
 import type { Node as ReactFlowNode, Edge } from '@xyflow/react';
 import type { LayoutOptions } from '../types/layout';
+import type { LayoutResult } from '../types/layout-strategy';
+import type { LaneRankDecision } from '../types/domainLaneRank';
 import { ILayoutStrategy } from './LayoutStrategyManager';
 import { diagramConfigManager } from '../config/DiagramConfig';
 import {
@@ -66,7 +68,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         nodes: ReactFlowNode[],
         edges: Edge[],
         options: LayoutOptions
-    ): Promise<{ nodes: ReactFlowNode[]; edges: Edge[] }> {
+    ): Promise<LayoutResult> {
         edges = Array.isArray(edges) ? edges : [];
         const cfg = diagramConfigManager.getConfig() || {};
         const layoutCfg = diagramConfigManager.getLayoutConfig();
@@ -480,12 +482,17 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             }
         }
 
+        let laneRankDecision: LaneRankDecision | undefined;
         if (domainPlacement === 'ordered-lanes' && (nodeArrangement === 'dagre' || nodeArrangement === 'flow')) {
-            const { alignDomainDagreLaneFlow } = await import('./domainDagreSemanticLaneFlow');
-            updatedNodes = alignDomainDagreLaneFlow(updatedNodes, edges, {
+            const { selectDomainDagreLaneFlow } = await import('./domainDagreLaneRankDecision');
+            const selected = selectDomainDagreLaneFlow(updatedNodes, edges, {
                 direction, nodeToSubGroup, domainOrder: domainOrderArr, subDomainOrder: subDomainOrderOpt,
                 horizontalGap: nodeGapH, verticalGap: nodeGapV,
+                laneRankPreference: options.laneRankPreference,
+                previousLaneRankDecision: options.previousLaneRankDecision,
             });
+            updatedNodes = selected.nodes;
+            laneRankDecision = selected.decision;
         }
 
         // ============================================
@@ -517,7 +524,8 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             convertDomainDagreToHierarchy(updatedNodes, nodeToSubGroup),
         );
 
-        return { nodes: updatedNodes, edges: finalRoutedEdges };
+        return { nodes: updatedNodes, edges: finalRoutedEdges,
+            ...(laneRankDecision ? { metadata: { laneRankDecision } } : {}) };
     }
 
 

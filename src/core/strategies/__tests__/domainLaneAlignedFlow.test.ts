@@ -21,6 +21,9 @@ import { projectBaseReactFlowDisplayWorkerInput } from '../../components/shared/
 import { LayoutOptimizer } from '../../components/layout/LayoutOptimizer';
 import { resolveDomainLaneSpacing } from '../../components/diagrams/flowchartLayoutStrategyMode';
 import { auditBaseReactFlowDisplayCommercialQuality } from '../../components/shared/baseReactFlowDisplayCommercialQuality';
+import { scoreNodeClearanceRisk } from '../shared/edgeWaypointCandidateRepair';
+import { COMMERCIAL_BUSINESS_NODE_CLEARANCE } from '../shared/edgeBusinessNodeClearanceRepair';
+import { getDisplayComputedPath } from '../../components/shared/baseReactFlowDisplayGeometry';
 
 vi.hoisted(() => {
   Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
@@ -161,7 +164,13 @@ describe('shared process ranks with local branch separation', () => {
       paths: paths.map(edge => ({ id: edge.id, path: edge.data?.computedPath })),
     }));
     repairSpy.mockRestore();
-    expect(response.hardClean, JSON.stringify({ report: response.hardReport, attempted })).toBe(true);
+    const clearance = (response.edges ?? []).flatMap(edge => arranged.flatMap(node => {
+      const path = getDisplayComputedPath(edge);
+      const risk = scoreNodeClearanceRisk(path, [node], edge, COMMERCIAL_BUSINESS_NODE_CLEARANCE);
+      return risk > 0.5 ? [{ edgeId: edge.id, nodeId: node.id, risk,
+        rect: { ...node.position, ...getNodeDimensions(node) }, path }] : [];
+    }));
+    expect(response.hardClean, JSON.stringify({ report: response.hardReport, clearance, attempted })).toBe(true);
     expect(response.hardReport, JSON.stringify(response.hardReport)).toMatchObject({
       hardClean: true, obstacleHits: 0, terminalsAttached: true, terminalsAnchored: true,
       minimumClearanceViolations: 0, commercialClearanceViolations: 0,

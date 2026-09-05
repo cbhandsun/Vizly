@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Edge, Node } from '@xyflow/react';
 import { alignDomainDagreLaneFlow } from '../domainDagreSemanticLaneFlow';
+import { connectedLaneInputFingerprint } from '../domainDagreLaneRankDecision';
 import { getNodeDimensions } from '../DomainDagreLayoutHelpers';
 import { isDomainDagreGroupNode } from '../domainDagreHierarchy';
 
@@ -93,6 +94,44 @@ describe('semantic swimlane process geometry', () => {
     const domains = arranged.filter(node => node.type === 'titleGroup');
     const flowExtents = domains.map(node => getNodeDimensions(node)[direction === 'LR' ? 'width' : 'height']);
     expect(new Set(flowExtents).size).toBe(1);
+  });
+
+  it.each([
+    { direction: 'TB' as const, rankMode: 'global' as const },
+    { direction: 'BT' as const, rankMode: 'global' as const },
+    { direction: 'LR' as const, rankMode: 'global' as const },
+    { direction: 'RL' as const, rankMode: 'global' as const },
+    { direction: 'TB' as const, rankMode: 'compact' as const },
+    { direction: 'BT' as const, rankMode: 'compact' as const },
+    { direction: 'LR' as const, rankMode: 'compact' as const },
+    { direction: 'RL' as const, rankMode: 'compact' as const },
+  ])('does not serialize a connected peer branch when an isolated peer shares its rank in $rankMode $direction mode', ({ direction, rankMode }) => {
+    const domain = makeNode('domain', 'a', 0, 'titleGroup');
+    const connected = [makeNode('start', 'a'), makeNode('left', 'a'), makeNode('right', 'a'), makeNode('end', 'a')];
+    const branchEdges: Edge[] = [
+      { id: 'start-left', source: 'start', target: 'left' },
+      { id: 'start-right', source: 'start', target: 'right' },
+      { id: 'left-end', source: 'left', target: 'end' },
+      { id: 'right-end', source: 'right', target: 'end' },
+    ];
+    const options = { direction, rankMode };
+    const withoutIsolated = alignDomainDagreLaneFlow([domain, ...connected], branchEdges, options);
+    const withIsolated = alignDomainDagreLaneFlow([
+      domain, ...connected, makeNode('isolated', 'a'),
+    ], branchEdges, options);
+    const withoutById = new Map(withoutIsolated.map(node => [node.id, node]));
+    const withById = new Map(withIsolated.map(node => [node.id, node]));
+
+    expect(connectedLaneInputFingerprint([domain, ...connected], branchEdges, { direction })).toEqual(
+      connectedLaneInputFingerprint([domain, ...connected, makeNode('isolated', 'a')], branchEdges, { direction }),
+    );
+
+    for (const id of ['start', 'left', 'right', 'end']) {
+      expect(withById.get(id)?.position).toEqual(withoutById.get(id)?.position);
+    }
+    const flow = direction === 'LR' || direction === 'RL' ? 'x' : 'y';
+    expect(withById.get('isolated')?.position[flow]).toEqual(withById.get('start')?.position[flow]);
+    expect(Math.abs((withById.get('left')?.position[flow] ?? NaN) - (withById.get('right')?.position[flow] ?? NaN))).toBe(120);
   });
 
   it.each([

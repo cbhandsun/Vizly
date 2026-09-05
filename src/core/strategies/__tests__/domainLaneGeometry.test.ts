@@ -56,10 +56,10 @@ describe('semantic lane geometry independent of routing', () => {
     const nodes: Node[] = wms.nodes.map(node => ({ id: node.id, type: 'custom', position: { x: 0, y: 0 },
       data: { ...node, subDomain: node.domain }, width: 240, height: 96, measured: { width: 240, height: 96 } }));
     const align = semantic.alignDomainDagreLaneFlow;
-    let expected: Node[] = [];
+    const candidates = new Map<string, Node[]>();
     const spy = vi.spyOn(semantic, 'alignDomainDagreLaneFlow').mockImplementation((...args) => {
       const output = align(...args);
-      expected = structuredClone(output);
+      candidates.set(args[2].rankMode ?? 'global', structuredClone(output));
       return output;
     });
     try {
@@ -69,7 +69,12 @@ describe('semantic lane geometry independent of routing', () => {
         spacing: { horizontal: 120, vertical: 120 }, generateDomainGroups: true, generateSubDomainGroups: true,
       });
       expect(result.nodes.filter(node => node.type === 'custom')).toHaveLength(nodes.length);
-      expect(spy).toHaveBeenCalledOnce();
+      expect(spy).toHaveBeenCalledTimes(2);
+      expect([...candidates.keys()].sort()).toEqual(['compact', 'global']);
+      const applied = result.metadata?.laneRankDecision?.applied;
+      expect(applied).toBeDefined();
+      const expected = applied ? candidates.get(applied) : undefined;
+      if (!expected) throw new Error('Missing selected ranking candidate');
       const projected = projectBaseReactFlowDisplayWorkerInput(result);
       const actual = new Map(projected.nodes.map(node => [node.id, node]));
       for (const node of expected) {
