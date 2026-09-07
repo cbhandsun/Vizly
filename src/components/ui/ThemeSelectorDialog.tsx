@@ -77,6 +77,7 @@ export const ThemeSelectorDialog: React.FC<ThemeSelectorDialogProps> = ({
       <div
         ref={dialogRef}
         role="dialog"
+        data-theme-selector-dialog
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
@@ -92,6 +93,7 @@ export const ThemeSelectorDialog: React.FC<ThemeSelectorDialogProps> = ({
           <button
             ref={closeButtonRef}
             type="button"
+            data-theme-selector-close
             aria-label={closeLabel}
             title={closeLabel}
             onClick={onClose}

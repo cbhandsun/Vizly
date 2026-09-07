@@ -67,12 +67,53 @@ const waitForThemeState = async (session, expected, timeoutMs = 5_000) => {
   return state;
 };
 
-const switchTheme = (session, themeId) => session.evaluate(`(() => {
-  window.dispatchEvent(new CustomEvent('diagram-global-theme-changed', {
-    detail: ${JSON.stringify(themeId)},
-  }));
+// The global-theme event is a notification, and its designer listener may not
+// be mounted. Exercise the authoritative application control in every view.
+export const clickDisplayRoutingThemeControl = (doc, action, themeId) => {
+  if (!['light', 'dark', 'high-contrast'].includes(themeId)
+    || !['open', 'select', 'close'].includes(action)) return false;
+  const dialogs = [...doc.querySelectorAll('[data-theme-selector-dialog]')];
+  const clickable = button => button?.tagName === 'BUTTON' && !button.disabled
+    && !button.closest('[inert], [hidden]') && button.getClientRects().length > 0;
+  let button;
+  if (action === 'open') {
+    if (dialogs.length > 0) return false;
+    button = [...doc.querySelectorAll('[data-theme-selector-trigger]')].find(clickable);
+  } else {
+    if (dialogs.length !== 1) return false;
+    button = action === 'close'
+      ? dialogs[0].querySelector('[data-theme-selector-close]')
+      : [...dialogs[0].querySelectorAll('[data-theme-id]')]
+        .find(candidate => candidate.getAttribute('data-theme-id') === themeId);
+  }
+  if (!clickable(button)) return false;
+  button.click();
   return true;
-})()`);
+};
+
+const switchTheme = async (session, themeCase) => {
+  const deadline = Date.now() + 5_000;
+  let step = 'open';
+  let state = null;
+  const click = action => session.evaluate(
+    `(${clickDisplayRoutingThemeControl.toString()})(document, ${JSON.stringify(action)}, ${JSON.stringify(themeCase.id)})`,
+  );
+  while (Date.now() < deadline) {
+    if (step === 'open' && await click('open')) step = 'select';
+    else if (step === 'select' && await click('select')) step = 'applied';
+    else if (step === 'applied') {
+      state = await readThemeState(session);
+      if (state?.dataTheme === themeCase.mode
+        && normalizeColor(state.primary) === normalizeColor(themeCase.primary)) {
+        if (await click('close')) step = 'closed';
+      }
+    } else if (step === 'closed' && await session.evaluate(
+      `!document.querySelector('[data-theme-selector-dialog]')`,
+    )) return state;
+    await delay(50);
+  }
+  throw new Error(`Theme selector did not complete ${themeCase.id} (${step}) within 5000ms`);
+};
 
 export const verifyDisplayRoutingThemeMatrix = async ({
   session,
@@ -85,10 +126,12 @@ export const verifyDisplayRoutingThemeMatrix = async ({
 }) => {
   const results = [];
   for (const [index, themeCase] of DISPLAY_ROUTING_THEME_CASES.entries()) {
-    if (index > 0) await switchTheme(session, themeCase.id);
+    const appliedState = index > 0
+      ? await switchTheme(session, themeCase)
+      : await waitForThemeState(session, themeCase);
     const state = assertDisplayRoutingThemeState({
       themeCase,
-      state: await waitForThemeState(session, themeCase),
+      state: appliedState,
       expectedSignature,
       expectedWorkerStartCount,
       expectedWorkerAbortCount,
