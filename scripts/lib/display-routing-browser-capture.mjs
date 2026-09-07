@@ -5,6 +5,16 @@
  */
 export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
   const NativeWorker = window.Worker;
+  const bootErrors = { script: 0, resource: 0, rejection: 0 };
+  window.__vizlyBrowserBootErrors = bootErrors;
+  // Keep counts only: exception messages and resource URLs may contain user data.
+  window.addEventListener?.('error', event => {
+    const key = event.target && event.target !== window ? 'resource' : 'script';
+    bootErrors[key] = Math.min(100_000, bootErrors[key] + 1);
+  }, true);
+  window.addEventListener?.('unhandledrejection', () => {
+    bootErrors.rejection = Math.min(100_000, bootErrors.rejection + 1);
+  });
   window.__vizlyRoutingRequests = [];
   window.__vizlyRoutingResponses = [];
   window.__vizlyBoundedCandidates = [];

@@ -4,7 +4,23 @@ const DEFAULT_WAIT_TIMEOUT_MS = 60_000;
 
 const DISPLAY_ROUTING_TIMEOUT_DIAGNOSTICS_EXPRESSION = `(() => {
   const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
+  const boundedCount = value => Number.isSafeInteger(value) && value >= 0
+    ? Math.min(100_000, value) : null;
+  const bootErrors = window.__vizlyBrowserBootErrors || {};
   return {
+    page: {
+      readyState: ['loading', 'interactive', 'complete'].includes(document.readyState)
+        ? document.readyState : 'unknown',
+      protocol: ['http:', 'https:', 'about:', 'chrome-error:'].includes(window.location?.protocol)
+        ? window.location.protocol : 'other',
+      captureInstalled: !!window.__vizlyBrowserBootErrors,
+      rootChildCount: boundedCount(document.querySelector('#root')?.childElementCount),
+      moduleScriptCount: document.querySelectorAll('script[type="module"]').length,
+      renderedNodeCount: document.querySelectorAll('.react-flow__node').length,
+      scriptErrors: boundedCount(bootErrors.script),
+      resourceErrors: boundedCount(bootErrors.resource),
+      unhandledRejections: boundedCount(bootErrors.rejection),
+    },
     routing: {
       stage: routing.stage,
       workerStartCount: routing.workerStartCount,
