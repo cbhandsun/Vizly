@@ -37,6 +37,9 @@ test-results/
 .gemini
 docs/*
 !docs/edge-routing-session-plan.md
+!docs/edge-routing-balanced-model-report.md
+!docs/edge-routing-normal-entry-fix.md
+!docs/layout-space-optimization.md
 scratch/
 .tmp-vizly-smoke-profile-*/
 thumbnails/
