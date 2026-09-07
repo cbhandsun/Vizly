@@ -25,6 +25,15 @@ const finiteDuration = value => (
   Number.isFinite(value) && value >= 0 && value <= MAX_DURATION_MS ? value : null
 );
 const subtractDurations = (totalMs, partMs) => Number((totalMs - partMs).toFixed(3));
+const WORKER_TIMING_FIELDS = ['prewarmLeadMs', 'requestPreparationMs', 'firstResponseMs',
+  'workerDeliveryOverheadMs', 'workerMonotonicDeliveryOverheadMs', 'responseParseMs', 'responseApplyMs'];
+const projectWorkerTimings = value => {
+  if (value == null) return null;
+  if (!isRecord(value) || WORKER_TIMING_FIELDS.some(field => finiteDuration(value[field]) == null)) {
+    throw new Error('Cold-route Worker timings contain invalid aggregate data');
+  }
+  return Object.fromEntries(WORKER_TIMING_FIELDS.map(field => [field, value[field]]));
+};
 const sumDurations = durations => Number(
   durations.reduce((sum, durationMs) => sum + durationMs, 0).toFixed(3),
 );
@@ -149,6 +158,7 @@ export const buildPrecompiledDisplayRoutePerformanceResult = captures => {
       routeMs,
       workerDurationMs,
       routeOverheadMs: subtractDurations(routeMs, workerDurationMs),
+      workerTimings: projectWorkerTimings(measurement.workerTimings),
       tracedExclusiveMs,
       workerUntracedMs: subtractDurations(
         workerDurationMs,
@@ -232,6 +242,16 @@ export const summarizePrecompiledDisplayRoutePerformance = (
       route: summarizeDisplayRoutingSamples(cases.map(item => item.routeMs)),
       workerCompute: summarizeDisplayRoutingSamples(cases.map(item => item.workerDurationMs)),
       routeOverhead: summarizeDisplayRoutingSamples(cases.map(item => item.routeOverheadMs)),
+      workerTimingSampleCount: cases.filter(item => item.workerTimings).length,
+      workerTimings: Object.fromEntries(WORKER_TIMING_FIELDS.map(field => [field,
+        summarizeDisplayRoutingSamples(cases.flatMap(item => (
+          item.workerTimings ? [item.workerTimings[field]] : []
+        ))),
+      ])),
+      slowestSamples: cases.map((item, index) => ({
+        sampleIndex: index + 1, routeMs: item.routeMs, workerDurationMs: item.workerDurationMs,
+        routeOverheadMs: item.routeOverheadMs, workerTimings: item.workerTimings,
+      })).sort((left, right) => right.routeMs - left.routeMs).slice(0, 5),
       tracedCompute: summarizeDisplayRoutingSamples(cases.map(item => item.tracedExclusiveMs)),
       untracedCompute: summarizeDisplayRoutingSamples(cases.map(item => item.workerUntracedMs)),
       resolutions: Object.fromEntries([...new Set(cases.map(item => item.workerResolution))]

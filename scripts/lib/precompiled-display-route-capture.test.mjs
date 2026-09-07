@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  createPrecompiledDisplayRouteTimingRecorder,
+  projectPrecompiledDisplayRouteTimings,
   createPrecompiledDisplayRoutePatches,
   isFreshFullRouteResolution,
   isFreshFullRouteRequestResponse,
@@ -32,6 +34,61 @@ const routed = [{
 }];
 
 describe('precompiled display route capture', () => {
+  it('times only matching replies and resets between requests', () => {
+    const recorder = createPrecompiledDisplayRouteTimingRecorder(100);
+    expect(recorder.received({ requestId: 'first' }, 110)).toBeNull();
+    recorder.posted('first', 120);
+    expect(recorder.received({ requestId: 'stale', edges: [] }, 130)).toBeNull();
+    expect(recorder.received({ requestId: 'first', phaseProgress: {} }, 140)).toEqual({
+      createdAt: 100, postedAt: 120, firstResponseAt: 140, finalResponseAt: null,
+      postedMonotonicAt: 120, finalResponseMonotonicAt: null,
+    });
+    const result = recorder.received({ requestId: 'first', edges: [] }, 180);
+    expect(result.finalResponseAt).toBe(180);
+    result.finalResponseAt = 0;
+    expect(recorder.received({ requestId: 'first', edges: [] }, 200).finalResponseAt).toBe(180);
+    recorder.posted('second', 210);
+    expect(recorder.received({ requestId: 'first' }, 220)).toBeNull();
+    expect(recorder.received({ requestId: 'second', error: 'failed' }, 230)).toEqual({
+      createdAt: 100, postedAt: 210, firstResponseAt: 230, finalResponseAt: 230,
+      postedMonotonicAt: 210, finalResponseMonotonicAt: 230,
+    });
+    for (const id of [null, '', 123, 'x'.repeat(501)]) {
+      recorder.posted(id, 240);
+      expect(recorder.received({ requestId: id }, 250)).toBeNull();
+    }
+  });
+
+  it('projects only ordered bounded timing durations', () => {
+    const timing = { createdAt: 100, postedAt: 220, firstResponseAt: 230, finalResponseAt: 700,
+      postedMonotonicAt: 20.5, finalResponseMonotonicAt: 500.5 };
+    const routing = { workerStartedAt: 200, workerResponseParsedAt: 720, finalAppliedAt: 730 };
+    expect(projectPrecompiledDisplayRouteTimings(timing, routing, 400)).toEqual({
+      prewarmLeadMs: 120, requestPreparationMs: 20, firstResponseMs: 10,
+      workerDeliveryOverheadMs: 80, responseParseMs: 20, responseApplyMs: 10,
+      workerMonotonicDeliveryOverheadMs: 80,
+    });
+    // A worker created on demand is valid, but has less prewarm lead.
+    expect(projectPrecompiledDisplayRouteTimings({ ...timing, createdAt: 210 }, routing, 400)
+      .prewarmLeadMs).toBe(10);
+    expect(projectPrecompiledDisplayRouteTimings(timing, routing, 480.5)
+      .workerDeliveryOverheadMs).toBe(0);
+    for (const value of [null, {}, [], { ...timing, createdAt: 221 },
+      { ...timing, firstResponseAt: 701 }, { ...timing, finalResponseAt: 600_900 },
+      ...[NaN, Infinity, -1, '700', 700.1, '<script>'].map(finalResponseAt => ({ ...timing, finalResponseAt }))]) {
+      expect(projectPrecompiledDisplayRouteTimings(value, routing, 400)).toBeNull();
+    }
+    for (const value of [NaN, Infinity, -1, 482, '400']) {
+      expect(projectPrecompiledDisplayRouteTimings(timing, routing, value)).toBeNull();
+    }
+    expect(projectPrecompiledDisplayRouteTimings(timing, null, 400)).toBeNull();
+    expect(projectPrecompiledDisplayRouteTimings(timing, { ...routing, finalAppliedAt: 719 }, 400)).toBeNull();
+    expect(projectPrecompiledDisplayRouteTimings({ ...timing, finalResponseMonotonicAt: Infinity }, routing, 400)).toBeNull();
+    expect(projectPrecompiledDisplayRouteTimings({ ...timing, finalResponseMonotonicAt: 400 }, routing, 400)).toBeNull();
+    expect(projectPrecompiledDisplayRouteTimings({ ...timing, finalResponseMonotonicAt: 421 }, routing, 400)
+      .workerMonotonicDeliveryOverheadMs).toBe(0.5);
+  });
+
   it('captures bounded worker compute duration for cold-route diagnostics', () => {
     expect(renderPrecompiledDisplayRouteCaptureExpression('safe-preset'))
       .toContain('workerDurationMs: isLayoutCapture ? routing.routeMs : response.workerDurationMs');
