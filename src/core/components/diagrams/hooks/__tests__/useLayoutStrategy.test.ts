@@ -204,6 +204,27 @@ describe('prepareLayeredLayoutEdges', () => {
   });
 
   it.each([
+    ['manualHandleSides', ['source', 'target']],
+    ['manualHandlePositions', ['source', 'target']],
+    ['manualHandles', true],
+    ['manualHandles', { source: true, target: true }],
+    ['_manualHandles', { source: true }],
+    ['manualHandleSides', { invalid: '<script>' }],
+  ])('releases old %s constraints when a new layout replaces the ports', (key, value) => {
+    const source: Edge = {
+      id: 'saved-edge', source: 'source', target: 'below',
+      sourceHandle: 'right', targetHandle: 'left', label: 'condition',
+      data: { [String(key)]: value, labelOffset: { x: -8, y: 6 } },
+    };
+    const before = structuredClone(source);
+    const [edge] = prepareLayeredLayoutEdges(nodes, [source], 'TB');
+    expect(edge).toMatchObject({ sourceHandle: 'bottom', targetHandle: 'top',
+      label: 'condition', data: { labelOffset: { x: -8, y: 6 } } });
+    expect(edge.data?.[String(key)]).toBeUndefined();
+    expect(source).toEqual(before);
+  });
+
+  it.each([
     ['BT', { x: 40, y: 180 }, { x: 0, y: 0 }, 'top', 'bottom'],
     ['RL', { x: 420, y: 0 }, { x: 0, y: 0 }, 'left', 'right'],
   ] as const)(

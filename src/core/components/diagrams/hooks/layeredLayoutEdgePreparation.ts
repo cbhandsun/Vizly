@@ -288,6 +288,12 @@ export const prepareLayeredLayoutEdges = (
             type: clearLayoutEdgeRoutingType(edge),
             data: {
                 ...clearBaseReactFlowLayoutEdgeRoutingData(edge.data),
+                // This command has assigned ports for the new layout. Locks
+                // from the saved layout cannot constrain those new endpoints.
+                manualHandleSides: undefined,
+                manualHandlePositions: undefined,
+                manualHandles: undefined,
+                _manualHandles: undefined,
                 ...(layoutRoute ? {
                     elkPath: layoutRoute,
                     layoutRoutingCandidate: true,
