@@ -343,6 +343,21 @@ describe('display routing chunk classifier', () => {
 });
 
 describe('sharedModuleWorkers Vite plugin', () => {
+  it('co-loads the precompiled descriptors and their dedicated bounded asset fetcher', () => {
+    for (const suffix of [
+      'generated/baseReactFlowPrecompiledRouteLoaders.ts',
+      'baseReactFlowPrecompiledRouteAsset.ts',
+    ]) {
+      expect(matchesFlowchartDesignerMicroModule(`C:/repo/src/core/components/shared/${suffix}`)).toBe(true);
+    }
+    expect(matchesFlowchartDesignerMicroModule(
+      'C:\\repo\\src\\core\\components\\shared\\baseReactFlowPrecompiledRouteAsset.ts?import',
+    )).toBe(true);
+    expect(matchesFlowchartDesignerMicroModule(
+      'C:/repo/src/core/components/shared/baseReactFlowDisplayEdges.worker.ts',
+    )).toBe(false);
+  });
+
   it('keeps diagnostic routing chunk names while compacting ordinary lazy chunks', () => {
     expect(productionChunkFileNames({ name: 'baseReactFlowDisplayEdges.worker' }))
       .toBe('assets/[name]-[hash].js');

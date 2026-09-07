@@ -60,6 +60,8 @@ const FLOWCHART_DESIGNER_STARTUP_MODULES = new Set([
 
 const FLOWCHART_DESIGNER_MICRO_MODULES = new Set([
   '/src/core/components/shared/generated/baseReactFlowPrecompiledRouteLoaders.ts',
+  // This bounded fetcher has only the generated loaders as a runtime consumer.
+  '/src/core/components/shared/baseReactFlowPrecompiledRouteAsset.ts',
   '/src/components/diagramViewerTemplateSelection.ts',
   '/src/core/components/shared/viewportStore.ts',
   '/src/core/components/shared/diagramNodeBounds.ts',
