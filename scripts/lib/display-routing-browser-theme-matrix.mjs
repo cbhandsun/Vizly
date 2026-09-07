@@ -96,15 +96,18 @@ export const clickDisplayRoutingThemeControl = (doc, action, themeId) => {
   return true;
 };
 
-const switchTheme = async (session, themeCase) => {
-  const deadline = Date.now() + 5_000;
+export const switchDisplayRoutingTheme = async (session, themeCase, { now = Date.now, wait = delay } = {}) => {
+  const startedAt = now();
+  const deadline = startedAt + 5_000;
   let step = 'open';
+  const transitions = [{ step, elapsedMs: 0 }];
   let state = null;
   let openedSettings = false;
   const click = action => session.evaluate(
     `(${clickDisplayRoutingThemeControl.toString()})(document, ${JSON.stringify(action)}, ${JSON.stringify(themeCase.id)})`,
   );
-  while (Date.now() < deadline) {
+  while (now() < deadline) {
+    const previousStep = step;
     if (step === 'open') {
       if (await click('open')) step = 'select';
       else if (!openedSettings) {
@@ -127,14 +130,26 @@ const switchTheme = async (session, themeCase) => {
     } else if (step === 'closed' && await session.evaluate(
       `!document.querySelector('[data-theme-selector-dialog]')`,
     )) {
-      if (!openedSettings) return state;
+      if (!openedSettings) {
+        if (now() < deadline) return state;
+        break;
+      }
       if (await click('close-settings')) step = 'settings-closed';
     } else if (step === 'settings-closed' && await session.evaluate(
       `!document.querySelector('[data-settings-close]')`,
-    )) return state;
-    await delay(50);
+    )) {
+      if (now() < deadline) return state;
+      break;
+    }
+    if (step !== previousStep) {
+      transitions.push({ step, elapsedMs: Math.min(60_000, Math.max(0, now() - startedAt)) });
+    } else {
+      // Poll only pending UI work. Sleeping after a successful close can move
+      // its completion check beyond the original deadline even with no dialog.
+      await wait(Math.min(50, Math.max(0, deadline - now())));
+    }
   }
-  throw new Error(`Theme selector did not complete ${themeCase.id} (${step}) within 5000ms`);
+  throw new Error(`Theme selector did not complete ${themeCase.id} (${step}) within 5000ms; transitions=${JSON.stringify(transitions)}`);
 };
 
 export const verifyDisplayRoutingThemeMatrix = async ({
@@ -149,7 +164,7 @@ export const verifyDisplayRoutingThemeMatrix = async ({
   const results = [];
   for (const [index, themeCase] of DISPLAY_ROUTING_THEME_CASES.entries()) {
     const appliedState = index > 0
-      ? await switchTheme(session, themeCase)
+      ? await switchDisplayRoutingTheme(session, themeCase)
       : await waitForThemeState(session, themeCase);
     const state = assertDisplayRoutingThemeState({
       themeCase,

@@ -6,6 +6,7 @@ import {
   assertDisplayRoutingThemeState,
   DISPLAY_ROUTING_THEME_CASES,
   clickDisplayRoutingThemeControl,
+  switchDisplayRoutingTheme,
   verifyDisplayRoutingThemeMatrix,
 } from './display-routing-browser-theme-matrix.mjs';
 
@@ -19,6 +20,58 @@ const stateFor = themeCase => ({
 });
 
 describe('display routing browser theme matrix', () => {
+  it.each([
+    { closedAt: 4_980, observedAt: 4_980, succeeds: true },
+    { closedAt: 5_001, observedAt: 5_001, succeeds: false },
+    { closedAt: 4_980, observedAt: 5_001, succeeds: false },
+  ])('checks completed settings closure within the original deadline: %j', async ({ closedAt, observedAt, succeeds }) => {
+    vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}]);
+    let now = 0;
+    const theme = DISPLAY_ROUTING_THEME_CASES[1];
+    const trigger = document.createElement('button');
+    trigger.setAttribute('data-theme-selector-trigger', '');
+    trigger.onclick = () => {
+      const dialog = document.createElement('div');
+      dialog.setAttribute('data-theme-selector-dialog', '');
+      const choice = document.createElement('button');
+      choice.setAttribute('data-theme-id', theme.id);
+      choice.onclick = () => {
+        document.documentElement.setAttribute('data-theme', theme.mode);
+        document.documentElement.style.setProperty('--theme-primary-main', theme.primary);
+      };
+      const close = document.createElement('button');
+      close.setAttribute('data-theme-selector-close', '');
+      close.onclick = () => dialog.remove();
+      dialog.append(choice, close);
+      document.body.append(dialog);
+    };
+    const session = {
+      evaluate: async expression => {
+        const result = runInNewContext(expression, {
+          document, window, getComputedStyle: window.getComputedStyle.bind(window),
+        });
+        if (expression === "!document.querySelector('[data-settings-close]')") now = observedAt;
+        return result;
+      },
+      send: async (_method, { type }) => {
+        if (type !== 'keyDown') return;
+        const settings = document.createElement('div');
+        const close = document.createElement('button');
+        close.setAttribute('data-settings-close', '');
+        close.onclick = () => { settings.remove(); now = closedAt; };
+        settings.append(trigger, close);
+        document.body.append(settings);
+      },
+    };
+    const result = switchDisplayRoutingTheme(session, theme, {
+      now: () => now,
+      wait: async ms => { now += ms; },
+    });
+    if (succeeds) await expect(result).resolves.toMatchObject({ dataTheme: 'dark' });
+    else await expect(result).rejects.toThrow('within 5000ms');
+    expect(document.querySelector('[data-settings-close]')).toBeNull();
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
     document.body.replaceChildren();
