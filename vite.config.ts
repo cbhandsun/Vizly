@@ -7,6 +7,7 @@ import { realpathSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { jspdfRasterOnlyPlugin } from './vite-plugins/jspdfRasterOnly'
 import { displayWorkerChunkIsolationPlugin } from './vite-plugins/displayWorkerChunkIsolation'
+import { lazyAntdTableChunkGroup, lazyAntdTableIsolationPlugin } from './vite-plugins/lazyAntdTableChunk'
 import { devCspPlugin } from './vite-plugins/devCsp'
 import { elkWorkerAssetPlugin } from './vite-plugins/elkWorkerAsset'
 import { pdfFontAssetPlugin } from './vite-plugins/pdfFontAsset'
@@ -329,6 +330,7 @@ export default defineConfig({
     elkWorkerAssetPlugin(projectRoot),
     pdfFontAssetPlugin(projectRoot),
     minifyLocaleAssetsPlugin(projectRoot),
+    lazyAntdTableIsolationPlugin(),
     react(),
     tailwindcss(),
   ],
@@ -390,6 +392,7 @@ export default defineConfig({
         chunkFileNames: productionChunkFileNames,
         codeSplitting: {
           groups: [
+            lazyAntdTableChunkGroup,
             {
               name: 'app-safe-logging',
               test: matchesAppSafeLoggingModule,

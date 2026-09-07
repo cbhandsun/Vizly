@@ -18,6 +18,11 @@ import {
 import { minifyLocaleJsonAsset } from '../../../../vite-plugins/minifyLocaleAssets';
 import { assertDisplayWorkerChunkIsolation, displayWorkerChunkIsolationPlugin } from '../../../../vite-plugins/displayWorkerChunkIsolation';
 import {
+  assertLazyAntdTableIsolation,
+  lazyAntdTableIsolationPlugin,
+  matchesLazyAntdTableModule,
+} from '../../../../vite-plugins/lazyAntdTableChunk';
+import {
   classifyDisplayRoutingChunkGraph,
   createDisplayRoutingChunkClassifier,
   type ChunkGraphModuleInfo,
@@ -25,6 +30,74 @@ import {
 
 const displayWorkerId = 'C:\\repo\\src\\core\\components\\shared\\baseReactFlowDisplayEdges.worker.ts';
 const appEntryId = 'C:/repo/src/main.tsx';
+
+describe('lazy table implementation isolation', () => {
+  const tableId = 'C:/repo/node_modules/antd/es/table/index.js';
+  const contextId = 'C:/repo/node_modules/antd/es/table/TableMeasureRowContext.js';
+  const graph = (): Array<{
+    fileName: string;
+    facadeModuleId: string | null;
+    imports: string[];
+    modules: Record<string, { renderedLength: number }>;
+  }> => [
+    { fileName: 'main.js', facadeModuleId: appEntryId, imports: ['tooltip.js'], modules: {} },
+    { fileName: 'designer.js', facadeModuleId: 'C:/repo/src/core/components/diagrams/FlowchartDesigner.tsx', imports: [], modules: {} },
+    { fileName: 'canvas.js', facadeModuleId: 'C:/repo/src/core/components/diagrams/AdvancedFlowchartCanvasShell.tsx', imports: [], modules: {} },
+    { fileName: 'tooltip.js', facadeModuleId: null, imports: [], modules: { [contextId]: { renderedLength: 100 } } },
+    { fileName: 'table.js', facadeModuleId: null, imports: ['tooltip.js'], modules: { [tableId]: { renderedLength: 100 } } },
+  ];
+
+  it('leaves the Tooltip context shared while isolating actual table modules', () => {
+    expect(matchesLazyAntdTableModule(tableId)).toBe(true);
+    expect(matchesLazyAntdTableModule('C:\\repo\\node_modules\\@rc-component\\table\\es\\Table.js?commonjs')).toBe(true);
+    for (const id of [contextId, `${contextId}?query`, '', '/src/table.ts',
+      '/repo/node_modules/antd/es/table-extra/index.js', '/repo/node_modules/antd/es/tooltip/index.js']) {
+      expect(matchesLazyAntdTableModule(id)).toBe(false);
+    }
+  });
+
+  it('allows lazy table consumers and a Tooltip context on editor startup', () => {
+    expect(() => assertLazyAntdTableIsolation(graph())).not.toThrow();
+    const plugin = lazyAntdTableIsolationPlugin();
+    const hook = plugin.generateBundle;
+    if (typeof hook !== 'function') throw new Error('generateBundle hook missing');
+    const bundle = Object.fromEntries(graph().map(chunk => [chunk.fileName, { type: 'chunk', ...chunk }]));
+    expect(() => Reflect.apply(hook, {}, [{}, bundle, false])).not.toThrow();
+    expect(plugin.apply).toBe('build');
+  });
+
+  it('rejects a Tooltip context co-located with a table implementation', () => {
+    const chunks = graph();
+    chunks[3].imports.push('table.js');
+    expect(() => assertLazyAntdTableIsolation(chunks)).toThrow('Editor startup imports table implementation');
+  });
+
+  it('finds the application module behind Vite HTML facades and merged chunks', () => {
+    const chunks = graph();
+    chunks[0].facadeModuleId = 'C:/repo/index.html';
+    chunks[0].modules[appEntryId] = { renderedLength: 100 };
+    expect(() => assertLazyAntdTableIsolation(chunks)).not.toThrow();
+    chunks[0].imports.push('table.js');
+    expect(() => assertLazyAntdTableIsolation(chunks)).toThrow('Editor startup imports table implementation');
+  });
+
+  it('ignores tree-shaken table declarations and terminates shared import cycles', () => {
+    const chunks = graph();
+    chunks[3].imports.push('table.js');
+    chunks[4].modules[tableId].renderedLength = 0;
+    expect(() => assertLazyAntdTableIsolation(chunks)).not.toThrow();
+  });
+
+  it('fails closed on incomplete or ambiguous emitted graphs', () => {
+    expect(() => assertLazyAntdTableIsolation([])).toThrow('requires one entry');
+    const chunks = graph();
+    expect(() => assertLazyAntdTableIsolation([...chunks, chunks[0]])).toThrow('duplicate chunk names');
+    expect(() => assertLazyAntdTableIsolation([...chunks, { ...chunks[0], fileName: 'main-copy.js' }]))
+      .toThrow('requires one entry');
+    chunks[3].imports.push('missing.js');
+    expect(() => assertLazyAntdTableIsolation(chunks)).toThrow('missing static import');
+  });
+});
 
 describe('emitted display Worker isolation', () => {
   const chunk = (fileName: string, imports: string[] = [], modules: string[] = []) => ({
