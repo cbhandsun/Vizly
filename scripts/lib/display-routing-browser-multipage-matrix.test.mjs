@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   displayRoutingMultiPageStateIsExpected,
   readDisplayRoutingMultiPageState,
+  readDisplayRoutingMarkedLabelOffset,
 } from './display-routing-browser-multipage-matrix.mjs';
 import { verifyDisplayRoutingBrowserCases } from './display-routing-matrix-browser-cases.mjs';
 import { parseLayoutSelection } from '../../src/core/components/diagrams/layoutSelectionPersistence';
@@ -65,6 +66,40 @@ const createFixture = () => {
 };
 
 describe('display routing browser multi-page matrix', () => {
+  it('finds the edited label after layout/reload reorders and duplication renames edges', () => {
+    const edited = { id: 'copy-id', label: 'multi-page-copy', data: { labelOffset: { x: -8, y: 6 } } };
+    for (const edges of [[edited, { id: 'other' }], [{ id: 'other' }, edited]]) {
+      expect(readDisplayRoutingMarkedLabelOffset(edges, 'multi-page-copy')).toEqual({ x: -8, y: 6 });
+    }
+    expect(readDisplayRoutingMarkedLabelOffset([edited, edited], 'multi-page-copy')).toBeNull();
+    expect(readDisplayRoutingMarkedLabelOffset([edited], 'multi-page-first')).toBeNull();
+  });
+
+  it.each([undefined, null, [], {}, '[]', Array(10_001).fill(null)])('rejects missing or invalid edge lists', edges => {
+    expect(readDisplayRoutingMarkedLabelOffset(edges, 'multi-page-copy')).toBeNull();
+  });
+
+  it.each([undefined, null, [], {}, { x: '6', y: 1 }, { x: NaN, y: 1 },
+    { x: 1, y: Infinity }, { x: 1001, y: 0 }, { x: 0, y: -1001 },
+    { x: '<img src=x onerror=alert(1)>', y: 0 },
+  ])('rejects invalid label offsets without interpreting content', labelOffset => {
+    expect(readDisplayRoutingMarkedLabelOffset([
+      { label: 'multi-page-copy', data: { labelOffset } },
+    ], 'multi-page-copy')).toBeNull();
+  });
+
+  it.each([null, '', 42, 'x'.repeat(1025)])('rejects an invalid marker', marker => {
+    expect(readDisplayRoutingMarkedLabelOffset([], marker)).toBeNull();
+  });
+
+  it('accepts bounded zero and signed offsets', () => {
+    for (const labelOffset of [{ x: 0, y: 0 }, { x: -1000, y: 1000 }]) {
+      expect(readDisplayRoutingMarkedLabelOffset([
+        { label: 'marker', data: { labelOffset } },
+      ], 'marker')).toEqual(labelOffset);
+    }
+  });
+
   it('runs only the requested production-browser scenario', async () => {
     const verifyTopology = vi.fn(async () => ({ id: 'topology-edit-cycle' }));
     const verifyMultiPage = vi.fn(async options => {

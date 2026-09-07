@@ -46,7 +46,7 @@ vi.mock('@xyflow/react', async () => {
       interactionWidth?: number;
       style?: React.CSSProperties;
     }) => ReactModule.createElement('path', {
-      'data-testid': 'base-edge',
+      'data-testid': className === 'shared-trunk-accent-trace' ? 'trace-edge' : 'base-edge',
       'data-edge-id': id,
       d: path,
       className,
@@ -127,6 +127,23 @@ describe('StablePathEdge', () => {
     useLineJumpsMock.mockReset();
     useLineJumpsMock.mockReturnValue({ jumps: [], jumpPath: null });
     reactFlowStoreMock.nodeLookup.clear();
+  });
+
+  it.each([false, true])('mounts a complete markerless trace on an unshared edge (selected=%s)', selected => {
+    const { container } = renderStablePathEdge({
+      selected,
+      sourceX: 0, sourceY: 0, targetX: 80, targetY: 40,
+      markerStart: 'url(#source)', markerEnd: 'url(#target)',
+      data: { computedPath: [{ x: 0, y: 0 }, { x: 80, y: 0 }, { x: 80, y: 40 }] },
+    });
+    const traces = container.querySelectorAll('.shared-trunk-accent-trace');
+    expect(traces).toHaveLength(1);
+    expect(traces[0].getAttribute('d')).toBe('M 0 0 L 80 0 L 80 40');
+    expect(traces[0].getAttribute('style')).toContain(`opacity: ${selected ? 1 : 0}`);
+    expect(traces[0].getAttribute('marker-start')).toBeNull();
+    expect(traces[0].getAttribute('marker-end')).toBeNull();
+    expect(traces[0].getAttribute('data-interaction-width')).toBe('0');
+    expect(container.querySelectorAll('.react-flow__edge-interaction')).toHaveLength(1);
   });
 
   it('renders locked computed paths as strict M/L orthogonal SVG paths', () => {
