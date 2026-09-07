@@ -71,11 +71,15 @@ export const repairInternalStrictCrossingLanes = <T extends Edge[]>(
   edges: T,
   nodes: Node[],
   diagnostics?: StrictCrossingRepairDiagnostics,
+  maxQualityEvaluations = Number.POSITIVE_INFINITY,
 ): T => {
+  if (maxQualityEvaluations !== Number.POSITIVE_INFINITY
+    && (!Number.isSafeInteger(maxQualityEvaluations) || maxQualityEvaluations <= 0)) return edges;
+  let candidateEvaluations = 0;
   const countKnownDisplayStrict = createDisplayStrictCrossingCounter(diagnostics);
   let current = edges;
   let terminalValidation: DisplayTerminalValidationSnapshot | null = null;
-  for (let pass = 0; pass < 2; pass += 1) {
+  for (let pass = 0; pass < 2 && candidateEvaluations < maxQualityEvaluations; pass += 1) {
     const baselineStrict = countTrackedStrictCrossings(current, diagnostics);
     const baselineDisplayStrict = countKnownDisplayStrict(
       current,
@@ -120,6 +124,7 @@ export const repairInternalStrictCrossingLanes = <T extends Edge[]>(
         const countCandidateStrict = createCandidateStrictCrossingCounter(otherSegments);
         const baselineEdgeStrict = countCandidateStrict(path);
         for (const candidatePath of candidatePaths) {
+          if (candidateEvaluations >= maxQualityEvaluations) break;
           const candidateEdgeStrict = countCandidateStrict(candidatePath);
           const candidateStrict = baselineStrict - baselineEdgeStrict + candidateEdgeStrict;
           const candidateDisplayStrict = baselineDisplayStrict - baselineEdgeStrict + candidateEdgeStrict;
@@ -130,6 +135,7 @@ export const repairInternalStrictCrossingLanes = <T extends Edge[]>(
             edgeIndex === segment.edgeIndex ? withDisplayComputedPath(edge, candidatePath) : edge
           )) as T;
           if (!changedDisplayTerminalsRemainAnchored(current, candidateEdges, terminalValidation)) continue;
+          candidateEvaluations += 1;
           const candidateQuality = qualityContext.evaluateChanged(candidateEdges, [segment.edgeIndex]);
           const candidateObstacleHits = obstacleContext.evaluateKnownChanges(candidateEdges, [segment.edgeIndex]);
           const candidateScore = obstacleRepairScore(candidateQuality, candidateObstacleHits);

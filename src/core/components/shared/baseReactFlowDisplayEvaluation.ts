@@ -127,6 +127,7 @@ export const finalVisualPolishScoreFromQuality = (score: EdgePathQualityScore): 
     + score.backtrackPenalty * 400
     + score.detourPenalty * 1.5
     + score.bends * 6
+    + (score.crossingCost ?? score.bridgedCrossings ?? 0) * 2
     + score.totalLength * 0.01
 );
 

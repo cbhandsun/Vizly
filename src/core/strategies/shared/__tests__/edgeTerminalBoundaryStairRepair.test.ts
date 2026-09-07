@@ -258,7 +258,7 @@ describe('repairTerminalBoundaryStairs', () => {
     expect(result.targetHandle).toBe('top');
   });
 
-  it('uses the geometric exit side when a same-side outward lane would cross another edge', () => {
+  it('keeps the endpoint side when an outward lane has only a clear crossing', () => {
     const feedback: Edge = {
       id: 'feedback',
       source: 'labor',
@@ -306,10 +306,10 @@ describe('repairTerminalBoundaryStairs', () => {
     );
 
     expect((repaired.data as any).computedPath).not.toEqual(originalPath);
-    expect(repaired.targetHandle).toBe('top');
+    expect(repaired.targetHandle).toBe('right');
     expect(((repaired.data as any).computedPath as Array<{ x: number; y: number }>).at(-1)).toEqual({
-      x: 1059,
-      y: 1418,
+      x: 1115,
+      y: 1466,
     });
     expect(countEndpointNodeTraversalHits(
       (repaired.data as any).computedPath,
@@ -450,7 +450,7 @@ describe('repairTerminalBoundaryStairs', () => {
     expect(quality.nonOrthogonalSegments).toBe(0);
   });
 
-  it('keeps the original terminal corridor when every anchor nudge adds a hard crossing', () => {
+  it('can simplify a terminal corridor across clearly bridged lanes', () => {
     const edges: Edge[] = [
       {
         id: 'carrier',
@@ -498,8 +498,8 @@ describe('repairTerminalBoundaryStairs', () => {
       node('visibility', 1579.69, 1922, 420, 236),
     ]);
     const path = (result[0].data as any).computedPath as Array<{ x: number; y: number }>;
-    expect(path).toEqual((edges[0].data as any).computedPath);
-    expect((result[0].data as any).terminalBoundaryStairRepaired).toBeUndefined();
+    expect(path.length).toBeLessThan((edges[0].data as { computedPath: unknown[] }).computedPath.length);
+    expect(calculateEdgePathQualityScore(result).strictCrossings).toBe(0);
   });
 
   it('removes a micro boundary slide and widens a safe near-terminal staircase', () => {

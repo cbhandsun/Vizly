@@ -3,6 +3,8 @@
 import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
+import { resolveLayoutStrategyGeometryConstraints } from '../layoutStrategyGeometryConstraints';
+import { prepareFlatLayoutStrategyGraph } from '../layoutStrategyInputBoundary';
 import { parsePersistedLayoutSelection, usePersistedLayoutSelection, useLayoutAutoSaveMetadata } from '../usePersistedLayoutSelection';
 import {
   clearLayoutRuntimeAbsolutePosition,
@@ -17,6 +19,60 @@ import {
   prepareLayeredLayoutEdges,
   sanitizeLayoutEdges,
 } from '../layeredLayoutEdgePreparation';
+
+describe('layout strategy graph preparation', () => {
+  it('flattens real parent coordinates without retaining runtime positions or unrelated edges', () => {
+    const nodes: Node[] = [
+      { id: 'group', type: 'titleGroup', position: { x: 100, y: 200 }, data: {} },
+      { id: 'child', parentId: 'group', extent: 'parent', position: { x: 20, y: 30 }, data: {} },
+      { id: 'peer', position: { x: 400, y: 500 }, data: {} },
+      { id: 'note', type: 'sticky-note', position: { x: 0, y: 0 }, data: {} },
+    ];
+    const original = structuredClone(nodes);
+    const edges: Edge[] = [
+      { id: 'valid', source: 'child', target: 'peer' },
+      { id: 'container', source: 'child', target: 'group' },
+      { id: 'missing', source: 'child', target: 'missing' },
+    ];
+    const prepared = prepareFlatLayoutStrategyGraph(nodes, edges);
+    expect(prepared.layoutNodes.map(node => node.id)).toEqual(['child', 'peer']);
+    expect(prepared.layoutNodes[0]).toMatchObject({ position: { x: 120, y: 230 }, parentId: undefined, extent: undefined });
+    expect(prepared.layoutEdges).toEqual([edges[0]]);
+    expect(nodes).toEqual(original);
+    expect(prepareFlatLayoutStrategyGraph([], edges).layoutEdges).toEqual([]);
+  });
+});
+
+describe('layout strategy geometry constraints', () => {
+  const lane = (id: string, x: number, y = 0): Node => ({
+    id, type: 'titleGroup', position: { x, y }, data: { domain: id },
+  });
+  it('binds explicit domain order independently of output array and coordinates', () => {
+    const nodes = [lane('b', 0), lane('a', 500), { ...lane('hidden', 0), hidden: true }];
+    expect(resolveLayoutStrategyGeometryConstraints('domain-lanes', 'TB', nodes, ['a', 'b']))
+      .toEqual({ lanes: { direction: 'TB', nodeIds: ['a', 'b'] } });
+    expect(resolveLayoutStrategyGeometryConstraints('domain-dagre', 'TB', nodes, ['a', 'b']))
+      .toBeUndefined();
+  });
+  it.each(['TB', 'BT', 'LR', 'RL'] as const)('preserves the computed cross-axis order in %s without authored order', direction => {
+    const nodes = [lane('b', 500, 500), lane('a', 0, 0)];
+    expect(resolveLayoutStrategyGeometryConstraints('domain-lanes', direction, nodes, undefined))
+      .toEqual({ lanes: { direction, nodeIds: ['a', 'b'] } });
+    expect(resolveLayoutStrategyGeometryConstraints('domain-lanes', direction, [], undefined))
+      .toEqual({ lanes: { direction, nodeIds: [] } });
+  });
+  it('binds original membership even when the candidate changes a child domain and parent', () => {
+    const original: Node[] = [lane('a', 0), lane('b', 500), {
+      id: 'child', parentId: 'a', position: { x: 20, y: 60 }, data: { domain: 'a' },
+    }];
+    const candidate = [...original.slice(0, 2), { ...original[2], parentId: 'b', data: { domain: 'b' } }];
+    expect(resolveLayoutStrategyGeometryConstraints('domain-lanes', 'TB', candidate, undefined, original))
+      .toEqual({ lanes: { direction: 'TB', nodeIds: ['a', 'b'], memberships: [{ nodeId: 'child', laneId: 'a' }] } });
+    const throughParent = original.map(node => node.id === 'child' ? { ...node, data: {} } : node);
+    expect(resolveLayoutStrategyGeometryConstraints('domain-lanes', 'TB', candidate, undefined, throughParent))
+      .toMatchObject({ lanes: { memberships: [{ nodeId: 'child', laneId: 'a' }] } });
+  });
+});
 
 describe('persisted layout selection', () => {
   it('roundtrips layout metadata alongside pages and preserves the page restore result', () => {

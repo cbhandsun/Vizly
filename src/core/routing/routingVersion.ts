@@ -1,4 +1,4 @@
-export const EDGE_ROUTING_CACHE_VERSION = '16';
+export const EDGE_ROUTING_CACHE_VERSION = '18';
 
 /**
  * Version of the renderer-facing commercial quality contract. Keep this
@@ -6,7 +6,7 @@ export const EDGE_ROUTING_CACHE_VERSION = '16';
  * invalidate Worker session authority even when route serialization remains
  * compatible.
  */
-export const EDGE_ROUTING_VISUAL_VERSION = 'commercial-hard-gate-v1';
+export const EDGE_ROUTING_VISUAL_VERSION = 'balanced-crossing-gate-v2';
 
 /** Version of the structured-clone contract used for commit-capable Worker results. */
 export const EDGE_ROUTING_WORKER_PROTOCOL_VERSION = 'display-routing-worker-v1';

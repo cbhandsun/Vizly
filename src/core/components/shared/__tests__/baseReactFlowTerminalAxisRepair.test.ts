@@ -1,4 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
+import { isReadableOrthogonalCrossing } from '../../../routing/orthogonalCrossingPolicy';
 import { describe, expect, it } from 'vitest';
 
 import { calculateEdgePathQualityScore } from '../../../strategies/shared/edgeStrictCrossingGuard';
@@ -494,7 +495,9 @@ const countStrictCrossings = (paths: Array<Array<{ x: number; y: number }>>): nu
             && vertical[0].x < Math.max(horizontal[0].x, horizontal[1].x) - 1
             && horizontal[0].y > Math.min(vertical[0].y, vertical[1].y) + 1
             && horizontal[0].y < Math.max(vertical[0].y, vertical[1].y) - 1
-          ) count += 1;
+          ) {
+            if (!isReadableOrthogonalCrossing({ a: a[0], b: a[1] }, { a: b[0], b: b[1] })) count += 1;
+          }
         }
       }
     }

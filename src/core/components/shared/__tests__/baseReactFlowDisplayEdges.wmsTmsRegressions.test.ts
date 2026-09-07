@@ -1,4 +1,6 @@
 import warmBtRequestJson from './fixtures/wmsWarmBtWorkerRequest.json';
+import { tmsCrossedCostSpinePaths } from './fixtures/tmsResidualStrictPaths';
+import { finalSameSideTrueTrunksDoNotRegress } from '../baseReactFlowDisplayTrueTrunkContract';
 import { parseDisplayEdgesWorkerRequest } from '../baseReactFlowDisplayWorkerProtocol';
 import type { Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
@@ -49,6 +51,30 @@ const measuredNodeWidth = (nodeItem: Node): number => {
 };
 
 describe('baseReactFlowDisplayEdges WMS and TMS regressions', () => {
+  it('closes the cold TMS seed including pre-existing elbows and stale terminal declarations', async () => {
+    const preset = coerceCustomPreset(tmsStandardData, { id: 'tms-cold-seed', title: 'TMS' });
+    if (!preset) throw new Error('Expected a valid TMS preset');
+    const canvas = await standardDataToCanvas(preset);
+    const nodes = withAbsoluteNodePositions(canvas.nodes);
+    const edges = canvas.edges.filter(edge => tmsCrossedCostSpinePaths[edge.id]).map(edge => ({
+      ...edge,
+      ...(edge.id === 'edge-tms-cost' ? { sourceHandle: 'bottom', targetHandle: 'left' } : {}),
+      data: { ...edge.data, computedPath: tmsCrossedCostSpinePaths[edge.id].map(point => ({ ...point })) },
+    }));
+    const result = createBaseReactFlowDisplayEdges({
+      edges, nodes, enableSmartEdges: true, smartEdgePadding: 20, isLargeGraph: false,
+      displayEdgeEpoch: computeBaseReactFlowDisplayEdgeEpoch({ edges, nodes }),
+      skipFinalizedReuse: true,
+    });
+    const report = getDisplayHardQualityGateReport(result, nodes, 'polished');
+    expect(report.hardClean, JSON.stringify(report)).toBe(true);
+    expect(report.quality.tinyInteriorDoglegs).toBe(0);
+    expect(report.minimumClearanceViolations).toBe(0);
+    expect(finalSameSideTrueTrunksDoNotRegress(edges, result, nodes)).toBe(true);
+    expect(result.map(edge => [edge.id, edge.source, edge.target]))
+      .toEqual(edges.map(edge => [edge.id, edge.source, edge.target]));
+  }, 30_000);
+
   it('keeps the bounded demand-allocation route hard-clean without commercial detours', async () => {
     const preset = coerceCustomPreset(demandAllocationData, {
       id: 'DemandAllocationRouteProbe',

@@ -87,6 +87,22 @@ describe('LineJumpEngine', () => {
         );
     });
 
+    it.each([false, true])('spans dense crossing clusters without dropping a crossing (reverse=%s)', reverse => {
+        const points = [{ x: 0, y: 50 }, { x: 200, y: 50 }];
+        if (reverse) points.reverse();
+        const paths = [
+            { edgeId: 'horizontal', points },
+            ...[80, 88, 96].map(x => ({
+                edgeId: `vertical-${x}`, points: [{ x, y: 0 }, { x, y: 100 }],
+            })),
+        ];
+        const jumps = collectLineJumpIntersections(paths);
+        expect(jumps).toHaveLength(3);
+        const path = injectLineJumps(points, jumps, 6, 0);
+        expect(path).toContain(reverse ? 'L 102 50 A 14 6 0 0 0 74 50' : 'L 74 50 A 14 6 0 0 1 102 50');
+        expect(path.match(/ A /gu)).toHaveLength(1);
+    });
+
     it('keeps indexed crossing output equivalent to an explicit sparse construction', () => {
         const horizontalPaths = Array.from({ length: 80 }, (_, index) => ({
             edgeId: `horizontal-${index}`,

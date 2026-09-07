@@ -654,7 +654,7 @@ describe('baseReactFlowDisplayEvaluation', () => {
     expect(pathMutatedContext).not.toBe(context);
     expect(pathMutatedContext.evaluate(baseline)).toBe(expected);
 
-    nodes[0].position = { x: 40, y: 100 };
+    nodes[0].position = { x: 12, y: 100 };
     const nodeMutatedContext = createDisplayObstacleEvaluationContext(baseline, nodes);
     expect(nodeMutatedContext).not.toBe(pathMutatedContext);
     expect(nodeMutatedContext.evaluate(baseline)).toBe(0);
@@ -698,7 +698,7 @@ describe('baseReactFlowDisplayEvaluation', () => {
     ];
     expect(countDisplayObstacleHits(endpoint, nodes)).toBe(1);
 
-    nodes[0].position = { x: 40, y: 100 };
+    nodes[0].position = { x: 12, y: 100 };
     expect(countDisplayObstacleHits(endpoint, nodes)).toBe(0);
   });
 
@@ -791,9 +791,9 @@ describe('baseReactFlowDisplayEvaluation', () => {
     const edges: Edge[] = [
       {
         ...edge([
-          { x: 40, y: 0 },
-          { x: 40, y: 60 },
-          { x: 40, y: 100 },
+          { x: 12, y: 0 },
+          { x: 12, y: 60 },
+          { x: 12, y: 100 },
         ]),
         id: 'split-vertical',
         source: 'shared',

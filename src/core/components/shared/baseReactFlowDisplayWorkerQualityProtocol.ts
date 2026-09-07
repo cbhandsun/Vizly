@@ -61,9 +61,14 @@ export const isDisplayWorkerBoundedCandidateReport = (
     || typeof value.terminalsAttached !== 'boolean'
     || typeof value.terminalsAnchored !== 'boolean'
     || !isBoundedMetric(value.obstacleHits)
-    || qualityKeys.length !== QUALITY_KEYS.length
-    || !qualityKeys.every(key => (QUALITY_KEYS as readonly string[]).includes(key))
+    || qualityKeys.length < QUALITY_KEYS.length
+    || !qualityKeys.every(key => key === 'bridgedCrossings' || key === 'crossingCost'
+      || (QUALITY_KEYS as readonly string[]).includes(key))
     || !QUALITY_KEYS.every(key => isBoundedMetric(quality[key]))
+    || (typeof quality.bridgedCrossings !== 'undefined'
+      && (!isBoundedMetric(quality.bridgedCrossings) || !Number.isSafeInteger(quality.bridgedCrossings)))
+    || (typeof quality.crossingCost !== 'undefined'
+      && (!isBoundedMetric(quality.crossingCost) || !Number.isSafeInteger(quality.crossingCost)))
     || !isOptionalViolationCount(value.minimumClearanceViolations)
     || !isOptionalViolationCount(value.commercialClearanceViolations)
   ) return false;

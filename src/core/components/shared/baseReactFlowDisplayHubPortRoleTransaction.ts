@@ -77,6 +77,11 @@ export interface BoundedHubPortRoleTransactionOptions {
   primaryEdgeIndexes?: readonly number[];
   /** Optional caller-owned object populated without production logging. */
   diagnostics?: BoundedHubPortRoleTransactionDiagnostics;
+  /** A production caller lends its existing transaction budget; no nested budget is added. */
+  consumeEvaluation?: () => boolean;
+  maxQualityEvaluations?: number;
+  /** Complete group/trunk and final-report acceptance remains owned by the caller. */
+  candidateIsAccepted?: (edges: Edge[]) => boolean;
 }
 
 export interface BoundedHubPortRoleTransactionDiagnostics {
@@ -461,6 +466,7 @@ export const repairBoundedHubPortRoleTransaction = <T extends Edge[]>(
   options: BoundedHubPortRoleTransactionOptions = {},
 ): T => {
   const diagnostics = options.diagnostics;
+  const evaluationLimit = options.maxQualityEvaluations ?? MAX_QUALITY_EVALUATIONS;
   const pruned = { duplicate: 0, strict: 0, hardQuality: 0, obstacle: 0 };
   if (diagnostics) {
     diagnostics.reason = undefined;
@@ -470,7 +476,9 @@ export const repairBoundedHubPortRoleTransaction = <T extends Edge[]>(
     diagnostics.pruned = pruned;
     diagnostics.bestPartial = undefined;
   }
-  if (seedEdges.length === 0 || seedEdges.length !== acceptanceEdges.length) {
+  if (seedEdges.length === 0 || seedEdges.length !== acceptanceEdges.length
+    || !Number.isSafeInteger(evaluationLimit) || evaluationLimit < 1
+    || evaluationLimit > MAX_QUALITY_EVALUATIONS) {
     if (diagnostics) diagnostics.reason = 'invalid';
     return seedEdges;
   }
@@ -567,6 +575,7 @@ export const repairBoundedHubPortRoleTransaction = <T extends Edge[]>(
     signature: '',
   }];
   let evaluations = 0;
+  let budgetExhausted = false;
   recordBestPartial(beam[0]);
 
   for (let depth = 0; depth < MAX_SEARCH_DEPTH; depth += 1) {
@@ -599,7 +608,11 @@ export const repairBoundedHubPortRoleTransaction = <T extends Edge[]>(
           hubRole,
         );
         for (const candidate of roleCandidates.candidates) {
-          if (evaluations >= MAX_QUALITY_EVALUATIONS) break;
+          if (evaluations >= evaluationLimit || budgetExhausted) break;
+          if (options.consumeEvaluation && !options.consumeEvaluation()) {
+            budgetExhausted = true;
+            break;
+          }
           evaluations += 1;
           const candidateEdges = state.edges.map((edge, index) => (
             index === hubRole.edgeIndex ? candidate.edge : edge
@@ -635,7 +648,7 @@ export const repairBoundedHubPortRoleTransaction = <T extends Edge[]>(
             signature,
           };
           recordBestPartial(nextState);
-          if (isAccepted(nextState)) {
+          if (isAccepted(nextState) && (options.candidateIsAccepted?.(candidateEdges) ?? true)) {
             if (diagnostics) {
               diagnostics.reason = 'accepted';
               diagnostics.evaluations = evaluations;
@@ -644,9 +657,9 @@ export const repairBoundedHubPortRoleTransaction = <T extends Edge[]>(
           }
           nextStates.push(nextState);
         }
-        if (evaluations >= MAX_QUALITY_EVALUATIONS) break;
+        if (evaluations >= evaluationLimit || budgetExhausted) break;
       }
-      if (evaluations >= MAX_QUALITY_EVALUATIONS) break;
+      if (evaluations >= evaluationLimit || budgetExhausted) break;
     }
     if (nextStates.length === 0) break;
     beam = selectDiverseStates(nextStates);

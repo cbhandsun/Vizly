@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  bindBaseReactFlowExportBackgroundVisibility,
   createBaseReactFlowExportStateHandlers,
   isUsableBaseReactFlowViewport,
   resolveBaseReactFlowContainerClassName,
@@ -127,5 +128,17 @@ describe('baseReactFlowViewport', () => {
 
     expect(setHidden).toHaveBeenNthCalledWith(1, true);
     expect(setHidden).toHaveBeenNthCalledWith(2, false);
+  });
+
+  it('binds export background visibility and removes all listeners on cleanup', () => {
+    const target = new EventTarget();
+    const setHidden = vi.fn();
+    const unbind = bindBaseReactFlowExportBackgroundVisibility({ target, setHidden });
+    for (const type of ['diagramExportStart', 'diagramExportComplete', 'diagramExportError']) target.dispatchEvent(new Event(type));
+    expect(setHidden.mock.calls).toEqual([[true], [false], [false]]);
+    unbind();
+    setHidden.mockClear();
+    for (const type of ['diagramExportStart', 'diagramExportComplete', 'diagramExportError']) target.dispatchEvent(new Event(type));
+    expect(setHidden).not.toHaveBeenCalled();
   });
 });

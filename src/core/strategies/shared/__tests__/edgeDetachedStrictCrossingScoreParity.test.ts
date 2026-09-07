@@ -1,3 +1,4 @@
+import { isReadableOrthogonalCrossing } from '../../../routing/orthogonalCrossingPolicy';
 import type { Edge } from '@xyflow/react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -51,7 +52,7 @@ describe('detached strict-crossing incremental score parity', () => {
   it('counts only perpendicular segments from other edges', () => {
     const paths: Point[][] = [
       [{ x: 0, y: 50 }, { x: 100, y: 50 }, { x: 100, y: 100 }],
-      [{ x: 50, y: 0 }, { x: 50, y: 100 }],
+      [{ x: 12, y: 0 }, { x: 12, y: 100 }],
       [{ x: 0, y: 75 }, { x: 100, y: 75 }],
     ];
     const edges = paths.map((path, index) => edge(`partition-${index}`, path));
@@ -82,7 +83,7 @@ describe('detached strict-crossing incremental score parity', () => {
   it('does not retain invalid candidate geometry in the strict crossing cache', () => {
     const paths: Point[][] = [
       [{ x: 0, y: 50 }, { x: 100, y: 50 }],
-      [{ x: 50, y: 0 }, { x: 50, y: 100 }],
+      [{ x: 12, y: 0 }, { x: 12, y: 100 }],
     ];
     const edges = paths.map((path, index) => edge(`invalid-cache-${index}`, path));
     const allSegments = extractPathSegmentRefs(paths, edges);
@@ -104,7 +105,7 @@ describe('detached strict-crossing incremental score parity', () => {
   it('invalidates a reference cache entry when candidate coordinates change', () => {
     const paths: Point[][] = [
       [{ x: 0, y: 50 }, { x: 100, y: 50 }],
-      [{ x: 50, y: 0 }, { x: 50, y: 100 }],
+      [{ x: 12, y: 0 }, { x: 12, y: 100 }],
     ];
     const edges = paths.map((path, index) => edge(`mutable-cache-${index}`, path));
     const allSegments = extractPathSegmentRefs(paths, edges);
@@ -126,9 +127,9 @@ describe('detached strict-crossing incremental score parity', () => {
 
   it('preserves source segment order while partitioning strict-crossing axes', () => {
     const paths: Point[][] = [
-      [{ x: 25, y: 0 }, { x: 25, y: 100 }],
+      [{ x: 12, y: 0 }, { x: 12, y: 100 }],
       [{ x: 0, y: 50 }, { x: 100, y: 50 }],
-      [{ x: 75, y: 0 }, { x: 75, y: 100 }],
+      [{ x: 88, y: 0 }, { x: 88, y: 100 }],
     ];
     const edges = paths.map((path, index) => edge(`ordered-${index}`, path));
 
@@ -156,6 +157,7 @@ describe('detached strict-crossing incremental score parity', () => {
         if (
           segments[first].edgeIndex !== segments[second].edgeIndex
           && strictCross(segments[first], segments[second])
+          && !isReadableOrthogonalCrossing(segments[first], segments[second])
         ) {
           expectedPairs.push([segments[first].edgeId, segments[second].edgeId]);
         }
@@ -196,6 +198,7 @@ describe('detached strict-crossing incremental score parity', () => {
         if (
           segments[first].edgeIndex !== segments[second].edgeIndex
           && strictCross(segments[first], segments[second])
+          && !isReadableOrthogonalCrossing(segments[first], segments[second])
         ) {
           expected.push([
             segments[first].edgeIndex,
@@ -251,7 +254,7 @@ describe('detached strict-crossing incremental score parity', () => {
   it('selects the same point-for-point repair as the legacy full scorer', () => {
     const edges = [
       edge('horizontal', [{ x: 0, y: 100 }, { x: 400, y: 100 }]),
-      edge('vertical', [{ x: 200, y: -100 }, { x: 200, y: 300 }]),
+      edge('vertical', [{ x: 12, y: -100 }, { x: 12, y: 300 }]),
       edge('nearby', [{ x: 0, y: 200 }, { x: 400, y: 200 }]),
     ];
 

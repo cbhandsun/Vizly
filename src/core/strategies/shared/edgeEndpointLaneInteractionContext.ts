@@ -1,4 +1,5 @@
 import type { Edge } from '@xyflow/react';
+import { isReadableOrthogonalCrossing } from '../../routing/orthogonalCrossingPolicy';
 
 export type EndpointLanePoint = { x: number; y: number };
 export type EndpointLaneSegment = { a: EndpointLanePoint; b: EndpointLanePoint };
@@ -7,6 +8,7 @@ export type EndpointLaneInteractionMetrics = {
   crossings: number;
   totalCrossings: number;
   oppositeOverlap: number;
+  crossingCost?: number;
 };
 
 export type EndpointLaneInteractionContext = {
@@ -54,7 +56,8 @@ export function endpointLaneStrictCrosses(
   return x > Math.min(horizontal.a.x, horizontal.b.x) + 1
     && x < Math.max(horizontal.a.x, horizontal.b.x) - 1
     && y > Math.min(vertical.a.y, vertical.b.y) + 1
-    && y < Math.max(vertical.a.y, vertical.b.y) - 1;
+    && y < Math.max(vertical.a.y, vertical.b.y) - 1
+    && !isReadableOrthogonalCrossing(first, second);
 }
 
 export function endpointLaneSegmentDirection(segment: EndpointLaneSegment): number {
@@ -95,6 +98,7 @@ type PreparedSegment = {
   direction: number;
   contributesToCrossings: boolean;
   contributesToOppositeOverlap: boolean;
+  crossingCost: number;
   otherOrder: number;
   segmentOrder: number;
 };
@@ -171,6 +175,8 @@ export function createEndpointLaneInteractionContext(
         direction: endpointLaneSegmentDirection(segment),
         contributesToCrossings,
         contributesToOppositeOverlap,
+        crossingCost: other && (other.source === edge.source || other.target === edge.target
+          || other.source === edge.target || other.target === edge.source) ? 7 : 1,
         otherOrder,
         segmentOrder,
       };
@@ -189,6 +195,7 @@ export function createEndpointLaneInteractionContext(
       const candidateSegments = endpointLaneToSegments(path);
       let crossings = 0;
       let totalCrossings = 0;
+      let crossingCost = 0;
       const overlapContributions: OverlapContribution[] = [];
 
       for (let candidateOrder = 0; candidateOrder < candidateSegments.length; candidateOrder += 1) {
@@ -205,6 +212,10 @@ export function createEndpointLaneInteractionContext(
           : Math.max(first.a.y, first.b.y) - 1 + EPS;
         forEachCoordinateRange(strictSegments, strictMinimum, strictMaximum, prepared => {
           scannedSegmentCount += 1;
+          if (isReadableOrthogonalCrossing(first, prepared.segment)) {
+            crossingCost += prepared.crossingCost;
+            return;
+          }
           if (!endpointLaneStrictCrosses(first, prepared.segment)) return;
           totalCrossings += 1;
           if (prepared.contributesToCrossings) crossings += 1;
@@ -241,7 +252,7 @@ export function createEndpointLaneInteractionContext(
         0,
       );
 
-      return { crossings, totalCrossings, oppositeOverlap };
+      return { crossings, totalCrossings, oppositeOverlap, ...(crossingCost > 0 ? { crossingCost } : {}) };
     },
     readMetrics: () => ({ evaluationCount, scannedSegmentCount }),
   };

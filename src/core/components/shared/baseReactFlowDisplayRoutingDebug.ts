@@ -1,4 +1,5 @@
 import type { DisplayGeometryBarrierResolution } from './baseReactFlowDisplayGeometryBarrier';
+import type { LayoutGeometryReport } from '../../algorithms/layoutGeometryConstraints';
 import type { DisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
 import type {
@@ -47,6 +48,7 @@ export type DisplayRoutingDebugState = {
   stagedLayoutSourceSignature?: string;
   stagedLayoutSourceGeometryDigest?: string;
   layoutSeedTerminalsAttached?: boolean;
+  layoutGeometryReport?: LayoutGeometryReport;
   layoutSeedTerminalsAnchored?: boolean;
   layoutSeedObstacleHits?: number;
   layoutSeedStrictCrossings?: number;

@@ -8,6 +8,7 @@ import { useBaseReactFlowDisplayRouting } from '../useBaseReactFlowDisplayRoutin
 import { computeBaseReactFlowDisplayEdgesInWorker, type BaseReactFlowDisplayWorkerResult } from '../baseReactFlowDisplayWorkerClient';
 import { createBaseReactFlowRoutingSessionRuntime } from '../baseReactFlowRoutingSessionRuntime';
 import { clearBaseReactFlowDisplayCommittedSnapshots } from '../baseReactFlowDisplayCommittedSnapshot';
+import { resolveBaseReactFlowDisplayCandidate } from '../baseReactFlowDisplayCandidateResolver';
 import { readDisplayRoutingDebugState } from '../baseReactFlowDisplayRoutingDebug';
 import type { UseBaseReactFlowDisplayRoutingOptions } from '../baseReactFlowDisplayRoutingTypes';
 
@@ -58,6 +59,22 @@ beforeEach(() => {
 afterEach(() => vi.clearAllMocks());
 
 describe('display routing rejection lifecycle', () => {
+  it('drops a display intent rejected during a synchronous layout commit before candidate loading', async () => {
+    const { hook, runtime } = setup();
+    const beginJob = runtime.beginJob;
+    const layoutJob = beginJob('layout');
+    vi.spyOn(runtime, 'beginJob').mockImplementation(owner => {
+      const result = runtime.commitJob(layoutJob, () => beginJob(owner));
+      if (!result.committed) throw Error('expected current layout commit');
+      return result.value;
+    });
+    await act(async () => { await Promise.resolve(); });
+    expect(resolveBaseReactFlowDisplayCandidate).not.toHaveBeenCalled();
+    expect(computeBaseReactFlowDisplayEdgesInWorker).not.toHaveBeenCalled();
+    expect(hook.result.current.failure).toBeNull();
+    hook.unmount();
+  });
+
   it('starts a fresh job when runtime changes with identical geometry after failure', async () => {
     vi.mocked(computeBaseReactFlowDisplayEdgesInWorker).mockResolvedValue(rejected);
     const { hook, options } = setup();

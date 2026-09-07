@@ -4,6 +4,7 @@ import type { Edge, Node } from '@xyflow/react';
 import logistics from '../../../data/standardized/LogisticsStandardData.json';
 import wmsProcess from '../../../data/standardized/WmsProcessFlowStandardData.json';
 import demandAllocation from '../../../data/standardized/DeamndAllocation.json';
+import enterpriseArchitecture from '../../../data/standardized/ArchitectureStandardData.json';
 import { DomainDagreLayoutStrategy } from '../DomainDagreLayoutStrategy';
 import { LayoutType } from '../../types/layout';
 import { withDisplayAbsolutePositions } from '../../components/shared/baseReactFlowDisplayEdgeCore';
@@ -52,6 +53,7 @@ describe('shared process ranks with local branch separation', () => {
     ...(['TB', 'LR'] as const).map(direction => ({ name: 'wms-process', preset: wmsProcess, direction, productionGeometry: false, preserveSubDomain: false })),
     ...(['TB', 'LR'] as const).map(direction => ({ name: 'wms-production', preset: wmsProcess, direction, productionGeometry: true, preserveSubDomain: false })),
     ...(['TB', 'LR'] as const).map(direction => ({ name: 'demand-allocation', preset: demandAllocation, direction, productionGeometry: false, preserveSubDomain: true })),
+    ...(['TB', 'LR'] as const).map(direction => ({ name: 'enterprise', preset: enterpriseArchitecture, direction, productionGeometry: false, preserveSubDomain: true })),
   ];
   it.each(cases)('preserves business order and full routing quality in $name $direction', async ({ name, preset, direction, productionGeometry, preserveSubDomain }) => {
     const dimensionsByDescription = new Map(preset.nodes.map(node => [node.description.trim(), wmsDimensions[node.id]]));
@@ -99,6 +101,8 @@ describe('shared process ranks with local branch separation', () => {
     const byId = new Map(arranged.map(node => [node.id, node]));
     const chain = name === 'logistics'
       ? ['upstream', 'l-oms', 'visibility', 'downstream']
+      : name === 'enterprise'
+        ? ['ch-offline', 'fe-store', 'mid-trade']
       : name === 'demand-allocation'
         ? ['start-calc', 'init-data']
         : ['order-input', 'allocation'];

@@ -4,11 +4,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { calculateEdgePathQualityScore } from '../../../strategies/shared/edgeStrictCrossingGuard';
 import {
   chooseDistinctQualitySeedCandidate,
+  chooseObstacleSafeQualitySeedCandidate,
   createBaseReactFlowInteractiveDisplayEdges,
   getInteractiveGlobalCandidateEdgeBudget,
 } from '../baseReactFlowDisplayQualitySeedPipeline';
 import { createBaseReactFlowPreDisplayFinalEdges } from '../baseReactFlowDisplayPreDisplayPipeline';
 import { repairBoundedReverseParallelOverlaps } from '../baseReactFlowDisplayReverseParallelOverlapClosure';
+import { synthesizeStableFallbackPath } from '../baseReactFlowDisplayEdgeGeometry';
 import type { DisplayRoutingPhaseTrace } from '../baseReactFlowDisplayRoutingTrace';
 import {
   edgeNodeObstacleHits,
@@ -22,6 +24,86 @@ import {
 } from './baseReactFlowDisplayEdges.testUtils';
 
 describe('baseReactFlowDisplayEdges local repairs', () => {
+  it.each([
+    { x: 0, y: 300, source: 'bottom', target: 'top' },
+    { x: 0, y: -300, source: 'top', target: 'bottom' },
+    { x: 300, y: 0, source: 'right', target: 'left' },
+    { x: -300, y: 0, source: 'left', target: 'right' },
+  ])('seeds restored flow edges with matching ports at $x,$y', ({ x, y, source, target }) => {
+    const nodes = [node('source', 0, 0, 100, 60), node('target', x, y, 100, 60)];
+    const edge: Edge = { id: 'restored', source: 'source', target: 'target', type: 'advanced-smart-step' };
+    const direct = synthesizeStableFallbackPath({
+      edge, nodeById: new Map(nodes.map(item => [item.id, item])), allowUnroutedFlowEdge: true,
+    });
+    expect(direct).toMatchObject({ sourceHandle: source, targetHandle: target });
+    const result = createBaseReactFlowInteractiveDisplayEdges({
+      nodes, edges: [edge], seedUnroutedFlowEdges: true,
+      enableSmartEdges: true, smartEdgePadding: 20, isLargeGraph: false, displayEdgeEpoch: 1,
+    });
+    expect(result[0]).toMatchObject({ sourceHandle: source, targetHandle: target });
+    expect(result[0].data?.computedPath).toHaveLength(2);
+    expect(edgeNodeObstacleHits(result, nodes)).toEqual([]);
+    expect(edge.sourceHandle).toBeUndefined();
+    expect(edge.data).toBeUndefined();
+  });
+
+  it('preserves authored port identity and refuses unresolved fixed or forbidden ports', () => {
+    const nodes = [node('source', 0, 0, 100, 60), node('target', 0, 300, 100, 60)];
+    const nodeById = new Map(nodes.map(item => [item.id, item]));
+    const edge: Edge = {
+      id: 'manual', source: 'source', target: 'target', type: 'stablepath',
+      sourceHandle: 'source-bottom-custom', targetHandle: 'target-top-custom',
+      data: { manualHandles: true },
+    };
+    expect(synthesizeStableFallbackPath({ edge, nodeById })).toMatchObject({
+      sourceHandle: edge.sourceHandle, targetHandle: edge.targetHandle,
+    });
+    for (const sourceHandle of [undefined, 'custom-port-without-side']) {
+      const fixed = { ...edge, sourceHandle };
+      expect(synthesizeStableFallbackPath({ edge: fixed, nodeById })).toBe(fixed);
+    }
+    const forbidden = { ...edge, data: { sourcePortPolicy: 'forbidden' } };
+    expect(synthesizeStableFallbackPath({ edge: forbidden, nodeById })).toBe(forbidden);
+    expect(synthesizeStableFallbackPath({ edge, nodeById: new Map() })).toBe(edge);
+    const unrequested = { ...edge, type: 'advanced-smart-step' };
+    expect(synthesizeStableFallbackPath({ edge: unrequested, nodeById })).toBe(unrequested);
+  });
+
+  it.each([0, 1, 2, 3])('rejects a shorter path through its own terminal body at rotation %i', rotation => {
+    const rotate = (point: { x: number; y: number }) => {
+      let result = point;
+      for (let i = 0; i < rotation; i += 1) result = { x: -result.y, y: result.x };
+      return result;
+    };
+    const rect = (id: string, y: number): Node => {
+      const corners = [rotate({ x: 0, y }), rotate({ x: 80, y: y + 40 })];
+      return node(id, Math.min(...corners.map(p => p.x)), Math.min(...corners.map(p => p.y)),
+        Math.abs(corners[1].x - corners[0].x), Math.abs(corners[1].y - corners[0].y));
+    };
+    const nodes = [rect('source', 100), rect('target', -100)];
+    const clear = [lockedEdge('route', 'source', 'target', [
+      { x: 40, y: 140 }, { x: 40, y: 188 }, { x: 240, y: 188 },
+      { x: 240, y: -12 }, { x: 40, y: -12 }, { x: 40, y: -60 },
+    ].map(rotate))];
+    const throughBody = [lockedEdge('route', 'source', 'target', [
+      { x: 40, y: 140 }, { x: 40, y: -60 },
+    ].map(rotate))];
+    expect(calculateEdgePathQualityScore(throughBody).totalLength)
+      .toBeLessThan(calculateEdgePathQualityScore(clear).totalLength);
+    expect(chooseObstacleSafeQualitySeedCandidate(nodes, [throughBody, clear])).toBe(clear);
+    expect(chooseObstacleSafeQualitySeedCandidate(nodes, [clear, throughBody])).toBe(clear);
+    const reverse = (edges: Edge[]) => edges.map(edge => ({
+      ...edge, source: edge.target, target: edge.source,
+      data: { computedPath: [...(edge.data?.computedPath as Array<{ x: number; y: number }>)].reverse() },
+    }));
+    const clearReverse = reverse(clear);
+    expect(chooseObstacleSafeQualitySeedCandidate(nodes, [reverse(throughBody), clearReverse])).toBe(clearReverse);
+  });
+
+  it('handles an empty seed set without inventing a route', () => {
+    expect(chooseObstacleSafeQualitySeedCandidate([], [])).toEqual([]);
+  });
+
   it('scores equivalent quality seed paths once and keeps the first candidate reference', () => {
     const path = [
       { x: 0, y: 0 },

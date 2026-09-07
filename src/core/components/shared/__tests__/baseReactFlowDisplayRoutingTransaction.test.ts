@@ -16,6 +16,27 @@ import {
 import { projectBaseReactFlowDisplayWorkerInput } from '../baseReactFlowDisplayWorkerClient';
 
 describe('baseReactFlowDisplayRoutingTransaction', () => {
+  it('round-trips cleared routing data without deleting business metadata', () => {
+    const source: Edge[] = [{ id: 'edge', source: 's', target: 't', data: {
+      computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+      elkPath: [{ x: 0, y: 0 }, { x: 200, y: 0 }],
+      h: [{ x: 50, y: 0 }], treeRouting: { effectiveSourceHandle: 'bottom' },
+      sharedTrunkAware: true, sharedTrunkSynthesized: true, isTreeBus: true,
+      overextendedTargetTrunkCorridorReclaimed: true, userNote: 'preserve',
+    } }];
+    const routed: Edge[] = [{ id: 'edge', source: 's', target: 't', data: {
+      computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+    } }];
+    const patches = createBaseReactFlowDisplayEdgePatches(source, routed);
+    const safe = patches ? sanitizeBaseReactFlowTrustedDisplayPatches(source, structuredClone(patches)) : null;
+    const replay = safe ? mergeBaseReactFlowDisplayEdgePatches(source, safe) : null;
+    expect(replay).not.toBeNull();
+    expect(replay?.[0].data?.userNote).toBe('preserve');
+    expect(computeBaseReactFlowDisplayOutputRouteSignature(replay ?? []))
+      .toBe(computeBaseReactFlowDisplayOutputRouteSignature(routed));
+    expect(source[0].data?.isTreeBus).toBe(true);
+  });
+
   it('uses projected route and repair baselines without overwriting latest metadata', () => {
     const longLabel = `latest-${'x'.repeat(25_000)}`;
     const deeplyNestedMetadata = {

@@ -43,7 +43,7 @@ describe('repairResidualHairpinBridges', () => {
     expect(quality.reverseOverlap).toBe(0);
   });
 
-  it('keeps the original bridge when every widened lane creates a strict crossing', () => {
+  it('removes a hairpin when the wider lane introduces only a clear crossing', () => {
     const original = edge('master-data-erp', path);
     const blocker = edge('blocker', [
       { x: 1000, y: -120 },
@@ -53,8 +53,11 @@ describe('repairResidualHairpinBridges', () => {
 
     const [repaired] = repairResidualHairpinBridges([original, blocker], []);
 
-    expect((repaired.data as any).computedPath).toEqual(path);
-    expect((repaired.data as any).hairpinBridgeWidened).toBeUndefined();
+    expect((repaired.data as any).computedPath).not.toEqual(path);
+    expect((repaired.data as any).hairpinBridgeWidened).toBe(true);
+    expect(calculateEdgePathQualityScore([repaired, blocker])).toMatchObject({
+      hairpins: 0, bridgedCrossings: 1,
+    });
     expect(calculateEdgePathQualityScore([repaired, blocker]).strictCrossings).toBe(0);
   });
 });

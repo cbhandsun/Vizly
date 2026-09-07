@@ -21,7 +21,7 @@ import {
 } from './baseReactFlowDisplayGeometry';
 import { displayTerminalSideCanSwitch } from './baseReactFlowDisplayTerminalPortCandidates';
 
-const MIN_LOOP_SHORTCUT_TERMINAL_STUB = 56;
+import { MIN_RENDER_SAFE_ENDPOINT_STUB as MIN_LOOP_SHORTCUT_TERMINAL_STUB } from './baseReactFlowDisplayEndpointStubMetrics';
 
 export const buildLoopLaneNudgeVariants = (
   path: DisplayPoint[],

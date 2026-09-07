@@ -1,3 +1,4 @@
+import { isReadableOrthogonalCrossing } from '../../../routing/orthogonalCrossingPolicy';
 import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
@@ -609,7 +610,7 @@ describe('separateDetachedParallelOverlaps', () => {
     expect(repaired.some(edge => (edge.data as any).detachedOverlapSeparated)).toBe(true);
   });
 
-  it('bypasses strict crossings introduced while separating rendered systems overlaps', () => {
+  it('retains readable crossings after separating rendered systems overlaps', () => {
     const edges: Edge[] = [
       {
         id: 'edge-oms-fulfill-wms-outbound',
@@ -651,7 +652,7 @@ describe('separateDetachedParallelOverlaps', () => {
     const second = (repaired[1].data as any).computedPath as Array<{ x: number; y: number }>;
 
     expect(hasStrictCrossing(first, second)).toBe(false);
-    expect(repaired.some(edge => (edge.data as any).detachedOverlapSeparated)).toBe(true);
+    expect(calculateEdgePathQualityScore(repaired).bridgedCrossings).toBeGreaterThan(0);
   });
 
   it('bypasses a rendered systems reverse-pair crossing without leaving a shared direction segment', () => {
@@ -864,7 +865,7 @@ function hasStrictCrossing(a: Array<{ x: number; y: number }>, b: Array<{ x: num
   for (let i = 0; i < a.length - 1; i += 1) {
     for (let j = 0; j < b.length - 1; j += 1) {
       const crossing = strictSegmentCrossing(a[i], a[i + 1], b[j], b[j + 1]);
-      if (crossing) return true;
+      if (crossing && !isReadableOrthogonalCrossing({ a: a[i], b: a[i + 1] }, { a: b[j], b: b[j + 1] })) return true;
     }
   }
   return false;

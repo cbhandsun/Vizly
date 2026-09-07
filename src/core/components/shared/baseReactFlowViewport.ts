@@ -110,3 +110,22 @@ export const createBaseReactFlowExportStateHandlers = ({
   onStart: () => setHidden(true),
   onStop: () => setHidden(false),
 });
+
+/** Own the complete export visibility subscription so canvas cleanup cannot
+ * leave a stale listener writing React state after the canvas is unmounted. */
+export const bindBaseReactFlowExportBackgroundVisibility = ({
+  target, setHidden,
+}: {
+  target: Pick<EventTarget, 'addEventListener' | 'removeEventListener'>;
+  setHidden: (hidden: boolean) => void;
+}): (() => void) => {
+  const { onStart, onStop } = createBaseReactFlowExportStateHandlers({ setHidden });
+  target.addEventListener('diagramExportStart', onStart);
+  target.addEventListener('diagramExportComplete', onStop);
+  target.addEventListener('diagramExportError', onStop);
+  return () => {
+    target.removeEventListener('diagramExportStart', onStart);
+    target.removeEventListener('diagramExportComplete', onStop);
+    target.removeEventListener('diagramExportError', onStop);
+  };
+};

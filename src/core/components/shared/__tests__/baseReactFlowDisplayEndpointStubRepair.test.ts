@@ -551,7 +551,7 @@ describe('baseReactFlowDisplayEndpointStubRepair', () => {
   it('does not exhaust the budget on crossing fallbacks before a direct short-stub repair', () => {
     const edges = [edgeWithPath('short', [
       { x: 0, y: 0 }, { x: 16, y: 0 }, { x: 16, y: 100 }, { x: 300, y: 100 },
-    ]), edgeWithPath('blocker', [{ x: 50, y: -50 }, { x: 50, y: 50 }])];
+    ]), edgeWithPath('blocker', [{ x: 50, y: -12 }, { x: 50, y: 50 }])];
     const pathAt = (x: number) => [
       { x: 0, y: 0 }, { x, y: 0 }, { x, y: 100 }, { x: 300, y: 100 },
     ];
@@ -577,7 +577,7 @@ describe('baseReactFlowDisplayEndpointStubRepair', () => {
   it('stably prioritizes non-crossing candidates without mutating the generated list', () => {
     const edges = [edgeWithPath('short', [
       { x: 0, y: 0 }, { x: 16, y: 0 }, { x: 16, y: 100 }, { x: 300, y: 100 },
-    ]), edgeWithPath('blocker', [{ x: 50, y: -50 }, { x: 50, y: 50 }])];
+    ]), edgeWithPath('blocker', [{ x: 50, y: -12 }, { x: 50, y: 50 }])];
     const pathAt = (x: number) => [
       { x: 0, y: 0 }, { x, y: 0 }, { x, y: 100 }, { x: 300, y: 100 },
     ];

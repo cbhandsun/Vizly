@@ -1,4 +1,5 @@
-export const MIN_DIAGRAM_FULL_FIT_ZOOM = 0.32;
+// Overview fits content; reading-mode zoom limits belong to fitWidthTop.
+export const MIN_DIAGRAM_FULL_FIT_ZOOM = 1e-9;
 export const MAX_DIAGRAM_FULL_FIT_ZOOM = 1;
 export const DEFAULT_DIAGRAM_RIGHT_SIDEBAR_OFFSET = 60;
 export const MAX_DIAGRAM_SIDEBAR_OFFSET = 800;
@@ -81,10 +82,7 @@ export const clampDiagramFullFitZoom = (rawZoom: number): number => {
     return MIN_DIAGRAM_FULL_FIT_ZOOM;
   }
 
-  return Math.max(
-    MIN_DIAGRAM_FULL_FIT_ZOOM,
-    Math.min(MAX_DIAGRAM_FULL_FIT_ZOOM, rawZoom * 0.98),
-  );
+  return Math.min(MAX_DIAGRAM_FULL_FIT_ZOOM, rawZoom * 0.98 || rawZoom);
 };
 
 const isFiniteNonNegative = (value: number): boolean =>
@@ -120,14 +118,9 @@ export const computeDiagramFitViewport = (
   const padding = isFiniteNonNegative(input.padding ?? 16)
     ? Math.min(input.padding ?? 16, 200)
     : 16;
-  const availableWidth = Math.max(
-    1,
-    input.viewportWidth - safeArea.left - safeArea.right - padding * 2,
-  );
-  const availableHeight = Math.max(
-    1,
-    input.viewportHeight - safeArea.top - safeArea.bottom - padding * 2,
-  );
+  const availableWidth = input.viewportWidth - safeArea.left - safeArea.right - padding * 2;
+  const availableHeight = input.viewportHeight - safeArea.top - safeArea.bottom - padding * 2;
+  if (availableWidth <= 0 || availableHeight <= 0) return null;
   const zoom = clampDiagramFullFitZoom(Math.min(
     availableWidth / bounds.width,
     availableHeight / bounds.height,

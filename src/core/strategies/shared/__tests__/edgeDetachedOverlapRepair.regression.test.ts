@@ -255,7 +255,7 @@ describe('separateDetachedParallelOverlaps', () => {
     expect(
       countStrictEdgeCrossings(repaired),
       JSON.stringify(repaired.map(edge => ({ id: edge.id, path: (edge.data as any).computedPath })), null, 2),
-    ).toBe(1);
+    ).toBe(0);
     expect(
       totalRoutingObstacleHits(repaired, [
         node('master-data', 32, 2816, 420, 236),
@@ -335,7 +335,7 @@ describe('separateDetachedParallelOverlaps', () => {
       node('wms-outbound', 0, 1210, 160, 120),
     ];
     const baselineObstacleHits = totalRoutingObstacleHits(edges, nodes);
-    expect(countStrictEdgeCrossings(edges)).toBe(1);
+    expect(calculateEdgePathQualityScore(edges)).toMatchObject({ strictCrossings: 0, bridgedCrossings: 1 });
 
     const repaired = repairDetachedStrictCrossingBypasses(edges, nodes);
     const quality = calculateEdgePathQualityScore(repaired);
@@ -430,7 +430,7 @@ describe('separateDetachedParallelOverlaps', () => {
     expect(
       countStrictEdgeCrossings(repaired),
       JSON.stringify(repaired.map(edge => ({ id: edge.id, path: (edge.data as any).computedPath })), null, 2),
-    ).toBe(1);
+    ).toBe(0);
     expect(
       totalRoutingObstacleHits(repaired, nodes),
       JSON.stringify(repaired.map(edge => ({ id: edge.id, path: getEdgePath(edge) })), null, 2),
@@ -477,7 +477,7 @@ describe('separateDetachedParallelOverlaps', () => {
     ];
     const baselineObstacleHits = totalRoutingObstacleHits(edges, nodes);
 
-    expect(countStrictEdgeCrossings(edges)).toBe(1);
+    expect(calculateEdgePathQualityScore(edges)).toMatchObject({ strictCrossings: 0, bridgedCrossings: 1 });
     expect(baselineObstacleHits).toBe(0);
 
     const repaired = repairDetachedStrictCrossingBypasses(edges, nodes);
@@ -493,8 +493,8 @@ describe('separateDetachedParallelOverlaps', () => {
     const nodes = [
       node('horizontal-source', -80, 76, 80, 48),
       node('horizontal-target', 300, 76, 80, 48),
-      node('vertical-source', 126, -48, 48, 48),
-      node('vertical-target', 126, 240, 48, 48),
+      node('vertical-source', 26, -48, 48, 48),
+      node('vertical-target', 26, 240, 48, 48),
     ];
     const edges: Edge[] = [
       {
@@ -518,8 +518,8 @@ describe('separateDetachedParallelOverlaps', () => {
         target: 'vertical-target',
         data: {
           computedPath: [
-            { x: 150, y: 0 },
-            { x: 150, y: 240 },
+            { x: 50, y: 0 },
+            { x: 50, y: 240 },
           ],
         },
       },

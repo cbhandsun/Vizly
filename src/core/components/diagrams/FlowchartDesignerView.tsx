@@ -31,6 +31,7 @@ import {
     FlowchartDesignerLeftSidebar,
     FlowchartDesignerOverlaysRegion,
     FlowchartDesignerRightSidebarRegion,
+    FlowchartDesignerSidebarFrame,
 } from './FlowchartDesignerShellRegions';
 import { filterCommentsForPage } from './commentPageScope';
 import { useFlowchartDesignerViewSetup } from './useFlowchartDesignerViewSetup';
@@ -300,7 +301,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                     title={t('designer.toolbar.import')}
                 />
             }
-            leftSidebar={editingEnabled ? <FlowchartDesignerLeftSidebar model={model} /> : null}
+            leftSidebar={<FlowchartDesignerSidebarFrame visible={!isReadonly && !presentationActive} interactive={editingEnabled}><FlowchartDesignerLeftSidebar model={model} /></FlowchartDesignerSidebarFrame>}
             canvasArea={
                 <>
                     {showEditingChrome && showRuler && (
@@ -689,7 +690,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                     </div>
                 </>
             }
-            rightSidebar={editingEnabled ? <FlowchartDesignerRightSidebarRegion model={model} /> : null}
+            rightSidebar={<FlowchartDesignerSidebarFrame visible={!isReadonly && !presentationActive} interactive={editingEnabled}><FlowchartDesignerRightSidebarRegion model={model} /></FlowchartDesignerSidebarFrame>}
             overlays={<>{fileDrop.isFileDragActive ? <FlowchartFileDropOverlay t={t} /> : null}<FlowchartDesignerOverlaysRegion model={model} /></>}
         />
     );

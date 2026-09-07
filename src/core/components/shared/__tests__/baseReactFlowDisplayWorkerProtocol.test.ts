@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { isDisplayWorkerBoundedCandidateReport } from '../baseReactFlowDisplayWorkerQualityProtocol';
 
 import {
   parseDisplayEdgesWorkerRequest,
@@ -24,6 +25,23 @@ import {
 const cleanHardReport = createTestDisplayHardReport();
 
 describe('baseReactFlowDisplayWorkerProtocol', () => {
+  it('retains counted readable crossings through the Worker report boundary', () => {
+    const hardReport = { ...cleanHardReport, quality: {
+      ...cleanHardReport.quality, bridgedCrossings: 3, crossingCost: 9,
+    } };
+    const response = { requestId: 'bridges', edges: [], hardClean: true, hardReport, routeResolution: 'full-route' };
+    expect(isDisplayWorkerBoundedCandidateReport(hardReport)).toBe(true);
+    expect(parseDisplayEdgesWorkerResponse(response, 'bridges')?.hardReport?.quality)
+      .toMatchObject({ bridgedCrossings: 3, crossingCost: 9 });
+    for (const key of ['bridgedCrossings', 'crossingCost']) {
+      for (const invalid of [-1, 0.5, NaN, Infinity, '3', null, {}, 1e16]) {
+        const malformed = { ...hardReport, quality: { ...hardReport.quality, [key]: invalid } };
+        expect(isDisplayWorkerBoundedCandidateReport(malformed)).toBe(false);
+        expect(parseDisplayEdgesWorkerResponse({ ...response, hardReport: malformed }, 'bridges')).toBeNull();
+      }
+    }
+  });
+
   it('keeps document router intent through the Worker boundary without widening browser cache authority', () => {
     const candidate = { ...validRepairRequest.edges[0], data: {
       computedPath: [{ x: 100, y: 30 }, { x: 300, y: 30 }],

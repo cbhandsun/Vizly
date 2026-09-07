@@ -36,7 +36,7 @@ describe('edgeCommercialRouteGuard', () => {
     expect(chooseCommercialRouteCandidate(nodes, unsafe, safe)).toBe(safe);
   });
 
-  it('uses crossing quality when candidates have equal obstacle safety', () => {
+  it('prefers a clear crossing to extra bends when obstacle safety is equal', () => {
     const first = pathEdge('first', [{ x: 0, y: 50 }, { x: 100, y: 50 }]);
     const crossing = pathEdge('second', [{ x: 50, y: 0 }, { x: 50, y: 100 }]);
     const clear = pathEdge('second', [
@@ -47,7 +47,7 @@ describe('edgeCommercialRouteGuard', () => {
     const crossed = [first, crossing];
     const uncrossed = [first, clear];
 
-    expect(chooseCommercialRouteCandidate([], crossed, uncrossed)).toBe(uncrossed);
+    expect(chooseCommercialRouteCandidate([], crossed, uncrossed)).toBe(crossed);
   });
 
   it('preserves whole-graph selection when only one edge changes', () => {

@@ -17,6 +17,7 @@ import { loadBaseReactFlowPrecompiledRouteAsset } from '../baseReactFlowPrecompi
 import {
   hasBaseReactFlowPrecompiledRouteCandidateInRegistry,
   loadBaseReactFlowPrecompiledRouteCandidateFromRegistry,
+  mergeTrustedBaseReactFlowPrecompiledRouteArtifact,
 } from '../baseReactFlowPrecompiledRouteRegistry';
 import {
   prefetchBaseReactFlowPrecompiledRouteFromRegistry,
@@ -119,6 +120,38 @@ const artifact = {
 };
 
 describe('baseReactFlowPrecompiledRouteRegistry', () => {
+  it('replaces absent routing metadata when replaying a complete artifact', () => {
+    const source: Edge[] = sourceEdges.map(item => ({
+      ...item,
+      label: 'Preserved semantic label',
+      data: {
+        ...item.data,
+        userNote: 'Preserved business data',
+        h: 'h',
+        elkPath: [{ x: 0, y: 0 }, { x: 10, y: 0 }],
+        treeRouting: { effectiveSourceHandle: 'right', points: [{ x: 0, y: 0 }, { x: 10, y: 0 }] },
+        sharedTrunkAware: true,
+        sharedTrunkSynthesized: true,
+        isTreeBus: true,
+      },
+    }));
+    const signature = computeBaseReactFlowDisplayOutputRouteSignature(routedEdges);
+    if (!signature) throw new Error('Invalid test route');
+    const merged = mergeTrustedBaseReactFlowPrecompiledRouteArtifact(source, {
+      edges: routedEdges,
+      hardClean: true,
+      outputRouteSignature: signature,
+    });
+    expect(merged).not.toBeNull();
+    expect(computeBaseReactFlowDisplayOutputRouteSignature(merged ?? [])).toBe(signature);
+    expect(merged?.[0].label).toBe('Preserved semantic label');
+    expect(merged?.[0].data?.userNote).toBe('Preserved business data');
+    for (const key of ['h', 'elkPath', 'treeRouting', 'sharedTrunkAware', 'sharedTrunkSynthesized', 'isTreeBus']) {
+      expect(merged?.[0].data).not.toHaveProperty(key);
+      expect(source[0].data).toHaveProperty(key);
+    }
+  });
+
   it('recognizes only an own exact signature and geometry descriptor', () => {
     const descriptor = {
       sourceHash: SOURCE_HASH,

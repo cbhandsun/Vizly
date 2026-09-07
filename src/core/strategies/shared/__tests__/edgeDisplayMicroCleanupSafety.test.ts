@@ -177,7 +177,7 @@ describe('edgeDisplayMicroCleanup node safety', () => {
       { allowCompoundRepairs: false },
     );
     expect(singleEdgeDiagnostics.generatedCandidateCount)
-      .toBeLessThan(compoundDiagnostics.generatedCandidateCount);
+      .toBeLessThanOrEqual(compoundDiagnostics.generatedCandidateCount);
 
     const safetyContext = createBaseReactFlowDisplayMicroSafetyContext(
       baseline,

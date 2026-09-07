@@ -1,5 +1,9 @@
 import { useCallback } from 'react';
 import type { Edge, Node } from '@xyflow/react';
+import { createLayoutCandidateAcceptance, layoutCandidateAcceptanceMatches } from '../../../algorithms/layoutCandidateAcceptance';
+import { evaluateLayoutGeometry, type LayoutGeometryConstraints } from '../../../algorithms/layoutGeometryConstraints';
+import { updateDisplayRoutingDebugState } from '../../shared/baseReactFlowDisplayRoutingDebug';
+import { normalizeBaseReactFlowLayoutVisibility } from '../../shared/baseReactFlowLayoutVisibility';
 
 import { runAfterLayoutRenderFrames } from '../../../utils/animateLayoutTransition';
 import { flushObstacles } from '../../custom-edges/obstacleContext';
@@ -21,6 +25,7 @@ type LayoutRoutingTransactionRequest = Readonly<{
   routingJob: BaseReactFlowRoutingSessionJob;
   beforePreviewRelease?: () => Promise<unknown>;
   commitSelection?: () => void;
+  layoutConstraints?: LayoutGeometryConstraints;
   rejectObstacleDirtyBoundedCandidate?: boolean;
   rejectUnanchoredFlatElkCandidate?: boolean;
   candidateRepairPolicy?: 'default' | 'skip-exact-clean';
@@ -68,6 +73,7 @@ export const useLayoutRoutingTransaction = ({
     routingJob,
     beforePreviewRelease,
     commitSelection,
+    layoutConstraints,
     rejectObstacleDirtyBoundedCandidate,
     rejectUnanchoredFlatElkCandidate,
     candidateRepairPolicy,
@@ -104,7 +110,11 @@ export const useLayoutRoutingTransaction = ({
         throw new Error('layout-routing-cancelled');
       }
 
-      const targetNodes = clearBaseReactFlowLayoutNodeRuntimeGeometry(nodes);
+      const targetNodes = clearBaseReactFlowLayoutNodeRuntimeGeometry(normalizeBaseReactFlowLayoutVisibility(nodes));
+      const geometryAcceptance = createLayoutCandidateAcceptance(targetNodes, layoutConstraints, null);
+      updateDisplayRoutingDebugState({ layoutGeometryReport: geometryAcceptance?.geometry
+        ?? evaluateLayoutGeometry(targetNodes, layoutConstraints) });
+      if (!geometryAcceptance) throw new Error('layout-routing-hard-quality-rejected');
       setLayoutStable?.(false);
       publishLayoutPreview?.({ nodes: targetNodes, routingJob });
       let committedEdges = edges;
@@ -125,6 +135,7 @@ export const useLayoutRoutingTransaction = ({
           requestId: `layout:${routingJob.id}`,
           sourceEdges: edges,
           sourceNodes: targetNodes,
+          layoutConstraints: layoutConstraints === undefined ? undefined : geometryAcceptance.constraints,
           isLargeGraph,
           signal: routingJob.signal,
           forceFreshFullRoute: precompiledLayoutRegeneration !== null,
@@ -146,7 +157,14 @@ export const useLayoutRoutingTransaction = ({
         commitLayoutSnapshot = staged.commitSnapshot;
       }
       const commit = () => routingSessionRuntime.commitJob(routingJob, () => {
+        if (!layoutCandidateAcceptanceMatches(geometryAcceptance, targetNodes, null)) {
+          updateDisplayRoutingDebugState({ layoutGeometryReport: evaluateLayoutGeometry(targetNodes, geometryAcceptance.constraints) });
+          throw new Error('layout-routing-hard-quality-rejected');
+        }
         if (!commitLayoutSnapshot(routingSessionRuntime)) {
+          throw new Error('layout-routing-hard-quality-rejected');
+        }
+        if (edges.length === 0 && !routingSessionRuntime.commitLayoutAcceptance(geometryAcceptance, targetNodes, null)) {
           throw new Error('layout-routing-hard-quality-rejected');
         }
         takeSnapshot(nodesRef.current, edgesRef.current);

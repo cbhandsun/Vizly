@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { MutableRefObject } from 'react';
 import type { Edge, Node } from '@xyflow/react';
+import { layoutCandidateAcceptanceMatches, type LayoutCandidateAcceptance, type LayoutRouteProof } from '../../algorithms/layoutCandidateAcceptance';
 import type { RoutingOnlyDocumentSnapshot } from '../../routing/persistedRoutingCandidate';
 import { createBaseReactFlowDocumentSnapshotSource, type BaseReactFlowDocumentSnapshotSource,
   type DocumentSnapshotRoutingOptions } from './baseReactFlowDocumentSnapshotSource';
@@ -36,6 +37,8 @@ export type BaseReactFlowRoutingSessionRuntime = Readonly<{
   commitDisplaySnapshot: (
     options: BaseReactFlowDisplaySnapshotCommitOptions,
   ) => BaseReactFlowDisplayCommittedSnapshotBaseline | null;
+  commitLayoutAcceptance: (acceptance: LayoutCandidateAcceptance, nodes: readonly Node[], route: LayoutRouteProof | null) => boolean;
+  readLayoutAcceptance: () => LayoutCandidateAcceptance | null;
   rememberDocumentSnapshot: (baseline: BaseReactFlowDisplayCommittedSnapshotBaseline, options: DocumentSnapshotRoutingOptions) => void;
   createDocumentSnapshot: (nodes: Node[], edges: Edge[]) => RoutingOnlyDocumentSnapshot | null;
   registerWorkerDisposer: (
@@ -68,6 +71,9 @@ export const createBaseReactFlowRoutingSessionRuntime = (
   let workerDisposer = terminateWorkerDirectly;
   let disposed = false;
   let documentSource: BaseReactFlowDocumentSnapshotSource | null = null;
+  let layoutAcceptance: LayoutCandidateAcceptance | null = null;
+  let pendingLayoutAcceptance: LayoutCandidateAcceptance | null = null;
+  let hasPendingLayoutAcceptance = false;
 
   const isCurrentJob = (job: BaseReactFlowRoutingSessionJob): boolean => (
     !disposed
@@ -76,13 +82,13 @@ export const createBaseReactFlowRoutingSessionRuntime = (
   );
 
   const finishJob = (job: BaseReactFlowRoutingSessionJob): boolean => {
-    if (!isCurrentJob(job)) return false;
+    if (committingJob || !isCurrentJob(job)) return false;
     activeJob = null;
     return true;
   };
 
   const cancelJob = (job: BaseReactFlowRoutingSessionJob): boolean => {
-    if (activeJob?.publicJob !== job) return false;
+    if (committingJob || activeJob?.publicJob !== job) return false;
     activeJob.abortController.abort();
     activeJob = null;
     return true;
@@ -92,14 +98,21 @@ export const createBaseReactFlowRoutingSessionRuntime = (
     workerRef,
     beginJob: (owner) => {
       if (disposed) throw new Error('routing-session-runtime-disposed');
-      documentSource = null;
-      activeJob?.abortController.abort();
       const abortController = new AbortController();
       const publicJob = Object.freeze({
         id: nextJobId += 1,
         owner,
         signal: abortController.signal,
       });
+      // State writers can synchronously trigger another layout/display intent.
+      // That intent must not split the nodes/edges/selection write in progress.
+      // Return an explicitly cancelled, unregistered job for the caller to drop.
+      if (committingJob) {
+        abortController.abort();
+        return publicJob;
+      }
+      documentSource = null;
+      activeJob?.abortController.abort();
       activeJob = { publicJob, abortController };
       return publicJob;
     },
@@ -107,21 +120,38 @@ export const createBaseReactFlowRoutingSessionRuntime = (
     finishJob,
     cancelJob,
     commitJob: (job, commit) => {
-      if (!isCurrentJob(job)) return { committed: false };
+      if (committingJob || !isCurrentJob(job)) return { committed: false };
       committingJob = job;
+      hasPendingLayoutAcceptance = false;
       try {
         const value = commit();
+        if (!isCurrentJob(job)) return { committed: false };
+        if (hasPendingLayoutAcceptance) layoutAcceptance = pendingLayoutAcceptance;
         if (activeJob?.publicJob === job) activeJob = null;
         return { committed: true, value };
       } finally {
         committingJob = null;
+        hasPendingLayoutAcceptance = false;
+        pendingLayoutAcceptance = null;
       }
     },
-    commitDisplaySnapshot: options => (
-      committingJob && isCurrentJob(committingJob)
-        ? commitBaseReactFlowDisplaySnapshot(options)
-        : null
-    ),
+    commitDisplaySnapshot: options => {
+      if (!committingJob || !isCurrentJob(committingJob)) return null;
+      const snapshot = commitBaseReactFlowDisplaySnapshot(options);
+      if (snapshot) {
+        pendingLayoutAcceptance = snapshot.layoutAcceptance ?? null;
+        hasPendingLayoutAcceptance = true;
+      }
+      return snapshot;
+    },
+    commitLayoutAcceptance: (acceptance, nodes, route) => {
+      if (!committingJob || committingJob.owner !== 'layout' || !isCurrentJob(committingJob)
+        || !layoutCandidateAcceptanceMatches(acceptance, nodes, route)) return false;
+      pendingLayoutAcceptance = acceptance;
+      hasPendingLayoutAcceptance = true;
+      return true;
+    },
+    readLayoutAcceptance: () => layoutAcceptance,
     rememberDocumentSnapshot: (baseline, options) => {
       if (!disposed) documentSource = createBaseReactFlowDocumentSnapshotSource(baseline, options);
     },
@@ -133,6 +163,9 @@ export const createBaseReactFlowRoutingSessionRuntime = (
       if (disposed) return;
       disposed = true;
       documentSource = null;
+      layoutAcceptance = null;
+      pendingLayoutAcceptance = null;
+      hasPendingLayoutAcceptance = false;
       activeJob?.abortController.abort();
       activeJob = null;
       committingJob = null;

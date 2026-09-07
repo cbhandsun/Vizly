@@ -1,10 +1,10 @@
 {
   "requestId": "3316775788:1",
   "inputIdentity": {
-    "routingVersion": "16",
-    "visualVersion": "commercial-hard-gate-v1",
-    "inputSignature": "242495978",
-    "inputGeometryDigest": "geometry-v1:70423b7cfce187fc40cd6338e0b37870"
+    "routingVersion": "18",
+    "visualVersion": "balanced-crossing-gate-v2",
+    "inputSignature": "672564844",
+    "inputGeometryDigest": "geometry-v1:c6d418bef3c1e4a601ca949e927a3b72"
   },
   "edges": [
     {

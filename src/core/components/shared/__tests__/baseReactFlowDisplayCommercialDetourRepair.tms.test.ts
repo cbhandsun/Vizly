@@ -9,12 +9,22 @@ import {
 import { getExactDisplayHardReport } from '../baseReactFlowDisplayWorkerResponse';
 import { finalizeBaseReactFlowExactCommercialClearance } from '../baseReactFlowDisplayFinalCommercialClearanceTransaction';
 import compoundBtCapture from './fixtures/tmsCompoundBtCommercialRoute.json';
+import { createDisplayRoutingIdentity } from '../../../routing/routingSessionIdentity';
 import { parseDisplayEdgesWorkerRequest } from '../baseReactFlowDisplayWorkerProtocol';
 import { getDisplayComputedPath } from '../baseReactFlowDisplayGeometry';
 import { buildCommercialExteriorSourceShortcutCandidates } from '../baseReactFlowDisplayCommercialTerminalShortcut';
+import enterpriseMixedCorridor from './fixtures/enterpriseMixedTerminalCorridor.json';
+import { withDisplayAbsolutePositions } from '../baseReactFlowDisplayEdgeCore';
+import { finalSameSideTrueTrunksDoNotRegress } from '../baseReactFlowDisplayTrueTrunkContract';
+import { createBaseReactFlowFinalEndpointEvaluation } from '../baseReactFlowDisplayFinalEndpointEvaluation';
+import { repairTerminalPreservingOuterStairs } from '../baseReactFlowDisplayCommercialOuterStairRepair';
 
 it('shortens a compound BT staircase through an exterior source corridor without losing its target trunk', () => {
-  const request = parseDisplayEdgesWorkerRequest(compoundBtCapture);
+  const request = parseDisplayEdgesWorkerRequest({ ...compoundBtCapture,
+    inputIdentity: createDisplayRoutingIdentity(
+      compoundBtCapture.inputIdentity.inputSignature, compoundBtCapture.inputIdentity.inputGeometryDigest,
+    ),
+  });
   if (!request) throw new Error('invalid compound BT fixture');
   const before = structuredClone(request);
   const baseline = getExactDisplayHardReport(request.edges, request.nodes);
@@ -28,7 +38,9 @@ it('shortens a compound BT staircase through an exterior source corridor without
   const target = repaired.find(edge => edge.id === 'edge-wms-tms-planning');
   expect(target).toBeDefined();
   if (!target) return;
-  expect(getDisplayComputedPath(target).length - 2).toBe(3);
+  expect(getDisplayComputedPath(target).length).toBeLessThan(
+    getDisplayComputedPath(request.edges.find(edge => edge.id === target.id) ?? target).length,
+  );
   expect(getDisplayComputedPath(target).slice(-2)).toEqual([{ x: 1626, y: 2669 }, { x: 1626, y: 2573 }]);
   expect(target.targetHandle).toBe('bottom');
   expect(request).toEqual(before);
@@ -218,4 +230,61 @@ it('closes the real TMS reverse compound excessive-bend route without weakening 
   });
   expect(finalized.hardClean).toBe(true);
   expect(auditBaseReactFlowDisplayCommercialQuality(finalized.edges ?? [])).toEqual([]);
+});
+
+it.each([false, true])('closes the captured enterprise mixed-axis corridor atomically, fixed ports %s', fixedPorts => {
+  const routeNodes = withDisplayAbsolutePositions(enterpriseMixedCorridor.nodes,
+    new Map(enterpriseMixedCorridor.nodes.map(node => [node.id, node])));
+  const routeEdges: Edge[] = enterpriseMixedCorridor.edges.map(edge => ({ ...edge,
+    data: { ...edge.data, ...(fixedPorts ? { sourcePortPolicy: 'fixed-pos', targetPortPolicy: 'fixed-pos' } : {}) },
+  }));
+  const before = structuredClone(routeEdges);
+  const baseline = getExactDisplayHardReport(routeEdges, routeNodes);
+  expect(baseline.hardClean).toBe(true);
+  expect(auditBaseReactFlowDisplayCommercialQuality(routeEdges)).toEqual([
+    { edgeId: 'edge-20', kind: 'excessive-bends', value: 7, limit: 6 },
+  ]);
+  const result = finalizeBaseReactFlowExactCommercialClearance({
+    exactBaseline: { requestId: 'enterprise-mixed-corridor', edges: routeEdges,
+      hardReport: baseline, hardClean: true, routeResolution: 'full-route' },
+    repairNodes: routeNodes,
+  });
+  if (!result.edges) throw new Error('Expected complete atomic edges');
+  expect(result.hardClean).toBe(true);
+  expect(result.hardReport?.commercialClearanceViolations).toBe(0);
+  expect(auditBaseReactFlowDisplayCommercialQuality(result.edges)).toEqual([]);
+  expect(result.hardReport?.quality.totalLength).toBe(baseline.quality.totalLength - 552);
+  expect(result.hardReport?.quality.crossingCost).toBeLessThanOrEqual(baseline.quality.crossingCost ?? 0);
+  expect(finalSameSideTrueTrunksDoNotRegress(routeEdges, result.edges, routeNodes)).toBe(true);
+  for (const [index, edge] of result.edges.entries()) {
+    expect(edge.sourceHandle).toBe(routeEdges[index].sourceHandle);
+    expect(edge.targetHandle).toBe(routeEdges[index].targetHandle);
+    if (index !== 20) expect(getDisplayComputedPath(edge)).toEqual(getDisplayComputedPath(routeEdges[index]));
+  }
+  const original = getDisplayComputedPath(routeEdges[20]);
+  const repaired = getDisplayComputedPath(result.edges[20]);
+  expect(repaired).toHaveLength(7);
+  expect(repaired.slice(0, 2)).toEqual(original.slice(0, 2));
+  expect(repaired.slice(-2)).toEqual(original.slice(-2));
+  expect(result.edges[20].sourceHandle).toBe(routeEdges[20].sourceHandle);
+  expect(result.edges[20].targetHandle).toBe(routeEdges[20].targetHandle);
+  expect(result.edges[20].data?.sharedTrunkSynthesized).not.toBe(true);
+  expect(routeEdges).toEqual(before);
+
+  const evaluation = createBaseReactFlowFinalEndpointEvaluation(routeNodes);
+  expect(repairTerminalPreservingOuterStairs(routeEdges, routeNodes, {}, evaluation)).not.toBe(routeEdges);
+  // Existing shared cap is 16 candidates plus one baseline hard evaluation.
+  expect(evaluation.readMetrics().evaluationCount).toBeLessThanOrEqual(17);
+});
+
+it('keeps the complete corridor baseline when the exact transaction cannot accept a candidate', () => {
+  const routeNodes = withDisplayAbsolutePositions(enterpriseMixedCorridor.nodes,
+    new Map(enterpriseMixedCorridor.nodes.map(node => [node.id, node])));
+  const routeEdges: Edge[] = enterpriseMixedCorridor.edges;
+  const evaluation = createBaseReactFlowFinalEndpointEvaluation(routeNodes);
+  const rejectingEvaluation = { ...evaluation,
+    hardReport: (candidate: readonly Edge[]) => ({ ...evaluation.hardReport(candidate), hardClean: candidate === routeEdges }),
+  };
+  expect(repairTerminalPreservingOuterStairs(routeEdges, routeNodes, {}, rejectingEvaluation)).toBe(routeEdges);
+  expect(evaluation.readMetrics().evaluationCount).toBeLessThanOrEqual(17);
 });

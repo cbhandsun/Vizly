@@ -5,7 +5,7 @@ import {
   segmentDisplayLength,
 } from './baseReactFlowDisplayGeometry';
 
-const MIN_COMMERCIAL_INTERIOR_SEGMENT = 24;
+export const MIN_COMMERCIAL_INTERIOR_SEGMENT = 24;
 export const MAX_COMMERCIAL_BEND_COUNT = 6;
 const COMMERCIAL_LENGTH_BUDGET_PER_REMOVED_BEND = 32;
 

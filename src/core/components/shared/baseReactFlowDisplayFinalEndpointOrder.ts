@@ -333,6 +333,15 @@ export const repairBaseReactFlowFinalEndpointOrder = <T extends Edge[]>(
     onTrace: options.onPhaseTrace,
   });
   const baselineReport = evaluation.hardReport(edges);
+  const validateTopologyCandidate = (
+    context: FinalEndpointTopologyCandidateValidation,
+  ): boolean => passesFinalDisplayGate(
+    context.baselineEdges,
+    context.candidateEdges,
+    context.changedEdgeIndexes,
+    options,
+    evaluation,
+  );
   const restorePreferredSourceTrunks = (baseline: Edge[]): Edge[] => (
     repairPreferredSourceTrunkBundles(
       baseline,
@@ -392,20 +401,18 @@ export const repairBaseReactFlowFinalEndpointOrder = <T extends Edge[]>(
       options,
       evaluation,
     );
-    preferredSourceTrunkCandidate = repairFinalSharedSourceTerminalTrunks(
-      preferredSourceTrunkCandidate,
-      repairNodes,
-      {
-        evaluateEndpointOrder: evaluation.endpointOrder,
-        validateCandidate: context => passesFinalDisplayGate(
-          context.baselineEdges,
-          context.candidateEdges,
-          context.changedEdgeIndexes,
-          options,
-          evaluation,
-        ),
-      },
-    );
+    // A hard-clean crossing policy can accept separate target stems. Complete
+    // target consolidation before the clean fast return, just as for sources.
+    for (const repairTrunks of [repairFinalSharedSourceTerminalTrunks, repairFinalSameTargetTerminalTrunks]) {
+      preferredSourceTrunkCandidate = repairTrunks(
+        preferredSourceTrunkCandidate,
+        repairNodes,
+        {
+          evaluateEndpointOrder: evaluation.endpointOrder,
+          validateCandidate: validateTopologyCandidate,
+        },
+      );
+    }
     preferredSourceTrunkCandidate = separatePreferredSourceBranches(
       preferredSourceTrunkCandidate,
       preferredTransactionBaseline,
@@ -457,15 +464,6 @@ export const repairBaseReactFlowFinalEndpointOrder = <T extends Edge[]>(
     }
   }
   seedTimer.finish('fallback');
-  const validateTopologyCandidate = (
-    context: FinalEndpointTopologyCandidateValidation,
-  ): boolean => passesFinalDisplayGate(
-    context.baselineEdges,
-    context.candidateEdges,
-    context.changedEdgeIndexes,
-    options,
-    evaluation,
-  );
   const repairEndpointOrder = (baseline: Edge[]): Edge[] => (
     repairFinalSameSideEndpointOrder(baseline, repairNodes, {
       evaluateEndpointOrder: evaluation.endpointOrder,

@@ -1,4 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
+import { isReadableOrthogonalCrossing } from '../../../routing/orthogonalCrossingPolicy';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as qualitySeed from '../baseReactFlowDisplayQualitySeedPipeline';
 import * as clearanceRepair from '../baseReactFlowDisplayBusinessNodeClearance';
@@ -82,7 +83,7 @@ const referenceDisplayStrictCrossingHits = (
       const crosses = first.axis === 'h'
         ? displayStrictCrossesHorizontal(first.a, first.b, second)
         : displayStrictCrossesVertical(first.a, first.b, second);
-      if (crosses) hits.push({ a: first, b: second });
+      if (crosses && !isReadableOrthogonalCrossing(first, second)) hits.push({ a: first, b: second });
     }
   }
   return hits;

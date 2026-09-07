@@ -183,7 +183,7 @@ export const calculateLayeredLayoutWithReverse = async (
     // container headers upright. Mirroring that layout would swap header and
     // bottom padding and place terminal nodes inside the title strip.
     const nativeSemanticReverse = options.domainPlacement === 'ordered-lanes'
-        && (options.nodeLayout === 'dagre' || options.nodeLayout === 'flow');
+        && options.nodeLayout === 'dagre';
     const reverseDirection = reverseRanking
         && !nativeSemanticReverse
         && (requestedDirection === 'BT' || requestedDirection === 'RL')

@@ -4,7 +4,8 @@ import { act, renderHook } from '@testing-library/react';
 import type { Edge, Node } from '@xyflow/react';
 import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { createGroupCollapseTogglePlan, useCollapsibleGroups } from '../useCollapsibleGroups';
+import { buildChildrenMap, getDescendantIds, createGroupCollapseTogglePlan, useCollapsibleGroups } from '../useCollapsibleGroups';
+import { normalizeBaseReactFlowLayoutVisibility } from '../../../shared/baseReactFlowLayoutVisibility';
 
 const group = (overrides: Partial<Node> = {}): Node => ({
     id: 'group',
@@ -12,6 +13,45 @@ const group = (overrides: Partial<Node> = {}): Node => ({
     position: { x: 0, y: 0 },
     data: {},
     ...overrides,
+});
+
+describe('shared explicit layout visibility', () => {
+    it('uses the same semantic and actual descendants as rendered container collapse', () => {
+        const nodes: Node[] = [
+            group({ data: { domain: 'D', collapsed: true } }),
+            group({ id: 'sub', type: 'subGroup', data: { domain: 'D', subDomain: 'S' } }),
+            group({ id: 'semantic-child', type: 'custom', data: { domain: 'D', subDomain: 'S' } }),
+            group({ id: 'actual-child', type: 'custom', parentId: 'sub' }),
+        ];
+        expect(getDescendantIds(nodes, 'group')).toEqual(['sub', 'actual-child', 'semantic-child']);
+        const normalized = normalizeBaseReactFlowLayoutVisibility(nodes);
+        const { result } = renderHook(() => useCollapsibleGroups({ nodes, edges: [], setNodes: vi.fn() }));
+        expect(normalized.map(node => [node.id, !!node.hidden])).toEqual(
+            result.current.nodesWithCollapseState.map(node => [node.id, !!node.hidden]),
+        );
+        expect(normalizeBaseReactFlowLayoutVisibility(normalized)).toBe(normalized);
+        expect(nodes.every(node => node.hidden === undefined)).toBe(true);
+    });
+
+    it('handles empty, missing, duplicate paths and cyclic ancestry without infinite traversal', () => {
+        expect(buildChildrenMap([]).size).toBe(0);
+        expect(getDescendantIds([], 'missing')).toEqual([]);
+        const cyclic = [group({ id: 'a', parentId: 'b' }), group({ id: 'b', parentId: 'a' })];
+        expect(getDescendantIds(cyclic, 'a')).toEqual(['b']);
+        const duplicatePath = [group({ data: { domain: 'D' } }),
+            group({ id: 'child', type: 'custom', parentId: 'group', data: { domain: 'D' } })];
+        expect(getDescendantIds(duplicatePath, 'group')).toEqual(['child']);
+        expect(normalizeBaseReactFlowLayoutVisibility(cyclic)).toBe(cyclic);
+        expect(normalizeBaseReactFlowLayoutVisibility([{ ...cyclic[0], data: { collapsed: true } }, cyclic[1]]))
+            .toHaveLength(2);
+    });
+
+    it('keeps visible structural children and ignores untrusted nonboolean collapse flags', () => {
+        const nodes = [group({ hidden: true, data: { collapsed: '<script>private</script>' } }),
+            group({ id: 'child', type: 'custom', parentId: 'group' })];
+        expect(normalizeBaseReactFlowLayoutVisibility(nodes)).toBe(nodes);
+        expect(nodes[1].hidden).toBeUndefined();
+    });
 });
 
 describe('useCollapsibleGroups transactions', () => {

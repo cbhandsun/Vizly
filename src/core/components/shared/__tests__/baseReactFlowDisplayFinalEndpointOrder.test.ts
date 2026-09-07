@@ -712,6 +712,9 @@ describe('base React Flow final endpoint order transaction', () => {
     );
     const sourceTerminals = edges.map(candidate => pathOf(candidate)[0]);
 
+    // Legal line crossings make this baseline hard-clean; the early return
+    // must still perform the independent nearby-target consolidation.
+    expect(getDisplayHardQualityGateReport(edges, repairNodes, 'polished').hardClean).toBe(true);
     const result = repairBaseReactFlowFinalEndpointOrder(edges, nodes);
     const order = auditFinalSameSideEndpointOrder(result, repairNodes);
     const targetTrunk = order.legalSharedTrunks.find(trunk => (
@@ -725,6 +728,7 @@ describe('base React Flow final endpoint order transaction', () => {
     expect(order.inversions).toBe(0);
     expect(order.collapsedLanePairs).toBe(0);
     expect(getDisplayHardQualityGateReport(result, repairNodes, 'polished').hardClean).toBe(true);
+    expect(repairBaseReactFlowFinalEndpointOrder(result, nodes)).toBe(result);
   });
 
   it('skips the residual overlap closure when the exact baseline is already hard-clean', () => {

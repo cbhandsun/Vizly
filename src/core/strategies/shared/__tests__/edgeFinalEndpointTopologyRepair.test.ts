@@ -322,7 +322,7 @@ describe('final endpoint topology repair', () => {
 
     const result = repairFinalSameSideAdjacentTerminalEscape(edges, nodes);
 
-    expect(result.find(edge => edge.id === 'far-edge')?.sourceHandle).toBe('right');
+    expect(result.find(edge => edge.id === 'far-edge')?.sourceHandle).toBe('bottom');
     expect(auditFinalSameSidePassageOrder(result, nodes).passageDefects).toBe(0);
     expect(auditFinalSameSideEndpointOrder(result, nodes).inversions).toBe(0);
   });

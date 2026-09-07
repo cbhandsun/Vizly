@@ -29,7 +29,7 @@ import {
   scheduleBaseReactFlowNodeInternalsRetry,
 } from './baseReactFlowNodeInternals';
 import {
-  createBaseReactFlowExportStateHandlers,
+  bindBaseReactFlowExportBackgroundVisibility,
   resolveBaseReactFlowInitialFitMode,
   restoreBaseReactFlowViewportOnInit,
 } from './baseReactFlowViewport';
@@ -84,6 +84,7 @@ import { useBaseReactFlowNodeDragState } from './useBaseReactFlowNodeDragState';
 import { BASE_REACT_FLOW_DEFAULT_SNAP_GRID, BASE_REACT_FLOW_DEFAULT_STYLE, BASE_REACT_FLOW_DEFAULT_VIEWPORT } from './baseReactFlowDefaults';
 import { BaseReactFlowViewportSemanticContext } from './baseReactFlowViewportSemanticContext';
 import { useBaseReactFlowViewportSemanticState } from './useBaseReactFlowViewportSemanticState';
+import { MIN_DIAGRAM_FULL_FIT_ZOOM } from './diagramControlFit';
 
 const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   nodes = [],
@@ -94,7 +95,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   className = 'diagram-preview-root',
   flowClassName,
   fitView = false,
-  minZoom = 0.1,
+  minZoom = MIN_DIAGRAM_FULL_FIT_ZOOM,
   maxZoom = 4,
   defaultViewport = BASE_REACT_FLOW_DEFAULT_VIEWPORT,
   showMiniMap = true,
@@ -355,7 +356,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
 
     const unbind = bindBaseReactFlowWheelHandler({
       pane,
-      wheelHandler: wheelHandler as EventListener,
+      wheelHandler,
       onPassiveBindFailure: (error) => logBaseReactFlowEventBindingFailure('bindWheelHandlerPassive', error),
     });
 
@@ -370,6 +371,8 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
 
   useBaseReactFlowFitController({
     rfInstance,
+    containerRef,
+    syncSemanticViewport: syncViewportSemanticState,
     renderNodes,
     visibleNodeCount: visibleNodes.length,
     edges,
@@ -459,19 +462,10 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
    * 目的：确保 PNG/SVG/PDF/GIF 导出不包含 React Flow 的网格点背景
    */
   const [hideBackgroundDuringExport, setHideBackgroundDuringExport] = useState(false);
-  useEffect(() => {
-    const { onStart, onStop } = createBaseReactFlowExportStateHandlers({
-      setHidden: setHideBackgroundDuringExport,
-    });
-    window.addEventListener('diagramExportStart', onStart);
-    window.addEventListener('diagramExportComplete', onStop);
-    window.addEventListener('diagramExportError', onStop);
-    return () => {
-      window.removeEventListener('diagramExportStart', onStart);
-      window.removeEventListener('diagramExportComplete', onStop);
-      window.removeEventListener('diagramExportError', onStop);
-    };
-  }, []);
+  useEffect(() => bindBaseReactFlowExportBackgroundVisibility({
+    target: window,
+    setHidden: setHideBackgroundDuringExport,
+  }), []);
 
   // 调试辅助线由独立渲染器读取开关和节点快照。
 

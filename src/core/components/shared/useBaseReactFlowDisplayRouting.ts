@@ -351,6 +351,7 @@ export const useBaseReactFlowDisplayRouting = ({
         geometryBarrierSamples: geometryBarrier.sampleCount,
       });
       routingJob = displayRoutingSessionRuntime.beginJob('display');
+      if (!displayRoutingSessionRuntime.isCurrentJob(routingJob)) return;
       const incrementalPlan = createBaseReactFlowDisplayIncrementalPlan({
         baseline: forceFreshFullRoute ? null : committedSnapshotBaselineRef.current,
         nextInputSignature: displayEdgeCacheSignature,

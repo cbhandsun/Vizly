@@ -3,6 +3,8 @@ import type { LaneRankMode } from '../types/domainLaneRank';
 import { getNodeDimensions, layoutWithDagre } from './DomainDagreLayoutHelpers';
 import { domainDagreDomainOf, isDomainDagreGroupNode, isDomainDagreNodeHidden } from './domainDagreHierarchy';
 import { domainDagrePeerComponentIndex } from './domainDagrePeerComponents';
+import { compactDomainDagreLaneCrossAxis } from './domainDagreLaneCrossCompaction';
+import { assignDomainDagreLaneCoordinates, type DomainDagreLaneCoordinateScope } from './domainDagreLaneCoordinateAssignment';
 import { boundedDomainDagreNumber, getDomainDagreSubDomainOrderIndex,
   type DomainDagreDirection, type DomainDagreSubDomainOrder } from './domainDagreLayoutBoundary';
 
@@ -14,6 +16,7 @@ export interface SemanticLaneFlowOptions {
   subDomainOrder?: DomainDagreSubDomainOrder;
   horizontalGap?: number;
   verticalGap?: number;
+  independentNodeArrangement?: 'grid' | 'flow';
 }
 
 const withoutAbsolutePosition = (node: Node): Node => {
@@ -84,12 +87,14 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
   }
   const domains = nodes.filter(node => node.type === 'titleGroup' && !isDomainDagreNodeHidden(node));
   if (!domains.length) return nodes;
-  const rank = (domain: Node) => Math.min(...leaves.filter(node => domainDagreDomainOf(node) === domainDagreDomainOf(domain))
-    .map(node => globalPositions.get(node.id)?.[flow] ?? Infinity));
+  // Process ranks order business nodes along a lane; they do not redefine
+  // the declared cross-axis lane order, especially for independent cards.
+  const declarationRank = new Map(domains.map((domain, index) => [domain.id, index]));
   const explicitRank = new Map(domainOrder.map((key, index) => [key, index]));
   const orderedDomains = domains.toSorted((a, b) =>
     (explicitRank.get(domainDagreDomainOf(a)) ?? Number.MAX_SAFE_INTEGER)
-    - (explicitRank.get(domainDagreDomainOf(b)) ?? Number.MAX_SAFE_INTEGER) || rank(a) - rank(b));
+    - (explicitRank.get(domainDagreDomainOf(b)) ?? Number.MAX_SAFE_INTEGER)
+    || (declarationRank.get(a.id) ?? 0) - (declarationRank.get(b.id) ?? 0));
   const originals = new Map(nodes.map(node => [node.id, node]));
   const replacements = new Map<string, Node>();
   const at = (c: number, f: number) => horizontal ? { x: f, y: c } : { x: c, y: f };
@@ -103,6 +108,7 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
   };
   const flowEnd = Math.max(...leaves.map(node => (globalPositions.get(node.id)?.[flow] ?? 0) + flowSize(node))) + 232;
   let domainCross = 0;
+  const coordinateScopes: DomainDagreLaneCoordinateScope[] = [];
   for (const domain of orderedDomains) {
     const domainKey = domainDagreDomainOf(domain);
     const members = leaves.filter(node => domainDagreDomainOf(node) === domainKey);
@@ -116,14 +122,18 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
     const orderedBuckets = [...buckets].sort(([a], [b]) =>
       getDomainDagreSubDomainOrderIndex(subDomainOrder, domainKey, originals.get(a)?.data.subDomain)
       - getDomainDagreSubDomainOrderIndex(subDomainOrder, domainKey, originals.get(b)?.data.subDomain));
+    coordinateScopes.push({ domainId: domain.id,
+      buckets: orderedBuckets.map(([id, bucket]) => ({ id, nodeIds: bucket.map(node => node.id) })) });
     for (const [id, bucket] of orderedBuckets) {
-      const minCross = Math.min(...bucket.map(node => node.position[cross]));
-      const maxCross = Math.max(...bucket.map(node => node.position[cross] + crossSize(node)));
+      const compactCross = compactDomainDagreLaneCrossAxis(bucket, globalPositions, cross, crossGap);
+      const crossPosition = (node: Node) => compactCross.get(node.id) ?? node.position[cross];
+      const minCross = Math.min(...bucket.map(crossPosition));
+      const maxCross = Math.max(...bucket.map(node => crossPosition(node) + crossSize(node)));
       const inset = horizontal ? 64 : 32;
       const width = maxCross - minCross + inset + 32;
       for (const node of bucket) {
         const leaf = withoutAbsolutePosition(node);
-        replacements.set(node.id, { ...leaf, position: at(bucketCross + inset + node.position[cross] - minCross,
+        replacements.set(node.id, { ...leaf, position: at(bucketCross + inset + crossPosition(node) - minCross,
           200 + (globalPositions.get(node.id)?.[flow] ?? 0)) });
       }
       const group = originals.get(id);
@@ -231,6 +241,8 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
     if (!isDomainDagreGroupNode(node)) continue;
     replacements.set(node.id, resize(node, node.position[cross], node.position[flow], crossSize(node), flowSize(node) + flowOffset - flowReduction));
   }
+  assignDomainDagreLaneCoordinates(replacements, coordinateScopes, edges, horizontal, crossGap, flowGap,
+    options.independentNodeArrangement);
   if (reversed) {
     const visible = leaves.map(node => replacements.get(node.id) ?? node);
     const mirror = Math.min(...visible.map(node => node.position[flow]))

@@ -33,7 +33,8 @@ describe('edgePathQualityFullScan', () => {
 
     const score = calculateEdgePathQualityScoreExact(edges, metrics);
 
-    expect(score.strictCrossings).toBe(1);
+    expect(score.strictCrossings).toBe(0);
+    expect(score.bridgedCrossings).toBe(1);
     expect(metrics.scannedEdgePairCount).toBe(3);
   });
 
@@ -84,7 +85,9 @@ describe('edgePathQualityFullScan', () => {
     calculateMemoizedEdgePathQualityDecomposition(edges, buildQualityInputSnapshot(edges));
     const metrics = { scannedEdgePairCount: 0 };
 
-    expect(calculateEdgePathQualityScoreExact(edges, metrics).strictCrossings).toBe(1);
+    expect(calculateEdgePathQualityScoreExact(edges, metrics)).toMatchObject({
+      strictCrossings: 0, bridgedCrossings: 1,
+    });
     expect(metrics.scannedEdgePairCount).toBe(3);
   });
 
@@ -109,6 +112,7 @@ describe('edgePathQualityFullScan', () => {
       [{ x: 50, y: 0 }, { x: 50, y: 100 }],
     );
     const prefix = 'x'.repeat(128);
+    vertical.source = horizontal.source;
     const withoutCrossingHop = [
       { ...horizontal, data: { ...horizontal.data, h: `${prefix};20,20;` } },
       vertical,
@@ -126,7 +130,8 @@ describe('edgePathQualityFullScan', () => {
       buildQualityInputSnapshot(withCrossingHop),
     ).score;
 
-    expect(withoutHopScore.strictCrossings).toBe(1);
+    expect(withoutHopScore.strictCrossings).toBe(0);
+    expect(withoutHopScore.bridgedCrossings).toBe(1);
     expect(withHopScore.strictCrossings).toBe(0);
     expect(withHopScore).toEqual(calculateEdgePathQualityScoreExact(withCrossingHop));
   });

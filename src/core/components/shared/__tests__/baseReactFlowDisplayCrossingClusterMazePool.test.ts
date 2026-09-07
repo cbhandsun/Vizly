@@ -10,7 +10,7 @@ import { repairDisplayCrossingClusterMazeFallback } from '../baseReactFlowDispla
 
 const fixture = (): Edge[] => [
   { id: 'horizontal', source: 'a', target: 'b', data: { computedPath: [{ x: 0, y: 0 }, { x: 400, y: 0 }] } },
-  { id: 'vertical', source: 'c', target: 'd', data: { computedPath: [{ x: 200, y: -100 }, { x: 200, y: 100 }] } },
+  { id: 'vertical', source: 'c', target: 'd', data: { computedPath: [{ x: 12, y: -100 }, { x: 12, y: 100 }] } },
 ];
 
 afterEach(() => vi.restoreAllMocks());
@@ -37,8 +37,8 @@ describe('crossing cluster maze pool', () => {
     const nodes = [
       { id: 'a', position: { x: -100, y: -40 }, width: 100, height: 80, data: {} },
       { id: 'b', position: { x: 400, y: -40 }, width: 100, height: 80, data: {} },
-      { id: 'c', position: { x: 160, y: -180 }, width: 80, height: 80, data: {} },
-      { id: 'd', position: { x: 160, y: 100 }, width: 80, height: 80, data: {} },
+      { id: 'c', position: { x: -28, y: -180 }, width: 80, height: 80, data: {} },
+      { id: 'd', position: { x: -28, y: 100 }, width: 80, height: 80, data: {} },
     ];
     const acceptCandidate = vi.fn(() => false);
     expect(repairBoundedMultiEdgeResidualStrictCrossings(edges, nodes, { acceptCandidate })).toBe(edges);
@@ -125,11 +125,18 @@ describe('crossing cluster maze pool', () => {
   });
 
   it('tries a bounded moving set even when its full crossing component exceeds the bridge budget', () => {
-    const edges: Edge[] = [fixture()[0], ...Array.from({ length: 24 }, (_, index): Edge => ({
+    const edges: Edge[] = [{ ...fixture()[0], data: { computedPath: [{ x: 0, y: 0 }, { x: 1000, y: 0 }] } }, ...Array.from({ length: 24 }, (_, index): Edge => ({
       id: `crossing-${index}`, source: `s-${index}`, target: `t-${index}`,
-      data: { computedPath: [{ x: 8 + index * 16, y: -100 }, { x: 8 + index * 16, y: 100 }] },
+      data: { computedPath: [{ x: 80 + index * 32, y: -12 }, { x: 80 + index * 32, y: 100 }] },
     }))];
-    const build = vi.spyOn(maze, 'buildDisplaySegmentMazeCandidate');
+    // Supply one feasible local route so this test isolates moving-set selection
+    // from the maze grid's independently tested search envelope.
+    const build = vi.spyOn(maze, 'buildDisplaySegmentMazeCandidate').mockImplementation((routes, _nodes, moving) => (
+      moving.edgeIndex === 0 ? { ...routes[0], data: { computedPath: [
+        { x: 0, y: 0 }, { x: 48, y: 0 }, { x: 48, y: -60 },
+        { x: 952, y: -60 }, { x: 952, y: 0 }, { x: 1000, y: 0 },
+      ] } } : null
+    ));
     const repaired = repairBoundedMultiEdgeResidualStrictCrossings(edges, []);
     expect(calculateEdgePathQualityScore(edges).strictCrossings).toBe(24);
     expect(calculateEdgePathQualityScore(repaired).strictCrossings).toBeLessThan(24);
@@ -157,8 +164,8 @@ describe('crossing cluster maze pool', () => {
     const nodes = [
       { id: 'a', position: { x: -100, y: -40 }, width: 100, height: 80, data: {} },
       { id: 'b', position: { x: 400, y: -40 }, width: 100, height: 80, data: {} },
-      { id: 'c', position: { x: 160, y: -180 }, width: 80, height: 80, data: {} },
-      { id: 'd', position: { x: 160, y: 100 }, width: 80, height: 80, data: {} },
+      { id: 'c', position: { x: -28, y: -180 }, width: 80, height: 80, data: {} },
+      { id: 'd', position: { x: -28, y: 100 }, width: 80, height: 80, data: {} },
     ];
     const build = vi.spyOn(maze, 'buildDisplaySegmentMazeCandidate');
     const repaired = repairBoundedMultiEdgeResidualStrictCrossings(edges, nodes);

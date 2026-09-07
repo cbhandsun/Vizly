@@ -379,8 +379,8 @@ describe('repairDisplayMicroArtifacts', () => {
     expect(repairedPath).toEqual([
       { x: 916, y: 653 },
       { x: 916, y: 742 },
-      { x: 148, y: 742 },
-      { x: 148, y: 1450 },
+      { x: 892, y: 742 },
+      { x: 892, y: 1450 },
       { x: 1216, y: 1450 },
       { x: 1216, y: 1539 },
     ]);

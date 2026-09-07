@@ -39,7 +39,7 @@ describe('edgePathQualityGeometry', () => {
     expect(score.totalLength).toBe(140);
   });
 
-  it('detects one strict crossing between unrelated orthogonal edges', () => {
+  it('records a clear ordinary crossing as bridged while retaining its count', () => {
     const horizontalPath = [{ x: 0, y: 50 }, { x: 100, y: 50 }];
     const verticalPath = [{ x: 50, y: 0 }, { x: 50, y: 100 }];
     const contribution = calculateEdgePairQuality(
@@ -49,7 +49,8 @@ describe('edgePathQualityGeometry', () => {
       buildEdgeSegments(verticalPath, 1),
     );
 
-    expect(contribution.strictCrossings).toBe(1);
+    expect(contribution.strictCrossings).toBe(0);
+    expect(contribution.bridgedCrossings).toBe(1);
     expect(contribution.unrelatedOverlap).toBe(0);
   });
 
@@ -95,10 +96,10 @@ describe('edgePathQualityGeometry', () => {
     );
 
     expect(endpointJunction.strictCrossings).toBe(0);
-    expect(internalCrossing.strictCrossings).toBe(1);
+    expect(internalCrossing).toMatchObject({ strictCrossings: 0, bridgedCrossings: 1, crossingCost: 7 });
   });
 
-  it('recognizes a visually coincident same-source trunk across a three-pixel lane drift', () => {
+  it.each([0.5, 1, 2, 3])('distinguishes shared trunk rounding from a %s-pixel parallel lane', (drift) => {
     const firstPath = [
       { x: 0, y: 0 },
       { x: 0, y: 72 },
@@ -108,8 +109,8 @@ describe('edgePathQualityGeometry', () => {
     const secondPath = [
       { x: 0, y: 0.5 },
       { x: 0, y: 72 },
-      { x: 264, y: 72 },
-      { x: 264, y: 300 },
+      { x: 267 - drift, y: 72 },
+      { x: 267 - drift, y: 300 },
     ];
     const contribution = calculateEdgePairQuality(
       edge('first', 'shared-source', 'first-target'),
@@ -119,7 +120,7 @@ describe('edgePathQualityGeometry', () => {
     );
 
     expect(contribution.relatedOverlap).toBeGreaterThanOrEqual(113);
-    expect(contribution.unexplainedRelatedOverlap).toBe(0);
+    expect(contribution.unexplainedRelatedOverlap).toBe(drift <= 1 ? 0 : 113);
     expect(contribution.reverseOverlap).toBe(0);
   });
 

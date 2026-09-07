@@ -46,9 +46,25 @@ describe('diagramControl', () => {
     );
   });
 
-  it('keeps full-fit views readable without returning to the old 45 percent floor', () => {
-    expect(clampDiagramFullFitZoom(0.3)).toBe(MIN_DIAGRAM_FULL_FIT_ZOOM);
-    expect(clampDiagramFullFitZoom(0.3)).toBeLessThan(0.45);
+  it('fits an overview below reading-mode zoom limits', () => {
+    expect(clampDiagramFullFitZoom(0.3)).toBeCloseTo(0.294);
+    expect(clampDiagramFullFitZoom(0.01)).toBeCloseTo(0.0098);
+  });
+
+  it.each([
+    [9845, 3304, 1948, 1037],
+    [3304, 9845, 1948, 1037],
+    [1_000_000, 1_000_000, 390, 844],
+  ])('contains a %i by %i graph in a %i by %i viewport', (width, height, vw, vh) => {
+    const layout = resolveDiagramFitLayout({ viewportWidth: vw, leftSidebarOffset: 76, rightSidebarOffset: 60 });
+    const bounds = { minX: -200, minY: -400, width, height };
+    const result = computeDiagramFitViewport({ bounds, viewportWidth: vw, viewportHeight: vh, ...layout });
+    expect(result).not.toBeNull();
+    if (!result) return;
+    expect(result.x + bounds.minX * result.zoom).toBeGreaterThanOrEqual(layout.safeArea.left + layout.padding);
+    expect(result.y + bounds.minY * result.zoom).toBeGreaterThanOrEqual(layout.safeArea.top + layout.padding);
+    expect(result.x + (bounds.minX + width) * result.zoom).toBeLessThanOrEqual(vw - layout.safeArea.right - layout.padding);
+    expect(result.y + (bounds.minY + height) * result.zoom).toBeLessThanOrEqual(vh - layout.safeArea.bottom - layout.padding);
   });
 
   it('clamps invalid and extreme full-fit zoom values', () => {
@@ -166,6 +182,11 @@ describe('diagramControl', () => {
       viewportWidth: 1_280,
       viewportHeight: 720,
       safeArea: { top: 0, right: 0, bottom: 0, left: 0 },
+    })).toBeNull();
+    expect(computeDiagramFitViewport({
+      bounds: { minX: 0, minY: 0, width: 100, height: 100 },
+      viewportWidth: 100, viewportHeight: 100,
+      safeArea: { top: 70, right: 0, bottom: 70, left: 0 },
     })).toBeNull();
   });
 });

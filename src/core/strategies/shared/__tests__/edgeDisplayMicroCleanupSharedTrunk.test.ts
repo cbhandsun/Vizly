@@ -142,7 +142,7 @@ describe('repairDisplayMicroArtifacts shared trunks', () => {
     expect(baseline.strictCrossings).toBe(0);
     expect(baseline.tinyInteriorDoglegs).toBe(2);
     expect(quality.strictCrossings).toBe(0);
-    expect(quality.tinyInteriorDoglegs).toBe(2);
+    expect(quality.tinyInteriorDoglegs).toBe(0);
     expect(connectedQuality.tinyInteriorDoglegs).toBe(0);
     expect(passesBaseReactFlowFinalDisplayGate(
       edges,
@@ -164,8 +164,7 @@ describe('repairDisplayMicroArtifacts shared trunks', () => {
     expect(finalizedQuality.unrelatedOverlap).toBe(0);
     expect(finalizedQuality.unexplainedRelatedOverlap).toBe(0);
     expect(countDisplayObstacleHits(finalized, nodes)).toBe(0);
-    expect(finalized.find(edge => edge.id === 'edge-loms-customs')?.data)
-      .toMatchObject({ sourceBranchCorridorSeparated: true });
+    expect(finalizedQuality.bridgedCrossings).toBeGreaterThan(0);
   });
 
   it('flattens a 24-40px visual stair between true source and target trunks', () => {
@@ -265,12 +264,8 @@ describe('repairDisplayMicroArtifacts shared trunks', () => {
     expect(quality.hairpins).toBe(0);
     expect(repairedPath).toEqual([
       { x: 4351, y: 496 },
-      { x: 4243, y: 496 },
-      { x: 4243, y: 614 },
-      { x: 2386, y: 614 },
-      { x: 2386, y: 686 },
-      { x: 2242, y: 686 },
-      { x: 2242, y: 638 },
+      { x: 4255, y: 496 },
+      { x: 4255, y: 638 },
       { x: 291, y: 638 },
     ]);
   });

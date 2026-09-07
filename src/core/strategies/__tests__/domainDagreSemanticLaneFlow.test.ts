@@ -23,6 +23,38 @@ const edges: Edge[] = [
 const membership = new Map([['start', 'sub-1'], ['left', 'sub-1'], ['end', 'sub-2']]);
 
 describe('semantic swimlane process geometry', () => {
+  it.each((['TB', 'BT', 'LR', 'RL'] as const).flatMap(direction => (['grid', 'flow'] as const)
+    .map(independentNodeArrangement => ({ direction, independentNodeArrangement }))))('keeps cross-domain process bands while $independentNodeArrangement packs only globally isolated cards in $direction', ({ direction, independentNodeArrangement }) => {
+    const cards = Array.from({ length: 6 }, (_, index) => makeNode(`isolated-${index}`, 'a'));
+    const process = [makeNode('first', 'a'), makeNode('middle', 'b'), makeNode('last', 'a')];
+    const graph = [makeNode('domain-a', 'a', 0, 'titleGroup'), makeNode('domain-b', 'b', 0, 'titleGroup'), ...process, ...cards];
+    const crossEdges = [{ id: 'first-middle', source: 'first', target: 'middle' },
+      { id: 'middle-last', source: 'middle', target: 'last' }];
+    const options = { direction, rankMode: 'global' as const, horizontalGap: 120, verticalGap: 120 };
+    const baseline = new Map(alignDomainDagreLaneFlow(graph, crossEdges, options).map(node => [node.id, node]));
+    const arranged = alignDomainDagreLaneFlow(graph, crossEdges, { ...options, independentNodeArrangement });
+    const byId = new Map(arranged.map(node => [node.id, node]));
+    const horizontal = direction === 'LR' || direction === 'RL';
+    const flow = horizontal ? 'x' : 'y', flowSize = horizontal ? 'width' : 'height';
+    const sign = direction === 'BT' || direction === 'RL' ? -1 : 1;
+    for (const edge of crossEdges) {
+      const difference = (byId.get(edge.target)?.position[flow] ?? NaN) - (byId.get(edge.source)?.position[flow] ?? NaN);
+      const original = (baseline.get(edge.target)?.position[flow] ?? NaN) - (baseline.get(edge.source)?.position[flow] ?? NaN);
+      expect(difference).toBe(original);
+      expect(difference * sign).toBeGreaterThan(0);
+    }
+    expect(new Set(cards.map(card => byId.get(card.id)?.position.x)).size).toBeGreaterThan(1);
+    expect(new Set(cards.map(card => byId.get(card.id)?.position.y)).size).toBeGreaterThan(1);
+    expect(byId.get('domain-a')?.[flowSize]).toBe(byId.get('domain-b')?.[flowSize]);
+    for (const child of arranged.filter(node => !isDomainDagreGroupNode(node))) {
+      const parent = byId.get(`domain-${String(child.data.domain)}`);
+      if (!parent) throw Error('missing semantic lane');
+      for (const [axis, size] of [['x', 'width'], ['y', 'height']] as const) {
+        expect(child.position[axis]).toBeGreaterThanOrEqual(parent.position[axis]);
+        expect(child.position[axis] + getNodeDimensions(child)[size]).toBeLessThanOrEqual(parent.position[axis] + getNodeDimensions(parent)[size]);
+      }
+    }
+  });
   it('keeps differently sized peers inside their lane after cross-domain ordering', () => {
     const wide = { ...makeNode('wide', 'a'), width: 600, measured: { width: 600, height: 80 }, style: { width: 600, height: 80 } };
     const narrow = makeNode('narrow', 'a', 2000);

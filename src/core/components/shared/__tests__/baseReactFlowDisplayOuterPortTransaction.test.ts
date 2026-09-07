@@ -107,8 +107,8 @@ const crossingOnlyEdges = (): Edge[] => [
       { x: 340, y: 40 },
       { x: 340, y: 80 },
       { x: 200, y: 80 },
-      { x: 200, y: 160 },
-      { x: 40, y: 160 },
+      { x: 200, y: 140 },
+      { x: 40, y: 140 },
       { x: 40, y: 200 },
     ] },
   },
@@ -131,9 +131,11 @@ describe('outer port transaction', () => {
     expect(candidates.some(candidate => getDisplayHardQualityGateReport(
       candidate.edges, nodes, 'polished',
     ).hardClean)).toBe(true);
-    expect(candidates.every(candidate => edges.filter(
-      (edge, index) => candidate.edges[index] !== edge,
-    ).length === 1)).toBe(true);
+    expect(candidates.every(candidate => {
+      const changedIndexes = edges.flatMap((edge, index) => candidate.edges[index] === edge ? [] : [index]);
+      return changedIndexes.length > 0 && changedIndexes.length <= 2
+        && changedIndexes.every(index => index === 2 || index === 6);
+    })).toBe(true);
     const repaired = repairResidualOuterPortTransactionWithHardGate(edges, nodes);
     expect(getDisplayHardQualityGateReport(repaired, nodes, 'polished').hardClean).toBe(true);
     expect(repaired.map(edge => [edge.id, edge.source, edge.target]))
@@ -366,6 +368,12 @@ describe('outer port transaction', () => {
   it('reuses request-local changed hard reports without changing the selected route', () => {
     const edges = overlappingEdges();
     const expected = repairResidualOuterPortTransactionWithHardGate(edges, graphNodes, 64);
+    const seed = buildBoundedOuterPortTransactionCandidates(edges, graphNodes, { maxCandidates: 12 })[0];
+    if (!seed) throw new Error('Expected a bounded overlap candidate');
+    // Exercise the safe-stub incremental branch with a fully normalized real
+    // candidate; the following test covers the unsafe-stub full fallback.
+    vi.spyOn(outerPortCandidates, 'buildBoundedOuterPortTransactionCandidates')
+      .mockReturnValueOnce([{ ...seed, edges: expected }]);
     const evaluation = createBaseReactFlowFinalEndpointEvaluation(graphNodes);
     const initialReport = evaluation.hardReport(edges);
     const traces: DisplayRoutingPhaseTrace[] = [];

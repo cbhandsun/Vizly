@@ -5,7 +5,7 @@ import { scoreNodeClearanceRisk } from '../../strategies/shared/edgeWaypointCand
 import { changedEdgesObstacleHitsDoNotRegress, visualPolishHardQualityDoesNotRegress } from './baseReactFlowDisplayEvaluation';
 import type { BaseReactFlowFinalEndpointEvaluation } from './baseReactFlowDisplayFinalEndpointEvaluation';
 import { passesBaseReactFlowCommercialFinalDisplayGate, type BaseReactFlowFinalEndpointOrderOptions } from './baseReactFlowDisplayFinalEndpointGate';
-import { buildCommercialParallelTerminalCorridorShortcutPaths, buildCommercialSameSideRectangularShortcutPaths } from './baseReactFlowDisplayCommercialTerminalShortcut';
+import { buildCommercialTerminalCorridorShortcutPaths, buildCommercialSameSideRectangularShortcutPaths } from './baseReactFlowDisplayCommercialTerminalShortcut';
 import { MAX_COMMERCIAL_BEND_COUNT } from './baseReactFlowDisplayCommercialQuality';
 import { displayBusinessNodeCommercialClearanceIsClean } from './baseReactFlowDisplayBusinessNodeClearance';
 import {
@@ -109,7 +109,7 @@ export const repairTerminalPreservingOuterStairs = <T extends Edge[]>(
         best[edgeIndex], path, nodes, includeCorners,
       );
       yield* buildTerminalPreservingDirectShortcutCandidates(path);
-      yield* buildCommercialParallelTerminalCorridorShortcutPaths(path, nodes, best[edgeIndex]);
+      yield* buildCommercialTerminalCorridorShortcutPaths(path, nodes, best[edgeIndex]);
       yield* buildCommercialSameSideRectangularShortcutPaths(best[edgeIndex], nodes, best);
     })(),
   }));

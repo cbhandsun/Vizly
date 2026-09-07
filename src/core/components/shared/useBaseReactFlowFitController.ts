@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { RefObject } from 'react';
 import type { Edge, Node, ReactFlowInstance } from '@xyflow/react';
 
 import { diagramConfigManager } from '@/core/config/DiagramConfig';
@@ -16,12 +17,17 @@ import {
   shouldResetBaseReactFlowInitialization,
 } from './baseReactFlowInitialization';
 import { readBaseReactFlowFitRatio, readBaseReactFlowMaxFitZoom } from './baseReactFlowFitConfig';
-import { logBaseReactFlowConfigReadFailure, logBaseReactFlowFitWidthTopFailure } from './baseReactFlowLogging';
+import { logBaseReactFlowConfigReadFailure, logBaseReactFlowEventBindingFailure, logBaseReactFlowFitWidthTopFailure } from './baseReactFlowLogging';
+import { applyDiagramOverviewFit, readDiagramOverviewFitInput, sameDiagramViewport } from './diagramOverviewFit';
+import { waitForDiagramControlViewportPaint } from './diagramControlPaint';
+import type { DiagramFitViewport } from './diagramControlFit';
 
 type ContainerSize = { width: number; height: number };
 
 interface UseBaseReactFlowFitControllerParams {
-  rfInstance: Pick<ReactFlowInstance<Node, Edge>, 'fitView' | 'getNodes' | 'setViewport'>;
+  rfInstance: Pick<ReactFlowInstance<Node, Edge>, 'fitView' | 'getNodes' | 'getEdges' | 'getViewport' | 'setViewport'>;
+  containerRef?: RefObject<HTMLElement | null>;
+  syncSemanticViewport?: (viewport: DiagramFitViewport) => void;
   renderNodes: Node[];
   visibleNodeCount: number;
   edges: Edge[];
@@ -37,6 +43,8 @@ interface UseBaseReactFlowFitControllerParams {
 
 export const useBaseReactFlowFitController = ({
   rfInstance,
+  containerRef,
+  syncSemanticViewport,
   renderNodes,
   visibleNodeCount,
   edges,
@@ -57,6 +65,7 @@ export const useBaseReactFlowFitController = ({
   const lastZoomRef = useRef<number | null>(null);
   const initializedAtRef = useRef(0);
   const lastFitTriggerKeyRef = useRef(fitTriggerKey);
+  const lastOverviewViewportRef = useRef<DiagramFitViewport | null>(null);
 
   useEffect(() => {
     const currentSignature = computeBaseReactFlowNodeStructureSignature(renderNodes);
@@ -161,20 +170,60 @@ export const useBaseReactFlowFitController = ({
     });
     if (!schedulePlan.shouldSchedule) return;
 
+    const scheduledViewport = rfInstance.getViewport();
+    // After an unpinned overview, a user's pan/zoom owns subsequent resizes.
+    // A new explicit trigger remains an intentional request to fit again.
+    if (fitMode === 'fitAll' && !pinFit && hasInitialized && !schedulePlan.isTriggerKeyChanged
+      && (!lastOverviewViewportRef.current || !sameDiagramViewport(lastOverviewViewportRef.current, scheduledViewport))) return;
+    const controller = new AbortController();
+
     const timeoutId = setTimeout(() => {
       if (fitMode === 'fitWidthTop') {
         performFitWidthTop(schedulePlan.isTriggerKeyChanged);
       } else if (fitMode === 'fitAll') {
-        rfInstance.fitView({ padding: fitPadding });
-        previousContainerRef.current = { ...containerSize };
-        if (!hasInitialized) setHasInitialized(true);
+        // A gesture or restored viewport during the existing debounce wins
+        // over this older automatic request, including before initialization.
+        if (!pinFit && !sameDiagramViewport(scheduledViewport, rfInstance.getViewport())) {
+          lastOverviewViewportRef.current = null;
+          previousContainerRef.current = { ...containerSize };
+          if (!hasInitialized) setHasInitialized(true);
+        } else {
+          let appliedViewport: DiagramFitViewport | null = null;
+          void applyDiagramOverviewFit({
+            readFitInput: () => readDiagramOverviewFitInput({
+              container: containerRef?.current ?? null, fallbackSize: containerSize,
+              nodes: rfInstance.getNodes(), edges: rfInstance.getEdges(), viewport: rfInstance.getViewport(),
+            }),
+            getViewport: rfInstance.getViewport,
+            setViewport: async viewport => {
+              const applied = await rfInstance.setViewport(viewport);
+              if (applied) appliedViewport = viewport;
+              return applied;
+            },
+            fallbackFit: async () => false,
+            syncSemanticViewport,
+            waitForPaint: () => waitForDiagramControlViewportPaint({ signal: controller.signal }),
+            isCancelled: () => controller.signal.aborted,
+          }).then(applied => {
+            if (!applied || controller.signal.aborted) return;
+            lastOverviewViewportRef.current = appliedViewport;
+            previousContainerRef.current = { ...containerSize };
+            if (!hasInitialized) setHasInitialized(true);
+          }).catch(error => {
+            if (!controller.signal.aborted) logBaseReactFlowEventBindingFailure('fitAll', error);
+          });
+        }
       }
       if (schedulePlan.isTriggerKeyChanged) lastFitTriggerKeyRef.current = fitTriggerKey;
     }, schedulePlan.debounceTime);
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
   }, [
     containerSize,
+    containerRef,
     defaultDebounceMs,
     fitMode,
     fitPadding,
@@ -183,6 +232,7 @@ export const useBaseReactFlowFitController = ({
     performFitWidthTop,
     pinFit,
     rfInstance,
+    syncSemanticViewport,
     visibleNodeCount,
   ]);
 };

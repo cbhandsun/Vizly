@@ -311,19 +311,39 @@ export const readRenderedDisplayEdgeHardGeometryAudit = (rawEdges, rawNodes) => 
       && secondSegment.segmentIndex === secondSegment.segmentCount - 1
       && sameTrunkPoint(firstSegment.b, secondSegment.b))
   );
-  const softCrossingBridgeIsDeclared = (first, second, firstSegment, secondSegment, x, y) => {
-    const bridge = `;${x},${y};`;
-    const firstHops = first.data && typeof first.data === 'object' ? first.data.h : null;
-    const secondHops = second.data && typeof second.data === 'object' ? second.data.h : null;
-    if (!(typeof firstHops === 'string' && firstHops.includes(bridge))
-      && !(typeof secondHops === 'string' && secondHops.includes(bridge))) return false;
-    const crossingPoint = { x, y };
+  // Read the actual painted bridge arcs, never an edge metadata declaration.
+  // StablePathEdge emits absolute L/A pairs, including one wide arc for a cluster.
+  const number = '([-+]?\\d*\\.?\\d+(?:e[-+]?\\d+)?)';
+  const separator = '[\\s,]+';
+  const arcPattern = new RegExp('L' + separator + number + separator + number
+    + separator + 'A' + separator + Array(7).fill(number).join(separator), 'gi');
+  const paintedBridges = [...document.querySelectorAll('.stable-path-edge-graphics .react-flow__edge-path')]
+    .flatMap(element => {
+      const paint = typeof getComputedStyle === 'function' ? getComputedStyle(element) : null;
+      if (paint && (paint.display === 'none' || paint.visibility === 'hidden'
+        || Number(paint.opacity) === 0 || Number(paint.strokeOpacity) === 0)) return [];
+      const path = element.getAttribute('d') || '';
+      if (path.length > 100_000) return [];
+      return [...path.matchAll(arcPattern)].flatMap(match => {
+        const [x1, y1, rx, ry, rotation, large, sweep, x2, y2] = match.slice(1).map(Number);
+        return [x1, y1, rx, ry, x2, y2].every(finite) && rx > 0 && ry >= 3
+          && rotation === 0 && large === 0 && (sweep === 0 || sweep === 1)
+          && Math.abs(y1 - y2) < EPS && Math.abs(Math.abs(x2 - x1) - 2 * rx) < EPS
+          ? [{ min: Math.min(x1, x2), max: Math.max(x1, x2), y: y1 }] : [];
+      });
+    });
+  const crossingHasPaintedBridge = (firstSegment, secondSegment, x, y) => {
+    const point = { x, y };
     return [firstSegment, secondSegment].every(segment => (
-      length(segment.a, crossingPoint) >= MIN_INTERIOR_SEGMENT
-      && length(segment.b, crossingPoint) >= MIN_INTERIOR_SEGMENT
-    ));
+      length(segment.a, point) >= MIN_INTERIOR_SEGMENT
+      && length(segment.b, point) >= MIN_INTERIOR_SEGMENT
+    )) && paintedBridges.some(bridge => Math.abs(bridge.y - y) < EPS
+      && x >= bridge.min + 3 && x <= bridge.max - 3);
   };
   const strictCrossings = [];
+  const bridgedCrossings = [];
+  let geometricCrossingCount = 0;
+  let bridgedCrossingCount = 0;
   const illegalOverlaps = [];
   for (let firstIndex = 0; firstIndex < audited.length; firstIndex += 1) {
     for (let secondIndex = firstIndex + 1; secondIndex < audited.length; secondIndex += 1) {
@@ -340,9 +360,11 @@ export const readRenderedDisplayEdgeHardGeometryAudit = (rawEdges, rawNodes) => 
               && x < Math.max(horizontal.a.x, horizontal.b.x) - EPS
               && y > Math.min(vertical.a.y, vertical.b.y) + EPS
               && y < Math.max(vertical.a.y, vertical.b.y) - EPS) {
-              if (!softCrossingBridgeIsDeclared(
-                first.edge, second.edge, firstSegment, secondSegment, x, y,
-              ) && !crossingTouchesSharedEndpoint(
+              geometricCrossingCount += 1;
+              if (crossingHasPaintedBridge(firstSegment, secondSegment, x, y)) {
+                bridgedCrossingCount += 1;
+                recordFinding(bridgedCrossings, { edgeA: first.edgeId, edgeB: second.edgeId });
+              } else if (!crossingTouchesSharedEndpoint(
                 first.edge, second.edge, firstSegment, secondSegment,
               )) recordFinding(strictCrossings, { edgeA: first.edgeId, edgeB: second.edgeId });
             }
@@ -389,6 +411,9 @@ export const readRenderedDisplayEdgeHardGeometryAudit = (rawEdges, rawNodes) => 
     excessiveBendFindings,
     hairpinEdgeIds,
     strictCrossings,
+    geometricCrossingCount,
+    bridgedCrossingCount,
+    bridgedCrossings,
     illegalOverlaps,
   };
 };

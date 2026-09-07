@@ -45,7 +45,7 @@ describe('commercial path search container geometry', () => {
 
   it.each(['source', 'target'])('rejects a crossing in the fixed %s lead before searching the interior', role => {
     const fixed: Edge = { ...edge, data: { ...edge.data, manualHandleSides: ['source', 'target'] } };
-    const x = role === 'source' ? 240 : 560;
+    const x = role === 'source' ? 212 : 588;
     const blocker: Edge = { id: 'lead-blocker', source: 'blocker-source', target: 'blocker-target',
       data: { computedPath: [{ x, y: 100 }, { x, y: 180 }] } };
     expect(buildCommercialPathSearchTerminalCandidates(fixed, nodes, [fixed, blocker])).toEqual([]);

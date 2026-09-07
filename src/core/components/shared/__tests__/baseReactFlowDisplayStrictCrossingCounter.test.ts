@@ -55,7 +55,7 @@ describe('display candidate strict crossing index', () => {
     ];
     const edges: Edge[] = [
       { id: 'ab', source: 'a', target: 'b', sourceHandle: 'right', targetHandle: 'left', data: {
-        computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 300 }, { x: 300, y: 300 }],
+        computedPath: [{ x: 0, y: 0 }, { x: 230, y: 0 }, { x: 230, y: 300 }, { x: 300, y: 300 }],
       } },
       { id: 'cd', source: 'c', target: 'd', sourceHandle: 'right', targetHandle: 'left', data: {
         computedPath: [{ x: 0, y: 150 }, { x: 250, y: 150 }, { x: 250, y: 400 }, { x: 400, y: 400 }],

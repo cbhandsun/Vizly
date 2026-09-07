@@ -1,4 +1,6 @@
 import { expect } from 'vitest';
+import type { Edge } from '@xyflow/react';
+import { findDisplayGeometricCrossingHits } from '../baseReactFlowDisplayGeometry';
 
 import { createFilletedPath } from '../../../algorithms/smartEdgeUtils';
 import { standardDataToCanvas } from '../../diagrams/designerUtils';
@@ -28,7 +30,29 @@ import {
   tinyInteriorSegments,
   tinyRenderedSegments,
   withAbsoluteNodePositions,
+  paintedDisplayPaths,
 } from './baseReactFlowDisplayEdges.testUtils';
+
+// Check the actual painted arc, rather than treating a rounded centerline as
+// a drawing with no bridges. Live DOM visibility is checked by the browser audit.
+export const assertPaintedCrossingCoverage = (edges: Edge[]): void => {
+  const painted = paintedDisplayPaths(edges);
+  for (const hit of findDisplayGeometricCrossingHits(edges)) {
+    const horizontal = hit.a.axis === 'h' ? hit.a : hit.b;
+    const vertical = hit.a.axis === 'v' ? hit.a : hit.b;
+    const edgeId = edges[horizontal.edgeIndex].id;
+    const x = vertical.a.x;
+    const y = horizontal.a.y;
+    const d = painted.get(edgeId) ?? '';
+    const arcs = [...d.matchAll(/L ([\d.e+-]+) ([\d.e+-]+) A ([\d.e+-]+) ([\d.e+-]+) 0 0 [01] ([\d.e+-]+) ([\d.e+-]+)/gi)];
+    expect(arcs.some(arc => {
+      const [sx, sy, rx, ry, ex, ey] = arc.slice(1).map(Number);
+      return Math.abs(sy - y) < 0.5 && Math.abs(ey - y) < 0.5 && ry >= 6
+        && Math.abs(Math.abs(ex - sx) - rx * 2) < 0.5
+        && x > Math.min(sx, ex) && x < Math.max(sx, ex);
+    }), JSON.stringify({ edgeId, x, y, d })).toBe(true);
+  }
+};
 
 export const assertBaseReactFlowDisplayQualityGates = async (dataset: unknown) => {
   const canvas = await standardDataToCanvas(dataset as any);
@@ -277,10 +301,7 @@ export const assertBaseReactFlowDisplayQualityGates = async (dataset: unknown) =
       computedPath: renderedPaths[index]?.path ?? [],
     },
   }));
-  expect(
-    strictPathCrossings(renderedPaths),
-    JSON.stringify({ name: (dataset as any).name, renderedPaths }, null, 2),
-  ).toEqual([]);
+  assertPaintedCrossingCoverage(result);
   expect(
     edgeNodeObstacleHits(renderedEdges, absoluteNodes),
     JSON.stringify({ name: (dataset as any).name, renderedPaths }, null, 2),

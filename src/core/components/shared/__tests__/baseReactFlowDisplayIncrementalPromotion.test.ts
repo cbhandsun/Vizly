@@ -24,7 +24,7 @@ describe('findBaseReactFlowStrictContextEdgePromotions', () => {
     },
     {
       id: 'context', source: 'c', target: 'd', data: {
-        computedPath: [{ x: 50, y: 0 }, { x: 50, y: 100 }],
+        computedPath: [{ x: 12, y: 0 }, { x: 12, y: 100 }],
       },
     },
     {

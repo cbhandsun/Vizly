@@ -48,6 +48,41 @@ const pathOf = (item: Edge | undefined): Point[] => {
 };
 
 describe('final same-side passage order repair', () => {
+  for (const mirror of [1, -1]) for (const rotation of [0, 1, 2, 3]) {
+    for (const role of ['source', 'target'] as const) {
+      it(`keeps passage ordering invariant under mirror ${mirror}, rotation ${rotation}, ${role}`, () => {
+        const transform = ({ x, y }: Point): Point => {
+          const mx = mirror * x;
+          return [{ x: mx, y }, { x: -y, y: mx }, { x: -mx, y: -y }, { x: y, y: -mx }][rotation];
+        };
+        const rotateNode = (item: ReactFlowNode): ReactFlowNode => {
+          const a = transform(item.position);
+          const b = transform({ x: item.position.x + (item.width ?? 0), y: item.position.y + (item.height ?? 0) });
+          return { ...item, position: { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y) }, width: Math.abs(a.x - b.x), height: Math.abs(a.y - b.y) };
+        };
+        const nodes = [node('hub', 0, 0, 400, 100), node('a', 550, 600, 100, 100), node('b', 850, 600, 100, 100)].map(rotateNode);
+        const makeEdges = (crossed: boolean): Edge[] => [120, 240].map((x, index) => {
+          const remote = index === 0 ? 'a' : 'b';
+          const lane = crossed ? 200 + index * 100 : 300 - index * 100;
+          const path = [{ x, y: 100 }, { x, y: lane }, { x: 600 + index * 300, y: lane }, { x: 600 + index * 300, y: 600 }].map(transform);
+          const hubSide = ['bottom', 'left', 'top', 'right'][rotation];
+          const remoteSide = ['top', 'right', 'bottom', 'left'][rotation];
+          return {
+            ...edge(remote, role === 'source' ? 'hub' : remote, role === 'source' ? remote : 'hub', role === 'source' ? path : path.reverse()),
+            sourceHandle: role === 'source' ? hubSide : remoteSide,
+            targetHandle: role === 'source' ? remoteSide : hubSide,
+          };
+        });
+        const safe = makeEdges(false);
+        expect(auditFinalSameSidePassageOrder(safe, nodes).reversePassageDefects).toBe(0);
+        expect(repairFinalSameSidePassageOrder(safe, nodes)).toBe(safe);
+        const crossed = makeEdges(true);
+        expect(auditFinalSameSidePassageOrder(crossed, nodes).reversePassageDefects).toBe(1);
+        expect(auditFinalSameSidePassageOrder(repairFinalSameSidePassageOrder(crossed, nodes), nodes).reversePassageDefects).toBe(0);
+      });
+    }
+  }
+
   it('does not report port weaving against a direct leg that ends before the sibling passage', () => {
     const nodes = [
       node('hub', 0, 0, 300, 100),

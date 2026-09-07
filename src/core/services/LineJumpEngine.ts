@@ -1,4 +1,5 @@
 import { collapseCollinearBacktracks } from '../algorithms/smartEdgeUtils';
+import { LINE_JUMP_RADIUS } from '../routing/orthogonalCrossingPolicy';
 import { createVerticalSegmentIndex, queryVerticalSegments } from './lineJumpSpatialIndex';
 
 /**
@@ -45,7 +46,7 @@ export interface IntersectionInfo {
     verticalEdgeId: string;
 }
 
-const JUMP_RADIUS = 6;
+const JUMP_RADIUS = LINE_JUMP_RADIUS;
 const ENDPOINT_CONTACT_TOLERANCE = 1.5;
 
 /**
@@ -396,24 +397,23 @@ export function injectLineJumps(
             })
             .sort((a, b) => goingRight ? a.point.x - b.point.x : b.point.x - a.point.x);
 
-        // 过滤掉间距 < 2×radius 的重叠跳弧
-        const segJumps: IntersectionInfo[] = [];
-        let lastJumpX = -Infinity;
+        // A close crossing cluster needs one bridge spanning every obstacle.
+        // Dropping alternate jumps leaves real crossings visually connected.
+        const spans: Array<{ start: number; end: number }> = [];
         for (const j of rawJumps) {
             const jx = j.point.x;
-            if (Math.abs(jx - lastJumpX) >= radius * 2 + 1) {
-                segJumps.push(j);
-                lastJumpX = jx;
-            }
+            const previous = spans.at(-1);
+            if (previous && Math.abs(jx - previous.end) < radius * 2 + 1) previous.end = jx;
+            else spans.push({ start: jx, end: jx });
         }
 
-        for (const jump of segJumps) {
-            const jx = jump.point.x;
-            const arcStartX = jx - (goingRight ? radius : -radius);
+        for (const span of spans) {
+            const arcStartX = span.start - (goingRight ? radius : -radius);
             parts.push(`L ${arcStartX} ${y}`);
-            const arcEndX = jx + (goingRight ? radius : -radius);
+            const arcEndX = span.end + (goingRight ? radius : -radius);
+            const horizontalRadius = Math.abs(arcEndX - arcStartX) / 2;
             const sweepFlag = goingRight ? 1 : 0;
-            parts.push(`A ${radius} ${radius} 0 0 ${sweepFlag} ${arcEndX} ${y}`);
+            parts.push(`A ${horizontalRadius} ${radius} 0 0 ${sweepFlag} ${arcEndX} ${y}`);
         }
         // 画到终点
         parts.push(`L ${toX} ${y}`);

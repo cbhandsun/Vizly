@@ -298,7 +298,7 @@ describe('display loop shortcut repair', () => {
     );
   }, 30_000);
 
-  it('shortens a clean detour by moving a free blocking terminal lane atomically', () => {
+  it('shortens a clean detour without moving a readable crossing companion', () => {
     const node = (id: string, x: number, y: number, width: number, height: number): Node => ({
       id,
       position: { x, y },
@@ -370,18 +370,7 @@ describe('display loop shortcut repair', () => {
       obstacleHits: 0,
       allAnchored: true,
     });
-    expect(
-      blockingVariants,
-      JSON.stringify(blockingVariants, null, 2),
-    ).toContainEqual({
-      edgeIndex: 1,
-      path: [
-        { x: 1100, y: 900 }, { x: 1100, y: 956 },
-        { x: 1556, y: 956 }, { x: 1556, y: 150 }, { x: 1500, y: 150 },
-      ],
-      sourceSide: 'bottom',
-      targetSide: 'right',
-    });
+    expect(blockingVariants).toEqual([]);
     const incrementalQuality = createEdgePathQualityEvaluationContext(edges)
       .evaluateChanged(feasibleAtomicCandidate, [0, 1]);
     const incrementalObstacles = createDisplayObstacleEvaluationContext(edges, nodes)

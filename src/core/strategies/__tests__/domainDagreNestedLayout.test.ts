@@ -16,6 +16,25 @@ const leaf = (id: string, subDomain = ''): Node => ({
 });
 
 describe('runDomainDagreNestedLayout', () => {
+  it('does not multiply the whitespace inside a direct-content block by text compensation', () => {
+    const children = Array.from({ length: 4 }, (_, index) => leaf(`direct-${index}`));
+    const domain: Node = { id: 'operations', type: 'titleGroup', position: { x: 0, y: 0 }, data: { domain: 'operations' } };
+    const nodes = [domain, ...children];
+    runDomainDagreNestedLayout({
+      domains: [domain], subGroups: [], leafNodes: children, edges: [],
+      nodeById: new Map(nodes.map(node => [node.id, node])),
+      childrenBySubGroup: new Map(), nodeToSubGroup: new Map(),
+      subDomainNodeIsHorizontal: true, nodeArrangement: 'horizontal', domainSubGroupIsHorizontal: true,
+      packVerticalSubDomains: false,
+      nodeGapH: 40, nodeGapV: 30, subDomainPaddingH: 20, subDomainPaddingV: 12,
+      subDomainTitleHeight: 24, domainPaddingH: 30, domainPaddingV: 20,
+      domainTitleHeight: 32, titleSafetyGap: 8, bottomSafetyGap: 10,
+      globalBottomSafetyGap: 6, widthCompensation: 1.2, getNodeDimensions: dimensions,
+    });
+    expect(dimensions(domain).width).toBe(4 * 120 + 3 * 40 + 120 * 0.2 + 2 * 30);
+    expect(children.map(node => node.position.x)).toEqual([30, 190, 350, 510]);
+  });
+
   it('lays out subgroup children and free nodes inside a sized domain', () => {
     const first = leaf('first', 'inbound');
     const second = leaf('second', 'inbound');

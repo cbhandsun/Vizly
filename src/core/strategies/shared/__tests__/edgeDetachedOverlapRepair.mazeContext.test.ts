@@ -8,6 +8,7 @@ import { buildBoundedResidualOverlapMazeCandidate } from '../edgeDetachedResidua
 import { routeStrictCrossingMazeCandidate } from '../edgeDetachedStrictCrossingMaze';
 import type { StrictCrossingMazeDiagnostics } from '../edgeDetachedOverlapRepairTypes';
 import { calculateEdgePathQualityScore, countStrictEdgeCrossings } from '../edgeStrictCrossingGuard';
+import { createNodeClearanceGraphEvaluationContext, HARD_MINIMUM_BUSINESS_NODE_CLEARANCE } from '../edgeWaypointCandidateRepair';
 
 type Point = { x: number; y: number };
 
@@ -21,6 +22,24 @@ function edge(id: string, path: Point[]): Edge {
 }
 
 describe('routeStrictCrossingMazeCandidate penalty context', () => {
+  it.each([0, 1, 2, 3])('keeps the hard minimum node clearance on fractional geometry, rotation %i', turns => {
+    const point = (x: number, y: number): Point => {
+      for (let turn = 0; turn < turns; turn += 1) [x, y] = [-y, x];
+      return { x: x + 317.175, y: y - 219.175 };
+    };
+    const start = point(100, -40), end = point(200, 40);
+    const obstacle: Node = { id: 'unrelated',
+      position: { x: Math.min(start.x, end.x), y: Math.min(start.y, end.y) },
+      width: Math.abs(start.x-end.x), height: Math.abs(start.y-end.y), data: {} };
+    const path = [point(0, 0), point(300, 0)];
+    const moving = edge('transfer', path);
+    const candidate = routeStrictCrossingMazeCandidate(path, 0, [path], [moving], [obstacle]);
+    expect(candidate).not.toBeNull();
+    if (!candidate) throw new Error('Expected a route around the obstacle');
+    expect(createNodeClearanceGraphEvaluationContext([obstacle])
+      .score(candidate, moving, HARD_MINIMUM_BUSINESS_NODE_CLEARANCE)).toBe(0);
+  });
+
   it('skips short turn runs, except where a retained suffix completes the run', () => {
     const coordinates = [0, 16, 32, 48];
     expect(resolveMazeRunDestination(coordinates, 0, 1)).toBe(2);

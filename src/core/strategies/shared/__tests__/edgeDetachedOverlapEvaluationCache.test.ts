@@ -28,6 +28,20 @@ const unusedStateEvaluation = (): never => {
 };
 
 describe('createQualityEvaluationBudget', () => {
+  it.each([8, 12, 15.999, 20])('rejects a shorter lane that consumes business-node clearance at %spx', gap => {
+    const edges = candidateEdges();
+    const obstacle = { id: 'business', position: { x: 80, y: 100 }, width: 40, height: 40, data: {} };
+    const gate = createRoutingObstacleGate(edges, new Map([
+      ['business', { x: 80, y: 100, width: 40, height: 40 }],
+    ]), undefined, [obstacle]);
+    const safe = [[{ x: 0, y: 50 }, { x: 200, y: 50 }]];
+    const candidate = [[{ x: 0, y: 100 - gap }, { x: 200, y: 100 - gap }]];
+    expect(gate(safe, candidate, [0])).toBe(false);
+    expect(gate(candidate, safe, [0])).toBe(true);
+    expect(gate(safe, safe, [0])).toBe(true);
+    expect(gate(safe, [], [0])).toBe(false);
+  });
+
   it('charges pruned exact duplicates without rebuilding their score', () => {
     const diagnostics = { evaluationCount: 0, cacheHitCount: 0 };
     const budget = createQualityEvaluationBudget(2, diagnostics);

@@ -153,6 +153,26 @@ describe('final same-side endpoint order repair', () => {
     expect(repairFinalSameSideEndpointOrder(edges, nodes)).toBe(edges);
   });
 
+  it.each([0, 1, 2, 3])('recognizes rounded collinear anchors without merging parallel lanes, rotation %i', turn => {
+    const rotate = (p: { x: number; y: number }) => {
+      let result = p;
+      for (let i = 0; i < turn; i++) result = { x: -result.y, y: result.x };
+      return result;
+    };
+    const sides = ['bottom', 'left', 'top', 'right'];
+    const nodes = [node('hub', -100, -100, 200, 200), node('leaf-a', -500, -500, 1000, 1000), node('leaf-b', -500, -500, 1000, 1000)];
+    const make = (offset: number, firstEnd = 160) => [
+      edge('a', 'hub', 'leaf-a', [{ x: 30, y: 100 }, { x: 30, y: firstEnd }, { x: -100, y: firstEnd }].map(rotate)),
+      edge('b', 'hub', 'leaf-b', [{ x: 30 + offset, y: 101 }, { x: 30 + offset, y: 180 }, { x: 100, y: 180 }].map(rotate)),
+    ].map(item => ({ ...item, sourceHandle: sides[turn] }));
+    const audit = auditFinalSameSideEndpointOrder(make(0), nodes);
+    expect(audit.legalSharedTrunks.find(t => t.nodeId === 'hub')?.commonStemLength).toBe(59);
+    expect(audit.ambiguousLaneTies).toBe(0);
+    expect(auditFinalSameSideEndpointOrder(make(1), nodes).legalSharedTrunks).toEqual([]);
+    // Only 47px is common when a nominal 48px stem starts a pixel earlier.
+    expect(auditFinalSameSideEndpointOrder(make(0, 148), nodes).legalSharedTrunks).toEqual([]);
+  });
+
   it('splits a false same-coordinate collapse when the routes have no real shared stem', () => {
     const nodes = [
       node('hub', 0, 0, 300, 100),

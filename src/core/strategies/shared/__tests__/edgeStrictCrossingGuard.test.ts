@@ -85,7 +85,7 @@ const calculateFreshQualityScore = async (edges: Edge[]) => {
   return guard.calculateEdgePathQualityScore(edges);
 };
 
-const legacyQualityKeys: Array<keyof EdgePathQualityScore> = [
+const legacyQualityKeys = [
   'nonOrthogonalSegments',
   'strictCrossings',
   'reverseOverlap',
@@ -98,7 +98,7 @@ const legacyQualityKeys: Array<keyof EdgePathQualityScore> = [
   'detourPenalty',
   'bends',
   'totalLength',
-];
+] as const;
 
 const legacyCompareScores = (
   first: EdgePathQualityScore,
@@ -175,14 +175,14 @@ describe('edgeStrictCrossingGuard', () => {
   it('counts strict orthogonal crossings between different edges', () => {
     expect(countStrictEdgeCrossings([
       edge('horizontal', [{ x: 0, y: 50 }, { x: 100, y: 50 }]),
-      edge('vertical', [{ x: 50, y: 0 }, { x: 50, y: 100 }]),
+      edge('vertical', [{ x: 12, y: 0 }, { x: 12, y: 100 }]),
     ])).toBe(1);
   });
 
   it('invalidates cached quality when a path is mutated in place', () => {
     const edges = [
       edge('horizontal', [{ x: 0, y: 50 }, { x: 100, y: 50 }]),
-      edge('vertical', [{ x: 50, y: 0 }, { x: 50, y: 100 }]),
+      edge('vertical', [{ x: 12, y: 0 }, { x: 12, y: 100 }]),
     ];
 
     expect(calculateEdgePathQualityScore(edges).strictCrossings).toBe(1);
@@ -215,7 +215,7 @@ describe('edgeStrictCrossingGuard', () => {
     ];
     const candidate = [
       edge('horizontal', [{ x: 0, y: 50 }, { x: 100, y: 50 }]),
-      edge('vertical', [{ x: 50, y: 0 }, { x: 50, y: 100 }]),
+      edge('vertical', [{ x: 12, y: 0 }, { x: 12, y: 100 }]),
     ];
 
     expect(keepIfNoNewStrictCrossings(baseline, candidate)).toBe(baseline);
@@ -955,7 +955,7 @@ describe('edgeStrictCrossingGuard', () => {
   it('identifies only edges participating in hard pair defects', () => {
     const baseline = [
       edge('horizontal', [{ x: 0, y: 50 }, { x: 100, y: 50 }]),
-      edge('vertical', [{ x: 50, y: 0 }, { x: 50, y: 100 }]),
+      edge('vertical', [{ x: 12, y: 0 }, { x: 12, y: 100 }]),
       edge('detached', [{ x: 200, y: 0 }, { x: 200, y: 100 }]),
     ];
     const context = createEdgePathQualityEvaluationContext(baseline);

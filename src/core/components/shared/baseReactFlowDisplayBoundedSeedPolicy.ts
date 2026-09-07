@@ -4,6 +4,18 @@ export type BoundedSeedPolicyInput = Readonly<{
   nodeCount: number;
 }>;
 
+const DEFERRED_GLOBAL_CANDIDATE_EDGE_THRESHOLD = 24;
+const DEFERRED_GLOBAL_CANDIDATE_EDGE_BUDGET = 12;
+
+export const getInteractiveGlobalCandidateEdgeBudget = (
+  edgeCount: number,
+  deferOuterObstacleRepair: boolean,
+): number | undefined => (
+  deferOuterObstacleRepair && edgeCount > DEFERRED_GLOBAL_CANDIDATE_EDGE_THRESHOLD
+    ? DEFERRED_GLOBAL_CANDIDATE_EDGE_BUDGET
+    : undefined
+);
+
 const toSafeCount = (value: number): number =>
   Number.isSafeInteger(value) && value >= 0 ? value : 0;
 

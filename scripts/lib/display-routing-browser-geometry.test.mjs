@@ -80,6 +80,9 @@ describe('display routing browser geometry', () => {
       excessiveBendFindings: [],
       hairpinEdgeIds: [],
       strictCrossings: [],
+      geometricCrossingCount: 0,
+      bridgedCrossingCount: 0,
+      bridgedCrossings: [],
       illegalOverlaps: [],
     };
     expect(displayRoutingFinalSvgGeometryIsClean({
@@ -127,6 +130,9 @@ describe('display routing browser geometry', () => {
     expect(readRenderedDisplayEdgeHardGeometryAudit([edge], nodes)).toEqual({
       edgeCount: 1,
       auditedPathCount: 1,
+      geometricCrossingCount: 0,
+      bridgedCrossingCount: 0,
+      bridgedCrossings: [],
       invalidEdgeIds: [],
       nonOrthogonalEdgeIds: [],
       detachedTerminalEdgeIds: [],
@@ -212,6 +218,18 @@ describe('display routing browser geometry', () => {
       strictCrossings: [{ edgeA: 'horizontal', edgeB: 'vertical' }],
       illegalOverlaps: [],
     });
+
+    const paint = { getAttribute: name => name === 'd'
+      ? 'M 40 100 L 134 100 A 6 6 0 0 1 146 100 L 240 100' : null };
+    document.querySelectorAll = selector => selector.includes('.stable-path-edge-graphics') ? [paint] : wrappers;
+    expect(readRenderedDisplayEdgeHardGeometryAudit(edges, nodes)).toMatchObject({
+      strictCrossings: [], geometricCrossingCount: 1, bridgedCrossingCount: 1,
+      bridgedCrossings: [{ edgeA: 'horizontal', edgeB: 'vertical' }],
+    });
+    document.querySelectorAll = () => wrappers;
+    expect(readRenderedDisplayEdgeHardGeometryAudit(edges.map(edge => ({
+      ...edge, data: { h: ';140,100;' },
+    })), nodes).strictCrossings).toHaveLength(1);
 
     const sharedNodes = [
       { id: 'source', position: { x: 0, y: 0 }, width: 40, height: 40 },

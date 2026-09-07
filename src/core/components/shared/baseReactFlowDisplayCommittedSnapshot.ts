@@ -1,4 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
+import { layoutCandidateAcceptanceMatches, type LayoutCandidateAcceptance } from '../../algorithms/layoutCandidateAcceptance';
 
 import {
   createPersistedRoutingCandidate,
@@ -58,6 +59,7 @@ export type RoutingCommittedSnapshot = Readonly<{
   hardReportDigest: DisplayRoutingHardReportDigest;
   hardReport?: RoutingHardReport;
   workerSessionRef?: RoutingWorkerSessionRef;
+  layoutAcceptance?: LayoutCandidateAcceptance;
 }>;
 
 /** Transitional aliases keep existing incremental callers source-compatible. */
@@ -156,6 +158,7 @@ const createCommittedSnapshot = ({
   hardReport,
   hardReportDigest,
   workerSessionRef,
+  layoutAcceptance,
 }: {
   inputSignature: string;
   inputGeometryDigest: string;
@@ -164,6 +167,7 @@ const createCommittedSnapshot = ({
   displayPatches: RoutingPatch[];
   outputRouteSignature: string | null;
   workerSessionRef?: RoutingWorkerSessionRef;
+  layoutAcceptance?: LayoutCandidateAcceptance;
 } & CommittedHardReportIdentity): BaseReactFlowDisplayCommittedSnapshotBaseline | null => {
   if (
     !hasValidIdentity(inputSignature, inputGeometryDigest)
@@ -187,6 +191,9 @@ const createCommittedSnapshot = ({
       ? hardReportDigest
       : null;
   if (!safeHardReportDigest) return null;
+  if (layoutAcceptance && !layoutCandidateAcceptanceMatches(layoutAcceptance, sourceNodes, {
+    outputRouteSignature, hardReportDigest: safeHardReportDigest,
+  })) return null;
   const safeHardReport = hardReport ? cloneRoutingHardReport(hardReport) : null;
   if (hardReport && !safeHardReport) return null;
   const safeWorkerSessionRef = isDisplayRoutingWorkerSessionRef(workerSessionRef)
@@ -210,6 +217,7 @@ const createCommittedSnapshot = ({
     displayPatches: safePatches,
     outputRouteSignature,
     ...(safeWorkerSessionRef ? { workerSessionRef: safeWorkerSessionRef } : {}),
+    ...(layoutAcceptance ? { layoutAcceptance } : {}),
   };
 };
 
@@ -273,6 +281,7 @@ export const readBaseReactFlowDisplayCommittedSnapshot = ({
     ) ?? [],
     outputRouteSignature: snapshot.outputRouteSignature,
     ...(snapshot.workerSessionRef ? { workerSessionRef: snapshot.workerSessionRef } : {}),
+    ...(snapshot.layoutAcceptance ? { layoutAcceptance: snapshot.layoutAcceptance } : {}),
   };
   trustedCommittedSnapshotBaselines.add(baseline);
   return {
@@ -324,6 +333,7 @@ export type BaseReactFlowDisplaySnapshotCommitOptions = {
   outputRouteSignature: string | null;
   workerSessionRef?: RoutingWorkerSessionRef;
   precompiledCapturePresetId?: string | null;
+  layoutAcceptance?: LayoutCandidateAcceptance;
   precompiledLayoutCapture?: BaseReactFlowPrecompiledLayoutRegeneration & Readonly<{
     provenance: 'fresh-layout-repair-validated' | 'fresh-full-route';
   }>;

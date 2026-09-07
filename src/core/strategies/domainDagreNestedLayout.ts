@@ -9,6 +9,10 @@ import {
   sortDomainDagreSubGroups,
 } from './domainDagreHierarchy';
 import type { DomainDagreSubDomainOrder } from './domainDagreLayoutBoundary';
+import { packDisconnectedDagreComponents } from './domainDagreComponentPacking';
+import type { DomainDagreContentBudget } from './domainDagreContentBudget';
+import { createDomainDagreDirectContent } from './domainDagreDirectContent';
+import type { DomainDagreComponentIndex } from './domainDagrePeerComponents';
 import {
   arrangeDomainDagreChildren,
   type DomainDagreNodeArrangement,
@@ -29,6 +33,8 @@ export interface DomainDagreNestedLayoutContext {
   nodeArrangement: DomainDagreNodeArrangement;
   domainSubGroupIsHorizontal: boolean;
   packVerticalSubDomains: boolean;
+  packDisconnectedComponents?: boolean;
+  globalComponentByNodeId?: DomainDagreComponentIndex;
   nodeGapH: number;
   nodeGapV: number;
   subDomainPaddingH: number;
@@ -45,6 +51,8 @@ export interface DomainDagreNestedLayoutContext {
 }
 
 const setNodeSize = (node: Node, width: number, height: number): void => {
+  node.width = width;
+  node.height = height;
   node.measured = { width, height };
   node.style = { ...node.style, width, height };
 };
@@ -81,6 +89,7 @@ const moveSubGroupChildren = (
 const layoutSubGroupChildren = (
   subGroup: Node,
   context: DomainDagreNestedLayoutContext,
+  parentBudget?: DomainDagreContentBudget,
 ): void => {
   const children = childrenFor(subGroup, context.childrenBySubGroup, context.nodeById);
   if (children.length === 0) return;
@@ -92,6 +101,9 @@ const layoutSubGroupChildren = (
     context.nodeGapH,
     context.nodeGapV,
     context.getNodeDimensions,
+    context.packDisconnectedComponents,
+    parentBudget,
+    context.globalComponentByNodeId,
   );
   for (const position of positions) {
     const node = context.nodeById.get(position.id);
@@ -125,29 +137,47 @@ export const runDomainDagreNestedLayout = (
       domainDagreDomainOf(node) === domainKey && !context.nodeToSubGroup.has(node.id)
     ));
     for (const subGroup of domainSubGroups) layoutSubGroupChildren(subGroup, context);
+    if (context.packDisconnectedComponents && context.domainSubGroupIsHorizontal && domainSubGroups.length > 1) {
+      const sharedHeight = Math.max(...domainSubGroups.map(group => context.getNodeDimensions(group).height));
+      for (const group of domainSubGroups) layoutSubGroupChildren(group, context, {
+        maxWidth: context.getNodeDimensions(group).width - context.subDomainPaddingH * 2,
+        maxHeight: sharedHeight - context.subDomainTitleHeight - context.subDomainPaddingV * 2,
+        objective: 'width',
+      });
+    }
 
-    const domainChildren = [...domainSubGroups, ...freeNodes];
+    const direct = createDomainDagreDirectContent(freeNodes, context.edges, context.nodeArrangement,
+      context.subDomainNodeIsHorizontal, context.nodeGapH, context.nodeGapV,
+      context.getNodeDimensions, new Set(context.nodeById.keys()), context.packDisconnectedComponents === true,
+      context.globalComponentByNodeId);
+    const domainChildren = [...domainSubGroups, ...(direct ? [direct.block] : [])];
     if (domainChildren.length === 0) continue;
+    const containers = new Map(context.nodeToSubGroup);
+    if (direct) for (const node of freeNodes) containers.set(node.id, direct.block.id);
     const domainChildIds = new Set(domainChildren.map(node => node.id));
     const domainEdges = context.edges.filter(edge => {
       const source = context.nodeById.get(edge.source);
       const target = context.nodeById.get(edge.target);
       if (!source || !target) return false;
       if (domainDagreDomainOf(source) !== domainKey || domainDagreDomainOf(target) !== domainKey) return false;
-      const sourceItem = context.nodeToSubGroup.get(edge.source) || edge.source;
-      const targetItem = context.nodeToSubGroup.get(edge.target) || edge.target;
+      const sourceItem = containers.get(edge.source) || edge.source;
+      const targetItem = containers.get(edge.target) || edge.target;
       return domainChildIds.has(sourceItem) && domainChildIds.has(targetItem);
     });
-    const positions = layoutWithDagre(
+    const dagrePositions = layoutWithDagre(
       domainChildren,
-      mapEdgesToContainers(domainEdges, context.nodeToSubGroup),
+      mapEdgesToContainers(domainEdges, containers),
       context.domainSubGroupIsHorizontal ? 'LR' : 'TB',
       context.domainSubGroupIsHorizontal ? context.nodeGapV : context.nodeGapH,
       context.domainSubGroupIsHorizontal ? context.nodeGapH : context.nodeGapV,
       context.getNodeDimensions,
     );
+    const positions = context.packDisconnectedComponents ? packDisconnectedDagreComponents(
+      dagrePositions, domainChildren, mapEdgesToContainers(domainEdges, containers),
+      context.nodeGapH, context.nodeGapV, context.getNodeDimensions,
+    ) : dagrePositions;
     for (const position of positions) {
-      const node = context.nodeById.get(position.id);
+      const node = position.id === direct?.block.id ? direct.block : context.nodeById.get(position.id);
       if (!node) continue;
       const newX = position.x + context.domainPaddingH;
       const newY = position.y
@@ -158,9 +188,13 @@ export const runDomainDagreNestedLayout = (
         moveSubGroupChildren(node, newX - node.position.x, newY - node.position.y, context);
       }
       node.position = { x: newX, y: newY };
+      if (direct && node === direct.block) for (const local of direct.positions) {
+        const child = context.nodeById.get(local.id);
+        if (child) child.position = { x: newX + local.x, y: newY + local.y };
+      }
     }
 
-    if (context.domainSubGroupIsHorizontal && domainSubGroups.length > 1) {
+    if (!direct && context.domainSubGroupIsHorizontal && domainSubGroups.length > 1) {
       const rowY = Math.min(...domainSubGroups.map(subGroup => subGroup.position.y));
       let cursorX = context.domainPaddingH;
       for (const subGroup of domainSubGroups) {
@@ -172,7 +206,7 @@ export const runDomainDagreNestedLayout = (
         }
         cursorX += context.getNodeDimensions(subGroup).width + context.nodeGapH;
       }
-    } else if (context.packVerticalSubDomains && domainSubGroups.length > 1) {
+    } else if (!direct && context.packVerticalSubDomains && domainSubGroups.length > 1) {
       const columnX = Math.min(...domainSubGroups.map(subGroup => subGroup.position.x));
       let cursorY = Math.min(...domainSubGroups.map(subGroup => subGroup.position.y));
       for (const subGroup of domainSubGroups) {
@@ -186,7 +220,9 @@ export const runDomainDagreNestedLayout = (
       }
     }
 
-    const bounds = calculateBounds(domainChildren, context.getNodeDimensions, context.widthCompensation);
+    // The direct block is a placement constraint, not text. Apply any text
+    // width compensation to its real cards, never to the gaps inside it.
+    const bounds = calculateBounds([...domainSubGroups, ...freeNodes], context.getNodeDimensions, context.widthCompensation);
     setNodeSize(
       domain,
       bounds.width + context.domainPaddingH * 2,

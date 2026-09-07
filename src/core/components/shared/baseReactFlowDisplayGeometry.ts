@@ -1,4 +1,5 @@
 import type { Edge, Node, XYPosition } from '@xyflow/react';
+import { isReadableOrthogonalCrossing } from '../../routing/orthogonalCrossingPolicy';
 
 import {
   compactOrthogonalPath,
@@ -328,7 +329,8 @@ export const displayStrictCrossesVertical = (
     && y < Math.max(verticalStart.y, verticalEnd.y) - STRICT_CROSSING_INTERIOR_EPS;
 };
 
-export const findDisplayStrictCrossingHits = (
+/** Raw geometric intersections, including readable crossings. */
+export const findDisplayGeometricCrossingHits = (
   edges: Edge[],
 ): Array<{ a: DisplaySegment; b: DisplaySegment }> => {
   const segments = extractDisplaySegments(edges);
@@ -371,6 +373,12 @@ export const findDisplayStrictCrossingHits = (
   return hitOrders.map(({ first, second }) => ({ a: segments[first], b: segments[second] }));
 };
 
+/** Only unresolved crossings enter hard-repair candidate selection. */
+export const findDisplayStrictCrossingHits = (
+  edges: Edge[],
+): Array<{ a: DisplaySegment; b: DisplaySegment }> => findDisplayGeometricCrossingHits(edges)
+  .filter(hit => !isReadableOrthogonalCrossing(hit.a, hit.b));
+
 export const candidateUnrelatedOverlapForEdge = (
   edgeIndex: number,
   path: DisplayPoint[],
@@ -402,6 +410,7 @@ export const candidateStrictCrossingsForEdge = (
   let crossings = 0;
   for (const first of candidateSegments) {
     for (const second of otherSegments) {
+      if (isReadableOrthogonalCrossing(first, second)) continue;
       if (first.axis === 'h') {
         if (displayStrictCrossesHorizontal(first.a, first.b, second)) crossings += 1;
       } else if (displayStrictCrossesVertical(first.a, first.b, second)) {

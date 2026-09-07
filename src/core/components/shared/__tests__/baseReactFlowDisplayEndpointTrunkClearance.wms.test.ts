@@ -26,7 +26,7 @@ import { repairAxisMismatchedTerminalsWithBoundedPortRoles } from '../baseReactF
 import { withAbsoluteNodePositions } from './baseReactFlowDisplayEdges.testUtils';
 
 describe('baseReactFlowDisplayEndpointTrunkClearance WMS regression', () => {
-  it('moves the master-data nested pair onto its existing safe sibling stem', async () => {
+  it('keeps the master-data nested pair on a clear sibling stem without redundant repair', async () => {
     const preset = coerceCustomPreset(wmsStandardData, {
       id: 'WmsEndpointTrunkClearanceProbe',
       title: 'WmsEndpointTrunkClearanceProbe',
@@ -65,6 +65,16 @@ describe('baseReactFlowDisplayEndpointTrunkClearance WMS regression', () => {
       hardReport: candidate ? getDisplayHardQualityGateReport(candidate, nodes, 'polished') : null,
     }, null, 2);
 
+    // The balanced router can close all 48px passage risks upstream. Exercise
+    // the no-op contract explicitly; synthetic candidate tests retain the
+    // original nested-pair repair cases when residual risk is present.
+    if (candidates.length === 0) {
+      expect(risk(baseline), diagnostics).toBe(0);
+      expect(getDisplayHardQualityGateReport(baseline, nodes, 'polished').hardClean).toBe(true);
+      expect(countRenderUnsafeEndpointStubs(baseline)).toBe(0);
+      expect(repairBaseReactFlowDisplayEndpointPassageClearance(baseline, nodes)).toBe(baseline);
+      return;
+    }
     expect(candidate, diagnostics).toBeDefined();
     if (!candidate) throw new Error('expected the real WMS endpoint-trunk candidate');
     expect(candidate.flatMap((edge, index) => edge === baseline[index] ? [] : [edge.id]))

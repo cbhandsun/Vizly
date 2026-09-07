@@ -1,7 +1,7 @@
 import type { Edge } from '@xyflow/react';
 
 import { parseRoutingLineHops } from '../../routing/routingLineHops';
-import type { RoutingPatch } from '../../routing/routingPatch';
+import { ROUTING_PATCH_DATA_KEYS, type RoutingPatch } from '../../routing/routingPatch';
 import {
   BASE_DISPLAY_ROUTING_VERSION,
   isBaseReactFlowDisplayOutputRouteSignature,
@@ -35,13 +35,7 @@ const ROUTING_INTENT_KEYS = [
   'isTreeBus',
   'overextendedTargetTrunkCorridorReclaimed',
 ] as const;
-const ROUTING_DATA_KEYS = new Set([
-  'computedPath',
-  'elkPath',
-  'treeRouting',
-  'h',
-  ...ROUTING_INTENT_KEYS,
-]);
+const ROUTING_DATA_KEYS = new Set<string>(ROUTING_PATCH_DATA_KEYS);
 const TREE_ROUTING_KEYS = new Set(['effectiveSourceHandle', 'effectiveTargetHandle', 'points']);
 
 export type BaseReactFlowPrecompiledRouteArtifact = {

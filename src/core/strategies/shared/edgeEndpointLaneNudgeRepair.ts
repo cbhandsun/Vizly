@@ -648,7 +648,7 @@ export function repairEndpointLaneCrossings(
     candidateCount += candidatePaths.length;
     const candidates = candidatePaths
       .map((candidate) => {
-        const { crossings, totalCrossings, oppositeOverlap } = interactionContext.evaluate(candidate.path);
+        const { crossings, totalCrossings, oppositeOverlap, crossingCost = 0 } = interactionContext.evaluate(candidate.path);
         return {
           path: candidate.path,
           crossings,
@@ -658,6 +658,8 @@ export function repairEndpointLaneCrossings(
           score: totalCrossings * 140000
             + crossings * 100000
             + oppositeOverlap * 500
+            + crossingCost * 10
+            + Math.max(0, candidate.path.length - 2) * 30
             + candidate.length * 0.05
             + Math.abs(candidate.path[0].x - path[0].x)
             + Math.abs(candidate.path[0].y - path[0].y),

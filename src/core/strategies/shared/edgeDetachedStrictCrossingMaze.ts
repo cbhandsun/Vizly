@@ -1,5 +1,6 @@
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 import { resolveMazeRunDestination } from './edgeStrictCrossingMazeSteps';
+import { HARD_MINIMUM_BUSINESS_NODE_CLEARANCE } from './edgeWaypointCandidateRepair';
 import { mazeDirectionsReverse, resolveMazeTerminalCaps, type MazeDirection } from './edgeStrictCrossingMazeTerminals';
 
 import type {
@@ -35,17 +36,6 @@ function segmentPenaltyAgainstOtherEdges(
 ): number {
   let penalty = 0;
   for (const other of otherSegments) {
-    // A grid vertex is not a route endpoint. Charge a straight-through
-    // crossing there once, on departure, before final path compaction.
-    const crossesAtDeparture = continuation && segment.axis !== other.axis
-      && Math.abs(other.axis === 'v' ? other.a.x - segment.a.x : other.a.y - segment.a.y) <= EPS
-      && strictCross(continuation, other);
-    if (strictCross(segment, other) || crossesAtDeparture) {
-      penalty += 100000;
-      continue;
-    }
-    const overlap = segmentOverlap(segment, other);
-    if (overlap <= 1) continue;
     const otherEdge = edges[other.edgeIndex];
     const related = otherEdge && (
       edge.source === otherEdge.source
@@ -53,6 +43,20 @@ function segmentPenaltyAgainstOtherEdges(
       || edge.target === otherEdge.source
       || edge.target === otherEdge.target
     );
+    // A grid vertex is not a route endpoint. Charge a straight-through
+    // crossing there once, on departure, before final path compaction.
+    const crossesAtDeparture = continuation && segment.axis !== other.axis
+      && Math.abs(other.axis === 'v' ? other.a.x - segment.a.x : other.a.y - segment.a.y) <= EPS
+      && strictCross(continuation, other);
+    if (strictCross(segment, other) || crossesAtDeparture) {
+      // This hard-defect escape search cannot establish bridge clearance from
+      // individual grid steps. Readable crossings are accepted by the full-path
+      // policy before entering this search, not by weakening its local penalty.
+      penalty += 100000;
+      continue;
+    }
+    const overlap = segmentOverlap(segment, other);
+    if (overlap <= 1) continue;
     const oppositeDirection = segment.axis === other.axis
       && segmentAxisDirection(segment) * segmentDirection(other) < 0;
     penalty += overlap * (oppositeDirection ? 180 : related ? 8 : 80);
@@ -149,11 +153,14 @@ export function routeStrictCrossingMazeCandidate(
   }
   for (const [nodeId, rect] of gridObstacles) {
     if (nodeId === edge.source || nodeId === edge.target) continue;
-    for (const offset of [0, 12, -12, 24, -24]) {
-      addX(rect.x + offset);
-      addX(rect.x + rect.width + offset);
-      addY(rect.y + offset);
-      addY(rect.y + rect.height + offset);
+    for (const offset of [0, HARD_MINIMUM_BUSINESS_NODE_CLEARANCE, -HARD_MINIMUM_BUSINESS_NODE_CLEARANCE, 24, -24]) {
+      // Keep fractional obstacle boundaries outside the required clearance when
+      // projecting them onto the integer grid. Nearest rounding can cut inside.
+      const roundOutward = offset < 0 ? Math.floor : offset > 0 ? Math.ceil : Math.round;
+      addX(roundOutward(rect.x + offset));
+      addX(roundOutward(rect.x + rect.width + offset));
+      addY(roundOutward(rect.y + offset));
+      addY(roundOutward(rect.y + rect.height + offset));
     }
   }
 
@@ -223,7 +230,7 @@ export function routeStrictCrossingMazeCandidate(
   const isSegmentBlockedByNode = (segment: Segment): boolean => {
     for (const [nodeId, rect] of obstacles) {
       if (nodeId === edge.source || nodeId === edge.target) continue;
-      if (segmentIntersectsRect(segment, rect, 12)) return true;
+      if (segmentIntersectsRect(segment, rect, HARD_MINIMUM_BUSINESS_NODE_CLEARANCE)) return true;
     }
     return false;
   };

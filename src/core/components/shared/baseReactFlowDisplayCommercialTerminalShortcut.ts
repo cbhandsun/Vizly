@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import { COMMERCIAL_BUSINESS_NODE_CLEARANCE } from '../../strategies/shared/edgeBusinessNodeClearanceRepair';
+import { buildMixedTerminalCorridorShortcutPaths } from './baseReactFlowDisplayMixedTerminalCorridor';
 import { compactOrthogonalPath } from './baseReactFlowDisplayEdgeCore';
 import {
   anchorForHandle,
@@ -518,22 +519,32 @@ export const buildCommercialSameSideRectangularShortcutPaths = (
  * interior lanes while preserving both terminal stubs. Exact graph and node
  * acceptance remains the caller's responsibility.
  */
-export const buildCommercialParallelTerminalCorridorShortcutPaths = (
+export const buildCommercialTerminalCorridorShortcutPaths = (
   path: Array<{ x: number; y: number }>,
   nodes: Node[] = [],
   edge?: Edge,
 ): Array<Array<{ x: number; y: number }>> => {
-  if (path.length < 6) return [];
+  if (path.length < 6 || path.length > 128 || nodes.length > 256) return [];
+  if (path.some(point => !Number.isFinite(point.x) || !Number.isFinite(point.y)
+    || Math.abs(point.x) > 1_000_000 || Math.abs(point.y) > 1_000_000)) return [];
+  if (path.some((point, index) => index > 0
+    && point.x !== path[index - 1].x && point.y !== path[index - 1].y)) return [];
   const source = path[0];
   const sourceStub = path[1];
   const targetStub = path.at(-2);
   const target = path.at(-1);
   if (!source || !sourceStub || !targetStub || !target) return [];
+  if (segmentDisplayLength(source, sourceStub) <= 0.5 || segmentDisplayLength(targetStub, target) <= 0.5) return [];
   const verticalTerminals = Math.abs(source.x - sourceStub.x) <= 0.5
     && Math.abs(targetStub.x - target.x) <= 0.5;
   const horizontalTerminals = Math.abs(source.y - sourceStub.y) <= 0.5
     && Math.abs(targetStub.y - target.y) <= 0.5;
-  if (!verticalTerminals && !horizontalTerminals) return [];
+  if (!verticalTerminals && !horizontalTerminals) {
+    return edge ? buildMixedTerminalCorridorShortcutPaths(path, nodes, edge, {
+      maxCandidates: MAX_TERMINAL_SHORTCUT_CANDIDATES,
+      containerNodeTypes: CONTAINER_NODE_TYPES,
+    }) : [];
+  }
 
   const laneCoordinates = new Set<number>();
   for (let index = 2; index < path.length - 3; index += 1) {

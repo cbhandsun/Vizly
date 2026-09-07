@@ -17,6 +17,7 @@ import {
   type Side,
 } from './edgeSharedEndpointPortOrderGeometry';
 import { countEndpointNodeTraversalHits } from './edgeWaypointCandidateRepair';
+import { commonEndpointStemLength, endpointStemExtent, endpointStemsShareAnchor } from './edgeEndpointTrunkGeometry';
 
 const MAX_PATH_POINTS = 4_096;
 const MAX_ABS_COORDINATE = 1_000_000_000;
@@ -240,10 +241,7 @@ function terminalNormalDelta(entry: EndpointEntry): number {
 }
 
 function entriesShareTerminalTrunk(first: EndpointEntry, second: EndpointEntry): boolean {
-  if (
-    Math.abs(first.terminal.x - second.terminal.x) > EPS
-    || Math.abs(first.terminal.y - second.terminal.y) > EPS
-  ) return false;
+  if (!endpointStemsShareAnchor(first, second)) return false;
   const expectedAxis = first.side === 'top' || first.side === 'bottom' ? 'v' : 'h';
   if (
     axisOf(first.terminal, first.stub) !== expectedAxis
@@ -253,7 +251,7 @@ function entriesShareTerminalTrunk(first: EndpointEntry, second: EndpointEntry):
   const secondDelta = terminalNormalDelta(second);
   return Math.sign(firstDelta) === Math.sign(secondDelta)
     && Math.sign(firstDelta) !== 0
-    && Math.min(Math.abs(firstDelta), Math.abs(secondDelta)) >= MIN_TRUE_TRUNK_STEM - EPS;
+    && commonEndpointStemLength([first, second]) >= MIN_TRUE_TRUNK_STEM - EPS;
 }
 
 function median(values: readonly number[]): number {
@@ -329,14 +327,14 @@ function legalSharedTrunksForBlock(
   block: EndpointBlock,
 ): SameSideEndpointTrunkIdentity[] {
   const entries = [...block.entries].sort((first, second) => (
-    Math.abs(terminalNormalDelta(second)) - Math.abs(terminalNormalDelta(first))
+    endpointStemExtent(second) - endpointStemExtent(first)
     || first.edgeId.localeCompare(second.edgeId)
   ));
   const trunks: SameSideEndpointTrunkIdentity[] = [];
   for (let index = 1; index < entries.length; index += 1) {
-    const commonStemLength = Math.abs(terminalNormalDelta(entries[index]));
+    const commonStemLength = commonEndpointStemLength(entries.slice(0, index + 1));
     const next = entries[index + 1];
-    if (next && commonStemLength - Math.abs(terminalNormalDelta(next)) <= EPS) continue;
+    if (next && commonStemLength - commonEndpointStemLength(entries.slice(0, index + 2)) <= EPS) continue;
     const edgeIds = entries.slice(0, index + 1).map(entry => entry.edgeId).sort((first, second) => (
       first.localeCompare(second)
     ));

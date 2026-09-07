@@ -39,12 +39,12 @@ describe('repairFinalResidualStrictCrossingsFromKnownAnalysis', () => {
     const edges = [
       edgeWithPath('horizontal', [
         { x: 0, y: 50 },
-        { x: 50, y: 50 },
+        { x: 12, y: 50 },
         { x: 100, y: 50 },
       ]),
       edgeWithPath('vertical', [
-        { x: 50, y: 0 },
-        { x: 50, y: 100 },
+        { x: 12, y: 0 },
+        { x: 12, y: 100 },
       ]),
     ];
     const rawStrictCrossings = calculateEdgePathQualityScore(edges).strictCrossings;

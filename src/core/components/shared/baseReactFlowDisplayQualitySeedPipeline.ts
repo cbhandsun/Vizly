@@ -1,4 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
+import { getInteractiveGlobalCandidateEdgeBudget } from './baseReactFlowDisplayBoundedSeedPolicy';
+export { getInteractiveGlobalCandidateEdgeBudget } from './baseReactFlowDisplayBoundedSeedPolicy';
 
 import { separateDetachedParallelOverlaps } from '../../strategies/shared/edgeDetachedOverlapRepair';
 import {
@@ -27,7 +29,8 @@ import {
   synthesizeStableFallbackPath,
   withDisplayAbsolutePositions,
 } from './baseReactFlowDisplayEdgeCore';
-import { compactDisplayEdgePaths } from './baseReactFlowDisplayGeometry';
+import { compactDisplayEdgePaths, getDisplayComputedPath } from './baseReactFlowDisplayGeometry';
+import { createDisplayObstacleHitContext } from './baseReactFlowDisplayObstacleHitCache';
 import { repairStrictBypassesIfNeeded } from './baseReactFlowDisplayObstacleRepair';
 import { DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS } from './baseReactFlowDisplayOverlapRepair';
 import { finishInteractiveDisplayEdgesForRenderMode } from './baseReactFlowDisplayRenderPipeline';
@@ -53,6 +56,26 @@ export const chooseDistinctQualitySeedCandidate = <T extends Edge[]>(
     return true;
   });
   return choose(...uniqueCandidates);
+};
+
+/** Avoiding a crossing cannot justify traversing a node, including the route's
+ * own source or target. Reuse the routing collision model before soft ranking. */
+export const chooseObstacleSafeQualitySeedCandidate = (
+  nodes: Node[],
+  candidates: Edge[][],
+): Edge[] => {
+  if (candidates.length === 0) return [];
+  const context = createDisplayObstacleHitContext(nodes);
+  const scored = candidates.map(edges => ({
+    edges,
+    hits: edges.reduce((count, edge) => (
+      count + context.countRouting(getDisplayComputedPath(edge), edge)
+    ), 0),
+  }));
+  const minimumHits = Math.min(...scored.map(candidate => candidate.hits));
+  return chooseFewestStrictCrossings(...scored
+    .filter(candidate => candidate.hits === minimumHits)
+    .map(candidate => candidate.edges));
 };
 
 export const createFastDisplayQualityEdges = (
@@ -83,7 +106,7 @@ export const createFastDisplayQualityEdges = (
     endpointDetachedEdges,
     targetEntryEdges,
     strictBypassEdges,
-  ], chooseFewestStrictCrossings);
+  ], (...candidates) => chooseObstacleSafeQualitySeedCandidate(repairNodes, candidates));
 };
 
 const INTERACTIVE_DETACHED_OVERLAP_REPAIR_OPTIONS = {
@@ -93,9 +116,6 @@ const INTERACTIVE_DETACHED_OVERLAP_REPAIR_OPTIONS = {
   maxResidualPasses: 1,
   qualityOnly: true,
 };
-
-const DEFERRED_GLOBAL_CANDIDATE_EDGE_THRESHOLD = 24;
-const DEFERRED_GLOBAL_CANDIDATE_EDGE_BUDGET = 12;
 
 const runInteractiveSeedPhase = (
   phase: DisplayRoutingPhaseName,
@@ -120,15 +140,6 @@ const runInteractiveSeedPhase = (
   );
   return result;
 };
-
-export const getInteractiveGlobalCandidateEdgeBudget = (
-  edgeCount: number,
-  deferOuterObstacleRepair: boolean,
-): number | undefined => (
-  deferOuterObstacleRepair && edgeCount > DEFERRED_GLOBAL_CANDIDATE_EDGE_THRESHOLD
-    ? DEFERRED_GLOBAL_CANDIDATE_EDGE_BUDGET
-    : undefined
-);
 
 const createInteractiveDisplayQualityEdges = (
   normalizedEdges: Edge[],
@@ -225,7 +236,7 @@ const createInteractiveDisplayQualityEdges = (
     localPolishedEdges,
     detachedEdges,
     endpointDetachedEdges,
-  ], chooseFewestStrictCrossings);
+  ], (...candidates) => chooseObstacleSafeQualitySeedCandidate(repairNodes, candidates));
 };
 
 export const createBaseReactFlowInteractiveDisplayEdges = ({
@@ -235,6 +246,7 @@ export const createBaseReactFlowInteractiveDisplayEdges = ({
   smartEdgePadding,
   isLargeGraph,
   displayEdgeEpoch,
+  seedUnroutedFlowEdges = false,
   deferOuterObstacleRepair = false,
   onPhaseTrace,
 }: {
@@ -244,6 +256,7 @@ export const createBaseReactFlowInteractiveDisplayEdges = ({
   smartEdgePadding: number;
   isLargeGraph: boolean;
   displayEdgeEpoch: number;
+  seedUnroutedFlowEdges?: boolean;
   deferOuterObstacleRepair?: boolean;
   onPhaseTrace?: (trace: DisplayRoutingPhaseTrace) => void;
 }): Edge[] => {
@@ -270,7 +283,9 @@ export const createBaseReactFlowInteractiveDisplayEdges = ({
       edge: rawEdge,
       nodeById,
       displayEdgeEpoch,
-    })).map((edge) => synthesizeStableFallbackPath({ edge, nodeById })),
+    })).map((edge) => synthesizeStableFallbackPath({
+      edge, nodeById, allowUnroutedFlowEdge: seedUnroutedFlowEdges,
+    })),
   );
   const layoutDirection = typeof normalizedEdges[0]?.data?.layoutDirection === 'string'
     ? normalizedEdges[0].data.layoutDirection

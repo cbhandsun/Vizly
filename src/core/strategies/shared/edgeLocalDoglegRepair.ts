@@ -63,6 +63,15 @@ import {
   type EdgePathQualityEvaluationContext,
   type EdgePathQualityScore,
 } from './edgeStrictCrossingGuard';
+import {
+  BUSINESS_NODE_CLEARANCE,
+  createNodeClearanceGraphEvaluationContext,
+  HARD_MINIMUM_BUSINESS_NODE_CLEARANCE,
+} from './edgeWaypointCandidateRepair';
+
+type LocalDoglegObstacleContext = EdgeObstacleInteractionContext & {
+  preservesClearance: (baseline: Point[], candidate: Point[]) => boolean;
+};
 
 const MAX_LOCAL_QUALITY_CACHE_ENTRIES = 4_096;
 
@@ -105,7 +114,7 @@ function findBestLocalDoglegCandidate(
   obstacles: Map<string, Rect>,
   sourceRect: Rect | null,
   targetRect: Rect | null,
-  obstacleContext: EdgeObstacleInteractionContext,
+  obstacleContext: LocalDoglegObstacleContext,
   qualityContext: EdgePathQualityEvaluationContext,
   qualityByCandidatePath: Map<string, EdgePathQualityScore>,
   interactionContext = createEdgePathInteractionContext(edgeKey, pathByEdgeKey),
@@ -206,6 +215,9 @@ function findBestLocalDoglegCandidate(
       && !fewerTinyDoglegs
       && !betterTerminalStub
     ) return;
+    // Obstacle intersection uses an 8px envelope. A shorter, intersection-free
+    // lane must also preserve the separate hard and commercial clearances.
+    if (!obstacleContext.preservesClearance(path, normalized)) return;
     let candidateQuality = candidateKey === null
       ? undefined
       : qualityByCandidatePath.get(candidateKey);
@@ -361,7 +373,7 @@ function repairPath(
   obstacles: Map<string, Rect>,
   sourceRect: Rect | null,
   targetRect: Rect | null,
-  obstacleContext: EdgeObstacleInteractionContext,
+  obstacleContext: LocalDoglegObstacleContext,
   interactionContext: ReturnType<typeof createEdgePathInteractionContext>,
   qualityContext: EdgePathQualityEvaluationContext,
   qualityByCandidatePath: Map<string, EdgePathQualityScore>,
@@ -455,7 +467,7 @@ function repairRemainingTinyArtifactsWithMaze(
   nodes: ReactFlowNode[],
   sourceRect: Rect | null,
   targetRect: Rect | null,
-  obstacleContext: EdgeObstacleInteractionContext,
+  obstacleContext: LocalDoglegObstacleContext,
   interactionContext: ReturnType<typeof createEdgePathInteractionContext>,
   qualityContext: EdgePathQualityEvaluationContext,
 ): Point[] {
@@ -480,6 +492,7 @@ function repairRemainingTinyArtifactsWithMaze(
   if (localVisualNoise(normalized) >= currentNoise) return path;
   if (snapshot.bends > bendCount(path) + 4) return path;
   if (snapshot.length > pathLength(path) + MAX_TINY_CLEANUP_LENGTH_PENALTY) return path;
+  if (!obstacleContext.preservesClearance(path, normalized)) return path;
   const baselineEdges = edgesWithCurrentPaths(edges, edgeKeys, pathByEdgeKey);
   const candidateBuffer = createChangedEdgePathEvaluationBuffer(baselineEdges, edgeIndex);
   const baselineQuality = qualityContext.evaluateChanged(baselineEdges, [edgeIndex]);
@@ -591,6 +604,7 @@ export function repairLocalDoglegArtifacts(
   if (pathByEdgeKey.size === 0 || riskyEdgeKeys.size === 0) return edges;
 
   const obstacles = getRoutingObstacles(nodes);
+  const clearance = createNodeClearanceGraphEvaluationContext(nodes);
   const nodeById = new Map(nodes.map(node => [node.id, node] as const));
   let changed = false;
   const repairedEdges = edges.map((edge, index) => {
@@ -600,7 +614,18 @@ export function repairLocalDoglegArtifacts(
     if (diagnostics) diagnostics.processedEdgeCount += 1;
     const sourceRect = nodeRect(nodeById.get(edge.source));
     const targetRect = nodeRect(nodeById.get(edge.target));
-    const obstacleContext = createEdgeObstacleInteractionContext(edge, obstacles);
+    const scoreClearance = (candidate: Point[]) => clearance.scorePair(
+      candidate, edge, HARD_MINIMUM_BUSINESS_NODE_CLEARANCE, BUSINESS_NODE_CLEARANCE,
+    );
+    const initialClearance = scoreClearance(getEdgePath(edge));
+    const obstacleContext: LocalDoglegObstacleContext = {
+      ...createEdgeObstacleInteractionContext(edge, obstacles),
+      preservesClearance(baseline, candidate) {
+        const before = scoreClearance(baseline);
+        const after = scoreClearance(candidate);
+        return after.every((risk, i) => risk <= Math.min(before[i], initialClearance[i]) + 1e-6);
+      },
+    };
     const interactionContext = createEdgePathInteractionContext(edgeKey, pathByEdgeKey);
     const qualityBaselineEdges = edgesWithCurrentPaths(edges, edgeKeys, pathByEdgeKey);
     const qualityContext = createEdgePathQualityEvaluationContext(qualityBaselineEdges);

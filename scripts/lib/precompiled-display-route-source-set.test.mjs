@@ -55,6 +55,10 @@ describe('precompiled display routing source set', () => {
 
     expect(paths).toContain('src/core/components/shared/useBaseReactFlowDisplayRouting.ts');
     expect(paths).toContain('src/core/components/shared/baseReactFlowDisplayEdges.worker.ts');
+    expect(paths).toContain('src/core/components/shared/baseReactFlowLayoutVisibility.ts');
+    expect(paths).toContain('src/core/components/shared/baseReactFlowLayoutRoutingTransaction.ts');
+    expect(paths).toContain('src/core/components/shared/baseReactFlowRoutingSessionRuntime.ts');
+    expect(paths).toContain('src/core/components/shared/baseReactFlowRenderableNodes.ts');
     expect(paths).toContain('src/components/diagramViewerFlowchartLoader.tsx');
     expect(paths.some(path => path.includes('/__tests__/'))).toBe(false);
     expect(paths.some(path => path.includes('/generated/'))).toBe(false);

@@ -50,7 +50,8 @@ import {
   DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
   repairResidualDisplayOverlaps,
 } from './baseReactFlowDisplayOverlapRepair';
-import { repairFinalResidualStrictCrossings } from './baseReactFlowDisplayStrictResidualRepair';
+import { repairFinalResidualStrictCrossings, repairInternalStrictCrossingLanes } from './baseReactFlowDisplayStrictResidualRepair';
+import { repairTerminalEndpointStrictCrossingStubs } from './baseReactFlowDisplayStrictTerminalRepair';
 import {
   chooseDirectionalOuterLaneCandidate,
   finalStrictDisplaySweep,
@@ -379,6 +380,11 @@ export const finishInteractiveDisplayEdgesForRenderMode = ({
     countChangedRoutingItems(localCleaned, obstacleCleaned),
   );
   if (deferOuterObstacleRepair) {
+    // Deferring outer routing must not omit the bounded local closure for a
+    // crossing next to a bend. This preserves the interactive work budget.
+    const terminalCrossingCleaned = repairTerminalEndpointStrictCrossingStubs(
+      repairInternalStrictCrossingLanes(obstacleCleaned, repairNodes, undefined, 16), repairNodes, 16,
+    );
     const commitTimer = onPhaseTrace
       ? startDisplayRoutingPhaseTrace({
           phase: 'seed-interactive-finish-commit',
@@ -387,7 +393,7 @@ export const finishInteractiveDisplayEdgesForRenderMode = ({
         })
       : null;
     const committed = markBaseDisplayFinalized(
-      compactDisplayEdgePaths(obstacleCleaned),
+      compactDisplayEdgePaths(terminalCrossingCleaned),
       inputSignature,
     );
     commitTimer?.finish('accepted', countChangedRoutingItems(obstacleCleaned, committed));

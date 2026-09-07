@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 
-import { useState } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { useEffect, useState } from 'react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
     FlowchartDesignerLeftSidebar,
     FlowchartDesignerOverlaysRegion,
     FlowchartDesignerRightSidebarRegion,
+    FlowchartDesignerSidebarFrame,
     type FlowchartDesignerLeftSidebarModel,
     type FlowchartDesignerOverlaysModel,
     type FlowchartDesignerRightSidebarModel,
@@ -18,6 +19,82 @@ import {
     shouldShowFlowchartOnboarding,
 } from '../flowchartResponsiveChrome';
 import type { PluginContext } from '../../../types/plugin';
+import { computeDiagramFitViewport, resolveDiagramFitLayout } from '../../shared/diagramControlFit';
+import { applyDiagramOverviewFit, diagramOverviewContainsContent } from '../../shared/diagramOverviewFit';
+
+const StatefulSidebarClearance = ({ onMount, onUnmount }: { onMount: () => void; onUnmount: () => void }) => {
+    useEffect(() => {
+        onMount();
+        document.documentElement.style.setProperty('--left-sidebar-offset', '68px');
+        document.documentElement.style.setProperty('--right-sidebar-offset', '376px');
+        return () => {
+            document.documentElement.style.setProperty('--left-sidebar-offset', '0px');
+            document.documentElement.style.setProperty('--right-sidebar-offset', '0px');
+            onUnmount();
+        };
+    }, [onMount, onUnmount]);
+    return <button>Sidebar editing control</button>;
+};
+
+describe('layout preview final canvas clearance', () => {
+    it('retains mounted sidebars while fitting, blocks preview editing, and keeps the final overview clear', async () => {
+        const onMount = vi.fn(), onUnmount = vi.fn();
+        const panel = <StatefulSidebarClearance onMount={onMount} onUnmount={onUnmount} />;
+        const { container, rerender, unmount } = render(
+            <FlowchartDesignerSidebarFrame visible interactive>{panel}</FlowchartDesignerSidebarFrame>,
+        );
+        const control = screen.getByText('Sidebar editing control');
+        rerender(<FlowchartDesignerSidebarFrame visible interactive={false}>{panel}</FlowchartDesignerSidebarFrame>);
+        expect(control.closest('[inert]')).not.toBeNull();
+        expect(onMount).toHaveBeenCalledOnce();
+        expect(onUnmount).not.toHaveBeenCalled();
+        const readFitInput = () => {
+            const style = getComputedStyle(document.documentElement);
+            return { bounds: { minX: 0, minY: 0, width: 7906, height: 3304 },
+                viewportWidth: 1948, viewportHeight: 1084, ...resolveDiagramFitLayout({ viewportWidth: 1948,
+                    leftSidebarOffset: style.getPropertyValue('--left-sidebar-offset'),
+                    rightSidebarOffset: style.getPropertyValue('--right-sidebar-offset'),
+                }),
+            };
+        };
+        let viewport = { x: 0, y: 0, zoom: 1 };
+        await act(async () => {
+            expect(await applyDiagramOverviewFit({ readFitInput, getViewport: () => viewport,
+                setViewport: async next => { viewport = next; return true; }, fallbackFit: async () => false,
+                waitForPaint: async () => true, isCancelled: () => false,
+            })).toBe(true);
+        });
+        rerender(<FlowchartDesignerSidebarFrame visible interactive>{panel}</FlowchartDesignerSidebarFrame>);
+        expect(screen.getByText('Sidebar editing control')).toBe(control);
+        expect(control.closest('[inert]')).toBeNull();
+        expect(onMount).toHaveBeenCalledOnce();
+        expect(onUnmount).not.toHaveBeenCalled();
+        expect(readFitInput().safeArea).toMatchObject({ left: 68, right: 376 });
+        expect(diagramOverviewContainsContent(readFitInput(), viewport)).toBe(true);
+        expect(viewport.x + 7906 * viewport.zoom).toBeLessThanOrEqual(1948 - 376 - 8);
+        // The reported clipped viewport is exactly the fit produced while
+        // unmounted sidebars temporarily publish zero clearance.
+        const oldViewport = computeDiagramFitViewport({ ...readFitInput(),
+            safeArea: { ...readFitInput().safeArea, left: 0, right: 0 } });
+        expect(oldViewport?.x).toBeCloseTo(27.32);
+        expect(oldViewport?.zoom).toBeCloseTo(0.23947888);
+        if (!oldViewport) throw Error('expected old viewport');
+        expect(diagramOverviewContainsContent(readFitInput(), oldViewport)).toBe(false);
+        expect(container.querySelector('[inert]')).toBeNull();
+        unmount();
+        expect(onUnmount).toHaveBeenCalledOnce();
+    });
+
+    it('still removes sidebars when the requested view hides editing chrome', () => {
+        const { rerender } = render(<FlowchartDesignerSidebarFrame visible interactive>
+            <button>Hidden editor</button>
+        </FlowchartDesignerSidebarFrame>);
+        rerender(<FlowchartDesignerSidebarFrame visible={false} interactive={false}>
+            <button>Hidden editor</button>
+        </FlowchartDesignerSidebarFrame>);
+        expect(screen.queryByText('Hidden editor')).toBeNull();
+    });
+});
 
 let iconRailMountSequence = 0;
 vi.mock('../IconRailSidebar', () => ({

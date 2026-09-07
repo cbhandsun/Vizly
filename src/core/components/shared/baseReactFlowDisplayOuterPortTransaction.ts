@@ -16,6 +16,9 @@ import {
   type BaseReactFlowFinalEndpointEvaluation,
 } from './baseReactFlowDisplayFinalEndpointEvaluation';
 import { getChangedBaseReactFlowDisplayRoutingIndexes } from './baseReactFlowDisplayRoutingTransaction';
+import { routingGroupPreservesAuthoredTerminals } from './baseReactFlowDisplayRoutingGroupContract';
+import { repairDisplayRoutingGroupTransaction } from './baseReactFlowDisplayRoutingGroupTransaction';
+import { createDisplayRoutingTopologyPlan } from './baseReactFlowDisplayRoutingTopologyPlan';
 import {
   startDisplayRoutingPhaseTrace,
   type DisplayRoutingPhaseTrace,
@@ -105,7 +108,7 @@ export const repairResidualOuterPortTransactionWithHardGate = <T extends Edge[]>
   maxExactEvaluations = 64,
   options: BaseReactFlowOuterPortTransactionOptions = {},
 ): T => {
-  if (edges.length === 0 || maxExactEvaluations <= 0) return edges;
+  if (edges.length === 0 || !Number.isSafeInteger(maxExactEvaluations) || maxExactEvaluations <= 0) return edges;
   const timer = startDisplayRoutingPhaseTrace({
     phase: 'finalizer-outer-port',
     candidateCount: 0,
@@ -134,6 +137,13 @@ export const repairResidualOuterPortTransactionWithHardGate = <T extends Edge[]>
   });
   let remainingEvaluations = Math.min(64, Math.max(1, maxExactEvaluations));
   let evaluatedCandidateCount = 0;
+  let attemptedGroupTransaction = false;
+  const consumeEvaluation = (): boolean => {
+    if (remainingEvaluations <= 0) return false;
+    remainingEvaluations -= 1;
+    evaluatedCandidateCount += 1;
+    return true;
+  };
   const finish = (resolution: 'accepted' | 'fallback', result: T): T => {
     const metrics = metricsBefore && options.evaluation
       ? diffBaseReactFlowEvaluationMetrics(metricsBefore, options.evaluation.readMetrics())
@@ -174,14 +184,27 @@ export const repairResidualOuterPortTransactionWithHardGate = <T extends Edge[]>
     const evaluationCandidate = terminalBase.map((edge, index) => (
       changedEdgeIndexSet.has(index) ? edge : normalizedReference[index]
     )) as T;
+    if (!routingGroupPreservesAuthoredTerminals(edges, evaluationCandidate) || !consumeEvaluation()) continue;
     const report = options.evaluation?.hardReportChanged(
       normalizedReference,
       evaluationCandidate,
       changedEdgeIndexes,
     ) ?? getDisplayHardQualityGateReport(terminalBase, nodes, 'polished');
-    evaluatedCandidateCount += 1;
-    remainingEvaluations -= 1;
     if (report.hardClean) return finish('accepted', terminalBase);
+    if (!attemptedGroupTransaction && remainingEvaluations > 2) {
+      attemptedGroupTransaction = true;
+      const primaryEdgeIndexes = getChangedBaseReactFlowDisplayRoutingIndexes(edges, candidate.edges);
+      const grouped = repairDisplayRoutingGroupTransaction(edges, terminalBase, nodes, {
+        topologyPlan: createDisplayRoutingTopologyPlan(nodes, terminalBase),
+        primaryEdgeIndexes: primaryEdgeIndexes.length > 0 ? primaryEdgeIndexes : [candidate.movingEdgeIndex],
+        consumeEvaluation,
+        finalCandidateIsAccepted: proposed => (
+          options.evaluation?.hardReport(proposed)
+          ?? getDisplayHardQualityGateReport(proposed, nodes, 'polished')
+        ).hardClean,
+      });
+      if (grouped !== edges) return finish('accepted', grouped);
+    }
     if (!reportIsGeometricallyClean(report) || report.terminalsAnchored) continue;
 
     const declaredRoleBudget = remainingEvaluations;
@@ -195,6 +218,7 @@ export const repairResidualOuterPortTransactionWithHardGate = <T extends Edge[]>
       remainingEvaluations,
       declaredRoleOutcome.exactEvaluations,
     );
+    evaluatedCandidateCount += declaredRoleOutcome.exactEvaluations;
     if (declaredRoleOutcome.edges !== terminalBase) {
       return finish('accepted', declaredRoleOutcome.edges as T);
     }

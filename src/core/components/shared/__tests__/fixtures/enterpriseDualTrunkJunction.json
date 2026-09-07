@@ -1,0 +1,737 @@
+{
+  "nodes": [
+    {
+      "id": "titlegroup-渠道触点域",
+      "type": "titleGroup",
+      "position": {
+        "x": -2.2737367544323206e-13,
+        "y": 0
+      },
+      "width": 1525,
+      "height": 268,
+      "data": {}
+    },
+    {
+      "id": "titlegroup-数字化前台域",
+      "type": "titleGroup",
+      "position": {
+        "x": -2.2737367544323206e-13,
+        "y": 428
+      },
+      "width": 1620,
+      "height": 268,
+      "data": {}
+    },
+    {
+      "id": "titlegroup-业务中台域",
+      "type": "titleGroup",
+      "position": {
+        "x": -2.2737367544323206e-13,
+        "y": 856
+      },
+      "width": 2666,
+      "height": 1036,
+      "data": {}
+    },
+    {
+      "id": "titlegroup-后端域",
+      "type": "titleGroup",
+      "position": {
+        "x": -2.2737367544323206e-13,
+        "y": 2052
+      },
+      "width": 5719,
+      "height": 1222,
+      "data": {}
+    },
+    {
+      "id": "titlegroup-数据域",
+      "type": "titleGroup",
+      "position": {
+        "x": 0,
+        "y": 3392
+      },
+      "width": 1517,
+      "height": 1036,
+      "data": {}
+    },
+    {
+      "id": "titlegroup-技术基础设施域",
+      "type": "titleGroup",
+      "position": {
+        "x": 0,
+        "y": 4588
+      },
+      "width": 3155,
+      "height": 268,
+      "data": {}
+    },
+    {
+      "id": "subgroup-后端域-SCM 供应链",
+      "type": "subGroup",
+      "position": {
+        "x": 178,
+        "y": 2136
+      },
+      "width": 3093,
+      "height": 210,
+      "data": {}
+    },
+    {
+      "id": "subgroup-后端域-物流",
+      "type": "subGroup",
+      "position": {
+        "x": 1019.175,
+        "y": 2464
+      },
+      "width": 1411,
+      "height": 722,
+      "data": {}
+    },
+    {
+      "id": "subgroup-后端域-业财客",
+      "type": "subGroup",
+      "position": {
+        "x": 3591.3999999999996,
+        "y": 2136
+      },
+      "width": 1949,
+      "height": 210,
+      "data": {}
+    },
+    {
+      "id": "ch-offline",
+      "type": "custom",
+      "position": {
+        "x": 31.999999999999773,
+        "y": 84
+      },
+      "width": 243,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "ch-private",
+      "type": "custom",
+      "position": {
+        "x": 594.9999999999998,
+        "y": 84
+      },
+      "width": 282,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "ch-public",
+      "type": "custom",
+      "position": {
+        "x": 1196.9999999999995,
+        "y": 84
+      },
+      "width": 257,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "fe-store",
+      "type": "custom",
+      "position": {
+        "x": 31.999999999999773,
+        "y": 512
+      },
+      "width": 282,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "fe-mall",
+      "type": "custom",
+      "position": {
+        "x": 633.9999999999998,
+        "y": 512
+      },
+      "width": 282,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "fe-op",
+      "type": "custom",
+      "position": {
+        "x": 1235.9999999999998,
+        "y": 512
+      },
+      "width": 306,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "mid-trade",
+      "type": "custom",
+      "position": {
+        "x": 153.49999999999977,
+        "y": 940
+      },
+      "width": 250,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "mid-pay",
+      "type": "custom",
+      "position": {
+        "x": 1123.9999999999998,
+        "y": 1196
+      },
+      "width": 224,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "mid-oms",
+      "type": "custom",
+      "position": {
+        "x": 1118.9999999999998,
+        "y": 1452
+      },
+      "width": 234,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "mid-product",
+      "type": "custom",
+      "position": {
+        "x": 31.999999999999773,
+        "y": 1196
+      },
+      "width": 234,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "mid-price",
+      "type": "custom",
+      "position": {
+        "x": 723.4999999999998,
+        "y": 940
+      },
+      "width": 234,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "mid-member",
+      "type": "custom",
+      "position": {
+        "x": 585.9999999999998,
+        "y": 1196
+      },
+      "width": 218,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "mid-risk",
+      "type": "custom",
+      "position": {
+        "x": 1277.4999999999998,
+        "y": 940
+      },
+      "width": 243,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "mid-mkt",
+      "type": "custom",
+      "position": {
+        "x": 1840.5,
+        "y": 940
+      },
+      "width": 231,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "mid-rule",
+      "type": "custom",
+      "position": {
+        "x": 2391.5,
+        "y": 940
+      },
+      "width": 211,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "mid-stock",
+      "type": "custom",
+      "position": {
+        "x": 165.99999999999977,
+        "y": 1708
+      },
+      "width": 225,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "be-scm-plan",
+      "type": "custom",
+      "position": {
+        "x": 206,
+        "y": 2198
+      },
+      "width": 290,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "be-scm-source",
+      "type": "custom",
+      "position": {
+        "x": 816,
+        "y": 2198
+      },
+      "width": 227,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "be-scm-make",
+      "type": "custom",
+      "position": {
+        "x": 1363,
+        "y": 2198
+      },
+      "width": 211,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "be-scm-deliver",
+      "type": "custom",
+      "position": {
+        "x": 1894,
+        "y": 2198
+      },
+      "width": 211,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "be-scm-return",
+      "type": "custom",
+      "position": {
+        "x": 2425,
+        "y": 2198
+      },
+      "width": 227,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "be-scm-enable",
+      "type": "custom",
+      "position": {
+        "x": 2972,
+        "y": 2198
+      },
+      "width": 236,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "be-logistics-dispatch",
+      "type": "custom",
+      "position": {
+        "x": 1047.175,
+        "y": 2526
+      },
+      "width": 243,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "be-logistics-warehouse",
+      "type": "custom",
+      "position": {
+        "x": 1197.425,
+        "y": 2782
+      },
+      "width": 225,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "be-logistics-transport",
+      "type": "custom",
+      "position": {
+        "x": 1063.175,
+        "y": 3038
+      },
+      "width": 211,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "be-logistics-customs",
+      "type": "custom",
+      "position": {
+        "x": 1610.175,
+        "y": 2526
+      },
+      "width": 211,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "be-logistics-billing",
+      "type": "custom",
+      "position": {
+        "x": 2141.175,
+        "y": 2526
+      },
+      "width": 227,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "be-corp-finance",
+      "type": "custom",
+      "position": {
+        "x": 3619.3999999999996,
+        "y": 2198
+      },
+      "width": 250,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "be-corp-hr",
+      "type": "custom",
+      "position": {
+        "x": 4189.4,
+        "y": 2198
+      },
+      "width": 211,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "be-corp-legal",
+      "type": "custom",
+      "position": {
+        "x": 4720.4,
+        "y": 2198
+      },
+      "width": 211,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "be-corp-admin",
+      "type": "custom",
+      "position": {
+        "x": 5251.4,
+        "y": 2198
+      },
+      "width": 227,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "data-collect",
+      "type": "custom",
+      "position": {
+        "x": 57,
+        "y": 3476
+      },
+      "width": 252,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "data-stream",
+      "type": "custom",
+      "position": {
+        "x": 42.5,
+        "y": 3732
+      },
+      "width": 281,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "data-warehouse",
+      "type": "custom",
+      "position": {
+        "x": 50,
+        "y": 3988
+      },
+      "width": 266,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "data-cdp",
+      "type": "custom",
+      "position": {
+        "x": 629,
+        "y": 3476
+      },
+      "width": 267,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "data-app",
+      "type": "custom",
+      "position": {
+        "x": 32,
+        "y": 4244
+      },
+      "width": 302,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "data-mdm",
+      "type": "custom",
+      "position": {
+        "x": 1216,
+        "y": 3476
+      },
+      "width": 234,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "infra-cloud",
+      "type": "custom",
+      "position": {
+        "x": 32,
+        "y": 4672
+      },
+      "width": 240,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "infra-paas",
+      "type": "custom",
+      "position": {
+        "x": 592,
+        "y": 4672
+      },
+      "width": 233,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "infra-integration",
+      "type": "custom",
+      "position": {
+        "x": 1145,
+        "y": 4672
+      },
+      "width": 230,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "infra-event",
+      "type": "custom",
+      "position": {
+        "x": 1695,
+        "y": 4672
+      },
+      "width": 243,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "infra-devops",
+      "type": "custom",
+      "position": {
+        "x": 2258,
+        "y": 4672
+      },
+      "width": 255,
+      "height": 96,
+      "data": {}
+    },
+    {
+      "id": "infra-security",
+      "type": "custom",
+      "position": {
+        "x": 2833,
+        "y": 4672
+      },
+      "width": 252,
+      "height": 96,
+      "data": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-dep-back-4",
+      "source": "be-logistics-dispatch",
+      "target": "be-logistics-transport",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1169,
+            "y": 2622
+          },
+          {
+            "x": 1169,
+            "y": 2742
+          },
+          {
+            "x": 1145,
+            "y": 2742
+          },
+          {
+            "x": 1145,
+            "y": 2918
+          },
+          {
+            "x": 1169,
+            "y": 2918
+          },
+          {
+            "x": 1169,
+            "y": 3038
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge-dep-back-3",
+      "source": "be-logistics-dispatch",
+      "target": "be-logistics-warehouse",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1169,
+            "y": 2622
+          },
+          {
+            "x": 1169,
+            "y": 2710
+          },
+          {
+            "x": 1310,
+            "y": 2710
+          },
+          {
+            "x": 1310,
+            "y": 2782
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge-dep-back-1",
+      "source": "be-scm-plan",
+      "target": "be-logistics-warehouse",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 496,
+            "y": 2294
+          },
+          {
+            "x": 496,
+            "y": 2670
+          },
+          {
+            "x": 1310,
+            "y": 2670
+          },
+          {
+            "x": 1310,
+            "y": 2782
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge-infra-3",
+      "source": "infra-integration",
+      "target": "be-logistics-warehouse",
+      "sourceHandle": "top",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1260,
+            "y": 4672
+          },
+          {
+            "x": 1260,
+            "y": 4600
+          },
+          {
+            "x": 1015.175,
+            "y": 4600
+          },
+          {
+            "x": 1015.175,
+            "y": 2710
+          },
+          {
+            "x": 1310,
+            "y": 2710
+          },
+          {
+            "x": 1310,
+            "y": 2782
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge-dep-mid-3",
+      "source": "mid-stock",
+      "target": "be-logistics-warehouse",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 278,
+            "y": 1804
+          },
+          {
+            "x": 278,
+            "y": 1876
+          },
+          {
+            "x": 768,
+            "y": 1876
+          },
+          {
+            "x": 768,
+            "y": 2670
+          },
+          {
+            "x": 1310,
+            "y": 2670
+          },
+          {
+            "x": 1310,
+            "y": 2782
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,4 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
+import { isReadableOrthogonalCrossing } from '../../../routing/orthogonalCrossingPolicy';
+import { collectLineJumpIntersections, injectLineJumps } from '../../../services/LineJumpEngine';
+import { getDisplayComputedPath } from '../baseReactFlowDisplayGeometry';
 import { vi } from 'vitest';
 
 vi.hoisted(() => {
@@ -383,6 +386,20 @@ export function strictPathCrossings(paths: Array<{ id: string; path: Array<{ x: 
   return crossings;
 }
 
+export function paintedDisplayPaths(edges: Edge[]): Map<string, string> {
+  const jumps = collectLineJumpIntersections(edges.map(edge => ({
+    edgeId: edge.id,
+    points: getDisplayComputedPath(edge),
+    endpointInfo: { source: edge.source, target: edge.target },
+  })));
+  return new Map(edges.map(edge => {
+    const points = getDisplayComputedPath(edge);
+    return [edge.id, injectLineJumps(
+      points, jumps.filter(jump => jump.horizontalEdgeId === edge.id), 6, 0,
+    ) || points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ')];
+  }));
+}
+
 export function parseRenderedStraightPath(svgPath: string): Array<{ x: number; y: number }> {
   const tokens = [...svgPath.matchAll(/([MLHVAZ])|(-?\d*\.?\d+(?:e[-+]?\d+)?)/gi)]
     .map(match => (match[1] ? match[1].toUpperCase() : Number(match[2])));
@@ -510,7 +527,9 @@ function firstStrictCrossing(
   for (let i = 0; i < a.length - 1; i += 1) {
     for (let j = 0; j < b.length - 1; j += 1) {
       const crossing = strictSegmentCrossing(a[i], a[i + 1], b[j], b[j + 1]);
-      if (crossing) return crossing;
+      if (crossing && !isReadableOrthogonalCrossing(
+        { a: a[i], b: a[i + 1] }, { a: b[j], b: b[j + 1] },
+      )) return crossing;
     }
   }
   return null;

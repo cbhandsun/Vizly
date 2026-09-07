@@ -156,7 +156,7 @@ describe('createBaseReactFlowFinalEndpointEvaluation', () => {
         id: 'vertical',
         source: 'top',
         target: 'bottom',
-        data: { computedPath: [{ x: 50, y: 0 }, { x: 50, y: 100 }] },
+        data: { computedPath: [{ x: 12, y: 0 }, { x: 12, y: 100 }] },
       },
     ];
     const candidate: Edge[] = [
@@ -241,7 +241,7 @@ describe('createBaseReactFlowFinalEndpointEvaluation', () => {
         id: 'vertical',
         source: 'top',
         target: 'bottom',
-        data: { computedPath: [{ x: 50, y: 0 }, { x: 50, y: 100 }] },
+        data: { computedPath: [{ x: 12, y: 0 }, { x: 12, y: 100 }] },
       },
     ];
     const resolved = [

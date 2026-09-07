@@ -17,11 +17,11 @@ import type { BaseReactFlowRoutingSessionRuntime } from '../../shared/baseReactF
 import { createLayoutRoutingTransactionDiagnostics } from './layoutRoutingTransactionDiagnostics';
 import type { DisplayLayoutTransactionErrorCode } from '../../shared/baseReactFlowDisplayRoutingDebug';
 import { reportLayoutFailure } from './layoutFailureFeedback';
-import { getNodeAbsolutePosition } from './diagramNodeParenting';
 import { normalizeLayoutVisibilityNodes } from './layoutVisibilityNodes';
 import { isDirectedForestLayoutGraph } from './treeLayoutTopology';
 import { commitCyclicTreeLayeredLayout } from './cyclicTreeLayeredLayout';
 import { calculateLayeredLayoutWithReverse } from './reverseLayeredLayoutGeometry';
+import { resolveLayoutStrategyGeometryConstraints } from './layoutStrategyGeometryConstraints';
 import {
     clearLayoutEdgeRoutingType,
     prepareLayeredLayoutEdges,
@@ -53,7 +53,7 @@ import {
 } from './layoutStrategyRuntime';
 import {
     asLayoutStrategyRecord as asRecord,
-    clearLayoutRuntimeAbsolutePosition,
+    prepareFlatLayoutStrategyGraph,
     coerceLayoutStrategyStringArray as coerceStringArray,
     coerceLayoutStrategyStringArrayRecord as coerceStringArrayRecord,
     loadLayoutStrategyPresetFromCandidates,
@@ -155,6 +155,7 @@ export function useLayoutStrategy({
         // asynchronous strategy/ELK work starts. Otherwise a stale layout
         // result could open a fresh epoch after a newer display commit.
         const routingJob = routingSessionRuntime.beginJob('layout');
+        if (!routingSessionRuntime.isCurrentJob(routingJob)) return false;
         const transactionDiagnostics = createLayoutRoutingTransactionDiagnostics(routingJob.id);
         transactionDiagnostics.beginPhase('command');
         layoutFitControllerRef.current?.abort();
@@ -178,6 +179,7 @@ export function useLayoutStrategy({
         const axisDirection = dir === 'LR' || dir === 'RL' ? 'LR' : 'TB';
         let appliedStrategyName = strategyName;
         let appliedNodeLayout = nodeLayout;
+        let appliedLaneDomainOrder: readonly string[] | undefined;
         let laneRankDecision: LaneRankDecision | undefined;
 
         try {
@@ -193,19 +195,7 @@ export function useLayoutStrategy({
                 new Set(allNodes.map(node => node.id)),
             );
 
-            // ═══ 前处理：过滤容器、转绝对坐标、清除 parentId ═══
-            const containerTypes = new Set(['titleGroup', 'subGroup', 'domain', 'group']);
-            const nonLayoutTypes = new Set(['mindmap', 'mindmap-boundary', 'sticky-note']);
-            const excludedTypes = new Set([...containerTypes, ...nonLayoutTypes]);
-            const plainNodes = allNodes.filter(n => !excludedTypes.has(n.type || ''));
-            const layoutNodes = plainNodes.map(n => clearLayoutRuntimeAbsolutePosition({
-                ...n,
-                position: getNodeAbsolutePosition(n, allNodes),
-                parentId: undefined,
-                extent: undefined,
-            }));
-            const nodeIdSet = new Set(layoutNodes.map(n => n.id));
-            const layoutEdges = allEdges.filter(e => nodeIdSet.has(e.source) && nodeIdSet.has(e.target));
+            const { layoutNodes, layoutEdges, nonLayoutTypes } = prepareFlatLayoutStrategyGraph(allNodes, allEdges);
             if (layoutNodes.length === 0) {
                 logLayoutNoLayoutableNodes();
                 transactionDiagnostics.noLayoutableNodes();
@@ -220,6 +210,9 @@ export function useLayoutStrategy({
                 transactionDiagnostics.finishPhase('layout-calculation');
                 transactionDiagnostics.beginAttempt();
                 await commitLayout({ ...request, diagnostics: transactionDiagnostics,
+                    layoutConstraints: resolveLayoutStrategyGeometryConstraints(
+                        appliedStrategyName, appliedDirection, request.nodes, appliedLaneDomainOrder, allNodes,
+                    ),
                     commitSelection: () => commitLayoutSelection({ version: 2,
                         strategy: appliedStrategyName, direction: appliedDirection,
                         nodeLayout: appliedNodeLayout && !isGlobalFullGraphLayoutStrategy(appliedStrategyName)
@@ -396,6 +389,7 @@ export function useLayoutStrategy({
                     }
                 } catch { /* ignore */ }
 
+                appliedLaneDomainOrder = domainOrder;
                 let strategy: ILayoutStrategy;
                 // [FIX] domain-dagre 始终走 DomainDagreLayoutStrategy（唯一支持 domainOrder 的策略）
                 if (isDomainDagre) {

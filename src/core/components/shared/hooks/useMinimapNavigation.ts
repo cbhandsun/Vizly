@@ -1,11 +1,12 @@
-import { useState, useRef, useCallback } from 'react';
-import { useReactFlow } from '@xyflow/react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { useReactFlow, useStoreApi } from '@xyflow/react';
 import { computeMinimapBounds, safeNumber, lerp, easeOutCubic } from './useMinimapMath';
 import { diagramConfigManager } from '@/core/config/DiagramConfig';
 import {
     getFixedMiniMapPanDelta,
     parseFixedMiniMapKeyboardCommand,
 } from '../fixedMiniMapKeyboard';
+import { resolveDiagramInteractiveZoom } from '../diagramInteractiveZoom';
 
 export function useMinimapNavigation(
     anchorRef: React.RefObject<HTMLDivElement | null>,
@@ -14,6 +15,7 @@ export function useMinimapNavigation(
     getUiScale: () => number
 ) {
     const reactFlowInstance = useReactFlow();
+    const flowStore = useStoreApi();
 
     const [isMinimapDragging, setIsMinimapDragging] = useState(false);
     const minimapDragStartRef = useRef({ x: 0, y: 0, startViewport: { x: 0, y: 0, zoom: 1 } });
@@ -35,22 +37,31 @@ export function useMinimapNavigation(
         animStartRef.current = null;
     }, []);
 
+    useEffect(() => cancelViewportAnimation, [cancelViewportAnimation]);
+
     const animateViewportTo = useCallback((target: { x: number; y: number; zoom: number }, duration: number = 200) => {
         cancelViewportAnimation();
         const start = reactFlowInstance.getViewport();
+        let lastApplied = start;
         const t0 = performance.now();
         animTargetRef.current = target;
         animStartRef.current = { ...start, t0 };
 
         const step = () => {
             if (!animStartRef.current || !animTargetRef.current) return;
+            const current = reactFlowInstance.getViewport();
+            if (current.x !== lastApplied.x || current.y !== lastApplied.y || current.zoom !== lastApplied.zoom) {
+                cancelViewportAnimation();
+                return;
+            }
             const now = performance.now();
             const progress = Math.min(1, (now - animStartRef.current.t0) / duration);
             const e = easeOutCubic(progress);
             const x = lerp(animStartRef.current.x, animTargetRef.current.x, e);
             const y = lerp(animStartRef.current.y, animTargetRef.current.y, e);
             const zoom = lerp(animStartRef.current.zoom, animTargetRef.current.zoom, e);
-            reactFlowInstance.setViewport({ x, y, zoom });
+            lastApplied = { x, y, zoom };
+            reactFlowInstance.setViewport(lastApplied);
             if (progress < 1) {
                 rafIdRef.current = requestAnimationFrame(step);
             } else {
@@ -198,6 +209,7 @@ export function useMinimapNavigation(
 
     const handleMiniMapWheel = useCallback((event: WheelEvent) => {
         if (!minimapRef.current) return;
+        cancelViewportAnimation();
         if (event.cancelable) event.preventDefault();
         event.stopPropagation();
 
@@ -228,14 +240,14 @@ export function useMinimapNavigation(
             : (yRatio * canvasSize.height - viewport.y) / currentZoom;
 
         const cfg = diagramConfigManager.getConfig();
-        const minZoomCfg = cfg.canvas?.zoom?.min ?? 0.05;
-        const maxZoomCfg = cfg.canvas?.zoom?.max ?? 8;
+        const { minZoom: minZoomCfg, maxZoom: maxZoomCfg } = flowStore.getState();
         const sensitivity = cfg.canvas?.zoom?.sensitivity ?? 1;
 
         const normalizedDelta = Math.max(-80, Math.min(80, event.deltaY));
         const direction = -normalizedDelta;
         const zoomFactor = Math.exp(direction * (0.0025 * sensitivity));
-        const targetZoom = Math.max(minZoomCfg, Math.min(maxZoomCfg, currentZoom * zoomFactor));
+        const targetZoom = resolveDiagramInteractiveZoom(currentZoom, currentZoom * zoomFactor, minZoomCfg, maxZoomCfg);
+        if (targetZoom === null) return;
 
         // Preserve anchor world position after zoom change:
         //   newViewport.x = anchorScreenX - anchorWorldX * targetZoom
@@ -252,32 +264,37 @@ export function useMinimapNavigation(
         const targetY = anchorScreenY - anchorWorldY * targetZoom;
 
         reactFlowInstance.setViewport({ x: targetX, y: targetY, zoom: targetZoom });
-    }, [reactFlowInstance, minimapRef, anchorRef, getCanvasPixelSize]);
+    }, [reactFlowInstance, flowStore, minimapRef, anchorRef, getCanvasPixelSize, cancelViewportAnimation]);
 
     const zoomIn = useCallback(() => {
         const viewport = reactFlowInstance.getViewport();
-        const cfg = diagramConfigManager.getConfig();
-        const maxZoomCfg = cfg.canvas?.zoom?.max ?? 8;
+        const { minZoom, maxZoom } = flowStore.getState();
+        const zoom = resolveDiagramInteractiveZoom(viewport.zoom, viewport.zoom * 1.5, minZoom, maxZoom);
+        if (zoom === null) return;
         animateViewportTo({
             ...viewport,
-            zoom: Math.min(maxZoomCfg, viewport.zoom * 1.5)
+            zoom,
         });
-    }, [reactFlowInstance, animateViewportTo]);
+    }, [reactFlowInstance, flowStore, animateViewportTo]);
 
     const zoomOut = useCallback(() => {
         const viewport = reactFlowInstance.getViewport();
-        const cfg = diagramConfigManager.getConfig();
-        const minZoomCfg = cfg.canvas?.zoom?.min ?? 0.05;
+        const { minZoom, maxZoom } = flowStore.getState();
+        const zoom = resolveDiagramInteractiveZoom(viewport.zoom, viewport.zoom / 1.5, minZoom, maxZoom);
+        if (zoom === null) return;
         animateViewportTo({
             ...viewport,
-            zoom: Math.max(minZoomCfg, viewport.zoom / 1.5)
+            zoom,
         });
-    }, [reactFlowInstance, animateViewportTo]);
+    }, [reactFlowInstance, flowStore, animateViewportTo]);
 
     const resetZoom = useCallback(() => {
         const viewport = reactFlowInstance.getViewport();
-        animateViewportTo({ ...viewport, zoom: 1 });
-    }, [reactFlowInstance, animateViewportTo]);
+        const { minZoom, maxZoom } = flowStore.getState();
+        const zoom = resolveDiagramInteractiveZoom(viewport.zoom, Math.max(minZoom, Math.min(maxZoom, 1)), minZoom, maxZoom);
+        if (zoom === null) return;
+        animateViewportTo({ ...viewport, zoom });
+    }, [reactFlowInstance, flowStore, animateViewportTo]);
 
     const handleMiniMapKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
         if (event.nativeEvent.isComposing || event.keyCode === 229) return;

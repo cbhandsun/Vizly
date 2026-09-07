@@ -118,7 +118,7 @@ function shiftEndpointSegment(
 }
 
 export function compareQualityScores(first: EdgePathQualityScore, second: EdgePathQualityScore): number {
-  const keys: Array<keyof EdgePathQualityScore> = [
+  const keys = [
     'nonOrthogonalSegments',
     'strictCrossings',
     'reverseOverlap',
@@ -131,7 +131,7 @@ export function compareQualityScores(first: EdgePathQualityScore, second: EdgePa
     'detourPenalty',
     'bends',
     'totalLength',
-  ];
+  ] as const;
   for (const key of keys) {
     const delta = first[key] - second[key];
     if (delta !== 0) return delta;
@@ -242,6 +242,7 @@ export function separateDetachedParallelOverlaps(
     edges,
     getRoutingObstacles(nodes),
     options.diagnostics,
+    nodes,
   );
 
   let changed = false;

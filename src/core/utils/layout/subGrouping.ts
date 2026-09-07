@@ -50,9 +50,16 @@ export const applySubGrouping = (
   const { SUB_GROUP_PADDING } = diagramConfigManager.getLayoutConfig();
 
   // 按域+子域组合键做合并，避免跨域子域容器
-  const groupedByDomainAndSub: Record<string, ReactFlowNode[]> = {};
-  const keyOf = (domain: string, sub: string) => `${domain}__${sub}`;
+  const groupedByDomainAndSub = new Map<string, ReactFlowNode[]>();
+  const keyOf = (domain: string, sub: string) => JSON.stringify([domain, sub]);
+  const existingGroups = new Set(nodes.filter(node => node.type === 'subGroup').map(node => {
+    const data = nodeData(node);
+    return keyOf(String(data.domain || '').trim(), subDomainOf(data));
+  }));
   nodes.forEach(node => {
+    // Re-layout consumes its previous containers. They are neither business
+    // children nor permission to create another container with the same ID.
+    if (isGroupType(node.type)) return;
     const data = nodeData(node);
     const domain = String(data.domain || '').trim();
     const subDomain = subDomainOf(data);
@@ -60,15 +67,18 @@ export const applySubGrouping = (
     if (Array.isArray(whitelist) && whitelist.length > 0 && !whitelist.includes(subDomain)) return;
     if (!domain) return;
     const k = keyOf(domain, subDomain);
-    (groupedByDomainAndSub[k] || (groupedByDomainAndSub[k] = [])).push(node);
+    const members = groupedByDomainAndSub.get(k) ?? [];
+    members.push(node);
+    groupedByDomainAndSub.set(k, members);
   });
 
-  if (!Object.keys(groupedByDomainAndSub).length) return nodes;
+  if (!groupedByDomainAndSub.size) return nodes;
 
   const result: ReactFlowNode[] = [...nodes];
+  const occupiedIds = new Set(nodes.map(node => node.id));
 
-  for (const k of Object.keys(groupedByDomainAndSub)) {
-    const children = groupedByDomainAndSub[k];
+  for (const [k, children] of groupedByDomainAndSub) {
+    if (existingGroups.has(k)) continue;
     if (!children.length) continue;
     const firstChildData = nodeData(children[0]);
     const domain = String(firstChildData.domain || '').trim();
@@ -93,13 +103,16 @@ export const applySubGrouping = (
       try { return deriveDomainClassFromDomain(domain); } catch { return undefined; }
     })();
 
+    let id = `subgroup-${domain}-${subDomain}`;
+    while (occupiedIds.has(id)) id += ':';
+    occupiedIds.add(id);
     const subGroupNode: ReactFlowNode<GroupNodeData> = {
-      id: `subgroup-${domain}-${subDomain}`,
+      id,
       type: 'subGroup',
       position: { x, y },
       style: { width, height },
       data: {
-        id: `subgroup-${domain}-${subDomain}`,
+        id,
         type: 'subGroup',
         description: subDomain,
         subDomain: subDomain,
