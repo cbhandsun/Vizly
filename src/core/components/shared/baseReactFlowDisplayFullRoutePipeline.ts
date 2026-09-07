@@ -178,7 +178,9 @@ export const createBaseReactFlowFullRouteEdges = (args: BaseReactFlowDisplayEdge
 
   const postRenderDefectPlan = createDisplayRoutingDefectPlan(
     context.evaluationSession.hardReport(postRenderResult.edges),
+    postRenderResult.edges.length <= 24 ? postRenderResult.edges : undefined,
   );
+  const terminalBudget = { remaining: 64 };
   if (postRenderResult.edges.length <= 24 && postRenderDefectPlan.terminalClosureEligible) {
     const terminalTimer = startDisplayRoutingPhaseTrace({
       phase: 'terminal',
@@ -189,16 +191,19 @@ export const createBaseReactFlowFullRouteEdges = (args: BaseReactFlowDisplayEdge
     const terminalEdges = runBaseReactFlowFullRouteTerminalPhase(
       context,
       postRenderResult.edges,
+      terminalBudget,
     );
+    const terminalAccepted = !postRenderDefectPlan.needsStrictCrossingRepair
+      || context.evaluationSession.hardReport(terminalEdges).hardClean;
     terminalTimer.finish(
-      'accepted',
+      terminalAccepted ? 'accepted' : 'fallback',
       terminalEdges.length,
       diffBaseReactFlowEvaluationMetrics(
         terminalMetricsBefore,
         context.evaluationSession.readMetrics(),
       ),
     );
-    return terminalEdges;
+    if (terminalAccepted) return terminalEdges;
   }
 
   const strictTimer = startDisplayRoutingPhaseTrace({
@@ -229,7 +234,7 @@ export const createBaseReactFlowFullRouteEdges = (args: BaseReactFlowDisplayEdge
     onTrace: args.onPhaseTrace,
   });
   const terminalMetricsBefore = context.evaluationSession.readMetrics();
-  const terminalEdges = runBaseReactFlowFullRouteTerminalPhase(context, strictResult.edges);
+  const terminalEdges = runBaseReactFlowFullRouteTerminalPhase(context, strictResult.edges, terminalBudget);
   terminalTimer.finish(
     'accepted',
     terminalEdges.length,

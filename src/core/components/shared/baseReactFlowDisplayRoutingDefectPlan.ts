@@ -1,4 +1,6 @@
+import type { Edge } from '@xyflow/react';
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
+import { findDisplayStrictCrossingHits, getDisplayComputedPath } from './baseReactFlowDisplayGeometry';
 
 type DisplayRoutingDefectQuality = BaseDisplayBoundedCandidateReport['quality'];
 
@@ -69,6 +71,7 @@ export const displayRoutingQualityNeedsTerminalRepair = (
 
 export const createDisplayRoutingDefectPlan = (
   report: BaseDisplayBoundedCandidateReport,
+  edges?: Edge[],
 ): RoutingDefectPlan => {
   const quality = report.quality;
   const needsOverlapRepair = quality.reverseOverlap > 0
@@ -78,6 +81,11 @@ export const createDisplayRoutingDefectPlan = (
     || !report.terminalsAnchored
     || displayRoutingQualityNeedsTerminalRepair(quality);
   const needsMicroRepair = displayRoutingQualityNeedsMicroRepair(quality);
+  // A crossing on a shared endpoint's terminal segment is a port/group defect.
+  // Resolve it in the existing terminal transaction before general lane sweeps
+  // can remove the crossing by moving an otherwise correctly anchored terminal.
+  const terminalCrossingsOnly = Boolean(edges && quality.strictCrossings > 0
+    && sharedEndpointTerminalCrossingsMatch(edges, quality.strictCrossings));
   const onlyTerminalAxisDefects = report.terminalsAttached
     && !report.terminalsAnchored
     && report.obstacleHits === 0
@@ -91,11 +99,12 @@ export const createDisplayRoutingDefectPlan = (
     && report.terminalsAttached
     && report.obstacleHits === 0
     && quality.nonOrthogonalSegments === 0
-    && quality.strictCrossings === 0
+    && (quality.strictCrossings === 0 || terminalCrossingsOnly)
     && !needsOverlapRepair
     && (
       needsTerminalRepair
       || needsMicroRepair
+      || terminalCrossingsOnly
     );
   return {
     hardClean: report.hardClean,
@@ -108,4 +117,21 @@ export const createDisplayRoutingDefectPlan = (
     terminalClosureEligible,
     orderedStages: createDisplayRoutingDefectStagePlan(quality),
   };
+};
+
+const sharedEndpointTerminalCrossingsMatch = (edges: Edge[], expectedCount: number): boolean => {
+  const crossings = findDisplayStrictCrossingHits(edges);
+  if (crossings.length !== expectedCount) return false;
+  return crossings.every(({ a, b }) => {
+    const first = edges[a.edgeIndex];
+    const second = edges[b.edgeIndex];
+    if (!first || !second) return false;
+    const firstLastSegment = getDisplayComputedPath(first).length - 2;
+    const secondLastSegment = getDisplayComputedPath(second).length - 2;
+    const incidentTo = (nodeId: string, edge: Edge): boolean => nodeId === edge.source || nodeId === edge.target;
+    return (a.segmentIndex === 0 && incidentTo(first.source, second))
+      || (a.segmentIndex === firstLastSegment && incidentTo(first.target, second))
+      || (b.segmentIndex === 0 && incidentTo(second.source, first))
+      || (b.segmentIndex === secondLastSegment && incidentTo(second.target, first));
+  });
 };

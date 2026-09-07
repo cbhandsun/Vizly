@@ -59,6 +59,51 @@ const edge = (path: Array<{ x: number; y: number }>): Edge => ({
 });
 
 describe('baseReactFlowDisplayEvaluation', () => {
+  it('schedules shared terminal crossings in the existing terminal transaction', () => {
+    const sourceEdges: Edge[] = [
+      { id: 'one', source: 'hub', target: 'one-target', data: { computedPath: [
+        { x: 0, y: 0 }, { x: 0, y: 96 }, { x: 200, y: 96 },
+      ] } },
+      { id: 'two', source: 'hub', target: 'two-target', data: { computedPath: [
+        { x: 5, y: 0 }, { x: 5, y: 90 }, { x: -200, y: 90 },
+      ] } },
+    ];
+    const reportFor = (edges: Edge[]) => ({
+      candidate: 'polished' as const, hardClean: false, obstacleHits: 0,
+      terminalsAttached: true, terminalsAnchored: true,
+      quality: calculateEdgePathQualityScore(edges),
+    });
+    const reverse = (edge: Edge): Edge => ({ ...edge, source: edge.target, target: edge.source,
+      data: { computedPath: Array.isArray(edge.data?.computedPath) ? [...edge.data.computedPath].reverse() : [] },
+    });
+    for (const edges of [sourceEdges, sourceEdges.map(reverse), [sourceEdges[0], reverse(sourceEdges[1])]]) {
+      const report = reportFor(edges);
+      expect(report.quality.strictCrossings).toBe(1);
+      expect(createDisplayRoutingDefectPlan(report, edges)).toMatchObject({
+        needsStrictCrossingRepair: true, terminalClosureEligible: true,
+      });
+      expect(createDisplayRoutingDefectPlan(report).terminalClosureEligible).toBe(false);
+      expect(createDisplayRoutingDefectPlan(report, []).terminalClosureEligible).toBe(false);
+      for (const patch of [{ obstacleHits: 1 }, { terminalsAttached: false },
+        { quality: { ...report.quality, unrelatedOverlap: 1 } },
+        { quality: { ...report.quality, strictCrossings: 2 } },
+      ]) {
+        expect(createDisplayRoutingDefectPlan({ ...report, ...patch }, edges).terminalClosureEligible).toBe(false);
+      }
+    }
+    const unrelated = sourceEdges.map((edge, index) => ({ ...edge, source: `source-${index}` }));
+    expect(createDisplayRoutingDefectPlan(reportFor(unrelated), unrelated).terminalClosureEligible).toBe(false);
+    const internal = sourceEdges.map((edge, index) => ({ ...edge, data: { computedPath: [
+      { x: index === 0 ? -40 : 45, y: 0 },
+      ...(Array.isArray(edge.data?.computedPath) ? edge.data.computedPath : []),
+      { x: index === 0 ? 200 : -200, y: 200 },
+    ] } }));
+    const internalReport = reportFor(internal);
+    expect(internalReport.quality.strictCrossings).toBe(1);
+    expect(internalReport.quality.nonOrthogonalSegments).toBe(0);
+    expect(createDisplayRoutingDefectPlan(internalReport, internal).terminalClosureEligible).toBe(false);
+  });
+
   it('builds bounded O2M/M2O groups, candidate axes, and usable corridors', () => {
     const topologyNodes: Node[] = [
       { id: 's', position: { x: 0, y: 100 }, measured: { width: 100, height: 60 }, data: {} },

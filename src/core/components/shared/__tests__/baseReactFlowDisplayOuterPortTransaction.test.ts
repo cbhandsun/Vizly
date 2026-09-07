@@ -333,6 +333,47 @@ describe('outer port transaction', () => {
     expect(getDisplayHardQualityGateReport(repaired, graphNodes, 'polished').hardClean).toBe(true);
   });
 
+  it.each([0, -1, 0.5, Number.NaN, Number.POSITIVE_INFINITY])(
+    'does not search with an exhausted or invalid shared allowance (%s)', remaining => {
+      const edges = overlappingEdges();
+      const candidates = vi.spyOn(outerPortCandidates, 'buildBoundedOuterPortTransactionCandidates');
+      expect(repairResidualOuterPortTransactionWithHardGate(edges, graphNodes, 64, {
+        evaluationBudget: { remaining },
+      })).toBe(edges);
+      expect(candidates).not.toHaveBeenCalled();
+    },
+  );
+
+  it('shares exact evaluations across rejected early and fallback searches', () => {
+    const edges = overlappingEdges();
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation(graphNodes);
+    const report = evaluation.hardReport(edges);
+    const exactEvaluation = vi.spyOn(evaluation, 'hardReportChanged').mockReturnValue(report);
+    const evaluationBudget = { remaining: 3 };
+    const traces: DisplayRoutingPhaseTrace[] = [];
+    const options = { evaluation, evaluationBudget, initialReport: { edges, report },
+      onPhaseTrace: (trace: DisplayRoutingPhaseTrace) => traces.push(trace) };
+    expect(repairResidualOuterPortTransactionWithHardGate(edges, graphNodes, 1, options)).toBe(edges);
+    expect(evaluationBudget.remaining).toBe(2);
+    expect(repairResidualOuterPortTransactionWithHardGate(edges, graphNodes, 64, options)).toBe(edges);
+    expect(evaluationBudget.remaining).toBe(0);
+    expect(exactEvaluation).toHaveBeenCalledTimes(3);
+    expect(traces.reduce((sum, trace) => sum + trace.candidateCount, 0)).toBe(3);
+    expect(repairResidualOuterPortTransactionWithHardGate(edges, graphNodes, 64, options)).toBe(edges);
+    expect(exactEvaluation).toHaveBeenCalledTimes(3);
+  });
+
+  it('preserves the selected hard-clean route with a shared allowance', () => {
+    const edges = overlappingEdges();
+    const expected = repairResidualOuterPortTransactionWithHardGate(edges, graphNodes);
+    const evaluationBudget = { remaining: 64 };
+    expect(repairResidualOuterPortTransactionWithHardGate(edges, graphNodes, 64, {
+      evaluationBudget,
+    })).toEqual(expected);
+    expect(evaluationBudget.remaining).toBeGreaterThanOrEqual(0);
+    expect(evaluationBudget.remaining).toBeLessThan(64);
+  });
+
   it('does not normalize the full graph when no bounded candidate exists', () => {
     const edges = crossingOnlyEdges();
     const evaluation = createBaseReactFlowFinalEndpointEvaluation(graphNodes);

@@ -4,7 +4,7 @@
   "sourceHash": "source-v1:da286fbefa1a0d0a3ba3bf5a6589d2edba849af0f477ddb910ecad4d91649986",
   "inputSignature": "1512289068",
   "inputGeometryDigest": "geometry-v1:e262270c015d6a0c3e84c11c0c519d20",
-  "outputRouteSignature": "route-v2:14:54:8e7f85349d24f552",
+  "outputRouteSignature": "route-v2:14:55:463ec2846aa56c4a",
   "hardClean": true,
   "patches": [
     {
@@ -63,17 +63,21 @@
       "source": "l-oms",
       "target": "visibility",
       "type": "stablePath",
-      "sourceHandle": "right",
+      "sourceHandle": "bottom",
       "targetHandle": "top",
       "data": {
         "computedPath": [
           {
-            "x": 1194,
-            "y": 593
+            "x": 982,
+            "y": 652
+          },
+          {
+            "x": 982,
+            "y": 748
           },
           {
             "x": 1434,
-            "y": 593
+            "y": 748
           },
           {
             "x": 1434,
@@ -110,11 +114,11 @@
       "data": {
         "computedPath": [
           {
-            "x": 987,
+            "x": 951.25,
             "y": 653
           },
           {
-            "x": 987,
+            "x": 951.25,
             "y": 742
           },
           {
@@ -176,11 +180,11 @@
             "y": 722
           },
           {
-            "x": 1458,
+            "x": 1426,
             "y": 722
           },
           {
-            "x": 1458,
+            "x": 1426,
             "y": 203
           }
         ],
