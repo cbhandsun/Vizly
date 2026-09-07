@@ -71,12 +71,17 @@ const waitForThemeState = async (session, expected, timeoutMs = 5_000) => {
 // be mounted. Exercise the authoritative application control in every view.
 export const clickDisplayRoutingThemeControl = (doc, action, themeId) => {
   if (!['light', 'dark', 'high-contrast'].includes(themeId)
-    || !['open', 'select', 'close'].includes(action)) return false;
+    || !['open', 'select', 'close', 'close-settings'].includes(action)) return false;
   const dialogs = [...doc.querySelectorAll('[data-theme-selector-dialog]')];
   const clickable = button => button?.tagName === 'BUTTON' && !button.disabled
     && !button.closest('[inert], [hidden]') && button.getClientRects().length > 0;
   let button;
-  if (action === 'open') {
+  if (action === 'close-settings') {
+    if (dialogs.length > 0) return false;
+    const settingsControls = [...doc.querySelectorAll('[data-settings-close]')].filter(clickable);
+    if (settingsControls.length !== 1) return false;
+    button = settingsControls[0];
+  } else if (action === 'open') {
     if (dialogs.length > 0) return false;
     button = [...doc.querySelectorAll('[data-theme-selector-trigger]')].find(clickable);
   } else {
@@ -95,12 +100,24 @@ const switchTheme = async (session, themeCase) => {
   const deadline = Date.now() + 5_000;
   let step = 'open';
   let state = null;
+  let openedSettings = false;
   const click = action => session.evaluate(
     `(${clickDisplayRoutingThemeControl.toString()})(document, ${JSON.stringify(action)}, ${JSON.stringify(themeCase.id)})`,
   );
   while (Date.now() < deadline) {
-    if (step === 'open' && await click('open')) step = 'select';
-    else if (step === 'select' && await click('select')) step = 'applied';
+    if (step === 'open') {
+      if (await click('open')) step = 'select';
+      else if (!openedSettings) {
+        // The viewer exposes this selector inside settings. Use its public
+        // shortcut once, then wait for the lazy panel within the same deadline.
+        openedSettings = true;
+        for (const type of ['keyDown', 'keyUp']) {
+          await session.send('Input.dispatchKeyEvent', {
+            type, key: ',', code: 'Comma', modifiers: 2, windowsVirtualKeyCode: 188,
+          });
+        }
+      }
+    } else if (step === 'select' && await click('select')) step = 'applied';
     else if (step === 'applied') {
       state = await readThemeState(session);
       if (state?.dataTheme === themeCase.mode
@@ -109,6 +126,11 @@ const switchTheme = async (session, themeCase) => {
       }
     } else if (step === 'closed' && await session.evaluate(
       `!document.querySelector('[data-theme-selector-dialog]')`,
+    )) {
+      if (!openedSettings) return state;
+      if (await click('close-settings')) step = 'settings-closed';
+    } else if (step === 'settings-closed' && await session.evaluate(
+      `!document.querySelector('[data-settings-close]')`,
     )) return state;
     await delay(50);
   }

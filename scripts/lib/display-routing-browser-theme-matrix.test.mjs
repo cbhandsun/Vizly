@@ -27,7 +27,7 @@ describe('display routing browser theme matrix', () => {
     delete window.__vizlyBaseReactFlowDisplayRouting;
   });
 
-  it('switches through application controls without a mounted designer event listener', async () => {
+  it.each([false, true])('switches through application controls (nested settings: %s)', async nestedSettings => {
     vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}]);
     const selected = [];
     const setTheme = themeCase => {
@@ -53,8 +53,20 @@ describe('display routing browser theme matrix', () => {
       dialog.append(close);
       document.body.append(dialog);
     };
-    document.body.append(trigger);
-    const session = { evaluate: async source => runInNewContext(source, {
+    const send = vi.fn(async (method, event) => {
+      expect(method).toBe('Input.dispatchKeyEvent');
+      expect(event).toMatchObject({ key: ',', code: 'Comma', modifiers: 2 });
+      if (event.type !== 'keyDown') return;
+      const settings = document.createElement('div');
+      settings.setAttribute('role', 'dialog');
+      const close = document.createElement('button');
+      close.setAttribute('data-settings-close', '');
+      close.onclick = () => settings.remove();
+      settings.append(trigger, close);
+      document.body.append(settings);
+    });
+    if (!nestedSettings) document.body.append(trigger);
+    const session = { send, evaluate: async source => runInNewContext(source, {
       window, document, getComputedStyle: window.getComputedStyle.bind(window),
     }) };
     const interactions = vi.fn(async () => []);
@@ -67,6 +79,8 @@ describe('display routing browser theme matrix', () => {
     expect(selected).toEqual(['dark', 'high-contrast']);
     expect(interactions).toHaveBeenCalledTimes(3);
     expect(document.querySelector('[data-theme-selector-dialog]')).toBeNull();
+    expect(document.querySelector('[data-settings-close]')).toBeNull();
+    expect(send).toHaveBeenCalledTimes(nestedSettings ? 4 : 0);
   });
 
   it('rejects missing, hidden, disabled, ambiguous and invalid controls', () => {
@@ -95,7 +109,27 @@ describe('display routing browser theme matrix', () => {
     }
     expect(clickDisplayRoutingThemeControl(document, 'select', 'dark')).toBe(false);
     expect(clickDisplayRoutingThemeControl(document, 'close', 'dark')).toBe(false);
+    expect(clickDisplayRoutingThemeControl(document, 'close-settings', 'dark')).toBe(false);
     expect(trigger.onclick).not.toHaveBeenCalled();
+  });
+
+  it('closes settings only after the nested selector closes and the control is unambiguous', () => {
+    vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}]);
+    expect(clickDisplayRoutingThemeControl(document, 'close-settings', 'dark')).toBe(false);
+    const close = document.createElement('button');
+    close.setAttribute('data-settings-close', '');
+    close.onclick = vi.fn();
+    const duplicate = close.cloneNode();
+    document.body.append(close, duplicate);
+    expect(clickDisplayRoutingThemeControl(document, 'close-settings', 'dark')).toBe(false);
+    duplicate.remove();
+    const dialog = document.createElement('div');
+    dialog.setAttribute('data-theme-selector-dialog', '');
+    document.body.append(dialog);
+    expect(clickDisplayRoutingThemeControl(document, 'close-settings', 'dark')).toBe(false);
+    dialog.remove();
+    expect(clickDisplayRoutingThemeControl(document, 'close-settings', 'dark')).toBe(true);
+    expect(close.onclick).toHaveBeenCalledOnce();
   });
 
   it('accepts all canonical themes without a geometry or Worker lifecycle change', () => {
