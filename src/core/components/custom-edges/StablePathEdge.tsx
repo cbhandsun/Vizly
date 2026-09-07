@@ -522,16 +522,14 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
                         />
                     </g>
                 )}
-                {hasSharedTrunk && (
-                    <ContrastSafeBaseEdge
-                        id={`${id}-trace`}
-                        path={renderedEdgePath}
-                        interactionWidth={0}
-                        canvasBackground={canvasBackground}
-                        className="shared-trunk-accent-trace"
-                        style={semanticTraceStyle}
-                    />
-                )}
+                <ContrastSafeBaseEdge
+                    id={`${id}-trace`}
+                    path={renderedEdgePath}
+                    interactionWidth={0}
+                    canvasBackground={canvasBackground}
+                    className="shared-trunk-accent-trace"
+                    style={semanticTraceStyle}
+                />
                 {isTraceActive && (
                     <g
                         aria-hidden="true"

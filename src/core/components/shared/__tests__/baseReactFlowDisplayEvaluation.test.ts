@@ -46,7 +46,6 @@ import {
 } from '../baseReactFlowDisplayRoutingTopologyPlan';
 import {
   createBaseReactFlowMovedNodeReconnectCandidates,
-  pushBoundedReconnectRankedCandidate,
   resolveReconnectCandidateBudgetPerEdge,
 } from '../baseReactFlowDisplayLocalReconnect';
 import { chooseExactThresholdResidualCandidate } from '../baseReactFlowDisplayOverlapEvaluation';
@@ -59,6 +58,51 @@ const edge = (path: Array<{ x: number; y: number }>): Edge => ({
 });
 
 describe('baseReactFlowDisplayEvaluation', () => {
+  it('schedules shared terminal crossings in the existing terminal transaction', () => {
+    const sourceEdges: Edge[] = [
+      { id: 'one', source: 'hub', target: 'one-target', data: { computedPath: [
+        { x: 0, y: 0 }, { x: 0, y: 96 }, { x: 200, y: 96 },
+      ] } },
+      { id: 'two', source: 'hub', target: 'two-target', data: { computedPath: [
+        { x: 5, y: 0 }, { x: 5, y: 90 }, { x: -200, y: 90 },
+      ] } },
+    ];
+    const reportFor = (edges: Edge[]) => ({
+      candidate: 'polished' as const, hardClean: false, obstacleHits: 0,
+      terminalsAttached: true, terminalsAnchored: true,
+      quality: calculateEdgePathQualityScore(edges),
+    });
+    const reverse = (edge: Edge): Edge => ({ ...edge, source: edge.target, target: edge.source,
+      data: { computedPath: Array.isArray(edge.data?.computedPath) ? [...edge.data.computedPath].reverse() : [] },
+    });
+    for (const edges of [sourceEdges, sourceEdges.map(reverse), [sourceEdges[0], reverse(sourceEdges[1])]]) {
+      const report = reportFor(edges);
+      expect(report.quality.strictCrossings).toBe(1);
+      expect(createDisplayRoutingDefectPlan(report, edges)).toMatchObject({
+        needsStrictCrossingRepair: true, terminalClosureEligible: true,
+      });
+      expect(createDisplayRoutingDefectPlan(report).terminalClosureEligible).toBe(false);
+      expect(createDisplayRoutingDefectPlan(report, []).terminalClosureEligible).toBe(false);
+      for (const patch of [{ obstacleHits: 1 }, { terminalsAttached: false },
+        { quality: { ...report.quality, unrelatedOverlap: 1 } },
+        { quality: { ...report.quality, strictCrossings: 2 } },
+      ]) {
+        expect(createDisplayRoutingDefectPlan({ ...report, ...patch }, edges).terminalClosureEligible).toBe(false);
+      }
+    }
+    const unrelated = sourceEdges.map((edge, index) => ({ ...edge, source: `source-${index}` }));
+    expect(createDisplayRoutingDefectPlan(reportFor(unrelated), unrelated).terminalClosureEligible).toBe(false);
+    const internal = sourceEdges.map((edge, index) => ({ ...edge, data: { computedPath: [
+      { x: index === 0 ? -40 : 45, y: 0 },
+      ...(Array.isArray(edge.data?.computedPath) ? edge.data.computedPath : []),
+      { x: index === 0 ? 200 : -200, y: 200 },
+    ] } }));
+    const internalReport = reportFor(internal);
+    expect(internalReport.quality.strictCrossings).toBe(1);
+    expect(internalReport.quality.nonOrthogonalSegments).toBe(0);
+    expect(createDisplayRoutingDefectPlan(internalReport, internal).terminalClosureEligible).toBe(false);
+  });
+
   it('builds bounded O2M/M2O groups, candidate axes, and usable corridors', () => {
     const topologyNodes: Node[] = [
       { id: 's', position: { x: 0, y: 100 }, measured: { width: 100, height: 60 }, data: {} },
@@ -284,38 +328,6 @@ describe('baseReactFlowDisplayEvaluation', () => {
     expect(resolveReconnectCandidateBudgetPerEdge(100)).toBe(256);
     expect(resolveReconnectCandidateBudgetPerEdge(0)).toBe(0);
     expect(resolveReconnectCandidateBudgetPerEdge(Number.NaN)).toBe(0);
-  });
-
-  it('retains only the stable best reconnect ranks while candidates stream in', () => {
-    const ranked: Array<{ id: string; hardDefects: number; score: number }> = [];
-    for (const candidate of [
-      { id: 'late', hardDefects: 2, score: 4 },
-      { id: 'first-tie', hardDefects: 0, score: 2 },
-      { id: 'best', hardDefects: 0, score: 1 },
-      { id: 'second-tie', hardDefects: 0, score: 2 },
-    ]) pushBoundedReconnectRankedCandidate(ranked, candidate, 2);
-
-    expect(ranked.map(candidate => candidate.id)).toEqual(['best', 'first-tie']);
-    pushBoundedReconnectRankedCandidate(ranked, { id: 'ignored', hardDefects: 0, score: 0 }, 0);
-    expect(ranked.map(candidate => candidate.id)).toEqual(['best', 'first-tie']);
-
-    const candidates = Array.from({ length: 200 }, (_, index) => ({
-      id: `candidate-${index}`,
-      hardDefects: (index * 7) % 5,
-      score: (index * 11) % 13,
-    }));
-    for (let limit = 1; limit <= 8; limit += 1) {
-      const bounded: typeof candidates = [];
-      for (const candidate of candidates) {
-        pushBoundedReconnectRankedCandidate(bounded, candidate, limit);
-      }
-      const legacy = candidates.toSorted((first, second) => (
-        first.hardDefects - second.hardDefects || first.score - second.score
-      )).slice(0, limit);
-      expect(bounded.map(candidate => candidate.id)).toEqual(
-        legacy.map(candidate => candidate.id),
-      );
-    }
   });
 
   it('reports bounded reconnect generation and ranking subphases without graph content', () => {

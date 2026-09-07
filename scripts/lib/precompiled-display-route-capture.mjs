@@ -278,6 +278,53 @@ export const precompiledDisplayRouteContractsMatch = (leftEdges, rightEdges) => 
   return true;
 };
 
+/** Self-contained so the cold browser harness can inject the same recorder. */
+export const createPrecompiledDisplayRouteTimingRecorder = (createdAt) => {
+  let requestId = null;
+  let timing = null;
+  return {
+    posted(id, at, monotonicAt = at) {
+      requestId = typeof id === 'string' && id.length > 0 && id.length <= 500 ? id : null;
+      timing = requestId ? { createdAt, postedAt: at, firstResponseAt: null, finalResponseAt: null,
+        postedMonotonicAt: monotonicAt, finalResponseMonotonicAt: null } : null;
+    },
+    received(response, at, monotonicAt = at) {
+      if (!timing || !response || response.requestId !== requestId) return null;
+      timing.firstResponseAt ??= at;
+      if ((response.edges || response.routingPatches || response.error) && timing.finalResponseAt === null) {
+        timing.finalResponseAt = at;
+        timing.finalResponseMonotonicAt = monotonicAt;
+      }
+      return { ...timing };
+    },
+  };
+};
+
+/** Durations only: no request identity or absolute timestamp leaves the page. */
+export const projectPrecompiledDisplayRouteTimings = (timing, routing, workerDurationMs) => {
+  if (!timing || !routing) return null;
+  const monotonicRoundTrip = timing.finalResponseMonotonicAt - timing.postedMonotonicAt;
+  const points = [routing.workerStartedAt, timing.postedAt,
+    timing.firstResponseAt, timing.finalResponseAt, routing.workerResponseParsedAt, routing.finalAppliedAt];
+  if (![timing.createdAt, ...points].every(value => Number.isSafeInteger(value) && value >= 0)
+    || timing.createdAt > timing.postedAt
+    || points.some((value, index) => index > 0 && value < points[index - 1])
+    || points.at(-1) - Math.min(timing.createdAt, points[0]) > 600_000
+    || !Number.isFinite(workerDurationMs) || workerDurationMs < 0
+    || ![timing.postedMonotonicAt, timing.finalResponseMonotonicAt].every(value => Number.isFinite(value) && value >= 0)
+    || monotonicRoundTrip < workerDurationMs - 1 || monotonicRoundTrip > 600_000
+    || workerDurationMs > timing.finalResponseAt - timing.postedAt + 1) return null;
+  return {
+    prewarmLeadMs: timing.postedAt - timing.createdAt,
+    requestPreparationMs: timing.postedAt - routing.workerStartedAt,
+    firstResponseMs: timing.firstResponseAt - timing.postedAt,
+    workerDeliveryOverheadMs: Math.max(0, timing.finalResponseAt - timing.postedAt - workerDurationMs),
+    workerMonotonicDeliveryOverheadMs: Math.max(0, monotonicRoundTrip - workerDurationMs),
+    responseParseMs: routing.workerResponseParsedAt - timing.finalResponseAt,
+    responseApplyMs: routing.finalAppliedAt - routing.workerResponseParsedAt,
+  };
+};
+
 export const renderPrecompiledDisplayRouteCaptureExpression = (
   targetId,
   variantId = 'initial',
@@ -288,6 +335,7 @@ export const renderPrecompiledDisplayRouteCaptureExpression = (
   const replayPatches = ${replayPrecompiledDisplayRoutePatches.toString()};
   const replayTrustedPatches = ${replayTrustedDisplayRoutePatches.toString()};
   const routeContractsMatch = ${precompiledDisplayRouteContractsMatch.toString()};
+  const projectTimings = ${projectPrecompiledDisplayRouteTimings.toString()};
   const hashQueryIndex = window.location.hash.indexOf('?');
   const activeTargetId = hashQueryIndex >= 0
     ? new URLSearchParams(window.location.hash.slice(hashQueryIndex + 1)).get('diagram')
@@ -351,5 +399,8 @@ export const renderPrecompiledDisplayRouteCaptureExpression = (
     provenance: committed.provenance ?? 'fresh-full-route',
     workerResolution: isLayoutCapture ? routing.workerResolution : response.routeResolution,
     workerDurationMs: isLayoutCapture ? routing.routeMs : response.workerDurationMs,
+    workerTimings: isLayoutCapture ? null : projectTimings(
+      window.__vizlyPrecompiledRouteTiming, routing, response.workerDurationMs,
+    ),
   };
 })()`;

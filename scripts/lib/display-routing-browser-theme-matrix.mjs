@@ -67,12 +67,90 @@ const waitForThemeState = async (session, expected, timeoutMs = 5_000) => {
   return state;
 };
 
-const switchTheme = (session, themeId) => session.evaluate(`(() => {
-  window.dispatchEvent(new CustomEvent('diagram-global-theme-changed', {
-    detail: ${JSON.stringify(themeId)},
-  }));
+// The global-theme event is a notification, and its designer listener may not
+// be mounted. Exercise the authoritative application control in every view.
+export const clickDisplayRoutingThemeControl = (doc, action, themeId) => {
+  if (!['light', 'dark', 'high-contrast'].includes(themeId)
+    || !['open', 'select', 'close', 'close-settings'].includes(action)) return false;
+  const dialogs = [...doc.querySelectorAll('[data-theme-selector-dialog]')];
+  const clickable = button => button?.tagName === 'BUTTON' && !button.disabled
+    && !button.closest('[inert], [hidden]') && button.getClientRects().length > 0;
+  let button;
+  if (action === 'close-settings') {
+    if (dialogs.length > 0) return false;
+    const settingsControls = [...doc.querySelectorAll('[data-settings-close]')].filter(clickable);
+    if (settingsControls.length !== 1) return false;
+    button = settingsControls[0];
+  } else if (action === 'open') {
+    if (dialogs.length > 0) return false;
+    button = [...doc.querySelectorAll('[data-theme-selector-trigger]')].find(clickable);
+  } else {
+    if (dialogs.length !== 1) return false;
+    button = action === 'close'
+      ? dialogs[0].querySelector('[data-theme-selector-close]')
+      : [...dialogs[0].querySelectorAll('[data-theme-id]')]
+        .find(candidate => candidate.getAttribute('data-theme-id') === themeId);
+  }
+  if (!clickable(button)) return false;
+  button.click();
   return true;
-})()`);
+};
+
+export const switchDisplayRoutingTheme = async (session, themeCase, { now = Date.now, wait = delay } = {}) => {
+  const startedAt = now();
+  const deadline = startedAt + 5_000;
+  let step = 'open';
+  const transitions = [{ step, elapsedMs: 0 }];
+  let state = null;
+  let openedSettings = false;
+  const click = action => session.evaluate(
+    `(${clickDisplayRoutingThemeControl.toString()})(document, ${JSON.stringify(action)}, ${JSON.stringify(themeCase.id)})`,
+  );
+  while (now() < deadline) {
+    const previousStep = step;
+    if (step === 'open') {
+      if (await click('open')) step = 'select';
+      else if (!openedSettings) {
+        // The viewer exposes this selector inside settings. Use its public
+        // shortcut once, then wait for the lazy panel within the same deadline.
+        openedSettings = true;
+        for (const type of ['keyDown', 'keyUp']) {
+          await session.send('Input.dispatchKeyEvent', {
+            type, key: ',', code: 'Comma', modifiers: 2, windowsVirtualKeyCode: 188,
+          });
+        }
+      }
+    } else if (step === 'select' && await click('select')) step = 'applied';
+    else if (step === 'applied') {
+      state = await readThemeState(session);
+      if (state?.dataTheme === themeCase.mode
+        && normalizeColor(state.primary) === normalizeColor(themeCase.primary)) {
+        if (await click('close')) step = 'closed';
+      }
+    } else if (step === 'closed' && await session.evaluate(
+      `!document.querySelector('[data-theme-selector-dialog]')`,
+    )) {
+      if (!openedSettings) {
+        if (now() < deadline) return state;
+        break;
+      }
+      if (await click('close-settings')) step = 'settings-closed';
+    } else if (step === 'settings-closed' && await session.evaluate(
+      `!document.querySelector('[data-settings-close]')`,
+    )) {
+      if (now() < deadline) return state;
+      break;
+    }
+    if (step !== previousStep) {
+      transitions.push({ step, elapsedMs: Math.min(60_000, Math.max(0, now() - startedAt)) });
+    } else {
+      // Poll only pending UI work. Sleeping after a successful close can move
+      // its completion check beyond the original deadline even with no dialog.
+      await wait(Math.min(50, Math.max(0, deadline - now())));
+    }
+  }
+  throw new Error(`Theme selector did not complete ${themeCase.id} (${step}) within 5000ms; transitions=${JSON.stringify(transitions)}`);
+};
 
 export const verifyDisplayRoutingThemeMatrix = async ({
   session,
@@ -85,10 +163,12 @@ export const verifyDisplayRoutingThemeMatrix = async ({
 }) => {
   const results = [];
   for (const [index, themeCase] of DISPLAY_ROUTING_THEME_CASES.entries()) {
-    if (index > 0) await switchTheme(session, themeCase.id);
+    const appliedState = index > 0
+      ? await switchDisplayRoutingTheme(session, themeCase)
+      : await waitForThemeState(session, themeCase);
     const state = assertDisplayRoutingThemeState({
       themeCase,
-      state: await waitForThemeState(session, themeCase),
+      state: appliedState,
       expectedSignature,
       expectedWorkerStartCount,
       expectedWorkerAbortCount,

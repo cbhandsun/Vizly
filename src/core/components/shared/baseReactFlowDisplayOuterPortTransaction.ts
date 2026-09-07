@@ -24,8 +24,12 @@ import {
   type DisplayRoutingPhaseTrace,
 } from './baseReactFlowDisplayRoutingTrace';
 
+/** Request-local allowance shared by early closure and the strict fallback. */
+export type OuterPortEvaluationBudget = { remaining: number };
+
 export type BaseReactFlowOuterPortTransactionOptions = Readonly<{
   evaluation?: BaseReactFlowFinalEndpointEvaluation;
+  evaluationBudget?: OuterPortEvaluationBudget;
   initialReport?: Readonly<{
     edges: readonly Edge[];
     report: ReturnType<typeof getDisplayHardQualityGateReport>;
@@ -109,6 +113,9 @@ export const repairResidualOuterPortTransactionWithHardGate = <T extends Edge[]>
   options: BaseReactFlowOuterPortTransactionOptions = {},
 ): T => {
   if (edges.length === 0 || !Number.isSafeInteger(maxExactEvaluations) || maxExactEvaluations <= 0) return edges;
+  const sharedRemaining = options.evaluationBudget?.remaining ?? 64;
+  if (!Number.isSafeInteger(sharedRemaining) || sharedRemaining <= 0) return edges;
+  const evaluationLimit = Math.min(64, maxExactEvaluations, sharedRemaining);
   const timer = startDisplayRoutingPhaseTrace({
     phase: 'finalizer-outer-port',
     candidateCount: 0,
@@ -133,9 +140,9 @@ export const repairResidualOuterPortTransactionWithHardGate = <T extends Edge[]>
   const candidates = buildBoundedOuterPortTransactionCandidates(edges, nodes, {
     includeStrictCrossings: true,
     minStub: MIN_RENDER_SAFE_ENDPOINT_STUB,
-    maxCandidates: Math.min(64, maxExactEvaluations),
+    maxCandidates: evaluationLimit,
   });
-  let remainingEvaluations = Math.min(64, Math.max(1, maxExactEvaluations));
+  let remainingEvaluations = evaluationLimit;
   let evaluatedCandidateCount = 0;
   let attemptedGroupTransaction = false;
   const consumeEvaluation = (): boolean => {
@@ -145,6 +152,9 @@ export const repairResidualOuterPortTransactionWithHardGate = <T extends Edge[]>
     return true;
   };
   const finish = (resolution: 'accepted' | 'fallback', result: T): T => {
+    if (options.evaluationBudget) {
+      options.evaluationBudget.remaining -= evaluationLimit - remainingEvaluations;
+    }
     const metrics = metricsBefore && options.evaluation
       ? diffBaseReactFlowEvaluationMetrics(metricsBefore, options.evaluation.readMetrics())
       : {};

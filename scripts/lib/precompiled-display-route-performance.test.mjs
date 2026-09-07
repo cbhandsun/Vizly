@@ -43,6 +43,31 @@ const sample = (logisticsMs = 700) => buildPrecompiledDisplayRoutePerformanceRes
 ]);
 
 describe('precompiled display route cold performance', () => {
+  it('retains bounded timing aggregates and correlates slow samples without private fields', () => {
+    const workerTimings = { prewarmLeadMs: 100, requestPreparationMs: 10, firstResponseMs: 30,
+      workerDeliveryOverheadMs: 100, workerMonotonicDeliveryOverheadMs: 99.5,
+      responseParseMs: 20, responseApplyMs: 10, privatePath: 'secret' };
+    const result = buildPrecompiledDisplayRoutePerformanceResult([
+      capture('logistics-architecture-v1', 700, { workerTimings }),
+    ]);
+    expect(result.presets[0].workerTimings).not.toHaveProperty('privatePath');
+    expect(parsePrecompiledDisplayRoutePerformanceResult(result)).toEqual(result);
+    const summary = summarizePrecompiledDisplayRoutePerformance([result], 1, ['logistics-architecture-v1']);
+    const logistics = summary.presets['logistics-architecture-v1'];
+    expect(logistics.workerTimingSampleCount).toBe(1);
+    expect(logistics.workerTimings.firstResponseMs.p95Ms).toBe(30);
+    expect(logistics.slowestSamples[0]).toMatchObject({ sampleIndex: 1, routeMs: 700, workerDurationMs: 560 });
+    expect(JSON.stringify(summary)).not.toContain('secret');
+    for (const invalid of [[], {}, 'invalid', ...[NaN, Infinity, -1, 600_001, '30'].map(firstResponseMs => ({
+      ...workerTimings, firstResponseMs,
+    }))]) {
+      expect(() => buildPrecompiledDisplayRoutePerformanceResult([
+        capture('safe', 700, { workerTimings: invalid }),
+      ])).toThrow(/invalid aggregate/);
+    }
+    expect(sample().presets[0].workerTimings).toBeNull();
+  });
+
   it('uses the bounded no-write path for cold samples', () => {
     expect(buildPrecompiledDisplayRouteSampleArguments()).toEqual([
       'scripts/generate-precompiled-display-routes.mjs',

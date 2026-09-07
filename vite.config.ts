@@ -6,7 +6,8 @@ import { dirname, resolve } from 'path'
 import { realpathSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { jspdfRasterOnlyPlugin } from './vite-plugins/jspdfRasterOnly'
-import { sharedModuleWorkersPlugin } from './vite-plugins/sharedModuleWorkers'
+import { displayWorkerChunkIsolationPlugin } from './vite-plugins/displayWorkerChunkIsolation'
+import { lazyAntdTableChunkGroup, lazyAntdTableIsolationPlugin } from './vite-plugins/lazyAntdTableChunk'
 import { devCspPlugin } from './vite-plugins/devCsp'
 import { elkWorkerAssetPlugin } from './vite-plugins/elkWorkerAsset'
 import { pdfFontAssetPlugin } from './vite-plugins/pdfFontAsset'
@@ -18,15 +19,11 @@ import {
   matchesFlowchartRuntimeModule,
   productionChunkFileNames,
 } from './vite-plugins/buildChunkGroups'
-import { createDisplayRoutingChunkClassifier } from './vite-plugins/displayRoutingChunkClassifier'
 import { minifyLocaleAssetsPlugin } from './vite-plugins/minifyLocaleAssets'
 import coverageThresholds from './scripts/coverage-thresholds.json'
 
 const projectRoot = dirname(fileURLToPath(import.meta.url))
 const projectRealRoot = realpathSync(projectRoot)
-const displayRoutingChunks = createDisplayRoutingChunkClassifier(id => (
-  matchesAppSafeLoggingModule(id) || matchesDisplayRoutingNeutralModule(id)
-))
 const shardCoverageReportsDirectory = process.env.VIZLY_COVERAGE_REPORTS_DIR
 const isShardCoverage = process.env.TEST_CI_COVERAGE === '1'
 
@@ -332,15 +329,17 @@ export default defineConfig({
     jspdfRasterOnlyPlugin(),
     elkWorkerAssetPlugin(projectRoot),
     pdfFontAssetPlugin(projectRoot),
-    sharedModuleWorkersPlugin(projectRoot),
-    displayRoutingChunks.plugin,
     minifyLocaleAssetsPlugin(projectRoot),
+    lazyAntdTableIsolationPlugin(),
     react(),
     tailwindcss(),
   ],
   worker: {
     format: 'es',
-    plugins: () => [elkWorkerAssetPlugin(projectRoot)],
+    // Keep the display Worker self-contained so a cold request does not wait
+    // for the client chunk graph's 15 static module loads.
+    // The unchanged aggregate bundle gate includes the duplicated shared code.
+    plugins: () => [elkWorkerAssetPlugin(projectRoot), displayWorkerChunkIsolationPlugin()],
   },
   server: {
     fs: {
@@ -393,6 +392,7 @@ export default defineConfig({
         chunkFileNames: productionChunkFileNames,
         codeSplitting: {
           groups: [
+            lazyAntdTableChunkGroup,
             {
               name: 'app-safe-logging',
               test: matchesAppSafeLoggingModule,
@@ -419,14 +419,6 @@ export default defineConfig({
               test: matchesReactVendorPackage,
               priority: 90,
               minSize: 0,
-            },
-            {
-              name: 'display-routing-shared',
-              test: displayRoutingChunks.matchesSharedModule,
-              priority: 80,
-              minSize: 0,
-              entriesAware: false,
-              includeDependenciesRecursively: false,
             },
             {
               name: 'flowchart-designer-startup',

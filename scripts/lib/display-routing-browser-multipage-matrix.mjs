@@ -298,13 +298,34 @@ const setFirstEdgeLabelOffset = async (session, marker, offset) => {
   if (!updated) throw new Error(`Could not set active multi-page label offset: ${marker}`);
 };
 
-const assertCurrentEdgeLabelOffset = async (waitForValue, session, expected, label) => waitForValue(
+// Routing may reorder edges, and duplication replaces IDs. The unique marker
+// identifies the edited label throughout this page's layout/reload transaction.
+export const readDisplayRoutingMarkedLabelOffset = (edges, marker) => {
+  if (!Array.isArray(edges) || edges.length > 10_000
+    || typeof marker !== 'string' || marker.length === 0 || marker.length > 1024) return null;
+  const matches = edges.filter(edge => edge && typeof edge === 'object' && edge.label === marker);
+  if (matches.length !== 1) return null;
+  const offset = matches[0].data?.labelOffset;
+  if (!offset || typeof offset !== 'object' || Array.isArray(offset)
+    || !Number.isFinite(offset.x) || !Number.isFinite(offset.y)
+    || Math.abs(offset.x) > 1000 || Math.abs(offset.y) > 1000) return null;
+  return { x: offset.x, y: offset.y };
+};
+
+const assertCurrentEdgeLabelOffset = async (waitForValue, session, marker, expected, label) => waitForValue(
   session, `(() => {
-    const offset = window.reactFlowInstance?.getEdges?.()[0]?.data?.labelOffset;
+    const readOffset = ${readDisplayRoutingMarkedLabelOffset.toString()};
+    const offset = readOffset(window.reactFlowInstance?.getEdges?.(), ${JSON.stringify(marker)});
     return offset && Number.isFinite(offset.x) && Number.isFinite(offset.y)
       && offset.x === ${JSON.stringify(expected.x)} && offset.y === ${JSON.stringify(expected.y)}
       ? { x: offset.x, y: offset.y } : null;
-  })()`, label);
+  })()`, label).catch(async error => {
+    const offset = await session.evaluate(`(() => {
+      const readOffset = ${readDisplayRoutingMarkedLabelOffset.toString()};
+      return readOffset(window.reactFlowInstance?.getEdges?.(), ${JSON.stringify(marker)});
+    })()`);
+    throw new Error(`${error.message}\nMarked label offset: ${JSON.stringify(offset)}`, { cause: error });
+  });
 
 const selectLayout = async ({ session, layoutCase, waitForLayoutRoute, auditFinalSvg }) => {
   const previousJobId = await session.evaluate(
@@ -363,9 +384,9 @@ export const verifyDisplayRoutingMultiPageMatrix = async ({
   });
   await waitForCurrentRenderAuthority(waitForValue, session, 'duplicated page route authority');
   await auditCurrentCanvas(session, auditFinalSvg, 'duplicated page route');
-  await assertCurrentEdgeLabelOffset(waitForValue, session, { x: 12, y: -4 }, 'duplicated page inherited');
+  await assertCurrentEdgeLabelOffset(waitForValue, session, MARKERS.first, { x: 12, y: -4 }, 'duplicated page inherited');
   await setFirstEdgeLabelOffset(session, MARKERS.copy, { x: -8, y: 6 });
-  await assertCurrentEdgeLabelOffset(waitForValue, session, { x: -8, y: 6 }, 'duplicated page edited');
+  await assertCurrentEdgeLabelOffset(waitForValue, session, MARKERS.copy, { x: -8, y: 6 }, 'duplicated page edited');
   await selectLayout({ session, layoutCase: copyLayout, waitForLayoutRoute, auditFinalSvg });
 
   await clickPageElement(session, '.page-tabs__add');
@@ -394,7 +415,7 @@ export const verifyDisplayRoutingMultiPageMatrix = async ({
     'durable multi-page state',
   );
   const copyAudit = await auditCurrentCanvas(session, auditFinalSvg, 'restored copy page');
-  await assertCurrentEdgeLabelOffset(waitForValue, session, { x: -8, y: 6 }, 'restored copy page');
+  await assertCurrentEdgeLabelOffset(waitForValue, session, MARKERS.copy, { x: -8, y: 6 }, 'restored copy page');
 
   await session.evaluate(`window.__vizlyRequestedLayoutLabel = ${JSON.stringify(firstLayout.label)}`);
   await clickPageElement(session, '.page-tabs__tab', 0);
@@ -404,7 +425,7 @@ export const verifyDisplayRoutingMultiPageMatrix = async ({
   await waitForCurrentRenderAuthority(waitForValue, session, 'restored first page authority');
   await assertRequestedLayoutSelected(session, FIRST_LAYOUT_ID);
   const firstAudit = await auditCurrentCanvas(session, auditFinalSvg, 'restored first page');
-  await assertCurrentEdgeLabelOffset(waitForValue, session, { x: 12, y: -4 }, 'restored first page isolation');
+  await assertCurrentEdgeLabelOffset(waitForValue, session, MARKERS.first, { x: 12, y: -4 }, 'restored first page isolation');
 
   await session.evaluate(`window.__vizlyRequestedLayoutLabel = ${JSON.stringify(copyLayout.label)}`);
   await clickPageElement(session, '.page-tabs__tab', 1);

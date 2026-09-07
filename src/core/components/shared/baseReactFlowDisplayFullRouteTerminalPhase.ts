@@ -21,7 +21,10 @@ import {
 } from './baseReactFlowDisplayEvaluation';
 import { runFinalAxisTransaction } from './baseReactFlowDisplayFinalAxisTransaction';
 import { finalizeFailClosedDisplayTransaction } from './baseReactFlowDisplayFinalTransaction';
-import { repairResidualOuterPortTransactionWithHardGate } from './baseReactFlowDisplayOuterPortTransaction';
+import {
+  repairResidualOuterPortTransactionWithHardGate,
+  type OuterPortEvaluationBudget,
+} from './baseReactFlowDisplayOuterPortTransaction';
 import type { BaseReactFlowFullRouteContext } from './baseReactFlowDisplayFullRouteTypes';
 import { diffBaseReactFlowEvaluationMetrics } from './baseReactFlowDisplayFinalEndpointEvaluation';
 import { startDisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
@@ -29,6 +32,7 @@ import { startDisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrac
 export const runBaseReactFlowFullRouteTerminalPhase = (
   context: BaseReactFlowFullRouteContext,
   strictCandidate: Edge[],
+  evaluationBudget?: OuterPortEvaluationBudget,
 ): Edge[] => {
   const {
     repairNodes,
@@ -258,6 +262,7 @@ export const runBaseReactFlowFullRouteTerminalPhase = (
     64,
     {
       evaluation: context.evaluationSession,
+      evaluationBudget,
       initialReport: {
         edges: finalFallbackTransactionCandidate,
         report: finalFallbackTransactionReport,

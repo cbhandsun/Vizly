@@ -16,6 +16,12 @@ import {
   productionChunkFileNames,
 } from '../../../../vite-plugins/buildChunkGroups';
 import { minifyLocaleJsonAsset } from '../../../../vite-plugins/minifyLocaleAssets';
+import { assertDisplayWorkerChunkIsolation, displayWorkerChunkIsolationPlugin } from '../../../../vite-plugins/displayWorkerChunkIsolation';
+import {
+  assertLazyAntdTableIsolation,
+  lazyAntdTableIsolationPlugin,
+  matchesLazyAntdTableModule,
+} from '../../../../vite-plugins/lazyAntdTableChunk';
 import {
   classifyDisplayRoutingChunkGraph,
   createDisplayRoutingChunkClassifier,
@@ -24,6 +30,167 @@ import {
 
 const displayWorkerId = 'C:\\repo\\src\\core\\components\\shared\\baseReactFlowDisplayEdges.worker.ts';
 const appEntryId = 'C:/repo/src/main.tsx';
+
+describe('lazy table implementation isolation', () => {
+  const tableId = 'C:/repo/node_modules/antd/es/table/index.js';
+  const contextId = 'C:/repo/node_modules/antd/es/table/TableMeasureRowContext.js';
+  const graph = (): Array<{
+    fileName: string;
+    facadeModuleId: string | null;
+    imports: string[];
+    modules: Record<string, { renderedLength: number }>;
+  }> => [
+    { fileName: 'main.js', facadeModuleId: appEntryId, imports: ['tooltip.js'], modules: {} },
+    { fileName: 'designer.js', facadeModuleId: 'C:/repo/src/core/components/diagrams/FlowchartDesigner.tsx', imports: [], modules: {} },
+    { fileName: 'canvas.js', facadeModuleId: 'C:/repo/src/core/components/diagrams/AdvancedFlowchartCanvasShell.tsx', imports: [], modules: {} },
+    { fileName: 'tooltip.js', facadeModuleId: null, imports: [], modules: { [contextId]: { renderedLength: 100 } } },
+    { fileName: 'table.js', facadeModuleId: null, imports: ['tooltip.js'], modules: { [tableId]: { renderedLength: 100 } } },
+  ];
+
+  it('leaves the Tooltip context shared while isolating actual table modules', () => {
+    expect(matchesLazyAntdTableModule(tableId)).toBe(true);
+    expect(matchesLazyAntdTableModule('C:\\repo\\node_modules\\@rc-component\\table\\es\\Table.js?commonjs')).toBe(true);
+    for (const id of [contextId, `${contextId}?query`, '', '/src/table.ts',
+      '/repo/node_modules/antd/es/table-extra/index.js', '/repo/node_modules/antd/es/tooltip/index.js']) {
+      expect(matchesLazyAntdTableModule(id)).toBe(false);
+    }
+  });
+
+  it('allows lazy table consumers and a Tooltip context on editor startup', () => {
+    expect(() => assertLazyAntdTableIsolation(graph())).not.toThrow();
+    const plugin = lazyAntdTableIsolationPlugin();
+    const hook = plugin.generateBundle;
+    if (typeof hook !== 'function') throw new Error('generateBundle hook missing');
+    const bundle = Object.fromEntries(graph().map(chunk => [chunk.fileName, { type: 'chunk', ...chunk }]));
+    expect(() => Reflect.apply(hook, {}, [{}, bundle, false])).not.toThrow();
+    expect(plugin.apply).toBe('build');
+  });
+
+  it('rejects a Tooltip context co-located with a table implementation', () => {
+    const chunks = graph();
+    chunks[3].imports.push('table.js');
+    expect(() => assertLazyAntdTableIsolation(chunks)).toThrow('Editor startup imports table implementation');
+  });
+
+  it('finds the application module behind Vite HTML facades and merged chunks', () => {
+    const chunks = graph();
+    chunks[0].facadeModuleId = 'C:/repo/index.html';
+    chunks[0].modules[appEntryId] = { renderedLength: 100 };
+    expect(() => assertLazyAntdTableIsolation(chunks)).not.toThrow();
+    chunks[0].imports.push('table.js');
+    expect(() => assertLazyAntdTableIsolation(chunks)).toThrow('Editor startup imports table implementation');
+  });
+
+  it('ignores tree-shaken table declarations and terminates shared import cycles', () => {
+    const chunks = graph();
+    chunks[3].imports.push('table.js');
+    chunks[4].modules[tableId].renderedLength = 0;
+    expect(() => assertLazyAntdTableIsolation(chunks)).not.toThrow();
+  });
+
+  it('fails closed on incomplete or ambiguous emitted graphs', () => {
+    expect(() => assertLazyAntdTableIsolation([])).toThrow('requires one entry');
+    const chunks = graph();
+    expect(() => assertLazyAntdTableIsolation([...chunks, chunks[0]])).toThrow('duplicate chunk names');
+    expect(() => assertLazyAntdTableIsolation([...chunks, { ...chunks[0], fileName: 'main-copy.js' }]))
+      .toThrow('requires one entry');
+    chunks[3].imports.push('missing.js');
+    expect(() => assertLazyAntdTableIsolation(chunks)).toThrow('missing static import');
+  });
+});
+
+describe('emitted display Worker isolation', () => {
+  const chunk = (fileName: string, imports: string[] = [], modules: string[] = []) => ({
+    fileName,
+    facadeModuleId: fileName === 'worker.js' ? displayWorkerId : null,
+    imports,
+    modules: Object.fromEntries(modules.map(id => [id, { renderedLength: 100 }])),
+  });
+
+  it('guards the native Worker build against static fetch chains and UI dependencies', () => {
+    const plugin = displayWorkerChunkIsolationPlugin();
+    const hook = plugin.generateBundle;
+    if (typeof hook !== 'function') throw new Error('generateBundle hook missing');
+    const invoke = (bundle: unknown) => Reflect.apply(hook, {}, [{}, bundle, false]);
+    const worker = { type: 'chunk', ...chunk('worker.js') };
+    expect(() => invoke({ worker })).not.toThrow();
+    expect(() => invoke({})).toThrow('found 0');
+    expect(() => invoke({
+      worker: { ...worker, imports: ['routing.js'] },
+      routing: { type: 'chunk', ...chunk('routing.js') },
+    })).toThrow('self-contained entry without static imports');
+    expect(() => invoke({ worker: {
+      type: 'chunk', ...chunk('worker.js', [], ['C:/repo/node_modules/react/index.js']),
+    } })).toThrow('imports UI runtime');
+    expect(plugin.apply).toBe('build');
+  });
+
+  it('installs isolation in the native Worker build while retaining lazy creation', () => {
+    const config = readFileSync(resolve(process.cwd(), 'vite.config.ts'), 'utf8');
+    expect(config).toContain('plugins: () => [elkWorkerAssetPlugin(projectRoot), displayWorkerChunkIsolationPlugin()]');
+    expect(config).not.toContain('sharedModuleWorkersPlugin(projectRoot)');
+    expect(config).not.toContain('displayRoutingChunks.plugin');
+    const client = readFileSync(resolve(process.cwd(),
+      'src/core/components/shared/baseReactFlowDisplayWorkerClient.ts'), 'utf8');
+    expect(client).toContain("new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', import.meta.url)");
+  });
+
+  it('allows shared routing chunks and cycles without reaching unrelated UI entries', () => {
+    expect(() => assertDisplayWorkerChunkIsolation([
+      chunk('worker.js', ['routing.js']),
+      chunk('routing.js', ['neutral.js']),
+      chunk('neutral.js', ['routing.js'], ['C:/repo/src/core/routing/persistedRoutingCandidate.ts']),
+      chunk('ui.js', [], ['C:/repo/node_modules/react/index.js']),
+    ])).not.toThrow();
+  });
+
+  it.each([
+    'react/index.js', 'react-dom/client.js', 'antd/es/index.js',
+    '@ant-design/cssinjs/es/index.js', '@rc-component/util/es/index.js', 'rc-util/es/index.js',
+  ])('rejects a parser co-located with %s in a transitive chunk', modulePath => {
+    const id = `C:\\repo\\node_modules\\${modulePath.replaceAll('/', '\\')}?commonjs-proxy`;
+    expect(() => assertDisplayWorkerChunkIsolation([
+      chunk('worker.js', ['routing.js']),
+      chunk('routing.js', ['runtime.js']),
+      chunk('runtime.js', [], ['C:/repo/src/core/routing/persistedRoutingCandidate.ts', id]),
+    ])).toThrow('Display Worker imports UI runtime in runtime.js');
+  });
+
+  it('ignores fully tree-shaken UI modules while checking remaining code', () => {
+    const removed = chunk('shared.js');
+    removed.modules['C:/repo/node_modules/react/index.js'] = { renderedLength: 0 };
+    expect(() => assertDisplayWorkerChunkIsolation([
+      chunk('worker.js', ['shared.js']), removed,
+    ])).not.toThrow();
+  });
+
+  it('rejects missing entries, duplicate names, and unresolved static imports', () => {
+    expect(() => assertDisplayWorkerChunkIsolation([])).toThrow('found 0');
+    expect(() => assertDisplayWorkerChunkIsolation([
+      chunk('worker.js'), { ...chunk('second.js'), facadeModuleId: displayWorkerId },
+    ])).toThrow('found 2');
+    expect(() => assertDisplayWorkerChunkIsolation([
+      chunk('worker.js'), chunk('shared.js'), chunk('shared.js'),
+    ])).toThrow('duplicate chunk names');
+    expect(() => assertDisplayWorkerChunkIsolation([
+      chunk('worker.js', ['missing.js']),
+    ])).toThrow('static import is missing: missing.js');
+  });
+
+  it('runs the isolation check from the production build hook', () => {
+    const hook = sharedModuleWorkersPlugin('C:/repo').generateBundle;
+    const disabledHook = sharedModuleWorkersPlugin('C:/repo', { displayWorker: false }).generateBundle;
+    if (typeof hook !== 'function' || typeof disabledHook !== 'function') {
+      throw new Error('generateBundle hook missing');
+    }
+    const bundle = {
+      worker: { type: 'chunk', ...chunk('worker.js', ['ui.js']) },
+      ui: { type: 'chunk', ...chunk('ui.js', [], ['C:/repo/node_modules/react/index.js']) },
+    };
+    expect(() => Reflect.apply(hook, {}, [{}, bundle, false])).toThrow('imports UI runtime');
+    expect(() => Reflect.apply(disabledHook, {}, [{}, {}, false])).not.toThrow();
+  });
+});
 
 const classifyGraph = (
   graph: Map<string, ChunkGraphModuleInfo | null>,
@@ -176,6 +343,21 @@ describe('display routing chunk classifier', () => {
 });
 
 describe('sharedModuleWorkers Vite plugin', () => {
+  it('co-loads the precompiled descriptors and their dedicated bounded asset fetcher', () => {
+    for (const suffix of [
+      'generated/baseReactFlowPrecompiledRouteLoaders.ts',
+      'baseReactFlowPrecompiledRouteAsset.ts',
+    ]) {
+      expect(matchesFlowchartDesignerMicroModule(`C:/repo/src/core/components/shared/${suffix}`)).toBe(true);
+    }
+    expect(matchesFlowchartDesignerMicroModule(
+      'C:\\repo\\src\\core\\components\\shared\\baseReactFlowPrecompiledRouteAsset.ts?import',
+    )).toBe(true);
+    expect(matchesFlowchartDesignerMicroModule(
+      'C:/repo/src/core/components/shared/baseReactFlowDisplayEdges.worker.ts',
+    )).toBe(false);
+  });
+
   it('keeps diagnostic routing chunk names while compacting ordinary lazy chunks', () => {
     expect(productionChunkFileNames({ name: 'baseReactFlowDisplayEdges.worker' }))
       .toBe('assets/[name]-[hash].js');
@@ -201,6 +383,9 @@ describe('sharedModuleWorkers Vite plugin', () => {
       'C:/repo/src/core/config/DiagramConfigDefaults.ts',
       'C:/repo/src/core/config/DiagramConfigManager.ts',
       'C:/repo/src/core/routing/routingVersion.ts',
+      'C:/repo/src/core/routing/persistedRoutingCandidate.ts',
+      'C:/repo/src/core/routing/routingLineHops.ts',
+      'C:/repo/src/core/routing/routingBoundaryLimits.ts',
       'C:/repo/src/core/routing/utils/handleUtils.ts',
       'C:/repo/src/core/types/flow.ts',
       'C:/repo/src/core/utils/boundedResponse.ts',

@@ -1,6 +1,8 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import { normalizeHandle } from '../../routing/utils/handleUtils';
+import { COMMERCIAL_BUSINESS_NODE_CLEARANCE } from '../../strategies/shared/edgeBusinessNodeClearanceRepair';
+import { createNodeClearanceEvaluationContext } from '../../strategies/shared/edgeWaypointCandidateRepair';
 import {
   createEdgePathQualityEvaluationContext,
   type EdgePathQualityScore,
@@ -154,15 +156,18 @@ type RankedReconnectCandidate = Readonly<{
   edges: Edge[];
   score: number;
   hardDefects: number;
+  clearanceRisk: number;
 }>;
 
 type ReconnectRank = Readonly<{
   score: number;
   hardDefects: number;
+  clearanceRisk: number;
 }>;
 
 const compareReconnectRanks = (first: ReconnectRank, second: ReconnectRank): number => (
   first.hardDefects - second.hardDefects
+  || first.clearanceRisk - second.clearanceRisk
   || first.score - second.score
 );
 
@@ -225,6 +230,14 @@ const rankReconnectCandidates = ({
   if (!sourceRect || !targetRect) return [];
   const qualityContext = createEdgePathQualityEvaluationContext(edges);
   const obstacleContext = createDisplayObstacleEvaluationContext(edges, nodes);
+  const clearanceContext = createNodeClearanceEvaluationContext(nodes, edge);
+  const unchangedClearanceRisk = edges.reduce((risk, unchangedEdge, index) => (
+    index === edgeIndex ? risk : risk + Math.max(0,
+      createNodeClearanceEvaluationContext(nodes, unchangedEdge).score(
+        getDisplayComputedPath(unchangedEdge), COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+      ) - 0.5,
+    )
+  ), 0);
   const ranked: RankedReconnectCandidate[] = [];
   // Candidate scoring is synchronous and changes exactly one edge. Reuse the
   // private array during evaluation, then snapshot only candidates retained by
@@ -255,10 +268,16 @@ const rankReconnectCandidates = ({
     if (quality.hairpins > 0) continue;
     const obstacleHits = obstacleContext.evaluateKnownChanges(candidateEdges, [edgeIndex]);
     const hardDefects = hardDefectCount(quality) + obstacleHits;
+    // The final gate requires commercial clearance. Keep a longer clean
+    // candidate ahead of a short path that a later clearance repair cannot
+    // necessarily fix within the frozen transaction boundary.
+    const clearanceRisk = unchangedClearanceRisk + Math.max(0,
+      clearanceContext.score(path, COMMERCIAL_BUSINESS_NODE_CLEARANCE) - 0.5,
+    );
     const score = obstacleRepairScore(quality, obstacleHits);
     pushBoundedReconnectRankedCandidate(
       ranked,
-      { edges: candidateEdges.slice(), score, hardDefects },
+      { edges: candidateEdges.slice(), score, hardDefects, clearanceRisk },
       limit,
     );
   }
@@ -321,6 +340,7 @@ export const createBaseReactFlowMovedNodeReconnectCandidates = ({
     edges: baselineEdges,
     score: Number.POSITIVE_INFINITY,
     hardDefects: Number.POSITIVE_INFINITY,
+    clearanceRisk: Number.POSITIVE_INFINITY,
   }];
 
   for (const edgeIndex of mutableIndexes) {
@@ -381,10 +401,7 @@ export const createBaseReactFlowMovedNodeReconnectCandidates = ({
       );
     }
     states = expanded
-      .sort((first, second) => (
-        first.hardDefects - second.hardDefects
-        || first.score - second.score
-      ))
+      .sort(compareReconnectRanks)
       .slice(0, beamWidth);
     if (states.length === 0) return [];
   }
@@ -465,10 +482,7 @@ export const createBaseReactFlowMovedNodeReconnectCandidates = ({
     }
     if (!hasStrictParticipant || refined.length === 0) break;
     states = refined
-      .sort((first, second) => (
-        first.hardDefects - second.hardDefects
-        || first.score - second.score
-      ))
+      .sort(compareReconnectRanks)
       .slice(0, beamWidth);
     if (states[0]?.hardDefects === 0) break;
   }

@@ -351,6 +351,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
         return (
           <ThemeChoiceButton
             key={themeId}
+            themeId={themeId}
             active={isActive}
             categoryLabel={preset?.category
               ? t(`theme.selector.categories.${preset.category}`, { defaultValue: preset.category })
@@ -389,6 +390,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
                   return (
                     <ThemeChoiceButton
                       key={preset.id}
+                      themeId={preset.id}
                       active={isActive}
                       categoryLabel={t(`theme.selector.categories.${preset.category}`, { defaultValue: preset.category })}
                       disabled={isThemeActionPending}
@@ -602,6 +604,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
             aria-label={triggerLabel}
             aria-expanded={isOpen}
             aria-haspopup="dialog"
+            data-theme-selector-trigger
             className={className || "inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-[6px] border-none text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"}
             onClick={() => setIsOpen(!isOpen)}
             style={style}
@@ -615,6 +618,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
             aria-label={triggerLabel}
             aria-expanded={isOpen}
             aria-haspopup="dialog"
+            data-theme-selector-trigger
             className={`flex items-center justify-between gap-1.5 ${borderless ? 'min-h-[44px]' : 'h-8'} px-2.5 text-[13px] transition-colors rounded-[6px] ${borderless ? 'bg-transparent border-none' : 'bg-white dark:bg-[#1C1C1E] border border-[#d9d9d9] dark:border-white/15 hover:border-blue-400 dark:hover:border-blue-500 shadow-sm'} text-gray-700 dark:text-gray-200 pointer-events-auto overflow-hidden w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 ${className}`}
             onClick={() => setIsOpen(!isOpen)}
             style={style}

@@ -1,0 +1,1135 @@
+{
+  "requestId": "cold-logistics-shared-terminal",
+  "edges": [
+    {
+      "id": "edge-loms-customs",
+      "source": "l-oms",
+      "target": "customs",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "关务指令",
+      "style": {
+        "stroke": "#FF5722",
+        "strokeWidth": 3
+      },
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "#FF5722"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 1142,
+            "y": 653
+          },
+          {
+            "x": 1142,
+            "y": 742
+          },
+          {
+            "x": 1667,
+            "y": 742
+          },
+          {
+            "x": 1667,
+            "y": 822
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true
+      }
+    },
+    {
+      "id": "edge-loms-tms",
+      "source": "l-oms",
+      "target": "tms",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "运输指令",
+      "style": {
+        "stroke": "#FF5722",
+        "strokeWidth": 3
+      },
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "#FF5722"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 1038.85,
+            "y": 653
+          },
+          {
+            "x": 1038.85,
+            "y": 811
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "edge-loms-visibility",
+      "source": "l-oms",
+      "target": "visibility",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "状态数据",
+      "style": {
+        "stroke": "#47CACC",
+        "strokeWidth": 2,
+        "strokeDasharray": "6 4"
+      },
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "#47CACC"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 1091,
+            "y": 653
+          },
+          {
+            "x": 1091,
+            "y": 788
+          },
+          {
+            "x": 1230,
+            "y": 788
+          },
+          {
+            "x": 1230,
+            "y": 823
+          },
+          {
+            "x": 1438,
+            "y": 823
+          },
+          {
+            "x": 1438,
+            "y": 954
+          },
+          {
+            "x": 1434,
+            "y": 954
+          },
+          {
+            "x": 1434,
+            "y": 1066
+          },
+          {
+            "x": 1487,
+            "y": 1066
+          },
+          {
+            "x": 1487,
+            "y": 1232
+          },
+          {
+            "x": 1434,
+            "y": 1232
+          },
+          {
+            "x": 1434,
+            "y": 1539
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": false,
+        "sharedTrunkAware": true,
+        "crossingOptimized": true
+      }
+    },
+    {
+      "id": "edge-loms-wms",
+      "source": "l-oms",
+      "target": "wms",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "仓储指令",
+      "style": {
+        "stroke": "#FF5722",
+        "strokeWidth": 3
+      },
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "#FF5722"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 987,
+            "y": 653
+          },
+          {
+            "x": 987,
+            "y": 742
+          },
+          {
+            "x": 191,
+            "y": 742
+          },
+          {
+            "x": 191,
+            "y": 811
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true
+      }
+    },
+    {
+      "id": "edge-tms-bms",
+      "source": "tms",
+      "target": "bms",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "运输费用",
+      "style": {
+        "stroke": "#78909C",
+        "strokeWidth": 2,
+        "strokeDasharray": "5 5"
+      },
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "#78909C"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 994,
+            "y": 931
+          },
+          {
+            "x": 994,
+            "y": 1020
+          },
+          {
+            "x": 976,
+            "y": 1020
+          },
+          {
+            "x": 976,
+            "y": 943
+          },
+          {
+            "x": 830,
+            "y": 943
+          },
+          {
+            "x": 830,
+            "y": 931
+          },
+          {
+            "x": 812,
+            "y": 931
+          },
+          {
+            "x": 812,
+            "y": 1089
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "crossingOptimized": true,
+        "sharedTrunkAware": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true
+      }
+    },
+    {
+      "id": "edge-tms-carrier",
+      "source": "tms",
+      "target": "carrier-portal",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "承运商协同",
+      "style": {
+        "stroke": "#78909C",
+        "strokeWidth": 2,
+        "strokeDasharray": "5 5"
+      },
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "#78909C"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 1018,
+            "y": 811
+          },
+          {
+            "x": 1018,
+            "y": 690
+          },
+          {
+            "x": 1027,
+            "y": 690
+          },
+          {
+            "x": 1027,
+            "y": 823
+          },
+          {
+            "x": 1045,
+            "y": 823
+          },
+          {
+            "x": 1045,
+            "y": 835
+          },
+          {
+            "x": 1408,
+            "y": 835
+          },
+          {
+            "x": 1408,
+            "y": 823
+          },
+          {
+            "x": 1426,
+            "y": 823
+          },
+          {
+            "x": 1426,
+            "y": 203
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "detachedOverlapSeparated": true,
+        "crossingOptimized": true,
+        "sharedTrunkAware": true
+      }
+    },
+    {
+      "id": "edge-tms-downstream",
+      "source": "tms",
+      "target": "downstream",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "配送完成",
+      "style": {
+        "stroke": "#FF5722",
+        "strokeWidth": 3
+      },
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "#FF5722"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 1065,
+            "y": 812
+          },
+          {
+            "x": 1065,
+            "y": 790
+          },
+          {
+            "x": 1924,
+            "y": 790
+          },
+          {
+            "x": 1924,
+            "y": 181
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": true,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "crossingOptimized": true,
+        "sharedTrunkAware": true
+      }
+    },
+    {
+      "id": "edge-tms-visibility",
+      "source": "tms",
+      "target": "visibility",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "运输数据",
+      "style": {
+        "stroke": "#47CACC",
+        "strokeWidth": 2,
+        "strokeDasharray": "6 4"
+      },
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "#47CACC"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 1135,
+            "y": 931
+          },
+          {
+            "x": 1135,
+            "y": 972
+          },
+          {
+            "x": 1508,
+            "y": 972
+          },
+          {
+            "x": 1508,
+            "y": 1539
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "detachedOverlapSeparated": true
+      }
+    },
+    {
+      "id": "edge-tms-yms",
+      "source": "tms",
+      "target": "yms",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "堆场协调",
+      "style": {
+        "stroke": "#78909C",
+        "strokeWidth": 2,
+        "strokeDasharray": "5 5"
+      },
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "#78909C"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 1065,
+            "y": 931
+          },
+          {
+            "x": 1065,
+            "y": 1020
+          },
+          {
+            "x": 1201,
+            "y": 1020
+          },
+          {
+            "x": 1201,
+            "y": 1000
+          },
+          {
+            "x": 1338,
+            "y": 1000
+          },
+          {
+            "x": 1338,
+            "y": 1089
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true
+      }
+    },
+    {
+      "id": "edge-upstream-loms",
+      "source": "upstream",
+      "target": "l-oms",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "订单下发",
+      "style": {
+        "stroke": "#FF5722",
+        "strokeWidth": 3
+      },
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "#FF5722"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 895,
+            "y": 181
+          },
+          {
+            "x": 895,
+            "y": 236
+          },
+          {
+            "x": 1065,
+            "y": 236
+          },
+          {
+            "x": 1065,
+            "y": 533
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true
+      }
+    },
+    {
+      "id": "edge-visibility-downstream",
+      "source": "visibility",
+      "target": "downstream",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "状态推送",
+      "style": {
+        "stroke": "#FF5722",
+        "strokeWidth": 3
+      },
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "#FF5722"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 1530,
+            "y": 1539
+          },
+          {
+            "x": 1530,
+            "y": 1457
+          },
+          {
+            "x": 1997,
+            "y": 1457
+          },
+          {
+            "x": 1997,
+            "y": 181
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "detachedOverlapSeparated": true
+      }
+    },
+    {
+      "id": "edge-wms-bms",
+      "source": "wms",
+      "target": "bms",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "仓储费用",
+      "style": {
+        "stroke": "#78909C",
+        "strokeWidth": 2,
+        "strokeDasharray": "5 5"
+      },
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "#78909C"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 191,
+            "y": 931
+          },
+          {
+            "x": 191,
+            "y": 1000
+          },
+          {
+            "x": 250,
+            "y": 1000
+          },
+          {
+            "x": 250,
+            "y": 919
+          },
+          {
+            "x": 731,
+            "y": 919
+          },
+          {
+            "x": 731,
+            "y": 1089
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "crossingOptimized": true,
+        "sharedTrunkAware": true
+      }
+    },
+    {
+      "id": "edge-wms-visibility",
+      "source": "wms",
+      "target": "visibility",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "仓储数据",
+      "style": {
+        "stroke": "#47CACC",
+        "strokeWidth": 2,
+        "strokeDasharray": "6 4"
+      },
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "#47CACC"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 262,
+            "y": 931
+          },
+          {
+            "x": 262,
+            "y": 1066
+          },
+          {
+            "x": 354,
+            "y": 1066
+          },
+          {
+            "x": 354,
+            "y": 1232
+          },
+          {
+            "x": 1360,
+            "y": 1232
+          },
+          {
+            "x": 1360,
+            "y": 1539
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": false,
+        "sharedTrunkAware": true
+      }
+    },
+    {
+      "id": "edge-wms-wcs",
+      "source": "wms",
+      "target": "wcs",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "设备控制",
+      "style": {
+        "stroke": "#78909C",
+        "strokeWidth": 2,
+        "strokeDasharray": "5 5"
+      },
+      "markerEnd": {
+        "type": "arrowclosed",
+        "color": "#78909C"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 121,
+            "y": 931
+          },
+          {
+            "x": 121,
+            "y": 1020
+          },
+          {
+            "x": 181,
+            "y": 1020
+          },
+          {
+            "x": 181,
+            "y": 1089
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "id": "titlegroup-external",
+      "type": "titleGroup",
+      "position": {
+        "x": 758.1125,
+        "y": 0
+      },
+      "positionAbsolute": {
+        "x": 758.1125,
+        "y": 0
+      },
+      "width": 1377,
+      "height": 290,
+      "measured": {
+        "width": 1377,
+        "height": 290
+      },
+      "style": {
+        "width": 1376.85,
+        "height": 290
+      },
+      "data": {}
+    },
+    {
+      "id": "titlegroup-logistics",
+      "type": "titleGroup",
+      "position": {
+        "x": 0,
+        "y": 450
+      },
+      "positionAbsolute": {
+        "x": 0,
+        "y": 450
+      },
+      "width": 1882,
+      "height": 846,
+      "measured": {
+        "width": 1882,
+        "height": 846
+      },
+      "style": {
+        "width": 1882.05,
+        "height": 846
+      },
+      "data": {}
+    },
+    {
+      "id": "titlegroup-data",
+      "type": "titleGroup",
+      "position": {
+        "x": 1254.3374999999999,
+        "y": 1456
+      },
+      "positionAbsolute": {
+        "x": 1254.3374999999999,
+        "y": 1456
+      },
+      "width": 404,
+      "height": 290,
+      "measured": {
+        "width": 404,
+        "height": 290
+      },
+      "style": {
+        "width": 404.4,
+        "height": 290
+      },
+      "data": {}
+    },
+    {
+      "id": "upstream",
+      "type": "custom",
+      "parentId": "titlegroup-external",
+      "position": {
+        "x": 32,
+        "y": 106.5
+      },
+      "positionAbsolute": {
+        "x": 790.1125,
+        "y": 106.5
+      },
+      "width": 210,
+      "height": 73,
+      "measured": {
+        "width": 210,
+        "height": 73
+      },
+      "style": {
+        "width": 210,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "l-oms",
+      "type": "custom",
+      "parentId": "titlegroup-logistics",
+      "position": {
+        "x": 935.25,
+        "y": 84
+      },
+      "positionAbsolute": {
+        "x": 935.25,
+        "y": 534
+      },
+      "width": 259,
+      "height": 118,
+      "measured": {
+        "width": 259,
+        "height": 118
+      },
+      "style": {
+        "width": 259,
+        "height": 118
+      },
+      "data": {}
+    },
+    {
+      "id": "wms",
+      "type": "custom",
+      "parentId": "titlegroup-logistics",
+      "position": {
+        "x": 50,
+        "y": 362
+      },
+      "positionAbsolute": {
+        "x": 50,
+        "y": 812
+      },
+      "width": 282,
+      "height": 118,
+      "measured": {
+        "width": 282,
+        "height": 118
+      },
+      "style": {
+        "width": 282,
+        "height": 118
+      },
+      "data": {}
+    },
+    {
+      "id": "wcs",
+      "type": "custom",
+      "parentId": "titlegroup-logistics",
+      "position": {
+        "x": 32,
+        "y": 640
+      },
+      "positionAbsolute": {
+        "x": 32,
+        "y": 1090
+      },
+      "width": 298,
+      "height": 118,
+      "measured": {
+        "width": 298,
+        "height": 118
+      },
+      "style": {
+        "width": 298,
+        "height": 118
+      },
+      "data": {}
+    },
+    {
+      "id": "tms",
+      "type": "custom",
+      "parentId": "titlegroup-logistics",
+      "position": {
+        "x": 923.75,
+        "y": 362
+      },
+      "positionAbsolute": {
+        "x": 923.75,
+        "y": 812
+      },
+      "width": 282,
+      "height": 118,
+      "measured": {
+        "width": 282,
+        "height": 118
+      },
+      "style": {
+        "width": 282,
+        "height": 118
+      },
+      "data": {}
+    },
+    {
+      "id": "customs",
+      "type": "custom",
+      "parentId": "titlegroup-logistics",
+      "position": {
+        "x": 1525.75,
+        "y": 373
+      },
+      "positionAbsolute": {
+        "x": 1525.75,
+        "y": 823
+      },
+      "width": 282,
+      "height": 96,
+      "measured": {
+        "width": 282,
+        "height": 96
+      },
+      "style": {
+        "width": 282,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "bms",
+      "type": "custom",
+      "parentId": "titlegroup-logistics",
+      "position": {
+        "x": 650,
+        "y": 640
+      },
+      "positionAbsolute": {
+        "x": 650,
+        "y": 1090
+      },
+      "width": 243,
+      "height": 118,
+      "measured": {
+        "width": 243,
+        "height": 118
+      },
+      "style": {
+        "width": 243,
+        "height": 118
+      },
+      "data": {}
+    },
+    {
+      "id": "yms",
+      "type": "custom",
+      "parentId": "titlegroup-logistics",
+      "position": {
+        "x": 1213,
+        "y": 640
+      },
+      "positionAbsolute": {
+        "x": 1213,
+        "y": 1090
+      },
+      "width": 250,
+      "height": 118,
+      "measured": {
+        "width": 250,
+        "height": 118
+      },
+      "style": {
+        "width": 250,
+        "height": 118
+      },
+      "data": {}
+    },
+    {
+      "id": "carrier-portal",
+      "type": "custom",
+      "parentId": "titlegroup-external",
+      "position": {
+        "x": 562,
+        "y": 84
+      },
+      "positionAbsolute": {
+        "x": 1320.1125,
+        "y": 84
+      },
+      "width": 211,
+      "height": 118,
+      "measured": {
+        "width": 211,
+        "height": 118
+      },
+      "style": {
+        "width": 211,
+        "height": 118
+      },
+      "data": {}
+    },
+    {
+      "id": "visibility",
+      "type": "custom",
+      "parentId": "titlegroup-data",
+      "position": {
+        "x": 32,
+        "y": 84
+      },
+      "positionAbsolute": {
+        "x": 1286.3374999999999,
+        "y": 1540
+      },
+      "width": 296,
+      "height": 118,
+      "measured": {
+        "width": 296,
+        "height": 118
+      },
+      "style": {
+        "width": 296,
+        "height": 118
+      },
+      "data": {}
+    },
+    {
+      "id": "downstream",
+      "type": "custom",
+      "parentId": "titlegroup-external",
+      "position": {
+        "x": 1093,
+        "y": 106.5
+      },
+      "positionAbsolute": {
+        "x": 1851.1125,
+        "y": 106.5
+      },
+      "width": 219,
+      "height": 73,
+      "measured": {
+        "width": 219,
+        "height": 73
+      },
+      "style": {
+        "width": 219,
+        "height": 73
+      },
+      "data": {}
+    }
+  ],
+  "enableSmartEdges": true,
+  "smartEdgePadding": 20,
+  "isLargeGraph": false,
+  "displayEdgeEpoch": 2666023774,
+  "qualityMode": "full",
+  "inputIdentity": {
+    "routingVersion": "18",
+    "visualVersion": "balanced-crossing-gate-v2",
+    "inputSignature": "1512289068",
+    "inputGeometryDigest": "geometry-v1:e262270c015d6a0c3e84c11c0c519d20"
+  },
+  "operation": "route"
+}

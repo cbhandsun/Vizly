@@ -1,5 +1,8 @@
 import type { Edge, Node } from '@xyflow/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as terminalPhase from '../baseReactFlowDisplayFullRouteTerminalPhase';
+import * as earlyQualityClosure from '../baseReactFlowDisplayQualityEarlyClosure';
+import * as postRenderPhase from '../baseReactFlowDisplayFullRoutePostRenderPhase';
 import logisticsStandardData from '../../../../data/standardized/LogisticsStandardData.json';
 import { standardDataToCanvas } from '../../diagrams/designerUtils';
 import { auditFinalSameSideEndpointOrder } from '../../../strategies/shared/edgeFinalSameSideEndpointOrderRepair';
@@ -23,6 +26,8 @@ import {
 import { withDisplayComputedPath } from '../baseReactFlowDisplayGeometry';
 import { getDisplayHardQualityGateReport } from '../baseReactFlowDisplayQualityGates';
 import { computeBaseReactFlowDisplayEdgesWorkerResponse } from '../baseReactFlowDisplayEdges.worker';
+import { parseDisplayEdgesWorkerRequest } from '../baseReactFlowDisplayWorkerProtocol';
+import coldSharedTerminalRequest from './fixtures/logisticsColdSharedTerminalRequest.json';
 import { projectBaseReactFlowDisplayWorkerInput } from '../baseReactFlowDisplayWorkerClient';
 import {
   createBaseReactFlowRoutingAffectedClosure,
@@ -54,6 +59,69 @@ import {
 } from './fixtures/displayEdgeQualityDiagnostics';
 
 describe('baseReactFlowDisplayEdges logistics regressions', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('continues strict repair when the early terminal transaction cannot close the cold route', () => {
+    vi.spyOn(earlyQualityClosure, 'tryDisplayQualityEarlyClosure').mockReturnValue(null);
+    const terminal = vi.spyOn(terminalPhase, 'runBaseReactFlowFullRouteTerminalPhase')
+      .mockImplementationOnce((_context, edges) => edges);
+    const request = parseDisplayEdgesWorkerRequest(structuredClone(coldSharedTerminalRequest));
+    if (!request || request.operation !== 'route') throw new Error('Invalid cold-route fixture');
+    const result = computeBaseReactFlowDisplayEdgesWorkerResponse(request);
+    expect(result.hardReport).toMatchObject({ hardClean: true, terminalsAnchored: true,
+      minimumClearanceViolations: 0, commercialClearanceViolations: 0 });
+    expect(result.phaseTrace?.find(trace => trace.phase === 'terminal'))
+      .toMatchObject({ resolution: 'fallback' });
+    expect(result.phaseTrace?.some(trace => trace.phase === 'strict-primary-crossing')).toBe(true);
+    expect(terminal).toHaveBeenCalledTimes(2);
+    expect(terminal.mock.calls[0]?.[2]).toBeDefined();
+    expect(terminal.mock.calls[1]?.[2]).toBe(terminal.mock.calls[0]?.[2]);
+  }, 60_000);
+
+  it('finishes the original route when speculative closure loses an edge', () => {
+    const actualPostRender = postRenderPhase.runBaseReactFlowFullRoutePostRenderPhase;
+    vi.spyOn(postRenderPhase, 'runBaseReactFlowFullRoutePostRenderPhase')
+      .mockImplementationOnce((...args) => {
+        const candidate = actualPostRender(...args);
+        return { ...candidate, edges: candidate.edges.slice(1) };
+      });
+    const request = parseDisplayEdgesWorkerRequest(structuredClone(coldSharedTerminalRequest));
+    if (!request || request.operation !== 'route') throw new Error('Invalid cold-route fixture');
+    const result = computeBaseReactFlowDisplayEdgesWorkerResponse(request);
+    expect(result.edges?.map(edge => edge.id).sort()).toEqual(request.edges.map(edge => edge.id).sort());
+    expect(result.hardReport).toMatchObject({ hardClean: true,
+      minimumClearanceViolations: 0, commercialClearanceViolations: 0 });
+    expect(result.phaseTrace?.find(trace => trace.phase === 'quality-crossing-early-closure'))
+      .toMatchObject({ resolution: 'fallback' });
+  }, 60_000);
+
+  it.each([true, false])('closes the cold browser crossing without strict sweeps (early quality=%s)', allowEarly => {
+    if (!allowEarly) {
+      vi.spyOn(earlyQualityClosure, 'tryDisplayQualityEarlyClosure').mockReturnValue(null);
+    }
+    // Captured from the ordinary production logistics preset on b2bd3d4f.
+    const request = parseDisplayEdgesWorkerRequest(structuredClone(coldSharedTerminalRequest));
+    if (!request || request.operation !== 'route') throw new Error('Invalid cold-route fixture');
+    const result = computeBaseReactFlowDisplayEdgesWorkerResponse(request);
+    expect(result.routeResolution).toBe('full-route');
+    if (!result.edges) throw new Error('Cold route did not return complete edges');
+    expect(result.edges.map(edge => edge.id).sort()).toEqual(request.edges.map(edge => edge.id).sort());
+    expect(result.hardReport).toMatchObject({
+      hardClean: true, obstacleHits: 0, terminalsAttached: true, terminalsAnchored: true,
+      minimumClearanceViolations: 0, commercialClearanceViolations: 0,
+      quality: { strictCrossings: 0, unrelatedOverlap: 0, reverseOverlap: 0,
+        unexplainedRelatedOverlap: 0, shortEndpointStubs: 0, tinyInteriorDoglegs: 0, hairpins: 0 },
+    });
+    expect(result.phaseTrace?.some(trace => trace.phase === 'strict-primary-crossing')).toBe(false);
+    expect(result.phaseTrace?.find(trace => trace.phase === (
+      allowEarly ? 'quality-crossing-early-closure' : 'terminal'
+    )))
+      .toMatchObject({ resolution: 'accepted' });
+    if (allowEarly) {
+      expect(result.phaseTrace?.some(trace => trace.phase === 'quality-polish')).toBe(false);
+    }
+  }, 60_000);
+
   it('removes logistics multi-trunk crossings before display', () => {
     const nodes: Node[] = [
       node('upstream', 985.487, 119, 303, 119),

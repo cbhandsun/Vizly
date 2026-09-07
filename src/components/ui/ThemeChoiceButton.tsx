@@ -2,6 +2,7 @@ import React from 'react';
 import { FaCheck } from 'react-icons/fa';
 
 interface ThemeChoiceButtonProps {
+  themeId: string;
   active: boolean;
   categoryLabel: string;
   disabled: boolean;
@@ -11,6 +12,7 @@ interface ThemeChoiceButtonProps {
 }
 
 export const ThemeChoiceButton: React.FC<ThemeChoiceButtonProps> = ({
+  themeId,
   active,
   categoryLabel,
   disabled,
@@ -20,6 +22,7 @@ export const ThemeChoiceButton: React.FC<ThemeChoiceButtonProps> = ({
 }) => (
   <button
     type="button"
+    data-theme-id={themeId}
     aria-label={label}
     aria-pressed={active}
     disabled={disabled}

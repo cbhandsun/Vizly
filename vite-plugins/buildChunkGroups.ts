@@ -25,6 +25,10 @@ const DISPLAY_ROUTING_NEUTRAL_MODULES = new Set([
   '/src/core/config/DiagramConfigDefaults.ts',
   '/src/core/config/DiagramConfigManager.ts',
   '/src/core/routing/routingVersion.ts',
+  // Clipboard consumers must not co-locate these Worker parsers with UI code.
+  '/src/core/routing/persistedRoutingCandidate.ts',
+  '/src/core/routing/routingLineHops.ts',
+  '/src/core/routing/routingBoundaryLimits.ts',
   '/src/core/routing/utils/handleUtils.ts',
   '/src/core/types/flow.ts',
   '/src/core/utils/boundedResponse.ts',
@@ -56,6 +60,8 @@ const FLOWCHART_DESIGNER_STARTUP_MODULES = new Set([
 
 const FLOWCHART_DESIGNER_MICRO_MODULES = new Set([
   '/src/core/components/shared/generated/baseReactFlowPrecompiledRouteLoaders.ts',
+  // This bounded fetcher has only the generated loaders as a runtime consumer.
+  '/src/core/components/shared/baseReactFlowPrecompiledRouteAsset.ts',
   '/src/components/diagramViewerTemplateSelection.ts',
   '/src/core/components/shared/viewportStore.ts',
   '/src/core/components/shared/diagramNodeBounds.ts',

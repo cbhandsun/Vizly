@@ -2,7 +2,6 @@ import type { Edge } from '@xyflow/react';
 
 import {
   COMMERCIAL_BUSINESS_NODE_CLEARANCE,
-  repairBusinessNodeClearanceRisks,
 } from '../../strategies/shared/edgeBusinessNodeClearanceRepair';
 import { repairResidualHairpinBridges } from '../../strategies/shared/edgeHairpinBridgeWidenRepair';
 import {
@@ -10,7 +9,6 @@ import {
 } from './baseReactFlowDisplayCache';
 import {
   createBaseReactFlowFastDisplayEdges,
-  lockFinalDisplayComputedPaths,
   withDisplayAbsolutePositions,
 } from './baseReactFlowDisplayEdgeCore';
 import { computeBaseReactFlowDisplayInputIdentityBundle } from './baseReactFlowDisplayInputIdentity';
@@ -61,6 +59,8 @@ import {
   baseReactFlowReportHasOnlyObstacleDefects as reportHasOnlyObstacleDefects,
   baseReactFlowReportHasOnlyStrictDefects as reportHasOnlyStrictDefects,
   baseReactFlowRoutingChangeSetMatches as routingChangeSetMatches,
+  lockBaseReactFlowIncrementalComputedPaths,
+  repairBaseReactFlowIncrementalClearance,
   preservesBaseReactFlowIncrementalBoundary as preservesIncrementalBoundary,
 } from './baseReactFlowDisplayIncrementalContracts';
 import {
@@ -250,20 +250,13 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
   ]);
   const strictContextClearanceIds = new Set<string>();
   const repairIncrementalClearance = (candidateEdges: Edge[]): Edge[] => (
-    repairBusinessNodeClearanceRisks(candidateEdges, repairNodes, {
-      eligibleEdgeIds: commercialClearanceRepairIds,
-      minimumClearance: COMMERCIAL_BUSINESS_NODE_CLEARANCE,
-      validateCandidate: ({ candidateEdges: nextEdges }) => (
-        preservesIncrementalBoundary(
-          baselineEdges,
-          nextEdges,
-          transactionMutableIds,
-        )
-        && (() => {
-          const nextReport = evaluationSession.hardReport(nextEdges);
-          return nextReport.hardClean || reportHasOnlyStrictDefects(nextReport);
-        })()
-      ),
+    repairBaseReactFlowIncrementalClearance({
+      edges: candidateEdges,
+      nodes: repairNodes,
+      baselineEdges,
+      mutableIds: transactionMutableIds,
+      clearanceIds: commercialClearanceRepairIds,
+      hardReport: edges => evaluationSession.hardReport(edges),
     })
   );
   const transactionSourceEdges = request.edges.filter(edge => (
@@ -328,7 +321,9 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
     candidateEdges: Edge[],
     minimumClearance = COMMERCIAL_BUSINESS_NODE_CLEARANCE,
   ): BaseReactFlowDisplayIncrementalRouteOutcome | null => {
-    const lockedCandidateEdges = lockFinalDisplayComputedPaths(candidateEdges, repairNodes);
+    const lockedCandidateEdges = lockBaseReactFlowIncrementalComputedPaths(
+      candidateEdges, repairNodes, transactionMutableIds,
+    );
     const report = evaluationSession.hardReport(lockedCandidateEdges);
     if (
       !report.hardClean
@@ -585,7 +580,9 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
       ? repairIncrementalClearance(strictExpansion.edges)
       : null;
     const lockedExpandedCandidate = expandedCandidate
-      ? lockFinalDisplayComputedPaths(expandedCandidate, repairNodes)
+      ? lockBaseReactFlowIncrementalComputedPaths(
+          expandedCandidate, repairNodes, transactionMutableIds,
+        )
       : null;
     const expandedPreservesClosureBoundary = lockedExpandedCandidate
       ? preservesIncrementalBoundary(
@@ -661,9 +658,9 @@ export const createBaseReactFlowIncrementalDisplayEdges = ({
   );
   fastFallbackTimer.finish('accepted', locallyRoutedById.size);
   localRouteTimer.finish('accepted', locallyRoutedById.size);
-  const candidateEdges = lockFinalDisplayComputedPaths(repairIncrementalClearance(
+  const candidateEdges = lockBaseReactFlowIncrementalComputedPaths(repairIncrementalClearance(
     baselineEdges.map(edge => locallyRoutedById.get(edge.id) ?? edge),
-  ), repairNodes);
+  ), repairNodes, transactionMutableIds);
   const hardGateTimer = startDisplayRoutingPhaseTrace({
     phase: 'hard-gate',
     candidateCount: candidateEdges.length,

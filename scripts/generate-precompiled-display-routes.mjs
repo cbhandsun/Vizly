@@ -5,6 +5,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { withPrecompiledRouteBrowser } from './lib/precompiled-display-route-cdp.mjs';
 import { clickPrecompiledDisplayRouteLayoutVariant } from './lib/precompiled-display-route-layout-capture.mjs';
 import {
+  createPrecompiledDisplayRouteTimingRecorder,
   isFreshFullRouteResolution,
   renderPrecompiledDisplayRouteCaptureExpression,
 } from './lib/precompiled-display-route-capture.mjs';
@@ -73,9 +74,11 @@ const writeAtomic = async (path, contents) => {
 
 const captureScript = `(() => {
   const NativeWorker = window.Worker;
+  const createTimingRecorder = ${createPrecompiledDisplayRouteTimingRecorder.toString()};
   window.__vizlyDisplayRoutingDiagnosticsEnabled = true;
   window.__vizlyPrecompiledRouteRequest = null;
   window.__vizlyPrecompiledRouteResponse = null;
+  window.__vizlyPrecompiledRouteTiming = null;
   window.__vizlyPrecompiledCommittedRoute = null;
   window.__vizlyPrecompiledRouteWorkerErrors = [];
   window.__vizlyPrecompiledRoutePageErrors = [];
@@ -88,10 +91,12 @@ const captureScript = `(() => {
   class CapturingWorker extends NativeWorker {
     constructor(...args) {
       super(...args);
+      this.routeTiming = createTimingRecorder(Date.now());
       this.addEventListener('message', event => {
         const response = event?.data;
         const request = window.__vizlyPrecompiledRouteRequest;
         if (response && request && response.requestId === request.requestId) {
+          window.__vizlyPrecompiledRouteTiming = this.routeTiming.received(response, Date.now(), performance.now());
           try { window.__vizlyPrecompiledRouteResponse = structuredClone(response); } catch {}
         }
       });
@@ -117,6 +122,7 @@ const captureScript = `(() => {
     postMessage(message, transfer) {
       if (message && (message.operation === 'route' || message.operation === 'validate-or-route')) {
         try { window.__vizlyPrecompiledRouteRequest = structuredClone(message); } catch {}
+        this.routeTiming.posted(message.requestId, Date.now(), performance.now());
       }
       return typeof transfer === 'undefined'
         ? super.postMessage(message)
@@ -366,6 +372,7 @@ const captureTarget = async (session, target, source, routingVersion) => {
       workerAbortCount: routing.workerAbortCount,
       routeMs: routing.routeMs,
       workerDurationMs,
+      workerTimings: captured.workerTimings,
       phaseTrace: routing.phaseTrace,
     },
   };

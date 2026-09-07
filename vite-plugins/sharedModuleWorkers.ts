@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import type { Plugin } from 'vite';
+import { assertDisplayWorkerChunkIsolation } from './displayWorkerChunkIsolation';
 
 const DISPLAY_WORKER_VIRTUAL_ID = 'virtual:vizly-display-worker-url';
 const RESOLVED_DISPLAY_WORKER_VIRTUAL_ID = `\0${DISPLAY_WORKER_VIRTUAL_ID}`;
@@ -120,6 +121,10 @@ export const sharedModuleWorkersPlugin = (
     },
     transform(code, id) {
       return transformSharedModuleWorkerConsumer(code, id, resolvedOptions);
+    },
+    generateBundle(_options, bundle) {
+      if (!resolvedOptions.displayWorker) return;
+      assertDisplayWorkerChunkIsolation(Object.values(bundle).filter(chunk => chunk.type === 'chunk'));
     },
   };
 };

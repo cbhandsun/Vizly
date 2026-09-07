@@ -68,7 +68,12 @@ const createBrowserSourceEdges = async (): Promise<Edge[]> => {
 };
 
 describe('Logistics incremental display routing', () => {
-  it('keeps an L-OMS move inside a hard-clean bounded transaction', async () => {
+  it.each([
+    { nodeId: 'l-oms', position: { x: 972, y: 90 }, mutableCount: 5 },
+    { nodeId: 'tms', position: { x: 972, y: 378 }, mutableCount: 6 },
+  ])('keeps a $nodeId move inside a hard-clean bounded transaction', async ({
+    nodeId, position, mutableCount,
+  }) => {
     const entry = Object.entries(GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_LOADERS)
       .find(([, descriptor]) => descriptor.presetId === 'logistics-architecture-v1');
     if (!entry) throw new Error('expected the Logistics precompiled loader');
@@ -86,8 +91,8 @@ describe('Logistics incremental display routing', () => {
     if (!baselineEdges) throw new Error('expected the Logistics artifact patches to merge');
     const baselineNodes = withAbsoluteNodePositions(browserLogisticsNodes);
     const nextNodes = withAbsoluteNodePositions(browserLogisticsNodes.map(node => (
-      node.id === 'l-oms'
-        ? { ...node, position: { x: 972, y: 90 } }
+      node.id === nodeId
+        ? { ...node, position }
         : node
     )));
     const baselinePatches = createBaseReactFlowDisplayEdgePatches(
@@ -131,7 +136,7 @@ describe('Logistics incremental display routing', () => {
     const boundedReports: ReturnType<typeof getDisplayHardQualityGateReport>[] = [];
     const response = computeBaseReactFlowDisplayEdgesWorkerResponse({
       operation: 'incremental-route',
-      requestId: 'logistics-loms-incremental',
+      requestId: `logistics-${nodeId}-incremental`,
       edges: sourceEdges,
       nodes: nextNodes,
       enableSmartEdges: true,
@@ -168,12 +173,27 @@ describe('Logistics incremental display routing', () => {
 
     expect(response.routeResolution, diagnostics).toBe('incremental-route');
     expect(response.fallbackLevel, diagnostics).toBe('none');
-    expect(affectedClosure.mutableEdgeIds, diagnostics).toHaveLength(5);
+    expect(affectedClosure.mutableEdgeIds, diagnostics).toHaveLength(mutableCount);
     expect(response.affectedEdgeCount, diagnostics).toBe(
       affectedClosure.mutableEdgeIds.length,
     );
     expect(report?.hardClean, diagnostics).toBe(true);
     expect(response.hardReport, diagnostics).toEqual(report);
+    if (!response.edges) throw new Error('expected the incremental route edges');
+    const responseById = new Map(response.edges.map(edge => [edge.id, edge]));
+    for (const baselineEdge of baselineEdges) {
+      const responseEdge = responseById.get(baselineEdge.id);
+      if (!responseEdge) throw new Error('expected every baseline edge to remain present');
+      if (affectedClosure.mutableEdgeIds.includes(baselineEdge.id)) {
+        expect(createNodeClearanceEvaluationContext(nextNodes, responseEdge).score(
+          getDisplayComputedPath(responseEdge), COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+        ), diagnostics).toBeLessThanOrEqual(0.5);
+      } else {
+        expect(doBaseReactFlowDisplayRoutesMatchExactly(
+          [baselineEdge], [responseEdge],
+        ), diagnostics).toBe(true);
+      }
+    }
     const reconnectCandidateTrace = response.phaseTrace?.find(
       trace => trace.phase === 'local-reconnect-candidates',
     );
