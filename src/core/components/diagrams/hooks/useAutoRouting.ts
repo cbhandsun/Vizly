@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState, useRef } from 'react';
 import { Edge, Node, ReactFlowInstance } from '@xyflow/react';
 import { diagramConfigManager, EdgeConfig } from '@/core/config/DiagramConfig';
 import { useLayoutStrategy } from './useLayoutStrategy';
+import { presentLayoutFailure, type LayoutFailureMessageApi } from './layoutFailureFeedback';
+import type { DisplayLayoutTransactionErrorCode } from '../../shared/baseReactFlowDisplayRoutingDebug';
 import { syncAutoPathSelection, applyRoutingProfile, DESIGNER_ROUTING_PROFILE } from './useSmartRoutingConfig';
 import {
     useBaseReactFlowRoutingSessionRuntime,
@@ -17,6 +19,7 @@ interface UseAutoRoutingOptions {
     reactFlowInstance: ReactFlowInstance | null;
     diagramId?: string;
     loadLayoutPresetMap?: () => Promise<Record<string, unknown>>;
+    messageApi?: LayoutFailureMessageApi;
 }
 
 export type LayoutPresentationPreview = Readonly<{
@@ -39,6 +42,7 @@ export function useAutoRouting({
     reactFlowInstance,
     diagramId,
     loadLayoutPresetMap,
+    messageApi,
 }: UseAutoRoutingOptions) {
     // [FIX] Read initial value from DiagramConfig instead of hardcoding false.
     // When autoRoutingEnabled starts as false, BaseReactFlow converts 'advanced-smart-step'
@@ -89,6 +93,10 @@ export function useAutoRouting({
         setAutoRoutingEnabledState(nextValue);
     }, []);
 
+    const onLayoutFailure = useCallback((code: DisplayLayoutTransactionErrorCode) => {
+        presentLayoutFailure(messageApi, code);
+    }, [messageApi]);
+
     // 布局策略
     const { handleStrategyLayout: _handleStrategyLayout, lastDomainStrategy, lastDomainDirection, lastNodeLayout,
         layoutSelection, restoreLayoutSelection } = useLayoutStrategy({
@@ -100,6 +108,7 @@ export function useAutoRouting({
         reactFlowInstance,
         diagramId,
         loadLayoutPresetMap,
+        onLayoutFailure,
         setLayoutStable: setIsLayoutStable,
         routingSessionRuntime,
         publishLayoutPreview,

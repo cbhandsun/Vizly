@@ -6,7 +6,6 @@ import {
 import {
   computeBaseReactFlowDisplayEdgesInWorker,
   prewarmBaseReactFlowDisplayWorker,
-  resolveBaseReactFlowDisplayWorkerFailureStage,
   type DeferredDisplayEdges,
   type DisplayRoutingInput,
 } from './baseReactFlowDisplayWorkerClient';
@@ -27,7 +26,6 @@ import {
 } from './baseReactFlowDisplayRoutingTransaction';
 import { resolveBaseReactFlowDisplayCandidate } from './baseReactFlowDisplayCandidateResolver';
 import type { BaseReactFlowDisplayCandidateResolution } from './baseReactFlowDisplayCandidateResolver';
-import { canCommitBaseReactFlowDisplayResult } from './baseReactFlowDisplayCommitPolicy';
 import {
   consumeBaseReactFlowStagedLayoutSnapshotHandoff,
   readBaseReactFlowDisplayCommittedSnapshot,
@@ -60,6 +58,9 @@ import {
 import { useBaseReactFlowDisplayWorker } from './useBaseReactFlowDisplayWorker';
 import { useBaseReactFlowDisplayRoutingResult } from './useBaseReactFlowDisplayRoutingResult';
 import { useBaseReactFlowDisplayQualityPolicy } from './useBaseReactFlowDisplayQualityPolicy';
+import { useBaseReactFlowDisplayFailure } from './useBaseReactFlowDisplayFailure';
+import { classifyDisplayFinalRejection, classifyDisplayWorkerFailure } from './baseReactFlowDisplayFailure';
+import { createDisplayRoutingRejectionHandler } from './baseReactFlowDisplayRejectionHandler';
 
 /**
  * Owns the asynchronous display-routing lifecycle while the canvas component
@@ -136,6 +137,9 @@ export const useBaseReactFlowDisplayRouting = ({
     shouldPrewarm: displayQualityPolicy.mode !== 'skip' && !committedFinalDisplayEntry,
     routingSessionRuntime,
   });
+  const { failure, setFailure } = useBaseReactFlowDisplayFailure(
+    displayEdgeCacheSignature, inputGeometryDigest, isNodeDragging || routingPaused, displayRoutingSessionRuntime,
+  );
   const displayEdgeWorkerRef = displayRoutingSessionRuntime.workerRef;
 
   const cachedDisplayCandidateEdges = useBaseReactFlowCachedDisplayCandidate({
@@ -181,6 +185,7 @@ export const useBaseReactFlowDisplayRouting = ({
     rememberCommittedRenderAuthority,
   } = useBaseReactFlowCommittedRenderAuthority();
   useEffect(() => {
+    if (failure) return undefined;
     const routingInput = displayRoutingInputRef.current;
     const nodeCount = routingInput?.nodes.length ?? 0;
     const edgeCount = routingInput?.edges.length ?? 0;
@@ -296,6 +301,14 @@ export const useBaseReactFlowDisplayRouting = ({
     let workerCompleted = false;
     let cancelCacheWrite: (() => void) | null = null;
     let routingJob: ReturnType<typeof displayRoutingSessionRuntime.beginJob> | null = null;
+    const rejectCurrentJob = createDisplayRoutingRejectionHandler({
+      runtime: displayRoutingSessionRuntime,
+      inputSignature: displayEdgeCacheSignature,
+      inputGeometryDigest,
+      readRequest: () => cancelled ? null : { job: routingJob, input: displayRoutingInputRef.current },
+      setFailure,
+      onFallbackResolved: isNodeDragFallbackPending ? onNodeDragFallbackResolved : undefined,
+    });
     const scheduledAt = Date.now();
     updateDisplayRoutingDebugState({
       stage: 'scheduled',
@@ -338,6 +351,7 @@ export const useBaseReactFlowDisplayRouting = ({
         geometryBarrierSamples: geometryBarrier.sampleCount,
       });
       routingJob = displayRoutingSessionRuntime.beginJob('display');
+      if (!displayRoutingSessionRuntime.isCurrentJob(routingJob)) return;
       const incrementalPlan = createBaseReactFlowDisplayIncrementalPlan({
         baseline: forceFreshFullRoute ? null : committedSnapshotBaselineRef.current,
         nextInputSignature: displayEdgeCacheSignature,
@@ -512,13 +526,7 @@ export const useBaseReactFlowDisplayRouting = ({
           workerRoutingPatches: workerResult.routingPatches,
         });
         if (!mergedTransactions) {
-          updateDisplayRoutingDebugState({
-            stage: 'latest-shape-mismatch',
-            signature: displayEdgeCacheSignature,
-            requestId,
-            nodeCount,
-            edgeCount,
-          });
+          rejectCurrentJob('source-shape-mismatch');
           displayRoutingSessionRuntime.finishJob(completedRoutingJob);
           return;
         }
@@ -528,21 +536,13 @@ export const useBaseReactFlowDisplayRouting = ({
           reportedFinalEdges,
           mergedFinalEdges,
         );
-        const canCommitFinalResult = canCommitBaseReactFlowDisplayResult({
-          qualityMode: displayWorkerQualityMode,
+        const rejectionReason = classifyDisplayFinalRejection({
           hardClean: workerResult.hardClean,
-          routeResolution: workerResult.routeResolution,
           routesMatch: routesMatchExactly,
+          hasReceipt: Boolean(workerResult.commitReceipt),
         });
-        if (!canCommitFinalResult || workerResult.hardClean !== true || !workerResult.commitReceipt) {
-          updateDisplayRoutingDebugState({
-            stage: 'final-quality-rejected',
-            signature: displayEdgeCacheSignature,
-            requestId,
-            nodeCount,
-            edgeCount,
-          });
-          logBaseReactFlowQualityFallback('worker-final-signature-mismatch');
+        if (rejectionReason || !workerResult.commitReceipt) {
+          rejectCurrentJob(rejectionReason ?? 'receipt-missing');
           displayRoutingSessionRuntime.finishJob(completedRoutingJob);
           return;
         }
@@ -569,12 +569,14 @@ export const useBaseReactFlowDisplayRouting = ({
           outputRouteSignature: mergedOutputRouteSignature,
           commitReceipt: workerResult.commitReceipt,
           precompiledCapturePresetId: precompiledRegenerationPresetId,
+          onRejected: () => rejectCurrentJob('session-commit-rejected'),
           rememberCommittedBaseline: (baseline, committedEdges) => {
             committedSnapshotBaselineRef.current = baseline;
             rememberCommittedRenderAuthority(baseline, committedEdges);
             displayRoutingSessionRuntime.rememberDocumentSnapshot(baseline, { enableSmartEdges, smartEdgePadding, isLargeGraph });
           },
           applyFinalGeometry: () => {
+            setFailure(null);
             const finalAppliedAt = Date.now();
             updateDisplayRoutingFinalAppliedState({
               signature: displayEdgeCacheSignature,
@@ -618,15 +620,12 @@ export const useBaseReactFlowDisplayRouting = ({
       }).catch((error) => {
         if (cancelled) return;
         workerCompleted = true;
+        if (!routingJob || !displayRoutingSessionRuntime.isCurrentJob(routingJob)) return;
+        const reason = classifyDisplayWorkerFailure(error);
+        if (reason) rejectCurrentJob(reason);
         if (routingJob) displayRoutingSessionRuntime.finishJob(routingJob);
-        updateDisplayRoutingDebugState({
-          stage: resolveBaseReactFlowDisplayWorkerFailureStage(error),
-          signature: displayEdgeCacheSignature,
-          requestId,
-          error: error instanceof Error ? error.message : 'unknown-worker-error',
-        });
-        if (!(error instanceof Error) || error.message !== 'display-edge-worker-timeout') {
-          logBaseReactFlowEventBindingFailure('computeDisplayEdges', error);
+        if (reason && reason !== 'worker-timeout') {
+          logBaseReactFlowEventBindingFailure('computeDisplayEdges', reason);
         }
       });
       },
@@ -666,6 +665,7 @@ export const useBaseReactFlowDisplayRouting = ({
     documentDisplayCandidateEdges,
     enableSmartEdges,
     forceFreshFullRoute,
+    failure,
     inputGeometryDigest,
     isContainerReady,
     isLargeGraph,
@@ -679,6 +679,7 @@ export const useBaseReactFlowDisplayRouting = ({
     routingGeometryReady,
     routingPaused,
     smartEdgePadding,
+    setFailure,
   ]);
 
   return useBaseReactFlowDisplayRoutingResult({
@@ -693,5 +694,6 @@ export const useBaseReactFlowDisplayRouting = ({
     dragFallbackPending: isNodeDragFallbackPending,
     nodeDragFallbackIds,
     committedRenderAuthority,
+    failure,
   });
 };

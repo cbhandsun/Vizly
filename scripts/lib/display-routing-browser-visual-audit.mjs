@@ -29,6 +29,9 @@ export const assertDisplayRoutingVisualScaleAudit = ({
     || audit.duplicateMarkerEdgeCount !== 0
     || audit.edgeAccessibleNameMissingCount !== 0
     || (expectedLabelCount !== null && audit.labelCount !== expectedLabelCount)
+    || audit.nodeScanComplete !== true
+    || audit.scannedNodeCount < 1
+    || audit.labelLabelOverlapCount !== 0
     || audit.labelNodeOverlapCount !== 0
     || (expectsOverviewLod
       ? (!audit.zoomedOut
@@ -113,6 +116,13 @@ export const assertDisplayRoutingVisualScaleAudit = ({
       duplicateMarkerEdgeCount: audit?.duplicateMarkerEdgeCount,
       edgeAccessibleNameMissingCount: audit?.edgeAccessibleNameMissingCount,
       labelCount: audit?.labelCount,
+      nodeScanComplete: audit?.nodeScanComplete,
+      inputNodeCount: audit?.inputNodeCount,
+      scannedNodeCount: audit?.scannedNodeCount,
+      omittedNodeCount: audit?.omittedNodeCount,
+      unmatchedDomNodeCount: audit?.unmatchedDomNodeCount,
+      invalidModelNodeCount: audit?.invalidModelNodeCount,
+      labelLabelOverlapCount: audit?.labelLabelOverlapCount,
       labelNodeOverlapCount: audit?.labelNodeOverlapCount,
       labelNodeOverlaps: Array.isArray(audit?.labelNodeOverlaps)
         ? audit.labelNodeOverlaps.slice(0, 8).map(item => ({

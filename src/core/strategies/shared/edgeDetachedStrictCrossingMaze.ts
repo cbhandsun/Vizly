@@ -1,4 +1,7 @@
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
+import { resolveMazeRunDestination } from './edgeStrictCrossingMazeSteps';
+import { HARD_MINIMUM_BUSINESS_NODE_CLEARANCE } from './edgeWaypointCandidateRepair';
+import { mazeDirectionsReverse, resolveMazeTerminalCaps, type MazeDirection } from './edgeStrictCrossingMazeTerminals';
 
 import type {
   StrictCrossingMazeContext,
@@ -29,15 +32,10 @@ function segmentPenaltyAgainstOtherEdges(
   otherSegments: PathSegmentRef[],
   edge: Edge,
   edges: Edge[],
+  continuation?: Segment,
 ): number {
   let penalty = 0;
   for (const other of otherSegments) {
-    if (strictCross(segment, other)) {
-      penalty += 100000;
-      continue;
-    }
-    const overlap = segmentOverlap(segment, other);
-    if (overlap <= 1) continue;
     const otherEdge = edges[other.edgeIndex];
     const related = otherEdge && (
       edge.source === otherEdge.source
@@ -45,6 +43,20 @@ function segmentPenaltyAgainstOtherEdges(
       || edge.target === otherEdge.source
       || edge.target === otherEdge.target
     );
+    // A grid vertex is not a route endpoint. Charge a straight-through
+    // crossing there once, on departure, before final path compaction.
+    const crossesAtDeparture = continuation && segment.axis !== other.axis
+      && Math.abs(other.axis === 'v' ? other.a.x - segment.a.x : other.a.y - segment.a.y) <= EPS
+      && strictCross(continuation, other);
+    if (strictCross(segment, other) || crossesAtDeparture) {
+      // This hard-defect escape search cannot establish bridge clearance from
+      // individual grid steps. Readable crossings are accepted by the full-path
+      // policy before entering this search, not by weakening its local penalty.
+      penalty += 100000;
+      continue;
+    }
+    const overlap = segmentOverlap(segment, other);
+    if (overlap <= 1) continue;
     const oppositeDirection = segment.axis === other.axis
       && segmentAxisDirection(segment) * segmentDirection(other) < 0;
     penalty += overlap * (oppositeDirection ? 180 : related ? 8 : 80);
@@ -83,6 +95,11 @@ export function routeStrictCrossingMazeCandidate(
   }
   const start = path[0];
   const end = path[path.length - 1];
+  const terminalCaps = resolveMazeTerminalCaps(context?.terminalCaps, start, end);
+  if (terminalCaps === null) {
+    recordDiagnostics('invalid');
+    return null;
+  }
   const penaltyPaths = context?.penaltyPaths ?? paths;
   const penaltyEdges = context?.penaltyEdges ?? edges;
   const penaltyEdgeIndex = context?.penaltyEdgeIndex ?? edgeIndex;
@@ -136,11 +153,14 @@ export function routeStrictCrossingMazeCandidate(
   }
   for (const [nodeId, rect] of gridObstacles) {
     if (nodeId === edge.source || nodeId === edge.target) continue;
-    for (const offset of [0, 12, -12, 24, -24]) {
-      addX(rect.x + offset);
-      addX(rect.x + rect.width + offset);
-      addY(rect.y + offset);
-      addY(rect.y + rect.height + offset);
+    for (const offset of [0, HARD_MINIMUM_BUSINESS_NODE_CLEARANCE, -HARD_MINIMUM_BUSINESS_NODE_CLEARANCE, 24, -24]) {
+      // Keep fractional obstacle boundaries outside the required clearance when
+      // projecting them onto the integer grid. Nearest rounding can cut inside.
+      const roundOutward = offset < 0 ? Math.floor : offset > 0 ? Math.ceil : Math.round;
+      addX(roundOutward(rect.x + offset));
+      addX(roundOutward(rect.x + rect.width + offset));
+      addY(roundOutward(rect.y + offset));
+      addY(roundOutward(rect.y + rect.height + offset));
     }
   }
 
@@ -159,9 +179,10 @@ export function routeStrictCrossingMazeCandidate(
     return null;
   }
 
-  type AxisState = 0 | 1 | 2;
-  type QueueItem = { cost: number; xIndex: number; yIndex: number; axis: AxisState };
-  const keyOf = (xIndex: number, yIndex: number, axis: AxisState) => `${xIndex}:${yIndex}:${axis}`;
+  // Arrival direction distinguishes a straight crossing from a touch/turn.
+  type DirectionState = MazeDirection;
+  type QueueItem = { cost: number; xIndex: number; yIndex: number; direction: DirectionState };
+  const keyOf = (xIndex: number, yIndex: number, direction: DirectionState) => `${xIndex}:${yIndex}:${direction}`;
   const pointOf = (xIndex: number, yIndex: number): Point => ({ x: allX[xIndex], y: allY[yIndex] });
   const queue: QueueItem[] = [];
   const pushQueue = (item: QueueItem) => {
@@ -196,14 +217,20 @@ export function routeStrictCrossingMazeCandidate(
     }
     return first;
   };
-  pushQueue({ cost: 0, xIndex: startX, yIndex: startY, axis: 0 });
+  pushQueue({ cost: 0, xIndex: startX, yIndex: startY, direction: 0 });
   const distByKey = new Map<string, number>([[keyOf(startX, startY, 0), 0]]);
   const prevByKey = new Map<string, string>();
+  // The same directed grid step is revisited with different arrival states.
+  // Keep geometry costs local to this search; the existing cell budget bounds
+  // storage. Straight-through crossings must use a distinct penalty slot.
+  const blockedSteps = new Uint8Array(allX.length * allY.length * 8);
+  const stepPenalties = new Float64Array(allX.length * allY.length * 16).fill(Number.NaN);
+  const terminalPenalties = new Float64Array(5).fill(Number.NaN);
 
   const isSegmentBlockedByNode = (segment: Segment): boolean => {
     for (const [nodeId, rect] of obstacles) {
       if (nodeId === edge.source || nodeId === edge.target) continue;
-      if (segmentIntersectsRect(segment, rect, 12)) return true;
+      if (segmentIntersectsRect(segment, rect, HARD_MINIMUM_BUSINESS_NODE_CLEARANCE)) return true;
     }
     return false;
   };
@@ -211,7 +238,7 @@ export function routeStrictCrossingMazeCandidate(
   let bestEndKey: string | null = null;
   while (queue.length > 0) {
     const current = popQueue()!;
-    const currentKey = keyOf(current.xIndex, current.yIndex, current.axis);
+    const currentKey = keyOf(current.xIndex, current.yIndex, current.direction);
     if ((distByKey.get(currentKey) ?? Number.POSITIVE_INFINITY) < current.cost - EPS) continue;
     if (current.xIndex === endX && current.yIndex === endY) {
       bestEndKey = currentKey;
@@ -219,32 +246,90 @@ export function routeStrictCrossingMazeCandidate(
     }
 
     const neighbors = [
-      { xIndex: current.xIndex - 1, yIndex: current.yIndex, axis: 1 as AxisState },
-      { xIndex: current.xIndex + 1, yIndex: current.yIndex, axis: 1 as AxisState },
-      { xIndex: current.xIndex, yIndex: current.yIndex - 1, axis: 2 as AxisState },
-      { xIndex: current.xIndex, yIndex: current.yIndex + 1, axis: 2 as AxisState },
+      { xIndex: current.xIndex - 1, yIndex: current.yIndex, direction: 1 as DirectionState },
+      { xIndex: current.xIndex + 1, yIndex: current.yIndex, direction: 2 as DirectionState },
+      { xIndex: current.xIndex, yIndex: current.yIndex - 1, direction: 3 as DirectionState },
+      { xIndex: current.xIndex, yIndex: current.yIndex + 1, direction: 4 as DirectionState },
     ];
     const from = pointOf(current.xIndex, current.yIndex);
+    const incomingDirection = current.direction === 0
+      ? terminalCaps?.incomingDirection ?? 0 : current.direction;
     for (const next of neighbors) {
+      const turns = incomingDirection !== 0 && (incomingDirection <= 2) !== (next.direction <= 2);
+      if (turns) {
+        const horizontal = next.direction <= 2;
+        const coordinates = horizontal ? allX : allY;
+        const originIndex = horizontal ? current.xIndex : current.yIndex;
+        const sign = next.direction === 1 || next.direction === 3 ? -1 : 1;
+        // A short last piece is allowed only when it merges forward into the
+        // retained suffix and the resulting straight run meets the same limit.
+        const endIndex = horizontal ? endX : endY;
+        const endOnRay = (horizontal ? current.yIndex === endY : current.xIndex === endX)
+          && (endIndex - originIndex) * sign > 0;
+        const retainedEnd = endOnRay && terminalCaps?.outgoingDirection === next.direction ? {
+          index: endIndex,
+          extension: Math.abs(terminalCaps.outgoing.b.x - end.x) + Math.abs(terminalCaps.outgoing.b.y - end.y),
+        } : undefined;
+        const destination = resolveMazeRunDestination(coordinates, originIndex, sign, retainedEnd);
+        if (horizontal) next.xIndex = destination;
+        else next.yIndex = destination;
+      }
       if (next.xIndex < 0 || next.xIndex >= allX.length || next.yIndex < 0 || next.yIndex >= allY.length) {
         continue;
       }
+      if (mazeDirectionsReverse(incomingDirection, next.direction)) continue;
+      const reachesEnd = next.xIndex === endX && next.yIndex === endY;
+      if (reachesEnd && terminalCaps && mazeDirectionsReverse(next.direction, terminalCaps.outgoingDirection)) continue;
       const to = pointOf(next.xIndex, next.yIndex);
       const axis = axisOf(from, to);
       if (!axis) continue;
       const segment = { a: from, b: to, axis };
-      if (isSegmentBlockedByNode(segment)) continue;
+      const skipsGridVertices = Math.abs(next.xIndex - current.xIndex) + Math.abs(next.yIndex - current.yIndex) > 1;
+      const stepIndex = ((current.yIndex * allX.length + current.xIndex) * 4 + next.direction - 1) * 2 + Number(skipsGridVertices);
+      if (blockedSteps[stepIndex] === 0) {
+        blockedSteps[stepIndex] = isSegmentBlockedByNode(segment) ? 2 : 1;
+      }
+      if (blockedSteps[stepIndex] === 2) continue;
       const length = Math.abs(from.x - to.x) + Math.abs(from.y - to.y);
-      const turnPenalty = current.axis !== 0 && current.axis !== next.axis ? 40 : 0;
+      const turnPenalty = incomingDirection !== 0
+        && (incomingDirection <= 2) !== (next.direction <= 2) ? 40 : 0;
+      const continuation = incomingDirection === next.direction ? {
+        a: current.direction === 0 && terminalCaps ? terminalCaps.incoming.a : pointOf(
+          current.xIndex + (current.direction === 1 ? 1 : current.direction === 2 ? -1 : 0),
+          current.yIndex + (current.direction === 3 ? 1 : current.direction === 4 ? -1 : 0),
+        ),
+        b: to,
+        axis,
+      } : undefined;
+      const penaltyIndex = stepIndex * 2 + Number(Boolean(continuation));
+      let penalty = stepPenalties[penaltyIndex];
+      const isCapStart = current.direction === 0 && terminalCaps !== undefined;
+      if (isCapStart || Number.isNaN(penalty)) {
+        penalty = segmentPenaltyAgainstOtherEdges(segment, otherSegments, edge, penaltyEdges, continuation);
+        if (!isCapStart) stepPenalties[penaltyIndex] = penalty;
+      }
+      let terminalPenalty = 0;
+      if (reachesEnd && terminalCaps) {
+        terminalPenalty = terminalPenalties[next.direction];
+        if (Number.isNaN(terminalPenalty)) {
+          terminalPenalty = (next.direction <= 2) !== (terminalCaps.outgoingDirection <= 2) ? 40 : 0;
+          if (next.direction === terminalCaps.outgoingDirection) {
+            const cap = terminalCaps.outgoing;
+            terminalPenalty += segmentPenaltyAgainstOtherEdges(cap, otherSegments, edge, penaltyEdges, { ...cap, a: from })
+              - segmentPenaltyAgainstOtherEdges(cap, otherSegments, edge, penaltyEdges);
+          }
+          terminalPenalties[next.direction] = terminalPenalty;
+        }
+      }
       const nextCost = current.cost
         + length
         + turnPenalty
-        + segmentPenaltyAgainstOtherEdges(segment, otherSegments, edge, penaltyEdges);
-      const nextKey = keyOf(next.xIndex, next.yIndex, next.axis);
+        + penalty + terminalPenalty;
+      const nextKey = keyOf(next.xIndex, next.yIndex, next.direction);
       if (nextCost + EPS >= (distByKey.get(nextKey) ?? Number.POSITIVE_INFINITY)) continue;
       distByKey.set(nextKey, nextCost);
       prevByKey.set(nextKey, currentKey);
-      pushQueue({ cost: nextCost, xIndex: next.xIndex, yIndex: next.yIndex, axis: next.axis });
+      pushQueue({ cost: nextCost, xIndex: next.xIndex, yIndex: next.yIndex, direction: next.direction });
     }
   }
 

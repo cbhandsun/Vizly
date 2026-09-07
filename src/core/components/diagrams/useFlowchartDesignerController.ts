@@ -375,6 +375,7 @@ export const useFlowchartDesignerController = ({
 
     const { autoRoutingEnabled, setAutoRoutingEnabled, isLayoutStable, isLayoutBusy, layoutPresentationPreview, handleStrategyLayout, lastDomainStrategy, lastDomainDirection, lastNodeLayout, routingSessionRuntime, layoutSelection, restoreLayoutSelection } = useAutoRouting({
         setNodes, setEdges, nodesRef, edgesRef, takeSnapshot, reactFlowInstance,
+        messageApi,
         diagramId: diagramIdForExport,
         loadLayoutPresetMap,
     });
@@ -669,7 +670,7 @@ export const useFlowchartDesignerController = ({
         handleWrappedDirectSave, hasCopiedStyle, highlightMainFlow, historyPanelVisible, id, isCommentMode, isConnecting, isContextToolbarHidden,
         isDirectSaveDisabled, isDragging, isDraggingNode, isDrawingMode, isInitialDiagramLoading, isLayoutBusy, isLayoutStable, isMarqueeActive, isMobile, isReadonly,
         isSidebarHidden, isSpacePressed, isValidConnection, isVersionHistoryOpen, isYjsSynced, collaborationStatus, jsonEditorInitialContent, jsonEditorVisible, jumpTo, laserEnabled, viewportPersistenceKey,
-        lastDomainDirection, lastDomainStrategy, lastNodeLayout, layerSyncedNodes, layoutPresentationPreview, layers, leftDrawerOpen, leftDrawerWidth, messageContextHolder, routingSessionRuntime,
+        lastDomainDirection, lastDomainStrategy, lastNodeLayout, layoutSelection, layerSyncedNodes, layoutPresentationPreview, layers, leftDrawerOpen, leftDrawerWidth, messageContextHolder, routingSessionRuntime,
         mobilePropertyDrawerVisible, multiPage: { ...multiPage, ...commentAwarePageLifecycle }, nodes, nodesRef, notificationContextHolder, onAiTabIntercept, onCloudSave, onConnectStart, onDirectSave, onSaveAs,
         onDisplayRoutingFinalApplied, onDragOver, onDrop, onEdgeContextMenu, onEdgesChangeWithLock, onNodeContextMenu, onNodeDrag, onNodeDragStop, onNodesChangeWithLock, onSmartNodeDrag,
         onExportPermissionCheck, onOpenCollaboration, onOpenSettings, onOpenShareDialog, onOpenVersionHistory, onPaneContextMenu, onPaneDoubleClick, onPaneMouseLeave, onPaneMouseMove,

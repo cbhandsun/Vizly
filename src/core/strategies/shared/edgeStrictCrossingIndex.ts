@@ -48,12 +48,16 @@ const upperBoundLine = (
   return low;
 };
 
-const countFullScanStrictCrossings = (segments: readonly Segment[]): number => {
+const countFullScanStrictCrossings = (
+  segments: readonly Segment[],
+  include: (first: Segment, second: Segment) => boolean,
+): number => {
   let total = 0;
   for (let firstIndex = 0; firstIndex < segments.length; firstIndex += 1) {
     for (let secondIndex = firstIndex + 1; secondIndex < segments.length; secondIndex += 1) {
       if (segments[firstIndex].edgeIndex === segments[secondIndex].edgeIndex) continue;
-      if (strictlyCrosses(segments[firstIndex], segments[secondIndex])) total += 1;
+      if (strictlyCrosses(segments[firstIndex], segments[secondIndex])
+        && include(segments[firstIndex], segments[secondIndex])) total += 1;
     }
   }
   return total;
@@ -68,10 +72,11 @@ const countFullScanStrictCrossings = (segments: readonly Segment[]): number => {
 export const countIndexedStrictSegmentCrossings = (
   segments: readonly Segment[],
   diagnostics?: StrictCrossingIndexDiagnostics,
+  include: (first: Segment, second: Segment) => boolean = () => true,
 ): number => {
   if (segments.some(segment => !finiteSegment(segment))) {
     if (diagnostics) diagnostics.scannedSegmentCount += segments.length ** 2;
-    return countFullScanStrictCrossings(segments);
+    return countFullScanStrictCrossings(segments, include);
   }
 
   const vertical = segments
@@ -89,7 +94,7 @@ export const countIndexedStrictSegmentCrossings = (
       if (diagnostics) diagnostics.scannedSegmentCount += 1;
       const candidate = vertical[index].segment;
       if (candidate.edgeIndex === horizontal.edgeIndex) continue;
-      if (strictlyCrosses(horizontal, candidate)) total += 1;
+      if (strictlyCrosses(horizontal, candidate) && include(horizontal, candidate)) total += 1;
     }
   }
   return total;

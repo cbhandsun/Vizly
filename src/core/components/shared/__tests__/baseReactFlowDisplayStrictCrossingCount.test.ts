@@ -54,9 +54,9 @@ describe('displayStrictCrossingsFromKnownQuality', () => {
       source: 'shared',
       target: 'vertical-target',
       data: { computedPath: [
-        { x: 40, y: 0 },
-        { x: 40, y: 60 },
-        { x: 40, y: 100 },
+        { x: 12, y: 0 },
+        { x: 12, y: 60 },
+        { x: 12, y: 100 },
       ] },
     };
     const horizontal: Edge = {

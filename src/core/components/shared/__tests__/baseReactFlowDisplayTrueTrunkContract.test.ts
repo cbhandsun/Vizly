@@ -1,4 +1,4 @@
-import type { Edge } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
 import type { SameSideEndpointTrunkIdentity } from '../../../strategies/shared/edgeFinalSameSideEndpointOrderRepair';
@@ -7,6 +7,7 @@ import {
   preservesInitialTrueTrunks,
   preservesInitialTrueTrunksWithPreferredSourceSupersession,
   preservesInitialTrueTrunksWithinClearanceMargin,
+  finalSameSideTrueTrunksDoNotRegress,
 } from '../baseReactFlowDisplayTrueTrunkContract';
 
 const trunk = (
@@ -23,6 +24,25 @@ const trunk = (
 });
 
 describe('baseReactFlowDisplayTrueTrunkContract', () => {
+  it('allows shortening only a colliding shared stem while preserving membership and clearance', () => {
+    const nodes: Node[] = [
+      { id: 'hub', position: { x: 0, y: 0 }, width: 100, height: 100, data: {} },
+      { id: 'a', position: { x: 500, y: -150 }, width: 100, height: 100, data: {} },
+      { id: 'b', position: { x: 500, y: 150 }, width: 100, height: 100, data: {} },
+      { id: 'obstacle', position: { x: 180, y: 25 }, width: 50, height: 50, data: {} },
+    ];
+    const branches = (length: number): Edge[] => ['a', 'b'].map((target, index) => ({
+      id: target, source: 'hub', target, sourceHandle: 'right', targetHandle: 'left',
+      data: { computedPath: [{ x: 100, y: 50 }, { x: 100 + length, y: 50 },
+        { x: 100 + length, y: index === 0 ? -100 : 200 }, { x: 500, y: index === 0 ? -100 : 200 }] },
+    }));
+    const baseline = branches(200);
+    expect(finalSameSideTrueTrunksDoNotRegress(baseline, branches(56), nodes)).toBe(true);
+    expect(finalSameSideTrueTrunksDoNotRegress(baseline, branches(56), nodes.slice(0, 3))).toBe(false);
+    expect(finalSameSideTrueTrunksDoNotRegress(baseline, branches(100), nodes)).toBe(false);
+    expect(finalSameSideTrueTrunksDoNotRegress(baseline, branches(24), nodes)).toBe(false);
+    expect(finalSameSideTrueTrunksDoNotRegress(baseline, branches(56).slice(0, 1), nodes)).toBe(false);
+  });
   it('preserves source and target identities independently for a dual-role edge', () => {
     const baseline = [
       trunk('source', ['dual', 'source-peer'], 64),

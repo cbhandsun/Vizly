@@ -111,10 +111,11 @@ describe('restoreReadableRawLockedPaths', () => {
     expect(quality.reverseOverlap).toBeLessThanOrEqual(baseline.reverseOverlap);
     expect(quality.detourPenalty).toBeLessThan(baseline.detourPenalty);
     expect((restored[1].data as any).readableRawPathRestored).toBe(true);
-    expect(restored[1].sourceHandle).toBe('right');
+    expect(restored[1].sourceHandle).toBe('top');
     expect(restored[1].targetHandle).toBe('target-bottom-runtime-port-1');
     expect(restoredPath.length).toBeLessThanOrEqual(5);
-    expect(restoredPath[0].x).toBe(1533);
+    expect(restoredPath[0].y).toBe(962);
+    expect(restoredPath[1].y).toBeLessThan(restoredPath[0].y);
     expect(restoredPath[restoredPath.length - 1]).toEqual({ x: 1769, y: 278 });
   });
 

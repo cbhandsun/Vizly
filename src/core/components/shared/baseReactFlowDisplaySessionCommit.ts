@@ -38,6 +38,7 @@ export const commitBaseReactFlowDisplaySessionResult = ({
   precompiledCapturePresetId,
   rememberCommittedBaseline,
   applyFinalGeometry,
+  onRejected,
 }: {
   runtime: BaseReactFlowRoutingSessionRuntime;
   job: BaseReactFlowRoutingSessionJob;
@@ -57,6 +58,7 @@ export const commitBaseReactFlowDisplaySessionResult = ({
     edges: Edge[],
   ) => void;
   applyFinalGeometry: () => void;
+  onRejected?: () => void;
 }): BaseReactFlowDisplaySessionCommitResult => {
   const result = runtime.commitJob(job, () => {
     const expectedIdentity = createDisplayRoutingIdentity(
@@ -66,7 +68,10 @@ export const commitBaseReactFlowDisplaySessionResult = ({
     if (
       !displayRoutingIdentitiesMatch(commitReceipt.identity, expectedIdentity)
       || commitReceipt.outputRouteSignature !== outputRouteSignature
-    ) return { accepted: false } as const;
+    ) {
+      onRejected?.();
+      return { accepted: false } as const;
+    }
     const baseline = runtime.commitDisplaySnapshot({
       inputSignature,
       inputGeometryDigest,
@@ -78,7 +83,10 @@ export const commitBaseReactFlowDisplaySessionResult = ({
       workerSessionRef: commitReceipt.sessionRef,
       precompiledCapturePresetId,
     });
-    if (!baseline) return { accepted: false } as const;
+    if (!baseline) {
+      onRejected?.();
+      return { accepted: false } as const;
+    }
     rememberCommittedBaseline(baseline, finalEdges);
     applyFinalGeometry();
     if (cacheReplaySignature !== null && cachePatches) {

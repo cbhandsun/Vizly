@@ -8,6 +8,11 @@ import { auditFinalSameSideEndpointOrder } from '../../strategies/shared/edgeFin
 import { createNodeClearanceGraphEvaluationContext } from '../../strategies/shared/edgeWaypointCandidateRepair';
 import { createAtomicRouteTransactionEvaluation } from './baseReactFlowDisplayAtomicTransactionEvaluation';
 import { createDisplayDeclaredAxisMismatchCounter } from './baseReactFlowDisplayDeclaredAxisTransaction';
+import { buildEndpointTrunkSlideCandidates } from './baseReactFlowDisplayEndpointTrunkSlide';
+import {
+  buildDisplayEndpointRoleSlideCandidates,
+  collectDisplayEndpointRoleSlideGroups,
+} from './baseReactFlowDisplayEndpointRoleSlide';
 import {
   getDisplayComputedPath,
   withDisplayComputedPath,
@@ -109,23 +114,51 @@ export const buildBaseReactFlowDisplayEndpointTrunkClearanceCandidates = <
   const baselineCommercial = commercialByIndex.reduce((total, risk) => total + risk, 0);
   if (baselineCommercial <= EPSILON) return [];
   const baselineMinimum = totalClearanceRisk(edges, clearance, MINIMUM_BUSINESS_NODE_CLEARANCE);
-  const atomic = createAtomicRouteTransactionEvaluation(edges, nodes);
   const countAxisMismatches = createDisplayDeclaredAxisMismatchCounter(nodes);
   const baselineAxis = edges.map(countAxisMismatches);
-  const audited = auditFinalSameSideEndpointOrder(edges, nodes).legalSharedTrunks;
-  const groups = audited.filter(trunk => (
-    trunk.edgeIds.length >= 3
+  const endpointBaseline = auditFinalSameSideEndpointOrder(edges, nodes);
+  const endpointReports = new WeakMap<readonly Edge[], typeof endpointBaseline>([[edges, endpointBaseline]]);
+  const endpointOrder = (candidate: readonly Edge[]) => {
+    const cached = endpointReports.get(candidate);
+    if (cached) return cached;
+    const report = auditFinalSameSideEndpointOrder(candidate, nodes);
+    endpointReports.set(candidate, report);
+    return report;
+  };
+  const atomic = createAtomicRouteTransactionEvaluation(edges, nodes, { endpointOrder });
+  const audited = endpointBaseline.legalSharedTrunks;
+  const hasCommercialRisk = (edgeIds: readonly string[]) => edgeIds.some(edgeId => {
+    const index = edgeIndexById.get(edgeId);
+    return index !== undefined && commercialByIndex[index] > EPSILON;
+  });
+  const dualRoleGroups = collectDisplayEndpointRoleSlideGroups(edges, nodes, options.eligibleEdgeIds)
+    .filter(group => hasCommercialRisk(group.edgeIds));
+  const trunkGroups = audited.filter(trunk => (
+    trunk.edgeIds.length >= 2
+    // Spend the bounded search on eligible groups with actual clearance debt.
+    // Clean groups earlier in endpoint order must not starve a later repair.
+    && hasCommercialRisk(trunk.edgeIds)
+    && (!options.eligibleEdgeIds || trunk.edgeIds.every(edgeId => options.eligibleEdgeIds?.has(edgeId)))
     && !audited.some(other => other !== trunk
       && other.nodeId === trunk.nodeId
       && other.role === trunk.role
       && other.side === trunk.side
       && other.edgeIds.length > trunk.edgeIds.length
       && trunk.edgeIds.every(edgeId => other.edgeIds.includes(edgeId)))
-  )).slice(0, maxGroups);
+    && !dualRoleGroups.some(group => group.nodeId === trunk.nodeId && group.side === trunk.side
+      && trunk.edgeIds.every(edgeId => group.edgeIds.includes(edgeId)))
+  ));
+  // Dual-role ports compete for the same physical side. They consume the
+  // existing group/slide budget instead of starting a second repair search.
+  const groups = [
+    ...dualRoleGroups.map(group => ({ kind: 'dual-role' as const, group })),
+    ...trunkGroups.map(group => ({ kind: 'trunk' as const, group })),
+  ].slice(0, maxGroups);
   const accepted: T[] = [];
   const seen = new Set<string>();
 
-  for (const group of groups) {
+  for (const entry of groups) {
+    const group = entry.group;
     const memberIndexes = group.edgeIds.flatMap(edgeId => {
       const index = edgeIndexById.get(edgeId);
       return index === undefined ? [] : [index];
@@ -137,27 +170,33 @@ export const buildBaseReactFlowDisplayEndpointTrunkClearanceCandidates = <
     ) continue;
     const riskIndexes = memberIndexes.filter(index => commercialByIndex[index] > EPSILON);
     const safeIndexes = memberIndexes.filter(index => commercialByIndex[index] <= EPSILON);
-    if (riskIndexes.length === 0 || safeIndexes.length === 0) continue;
-    const safeCoordinates = safeIndexes.map(index => {
+    if (riskIndexes.length === 0) continue;
+    const safeCoordinates = entry.kind === 'trunk' ? safeIndexes.map(index => {
       const path = paths[index];
-      const oriented = group.role === 'source' ? path : [...path].reverse();
+      const oriented = entry.group.role === 'source' ? path : [...path].reverse();
       return normalCoordinate(oriented[1], group.side);
     }).filter((value, index, values) => values.findIndex(
       candidate => Math.abs(candidate - value) <= EPSILON,
-    ) === index);
+    ) === index) : [];
 
-    for (const coordinate of safeCoordinates) {
+    const candidates = safeCoordinates.flatMap(coordinate => {
       const candidate = edges.slice() as T;
       let complete = true;
       for (const index of memberIndexes) {
-        const moved = moveEndpointStem(edges[index], group.role, group.side, coordinate);
+        const moved = entry.kind === 'trunk'
+          ? moveEndpointStem(edges[index], entry.group.role, group.side, coordinate) : null;
         if (!moved) {
           complete = false;
           break;
         }
         candidate[index] = moved;
       }
-      if (!complete) continue;
+      return complete ? [candidate] : [];
+    });
+    candidates.push(...(entry.kind === 'trunk'
+      ? buildEndpointTrunkSlideCandidates(edges, nodes, entry.group)
+      : buildDisplayEndpointRoleSlideCandidates(edges, nodes, entry.group)));
+    for (const candidate of candidates) {
       const changedIndexes = memberIndexes.filter(index => candidate[index] !== edges[index]);
       if (changedIndexes.length === 0) continue;
       const commercial = totalClearanceRisk(
@@ -177,6 +216,10 @@ export const buildBaseReactFlowDisplayEndpointTrunkClearanceCandidates = <
         || !evaluation.terminalsAnchored
         || !evaluation.trunksPreserved
       ) continue;
+      const endpointCandidate = endpointOrder(candidate);
+      if (endpointCandidate.inversions > endpointBaseline.inversions
+        || endpointCandidate.ambiguousLaneTies > endpointBaseline.ambiguousLaneTies
+        || endpointCandidate.collapsedLanePairs > endpointBaseline.collapsedLanePairs) continue;
       const signature = changedIndexes.map(index => (
         `${index}:${getDisplayComputedPath(candidate[index])
           .map(point => `${point.x}:${point.y}`).join('|')}`

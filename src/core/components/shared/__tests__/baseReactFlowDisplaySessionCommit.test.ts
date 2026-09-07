@@ -76,11 +76,16 @@ describe('baseReactFlowDisplaySessionCommit', () => {
   });
 
   it('fails closed before display mutation when snapshot evidence is invalid', () => {
-    const result = commit({ outputRouteSignature: 'route-v2:invalid' });
+    const runtime = createBaseReactFlowRoutingSessionRuntime();
+    const job = runtime.beginJob('display');
+    const onRejected = vi.fn(() => expect(runtime.isCurrentJob(job)).toBe(true));
+    const result = commit({ runtime, job, outputRouteSignature: 'route-v2:invalid', onRejected });
 
     expect(result.result).toEqual({ committed: false });
     expect(result.rememberCommittedBaseline).not.toHaveBeenCalled();
     expect(result.applyFinalGeometry).not.toHaveBeenCalled();
+    expect(onRejected).toHaveBeenCalledOnce();
+    expect(runtime.isCurrentJob(job)).toBe(false);
   });
 
   it('rejects a receipt that belongs to another input identity', () => {
@@ -107,11 +112,13 @@ describe('baseReactFlowDisplaySessionCommit', () => {
     const staleJob = runtime.beginJob('display');
     runtime.beginJob('layout');
     const applyFinalGeometry = vi.fn();
+    const onRejected = vi.fn();
 
-    const result = commit({ runtime, job: staleJob, applyFinalGeometry });
+    const result = commit({ runtime, job: staleJob, applyFinalGeometry, onRejected });
 
     expect(result.result).toEqual({ committed: false });
     expect(applyFinalGeometry).not.toHaveBeenCalled();
+    expect(onRejected).not.toHaveBeenCalled();
   });
 
   it('rejects direct snapshot mutation outside the current commit epoch', () => {

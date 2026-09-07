@@ -1,6 +1,10 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import { normalizeHandle } from '../../routing/utils/handleUtils';
+import {
+  edgeTerminalSideCanSwitch,
+  resolveEdgeTerminalHandleForSide,
+} from '../../routing/utils/edgeTerminalPolicy';
 import { isFinitePoint } from './baseReactFlowDisplayCache';
 
 export type NodeRect = {
@@ -170,6 +174,8 @@ export const synthesizeStableFallbackPath = ({
   const autoSides = autoAnchorSide(sourceRect, targetRect);
   const sourceSide = sideForHandle(edge.sourceHandle) || autoSides.source;
   const targetSide = sideForHandle(edge.targetHandle) || autoSides.target;
+  if (!edgeTerminalSideCanSwitch(edge, 'source', sourceSide)
+    || !edgeTerminalSideCanSwitch(edge, 'target', targetSide)) return edge;
   const source = anchorForHandle(sourceRect, sourceSide);
   const target = anchorForHandle(targetRect, targetSide);
   const useHorizontalSpine = sourceSide === 'left'
@@ -193,6 +199,10 @@ export const synthesizeStableFallbackPath = ({
   if (path.length < 2) return edge;
   return {
     ...edge,
+    // The route and its ports form one geometry decision. Leaving an inferred
+    // handle absent makes React Flow attach this path to its first DOM handle.
+    sourceHandle: resolveEdgeTerminalHandleForSide(edge, 'source', sourceSide),
+    targetHandle: resolveEdgeTerminalHandleForSide(edge, 'target', targetSide),
     data: {
       ...data,
       computedPath: path,

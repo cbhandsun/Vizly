@@ -11,7 +11,8 @@ import { EdgeLabelRenderer, useStore, type EdgeProps } from '@xyflow/react';
 import { getSmartLabelPosition } from '../../algorithms/smartEdgeUtils';
 import { useEdgeTheme } from '../diagrams/useEdgeUpdate';
 import { getEdgeLabelAutoOffset } from './edgeLabelAvoidance';
-import { collectStablePathPeerPaths } from './stablePathEdgePeerPaths';
+import { EDGE_LABEL_MAX_WIDTH, useEdgeLabelMeasurement, type EdgeLabelSize } from './edgeLabelMeasurement';
+import { useEdgeLabelArrangement } from './useEdgeLabelArrangement';
 import { useEdgeLabelObstacles } from './edgeLabelObstacleContext';
 import {
     createDisplayRoutingRenderEdgeClaim,
@@ -44,6 +45,7 @@ interface StablePathEdgeData {
     computedPath?: unknown;
     _layoutEpoch?: unknown;
     labelOffset?: unknown;
+    labelPosition?: unknown;
     absoluteLabelX?: unknown;
     absoluteLabelY?: unknown;
     labelPriority?: unknown;
@@ -102,8 +104,9 @@ const autoLabelOffset = (
     peerPaths: Point[][],
     obstacles: Array<{ x: number; y: number; width: number; height: number }>,
     labelScale: number,
+    labelSize?: EdgeLabelSize,
 ): Point => {
-    return getEdgeLabelAutoOffset(ownPath, labelPoint, labelText, peerPaths, obstacles, labelScale);
+    return getEdgeLabelAutoOffset(ownPath, labelPoint, labelText, peerPaths, obstacles, labelScale, labelSize);
 };
 
 const pathLength = (points: readonly Point[]): number => points.reduce(
@@ -175,22 +178,14 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
     );
     const currentTheme = useEdgeTheme();
     const canvasBackground = currentTheme?.diagram?.canvas?.background ?? '#ffffff';
-    // Subscribe to the stable edge-array reference. Returning a freshly mapped
-    // array from the store selector made every edge re-render on every node move.
-    const allEdges = useStore(state => state.edges);
     // Endpoint objects change when React Flow publishes new absolute geometry.
     // Subscribe only to this edge's two endpoints so layout transitions cannot
     // leave the attachment memo pinned to an early sentinel coordinate.
     const sourceNode = useStore(state => state.nodeLookup.get(props.source));
     const targetNode = useStore(state => state.nodeLookup.get(props.target));
     const labelObstacles = useEdgeLabelObstacles();
+    const { labelRef, labelSize } = useEdgeLabelMeasurement(label, labelStyle);
     const labelScale = useStore(state => resolveBaseReactFlowEdgeLabelScale(state.transform?.[2] ?? 1));
-    const peerPaths = useMemo(
-        () => acceptsCommittedGeometry
-            ? collectStablePathPeerPaths(allEdges, id, Boolean(label))
-            : [],
-        [acceptsCommittedGeometry, allEdges, id, label],
-    );
     const [isPointerTracing, setIsPointerTracing] = useState(false);
     const [isLabelFocused, setIsLabelFocused] = useState(false);
 
@@ -276,15 +271,21 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
         || sharedTrunkPlan.memberships.length
     ));
     const semanticLabelPath = longestSemanticFragment(paintFragments);
-    const automaticLabelPath = semanticLabelPath ?? (isTraceActive ? renderPath : undefined);
+    const automaticLabelPath = semanticLabelPath ?? renderPath;
     const initialLabelPosition = getSmartLabelPosition([...(automaticLabelPath ?? renderPath)]);
-    let labelX = initialLabelPosition.x;
-    let labelY = initialLabelPosition.y;
+    const storedLabelPosition = readPoint(edgeData?.labelPosition);
+    // Routing-generated positions always carry an `adjusted` flag, including
+    // false. Those become stale after collapse/reflow; unmarked positions are manual.
+    const manualLabelPosition = storedLabelPosition && !('adjusted' in storedLabelPosition)
+        ? storedLabelPosition : undefined;
+    let labelX = manualLabelPosition?.x ?? initialLabelPosition.x;
+    let labelY = manualLabelPosition?.y ?? initialLabelPosition.y;
 
     const labelOffset = readPoint(edgeData?.labelOffset);
     const hasManualLabelPosition = !!labelOffset
-        || typeof edgeData?.absoluteLabelX === 'number'
-        || typeof edgeData?.absoluteLabelY === 'number';
+        || !!manualLabelPosition
+        || (typeof edgeData?.absoluteLabelX === 'number' && Number.isFinite(edgeData.absoluteLabelX))
+        || (typeof edgeData?.absoluteLabelY === 'number' && Number.isFinite(edgeData.absoluteLabelY));
 
     if (labelOffset) {
         labelX += Number(labelOffset.x) || 0;
@@ -304,12 +305,30 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
             [...automaticLabelPath],
             { x: labelX, y: labelY },
             String(label),
-            peerPaths,
+            [],
             labelObstacles,
             labelScale,
+            labelSize,
         );
         labelX += offset.x;
         labelY += offset.y;
+    }
+
+    const labelPlacement = useEdgeLabelArrangement({
+        id,
+        path: renderPath,
+        labelPath: automaticLabelPath,
+        anchor: initialLabelPosition,
+        preferredCenter: { x: labelX, y: labelY },
+        text: label ? String(label) : '',
+        size: labelSize,
+        scale: labelScale,
+        manual: hasManualLabelPosition,
+        obstacles: labelObstacles,
+    });
+    if (labelPlacement) {
+        labelX = labelPlacement.center.x;
+        labelY = labelPlacement.center.y;
     }
 
     const graphicsRef = useRef<SVGGElement>(null);
@@ -342,9 +361,7 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
         isPrimaryLabel ? 'stable-path-edge-label--primary' : '',
         isTraceActive ? 'stable-path-edge-label--trace-active' : '',
     ].filter(Boolean).join(' ');
-    const shouldRenderLabel = Boolean(label) && Boolean(
-        semanticLabelPath || hasManualLabelPosition || isTraceActive,
-    );
+    const shouldRenderLabel = Boolean(label);
     const semanticTraceStyle = {
         ...style,
         opacity: isTraceActive ? 1 : 0,
@@ -546,20 +563,48 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
                     stroke="transparent"
                     strokeWidth={20}
                 />
+                {shouldRenderLabel && labelPlacement?.leaderEnd && (
+                    <g
+                        className="stable-path-edge-label-leader"
+                        data-edge-label-leader={id}
+                        data-edge-label-priority={isPrimaryLabel ? 'primary' : 'detail'}
+                        data-edge-trace-state={isTraceActive ? 'active' : 'idle'}
+                        aria-hidden="true"
+                    >
+                        <ContrastSafeBaseEdge
+                            id={`${id}-label-leader`}
+                            path={`M ${labelPlacement.anchor.x} ${labelPlacement.anchor.y} L ${labelPlacement.leaderEnd.x} ${labelPlacement.leaderEnd.y}`}
+                            canvasBackground={canvasBackground}
+                            interactionWidth={0}
+                            vectorEffect="non-scaling-stroke"
+                            style={{ stroke: typeof style?.stroke === 'string' ? style.stroke : '#64748b',
+                                strokeWidth: 1.25, strokeDasharray: '2 3', pointerEvents: 'none' }}
+                        />
+                    </g>
+                )}
             </g>
             {shouldRenderLabel && (
                 <EdgeLabelRenderer>
                     <div
                         key={`${id}-label`}
+                        ref={labelRef}
                         style={{
                             position: 'absolute',
                             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px) scale(var(--diagram-edge-label-scale, 1))`,
                             transformOrigin: 'center',
                             pointerEvents: 'all',
                             ...labelStyle,
+                            maxWidth: EDGE_LABEL_MAX_WIDTH,
+                            width: 'max-content',
+                            boxSizing: 'border-box',
+                            whiteSpace: 'pre-wrap',
+                            overflowWrap: 'anywhere',
                         }}
                         className={labelClassName}
                         data-edge-id={id}
+                        data-edge-label-placement={labelPlacement?.status ?? 'pending'}
+                        data-edge-label-conflicts={labelPlacement?.conflicts || undefined}
+                        title={labelPlacement?.status === 'unresolved' ? '标签空间不足，存在未解决的排布冲突' : undefined}
                         data-edge-label-priority={isPrimaryLabel ? 'primary' : 'detail'}
                         data-edge-trace-state={isTraceActive ? 'active' : 'idle'}
                         tabIndex={selected ? 0 : -1}

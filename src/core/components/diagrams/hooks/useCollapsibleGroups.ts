@@ -1,5 +1,7 @@
 import { useMemo, useCallback } from 'react';
 import { Node, Edge } from '@xyflow/react';
+import { buildChildrenMap, getDescendantIds } from '../../shared/baseReactFlowLayoutVisibility';
+export { buildChildrenMap, getDescendantIds } from '../../shared/baseReactFlowLayoutVisibility';
 
 const COLLAPSE_HIDDEN_CLASS = 'vizly-collapse-hidden';
 
@@ -15,93 +17,6 @@ const removeCollapseHiddenClass = (node: Node): string | undefined => {
         .filter(token => token && token !== COLLAPSE_HIDDEN_CLASS)
         .join(' ');
     return className || undefined;
-};
-
-// 构建快速子节点查找表 (O(N))
-export const buildChildrenMap = (nodes: Node[]): Map<string, string[]> => {
-    const map = new Map<string, string[]>();
-
-    const addEdge = (parent: string, child: string) => {
-        let arr = map.get(parent);
-        if (!arr) {
-            arr = [];
-            map.set(parent, arr);
-        }
-        if (!arr.includes(child)) {
-            arr.push(child);
-        }
-    };
-
-    // 1. 寻找所有的 titleGroup, subGroup 和普通节点
-    const titleGroups = nodes.filter(n => n.type === 'titleGroup');
-    const subGroups = nodes.filter(n => n.type === 'subGroup');
-    const normalNodes = nodes.filter(n => n.type !== 'titleGroup' && n.type !== 'subGroup');
-
-    // 2. 首先处理 React Flow 标准 parentId
-    for (let i = 0; i < nodes.length; i++) {
-        const pId = nodes[i].parentId;
-        if (pId) {
-            addEdge(pId, nodes[i].id);
-        }
-    }
-
-    // 3. 处理 Flowchart 语义化父子关系
-    // 3a. subGroup -> titleGroup 的父子关系
-    subGroups.forEach(sg => {
-        const domain = sg.data?.domain;
-        if (domain) {
-            const tg = titleGroups.find(t => t.data?.domain === domain);
-            if (tg) {
-                addEdge(tg.id, sg.id);
-            }
-        }
-    });
-
-    // 3b. 业务节点 -> subGroup 或 titleGroup 的父子关系
-    normalNodes.forEach(n => {
-        const domain = n.data?.domain;
-        const subDomain = n.data?.subDomain;
-
-        if (domain) {
-            // 优先归属到对应的子组 (subGroup)
-            if (subDomain) {
-                const sg = subGroups.find(s => s.data?.domain === domain && (s.data?.subDomain === subDomain || s.data?.description === subDomain));
-                if (sg) {
-                    addEdge(sg.id, n.id);
-                    return;
-                }
-            }
-            // 如果没有子组，归属到主域 (titleGroup)
-            const tg = titleGroups.find(t => t.data?.domain === domain);
-            if (tg) {
-                addEdge(tg.id, n.id);
-            }
-        }
-    });
-
-    return map;
-};
-
-// 获取给定节点的所有子代节点 ID (深度优先/广度优先)
-export const getDescendantIds = (nodes: Node[], parentId: string, prebuiltMap?: Map<string, string[]>): string[] => {
-    const childrenMap = prebuiltMap || buildChildrenMap(nodes);
-    
-    const descendants: string[] = [];
-    const queue = [parentId];
-    
-    let head = 0;
-    while (head < queue.length) {
-        const currentId = queue[head++];
-        const children = childrenMap.get(currentId);
-        if (children) {
-            for (let i = 0; i < children.length; i++) {
-                descendants.push(children[i]);
-                queue.push(children[i]);
-            }
-        }
-    }
-    
-    return descendants;
 };
 
 interface UseCollapsibleGroupsProps {

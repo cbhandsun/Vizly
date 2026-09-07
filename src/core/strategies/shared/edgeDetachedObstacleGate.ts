@@ -1,9 +1,12 @@
-import type { Edge } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 
 import type { Point, Rect } from './edgeDetachedOverlapCandidates';
 import type { RoutingObstacleGate } from './edgeDetachedOverlapRepairTypes';
 import {
   createRoutingObstacleEvaluationContext,
+  createNodeClearanceGraphEvaluationContext,
+  HARD_MINIMUM_BUSINESS_NODE_CLEARANCE,
+  BUSINESS_NODE_CLEARANCE,
   type RoutingObstacleEvaluationContext,
 } from './edgeWaypointCandidateRepair';
 
@@ -33,7 +36,9 @@ export const createRoutingObstacleGate = (
   edges: Edge[],
   obstacles: Map<string, Rect>,
   diagnostics?: ObstacleGateCacheDiagnostics,
+  nodes: Node[] = [],
 ): RoutingObstacleGate => {
+  const clearance = createNodeClearanceGraphEvaluationContext(nodes);
   const hitsByPath = new WeakMap<Point[], Map<number, number>>();
   const hitsByGeometry = new Map<string, number>();
   const obstacleEvaluationByEdge = new Map<number, RoutingObstacleEvaluationContext>();
@@ -74,9 +79,16 @@ export const createRoutingObstacleGate = (
     return hits;
   };
 
-  return (baselinePaths, candidatePaths, changedIndexes) => changedIndexes.every(edgeIndex => (
-    candidatePaths[edgeIndex]
-    && baselinePaths[edgeIndex]
-    && hitsFor(candidatePaths[edgeIndex], edgeIndex) <= hitsFor(baselinePaths[edgeIndex], edgeIndex)
-  ));
+  return (baselinePaths, candidatePaths, changedIndexes) => changedIndexes.every(edgeIndex => {
+    const baseline = baselinePaths[edgeIndex];
+    const candidate = candidatePaths[edgeIndex];
+    const edge = edges[edgeIndex];
+    if (!edge || !candidate || !baseline
+      || hitsFor(candidate, edgeIndex) > hitsFor(baseline, edgeIndex)) return false;
+    // A readable crossing must not buy a shorter route by consuming the
+    // separate business-node clearance. The obstacle test alone pads only 8px.
+    const before = clearance.scorePair(baseline, edge, HARD_MINIMUM_BUSINESS_NODE_CLEARANCE, BUSINESS_NODE_CLEARANCE);
+    const after = clearance.scorePair(candidate, edge, HARD_MINIMUM_BUSINESS_NODE_CLEARANCE, BUSINESS_NODE_CLEARANCE);
+    return after.every((risk, index) => risk <= before[index] + 1e-6);
+  });
 };

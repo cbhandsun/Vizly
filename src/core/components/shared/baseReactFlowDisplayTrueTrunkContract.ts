@@ -8,6 +8,7 @@ import {
   COMMERCIAL_BUSINESS_NODE_CLEARANCE,
   COMMERCIAL_BUSINESS_NODE_ROUTING_CLEARANCE,
 } from '../../strategies/shared/edgeBusinessNodeClearanceRepair';
+import { buildDisplayRoutingObstacles, collectPathHitObstacleRects, getDisplayComputedPath } from './baseReactFlowDisplayGeometry';
 
 const sameTrunkIdentity = (
   baseline: SameSideEndpointTrunkIdentity,
@@ -146,7 +147,31 @@ export const finalSameSideTrueTrunksDoNotRegress = (
   baselineEdges: readonly Edge[],
   candidateEdges: readonly Edge[],
   nodes: Node[],
-): boolean => preservesInitialTrueTrunks(
-  auditFinalSameSideEndpointOrder(baselineEdges, nodes).legalSharedTrunks,
-  auditFinalSameSideEndpointOrder(candidateEdges, nodes).legalSharedTrunks,
-);
+): boolean => {
+  const baseline = auditFinalSameSideEndpointOrder(baselineEdges, nodes).legalSharedTrunks;
+  const candidate = auditFinalSameSideEndpointOrder(candidateEdges, nodes).legalSharedTrunks;
+  if (preservesInitialTrueTrunks(baseline, candidate)) return true;
+  const obstacles = buildDisplayRoutingObstacles(nodes);
+  const crossesUnrelatedNode = (trunk: SameSideEndpointTrunkIdentity, edges: readonly Edge[]): boolean => {
+    const members = edges.filter(edge => trunk.edgeIds.includes(edge.id));
+    if (members.length !== trunk.edgeIds.length || !members[0]) return false;
+    const path = getDisplayComputedPath(members[0]);
+    const anchor = trunk.role === 'source' ? path[0] : path[path.length - 1];
+    if (!anchor || !Number.isFinite(trunk.commonStemLength)) return false;
+    const end = {
+      x: anchor.x + (trunk.side === 'right' ? trunk.commonStemLength : trunk.side === 'left' ? -trunk.commonStemLength : 0),
+      y: anchor.y + (trunk.side === 'bottom' ? trunk.commonStemLength : trunk.side === 'top' ? -trunk.commonStemLength : 0),
+    };
+    const endpointIds = new Set(members.flatMap(edge => [edge.source, edge.target]));
+    return [...obstacles].some(([id, rect]) => !endpointIds.has(id)
+      && collectPathHitObstacleRects([anchor, end], [rect]).length > 0);
+  };
+  // A provisional shared stem that crosses a business node is not a safe
+  // length baseline. Preserve its membership, side and commercial minimum,
+  // while allowing the collision to be removed before the final hard gate.
+  return baseline.every(trunk => candidate.some(next => sameTrunkIdentity(trunk, next)
+    && (next.commonStemLength + 1e-6 >= trunk.commonStemLength
+      || (next.commonStemLength >= COMMERCIAL_BUSINESS_NODE_CLEARANCE
+        && crossesUnrelatedNode(trunk, baselineEdges)
+        && !crossesUnrelatedNode(next, candidateEdges)))));
+};

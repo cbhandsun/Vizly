@@ -6,10 +6,12 @@ import { describe, expect, it } from 'vitest';
 import tmsStandardData from '../../../../data/standardized/TmsStandardData.json';
 import { standardDataToCanvas } from '../../diagrams/designerUtils';
 import { calculateEdgePathQualityScore } from '../../../strategies/shared/edgeStrictCrossingGuard';
-import { countDisplayObstacleHits } from '../baseReactFlowDisplayEvaluation';
+import { countDisplayObstacleHits, visualPolishHardQualityDoesNotRegress } from '../baseReactFlowDisplayEvaluation';
+import { finalSameSideTrueTrunksDoNotRegress } from '../baseReactFlowDisplayTrueTrunkContract';
 import {
   extractDisplaySegments,
   findDisplayStrictCrossingHits,
+  findDisplayGeometricCrossingHits,
   getDisplayComputedPath,
   type DisplaySegment,
 } from '../baseReactFlowDisplayGeometry';
@@ -54,6 +56,17 @@ const node = (id: string, x: number, y: number, width: number, height: number): 
 });
 
 describe('final residual strict-crossing repair', () => {
+  it.each([0, -1, Number.NaN, Number.NEGATIVE_INFINITY, 0.5])(
+    'preserves geometry when the internal-lane quality budget is invalid: %s', budget => {
+      const edges: Edge[] = [{ id: 'edge', source: 'source', target: 'target', data: {
+        computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+      } }];
+      const diagnostics = createStrictCrossingRepairDiagnostics();
+      expect(repairInternalStrictCrossingLanes(edges, [], diagnostics, budget)).toBe(edges);
+      expect(diagnostics.qualityEvaluationCount).toBe(0);
+    },
+  );
+
   it('does not construct node-aware repair contexts without a strict-crossing defect', () => {
     const cleanEdges: Edge[] = [{
       id: 'clean-edge',
@@ -347,7 +360,7 @@ describe('final residual strict-crossing repair', () => {
       },
     };
 
-    expect(baselineQuality.strictCrossings).toBe(1);
+    expect(baselineQuality).toMatchObject({ strictCrossings: 0, bridgedCrossings: 1 });
     expect(baselineTerminals).toEqual({
       attached: true,
       anchored: true,
@@ -650,7 +663,7 @@ describe('final residual strict-crossing repair', () => {
       }));
     const candidate = repairCrossedSpineWithOuterSkirt(edges, nodes);
 
-    expect(calculateEdgePathQualityScore(edges).strictCrossings).toBe(2);
+    expect(calculateEdgePathQualityScore(edges)).toMatchObject({ strictCrossings: 1, bridgedCrossings: 1 });
     expect(calculateEdgePathQualityScore(candidate).strictCrossings).toBe(0);
     expect(displayEdgesHaveNodeAnchoredTerminals(candidate, nodes)).toBe(true);
     expect(
@@ -659,7 +672,7 @@ describe('final residual strict-crossing repair', () => {
     ).toBe(0);
   });
 
-  it('repairs the cold TMS crossed-cost snapshot without trading it for another hard defect', async () => {
+  it('closes the cold TMS ambiguity without regressing other seed defects', async () => {
     const canvas = await standardDataToCanvas(tmsStandardData as any);
     const nodes = withAbsoluteNodePositions(canvas.nodes as any);
     const edges = canvas.edges
@@ -678,11 +691,18 @@ describe('final residual strict-crossing repair', () => {
     const skirtRepaired = repairCrossedSpineWithOuterSkirt(edges, nodes, {
       onReport: next => { report = next; },
     });
-    const repaired = repairFinalResidualStrictCrossings(skirtRepaired, nodes);
+    const strictRepaired = repairFinalResidualStrictCrossings(skirtRepaired, nodes);
     const baselineQuality = calculateEdgePathQualityScore(edges);
+    const strictQuality = calculateEdgePathQualityScore(strictRepaired);
+    expect(strictQuality.strictCrossings).toBe(0);
+    expect(visualPolishHardQualityDoesNotRegress(baselineQuality, strictQuality)).toBe(true);
+    expect(countDisplayObstacleHits(strictRepaired, nodes)).toBe(0);
+    expect(displayEdgesHaveNodeAnchoredTerminals(strictRepaired, nodes)).toBe(true);
+
+    const repaired = strictRepaired;
     const repairedQuality = calculateEdgePathQualityScore(repaired);
 
-    expect(baselineQuality.strictCrossings).toBe(2);
+    expect(baselineQuality).toMatchObject({ strictCrossings: 1, bridgedCrossings: 1 });
     expect(repairedQuality.strictCrossings, JSON.stringify({
       report,
       crossings: findDisplayStrictCrossingHits(repaired).map(hit => ({
@@ -697,23 +717,13 @@ describe('final residual strict-crossing repair', () => {
     expect(repairedQuality.unrelatedOverlap).toBe(0);
     expect(repairedQuality.unexplainedRelatedOverlap).toBe(0);
     expect(repairedQuality.shortEndpointStubs).toBe(0);
-    expect(repairedQuality.tinyInteriorDoglegs, JSON.stringify(repaired.map(edge => ({
-      id: edge.id,
-      sourceHandle: edge.sourceHandle,
-      targetHandle: edge.targetHandle,
-      path: edge.data?.computedPath,
-    })), null, 2)).toBe(0);
+    // Complete-route zero-defect acceptance lives in wmsTmsRegressions.test.ts.
+    expect(repairedQuality.tinyInteriorDoglegs).toBeLessThanOrEqual(baselineQuality.tinyInteriorDoglegs);
     expect(repairedQuality.hairpins).toBe(0);
     expect(countDisplayObstacleHits(repaired, nodes)).toBe(0);
     expect(displayEdgesHaveNodeAnchoredTerminals(repaired, nodes)).toBe(true);
+    expect(finalSameSideTrueTrunksDoNotRegress(edges, repaired, nodes)).toBe(true);
     expect(report?.pairedStrictReduced).toBeGreaterThan(0);
-    expect(report?.tripleAccepted).toBeGreaterThan(0);
-    const gpsEdge = repaired.find(edge => edge.id === 'edge-gps-tms-execution');
-    const driverEdge = repaired.find(edge => edge.id === 'edge-driver-tms-execution');
-    if (!gpsEdge || !driverEdge) throw new Error('Expected both shared-target TMS edges.');
-    const gpsPath = getDisplayComputedPath(gpsEdge);
-    const driverPath = getDisplayComputedPath(driverEdge);
-    expect(gpsPath.slice(-3)).toEqual(driverPath.slice(-3));
   });
 
   it('preserves a source trunk while merging a trapped incoming edge into a shared target trunk', () => {
@@ -792,8 +802,8 @@ describe('final residual strict-crossing repair', () => {
     const siblingSuffix = ((edges[2].data as { computedPath: Array<{ x: number; y: number }> })
       .computedPath).slice(-3);
 
-    expect(calculateEdgePathQualityScore(edges).strictCrossings).toBe(1);
-    const crossing = findDisplayStrictCrossingHits(edges)[0];
+    expect(calculateEdgePathQualityScore(edges)).toMatchObject({ strictCrossings: 0, bridgedCrossings: 1 });
+    const crossing = findDisplayGeometricCrossingHits(edges)[0];
     expect(crossing).toBeDefined();
     if (!crossing) return;
     const candidates = [

@@ -1,16 +1,22 @@
 import type { Edge, Node } from '@xyflow/react';
+import type { LaneRankMode } from '../types/domainLaneRank';
 import { getNodeDimensions, layoutWithDagre } from './DomainDagreLayoutHelpers';
 import { domainDagreDomainOf, isDomainDagreGroupNode, isDomainDagreNodeHidden } from './domainDagreHierarchy';
+import { domainDagrePeerComponentIndex } from './domainDagrePeerComponents';
+import { compactDomainDagreLaneCrossAxis } from './domainDagreLaneCrossCompaction';
+import { assignDomainDagreLaneCoordinates, type DomainDagreLaneCoordinateScope } from './domainDagreLaneCoordinateAssignment';
 import { boundedDomainDagreNumber, getDomainDagreSubDomainOrderIndex,
   type DomainDagreDirection, type DomainDagreSubDomainOrder } from './domainDagreLayoutBoundary';
 
 export interface SemanticLaneFlowOptions {
+  rankMode?: LaneRankMode;
   direction: DomainDagreDirection;
   nodeToSubGroup?: ReadonlyMap<string, string>;
   domainOrder?: readonly string[];
   subDomainOrder?: DomainDagreSubDomainOrder;
   horizontalGap?: number;
   verticalGap?: number;
+  independentNodeArrangement?: 'grid' | 'flow';
 }
 
 const withoutAbsolutePosition = (node: Node): Node => {
@@ -24,7 +30,10 @@ const moveAlong = (node: Node, axis: 'x' | 'y', value: number): Node => ({
 const appendGrouped = <K, V>(groups: Map<K, V[]>, key: K, value: V): void => {
   groups.set(key, [...(groups.get(key) ?? []), value]);
 };
-const geometryBoundsError = () => Error('Semantic swimlane layout exceeds supported geometry bounds');
+export class SemanticLaneGeometryError extends Error {
+  constructor() { super('Semantic swimlane layout exceeds supported geometry bounds'); }
+}
+const geometryBoundsError = () => new SemanticLaneGeometryError();
 // Keep enough room for an orthogonal connector, arrowhead and compact label,
 // without carrying Dagre's presentation spacing through every process rank.
 // This is a group-level flow-axis compaction: peer lanes still share one
@@ -59,11 +68,8 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
   if (leaves.some(node => !Number.isFinite(node.position.x) || !Number.isFinite(node.position.y))) {
     throw geometryBoundsError();
   }
-  // Small diagrams benefit from globally aligned process stages. On dense
-  // diagrams the same global ranks duplicate cross-domain progression on the
-  // flow axis and create mostly empty, extremely long lanes, so rank each lane
-  // independently while keeping the shared lane extent and routing bands.
-  const compactLaneRanks = leaves.length > 23;
+  // Ranking semantics are explicit; adding isolated nodes never changes them.
+  const compactLaneRanks = options.rankMode === 'compact';
   const positionScopes = new Map<string, Node[]>();
   for (const node of leaves) {
     const key = compactLaneRanks ? domainDagreDomainOf(node) : '';
@@ -81,12 +87,14 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
   }
   const domains = nodes.filter(node => node.type === 'titleGroup' && !isDomainDagreNodeHidden(node));
   if (!domains.length) return nodes;
-  const rank = (domain: Node) => Math.min(...leaves.filter(node => domainDagreDomainOf(node) === domainDagreDomainOf(domain))
-    .map(node => globalPositions.get(node.id)?.[flow] ?? Infinity));
+  // Process ranks order business nodes along a lane; they do not redefine
+  // the declared cross-axis lane order, especially for independent cards.
+  const declarationRank = new Map(domains.map((domain, index) => [domain.id, index]));
   const explicitRank = new Map(domainOrder.map((key, index) => [key, index]));
   const orderedDomains = domains.toSorted((a, b) =>
     (explicitRank.get(domainDagreDomainOf(a)) ?? Number.MAX_SAFE_INTEGER)
-    - (explicitRank.get(domainDagreDomainOf(b)) ?? Number.MAX_SAFE_INTEGER) || rank(a) - rank(b));
+    - (explicitRank.get(domainDagreDomainOf(b)) ?? Number.MAX_SAFE_INTEGER)
+    || (declarationRank.get(a.id) ?? 0) - (declarationRank.get(b.id) ?? 0));
   const originals = new Map(nodes.map(node => [node.id, node]));
   const replacements = new Map<string, Node>();
   const at = (c: number, f: number) => horizontal ? { x: f, y: c } : { x: c, y: f };
@@ -100,6 +108,7 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
   };
   const flowEnd = Math.max(...leaves.map(node => (globalPositions.get(node.id)?.[flow] ?? 0) + flowSize(node))) + 232;
   let domainCross = 0;
+  const coordinateScopes: DomainDagreLaneCoordinateScope[] = [];
   for (const domain of orderedDomains) {
     const domainKey = domainDagreDomainOf(domain);
     const members = leaves.filter(node => domainDagreDomainOf(node) === domainKey);
@@ -113,14 +122,18 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
     const orderedBuckets = [...buckets].sort(([a], [b]) =>
       getDomainDagreSubDomainOrderIndex(subDomainOrder, domainKey, originals.get(a)?.data.subDomain)
       - getDomainDagreSubDomainOrderIndex(subDomainOrder, domainKey, originals.get(b)?.data.subDomain));
+    coordinateScopes.push({ domainId: domain.id,
+      buckets: orderedBuckets.map(([id, bucket]) => ({ id, nodeIds: bucket.map(node => node.id) })) });
     for (const [id, bucket] of orderedBuckets) {
-      const minCross = Math.min(...bucket.map(node => node.position[cross]));
-      const maxCross = Math.max(...bucket.map(node => node.position[cross] + crossSize(node)));
+      const compactCross = compactDomainDagreLaneCrossAxis(bucket, globalPositions, cross, crossGap);
+      const crossPosition = (node: Node) => compactCross.get(node.id) ?? node.position[cross];
+      const minCross = Math.min(...bucket.map(crossPosition));
+      const maxCross = Math.max(...bucket.map(node => crossPosition(node) + crossSize(node)));
       const inset = horizontal ? 64 : 32;
       const width = maxCross - minCross + inset + 32;
       for (const node of bucket) {
         const leaf = withoutAbsolutePosition(node);
-        replacements.set(node.id, { ...leaf, position: at(bucketCross + inset + node.position[cross] - minCross,
+        replacements.set(node.id, { ...leaf, position: at(bucketCross + inset + crossPosition(node) - minCross,
           200 + (globalPositions.get(node.id)?.[flow] ?? 0)) });
       }
       const group = originals.get(id);
@@ -148,7 +161,11 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
     appendGrouped(layers, key, node);
   }
   const neighbors = new Map<string, string[]>();
+  const neighborRelations = new Set<string>();
   for (const edge of edges) {
+    const relation = JSON.stringify([edge.source, edge.target]);
+    if (neighborRelations.has(relation)) continue;
+    neighborRelations.add(relation);
     appendGrouped(neighbors, edge.source, edge.target);
     appendGrouped(neighbors, edge.target, edge.source);
   }
@@ -184,6 +201,7 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
   // Reserve distinct flow corridors for peers instead of forcing every
   // independent branch and cross-domain merge through the same rank gap.
   const flowRanks = new Map<number, Node[]>();
+  const peerComponents = domainDagrePeerComponentIndex(leaves.map(node => node.id), edges);
   for (const node of leaves) {
     const rankCenter = (globalPositions.get(node.id)?.[flow] ?? 0) + flowSize(node) / 2;
     appendGrouped(flowRanks, rankCenter, node);
@@ -192,15 +210,13 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
   let flowReduction = 0;
   let occupiedEnd: number | undefined;
   for (const [, peers] of [...flowRanks].sort(([a], [b]) => a - b)) {
-    let peerGroups = [peers];
-    if (compactLaneRanks) {
-      const peersByDomain = new Map<string, Node[]>();
-      for (const node of peers) {
-        const key = domainDagreDomainOf(node);
-        appendGrouped(peersByDomain, key, node);
-      }
-      peerGroups = [...peersByDomain.values()];
+    const peerGroupsByScope = new Map<string, Node[]>();
+    for (const node of peers) {
+      const scope = compactLaneRanks ? domainDagreDomainOf(node) : '';
+      const component = peerComponents.get(node.id) ?? node.id;
+      appendGrouped(peerGroupsByScope, JSON.stringify([scope, component]), node);
     }
+    const peerGroups = [...peerGroupsByScope.values()];
     let maximumPeerOffset = 0;
     const positioned = peerGroups.flatMap(domainPeers => (
       domainPeers
@@ -225,6 +241,8 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
     if (!isDomainDagreGroupNode(node)) continue;
     replacements.set(node.id, resize(node, node.position[cross], node.position[flow], crossSize(node), flowSize(node) + flowOffset - flowReduction));
   }
+  assignDomainDagreLaneCoordinates(replacements, coordinateScopes, edges, horizontal, crossGap, flowGap,
+    options.independentNodeArrangement);
   if (reversed) {
     const visible = leaves.map(node => replacements.get(node.id) ?? node);
     const mirror = Math.min(...visible.map(node => node.position[flow]))

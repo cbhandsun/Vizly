@@ -331,7 +331,9 @@ function groupAudit(group: LegGroup): SameSidePassageGroupAudit {
               * (firstLeg.branchLane - firstLeg.terminalNormal);
             const secondOutward = secondLeg.outwardDirection
               * (secondLeg.branchLane - secondLeg.terminalNormal);
-            if (legTerminalDelta * (firstOutward - secondOutward) >= -EPS) {
+            // A left/up branch reverses the lane order required by a right/down
+            // branch. Outward distance alone does not encode that orientation.
+            if (firstLeg.branchDirection * legTerminalDelta * (firstOutward - secondOutward) >= -EPS) {
               reversePassageDefects += 1;
             }
           }

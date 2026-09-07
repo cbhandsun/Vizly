@@ -86,6 +86,23 @@ describe('display routing matrix cases', () => {
     expect({}.polluted).toBeUndefined();
   });
 
+  it('compares saved manual label coordinates, offsets and text without trusting generated positions', () => {
+    const nodes = [{ id: 'a', position: { x: 0, y: 0 }, width: 100, height: 60 }];
+    const edge = { id: 'e', source: 'a', target: 'a', label: 'manual',
+      data: { labelPosition: { x: 110, y: -30 }, labelOffset: { x: 12, y: -4 }, absoluteLabelX: 140 } };
+    const raw = JSON.stringify({ nodes, edges: [edge], routingSnapshot: { candidate: { hardClean: true } } });
+    expect(readSavedDisplayRoutingState(raw, nodes, [structuredClone(edge)])).not.toBeNull();
+    for (const patch of [{ labelPosition: { x: 111, y: -30 } }, { labelOffset: { x: 12, y: 0 } },
+      { absoluteLabelX: 141 }, { labelOffset: { x: NaN, y: 0 } }]) {
+      expect(readSavedDisplayRoutingState(raw, nodes, [{ ...edge, data: { ...edge.data, ...patch } }])).toBeNull();
+    }
+    expect(readSavedDisplayRoutingState(raw, nodes, [{ ...edge, label: 'changed' }])).toBeNull();
+    const generated = { ...edge, data: { labelPosition: { x: 10, y: 20, adjusted: false } } };
+    const generatedRaw = JSON.stringify({ nodes, edges: [generated], routingSnapshot: { candidate: { hardClean: true } } });
+    expect(readSavedDisplayRoutingState(generatedRaw, nodes, [{ ...generated,
+      data: { labelPosition: { x: 500, y: 600, adjusted: true } } }])).not.toBeNull();
+  });
+
   it('accepts bounded desktop and narrow viewport configurations', () => {
     expect(parseDisplayRoutingMatrixViewport()).toEqual({ width: 1600, height: 1200 });
     expect(parseDisplayRoutingMatrixViewport('1280x720')).toEqual({ width: 1280, height: 720 });

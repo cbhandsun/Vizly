@@ -1,5 +1,8 @@
 import type { Edge, Node } from '@xyflow/react';
 
+import { compareBeamStates, selectDiverseBeamStates, type BeamState } from './baseReactFlowDisplayCrossingClusterBeam';
+import { repairDisplayCrossingClusterMazeFallback } from './baseReactFlowDisplayCrossingClusterMazeFallback';
+
 import { normalizeHandle } from '../../routing/utils/handleUtils';
 import {
   createEdgePathQualityEvaluationContext,
@@ -7,7 +10,7 @@ import {
 } from '../../strategies/shared/edgeStrictCrossingGuard';
 import { createRoutingObstacleEvaluationContext } from '../../strategies/shared/edgeWaypointCandidateRepair';
 import { compactOrthogonalPath } from './baseReactFlowDisplayEdgeCore';
-import { resolveDisplayCrossingClusterCandidateBudget } from './baseReactFlowDisplayCrossingClusterBudget';
+import { resolveDisplayCrossingClusterSearch } from './baseReactFlowDisplayCrossingClusterScope';
 import {
   buildDisplayRoutingObstacles,
   createDisplayCandidateInteractionContext,
@@ -39,14 +42,12 @@ import {
   type DisplayCrossingClusterRankedCandidate,
 } from './baseReactFlowDisplayCrossingClusterRanking';
 import {
-  displayCrossingClusterCrossingPairSignature,
   displayCrossingClusterEdgeStateSignature,
   displayCrossingClusterFacingSidePair,
   displayCrossingClusterOutwardStub,
   displayCrossingClusterPathSignature,
   displayCrossingClusterPointOnSide,
   displayCrossingClusterSideAxis,
-  firstDisplayCrossingClusterStrictHits,
   selectDisplayCrossingClusterOtherSegments,
 } from './baseReactFlowDisplayCrossingClusterGeometry';
 
@@ -57,16 +58,7 @@ export {
 } from './baseReactFlowDisplayCrossingClusterGeometry';
 export type { DisplayCrossingClusterStrictHit } from './baseReactFlowDisplayCrossingClusterGeometry';
 
-type BeamState<T extends Edge[]> = {
-  edges: T;
-  segments: DisplaySegment[];
-  quality: EdgePathQualityScore;
-  obstacleHits: number;
-  changedIndexes: number[];
-  signature: string;
-};
 const MAX_SEARCH_DEPTH = 4;
-const MAX_BEAM_WIDTH = 8;
 const MAX_STATE_EVALUATIONS = 12;
 const MAX_QUALITY_EVALUATIONS = 192;
 // Candidate construction used to enumerate tens of thousands of paths per
@@ -263,7 +255,11 @@ const buildMoverCandidates = (
   const sourceRect = sourceNode ? getDisplayNodeRect(sourceNode) : null;
   const targetRect = targetNode ? getDisplayNodeRect(targetNode) : null;
   if (path.length < 2 || !sourceRect || !targetRect) return [];
-  const routingObstacleContext = createRoutingObstacleEvaluationContext(edge, obstacles);
+  // Each candidate owns fresh interior points. Retain bounded coordinate reuse,
+  // without allocating reference-cache entries for these short-lived paths.
+  const routingObstacleContext = createRoutingObstacleEvaluationContext(edge, obstacles, {
+    cachePointReferences: false,
+  });
   const primaryCorridorAxis = displayCrossingClusterSideAxis(
     displayCrossingClusterFacingSidePair(sourceRect, targetRect)[0],
   ) === 'v'
@@ -519,67 +515,24 @@ const buildMoverCandidates = (
     }));
 };
 
-const compareBeamStates = <T extends Edge[]>(first: BeamState<T>, second: BeamState<T>): number => (
-  first.quality.strictCrossings - second.quality.strictCrossings
-  || first.obstacleHits - second.obstacleHits
-  || first.changedIndexes.length - second.changedIndexes.length
-  || first.quality.bends - second.quality.bends
-  || first.quality.totalLength - second.quality.totalLength
-);
-
-/**
- * A residual crossing can migrate from one edge pair to another while a valid
- * multi-edge repair is being assembled. Keeping only the globally shortest
- * partial paths tends to discard that progress because all intermediate
- * states can still have the same strict-crossing count. Preserve a small,
- * deterministic sample across both crossing topology and changed-edge sets,
- * then fill the remaining beam slots by the normal quality ordering.
- */
-const selectDiverseBeamStates = <T extends Edge[]>(states: BeamState<T>[]): BeamState<T>[] => {
-  const sorted = [...states].sort(compareBeamStates);
-  const selected: BeamState<T>[] = [];
-  const selectedSignatures = new Set<string>();
-  const crossingPairs = new Set<string>();
-  const changedSets = new Set<string>();
-  const append = (state: BeamState<T>): void => {
-    if (selected.length >= MAX_BEAM_WIDTH || selectedSignatures.has(state.signature)) return;
-    selectedSignatures.add(state.signature);
-    selected.push(state);
-  };
-
-  for (const state of sorted) {
-    const pairSignature = displayCrossingClusterCrossingPairSignature(state.segments);
-    if (crossingPairs.has(pairSignature)) continue;
-    crossingPairs.add(pairSignature);
-    append(state);
-    if (selected.length >= Math.min(4, MAX_BEAM_WIDTH)) break;
-  }
-
-  for (const state of sorted) {
-    const changedSet = state.changedIndexes.join(':');
-    if (changedSets.has(changedSet)) continue;
-    changedSets.add(changedSet);
-    append(state);
-    if (selected.length >= Math.min(6, MAX_BEAM_WIDTH)) break;
-  }
-
-  for (const state of sorted) append(state);
-  return selected;
-};
-
 /**
  * Last-resort bounded search for residual crossing clusters that require moving
- * several edges together. It deliberately never runs on normal/large graphs.
+ * several edges together. Larger graphs use a bounded crossing component as
+ * the moving scope, while all nodes and edges remain in the quality context.
  */
 export const repairBoundedMultiEdgeResidualStrictCrossings = <T extends Edge[]>(
   edges: T,
   nodes: Node[],
+  options: {
+    /** Invariants required of every intermediate and returned candidate. */
+    acceptCandidate?: (candidate: T) => boolean;
+  } = {},
 ): T => {
-  const candidateBudget = resolveDisplayCrossingClusterCandidateBudget(edges.length);
-  if (!candidateBudget) return edges;
+  if (edges.length === 0) return edges;
   const qualityContext = createEdgePathQualityEvaluationContext(edges);
   const baselineQuality = qualityContext.evaluate(edges);
-  if (baselineQuality.strictCrossings === 0 || hasDisplayCrossingClusterFixedPoint(edges, nodes)) return edges;
+  if (baselineQuality.strictCrossings === 0
+    || (!options.acceptCandidate && hasDisplayCrossingClusterFixedPoint(edges, nodes))) return edges;
   const obstacleContext = createDisplayObstacleEvaluationContext(edges, nodes);
   const baselineObstacleHits = obstacleContext.evaluate(edges);
   const nodesById = new Map(nodes.map(node => [node.id, node]));
@@ -600,13 +553,16 @@ export const repairBoundedMultiEdgeResidualStrictCrossings = <T extends Edge[]>(
     const nextStates: BeamState<T>[] = [];
     const nextSignatures = new Set<string>();
     for (const state of beam) {
-      const hits = firstDisplayCrossingClusterStrictHits(state.segments);
-      if (hits.length === 0) continue;
-      const candidatesByMover = new Map<number, DisplayCrossingClusterRankedCandidate[]>();
+      // Recompute after every candidate: crossings can migrate to an edge
+      // outside the original component. Keep the same total search budget.
+      const search = resolveDisplayCrossingClusterSearch(state.segments, edges.length);
+      if (!search) continue;
+      const { budget: candidateBudget, hits } = search;
+      const candidatesByMover = new Map<number, Edge[]>();
       for (const hit of hits) {
         for (const [segment, other] of [[hit.a, hit.b], [hit.b, hit.a]] as const) {
           if (candidatesByMover.has(segment.edgeIndex)) continue;
-          candidatesByMover.set(segment.edgeIndex, buildMoverCandidates(
+          const candidates = buildMoverCandidates(
             state.edges,
             nodes,
             nodesById,
@@ -616,16 +572,16 @@ export const repairBoundedMultiEdgeResidualStrictCrossings = <T extends Edge[]>(
             other.edgeIndex,
             candidateBudget.maxLocalCandidates,
             candidateBudget.maxSidePairCandidates,
-          ));
+          ).map(candidate => candidate.edge);
+          candidatesByMover.set(segment.edgeIndex, candidates);
         }
       }
-
       const moverEntries = [...candidatesByMover.entries()].sort(([firstIndex], [secondIndex]) => (
         Number(state.changedIndexes.includes(firstIndex)) - Number(state.changedIndexes.includes(secondIndex))
       ));
       const scheduled: Array<{
         moverIndex: number;
-        candidate: DisplayCrossingClusterRankedCandidate;
+        candidate: Edge;
       }> = [];
       const stateEvaluationLimit = depth === 0
         ? MAX_STATE_EVALUATIONS
@@ -644,17 +600,18 @@ export const repairBoundedMultiEdgeResidualStrictCrossings = <T extends Edge[]>(
 
       for (const { moverIndex, candidate } of scheduled) {
         if (evaluations >= MAX_QUALITY_EVALUATIONS) break;
-        evaluations += 1;
         const candidateEdges = state.edges.map((edge, edgeIndex) => (
-          edgeIndex === moverIndex ? candidate.edge : edge
+          edgeIndex === moverIndex ? candidate : edge
         )) as T;
         const changedIndexes = [...new Set([...state.changedIndexes, moverIndex])].sort((a, b) => a - b);
         const signature = displayCrossingClusterEdgeStateSignature(candidateEdges, changedIndexes);
         if (nextSignatures.has(signature)) continue;
+        evaluations += 1;
         const candidateQuality = qualityContext.evaluateChanged(candidateEdges, changedIndexes);
         if (!qualityWithinIntermediateBaseline(baselineQuality, candidateQuality)) continue;
         const candidateObstacleHits = obstacleContext.evaluateKnownChanges(candidateEdges, changedIndexes);
         if (candidateObstacleHits > baselineObstacleHits) continue;
+        if (options.acceptCandidate && !options.acceptCandidate(candidateEdges)) continue;
         const nextState: BeamState<T> = {
           edges: candidateEdges,
           segments: extractDisplaySegments(candidateEdges),
@@ -679,6 +636,10 @@ export const repairBoundedMultiEdgeResidualStrictCrossings = <T extends Edge[]>(
     beam = selectDiverseBeamStates(nextStates);
   }
 
-  if (!best) rememberDisplayCrossingClusterFixedPoint(edges, nodes);
-  return best?.edges ?? edges;
+  if (best) return best.edges;
+  const fallback = repairDisplayCrossingClusterMazeFallback(
+    edges, nodes, MAX_QUALITY_EVALUATIONS - evaluations, options.acceptCandidate,
+  );
+  if (fallback === edges && !options.acceptCandidate) rememberDisplayCrossingClusterFixedPoint(edges, nodes);
+  return fallback;
 };

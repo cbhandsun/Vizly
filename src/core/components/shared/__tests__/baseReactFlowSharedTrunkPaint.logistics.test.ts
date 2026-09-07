@@ -13,13 +13,9 @@ import {
   type SharedTrunkRole,
 } from '../../../rendering/sharedTrunkPaint';
 import { standardDataToCanvas } from '../../diagrams/designerUtils';
-import { parseBaseReactFlowPrecompiledRoutePatches } from '../baseReactFlowPrecompiledRouteArtifact';
 import { projectBaseReactFlowDisplayWorkerInput } from '../baseReactFlowDisplayWorkerClient';
 import { mergeBaseReactFlowDisplayEdgePatches } from '../baseReactFlowDisplayRoutingTransaction';
-import {
-  GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_PREFETCH_LOADERS,
-} from '../generated/baseReactFlowPrecompiledRouteLoaders';
-import { getGeneratedPrecompiledRouteArtifactForTest } from './fixtures/generatedPrecompiledRouteArtifacts';
+import { getCapturedLogisticsDualTrunkEdges } from './fixtures/logisticsDualTrunkFixture';
 import { withAbsoluteNodePositions } from './baseReactFlowDisplayEdges.testUtils';
 
 const byId = (edges: readonly Edge[], edgeId: string): Edge => {
@@ -74,20 +70,6 @@ const expectConsistentGroupMembership = (
   }
 };
 
-const loadLogisticsPatches = async (): Promise<Edge[]> => {
-  const descriptor = GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_PREFETCH_LOADERS[
-    'logistics-architecture-v1'
-  ];
-  if (!descriptor) throw new Error('Missing generated logistics route descriptor');
-  const artifact = getGeneratedPrecompiledRouteArtifactForTest('logistics-architecture-v1');
-  const artifactRecord = artifact !== null && typeof artifact === 'object' && !Array.isArray(artifact)
-    ? artifact as Record<string, unknown>
-    : {};
-  const patches = parseBaseReactFlowPrecompiledRoutePatches(artifactRecord.patches);
-  if (!patches) throw new Error('Invalid generated logistics route patches');
-  return patches;
-};
-
 const routeLogisticsCanvas = async (): Promise<{ nodes: Node[]; edges: Edge[] }> => {
   const canvas = await standardDataToCanvas(
     logisticsStandardData as unknown as StandardDiagramData,
@@ -95,7 +77,7 @@ const routeLogisticsCanvas = async (): Promise<{ nodes: Node[]; edges: Edge[] }>
   const projected = projectBaseReactFlowDisplayWorkerInput(canvas);
   const edges = mergeBaseReactFlowDisplayEdgePatches(
     projected.edges,
-    await loadLogisticsPatches(),
+    getCapturedLogisticsDualTrunkEdges(),
   );
   if (!edges) throw new Error('Unable to merge generated logistics route patches');
   return {

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi } from 'vitest';
+import type { Node } from '@xyflow/react';
 
 vi.hoisted(() => {
   Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
@@ -52,6 +53,33 @@ const baseNodes = [
 ];
 
 describe('subGrouping semantic helpers', () => {
+  it('is idempotent for generated and custom subgroup identities and never groups containers as children', () => {
+    const once = applySubGrouping(baseNodes);
+    const before = structuredClone(once);
+    const twice = applySubGrouping(once);
+    expect(twice).toEqual(once);
+    expect(once).toEqual(before);
+    expect(new Set(twice.map(node => node.id)).size).toBe(twice.length);
+    const custom = once.map(node => node.type === 'subGroup' ? { ...node, id: `custom:${node.id}` } : node);
+    expect(applySubGrouping(custom)).toEqual(custom);
+    expect(applySubGrouping(once.filter(node => node.type === 'subGroup'))).toEqual(once.filter(node => node.type === 'subGroup'));
+  });
+
+  it('separates semantic key and generated ID collisions without losing business identities', () => {
+    const nodes: Node[] = [
+      { ...baseNodes[0], id: 'subgroup-a-b-c', data: { domain: 'a-b', subDomain: 'c' } },
+      { ...baseNodes[1], id: 'second', data: { domain: 'a', subDomain: 'b-c' } },
+      { ...baseNodes[2], id: 'third', data: { domain: '__proto__', subDomain: 'constructor' } },
+    ];
+    const result = applySubGrouping(nodes);
+    expect(result.slice(0, nodes.length)).toEqual(nodes);
+    expect(new Set(result.map(node => node.id)).size).toBe(result.length);
+    expect(result.filter(node => node.type === 'subGroup').map(node => node.data.children)).toEqual([
+      ['subgroup-a-b-c'], ['second'], ['third'],
+    ]);
+    expect(applySubGrouping(result)).toEqual(result);
+  });
+
   it('creates subgroup containers by domain and subdomain', () => {
     const result = applySubGrouping(baseNodes as never);
     const subgroup = result.find(node => node.type === 'subGroup') as any;

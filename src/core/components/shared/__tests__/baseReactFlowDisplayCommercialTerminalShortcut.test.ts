@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildCommercialBranchedTerminalShortcutCandidates,
-  buildCommercialParallelTerminalCorridorShortcutPaths,
+  buildCommercialTerminalCorridorShortcutPaths,
   buildCommercialSameSideRectangularShortcutPaths,
   buildCommercialSourceTerminalShortcutCandidates,
   buildCommercialTerminalShortcutCandidates,
@@ -15,6 +15,8 @@ import {
   segmentDisplayLength,
 } from '../baseReactFlowDisplayGeometry';
 import { MIN_RENDER_SAFE_ENDPOINT_STUB } from '../baseReactFlowDisplayEndpointStubRepair';
+import { auditBaseReactFlowDisplayCommercialQuality } from '../baseReactFlowDisplayCommercialQuality';
+import { scoreNodeClearanceRisk } from '../../../strategies/shared/edgeWaypointCandidateRepair';
 
 const nodes: Node[] = [
   { id: 'source', position: { x: 400, y: 0 }, measured: { width: 100, height: 60 }, data: {} },
@@ -40,6 +42,42 @@ const edge = (data: Record<string, unknown> = {}): Edge => ({
     ...data,
   },
 });
+
+const corridorNode = (id: string, x: number, y: number, width: number, height: number): Node => ({
+  id, position: { x, y }, measured: { width, height }, data: {},
+});
+const mixedCorridorNodes: Node[] = [
+  corridorNode('source', -50, 1000, 100, 80),
+  corridorNode('target', 416, -40, 100, 80),
+  corridorNode('middle-blocker', 108, 500, 227, 96),
+  corridorNode('target-blocker', 411, 200, 234, 96),
+];
+const mixedCorridorPath = [
+  { x: 0, y: 1000 }, { x: 0, y: 900 }, { x: 360, y: 900 },
+  { x: 360, y: 644 }, { x: 60, y: 644 }, { x: 60, y: 452 },
+  { x: 360, y: 452 }, { x: 360, y: 0 }, { x: 416, y: 0 },
+];
+const mixedCorridorShortcut = [
+  { x: 0, y: 1000 }, { x: 0, y: 900 }, { x: 384, y: 900 },
+  { x: 384, y: 344 }, { x: 360, y: 344 }, { x: 360, y: 0 }, { x: 416, y: 0 },
+];
+const mixedCorridorEdge: Edge = {
+  id: 'mixed-corridor', source: 'source', target: 'target', sourceHandle: 'top', targetHandle: 'left',
+  data: { computedPath: mixedCorridorPath },
+};
+const rotateCorridorPoint = (point: { x: number; y: number }, turns: number): { x: number; y: number } => {
+  let rotated = { ...point };
+  for (let turn = 0; turn < turns; turn++) rotated = { x: -rotated.y, y: rotated.x };
+  return rotated;
+};
+const rotateCorridorNode = (node: Node, turns: number): Node => {
+  const width = Number(node.measured?.width);
+  const height = Number(node.measured?.height);
+  const start = rotateCorridorPoint(node.position, turns);
+  const end = rotateCorridorPoint({ x: node.position.x + width, y: node.position.y + height }, turns);
+  return { ...node, position: { x: Math.min(start.x, end.x), y: Math.min(start.y, end.y) },
+    measured: { width: Math.abs(end.x - start.x), height: Math.abs(end.y - start.y) } };
+};
 
 describe('commercial terminal shortcuts', () => {
   it('switches both automatic sides for a materially shorter same-row route', () => {
@@ -390,7 +428,7 @@ describe('commercial terminal shortcuts', () => {
   });
 
   it('collapses a stepped clearance skirt onto its proven outer lane', () => {
-    const candidates = buildCommercialParallelTerminalCorridorShortcutPaths([
+    const candidates = buildCommercialTerminalCorridorShortcutPaths([
       { x: 217, y: 3213 },
       { x: 217, y: 3269 },
       { x: 98, y: 3269 },
@@ -411,6 +449,84 @@ describe('commercial terminal shortcuts', () => {
       { x: 204, y: 3661 },
       { x: 204, y: 3789 },
     ]);
+  });
+
+  it.each([0, 1, 2, 3])('joins offset obstacle corridors with fixed mixed-axis terminals after %i quarter turns', turns => {
+    const rotatedNodes = mixedCorridorNodes.map(node => rotateCorridorNode(node, turns));
+    const path = mixedCorridorPath.map(point => rotateCorridorPoint(point, turns));
+    const expected = mixedCorridorShortcut.map(point => rotateCorridorPoint(point, turns));
+    const handles = ['top', 'right', 'bottom', 'left'];
+    const baseline: Edge = { ...mixedCorridorEdge, sourceHandle: handles[turns], targetHandle: handles[(turns + 3) % 4],
+      data: { computedPath: path, sourcePortPolicy: 'fixed-pos', targetPortPolicy: 'fixed-pos' } };
+    const before = structuredClone({ baseline, rotatedNodes, path });
+    const candidates = buildCommercialTerminalCorridorShortcutPaths(path, rotatedNodes, baseline);
+    expect(path.length - 2).toBe(7);
+    expect(candidates).toContainEqual(expected);
+    expect(expected.length - 2).toBe(5);
+    expect(displayPathLength(expected) - displayPathLength(path)).toBe(-552);
+    expect(scoreNodeClearanceRisk(path, rotatedNodes, baseline, 48)).toBe(0);
+    expect(candidates.length).toBeLessThanOrEqual(32);
+    for (const candidate of candidates) {
+      expect(candidate.slice(0, 2)).toEqual(path.slice(0, 2));
+      expect(candidate.slice(-2)).toEqual(path.slice(-2));
+      expect(candidate.every((point, index) => index === 0
+        || point.x === candidate[index - 1].x || point.y === candidate[index - 1].y)).toBe(true);
+      const candidateEdge = { ...baseline, data: { ...baseline.data, computedPath: candidate } };
+      expect(scoreNodeClearanceRisk(candidate, rotatedNodes, candidateEdge, 48)).toBe(0);
+      expect(auditBaseReactFlowDisplayCommercialQuality([candidateEdge])).toEqual([]);
+    }
+    expect(buildCommercialTerminalCorridorShortcutPaths(path, rotatedNodes.toReversed(), baseline)).toEqual(candidates);
+    expect({ baseline, rotatedNodes, path }).toEqual(before);
+  });
+
+  it('ignores hidden and container geometry when sampling mixed-terminal corridors', () => {
+    const baseline = buildCommercialTerminalCorridorShortcutPaths(mixedCorridorPath, mixedCorridorNodes, mixedCorridorEdge);
+    const overlays: Node[] = [
+      { ...corridorNode('hidden', -100, -100, 1000, 1200), hidden: true },
+      ...['titleGroup', 'subGroup', 'group', 'domain', 'subDomain', 'swimlane'].map(type => ({
+        ...corridorNode(type, -120, -120, 1040, 1240), type,
+      })),
+    ];
+    expect(baseline.length).toBeGreaterThan(0);
+    expect(buildCommercialTerminalCorridorShortcutPaths(mixedCorridorPath, [...mixedCorridorNodes, ...overlays], mixedCorridorEdge))
+      .toEqual(baseline);
+  });
+
+  it('rejects empty, invalid, non-orthogonal and excessive mixed route geometry', () => {
+    const invalidPaths = [
+      [],
+      ...[NaN, Infinity, -Infinity, 1_000_001, -1_000_001].map(x => mixedCorridorPath.map((point, index) => index === 2 ? { ...point, x } : point)),
+      mixedCorridorPath.map((point, index) => index === 3 ? { x: point.x + 1, y: point.y } : point),
+      [...Array.from({ length: 121 }, () => ({ ...mixedCorridorPath[0] })), ...mixedCorridorPath.slice(1)],
+    ];
+    for (const path of invalidPaths) {
+      expect(buildCommercialTerminalCorridorShortcutPaths(path, mixedCorridorNodes, mixedCorridorEdge)).toEqual([]);
+    }
+    expect(buildCommercialTerminalCorridorShortcutPaths(mixedCorridorPath, mixedCorridorNodes)).toEqual([]);
+    expect(buildCommercialTerminalCorridorShortcutPaths(mixedCorridorShortcut, mixedCorridorNodes, mixedCorridorEdge)).toEqual([]);
+  });
+
+  it('rejects excessive node count and invalid obstacle geometry', () => {
+    const tooMany = Array.from({ length: 257 }, (_, index) => corridorNode(String(index), 108, 500, 227, 96));
+    expect(buildCommercialTerminalCorridorShortcutPaths(mixedCorridorPath, tooMany, mixedCorridorEdge)).toEqual([]);
+    for (const x of [NaN, Infinity, -Infinity, 1_000_001, -1_000_001]) {
+      const invalidNodes = [...mixedCorridorNodes, corridorNode('invalid', x, 200, 100, 100)];
+      expect(buildCommercialTerminalCorridorShortcutPaths(mixedCorridorPath, invalidNodes, mixedCorridorEdge)).toEqual([]);
+    }
+    for (const width of [NaN, Infinity, 0, -1]) {
+      const invalidNodes = [...mixedCorridorNodes, corridorNode('invalid-size', 100, 200, width, 100)];
+      expect(buildCommercialTerminalCorridorShortcutPaths(mixedCorridorPath, invalidNodes, mixedCorridorEdge)).toEqual([]);
+    }
+  });
+
+  it('returns no mixed corridor when the source and target stubs leave no interior join interval', () => {
+    const noJoinPath = [
+      { x: 0, y: 1000 }, { x: 0, y: 900 }, { x: 360, y: 900 },
+      { x: 360, y: 644 }, { x: 60, y: 644 }, { x: 60, y: 452 },
+      { x: 360, y: 452 }, { x: 360, y: 900 }, { x: 416, y: 900 },
+    ];
+    expect(buildCommercialTerminalCorridorShortcutPaths(noJoinPath, [], mixedCorridorEdge)).toEqual([]);
+    expect(buildCommercialTerminalCorridorShortcutPaths([], [], mixedCorridorEdge)).toEqual([]);
   });
 
   it('branches a facing-port shortcut after the source safety stub', () => {

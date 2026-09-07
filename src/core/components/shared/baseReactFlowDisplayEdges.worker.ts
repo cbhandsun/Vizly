@@ -16,6 +16,7 @@ import {
   canCommitBaseReactFlowDisplayCandidateWithoutStabilization,
 } from './baseReactFlowDisplayCommercialQuality';
 import { createBaseReactFlowInteractiveDisplayEdges } from './baseReactFlowDisplayQualitySeedPipeline';
+import { seedObstacleAwareDisplayRoutes } from './baseReactFlowDisplayInitialRoute';
 import { resolveDisplayWorkerCandidate } from './baseReactFlowDisplayWorkerCandidate';
 import { doBaseReactFlowDisplayRoutesMatchExactly } from './baseReactFlowDisplayRoutingTransaction';
 import {
@@ -77,7 +78,7 @@ import {
   finalizeBoundedDisplayWorkerRepairResponse,
   type DisplayWorkerFinalizationOptions,
 } from './baseReactFlowDisplayWorkerFinalEvaluation';
-import { finalizeBaseReactFlowExactCommercialClearance } from './baseReactFlowDisplayFinalCommercialClearanceTransaction';
+import { finalizeBaseReactFlowExactCommercialClearance, isCommercialClearanceOnlyFailure } from './baseReactFlowDisplayFinalCommercialClearanceTransaction';
 import { runDisplayWorkerLayoutRepairTransaction } from './baseReactFlowDisplayWorkerLayoutTransaction';
 
 const finalizeContainerClearanceResponse = (
@@ -344,6 +345,13 @@ const finalizeContainerClearanceResponse = (
     && !doBaseReactFlowDisplayRoutesMatchExactly(response.edges, finalizedResponse.edges),
   );
   const exactFinalizedResponse = withExactHardReport(finalizedResponse);
+  // A remaining clearance defect has its own atomic closure. Try that before
+  // replaying the complete endpoint/commercial finalizer on the same graph.
+  if ((options.commercialStabilizationPass ?? 0) === 0
+    && isCommercialClearanceOnlyFailure(exactFinalizedResponse)) {
+    const clearanceClosed = finalizeExactCommercialResponse(exactFinalizedResponse);
+    if (clearanceClosed.hardClean) return clearanceClosed;
+  }
   if (canCommitBaseReactFlowDisplayCandidateWithoutStabilization(
     exactFinalizedResponse.hardClean === true,
     exactFinalizedResponse.edges,
@@ -619,19 +627,23 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
   if (!candidateValidationFinished) {
     candidateTimer.finish(candidateEdges ? 'rejected' : 'skip');
   }
+  const initialEdges = seedObstacleAwareDisplayRoutes(request.edges, request.nodes);
+  const constructedInitialRoutes = initialEdges !== request.edges;
   const commonInput = {
-    edges: request.edges,
+    edges: initialEdges,
     nodes: request.nodes,
     enableSmartEdges: request.enableSmartEdges,
     smartEdgePadding: request.smartEdgePadding,
     isLargeGraph: request.isLargeGraph,
-    forceFullQuality: request.qualityMode === 'full',
+    forceFullQuality: request.qualityMode === 'full' || constructedInitialRoutes,
     seedUnroutedFlowEdges: true,
     displayEdgeEpoch: request.displayEdgeEpoch,
   };
   let escalatedFromInteractive = false;
   let preparedInteractiveEdges: Edge[] | undefined;
-  if (request.qualityMode === 'interactive') {
+  // Route construction has no prior geometry to refine. Run one complete
+  // transaction from the obstacle-aware seed instead of two repair pipelines.
+  if (request.qualityMode === 'interactive' && !constructedInitialRoutes) {
     const interactiveTimer = startDisplayRoutingPhaseTrace({
       phase: 'quality',
       candidateCount: request.edges.length,

@@ -14,6 +14,7 @@ import {
   calculateEdgePairQuality,
   calculateSingleEdgeQuality,
   compareEdgePathQualityScores,
+  crossingCanBeBridged,
   countNonOrthogonalSegments,
   getEdgePath,
   getSegments,
@@ -173,7 +174,10 @@ export function countStrictEdgeCrossings(
     strictCrossingCache.set(edges, { signature: snapshot.signature, count: signatureCached });
     return signatureCached;
   }
-  const total = countIndexedStrictSegmentCrossings(getSegments(snapshot.paths), diagnostics);
+  const total = countIndexedStrictSegmentCrossings(
+    getSegments(snapshot.paths), diagnostics,
+    (first, second) => !crossingCanBeBridged(first, second),
+  );
   strictCrossingCache.set(edges, { signature: snapshot.signature, count: total });
   rememberBoundedSignatureValue(
     strictCrossingSignatureCache,

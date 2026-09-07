@@ -1,4 +1,5 @@
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
+import { isReadableOrthogonalCrossing } from '../../routing/orthogonalCrossingPolicy';
 
 import {
   type PathSegmentRef,
@@ -49,7 +50,8 @@ export function scoreDetachedOverlapState(
     for (let j = i + 1; j < segments.length; j += 1) {
       if (segments[i].edgeIndex === segments[j].edgeIndex) continue;
       if (segments[i].axis !== segments[j].axis) {
-        if (strictCross(segments[i], segments[j])) score += 4500;
+        if (strictCross(segments[i], segments[j])) score += isReadableOrthogonalCrossing(segments[i], segments[j])
+          ? (sharesAnyEndpoint(segments[i], segments[j], edges) ? 7 : 1) : 4500;
         continue;
       }
       const overlap = segmentOverlap(segments[i], segments[j]);
@@ -112,7 +114,8 @@ const detachedPairScore = (
   for (const first of firstSegments) {
     for (const second of secondSegments) {
       if (first.axis !== second.axis) {
-        if (strictCross(first, second)) score += 4500;
+        if (strictCross(first, second)) score += isReadableOrthogonalCrossing(first, second)
+          ? (unrelated ? 1 : 7) : 4500;
         continue;
       }
       const overlap = segmentOverlap(first, second);

@@ -33,6 +33,7 @@ import {
   keepPerEdgeObstacleNonRegressingCandidates,
 } from './baseReactFlowDisplayEvaluation';
 import { finalSameSideTrueTrunksDoNotRegress } from './baseReactFlowDisplayFinalEndpointOrder';
+import { createDisplayTerminalValidationSnapshot, keepDisplayTerminalValidationNonRegressing } from './baseReactFlowTerminalValidation';
 import {
   countChangedRoutingItems,
   startDisplayRoutingPhaseTrace,
@@ -658,6 +659,11 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     repairNodes,
     normalizedEdges,
     obstacleSafeQualityEdges,
+    keepDisplayTerminalValidationNonRegressing(
+      normalizedEdges,
+      obstacleSafeQualityEdges,
+      createDisplayTerminalValidationSnapshot(repairNodes),
+    ),
     residualQualityEdges,
   );
   const result = finalSameSideTrueTrunksDoNotRegress(

@@ -10,7 +10,10 @@ const QUALITY_KEYS = [
   'bends', 'totalLength',
 ] as const;
 
-export type RoutingHardQualityScore = Readonly<Record<(typeof QUALITY_KEYS)[number], number>>;
+export type RoutingHardQualityScore = Readonly<Record<(typeof QUALITY_KEYS)[number], number> & {
+  bridgedCrossings?: number;
+  crossingCost?: number;
+}>;
 export type RoutingHardReport = Readonly<{
   candidate: 'terminal-lane' | 'polished';
   hardClean: boolean;
@@ -49,6 +52,12 @@ export const cloneRoutingHardReport = (value: unknown): RoutingHardReport | null
     return isBoundedMetric(metric) ? [key, metric] as const : null;
   });
   if (qualityEntries.some(entry => entry === null)) return null;
+  const bridgedCrossings = optionalMetric(qualityRecord.bridgedCrossings);
+  const crossingCost = optionalMetric(qualityRecord.crossingCost);
+  if (bridgedCrossings === null
+    || crossingCost === null
+    || (typeof bridgedCrossings === 'number' && !Number.isSafeInteger(bridgedCrossings))
+    || (typeof crossingCost === 'number' && !Number.isSafeInteger(crossingCost))) return null;
   const minimumClearanceViolations = optionalMetric(value.minimumClearanceViolations);
   const commercialClearanceViolations = optionalMetric(value.commercialClearanceViolations);
   if (minimumClearanceViolations === null || commercialClearanceViolations === null) return null;
@@ -64,9 +73,11 @@ export const cloneRoutingHardReport = (value: unknown): RoutingHardReport | null
       ? Object.freeze([...value.minimumClearanceViolationEdgeIds] as string[])
       : null;
   if (edgeIds === null) return null;
-  const quality = Object.freeze(Object.fromEntries(
-    qualityEntries as Array<readonly [string, number]>,
-  )) as RoutingHardQualityScore;
+  const quality = Object.freeze({
+    ...Object.fromEntries(qualityEntries as Array<readonly [string, number]>),
+    ...(typeof bridgedCrossings === 'number' ? { bridgedCrossings } : {}),
+    ...(typeof crossingCost === 'number' ? { crossingCost } : {}),
+  }) as RoutingHardQualityScore;
   return Object.freeze({
     candidate: value.candidate,
     hardClean: value.hardClean,
@@ -114,6 +125,14 @@ export const computeDisplayRoutingHardReportDigest = (
   for (const key of QUALITY_KEYS) {
     feed(key);
     feed(report.quality[key]);
+  }
+  if (typeof report.quality.bridgedCrossings === 'number') {
+    feed('bridgedCrossings');
+    feed(report.quality.bridgedCrossings);
+  }
+  if (typeof report.quality.crossingCost === 'number') {
+    feed('crossingCost');
+    feed(report.quality.crossingCost);
   }
   return `hard-report-v1:${(primary >>> 0).toString(16).padStart(8, '0')}${(
     secondary >>> 0

@@ -65,6 +65,8 @@ import {
   type BaseReactFlowLayoutCandidateSeedAudit,
 } from '../baseReactFlowLayoutCandidateSeedAudit';
 import * as layoutCandidateSeedAudit from '../baseReactFlowLayoutCandidateSeedAudit';
+import { normalizeBaseReactFlowLayoutVisibility } from '../baseReactFlowLayoutVisibility';
+import { evaluateLayoutGeometry } from '../../../algorithms/layoutGeometryConstraints';
 
 const nodes: Node[] = [
   {
@@ -588,6 +590,12 @@ describe('baseReactFlow layout routing candidate sequence', () => {
     });
     expect(workerMocks.repair).toHaveBeenCalledOnce();
     expect(workerMocks.compute).toHaveBeenCalledOnce();
+    expect(commitLayoutSnapshot(second)).toBe(true);
+    await expect(stageBaseReactFlowLayoutRouting({
+      workerRef: { current: null }, requestId: 'layout:cached-invalid-contract',
+      sourceEdges: edges, sourceNodes: nodes, isLargeGraph: false,
+      layoutConstraints: { lanes: { direction: 'TB', nodeIds: ['missing-lane'] } },
+    })).rejects.toThrow('layout-routing-hard-quality-rejected');
     await stageBaseReactFlowLayoutRouting({
       workerRef: { current: null },
       requestId: 'layout:cached-shifted',
@@ -608,6 +616,37 @@ describe('baseReactFlow layout routing candidate sequence', () => {
     });
     expect(workerMocks.repair).toHaveBeenCalledTimes(2);
     expect(workerMocks.compute).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps normalized layout visibility and its envelope across Worker and cached commits', async () => {
+    workerMocks.repair.mockImplementation(async (request: {
+      edges: Edge[]; inputSignature: string; inputGeometryDigest: string;
+    }) => successfulResult(request.edges, request));
+    workerMocks.compute.mockImplementation(successfulCanonicalResult);
+    const candidateNodes: Node[] = [...nodes,
+      { id: 'hidden', position: { x: 0, y: 0 }, data: { hidden: true } },
+      { id: 'collapsed', type: 'titleGroup', position: { x: 1000, y: 0 },
+        width: 200, height: 100, data: { collapsed: true, domain: 'D' } },
+      { id: 'child', parentId: 'collapsed', position: { x: 500, y: 500 }, data: { domain: 'D' } },
+    ];
+    const expectedGeometry = evaluateLayoutGeometry(normalizeBaseReactFlowLayoutVisibility(candidateNodes));
+    const runtime = createBaseReactFlowRoutingSessionRuntime();
+    for (const id of ['worker', 'cache']) {
+      const staged = await stageBaseReactFlowLayoutRouting({
+        workerRef: runtime.workerRef, requestId: `layout:visibility-${id}`,
+        sourceNodes: candidateNodes, sourceEdges: edges, isLargeGraph: false,
+      });
+      const committed = runtime.commitJob(runtime.beginJob('layout'), () => staged.commitSnapshot(runtime));
+      expect(committed).toEqual({ committed: true, value: true });
+      expect(runtime.readLayoutAcceptance()?.geometry).toEqual(expectedGeometry);
+    }
+    expect(workerMocks.compute).toHaveBeenCalledOnce();
+    expect(workerMocks.compute.mock.calls[0][0].nodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'hidden', hidden: true }),
+      expect.objectContaining({ id: 'child', hidden: true }),
+    ]));
+    expect(candidateNodes[2].hidden).toBeUndefined();
+    expect(candidateNodes[4].hidden).toBeUndefined();
   });
 
   it('sends an opted-in exact-clean flat ELK seed directly to the canonical Worker', async () => {

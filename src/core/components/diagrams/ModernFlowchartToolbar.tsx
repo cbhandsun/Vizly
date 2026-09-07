@@ -20,9 +20,10 @@ import { FlowchartHistoryToolbarControls } from './FlowchartHistoryToolbarContro
 import { FlowchartCreationTools } from './FlowchartCreationTools';
 import { resolveFlowchartToolbarHistoryCount } from './flowchartToolbarHistoryPresentation';
 import { DropdownMenuTriggerButton } from './DropdownMenuTriggerButton';
-import { buildFlowchartLayoutMenuModel } from './flowchartToolbarLayoutMenu';
+import { useFlowchartLayoutMenu } from './hooks/useFlowchartLayoutMenu';
 import { getFlowchartLayoutMenuPlacements } from './flowchartLayoutMenuPlacement';
 import type { FlowchartLayoutDirection } from './flowchartLayoutStrategyMode';
+import type { LaneRankDecision, LaneRankPreference } from '../../types/domainLaneRank';
 import { buildToolModeMenuItems, resolveActiveToolModeKey } from './flowchartToolbarToolModeMenu';
 import { getFlowchartZoomControlState } from './flowchartZoomControlState';
 import { useKeyboardAccessibleDropdown } from './hooks/useKeyboardAccessibleDropdown';
@@ -57,6 +58,7 @@ interface FlowchartToolbarProps {
         strategyName: string,
         nodeLayout?: string,
         direction?: FlowchartLayoutDirection,
+        laneRankPreference?: LaneRankPreference,
     ) => void;
     /** 根据当前图结构选择低风险布局预设 */
     onSmartLayout?: () => void | Promise<void>;
@@ -66,6 +68,10 @@ interface FlowchartToolbarProps {
     lastDomainDirection?: FlowchartLayoutDirection;
     /** 当前选中的域内节点排布 */
     lastNodeLayout?: string;
+    /** Requested swimlane ranking mode from the last committed selection. */
+    laneRankPreference?: LaneRankPreference;
+    /** Applied mode from the last successful layout transaction. */
+    laneRankDecision?: LaneRankDecision;
     layoutBusy?: boolean;
     showRuler: boolean;
     toggleRuler: () => void;
@@ -138,6 +144,8 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     lastDomainStrategy,
     lastDomainDirection,
     lastNodeLayout,
+    laneRankPreference,
+    laneRankDecision,
     layoutBusy = false,
     showRuler,
     toggleRuler,
@@ -210,20 +218,10 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
         onShowShortcuts();
     }, [handleMoreDropdownOpenChange, moreDropdownTriggerRef, onShowShortcuts]);
 
-    const layoutMenuModel = useMemo(() => buildFlowchartLayoutMenuModel({
-        customDomainLayoutAvailable,
-        lastDomainDirection,
-        lastDomainStrategy,
-        lastNodeLayout,
-        onSmartLayout,
-        onStrategyLayout,
-        translate: (key, fallback) => t(key, fallback),
-    }), [customDomainLayoutAvailable, lastDomainDirection, lastDomainStrategy, lastNodeLayout, onSmartLayout, onStrategyLayout, t]);
-
-    const layoutBaseLabel = t('designer.flowchart.layout.tooltip', '自动布局');
-    const layoutTriggerLabel = layoutMenuModel.statusText
-        ? `${layoutBaseLabel}：${layoutMenuModel.statusText}`
-        : layoutBaseLabel;
+    const { layoutMenuModel, layoutTriggerLabel } = useFlowchartLayoutMenu({
+        customDomainLayoutAvailable, lastDomainDirection, lastDomainStrategy, lastNodeLayout,
+        laneRankPreference, laneRankDecision, onSmartLayout, onStrategyLayout,
+    });
     const zoomControlState = getFlowchartZoomControlState(zoomPercent);
     const normalizedZoomPercent = zoomControlState.percent;
     const zoomStatus = normalizedZoomPercent === undefined ? undefined : `${normalizedZoomPercent}%`;
@@ -535,6 +533,8 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                             ref={layoutDropdown.triggerRef}
                             ariaLabel={layoutTriggerLabel}
                             data-flowchart-layout-selection={layoutMenuModel.selectedKeys[0]}
+                            data-flowchart-lane-rank-preference={laneRankPreference ?? 'auto'}
+                            data-flowchart-lane-rank-applied={laneRankDecision?.applied ?? 'unknown'}
                             busy={layoutBusy}
                             disabled={layoutBusy}
                             open={layoutDropdown.open}

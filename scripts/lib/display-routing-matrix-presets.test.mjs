@@ -3,9 +3,29 @@ import { readFile } from 'node:fs/promises';
 
 import { DISPLAY_ROUTING_MATRIX_PRESET_TARGETS } from './display-routing-matrix-presets.mjs';
 import { assertDisplayRoutingSemanticFlow, auditDisplayRoutingLayoutSemantics,
+  assertDisplayRoutingLaneDimensions, readDisplayRoutingLaneDimensions,
   readDisplayRoutingSemanticNodes } from './display-routing-semantic-audit.mjs';
 
 describe('display routing matrix presets', () => {
+  it.each(['TB', 'BT', 'LR', 'RL'])('checks rendered sibling lane dimensions in %s', direction => {
+    const lanes = [
+      { id: 'a', parentId: '', width: 400, height: 300 },
+      { id: 'b', parentId: '', width: 400, height: 300 },
+      { id: 'nested', parentId: 'a', width: 200, height: 100 },
+    ];
+    expect(assertDisplayRoutingLaneDimensions(direction, lanes)).toMatchObject({ comparedGroups: 1, laneCount: 3 });
+    const dimension = ['LR', 'RL'].includes(direction) ? 'width' : 'height';
+    expect(() => assertDisplayRoutingLaneDimensions(direction, lanes.map((lane, i) => i === 1
+      ? { ...lane, [dimension]: lane[dimension] - 20 } : lane))).toThrow('Unequal sibling');
+  });
+
+  it.each([[], null, [{ id: 'a', parentId: '', width: null, height: 1 }],
+    [{ id: 'a', parentId: '', width: Infinity, height: 1 }],
+    [{ id: 'a', parentId: '', width: 0, height: 1 }],
+    [{ id: 'a', parentId: '', width: '400', height: 1 }]])('rejects missing or invalid lane geometry %#', lanes => {
+    expect(() => assertDisplayRoutingLaneDimensions('LR', lanes)).toThrow();
+  });
+
   it('includes Logistics alongside both WMS fixtures and TMS', () => {
     expect(DISPLAY_ROUTING_MATRIX_PRESET_TARGETS.map(target => target.presetId)).toEqual([
       'logistics-architecture-v1',
@@ -100,7 +120,38 @@ describe('rendered business flow semantics', () => {
       ],
       edges: [{ source: 'start', target: 'handoff' }, { source: 'handoff', target: 'finish' }],
     };
-    expect(assertDisplayRoutingSemanticFlow(input)).toMatchObject({ status: 'passed', checkedStepCount: 2 });
+    expect(assertDisplayRoutingSemanticFlow({ ...input, appliedMode: 'compact' })).toMatchObject({
+      status: 'passed', checkedStepCount: 2, appliedMode: 'compact',
+    });
+  });
+
+  it.each(['TB', 'BT', 'LR', 'RL'])('requires forward cross-domain steps in global mode in %s', direction => {
+    const horizontal = direction === 'LR' || direction === 'RL';
+    const reverse = direction === 'BT' || direction === 'RL';
+    const input = {
+      direction, chains: [['start', 'handoff']],
+      nodes: [
+        { id: 'start', domain: 'a', x: 0, y: 0, width: 80, height: 60 },
+        { id: 'handoff', domain: 'b', x: horizontal ? (reverse ? 200 : -200) : 200,
+          y: horizontal ? 200 : (reverse ? 200 : -200), width: 80, height: 60 },
+      ], edges: [{ source: 'start', target: 'handoff' }],
+    };
+    const compact = assertDisplayRoutingSemanticFlow({ ...input, appliedMode: 'compact' });
+    expect(compact.stepDiagnostics).toEqual([expect.objectContaining({
+      chainIndex: 0, step: 1, crossDomain: true, backtrack: true,
+    })]);
+    expect(compact.summary).toMatchObject({ stepCount: 1, crossDomainStepCount: 1, backtrackCount: 1 });
+    expect(compact.minimumForwardGap).toBeNull();
+    expect(() => assertDisplayRoutingSemanticFlow(input)).toThrow('contradicts');
+  });
+
+  it('validates the applied mode and rejects missing chain steps in both modes', () => {
+    const input = semanticInput();
+    expect(() => assertDisplayRoutingSemanticFlow({ ...input, appliedMode: 'invalid' })).toThrow();
+    for (const appliedMode of ['global', 'compact']) {
+      expect(() => assertDisplayRoutingSemanticFlow({ ...input, appliedMode, edges: input.edges.slice(1) }))
+        .toThrow('step 1 is missing');
+    }
   });
 
   it('supports multiple branches and safely treats hostile identifiers as data', () => {
@@ -145,11 +196,16 @@ describe('rendered business flow semantics', () => {
       const expressions = [];
       const session = { evaluate: async expression => {
         expressions.push(expression);
+        if (expression.includes('data-flowchart-lane-rank-applied')) return 'global';
+        if (expression.includes(readDisplayRoutingLaneDimensions.toString())) return [
+          { id: 'lane-a', parentId: '', width: 400, height: 300 },
+          { id: 'lane-b', parentId: '', width: 400, height: 300 },
+        ];
         return expression.includes(readDisplayRoutingSemanticNodes.toString()) ? input.nodes : input.edges;
       } };
       expect(await auditDisplayRoutingLayoutSemantics(session, { id: `domain-lanes-${direction.toLowerCase()}` }, input.chains))
         .toMatchObject({ status: 'passed', direction });
-      expect(expressions).toHaveLength(2);
+      expect(expressions).toHaveLength(4);
       await expect(auditDisplayRoutingLayoutSemantics(session, { id: 'domain-lanes-tb' }, [])).rejects.toThrow();
     }
   });
@@ -159,5 +215,11 @@ describe('rendered business flow semantics', () => {
     expect(await auditDisplayRoutingLayoutSemantics(session, { id: 'tree-tb' }, [])).toEqual({ status: 'not-applicable' });
     await expect(auditDisplayRoutingLayoutSemantics(session, { id: 'domain-lanes-tb' }, [['a', 'b']]))
       .rejects.toThrow('browser disconnected');
+  });
+
+  it.each([undefined, 'unknown', 'auto', 'invalid'])('rejects missing or invalid committed mode %s', async mode => {
+    const session = { evaluate: async () => mode };
+    await expect(auditDisplayRoutingLayoutSemantics(session, { id: 'domain-lanes-tb' }, [['a', 'b']]))
+      .rejects.toThrow('no committed applied mode');
   });
 });

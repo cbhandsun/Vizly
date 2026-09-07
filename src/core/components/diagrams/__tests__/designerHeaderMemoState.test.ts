@@ -29,6 +29,9 @@ describe('haveSameDesignerHeaderLayoutState', () => {
             ...state,
             lastNodeLayout: 'grid',
         })).toBe(false);
+        expect(haveSameDesignerHeaderLayoutState(state, {
+            ...state, laneRankPreference: 'compact',
+        })).toBe(false);
     });
 
     it('keeps the memo stable when layout state is unchanged', () => {

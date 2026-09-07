@@ -324,7 +324,7 @@ const repairDetachedStrictCrossingPaths = (
   createScoreEvaluationContext: DetachedStrictCrossingScoreEvaluationContextFactory,
 ): Point[][] => {
   let paths = inputPaths;
-  const routingObstacleGate = createRoutingObstacleGate(edges, getRoutingObstacles(nodes));
+  const routingObstacleGate = createRoutingObstacleGate(edges, getRoutingObstacles(nodes), undefined, nodes);
   for (let iteration = 0; iteration < 3; iteration += 1) {
     const hits = findStrictCrossings(paths, edges);
     if (hits.length === 0) break;

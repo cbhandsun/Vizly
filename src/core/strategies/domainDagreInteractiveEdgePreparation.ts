@@ -2,6 +2,7 @@ import type { Edge } from '@xyflow/react';
 import type { LayoutOptions } from '../types/layout';
 import { repairDomainLanePortRoutes } from './domainLanePortRouting';
 import { expandHandle } from '../routing/utils/handleUtils';
+import { readEdgeTerminalPolicy } from '../routing/utils/edgeTerminalPolicy';
 import {
   buildEndpointOrthogonalFallbackPath,
   lockComputedPathOnEdge,
@@ -12,7 +13,6 @@ import {
 } from './shared/edgeSharedTrunkSynthesis';
 import {
   asRoutingRecord,
-  readManualHandleLocks,
   routingNodeAbsolutePosition,
   routingNodeSize,
   type RoutingNode,
@@ -67,11 +67,13 @@ export function prepareDomainDagreInteractiveEdges({
   const interactiveEdges = edges.map(edge => {
     const source = nodeById.get(edge.source);
     const target = nodeById.get(edge.target);
+    const sourcePolicy = readEdgeTerminalPolicy(edge, 'source');
+    const targetPolicy = readEdgeTerminalPolicy(edge, 'target');
     if (!source || !target) {
       return {
         ...edge,
-        sourceHandle: edge.sourceHandle || (horizontal ? 'right' : 'bottom'),
-        targetHandle: edge.targetHandle || (horizontal ? 'left' : 'top'),
+        sourceHandle: sourcePolicy.sideFixed ? edge.sourceHandle : edge.sourceHandle || (horizontal ? 'right' : 'bottom'),
+        targetHandle: targetPolicy.sideFixed ? edge.targetHandle : edge.targetHandle || (horizontal ? 'left' : 'top'),
         data: {
           ...(edge.data || {}),
           algorithm: 'domain-dagre-interactive',
@@ -91,24 +93,17 @@ export function prepareDomainDagreInteractiveEdges({
         && targetDomain.length > 0
         && sourceDomain !== targetDomain,
     );
-    const manualHandleLocks = readManualHandleLocks(asRoutingRecord(edge.data));
-    const sourceHandle = manualHandleLocks.source && edge.sourceHandle
-      ? edge.sourceHandle
-      : handles.sourceHandle;
-    const targetHandle = manualHandleLocks.target && edge.targetHandle
-      ? edge.targetHandle
-      : handles.targetHandle;
     const nextEdge = {
       ...edge,
-      sourceHandle: expandHandle(sourceHandle),
-      targetHandle: expandHandle(targetHandle),
+      sourceHandle: sourcePolicy.sideFixed ? edge.sourceHandle : expandHandle(handles.sourceHandle),
+      targetHandle: targetPolicy.sideFixed ? edge.targetHandle : expandHandle(handles.targetHandle),
       data: {
         ...(edge.data || {}),
-        autoSource: !manualHandleLocks.source,
-        autoTarget: !manualHandleLocks.target,
+        autoSource: !sourcePolicy.sideFixed,
+        autoTarget: !targetPolicy.sideFixed,
         auto: [
-          ...(!manualHandleLocks.source ? ['source'] : []),
-          ...(!manualHandleLocks.target ? ['target'] : []),
+          ...(!sourcePolicy.sideFixed ? ['source'] : []),
+          ...(!targetPolicy.sideFixed ? ['target'] : []),
         ],
         algorithm: 'domain-dagre-interactive',
         trunkPolishVersion: 2,

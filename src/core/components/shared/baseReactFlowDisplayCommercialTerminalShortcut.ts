@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import { COMMERCIAL_BUSINESS_NODE_CLEARANCE } from '../../strategies/shared/edgeBusinessNodeClearanceRepair';
+import { buildMixedTerminalCorridorShortcutPaths } from './baseReactFlowDisplayMixedTerminalCorridor';
 import { compactOrthogonalPath } from './baseReactFlowDisplayEdgeCore';
 import {
   anchorForHandle,
@@ -59,6 +60,52 @@ const pathSignature = (path: Array<{ x: number; y: number }>): string => (
 const isStrictlyBetween = (value: number, first: number, second: number): boolean => (
   value > Math.min(first, second) && value < Math.max(first, second)
 );
+
+/** An alternate source side can make an exterior corridor shorter than an
+ * interior staircase. Preserve the old target suffix for shared-trunk checks.
+ */
+export const buildCommercialExteriorSourceShortcutCandidates = (edge: Edge, nodes: Node[]): Edge[] => {
+  const path = getDisplayComputedPath(edge);
+  const targetSide = sideForHandle(edge.targetHandle);
+  if (!targetSide || path.length < 5) return [];
+  const byId = new Map(nodes.map(node => [node.id, node] as const));
+  const sourceRect = getNodeRect(byId.get(edge.source), byId);
+  const rects = nodes.filter(node => !node.hidden && !CONTAINER_NODE_TYPES.has(node.type ?? ''))
+    .flatMap(node => { const rect = getNodeRect(node, byId); return rect ? [rect] : []; });
+  if (!sourceRect || !rects.length) return [];
+  const clearance = COMMERCIAL_BUSINESS_NODE_CLEARANCE;
+  const lanes = {
+    left: Math.min(...rects.map(rect => rect.x)) - clearance,
+    right: Math.max(...rects.map(rect => rect.x + rect.width)) + clearance,
+    top: Math.min(...rects.map(rect => rect.y)) - clearance,
+    bottom: Math.max(...rects.map(rect => rect.y + rect.height)) + clearance,
+  };
+  const candidates: Edge[] = [];
+  const seen = new Set<string>();
+  for (const side of TERMINAL_SIDES) {
+    if (!displayTerminalSideCanSwitch(edge, 'source', side)) continue;
+    const lane = lanes[side];
+    if (!Number.isFinite(lane) || Math.abs(lane) > 1_000_000) continue;
+    const start = anchorForHandle(sourceRect, resolveDisplayTerminalHandleForSide(edge, 'source', side));
+    const horizontal = side === 'left' || side === 'right';
+    for (let index = 2; index < path.length - 1; index += 1) {
+      const join = path[index];
+      const candidate = compactOrthogonalPath([
+        start,
+        horizontal ? { x: lane, y: start.y } : { x: start.x, y: lane },
+        horizontal ? { x: lane, y: join.y } : { x: join.x, y: lane },
+        ...path.slice(index),
+      ]);
+      if (candidate.length >= path.length || displayPathLength(candidate) >= displayPathLength(path) - 0.5) continue;
+      const key = `${side}:${pathSignature(candidate)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      candidates.push(withDisplayPortBridge(edge, candidate, side, targetSide));
+    }
+  }
+  return candidates.sort((a, b) => displayPathLength(getDisplayComputedPath(a)) - displayPathLength(getDisplayComputedPath(b)))
+    .slice(0, MAX_TERMINAL_SHORTCUT_CANDIDATES);
+};
 
 /**
  * Replaces a materially overlong layout route with the shortest facing-port
@@ -472,22 +519,32 @@ export const buildCommercialSameSideRectangularShortcutPaths = (
  * interior lanes while preserving both terminal stubs. Exact graph and node
  * acceptance remains the caller's responsibility.
  */
-export const buildCommercialParallelTerminalCorridorShortcutPaths = (
+export const buildCommercialTerminalCorridorShortcutPaths = (
   path: Array<{ x: number; y: number }>,
   nodes: Node[] = [],
   edge?: Edge,
 ): Array<Array<{ x: number; y: number }>> => {
-  if (path.length < 6) return [];
+  if (path.length < 6 || path.length > 128 || nodes.length > 256) return [];
+  if (path.some(point => !Number.isFinite(point.x) || !Number.isFinite(point.y)
+    || Math.abs(point.x) > 1_000_000 || Math.abs(point.y) > 1_000_000)) return [];
+  if (path.some((point, index) => index > 0
+    && point.x !== path[index - 1].x && point.y !== path[index - 1].y)) return [];
   const source = path[0];
   const sourceStub = path[1];
   const targetStub = path.at(-2);
   const target = path.at(-1);
   if (!source || !sourceStub || !targetStub || !target) return [];
+  if (segmentDisplayLength(source, sourceStub) <= 0.5 || segmentDisplayLength(targetStub, target) <= 0.5) return [];
   const verticalTerminals = Math.abs(source.x - sourceStub.x) <= 0.5
     && Math.abs(targetStub.x - target.x) <= 0.5;
   const horizontalTerminals = Math.abs(source.y - sourceStub.y) <= 0.5
     && Math.abs(targetStub.y - target.y) <= 0.5;
-  if (!verticalTerminals && !horizontalTerminals) return [];
+  if (!verticalTerminals && !horizontalTerminals) {
+    return edge ? buildMixedTerminalCorridorShortcutPaths(path, nodes, edge, {
+      maxCandidates: MAX_TERMINAL_SHORTCUT_CANDIDATES,
+      containerNodeTypes: CONTAINER_NODE_TYPES,
+    }) : [];
+  }
 
   const laneCoordinates = new Set<number>();
   for (let index = 2; index < path.length - 3; index += 1) {

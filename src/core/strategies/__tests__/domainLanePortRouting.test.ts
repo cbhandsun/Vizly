@@ -33,6 +33,31 @@ describe('domain lane obstacle-aware port selection', () => {
     expect(countCommercialObstacleHits([result], nodes)).toBe(0);
   });
 
+  it.each([
+    { sourcePortPolicy: 'fixed', targetPortPolicy: 'strong' },
+    { sourcePortConstraint: 'fixed-side', targetPortConstraint: 'fixed_side' },
+    { sourcePortPolicy: 'fixed-pos', targetPortPolicy: 'fixed_pos' },
+    { sourceHandleLocked: true, targetHandlePositionLocked: true },
+    { manualHandlePositions: ['source', 'target'] },
+  ])('preserves authored terminal identities while repairing obstacle paths', data => {
+    const constrained = edges.map(edge => ({
+      ...edge,
+      sourceHandle: 'source-right-port-1', targetHandle: 'target-left-port-1',
+      data: { ...edge.data, ...data, runtimeHandleLock: { source: true, target: true } },
+    }));
+    const original = structuredClone(constrained);
+    const [result] = repairDomainLanePortRoutes(constrained, nodes);
+
+    expect(result).toMatchObject({ sourceHandle: 'source-right-port-1', targetHandle: 'target-left-port-1' });
+    expect(countCommercialObstacleHits([result], nodes)).toBe(0);
+    expect(constrained).toEqual(original);
+  });
+
+  it('does not generate replacement ports for forbidden terminals', () => {
+    const forbidden = edges.map(edge => ({ ...edge, data: { ...edge.data, targetPortConstraint: 'forbidden' } }));
+    expect(repairDomainLanePortRoutes(forbidden, nodes)).toBe(forbidden);
+  });
+
   it('is deterministic and preserves graph identity', () => {
     const result = repairDomainLanePortRoutes(edges, nodes);
     expect(repairDomainLanePortRoutes(edges, nodes)).toEqual(result);

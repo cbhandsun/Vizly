@@ -377,6 +377,10 @@ describe('baseReactFlowLayoutRoutingTransaction', () => {
     expect(stagedHit?.edges).toEqual(committed!.routedEdges);
     expect(stagedHit?.trustedTransactionHandoff).toBe(true);
     if (!stagedHit) throw new Error('expected a staged layout snapshot handoff');
+    expect(stagedHit.baseline.layoutAcceptance).toMatchObject({
+      version: 1, geometry: { clean: true },
+      route: { outputRouteSignature: stagedHit.outputRouteSignature, hardReportDigest: stagedHit.baseline.hardReportDigest },
+    });
     expect(stagedHit.baseline.workerSessionRef).toMatchObject({
       identity: {
         inputSignature: committedSourceIdentity.cacheSignature,
@@ -473,6 +477,7 @@ describe('baseReactFlowLayoutRoutingTransaction', () => {
     const nestedNodes: Node[] = [
       {
         id: 'domain',
+        type: 'titleGroup',
         position: { x: 400, y: 300 },
         width: 500,
         height: 300,

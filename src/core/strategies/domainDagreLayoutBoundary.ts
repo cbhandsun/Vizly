@@ -1,5 +1,6 @@
 import type { Node } from '@xyflow/react';
 import type { DomainDagreNodeArrangement } from './domainDagreChildArrangement';
+import { MAX_PARENT_DEPTH } from '../algorithms/layoutGeometryConstraints';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -242,7 +243,7 @@ export const normalizeDomainDagreNodes = (
   if (!Array.isArray(nodes)) return [];
   const fallbackWidth = boundedDomainDagreNumber(defaultWidth, 200, 1, 10_000);
   const fallbackHeight = boundedDomainDagreNumber(defaultHeight, 80, 1, 10_000);
-  return nodes.flatMap(value => {
+  const normalized = nodes.flatMap(value => {
     const node = asRecord(value) as unknown as Node | undefined;
     if (!node || typeof node.id !== 'string' || !asRecord(node.position) || !asRecord(node.data)) return [];
     const style = asRecord(node.style);
@@ -264,6 +265,40 @@ export const normalizeDomainDagreNodes = (
       data: { ...node.data },
       measured: { width, height },
     }];
+  });
+  // Every Dagre phase works in absolute coordinates and the final hierarchy
+  // is rebuilt once. Old React Flow parents/cache must not be added again by
+  // routing or override a newly calculated position on repeated layouts.
+  const byId = new Map(normalized.map(node => [node.id, node]));
+  if (byId.size !== normalized.length) throw new Error('Invalid input hierarchy for domain layout');
+  return normalized.map(node => {
+    let x = node.position.x, y = node.position.y;
+    let current: Node | undefined = node;
+    let domain = boundedString(node.data.domain);
+    let subDomain = boundedString(node.data.subDomain);
+    const visited = new Set([node.id]);
+    let parentDepth = 0;
+    while (current?.parentId) {
+      if (visited.has(current.parentId) || parentDepth >= MAX_PARENT_DEPTH) throw new Error('Invalid input hierarchy for domain layout');
+      parentDepth++;
+      visited.add(current.parentId);
+      current = byId.get(current.parentId);
+      if (!current || !['titleGroup', 'subGroup', 'domain', 'group'].includes(String(current.type ?? ''))) {
+        throw new Error('Invalid input hierarchy for domain layout');
+      }
+      x += current.position.x;
+      y += current.position.y;
+      domain ??= boundedString(current.data.domain);
+      if (current.type === 'subGroup') subDomain ??= boundedString(current.data.subDomain ?? current.data.description);
+    }
+    const { parentId: _parent, extent: _extent, positionAbsolute: _absolute, ...source }: Node & { positionAbsolute?: unknown } = node;
+    const isContainer = ['titleGroup', 'subGroup', 'domain', 'group'].includes(String(node.type ?? ''));
+    return { ...source, data: { ...source.data,
+      ...(domain ? { domain } : {}), ...(!isContainer && subDomain ? { subDomain } : {}),
+    }, position: {
+      x: boundedDomainDagreNumber(x, 0, -1_000_000, 1_000_000),
+      y: boundedDomainDagreNumber(y, 0, -1_000_000, 1_000_000),
+    } };
   });
 };
 

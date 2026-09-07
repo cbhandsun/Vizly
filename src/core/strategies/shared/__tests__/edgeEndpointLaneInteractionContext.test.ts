@@ -1,4 +1,5 @@
 import type { Edge } from '@xyflow/react';
+import { isReadableOrthogonalCrossing } from '../../../routing/orthogonalCrossingPolicy';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -39,11 +40,17 @@ function evaluateWithLegacyScans(
   }
 
   let totalCrossings = 0;
+  let crossingCost = 0;
   for (const [otherId, otherPath] of paths) {
     if (otherId === candidateEdge.id) continue;
     for (const first of candidateSegments) {
       for (const second of endpointLaneToSegments(otherPath)) {
         if (endpointLaneStrictCrosses(first, second)) totalCrossings += 1;
+        if (isReadableOrthogonalCrossing(first, second)) {
+          const other = edgesById.get(otherId);
+          crossingCost += other && (other.source === candidateEdge.source || other.target === candidateEdge.target
+            || other.source === candidateEdge.target || other.target === candidateEdge.source) ? 7 : 1;
+        }
       }
     }
   }
@@ -61,7 +68,7 @@ function evaluateWithLegacyScans(
     }
   }
 
-  return { crossings, totalCrossings, oppositeOverlap };
+  return { crossings, totalCrossings, oppositeOverlap, ...(crossingCost > 0 ? { crossingCost } : {}) };
 }
 
 function expectParity(
@@ -75,6 +82,20 @@ function expectParity(
 }
 
 describe('createEndpointLaneInteractionContext', () => {
+  it('keeps readable crossings out of hard lane repair while retaining near-bend conflicts', () => {
+    const candidateEdge = edge('candidate', 'source', 'target');
+    const paths = new Map<string, readonly EndpointLanePoint[]>([
+      ['readable', [{ x: 50, y: -100 }, { x: 50, y: 100 }]],
+      ['near-bend', [{ x: 12, y: -100 }, { x: 12, y: 100 }]],
+    ]);
+    const edgesById = new Map([...paths.keys()].map(id => [id, edge(id, `${id}-s`, `${id}-t`)]));
+    const context = createEndpointLaneInteractionContext(candidateEdge, paths, edgesById);
+    expect(context.evaluate([{ x: 0, y: 0 }, { x: 100, y: 0 }]))
+      .toEqual({ crossings: 1, totalCrossings: 1, oppositeOverlap: 0, crossingCost: 1 });
+    expect(context.evaluate([{ x: -50, y: 0 }, { x: 100, y: 0 }]))
+      .toEqual({ crossings: 0, totalCrossings: 0, oppositeOverlap: 0, crossingCost: 2 });
+  });
+
   it('matches the legacy scans for empty and invalid geometry', () => {
     const candidateEdge = edge('candidate', 'source', 'target');
     const invalidPaths = new Map<string, readonly EndpointLanePoint[]>([

@@ -12,7 +12,7 @@ const ROUTING_SOURCE_SCOPES = Object.freeze([
   { directory: 'src/core/strategies', pattern: /\.ts$/ },
   {
     directory: 'src/core/components/shared',
-    pattern: /^baseReactFlow(?:Display|Precompiled).*\.ts$/,
+    pattern: /^baseReactFlow(?:Display|Precompiled|Layout|Renderable|RoutingSession).*\.ts$/,
   },
 ]);
 

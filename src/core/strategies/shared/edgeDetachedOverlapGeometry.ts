@@ -1,4 +1,5 @@
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
+import { isReadableOrthogonalCrossing } from '../../routing/orthogonalCrossingPolicy';
 
 export type Point = { x: number; y: number };
 export type Rect = { x: number; y: number; width: number; height: number };
@@ -548,7 +549,7 @@ export function strictCrossingsForEdgeSegments(
       const other = range.segments[index];
       cacheState.candidateVisitCount += 1;
       if (other.edgeIndex === edgeIndex) continue;
-      if (strictCross(candidate, other)) segmentCrossings += 1;
+      if (strictCross(candidate, other) && !isReadableOrthogonalCrossing(candidate, other)) segmentCrossings += 1;
     }
     total += segmentCrossings;
     if (
@@ -684,7 +685,7 @@ export function findStrictCrossings(paths: Point[][], edges: Edge[]): StrictCros
     for (let index = range.startIndex; index < range.endIndex; index += 1) {
       const vertical = range.segments[index];
       if (horizontal.edgeIndex === vertical.edgeIndex) continue;
-      if (!strictCross(horizontal, vertical)) continue;
+      if (!strictCross(horizontal, vertical) || isReadableOrthogonalCrossing(horizontal, vertical)) continue;
       const horizontalOrder = segmentOrder.get(horizontal) ?? 0;
       const verticalOrder = segmentOrder.get(vertical) ?? 0;
       hits.push(horizontalOrder < verticalOrder

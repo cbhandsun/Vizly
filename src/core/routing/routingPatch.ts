@@ -11,6 +11,11 @@ export type RoutingPatchData = Readonly<{
   overextendedTargetTrunkCorridorReclaimed?: unknown;
 }>;
 
+export const ROUTING_PATCH_DATA_KEYS = [
+  'computedPath', 'elkPath', 'treeRouting', 'h', 'sharedTrunkAware',
+  'sharedTrunkSynthesized', 'isTreeBus', 'overextendedTargetTrunkCorridorReclaimed',
+] as const satisfies readonly (keyof RoutingPatchData)[];
+
 /**
  * Routing-owned edge delta. Presentation and business fields are deliberately
  * absent; runtime boundary parsers further constrain the data keys and values.

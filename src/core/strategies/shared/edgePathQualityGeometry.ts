@@ -1,4 +1,5 @@
 import type { Edge } from '@xyflow/react';
+import { isReadableOrthogonalCrossing } from '../../routing/orthogonalCrossingPolicy';
 
 export type Point = { x: number; y: number };
 const asRecord = (value: unknown): Record<string, unknown> => (
@@ -21,6 +22,10 @@ export type Segment = {
 export type EdgePathQualityScore = {
   nonOrthogonalSegments: number;
   strictCrossings: number;
+  /** Clear perpendicular crossings shown with bridges; never hidden from diagnostics. */
+  bridgedCrossings?: number;
+  /** Ordinary crossing = 1, crossing among adjacent edges = 7. */
+  crossingCost?: number;
   reverseOverlap: number;
   unrelatedOverlap: number;
   relatedOverlap: number;
@@ -38,7 +43,7 @@ export const compareEdgePathQualityScores = (
   first: EdgePathQualityScore,
   second: EdgePathQualityScore,
 ): number => {
-  const keys: Array<keyof EdgePathQualityScore> = [
+  const keys = [
     'nonOrthogonalSegments',
     'strictCrossings',
     'reverseOverlap',
@@ -47,25 +52,28 @@ export const compareEdgePathQualityScores = (
     'shortEndpointStubs',
     'tinyInteriorDoglegs',
     'hairpins',
-    'backtrackPenalty',
-    'detourPenalty',
-    'bends',
-    'totalLength',
-  ];
+  ] as const;
   for (const key of keys) {
     const delta = first[key] - second[key];
     if (delta !== 0) return delta;
   }
-  return 0;
+  return edgePathReadabilityCost(first) - edgePathReadabilityCost(second);
 };
+
+/** Crossing and bend costs are relative weights, not pass/fail thresholds. */
+export const edgePathReadabilityCost = (score: EdgePathQualityScore): number => (
+  (score.crossingCost ?? score.bridgedCrossings ?? 0) + score.bends * 3 + score.totalLength * 0.005
+    + score.backtrackPenalty * 200 + score.detourPenalty * 0.75
+);
 
 const EPS = 0.5;
 export const MIN_EDGE_PATH_PENALIZED_OVERLAP = 24;
 const BOUNDED_CROSSING_JUNCTION_LENGTH = 24;
 const VISUAL_PARALLEL_LANE_TOLERANCE = 4;
-const SHARED_TRUNK_COORDINATE_EPS = VISUAL_PARALLEL_LANE_TOLERANCE;
+// Nearby parallel lanes are a defect; only rounding-scale drift describes one
+// shared trunk. Match the rendered audit's one-pixel identity tolerance.
+const SHARED_TRUNK_COORDINATE_EPS = 1;
 const SHORT_ENDPOINT_STUB = 32;
-const TINY_INTERIOR_SEGMENT = 24;
 const HAIRPIN_BRIDGE = 140;
 
 export function getEdgePath(edge: Edge): Point[] {
@@ -540,13 +548,15 @@ export function emptyScore(): EdgePathQualityScore {
 
 export type PairQualityContribution = Pick<EdgePathQualityScore,
   | 'strictCrossings'
+  | 'bridgedCrossings'
+  | 'crossingCost'
   | 'reverseOverlap'
   | 'unrelatedOverlap'
   | 'relatedOverlap'
   | 'unexplainedRelatedOverlap'
 >;
 
-const SCORE_KEYS: Array<keyof EdgePathQualityScore> = [
+const SCORE_KEYS = [
   'nonOrthogonalSegments',
   'strictCrossings',
   'reverseOverlap',
@@ -560,15 +570,27 @@ const SCORE_KEYS: Array<keyof EdgePathQualityScore> = [
   'detourPenalty',
   'bends',
   'totalLength',
-];
+] as const;
 
-const PAIR_SCORE_KEYS: Array<keyof PairQualityContribution> = [
+const PAIR_SCORE_KEYS = [
   'strictCrossings',
   'reverseOverlap',
   'unrelatedOverlap',
   'relatedOverlap',
   'unexplainedRelatedOverlap',
-];
+] as const;
+
+const addBridgedCrossings = (
+  target: { bridgedCrossings?: number; crossingCost?: number },
+  source: { bridgedCrossings?: number; crossingCost?: number },
+  multiplier: number,
+): void => {
+  for (const key of ['bridgedCrossings', 'crossingCost'] as const) {
+    const count = (target[key] ?? 0) + (source[key] ?? 0) * multiplier;
+    if (count !== 0) target[key] = count;
+    else delete target[key];
+  }
+};
 
 export function addScore(
   target: EdgePathQualityScore,
@@ -576,6 +598,7 @@ export function addScore(
   multiplier = 1,
 ): void {
   for (const key of SCORE_KEYS) target[key] += source[key] * multiplier;
+  addBridgedCrossings(target, source, multiplier);
 }
 
 export function addPairContribution(
@@ -589,7 +612,13 @@ export function addPairContribution(
   target.unrelatedOverlap += source.unrelatedOverlap * multiplier;
   target.relatedOverlap += source.relatedOverlap * multiplier;
   target.unexplainedRelatedOverlap += source.unexplainedRelatedOverlap * multiplier;
+  addBridgedCrossings(target, source, multiplier);
 }
+
+export const crossingCanBeBridged = (
+  first: Segment,
+  second: Segment,
+): boolean => isReadableOrthogonalCrossing(first, second);
 
 export function buildEdgeSegments(path: Point[], edgeIndex: number): Segment[] {
   const segments: Segment[] = [];
@@ -641,20 +670,11 @@ export function calculateEdgePairQuality(
   for (const first of firstSegments) {
     for (const second of secondSegments) {
       if (strictlyCrosses(first, second)) {
-        const crossingPoint = first.axis === 'h'
-          ? { x: second.a.x, y: first.a.y }
-          : { x: first.a.x, y: second.a.y };
-        const softBridge = `;${crossingPoint.x},${crossingPoint.y};`;
-        const firstLineHops = firstEdge.data?.h;
-        const secondLineHops = secondEdge.data?.h;
-        const crossingIsAwayFromBends = (
-          (typeof firstLineHops === 'string' && firstLineHops.includes(softBridge))
-          || (typeof secondLineHops === 'string' && secondLineHops.includes(softBridge))
-        ) && [first, second].every(segment => (
-          segmentLength(segment.a, crossingPoint) >= 24
-          && segmentLength(segment.b, crossingPoint) >= 24
-        ));
-        if (crossingIsAwayFromBends) continue;
+        if (crossingCanBeBridged(first, second)) {
+          score.bridgedCrossings = (score.bridgedCrossings ?? 0) + 1;
+          score.crossingCost = (score.crossingCost ?? 0) + (related ? 7 : 1);
+          continue;
+        }
         if (!crossingTouchesSharedEndpoint(
           firstEdge,
           secondEdge,
@@ -704,5 +724,6 @@ export function calculateEdgePairQuality(
 }
 
 export function hasPairContribution(score: PairQualityContribution): boolean {
-  return PAIR_SCORE_KEYS.some(key => score[key] !== 0);
+  return (score.bridgedCrossings ?? 0) !== 0 || PAIR_SCORE_KEYS.some(key => score[key] !== 0);
 }
+import { TINY_INTERIOR_SEGMENT } from './edgePathReadabilityThresholds';

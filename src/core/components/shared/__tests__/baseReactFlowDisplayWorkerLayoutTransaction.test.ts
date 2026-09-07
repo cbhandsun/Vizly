@@ -48,12 +48,12 @@ const routeFields = {
   inputIdentity: identity,
 };
 
-const runLegacy = (candidate: Edge[], stopAfterObstacleFailure = false) => {
+const runLegacy = (candidate: Edge[], stopAfterObstacleFailure = false, requestNodes = nodes) => {
   const repaired = computeBaseReactFlowDisplayEdgesWorkerResponse({
     operation: 'repair',
     requestId: 'layout',
     edges: candidate,
-    nodes,
+    nodes: requestNodes,
     inputIdentity: identity,
     repairMode: 'bounded',
     stopAfterObstacleFailure,
@@ -65,6 +65,7 @@ const runLegacy = (candidate: Edge[], stopAfterObstacleFailure = false) => {
   ) return repaired;
   return computeBaseReactFlowDisplayEdgesWorkerResponse({
     ...routeFields,
+    nodes: requestNodes,
     operation: 'validate-or-route',
     requestId: 'layout',
     edges: sourceEdges,
@@ -73,9 +74,10 @@ const runLegacy = (candidate: Edge[], stopAfterObstacleFailure = false) => {
   });
 };
 
-const runFused = (candidate: Edge[], stopAfterObstacleFailure = false) => (
+const runFused = (candidate: Edge[], stopAfterObstacleFailure = false, requestNodes = nodes) => (
   computeBaseReactFlowDisplayEdgesWorkerResponse({
     ...routeFields,
+    nodes: requestNodes,
     operation: 'repair-validate-or-route',
     requestId: 'layout',
     edges: sourceEdges,
@@ -116,10 +118,16 @@ describe('display Worker fused layout repair transaction', () => {
   });
 
   it('preserves stop-after-obstacle-failure without entering canonical routing', () => {
-    const legacy = runLegacy(dirtyCandidate, true);
+    // Enclosing the source makes this physically infeasible. An ordinary
+    // blocker can now be repaired and no longer exercises the failure branch.
+    const enclosedSourceNodes = [nodes[0], {
+      ...nodes[1], position: { x: -20, y: 80 }, measured: { width: 140, height: 100 },
+    }, nodes[2]];
+    const legacy = runLegacy(dirtyCandidate, true, enclosedSourceNodes);
     clearDisplayRoutingWorkerSessions();
-    const fused = runFused(dirtyCandidate, true);
+    const fused = runFused(dirtyCandidate, true, enclosedSourceNodes);
     expect(fused.routeResolution).toBe('repair');
+    expect(fused.hardReport?.obstacleHits).toBeGreaterThan(0);
     expect(fused.edges).toEqual(legacy.edges);
     expect(fused.hardReport).toEqual(legacy.hardReport);
     expect(fused.commitReceipt).toEqual(legacy.commitReceipt);

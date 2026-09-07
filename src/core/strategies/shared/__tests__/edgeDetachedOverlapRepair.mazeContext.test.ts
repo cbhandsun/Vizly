@@ -1,10 +1,14 @@
-import type { Edge } from '@xyflow/react';
-import { describe, expect, it } from 'vitest';
+import type { Edge, Node } from '@xyflow/react';
+import { describe, expect, it, vi } from 'vitest';
+import * as mazeGeometry from '../edgeDetachedOverlapCandidates';
+import { resolveMazeTerminalCaps } from '../edgeStrictCrossingMazeTerminals';
+import { resolveMazeRunDestination } from '../edgeStrictCrossingMazeSteps';
 
 import { buildBoundedResidualOverlapMazeCandidate } from '../edgeDetachedResidualOverlapMaze';
 import { routeStrictCrossingMazeCandidate } from '../edgeDetachedStrictCrossingMaze';
 import type { StrictCrossingMazeDiagnostics } from '../edgeDetachedOverlapRepairTypes';
-import { countStrictEdgeCrossings } from '../edgeStrictCrossingGuard';
+import { calculateEdgePathQualityScore, countStrictEdgeCrossings } from '../edgeStrictCrossingGuard';
+import { createNodeClearanceGraphEvaluationContext, HARD_MINIMUM_BUSINESS_NODE_CLEARANCE } from '../edgeWaypointCandidateRepair';
 
 type Point = { x: number; y: number };
 
@@ -18,6 +22,172 @@ function edge(id: string, path: Point[]): Edge {
 }
 
 describe('routeStrictCrossingMazeCandidate penalty context', () => {
+  it.each([0, 1, 2, 3])('keeps the hard minimum node clearance on fractional geometry, rotation %i', turns => {
+    const point = (x: number, y: number): Point => {
+      for (let turn = 0; turn < turns; turn += 1) [x, y] = [-y, x];
+      return { x: x + 317.175, y: y - 219.175 };
+    };
+    const start = point(100, -40), end = point(200, 40);
+    const obstacle: Node = { id: 'unrelated',
+      position: { x: Math.min(start.x, end.x), y: Math.min(start.y, end.y) },
+      width: Math.abs(start.x-end.x), height: Math.abs(start.y-end.y), data: {} };
+    const path = [point(0, 0), point(300, 0)];
+    const moving = edge('transfer', path);
+    const candidate = routeStrictCrossingMazeCandidate(path, 0, [path], [moving], [obstacle]);
+    expect(candidate).not.toBeNull();
+    if (!candidate) throw new Error('Expected a route around the obstacle');
+    expect(createNodeClearanceGraphEvaluationContext([obstacle])
+      .score(candidate, moving, HARD_MINIMUM_BUSINESS_NODE_CLEARANCE)).toBe(0);
+  });
+
+  it('skips short turn runs, except where a retained suffix completes the run', () => {
+    const coordinates = [0, 16, 32, 48];
+    expect(resolveMazeRunDestination(coordinates, 0, 1)).toBe(2);
+    expect(resolveMazeRunDestination(coordinates, 3, -1)).toBe(1);
+    expect(resolveMazeRunDestination(coordinates, 0, 1, { index: 1, extension: 8 })).toBe(1);
+    expect(resolveMazeRunDestination(coordinates, 0, 1, { index: 1, extension: 7 })).toBe(2);
+    expect(resolveMazeRunDestination(coordinates, 0, 1, { index: 1, extension: Number.NaN })).toBe(2);
+    expect(resolveMazeRunDestination([], 0, 1)).toBe(-1);
+    expect(resolveMazeRunDestination(coordinates, 3, 1)).toBe(-1);
+    expect(resolveMazeRunDestination(coordinates, -1, 1)).toBe(-1);
+  });
+
+  it('checks the whole long step when obstacle coordinates are absent from the grid', () => {
+    const path: Point[] = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }];
+    const moving = edge('moving', path);
+    const rect = { x: 40, y: -15, width: 1, height: 30 };
+    const nodes: Node[] = [{ id: 'thin-wall', position: { x: rect.x, y: rect.y }, width: rect.width, height: rect.height, data: {} }];
+    const candidate = routeStrictCrossingMazeCandidate(path, 0, [path], [moving], nodes, {
+      penaltyPaths: [path], penaltyEdges: [moving], penaltyEdgeIndex: 0, gridNodes: [],
+    });
+    expect(candidate).not.toBeNull();
+    if (!candidate) throw new Error('expected an obstacle-free alternative');
+    for (let index = 1; index < candidate.length; index += 1) {
+      const a = candidate[index - 1];
+      const b = candidate[index];
+      const axis = mazeGeometry.axisOf(a, b);
+      if (!axis) throw new Error('expected an orthogonal step');
+      expect(mazeGeometry.segmentIntersectsRect({ a, b, axis }, rect, 12)).toBe(false);
+    }
+  });
+
+  it('validates retained cap geometry before using it as search state', () => {
+    const start = { x: 0, y: 0 };
+    const end = { x: 100, y: 0 };
+    expect(resolveMazeTerminalCaps(undefined, start, end)).toBeUndefined();
+    for (const value of [null, {}, 'invalid',
+      { startPredecessor: { x: Number.NaN, y: 0 }, endSuccessor: { x: 200, y: 0 } },
+      { startPredecessor: { x: -10, y: 10 }, endSuccessor: { x: 200, y: 0 } },
+      { startPredecessor: start, endSuccessor: { x: 200, y: 0 } },
+      { startPredecessor: { x: -100, y: 0 }, endSuccessor: end },
+    ]) expect(resolveMazeTerminalCaps(value, start, end)).toBeNull();
+  });
+
+  it.each([0, 100])('counts the retained-cap crossing at seam x=%i before accepting a route', (seamX) => {
+    const path: Point[] = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
+    const blockerPath: Point[] = [{ x: seamX, y: -100 }, { x: seamX, y: 100 }];
+    const moving = edge('moving', path);
+    const blocker = edge('blocker', blockerPath);
+    const caps = { startPredecessor: { x: -100, y: 0 }, endSuccessor: { x: 200, y: 0 } };
+    const candidate = routeStrictCrossingMazeCandidate(path, 0, [path, blockerPath], [moving, blocker], [], {
+      penaltyPaths: [path, blockerPath], penaltyEdges: [moving, blocker], penaltyEdgeIndex: 0, terminalCaps: caps,
+    });
+    expect(candidate).not.toBeNull();
+    if (!candidate) throw new Error('expected the seam crossing to affect routing');
+    const joined = mazeGeometry.compactPath([caps.startPredecessor, ...candidate, caps.endSuccessor]);
+    expect(countStrictEdgeCrossings([edge('moving', joined), blocker])).toBe(0);
+  });
+
+  it.each(['LR', 'RL', 'TB', 'BT'])('preserves terminal caps and right-angle seam turns in %s', (direction) => {
+    const sign = direction === 'RL' || direction === 'BT' ? -1 : 1;
+    const vertical = direction === 'TB' || direction === 'BT';
+    const transform = ({ x, y }: Point): Point => vertical ? { x: y, y: sign * x || 0 } : { x: sign * x || 0, y };
+    const normalize = ({ x, y }: Point): Point => vertical ? { x: sign * y || 0, y: x } : { x: sign * x || 0, y };
+    const original: Point[] = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 200, y: 100 }];
+    const path = original.map(transform);
+    const blockerPath: Point[] = [{ x: 50, y: 50 }, { x: 150, y: 50 }].map(transform);
+    const blocker = edge('blocker', blockerPath);
+    const candidate = buildBoundedResidualOverlapMazeCandidate(
+      [edge('moving', path), blocker], [], 0, [1],
+    );
+    expect(candidate).not.toBeNull();
+    if (!candidate) throw new Error('expected a cap-preserving detour');
+    const normalized = candidate.map(normalize);
+    expect(normalized[0]).toEqual(original[0]);
+    expect(normalized[normalized.length - 1]).toEqual(original[original.length - 1]);
+    expect(normalized[1].y).toBe(0);
+    expect(normalized[1].x).toBeGreaterThanOrEqual(100);
+    expect(normalized[normalized.length - 2].y).toBe(100);
+    expect(normalized[normalized.length - 2].x).toBeLessThanOrEqual(100);
+    expect(countStrictEdgeCrossings([edge('moving', candidate), blocker])).toBe(0);
+    expect(calculateEdgePathQualityScore([edge('moving', candidate)]).tinyInteriorDoglegs).toBe(0);
+  });
+
+  it('checks each directed grid step against a node only once per search', () => {
+    const directPath: Point[] = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
+    const blockerPath: Point[] = [{ x: 50, y: -100 }, { x: 50, y: 100 }];
+    const nodes: Node[] = [{ id: 'obstacle', position: { x: 40, y: -20 }, width: 20, height: 40, data: {} }];
+    const checks = new Map<string, number>();
+    const intersects = mazeGeometry.segmentIntersectsRect;
+    const spy = vi.spyOn(mazeGeometry, 'segmentIntersectsRect').mockImplementation((segment, rect, padding) => {
+      const key = `${segment.a.x}:${segment.a.y}:${segment.b.x}:${segment.b.y}`;
+      checks.set(key, (checks.get(key) ?? 0) + 1);
+      return intersects(segment, rect, padding);
+    });
+    try {
+      const candidate = routeStrictCrossingMazeCandidate(
+        directPath, 0, [directPath, blockerPath], [edge('moving', directPath), edge('blocker', blockerPath)], nodes,
+      );
+      expect(candidate).not.toBeNull();
+      expect(checks.size).toBeGreaterThan(0);
+      expect(Math.max(...checks.values())).toBe(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('does not retain edge penalties after a search ends', () => {
+    const path: Point[] = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
+    const blockerPath: Point[] = [{ x: 50, y: -100 }, { x: 50, y: 100 }];
+    const moving = edge('moving', path);
+    const blocker = edge('blocker', blockerPath);
+    const context = { penaltyPaths: [path, blockerPath], penaltyEdges: [moving, blocker], penaltyEdgeIndex: 0 };
+    expect(routeStrictCrossingMazeCandidate(path, 0, [path], [moving], [], context)).not.toBeNull();
+    context.penaltyPaths = [path];
+    context.penaltyEdges = [moving];
+    expect(routeStrictCrossingMazeCandidate(path, 0, [path], [moving], [], context)).toBeNull();
+  });
+
+  it.each(['LR', 'RL', 'TB', 'BT'])('charges an internal grid vertex crossing in %s before path compaction', (direction) => {
+    const transform = ({ x, y }: Point): Point => {
+      const sign = direction === 'RL' || direction === 'BT' ? -1 : 1;
+      const along = x === 0 ? 0 : sign * x;
+      return direction === 'TB' || direction === 'BT' ? { x: y, y: along } : { x: along, y };
+    };
+    const directPath: Point[] = [{ x: 0, y: 0 }, { x: 100, y: 0 }].map(transform);
+    const blockerPath: Point[] = [{ x: 50, y: -100 }, { x: 50, y: 100 }].map(transform);
+    const moving = edge('moving', directPath);
+    const blocker = edge('blocker', blockerPath);
+    const candidate = routeStrictCrossingMazeCandidate(
+      directPath, 0, [directPath, blockerPath], [moving, blocker], [],
+    );
+    expect(candidate).not.toBeNull();
+    if (!candidate) throw new Error('expected a crossing-free detour');
+    expect(countStrictEdgeCrossings([edge('moving', candidate), blocker])).toBe(0);
+    expect(candidate[0]).toEqual(directPath[0]);
+    expect(candidate[candidate.length - 1]).toEqual(directPath[1]);
+  });
+
+  it('does not charge a perpendicular shared source as a straight-through crossing', () => {
+    const directPath: Point[] = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
+    const peerPath: Point[] = [{ x: 0, y: 0 }, { x: 0, y: 100 }];
+    const moving = edge('moving', directPath);
+    const peer = { ...edge('peer', peerPath), source: moving.source };
+    expect(routeStrictCrossingMazeCandidate(
+      directPath, 0, [directPath, peerPath], [moving, peer], [],
+    )).toBeNull();
+  });
+
   it('keeps a bounded local grid while scoring crossings against the full graph', () => {
     const directPath: Point[] = [
       { x: 0, y: 0 },
@@ -151,8 +321,14 @@ describe('routeStrictCrossingMazeCandidate penalty context', () => {
     });
 
     expect(candidate).not.toBeNull();
-    expect(candidate?.slice(0, 2)).toEqual(directPath.slice(0, 2));
-    expect(candidate?.slice(-2)).toEqual(directPath.slice(-2));
+    if (!candidate) throw new Error('expected a cap-preserving candidate');
+    // Compaction may extend a retained cap, but must not shorten or reverse it.
+    expect(candidate[0]).toEqual(directPath[0]);
+    expect(candidate[1].y).toBe(0);
+    expect(candidate[1].x).toBeGreaterThanOrEqual(20);
+    expect(candidate[candidate.length - 1]).toEqual(directPath[3]);
+    expect(candidate[candidate.length - 2].y).toBe(0);
+    expect(candidate[candidate.length - 2].x).toBeLessThanOrEqual(80);
     expect(countStrictEdgeCrossings([
       edge('moving', candidate!),
       edges[2],

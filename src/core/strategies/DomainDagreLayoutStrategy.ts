@@ -1,5 +1,7 @@
 import type { Node as ReactFlowNode, Edge } from '@xyflow/react';
 import type { LayoutOptions } from '../types/layout';
+import type { LayoutResult } from '../types/layout-strategy';
+import type { LaneRankDecision } from '../types/domainLaneRank';
 import { ILayoutStrategy } from './LayoutStrategyManager';
 import { diagramConfigManager } from '../config/DiagramConfig';
 import {
@@ -37,6 +39,8 @@ import {
 } from './domainDagreTopLevelLayout';
 import { runDomainDagreNestedLayout } from './domainDagreNestedLayout';
 import { arrangeDomainDagreChildren } from './domainDagreChildArrangement';
+import { centerDomainDagreSubGroups } from './domainDagreDirectContent';
+import { domainDagrePeerComponentIndex } from './domainDagrePeerComponents';
 import {
     unifyContainerHeightsByMaximum,
     unifyContainerWidthsByMaximum,
@@ -66,7 +70,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         nodes: ReactFlowNode[],
         edges: Edge[],
         options: LayoutOptions
-    ): Promise<{ nodes: ReactFlowNode[]; edges: Edge[] }> {
+    ): Promise<LayoutResult> {
         edges = Array.isArray(edges) ? edges : [];
         const cfg = diagramConfigManager.getConfig() || {};
         const layoutCfg = diagramConfigManager.getLayoutConfig();
@@ -171,6 +175,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         const domains = updatedNodes.filter(n => String(n.type || '') === 'titleGroup' && !isHidden(n));
         const subGroups = updatedNodes.filter(n => String(n.type || '') === 'subGroup' && !isHidden(n));
         const leafNodes = updatedNodes.filter(n => !isDomainDagreGroupNode(n) && !isHidden(n));
+        const globalComponentByNodeId = domainDagrePeerComponentIndex(leafNodes.map(node => node.id), edges);
 
         // [FIX] 构建域排序索引并按 domainOrder 排序域容器
         const domainsByScan: string[] = [];
@@ -278,6 +283,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             currentDomains.forEach(domain => {
                 const dk = domainOf(domain);
                 if (!dk) return;
+                if (leafNodes.some(node => domainOf(node) === dk && !nodeToSubGroup.has(node.id))) return;
 
                 const domainSubGroups = sortDomainDagreSubGroups(
                     updatedNodes.filter(n =>
@@ -345,7 +351,15 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                     subDomainNodeIsHorizontal,
                     nodeGapH,
                     nodeGapV,
-                    getNodeDimensions
+                    getNodeDimensions,
+                    domainPlacement !== 'ordered-lanes',
+                    domainPlacement !== 'ordered-lanes' && domainSubGroupIsHorizontal ? {
+                        maxWidth: getNodeDimensions(sg).width - sdPadHEffective * 2,
+                        maxHeight: Math.max(...updatedNodes.filter(node => node.type === 'subGroup' && domainOf(node) === domainOf(sg))
+                            .map(node => getNodeDimensions(node).height)) - sdTitleH - sdPadV * 2,
+                        objective: 'width',
+                    } : undefined,
+                    globalComponentByNodeId,
                 );
 
                 const baseX = sg.position.x;
@@ -384,6 +398,8 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             nodeArrangement,
             domainSubGroupIsHorizontal,
             packVerticalSubDomains: domainPlacement === 'ordered-lanes',
+            packDisconnectedComponents: domainPlacement !== 'ordered-lanes',
+            globalComponentByNodeId,
             nodeGapH,
             nodeGapV,
             subDomainPaddingH: sdPadHEffective,
@@ -403,7 +419,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         // 子域整体居中处理
         // ============================================
         // 在域内布局完成、域尺寸确定后,使域内多个子域作为整体相对父域居中
-        updatedNodes = centerSubGroupsInDomain(updatedNodes);
+        updatedNodes = centerDomainDagreSubGroups(updatedNodes, nodeToSubGroup, centerSubGroupsInDomain);
 
         // 更新节点映射以保持引用同步
         idMap.clear();
@@ -433,7 +449,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         // 子域整体居中处理（在所有域级布局完成后）
         // ============================================
 
-        updatedNodes = centerSubGroupsInDomain(updatedNodes);
+        updatedNodes = centerDomainDagreSubGroups(updatedNodes, nodeToSubGroup, centerSubGroupsInDomain);
 
         // 更新节点映射以保持引用同步
         idMap.clear();
@@ -480,12 +496,21 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             }
         }
 
-        if (domainPlacement === 'ordered-lanes' && (nodeArrangement === 'dagre' || nodeArrangement === 'flow')) {
-            const { alignDomainDagreLaneFlow } = await import('./domainDagreSemanticLaneFlow');
-            updatedNodes = alignDomainDagreLaneFlow(updatedNodes, edges, {
+        let laneRankDecision: LaneRankDecision | undefined;
+        // Grid/Flow can pack genuinely independent cards, but a dependency does not
+        // disappear merely because its other endpoint belongs to another lane.
+        if (domainPlacement === 'ordered-lanes'
+            && (nodeArrangement === 'dagre' || nodeArrangement === 'grid' || nodeArrangement === 'flow')) {
+            const { selectDomainDagreLaneFlow } = await import('./domainDagreLaneRankDecision');
+            const selected = selectDomainDagreLaneFlow(updatedNodes, edges, {
                 direction, nodeToSubGroup, domainOrder: domainOrderArr, subDomainOrder: subDomainOrderOpt,
                 horizontalGap: nodeGapH, verticalGap: nodeGapV,
+                laneRankPreference: options.laneRankPreference,
+                previousLaneRankDecision: options.previousLaneRankDecision,
+                independentNodeArrangement: nodeArrangement === 'dagre' ? undefined : nodeArrangement,
             });
+            updatedNodes = selected.nodes;
+            laneRankDecision = selected.decision;
         }
 
         // ============================================
@@ -513,11 +538,17 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                 ? unifyContainerWidthsByMaximum(updatedNodes, new Set(['titleGroup']), dTitleH)
                 : unifyContainerHeightsByMaximum(updatedNodes, new Set(['titleGroup']), 360);
         }
+        updatedNodes = updatedNodes.map(node => {
+            if (!isDomainDagreGroupNode(node) || isHidden(node)) return node;
+            const dimensions = getNodeDimensions(node);
+            return { ...node, ...dimensions, measured: dimensions, style: { ...node.style, ...dimensions } };
+        });
         updatedNodes = sortDomainDagreHierarchy(
             convertDomainDagreToHierarchy(updatedNodes, nodeToSubGroup),
         );
 
-        return { nodes: updatedNodes, edges: finalRoutedEdges };
+        return { nodes: updatedNodes, edges: finalRoutedEdges,
+            ...(laneRankDecision ? { metadata: { laneRankDecision } } : {}) };
     }
 
 

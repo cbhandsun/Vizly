@@ -14,6 +14,6 @@ describe('edge routing cache version', () => {
   });
 
   it('declares an independent renderer-facing commercial contract version', () => {
-    expect(EDGE_ROUTING_VISUAL_VERSION).toBe('commercial-hard-gate-v1');
+    expect(EDGE_ROUTING_VISUAL_VERSION).toBe('balanced-crossing-gate-v2');
   });
 });

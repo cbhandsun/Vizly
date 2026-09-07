@@ -8,6 +8,7 @@ import type { LayoutCalculationContext } from '../../types/layout-strategy';
 import { applyElkResultNodeGeometry } from '../AbstractElkLayoutStrategy';
 import { DomainCompoundElkLayoutStrategy } from '../DomainCompoundElkLayoutStrategy';
 import { DomainElkLayoutStrategy } from '../DomainElkLayoutStrategy';
+import { evaluateLayoutGeometry } from '../../algorithms/layoutGeometryConstraints';
 
 const elkMocks = vi.hoisted(() => ({
   runElkLayout: vi.fn(),
@@ -56,6 +57,64 @@ beforeEach(() => {
 });
 
 describe('DomainCompoundElkLayoutStrategy', () => {
+  it('reconstructs the returned hierarchy after layout-switch preparation removed parent ids', () => {
+    const domain = node('domain', 'titleGroup', { domain: 'A' });
+    const subgroup = node('subgroup', 'subGroup', { domain: 'A', subDomain: 'One' });
+    const child = node('child', 'custom', { domain: 'A', subDomain: 'One' });
+    const direct = node('direct', 'custom', { domain: 'A' });
+    const nodes = [child, direct, subgroup, domain];
+    for (const current of nodes) current.measured = { width: 9000, height: 9000 };
+    const orderedNodes = applyElkResultNodeGeometry([{
+      id: 'domain', x: 10, y: 20, width: 600, height: 400,
+      children: [
+        { id: 'subgroup', x: 30, y: 60, width: 240, height: 200,
+          children: [{ id: 'child', x: 20, y: 64, width: 180, height: 80 }] },
+        { id: 'direct', x: 320, y: 88, width: 180, height: 80 },
+      ],
+    }], new Map(nodes.map(current => [current.id, current])), { x: 40, y: 40 });
+    expect(orderedNodes.map(current => current.id)).toEqual(['domain', 'subgroup', 'child', 'direct']);
+    expect(domain.position).toEqual({ x: 50, y: 60 });
+    expect(subgroup).toMatchObject({ parentId: 'domain', extent: 'parent', position: { x: 30, y: 60 } });
+    expect(child).toMatchObject({ parentId: 'subgroup', extent: 'parent', position: { x: 20, y: 64 } });
+    expect(direct).toMatchObject({ parentId: 'domain', extent: 'parent', position: { x: 320, y: 88 } });
+    for (const current of nodes) {
+      expect(current.measured).toEqual({ width: current.width, height: current.height });
+      expect(current.style).toMatchObject(current.measured ?? {});
+    }
+    expect(evaluateLayoutGeometry(nodes).clean).toBe(true);
+  });
+
+  it('uses the new ELK parent and clears obsolete hierarchy on roots', () => {
+    const domain = { ...node('domain', 'titleGroup', {}), parentId: 'obsolete', extent: 'parent' as const };
+    const child = { ...node('child', 'custom', {}), parentId: 'obsolete', extent: 'parent' as const,
+      positionAbsolute: { x: 999, y: 999 } };
+    applyElkResultNodeGeometry([{ id: 'domain', x: 10, y: 20, width: 300, height: 200,
+      children: [{ id: 'child', x: 30, y: 60, width: 180, height: 80 }] }],
+    new Map([domain, child].map(current => [current.id, current])), { x: 40, y: 40 });
+    expect(domain.parentId).toBeUndefined();
+    expect(domain.extent).toBeUndefined();
+    expect(child.parentId).toBe('domain');
+    expect(child.positionAbsolute).toBeUndefined();
+    expect(evaluateLayoutGeometry([domain, child]).clean).toBe(true);
+  });
+
+  it('preserves omitted dimensions but cannot disguise supplied invalid ELK geometry', () => {
+    const first = node('first', 'custom', {}), second = node('second', 'custom', {});
+    applyElkResultNodeGeometry(undefined, new Map(), { x: 40, y: 40 });
+    applyElkResultNodeGeometry([{ id: 'first' }], new Map([[first.id, first]]), { x: 40, y: 40 });
+    expect(first.width).toBe(180);
+    expect(first.position).toEqual({ x: 40, y: 40 });
+    expect(evaluateLayoutGeometry([first]).clean).toBe(true);
+    applyElkResultNodeGeometry([{ id: 'first', x: 0, y: 0, width: NaN, height: 80 },
+      { id: 'second', x: 300, y: 0, width: -1, height: Infinity }],
+    new Map([first, second].map(current => [current.id, current])), { x: 40, y: 40 });
+    expect(evaluateLayoutGeometry([first, second]).clean).toBe(false);
+    const invalidPosition = node('position', 'custom', {});
+    applyElkResultNodeGeometry([{ id: 'position', x: Infinity, y: NaN }],
+      new Map([[invalidPosition.id, invalidPosition]]), { x: 40, y: 40 });
+    expect(evaluateLayoutGeometry([invalidPosition]).clean).toBe(false);
+  });
+
   it('forwards cancellation and does not route unchanged geometry after an ELK failure', async () => {
     const controller = new AbortController();
     const failure = new Error('ELK layout timed out after 30000ms');

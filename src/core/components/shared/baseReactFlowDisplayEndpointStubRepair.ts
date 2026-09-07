@@ -41,7 +41,8 @@ import type { DisplayTerminalValidationSnapshot } from './baseReactFlowTerminalV
 import { buildSharedRenderSafeStubCandidate } from './baseReactFlowDisplaySharedStubCandidate';
 import { buildPerpendicularTerminalStubCandidates } from './baseReactFlowDisplayPerpendicularStubCandidate';
 
-export const MIN_RENDER_SAFE_ENDPOINT_STUB = 56;
+import { MIN_RENDER_SAFE_ENDPOINT_STUB, countRenderUnsafeEndpointStubs } from './baseReactFlowDisplayEndpointStubMetrics';
+export { MIN_RENDER_SAFE_ENDPOINT_STUB, countRenderUnsafeEndpointStubs } from './baseReactFlowDisplayEndpointStubMetrics';
 const MAX_FINAL_ENDPOINT_STUB_REPAIR_EVALUATIONS = 8;
 const MAX_GLOBAL_STRICT_STUB_FALLBACK_EDGES = 36;
 const COMMERCIAL_CLEARANCE_RISK_EPSILON = 1e-6;
@@ -58,13 +59,7 @@ export const renderSafeEndpointStubRepairUsesGlobalStrictFallback = (
   && edgeCount >= 0
   && edgeCount <= MAX_GLOBAL_STRICT_STUB_FALLBACK_EDGES;
 
-export const countRenderUnsafeEndpointStubs = (edges: Edge[]): number => edges.reduce((total, edge) => {
-  const path = getDisplayComputedPath(edge);
-  if (path.length < 3) return total;
-  return total
-    + (segmentDisplayLength(path[0], path[1]) < MIN_RENDER_SAFE_ENDPOINT_STUB ? 1 : 0)
-    + (segmentDisplayLength(path[path.length - 2], path[path.length - 1]) < MIN_RENDER_SAFE_ENDPOINT_STUB ? 1 : 0);
-}, 0);
+
 
 export const repairFinalShortEndpointStubs = <T extends Edge[]>(edges: T, nodes: Node[]): T => {
   const qualityContext = createEdgePathQualityEvaluationContext(edges);
@@ -298,7 +293,12 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
     let acceptedCommercialRiskDelta = Number.POSITIVE_INFINITY;
     let needsTrunkPreservingPortAlternative = false;
     function* candidateEdges(): Generator<Edge> {
-      for (const candidatePath of buildRenderSafeEndpointStubPaths(getDisplayComputedPath(current[edgeIndex]))) {
+      const paths = prioritizeNonCrossingEndpointStubCandidates(
+        buildRenderSafeEndpointStubPaths(getDisplayComputedPath(current[edgeIndex])),
+        edgeIndex,
+        current,
+      );
+      for (const candidatePath of paths) {
         yield withDisplayComputedPath(current[edgeIndex], candidatePath);
       }
       // The loop stops on acceptance, so port changes are only considered when

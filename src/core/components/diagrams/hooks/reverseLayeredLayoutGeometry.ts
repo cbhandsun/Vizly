@@ -1,6 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 
-import type { ILayoutStrategy } from '../../../types/layout-strategy';
+import type { ILayoutStrategy, LayoutResult } from '../../../types/layout-strategy';
 import type { LayoutCalculationContext } from '../../../types/layout-strategy';
 import type { LayoutOptions } from '../../../types/layout';
 import type { FlowchartLayoutDirection } from '../flowchartLayoutStrategyMode';
@@ -178,12 +178,12 @@ export const calculateLayeredLayoutWithReverse = async (
     requestedDirection: FlowchartLayoutDirection,
     reverseRanking: boolean,
     context?: LayoutCalculationContext,
-): Promise<{ nodes: Node[]; edges: Edge[] }> => {
+): Promise<LayoutResult> => {
     // Semantic lanes already reverse their global business ranks while keeping
     // container headers upright. Mirroring that layout would swap header and
     // bottom padding and place terminal nodes inside the title strip.
     const nativeSemanticReverse = options.domainPlacement === 'ordered-lanes'
-        && (options.nodeLayout === 'dagre' || options.nodeLayout === 'flow');
+        && options.nodeLayout === 'dagre';
     const reverseDirection = reverseRanking
         && !nativeSemanticReverse
         && (requestedDirection === 'BT' || requestedDirection === 'RL')

@@ -395,7 +395,7 @@ describe('base React Flow topology incremental projection', () => {
     const changed: Edge = {
       id: 'changed', source: 'source', target: 'target',
       sourceHandle: 'right', targetHandle: 'left', type: 'stablePath',
-      data: { computedPath: [{ x: 0, y: 50 }, { x: 100, y: 50 }] },
+      data: { computedPath: [{ x: 40, y: 50 }, { x: 100, y: 50 }] },
     };
     const promoted: Edge = {
       id: 'promoted', source: 'hub', target: 'auxiliary',

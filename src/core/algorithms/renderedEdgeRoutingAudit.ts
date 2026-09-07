@@ -299,6 +299,24 @@ const structuralSegments = (points: ParsedPathPoint[]): Segment[] => {
     return segments;
 };
 
+// Jump arcs split a straight route into several painted segments. Reconstruct
+// that axis only for shared-trunk identity; crossing checks still use paint.
+const trunkSegments = (points: ParsedPathPoint[]): Segment[] => {
+    const chain: ParsedPathPoint[] = [];
+    for (const point of points) {
+        const next: ParsedPathPoint = point.command === 'A' ? { ...point, command: 'L' } : point;
+        const a = chain.at(-2);
+        const b = chain.at(-1);
+        if (a && b && b.command === 'L' && next.command === 'L'
+            && [a.x, a.y, b.x, b.y, next.x, next.y].every(Number.isFinite)
+            && ((Math.abs(a.y - b.y) <= EPS && Math.abs(b.y - next.y) <= EPS && (b.x - a.x) * (next.x - b.x) > 0)
+                || (Math.abs(a.x - b.x) <= EPS && Math.abs(b.x - next.x) <= EPS && (b.y - a.y) * (next.y - b.y) > 0))) {
+            chain[chain.length - 1] = next;
+        } else chain.push(next);
+    }
+    return structuralSegments(chain);
+};
+
 const isContainerNode = (node: RenderedAuditNode): boolean =>
     CONTAINER_TYPES.has(String(node.type ?? ''));
 
@@ -393,8 +411,16 @@ const isProtectedRenderedSharedTrunk = (
     secondSegments: readonly Segment[],
     secondEdge: RenderedAuditEdge,
 ): boolean => {
+    const containingSegment = (segment: Segment, chain: readonly Segment[]): Segment | undefined => chain.find(item => (
+        parallelOverlapLength(segment, item) >= Math.hypot(segment.b.x - segment.a.x, segment.b.y - segment.a.y) - EPS
+        && Math.abs((item.b.x - item.a.x) * (segment.a.y - item.a.y)
+            - (item.b.y - item.a.y) * (segment.a.x - item.a.x)) <= EPS
+    ));
+    const firstTrunk = containingSegment(first, firstSegments);
+    const secondTrunk = containingSegment(second, secondSegments);
+    if (!firstTrunk || !secondTrunk) return false;
     const chainContains = (target: boolean): boolean => {
-        const offsets = [first, second].map(segment => target ? segment.pointCount - 2 - segment.segmentIndex : segment.segmentIndex);
+        const offsets = [firstTrunk, secondTrunk].map(segment => target ? segment.pointCount - 2 - segment.segmentIndex : segment.segmentIndex);
         if (offsets[0] !== offsets[1] || offsets[0] < 0 || offsets[0] >= MAX_SHARED_TRUNK_SEGMENTS) return false;
         for (let offset = 0; offset <= offsets[0]; offset++) {
             const a = target ? firstSegments[firstSegments.length - 1 - offset] : firstSegments[offset];
@@ -518,7 +544,7 @@ export function auditRenderedEdgeRouting(
     const nodeById = new Map(nodes.map(node => [node.id, node]));
     const parsedEdges = edges.map(edge => {
         const points = parseRenderedSvgPath(edge.path);
-        return { edge, points, segments: structuralSegments(points) };
+        return { edge, points, segments: structuralSegments(points), trunks: trunkSegments(points) };
     });
     const errors: RenderedAuditFinding[] = [];
     const warnings: RenderedAuditFinding[] = [];
@@ -715,8 +741,8 @@ export function auditRenderedEdgeRouting(
                     const overlap = parallelOverlapLength(first, second);
                     if (overlap >= PARALLEL_OVERLAP_ERROR_LENGTH
                         && !isProtectedRenderedSharedTrunk(
-                            first, parsedEdges[i].segments, parsedEdges[i].edge,
-                            second, parsedEdges[j].segments, parsedEdges[j].edge,
+                            first, parsedEdges[i].trunks, parsedEdges[i].edge,
+                            second, parsedEdges[j].trunks, parsedEdges[j].edge,
                         )) {
                         pushError({
                             rule: 'edge-parallel-overlap',

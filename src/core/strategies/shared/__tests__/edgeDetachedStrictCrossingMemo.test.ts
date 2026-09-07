@@ -37,7 +37,7 @@ const crossingEdges = (businessMarker: string): Edge[] => [
     style: { stroke: businessMarker },
     data: {
       businessMarker,
-      computedPath: [{ x: 150, y: 0 }, { x: 150, y: 240 }],
+      computedPath: [{ x: 50, y: 0 }, { x: 50, y: 240 }],
     },
   },
 ];
@@ -51,7 +51,7 @@ const inputPaths = (): Point[][] => [
     { x: 260, y: 100 },
     { x: 300, y: 100 },
   ],
-  [{ x: 150, y: 0 }, { x: 150, y: 240 }],
+  [{ x: 50, y: 0 }, { x: 50, y: 240 }],
 ];
 
 const obstacleNode = (): Node => ({

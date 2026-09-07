@@ -1,5 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 import type { MutableRefObject } from 'react';
+import { createLayoutCandidateAcceptance, type LayoutCandidateAcceptance } from '../../algorithms/layoutCandidateAcceptance';
+import { evaluateLayoutGeometry, type LayoutGeometryConstraints } from '../../algorithms/layoutGeometryConstraints';
 import type { RoutingPatch } from '../../routing/routingPatch';
 
 import { computeBaseReactFlowDisplayOutputRouteSignature } from './baseReactFlowDisplayCache';
@@ -53,6 +55,7 @@ import {
 import type { BaseReactFlowPrecompiledLayoutRegeneration } from './baseReactFlowPrecompiledCaptureMode';
 import { isBaseReactFlowDisplayDiagnosticsEnabled } from './baseReactFlowDisplayDiagnostics';
 import { createDisplayTerminalValidationSnapshot } from './baseReactFlowTerminalValidation';
+import { normalizeBaseReactFlowLayoutVisibility } from './baseReactFlowLayoutVisibility';
 
 export { clearBaseReactFlowLayoutEdgeRoutingData } from './baseReactFlowLayoutEdgeRoutingData';
 
@@ -216,6 +219,7 @@ export const commitBaseReactFlowStagedLayoutRoutingResult = ({
   isLargeGraph = false,
   retainWorkerSession = true,
   precompiledLayoutCapture,
+  layoutConstraints,
 }: {
   sourceEdges: Edge[];
   sourceNodes: Node[];
@@ -231,6 +235,7 @@ export const commitBaseReactFlowStagedLayoutRoutingResult = ({
    */
   retainWorkerSession?: boolean;
   precompiledLayoutCapture?: BaseReactFlowLayoutPrecompiledCapture;
+  layoutConstraints?: LayoutGeometryConstraints;
 }): BaseReactFlowLayoutRoutingCommit | null => {
   if (!Array.isArray(workerResult.routingPatches) || !workerResult.commitReceipt) return null;
   const workerInputRoutingPatches = createBaseReactFlowDisplayEdgePatches(
@@ -255,6 +260,11 @@ export const commitBaseReactFlowStagedLayoutRoutingResult = ({
     routeResolution: workerResult.routeResolution,
     routesMatch,
   })) return null;
+  const layoutAcceptance = createLayoutCandidateAcceptance(sourceNodes, layoutConstraints, {
+    outputRouteSignature: workerResult.commitReceipt.outputRouteSignature,
+    hardReportDigest: workerResult.commitReceipt.hardReportDigest,
+  });
+  if (!layoutAcceptance) return null;
 
   return {
     committedSourceEdges: sourceEdges,
@@ -270,6 +280,7 @@ export const commitBaseReactFlowStagedLayoutRoutingResult = ({
       commitReceipt: workerResult.commitReceipt,
       retainCommitReceiptSession: retainWorkerSession,
       precompiledLayoutCapture,
+      layoutAcceptance,
     }),
   };
 };
@@ -288,6 +299,7 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
   workerSessionRef,
   retainCommitReceiptSession = true,
   precompiledLayoutCapture,
+  layoutAcceptance,
 }: {
   runtime: BaseReactFlowRoutingSessionRuntime;
   sourceEdges: Edge[];
@@ -302,6 +314,7 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
   workerSessionRef?: RoutingCommittedSnapshot['workerSessionRef'];
   retainCommitReceiptSession?: boolean;
   precompiledLayoutCapture?: BaseReactFlowLayoutPrecompiledCapture;
+  layoutAcceptance: LayoutCandidateAcceptance;
 }): boolean => {
   const hardReportIdentity = commitReceipt
     ? { hardReport: commitReceipt.hardReport }
@@ -368,6 +381,7 @@ const writeBaseReactFlowStagedLayoutSnapshot = ({
       workerSessionRef: snapshotWorkerSessionRef,
       precompiledLayoutCapture: snapshotPrecompiledLayoutCapture,
       ...hardReportIdentity,
+      layoutAcceptance,
     });
     return committed ? identity : null;
   };
@@ -396,7 +410,7 @@ export const stageBaseReactFlowLayoutRouting = async ({
   workerRef,
   requestId,
   sourceEdges,
-  sourceNodes,
+  sourceNodes: candidateNodes,
   enableSmartEdges = true,
   smartEdgePadding = 20,
   isLargeGraph,
@@ -408,6 +422,7 @@ export const stageBaseReactFlowLayoutRouting = async ({
   rejectObstacleDirtyBoundedCandidate = false,
   rejectUnanchoredFlatElkCandidate = false,
   candidateRepairPolicy = 'default',
+  layoutConstraints,
 }: {
   workerRef: MutableRefObject<Worker | null>;
   requestId: string;
@@ -424,7 +439,16 @@ export const stageBaseReactFlowLayoutRouting = async ({
   rejectObstacleDirtyBoundedCandidate?: boolean;
   rejectUnanchoredFlatElkCandidate?: boolean;
   candidateRepairPolicy?: 'default' | 'skip-exact-clean';
+  layoutConstraints?: LayoutGeometryConstraints;
 }): Promise<BaseReactFlowLayoutRoutingCommit> => {
+  const sourceNodes = normalizeBaseReactFlowLayoutVisibility(candidateNodes);
+  const initialAcceptance = createLayoutCandidateAcceptance(sourceNodes, layoutConstraints, null);
+  updateDisplayRoutingDebugState({ layoutGeometryReport: initialAcceptance?.geometry
+    ?? evaluateLayoutGeometry(sourceNodes, layoutConstraints) });
+  if (!initialAcceptance) {
+    throw new Error('layout-routing-hard-quality-rejected');
+  }
+  const candidateConstraints = initialAcceptance.constraints;
   const unseededSourceEdges = sourceEdges.map(edge => ({
     ...edge,
     data: clearBaseReactFlowLayoutEdgeRoutingData(edge.data),
@@ -458,6 +482,11 @@ export const stageBaseReactFlowLayoutRouting = async ({
   const cachedHardReport = cached?.baseline.hardReport;
   const cachedWorkerSessionRef = cached?.baseline.workerSessionRef;
   if (cachedEdges && cachedHardReportDigest) {
+    const layoutAcceptance = createLayoutCandidateAcceptance(sourceNodes, candidateConstraints, {
+      outputRouteSignature: cached?.baseline.outputRouteSignature ?? '',
+      hardReportDigest: cachedHardReportDigest,
+    });
+    if (!layoutAcceptance) throw new Error('layout-routing-hard-quality-rejected');
     return {
       committedSourceEdges: unseededSourceEdges,
       routedEdges: cachedEdges,
@@ -465,13 +494,14 @@ export const stageBaseReactFlowLayoutRouting = async ({
         runtime,
         sourceEdges: unseededSourceEdges,
         routedEdges: cachedEdges,
-        sourceNodes: projectedSource.nodes,
+        sourceNodes,
         enableSmartEdges,
         smartEdgePadding,
         isLargeGraph,
         hardReport: cachedHardReport,
         hardReportDigest: cachedHardReportDigest,
         workerSessionRef: cachedWorkerSessionRef,
+        layoutAcceptance,
       }),
     };
   }
@@ -603,8 +633,9 @@ export const stageBaseReactFlowLayoutRouting = async ({
     }
     : undefined;
   const committed = commitBaseReactFlowStagedLayoutRoutingResult({
+    layoutConstraints: candidateConstraints,
     sourceEdges: unseededSourceEdges,
-    sourceNodes: projectedSource.nodes,
+    sourceNodes,
     workerResult,
     enableSmartEdges,
     smartEdgePadding,

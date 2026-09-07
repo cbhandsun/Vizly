@@ -102,7 +102,7 @@ describe('repairSharedEndpointPortOrderCrossings', () => {
       .toBe('source-top-runtime');
   });
 
-  it('moves a bent source port to the corridor side of a same-side target trunk', () => {
+  it('retains a clear adjacent crossing without moving otherwise valid ports', () => {
     const edges: Edge[] = [
       {
         id: 'feedback',
@@ -137,16 +137,16 @@ describe('repairSharedEndpointPortOrderCrossings', () => {
       node('inventory', 408, 1259, 216, 96),
     ];
 
-    expect(calculateEdgePathQualityScore(edges).strictCrossings).toBe(1);
+    expect(calculateEdgePathQualityScore(edges)).toMatchObject({
+      strictCrossings: 0, bridgedCrossings: 1, crossingCost: 7,
+    });
     const repaired = repairSharedEndpointPortOrderCrossings(edges, nodes);
     const path = (repaired[0].data as any).computedPath as Array<{ x: number; y: number }>;
 
     expect(calculateEdgePathQualityScore(repaired).strictCrossings).toBe(0);
-    expect(path[0].x).toBeLessThan(516);
-    expect(repaired[0].sourceHandle).toBe('left');
-    expect(path[1].y).toBe(path[0].y);
-    expect(path[0].x - path[1].x).toBeGreaterThanOrEqual(48);
-    expect((repaired[0].data as any).sharedEndpointPortOrderRepaired).toBe(true);
+    expect(path[0]).toEqual({ x: 548, y: 1515 });
+    expect(repaired[0].sourceHandle).toBe('top');
+    expect(repaired).toBe(edges);
   });
 
   it('leaves an explicitly fixed source position unchanged', () => {
@@ -183,7 +183,7 @@ describe('repairSharedEndpointPortOrderCrossings', () => {
     expect(repairSharedEndpointPortOrderCrossings(edges, nodes)).toBe(edges);
   });
 
-  it('moves a flexible straight trunk when the bent port is fixed', () => {
+  it('preserves a fixed bent port beside a readable crossing', () => {
     const edges: Edge[] = [
       {
         id: 'fixed-feedback',
@@ -217,8 +217,8 @@ describe('repairSharedEndpointPortOrderCrossings', () => {
 
     expect((repaired[0].data as any).computedPath).toEqual((edges[0].data as any).computedPath);
     expect(calculateEdgePathQualityScore(repaired).strictCrossings).toBe(0);
-    expect(incomingPath.at(-1)?.x).toBeGreaterThan(548);
-    expect((repaired[1].data as any).sharedEndpointPortOrderRepaired).toBe(true);
+    expect(incomingPath.at(-1)?.x).toBe(516);
+    expect(repaired).toBe(edges);
   });
 
   it('repairs the WMS shared OMS crossing behind a full connected corridor wall', async () => {
@@ -352,11 +352,11 @@ describe('repairSharedEndpointPortOrderCrossings', () => {
     expect(repairedQuality.shortEndpointStubs).toBeLessThanOrEqual(baselineQuality.shortEndpointStubs);
     expect(repairedQuality.tinyInteriorDoglegs).toBeLessThanOrEqual(baselineQuality.tinyInteriorDoglegs);
     expect(repairedQuality.hairpins).toBeLessThanOrEqual(baselineQuality.hairpins);
-    expect(feedbackPath.at(-1)).toEqual({ x: 238, y: 975 });
+    expect(feedbackPath.at(-1)).toEqual({ x: 238, y: 857 });
     expect(feedbackPath).toContainEqual({ x: 6976, y: 541 });
-    expect(feedbackPath.some(point => point.y > 984 && point.x < 6976)).toBe(true);
+    expect(repairedQuality.totalLength).toBeLessThan(baselineQuality.totalLength);
     expect(feedbackPath).not.toContainEqual({ x: 350, y: 984 });
-    expect(repaired[1].targetHandle).toBe('bottom');
+    expect(repaired[1].targetHandle).toBe('top');
     expect((repaired[1].data as any).sharedEndpointPortOrderRepaired).toBe(true);
 
     const fixedTargetEdges = edges.map((edge, index) => (
@@ -371,8 +371,8 @@ describe('repairSharedEndpointPortOrderCrossings', () => {
         : edge
     ));
     const fixedTargetResult = repairSharedEndpointPortOrderCrossings(fixedTargetEdges, nodes);
-    expect(fixedTargetResult).toBe(fixedTargetEdges);
+    expect(fixedTargetResult[1]).toBe(fixedTargetEdges[1]);
     expect(fixedTargetResult[1].targetHandle).toBe('right');
-    expect(calculateEdgePathQualityScore(fixedTargetResult).strictCrossings).toBe(1);
+    expect(calculateEdgePathQualityScore(fixedTargetResult).strictCrossings).toBe(0);
   }, 20_000);
 });

@@ -186,7 +186,7 @@ function buildPassageCandidate(edges: readonly Edge[], group: LegGroup): Candida
       : currentDistances[middle];
     const centerIndex = (currentDistances.length - 1) / 2;
     const distances = currentDistances.map((_, index) => (
-      centerDistance + (centerIndex - index) * PASSAGE_LANE_GAP
+      centerDistance + direction * (centerIndex - index) * PASSAGE_LANE_GAP
     ));
     const minimumDistance = Math.min(...distances);
     if (minimumDistance < MIN_TRUE_TRUNK_STEM) {

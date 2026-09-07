@@ -1,0 +1,1443 @@
+{
+  "operation": "route",
+  "requestId": "captured-tms-compound-bt",
+  "nodes": [
+    {
+      "id": "upstream-systems",
+      "type": "custom",
+      "position": {
+        "x": 423,
+        "y": 1400.3333333333333
+      },
+      "positionAbsolute": {
+        "x": 423,
+        "y": 1400.3333333333333
+      },
+      "width": 229,
+      "height": 73,
+      "measured": {
+        "width": 229,
+        "height": 73
+      },
+      "style": {
+        "width": 229,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "logistics-oms",
+      "type": "custom",
+      "position": {
+        "x": 395,
+        "y": 789
+      },
+      "positionAbsolute": {
+        "x": 395,
+        "y": 789
+      },
+      "width": 285,
+      "height": 118,
+      "measured": {
+        "width": 285,
+        "height": 118
+      },
+      "style": {
+        "width": 285,
+        "height": 118
+      },
+      "data": {}
+    },
+    {
+      "id": "wms-inbound",
+      "type": "custom",
+      "position": {
+        "x": 429,
+        "y": 337
+      },
+      "positionAbsolute": {
+        "x": 429,
+        "y": 337
+      },
+      "width": 217,
+      "height": 96,
+      "measured": {
+        "width": 217,
+        "height": 96
+      },
+      "style": {
+        "width": 217,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "wms-outbound",
+      "type": "custom",
+      "position": {
+        "x": 242.5,
+        "y": 121
+      },
+      "positionAbsolute": {
+        "x": 242.5,
+        "y": 121
+      },
+      "width": 243,
+      "height": 96,
+      "measured": {
+        "width": 243,
+        "height": 96
+      },
+      "style": {
+        "width": 243,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "wms-integration",
+      "type": "custom",
+      "position": {
+        "x": 128,
+        "y": 337
+      },
+      "positionAbsolute": {
+        "x": 128,
+        "y": 337
+      },
+      "width": 172,
+      "height": 96,
+      "measured": {
+        "width": 172,
+        "height": 96
+      },
+      "style": {
+        "width": 172,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "tms-planning",
+      "type": "custom",
+      "position": {
+        "x": 1501,
+        "y": 2455
+      },
+      "positionAbsolute": {
+        "x": 1501,
+        "y": 2455
+      },
+      "width": 250,
+      "height": 118,
+      "measured": {
+        "width": 250,
+        "height": 118
+      },
+      "style": {
+        "width": 250,
+        "height": 118
+      },
+      "data": {}
+    },
+    {
+      "id": "tms-execution",
+      "type": "custom",
+      "position": {
+        "x": 1330.5,
+        "y": 2239
+      },
+      "positionAbsolute": {
+        "x": 1330.5,
+        "y": 2239
+      },
+      "width": 211,
+      "height": 96,
+      "measured": {
+        "width": 211,
+        "height": 96
+      },
+      "style": {
+        "width": 211,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "tms-delivery",
+      "type": "custom",
+      "position": {
+        "x": 1533,
+        "y": 1921
+      },
+      "positionAbsolute": {
+        "x": 1533,
+        "y": 1921
+      },
+      "width": 214,
+      "height": 96,
+      "measured": {
+        "width": 214,
+        "height": 96
+      },
+      "style": {
+        "width": 214,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "fleet-management",
+      "type": "custom",
+      "position": {
+        "x": 1665,
+        "y": 2929
+      },
+      "positionAbsolute": {
+        "x": 1665,
+        "y": 2929
+      },
+      "width": 218,
+      "height": 96,
+      "measured": {
+        "width": 218,
+        "height": 96
+      },
+      "style": {
+        "width": 218,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "driver-management",
+      "type": "custom",
+      "position": {
+        "x": 1327,
+        "y": 2929
+      },
+      "positionAbsolute": {
+        "x": 1327,
+        "y": 2929
+      },
+      "width": 218,
+      "height": 96,
+      "measured": {
+        "width": 218,
+        "height": 96
+      },
+      "style": {
+        "width": 218,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "gps",
+      "type": "custom",
+      "position": {
+        "x": 420,
+        "y": 2929
+      },
+      "positionAbsolute": {
+        "x": 420,
+        "y": 2929
+      },
+      "width": 172,
+      "height": 96,
+      "measured": {
+        "width": 172,
+        "height": 96
+      },
+      "style": {
+        "width": 172,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "frp",
+      "type": "custom",
+      "position": {
+        "x": 128,
+        "y": 2929
+      },
+      "positionAbsolute": {
+        "x": 128,
+        "y": 2929
+      },
+      "width": 172,
+      "height": 96,
+      "measured": {
+        "width": 172,
+        "height": 96
+      },
+      "style": {
+        "width": 172,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "carrier-portal",
+      "type": "custom",
+      "position": {
+        "x": 772,
+        "y": 1400.3333333333333
+      },
+      "positionAbsolute": {
+        "x": 772,
+        "y": 1400.3333333333333
+      },
+      "width": 211,
+      "height": 96,
+      "measured": {
+        "width": 211,
+        "height": 96
+      },
+      "style": {
+        "width": 211,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "mobile-app",
+      "type": "custom",
+      "position": {
+        "x": 1103,
+        "y": 1400.3333333333333
+      },
+      "positionAbsolute": {
+        "x": 1103,
+        "y": 1400.3333333333333
+      },
+      "width": 156,
+      "height": 96,
+      "measured": {
+        "width": 156,
+        "height": 96
+      },
+      "style": {
+        "width": 156,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "performance-analysis",
+      "type": "custom",
+      "position": {
+        "x": 1531,
+        "y": 1469
+      },
+      "positionAbsolute": {
+        "x": 1531,
+        "y": 1469
+      },
+      "width": 218,
+      "height": 96,
+      "measured": {
+        "width": 218,
+        "height": 96
+      },
+      "style": {
+        "width": 218,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "cost-analysis",
+      "type": "custom",
+      "position": {
+        "x": 1869,
+        "y": 1469
+      },
+      "positionAbsolute": {
+        "x": 1869,
+        "y": 1469
+      },
+      "width": 140,
+      "height": 96,
+      "measured": {
+        "width": 140,
+        "height": 96
+      },
+      "style": {
+        "width": 140,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "bi-report",
+      "type": "custom",
+      "position": {
+        "x": 1546,
+        "y": 1253
+      },
+      "positionAbsolute": {
+        "x": 1546,
+        "y": 1253
+      },
+      "width": 188,
+      "height": 96,
+      "measured": {
+        "width": 188,
+        "height": 96
+      },
+      "style": {
+        "width": 188,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "titlegroup-external",
+      "type": "titleGroup",
+      "position": {
+        "x": 347,
+        "y": 1331.3333333333333
+      },
+      "positionAbsolute": {
+        "x": 347,
+        "y": 1331.3333333333333
+      },
+      "width": 988,
+      "height": 322,
+      "measured": {
+        "width": 988,
+        "height": 322
+      },
+      "style": {
+        "width": 988,
+        "height": 322
+      },
+      "data": {}
+    },
+    {
+      "id": "titlegroup-logistics",
+      "type": "titleGroup",
+      "position": {
+        "x": 319,
+        "y": 720
+      },
+      "positionAbsolute": {
+        "x": 319,
+        "y": 720
+      },
+      "width": 437,
+      "height": 344,
+      "measured": {
+        "width": 437,
+        "height": 344
+      },
+      "style": {
+        "width": 437,
+        "height": 344
+      },
+      "data": {}
+    },
+    {
+      "id": "titlegroup-wms",
+      "type": "titleGroup",
+      "position": {
+        "x": 52,
+        "y": 52
+      },
+      "positionAbsolute": {
+        "x": 52,
+        "y": 52
+      },
+      "width": 670,
+      "height": 538,
+      "measured": {
+        "width": 670,
+        "height": 538
+      },
+      "style": {
+        "width": 670,
+        "height": 538
+      },
+      "data": {}
+    },
+    {
+      "id": "titlegroup-tms",
+      "type": "titleGroup",
+      "position": {
+        "x": 1254.5,
+        "y": 1852
+      },
+      "positionAbsolute": {
+        "x": 1254.5,
+        "y": 1852
+      },
+      "width": 633,
+      "height": 878,
+      "measured": {
+        "width": 633,
+        "height": 878
+      },
+      "style": {
+        "width": 633.5,
+        "height": 878
+      },
+      "data": {}
+    },
+    {
+      "id": "titlegroup-fleet",
+      "type": "titleGroup",
+      "position": {
+        "x": 1251,
+        "y": 2860
+      },
+      "positionAbsolute": {
+        "x": 1251,
+        "y": 2860
+      },
+      "width": 708,
+      "height": 317,
+      "measured": {
+        "width": 708,
+        "height": 317
+      },
+      "style": {
+        "width": 708,
+        "height": 317
+      },
+      "data": {}
+    },
+    {
+      "id": "titlegroup-tech",
+      "type": "titleGroup",
+      "position": {
+        "x": 52,
+        "y": 2860
+      },
+      "positionAbsolute": {
+        "x": 52,
+        "y": 2860
+      },
+      "width": 616,
+      "height": 317,
+      "measured": {
+        "width": 616,
+        "height": 317
+      },
+      "style": {
+        "width": 616,
+        "height": 317
+      },
+      "data": {}
+    },
+    {
+      "id": "titlegroup-analytics",
+      "type": "titleGroup",
+      "position": {
+        "x": 1455,
+        "y": 1189
+      },
+      "positionAbsolute": {
+        "x": 1455,
+        "y": 1189
+      },
+      "width": 630,
+      "height": 533,
+      "measured": {
+        "width": 630,
+        "height": 533
+      },
+      "style": {
+        "width": 630,
+        "height": 533
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-external-external",
+      "type": "subGroup",
+      "position": {
+        "x": 391,
+        "y": 1372.3333333333333
+      },
+      "positionAbsolute": {
+        "x": 391,
+        "y": 1372.3333333333333
+      },
+      "width": 900,
+      "height": 188,
+      "measured": {
+        "width": 900,
+        "height": 188
+      },
+      "style": {
+        "width": 900,
+        "height": 188
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-logistics-logistics",
+      "type": "subGroup",
+      "position": {
+        "x": 363,
+        "y": 761
+      },
+      "positionAbsolute": {
+        "x": 363,
+        "y": 761
+      },
+      "width": 349,
+      "height": 210,
+      "measured": {
+        "width": 349,
+        "height": 210
+      },
+      "style": {
+        "width": 349,
+        "height": 210
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-wms-wms",
+      "type": "subGroup",
+      "position": {
+        "x": 96,
+        "y": 93
+      },
+      "positionAbsolute": {
+        "x": 96,
+        "y": 93
+      },
+      "width": 582,
+      "height": 404,
+      "measured": {
+        "width": 582,
+        "height": 404
+      },
+      "style": {
+        "width": 582,
+        "height": 404
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-tms-核心规划与执行",
+      "type": "subGroup",
+      "position": {
+        "x": 1298.5,
+        "y": 2211
+      },
+      "positionAbsolute": {
+        "x": 1298.5,
+        "y": 2211
+      },
+      "width": 484,
+      "height": 426,
+      "measured": {
+        "width": 484,
+        "height": 426
+      },
+      "style": {
+        "width": 484.5,
+        "height": 426
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-tms-交付与签收",
+      "type": "subGroup",
+      "position": {
+        "x": 1501,
+        "y": 1893
+      },
+      "positionAbsolute": {
+        "x": 1501,
+        "y": 1893
+      },
+      "width": 278,
+      "height": 188,
+      "measured": {
+        "width": 278,
+        "height": 188
+      },
+      "style": {
+        "width": 278,
+        "height": 188
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-fleet-fleet",
+      "type": "subGroup",
+      "position": {
+        "x": 1295,
+        "y": 2901
+      },
+      "positionAbsolute": {
+        "x": 1295,
+        "y": 2901
+      },
+      "width": 620,
+      "height": 188,
+      "measured": {
+        "width": 620,
+        "height": 188
+      },
+      "style": {
+        "width": 620,
+        "height": 188
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-tech-tech",
+      "type": "subGroup",
+      "position": {
+        "x": 96,
+        "y": 2901
+      },
+      "positionAbsolute": {
+        "x": 96,
+        "y": 2901
+      },
+      "width": 528,
+      "height": 188,
+      "measured": {
+        "width": 528,
+        "height": 188
+      },
+      "style": {
+        "width": 528,
+        "height": 188
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-analytics-analytics",
+      "type": "subGroup",
+      "position": {
+        "x": 1499,
+        "y": 1225
+      },
+      "positionAbsolute": {
+        "x": 1499,
+        "y": 1225
+      },
+      "width": 542,
+      "height": 404,
+      "measured": {
+        "width": 542,
+        "height": 404
+      },
+      "style": {
+        "width": 542,
+        "height": 404
+      },
+      "data": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-cost-bi",
+      "source": "cost-analysis",
+      "target": "bi-report",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1939,
+            "y": 1469
+          },
+          {
+            "x": 1939,
+            "y": 1413
+          },
+          {
+            "x": 1640,
+            "y": 1413
+          },
+          {
+            "x": 1640,
+            "y": 1349
+          }
+        ],
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      },
+      "type": "stablePath",
+      "label": "成本报表"
+    },
+    {
+      "id": "edge-driver-tms-execution",
+      "source": "driver-management",
+      "target": "tms-execution",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1436,
+            "y": 2929
+          },
+          {
+            "x": 1436,
+            "y": 2335
+          }
+        ],
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": false,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      },
+      "type": "stablePath",
+      "label": "司机资源"
+    },
+    {
+      "id": "edge-fleet-tms-planning",
+      "source": "fleet-management",
+      "target": "tms-planning",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1774,
+            "y": 2929
+          },
+          {
+            "x": 1774,
+            "y": 2795
+          },
+          {
+            "x": 1626,
+            "y": 2795
+          },
+          {
+            "x": 1626,
+            "y": 2573
+          }
+        ],
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      },
+      "type": "stablePath",
+      "label": "车辆资源"
+    },
+    {
+      "id": "edge-frp-wms-integration",
+      "source": "frp",
+      "target": "wms-integration",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 214,
+            "y": 2929
+          },
+          {
+            "x": 214,
+            "y": 433
+          }
+        ],
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "trunkPolishVersion": 2,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": true,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      },
+      "type": "stablePath",
+      "label": "主数据同步"
+    },
+    {
+      "id": "edge-gps-tms-execution",
+      "source": "gps",
+      "target": "tms-execution",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 506,
+            "y": 2929
+          },
+          {
+            "x": 506,
+            "y": 2632
+          },
+          {
+            "x": 1436,
+            "y": 2632
+          },
+          {
+            "x": 1436,
+            "y": 2335
+          }
+        ],
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      },
+      "type": "stablePath",
+      "label": "位置数据"
+    },
+    {
+      "id": "edge-oms-wms-inbound",
+      "source": "logistics-oms",
+      "target": "wms-inbound",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 537.5,
+            "y": 789
+          },
+          {
+            "x": 537.5,
+            "y": 433
+          }
+        ],
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      },
+      "type": "stablePath",
+      "label": "入库指令"
+    },
+    {
+      "id": "edge-oms-wms-outbound",
+      "source": "logistics-oms",
+      "target": "wms-outbound",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 538,
+            "y": 789
+          },
+          {
+            "x": 538,
+            "y": 519
+          },
+          {
+            "x": 376,
+            "y": 519
+          },
+          {
+            "x": 376,
+            "y": 217
+          }
+        ],
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      },
+      "type": "stablePath",
+      "label": "出库指令"
+    },
+    {
+      "id": "edge-analysis-bi",
+      "source": "performance-analysis",
+      "target": "bi-report",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1640,
+            "y": 1469
+          },
+          {
+            "x": 1640,
+            "y": 1349
+          }
+        ],
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      },
+      "type": "stablePath",
+      "label": "报表数据"
+    },
+    {
+      "id": "edge-tms-mobile",
+      "source": "tms-delivery",
+      "target": "mobile-app",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1640,
+            "y": 1921
+          },
+          {
+            "x": 1640,
+            "y": 1708.6666666666665
+          },
+          {
+            "x": 1181,
+            "y": 1708.6666666666665
+          },
+          {
+            "x": 1181,
+            "y": 1496.3333333333333
+          }
+        ],
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "displayNodeClearanceRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      },
+      "type": "stablePath",
+      "label": "移动端交互"
+    },
+    {
+      "id": "edge-tms-performance",
+      "source": "tms-delivery",
+      "target": "performance-analysis",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1640,
+            "y": 1921
+          },
+          {
+            "x": 1640,
+            "y": 1565
+          }
+        ],
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      },
+      "type": "stablePath",
+      "label": "绩效数据"
+    },
+    {
+      "id": "edge-tms-carrier",
+      "source": "tms-execution",
+      "target": "carrier-portal",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1436,
+            "y": 2239
+          },
+          {
+            "x": 1436,
+            "y": 1867.6666666666665
+          },
+          {
+            "x": 877.5,
+            "y": 1867.6666666666665
+          },
+          {
+            "x": 877.5,
+            "y": 1496.3333333333333
+          }
+        ],
+        "crossingOptimized": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "displayNodeClearanceRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      },
+      "type": "stablePath",
+      "label": "承运商协同"
+    },
+    {
+      "id": "edge-tms-execution-delivery",
+      "source": "tms-execution",
+      "target": "tms-delivery",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1436,
+            "y": 2239
+          },
+          {
+            "x": 1436,
+            "y": 2115
+          },
+          {
+            "x": 1640,
+            "y": 2115
+          },
+          {
+            "x": 1640,
+            "y": 2017
+          }
+        ],
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      },
+      "type": "stablePath",
+      "label": "配送执行"
+    },
+    {
+      "id": "edge-tms-cost",
+      "source": "tms-planning",
+      "target": "cost-analysis",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1650,
+            "y": 2455
+          },
+          {
+            "x": 1650,
+            "y": 2366
+          },
+          {
+            "x": 1939,
+            "y": 2366
+          },
+          {
+            "x": 1939,
+            "y": 1565
+          }
+        ],
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      },
+      "type": "stablePath",
+      "label": "成本数据"
+    },
+    {
+      "id": "edge-tms-planning-execution",
+      "source": "tms-planning",
+      "target": "tms-execution",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1650,
+            "y": 2455
+          },
+          {
+            "x": 1650,
+            "y": 2399
+          },
+          {
+            "x": 1436,
+            "y": 2399
+          },
+          {
+            "x": 1436,
+            "y": 2335
+          }
+        ],
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      },
+      "type": "stablePath",
+      "label": "执行计划"
+    },
+    {
+      "id": "edge-upstream-oms",
+      "source": "upstream-systems",
+      "target": "logistics-oms",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 537.5,
+            "y": 1400.3333333333333
+          },
+          {
+            "x": 537.5,
+            "y": 907
+          }
+        ],
+        "detachedSourceEndpointReanchored": true,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      },
+      "type": "stablePath",
+      "label": "订单下发"
+    },
+    {
+      "id": "edge-wms-inbound-outbound",
+      "source": "wms-inbound",
+      "target": "wms-outbound",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 538,
+            "y": 337
+          },
+          {
+            "x": 538,
+            "y": 281
+          },
+          {
+            "x": 376,
+            "y": 281
+          },
+          {
+            "x": 376,
+            "y": 217
+          }
+        ],
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      },
+      "type": "stablePath",
+      "label": "库存流转"
+    },
+    {
+      "id": "edge-wms-tms-planning",
+      "source": "wms-outbound",
+      "target": "tms-planning",
+      "sourceHandle": "bottom",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 364,
+            "y": 217
+          },
+          {
+            "x": 364,
+            "y": 749
+          },
+          {
+            "x": 267,
+            "y": 749
+          },
+          {
+            "x": 267,
+            "y": 947
+          },
+          {
+            "x": 364,
+            "y": 947
+          },
+          {
+            "x": 364,
+            "y": 3121
+          },
+          {
+            "x": 1602,
+            "y": 3121
+          },
+          {
+            "x": 1602,
+            "y": 2669
+          },
+          {
+            "x": 1626,
+            "y": 2669
+          },
+          {
+            "x": 1626,
+            "y": 2573
+          }
+        ],
+        "detachedSourceEndpointReanchored": true,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "BT"
+      },
+      "type": "stablePath",
+      "label": "运输需求"
+    }
+  ],
+  "enableSmartEdges": true,
+  "smartEdgePadding": 20,
+  "isLargeGraph": true,
+  "displayEdgeEpoch": 3678080588,
+  "qualityMode": "full",
+  "inputIdentity": {
+    "routingVersion": "18",
+    "visualVersion": "balanced-crossing-gate-v2",
+    "inputSignature": "2729195620",
+    "inputGeometryDigest": "geometry-v1:1431887de948a3d14a65cc7724f9db85"
+  }
+}

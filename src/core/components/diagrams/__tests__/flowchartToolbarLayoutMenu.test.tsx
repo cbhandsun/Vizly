@@ -234,8 +234,8 @@ describe('flowchartToolbarLayoutMenu', () => {
       translate: (_key, fallback) => fallback,
     });
     const dagreFlowItem = collectItems(dagreModel.items).find(item => item.key === 'node-flow');
-    expect(dagreModel.selectedKeys).toEqual(['domain-dagre-tb']);
-    expect(dagreModel.statusText).not.toContain(' + ');
+    expect(dagreModel.selectedKeys).toEqual(['domain-dagre-tb', 'lane-rank-auto']);
+    expect(dagreModel.statusText).toContain('自动（下次布局评估）');
     if (typeof dagreFlowItem?.onClick === 'function') dagreFlowItem.onClick();
     expect(onStrategyLayout).toHaveBeenLastCalledWith('domain-vertical', 'flow', 'TB');
   });
@@ -360,9 +360,10 @@ describe('flowchartToolbarLayoutMenu', () => {
       onStrategyLayout: vi.fn(),
       translate: (_key, fallback) => fallback,
     });
-    const recommended = asRecord(model.items[0]);
-    const customCombination = asRecord(model.items[2]);
-    const moreEngines = asRecord(model.items[4]);
+    const rootItems = collectItems(model.items);
+    const recommended = rootItems.find(item => item.key === 'group-recommended') ?? {};
+    const customCombination = rootItems.find(item => item.key === 'group-custom-combination') ?? {};
+    const moreEngines = rootItems.find(item => item.key === 'more-layout-engines') ?? {};
 
     expect(recommended.key).toBe('group-recommended');
     expect(collectItems(recommended.children).map(item => item.key)).toEqual([
@@ -404,13 +405,14 @@ describe('flowchartToolbarLayoutMenu', () => {
       translate: (_key, fallback) => fallback,
     });
     const items = collectItems(model.items);
-    const recommended = collectItems(asRecord(model.items[0]).children);
-    const moreEngines = collectItems(asRecord(model.items[4]).children);
+    const rootItems = collectItems(model.items);
+    const recommended = collectItems(rootItems.find(item => item.key === 'group-recommended')?.children);
+    const moreEngines = collectItems(rootItems.find(item => item.key === 'more-layout-engines')?.children);
 
     expect(items.find(item => item.key === 'custom-domain-direction')?.disabled).toBe(true);
     expect(items.find(item => item.key === 'custom-node-arrangement')?.disabled).toBe(true);
     expect(items.find(item => item.key === 'domain-compound-elk-lr')?.disabled).not.toBe(true);
-    expect(asRecord(model.items[2]).label).toContain('当前图含合流或循环');
+    expect(rootItems.find(item => item.key === 'group-custom-combination')?.label).toContain('当前图含合流或循环');
     expect(recommended.map(item => item.key)).toEqual([
       'domain-compound-elk-tb',
       'domain-compound-elk-lr',
@@ -422,5 +424,36 @@ describe('flowchartToolbarLayoutMenu', () => {
     const topBottom = recommended.find(item => item.key === 'domain-compound-elk-tb');
     if (typeof topBottom?.onClick === 'function') topBottom.onClick();
     expect(onStrategyLayout).toHaveBeenCalledWith('domain-compound-elk', undefined, 'TB');
+  });
+
+  it('uses only committed lane-rank props for selection and passes the fourth layout argument', () => {
+    const onStrategyLayout = vi.fn();
+    const model = buildFlowchartLayoutMenuModel({
+      lastDomainStrategy: 'domain-dagre', lastDomainDirection: 'LR', lastNodeLayout: 'grid',
+      laneRankPreference: 'auto',
+      laneRankDecision: {
+        version: 1, policyVersion: 1, requested: 'auto', applied: 'compact',
+        reason: 'compact-benefit', direction: 'LR', connectedInputFingerprint: 'safe',
+        metrics: { global: { flowLength: 100, whitespaceRatio: 0.5, backwardTravel: 0, backwardEdgeCount: 0 } },
+      },
+      onStrategyLayout, translate: (_key, fallback) => fallback,
+    });
+    const items = collectItems(model.items);
+    const auto = items.find(item => item.key === 'lane-rank-auto');
+    const global = items.find(item => item.key === 'lane-rank-global');
+    const compact = items.find(item => item.key === 'lane-rank-compact');
+
+    expect(model.selectedKeys).toContain('lane-rank-auto');
+    expect(model.selectedKeys).not.toContain('lane-rank-compact');
+    expect(model.statusText).toContain('自动 · 域内紧凑');
+    expect(model.tooltipText).toBe('域内紧凑保留了足够的流向长度收益');
+    if (typeof auto?.onClick === 'function') auto.onClick();
+    if (typeof global?.onClick === 'function') global.onClick();
+    if (typeof compact?.onClick === 'function') compact.onClick();
+    expect(onStrategyLayout).toHaveBeenNthCalledWith(1, 'domain-lanes', 'dagre', 'LR', 'auto');
+    expect(onStrategyLayout).toHaveBeenNthCalledWith(2, 'domain-lanes', 'dagre', 'LR', 'global');
+    expect(onStrategyLayout).toHaveBeenNthCalledWith(3, 'domain-lanes', 'dagre', 'LR', 'compact');
+    expect(auto?.['aria-checked']).toBe(true);
+    expect(global?.['aria-checked']).toBe(false);
   });
 });

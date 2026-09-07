@@ -1,4 +1,5 @@
 import type { DisplayGeometryBarrierResolution } from './baseReactFlowDisplayGeometryBarrier';
+import type { LayoutGeometryReport } from '../../algorithms/layoutGeometryConstraints';
 import type { DisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
 import type {
@@ -47,6 +48,7 @@ export type DisplayRoutingDebugState = {
   stagedLayoutSourceSignature?: string;
   stagedLayoutSourceGeometryDigest?: string;
   layoutSeedTerminalsAttached?: boolean;
+  layoutGeometryReport?: LayoutGeometryReport;
   layoutSeedTerminalsAnchored?: boolean;
   layoutSeedObstacleHits?: number;
   layoutSeedStrictCrossings?: number;
@@ -170,6 +172,10 @@ export const updateDisplayLayoutTransactionState = ({
 export const classifyDisplayLayoutTransactionError = (
   error: unknown,
 ): DisplayLayoutTransactionErrorCode => {
+  if (
+    (error instanceof Error || (typeof DOMException !== 'undefined' && error instanceof DOMException))
+    && error.name === 'AbortError'
+  ) return 'cancelled';
   if (!(error instanceof Error)) return 'strategy-failed';
   if (error.message === 'layout-routing-cancelled') return 'cancelled';
   if (error.message === 'display-edge-worker-timeout') return 'worker-timeout';

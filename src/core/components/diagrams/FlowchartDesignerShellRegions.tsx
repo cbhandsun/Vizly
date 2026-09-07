@@ -1,4 +1,5 @@
 import type { Node } from '@xyflow/react';
+import type { ReactNode } from 'react';
 
 import type { DiagramTypePlugin } from '../../types/plugin';
 import { MobileBottomDock } from '../layout/MobileBottomDock';
@@ -10,6 +11,15 @@ import {
     resolveFlowchartPluginContribution,
     type FlowchartDesignerViewModel,
 } from './flowchartDesignerViewModel';
+
+/** A layout preview suspends editing while retaining the final canvas's side
+ * clearances and panel state. Unmounting panels here would clear their CSS
+ * offsets before the awaited layout fit and restore them only after it. */
+export function FlowchartDesignerSidebarFrame({ visible, interactive, children }: {
+    visible: boolean; interactive: boolean; children: ReactNode;
+}) {
+    return visible ? <div inert={!interactive} style={{ display: 'contents' }}>{children}</div> : null;
+}
 
 export type FlowchartDesignerLeftSidebarModel = Omit<Pick<FlowchartDesignerViewModel,
     | 'activeLayerId'

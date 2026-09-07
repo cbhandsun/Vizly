@@ -170,6 +170,7 @@ const waitForNodeGeometryParity = async (session, rawNodes, label) => {
     latest = await session.evaluate(expression);
     if (
       latest
+      && latest.nodeScanComplete === true
       && latest.comparedNodeCount > 0
       && latest.positionMismatchCount === 0
       && latest.sizeMismatchCount === 0

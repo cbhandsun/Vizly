@@ -2,9 +2,7 @@ import React, { useCallback, useEffect, useRef } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import {
   coerceDiagramSidebarOffset,
-  computeDiagramFitViewport,
   MIN_DIAGRAM_FULL_FIT_ZOOM,
-  resolveDiagramFitLayout,
 } from './diagramControlFit';
 import { computeDiagramNodeBounds } from './diagramNodeBounds';
 import { logDiagramControlBridgeFailure } from './diagramControlLogging';
@@ -15,6 +13,7 @@ import {
   resolveLayoutCommitFitRequest,
 } from './diagramControlRequest';
 import { waitForDiagramControlViewportPaint } from './diagramControlPaint';
+import { applyDiagramOverviewFit, readDiagramOverviewFitInput } from './diagramOverviewFit';
 import { useBaseReactFlowViewportSemanticSync } from './baseReactFlowViewportSemanticContext';
 import { registerReactFlowSnapshotProvider } from '../../rendering/reactFlowSnapshotRegistry';
 
@@ -67,6 +66,20 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
     return null;
   }, [resolveSelfDiagramId]);
 
+  const applyOverviewFit = useCallback((container: HTMLElement | null, signal: AbortSignal, duration = 0) => (
+    applyDiagramOverviewFit({
+      readFitInput: () => readDiagramOverviewFitInput({ container, nodes: rf.getNodes(), edges: rf.getEdges(), viewport: rf.getViewport() }),
+      getViewport: rf.getViewport,
+      setViewport: (viewport, animationDuration) => rf.setViewport(viewport, animationDuration ? { duration: animationDuration } : undefined),
+      fallbackFit: () => rf.fitView({ padding: 24, includeHiddenNodes: false, duration,
+        minZoom: MIN_DIAGRAM_FULL_FIT_ZOOM, maxZoom: 1 }),
+      syncSemanticViewport: syncViewportSemanticState ?? undefined,
+      waitForPaint: () => waitForDiagramControlViewportPaint({ signal }),
+      isCancelled: () => signal.aborted,
+      duration,
+    })
+  ), [rf, syncViewportSemanticState]);
+
   // 将React Flow实例暴露到window对象，方便调试
   useEffect(() => {
     const runtimeWindow = window as Window & { reactFlowInstance?: typeof rf };
@@ -91,7 +104,7 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
   }, [resolveSelfDiagramId, rf]);
 
   useEffect(() => {
-    const pendingTimeouts = new Set<number>();
+    const pendingFits = new Set<AbortController>();
 
     const onControl = (e: Event) => {
       const { action, diagramId: targetId } = (e as CustomEvent).detail || {};
@@ -101,63 +114,12 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
       if (!idToMatch && targetId) return;
 
       if (action === 'fit') {
-        try {
-          const container = resolveContainer();
-          if (!container) {
-            rf.fitView({ padding: 24, includeHiddenNodes: false, duration: 450, minZoom: MIN_DIAGRAM_FULL_FIT_ZOOM, maxZoom: 1.15 });
-            return;
-          }
-
-          const bounds = computeDiagramNodeBounds(rf.getNodes());
-          if (!bounds) {
-            rf.fitView({ padding: 24, includeHiddenNodes: false, duration: 450, minZoom: MIN_DIAGRAM_FULL_FIT_ZOOM, maxZoom: 1.15 });
-            return;
-          }
-
-          const viewportEl = (
-            container.querySelector('.react-flow__renderer')
-            ?? container.querySelector('.react-flow')
-            ?? container
-          ) as HTMLElement;
-          const applyViewport = (duration?: number) => {
-            const rootStyle = getComputedStyle(document.documentElement);
-            const fitLayout = resolveDiagramFitLayout({
-              viewportWidth: viewportEl.clientWidth,
-              leftSidebarOffset: rootStyle.getPropertyValue('--left-sidebar-offset'),
-              rightSidebarOffset: rootStyle.getPropertyValue('--right-sidebar-offset'),
-            });
-            const viewport = computeDiagramFitViewport({
-              bounds,
-              viewportWidth: viewportEl.clientWidth,
-              viewportHeight: viewportEl.clientHeight,
-              safeArea: fitLayout.safeArea,
-              padding: fitLayout.padding,
-            });
-            if (!viewport) {
-              rf.fitView({ padding: 24, includeHiddenNodes: false, duration, minZoom: MIN_DIAGRAM_FULL_FIT_ZOOM, maxZoom: 1 });
-              return;
-            }
-            rf.setViewport(viewport, duration ? { duration } : undefined);
-          };
-
-          applyViewport(450);
-          const timeoutId = window.setTimeout(() => {
-            pendingTimeouts.delete(timeoutId);
-            try {
-              applyViewport();
-            } catch (error) {
-              logDiagramControlBridgeFailure('fitRefine', error);
-            }
-          }, 250);
-          pendingTimeouts.add(timeoutId);
-        } catch (error) {
-          logDiagramControlBridgeFailure('fitFallback', error);
-          try {
-            rf.fitView({ padding: 24, includeHiddenNodes: false, duration: 450, minZoom: MIN_DIAGRAM_FULL_FIT_ZOOM, maxZoom: 1.0 });
-          } catch (fallbackError) {
-            logDiagramControlBridgeFailure('fitFallback', fallbackError);
-          }
-        }
+        pendingFits.forEach(pending => pending.abort());
+        const controller = new AbortController();
+        pendingFits.add(controller);
+        void applyOverviewFit(resolveContainer(), controller.signal, 450)
+          .catch(error => logDiagramControlBridgeFailure('fitFallback', error))
+          .finally(() => pendingFits.delete(controller));
         return;
       }
 
@@ -177,6 +139,7 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
       }
 
       if (action === 'top') {
+        pendingFits.forEach(pending => pending.abort());
         try {
           const container = resolveContainer();
           if (!container) {
@@ -221,12 +184,13 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
     window.addEventListener('diagramControl', onControl as EventListener);
     return () => {
       window.removeEventListener('diagramControl', onControl as EventListener);
-      pendingTimeouts.forEach(timeoutId => window.clearTimeout(timeoutId));
-      pendingTimeouts.clear();
+      pendingFits.forEach(pending => pending.abort());
+      pendingFits.clear();
     };
-  }, [diagramId, resolveContainer, rf, resolveSelfDiagramId]);
+  }, [diagramId, resolveContainer, rf, resolveSelfDiagramId, applyOverviewFit]);
 
   useEffect(() => {
+    const activeFits = new Map<Event, AbortController>();
     const onLayoutCommitFitRequest = (event: Event) => {
       // Only the bridge mounted inside BaseReactFlow owns the exact semantic
       // zoom container. A page-level compatibility bridge must not claim this
@@ -240,6 +204,10 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
       if (!idToMatch && inspected.diagramId) return;
       const request = claimLayoutCommitFitRequest(event);
       if (!request) return;
+      const controller = new AbortController();
+      const onAbort = () => controller.abort();
+      request.signal.addEventListener('abort', onAbort, { once: true });
+      activeFits.set(event, controller);
 
       void (async () => {
         const container = resolveContainer();
@@ -255,57 +223,31 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
         };
 
         try {
-          const bounds = computeDiagramNodeBounds(rf.getNodes());
-          const viewportEl = container
-            ? (container.querySelector('.react-flow__renderer')
-              ?? container.querySelector('.react-flow')
-              ?? container) as HTMLElement
-            : null;
-          if (!bounds || !viewportEl) {
-            await applyFallback();
-          } else {
-            const rootStyle = getComputedStyle(document.documentElement);
-            const fitLayout = resolveDiagramFitLayout({
-              viewportWidth: viewportEl.clientWidth,
-              leftSidebarOffset: rootStyle.getPropertyValue('--left-sidebar-offset'),
-              rightSidebarOffset: rootStyle.getPropertyValue('--right-sidebar-offset'),
-            });
-            const viewport = computeDiagramFitViewport({
-              bounds,
-              viewportWidth: viewportEl.clientWidth,
-              viewportHeight: viewportEl.clientHeight,
-              safeArea: fitLayout.safeArea,
-              padding: fitLayout.padding,
-            });
-            if (!viewport) {
-              await applyFallback();
-            } else {
-              syncSemanticViewport(viewport);
-              const applied = await rf.setViewport(viewport);
-              if (!applied) throw new Error('layout-viewport-not-applied');
-            }
-          }
-          syncSemanticViewport(rf.getViewport());
-          const painted = await waitForDiagramControlViewportPaint({ signal: request.signal });
-          if (painted) {
-            // React Flow may emit a stale onViewportChange during the same
-            // commit and temporarily restore the previous zoom class. Reapply
-            // from the authoritative viewport at the paint barrier boundary.
-            syncSemanticViewport(rf.getViewport());
-            resolveLayoutCommitFitRequest(event, 'applied');
-          }
+          const applied = await applyOverviewFit(container, controller.signal);
+          resolveLayoutCommitFitRequest(event, applied ? 'applied' : 'failed');
         } catch (error) {
+          if (controller.signal.aborted) {
+            resolveLayoutCommitFitRequest(event, 'failed');
+            return;
+          }
           logDiagramControlBridgeFailure('fitFallback', error);
           try {
             await applyFallback();
+            if (controller.signal.aborted) {
+              resolveLayoutCommitFitRequest(event, 'failed');
+              return;
+            }
             syncSemanticViewport(rf.getViewport());
-            const painted = await waitForDiagramControlViewportPaint({ signal: request.signal });
+            const painted = await waitForDiagramControlViewportPaint({ signal: controller.signal });
             if (painted) syncSemanticViewport(rf.getViewport());
             resolveLayoutCommitFitRequest(event, painted ? 'applied' : 'failed');
           } catch (fallbackError) {
-            logDiagramControlBridgeFailure('fitFallback', fallbackError);
+            if (!controller.signal.aborted) logDiagramControlBridgeFailure('fitFallback', fallbackError);
             resolveLayoutCommitFitRequest(event, 'failed');
           }
+        } finally {
+          request.signal.removeEventListener('abort', onAbort);
+          activeFits.delete(event);
         }
       })();
     };
@@ -313,8 +255,13 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
     window.addEventListener(DIAGRAM_CONTROL_REQUEST_EVENT, onLayoutCommitFitRequest);
     return () => {
       window.removeEventListener(DIAGRAM_CONTROL_REQUEST_EVENT, onLayoutCommitFitRequest);
+      activeFits.forEach((controller, event) => {
+        controller.abort();
+        resolveLayoutCommitFitRequest(event, 'failed');
+      });
+      activeFits.clear();
     };
-  }, [resolveContainer, resolveSelfDiagramId, rf, syncViewportSemanticState]);
+  }, [resolveContainer, resolveSelfDiagramId, applyOverviewFit, rf, syncViewportSemanticState]);
 
   return <span ref={markerRef} style={{ display: 'none' }} />;
 };

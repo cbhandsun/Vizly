@@ -13,13 +13,14 @@ import {
   displayStrictCrossesVertical,
   extractDisplaySegments,
   NEAR_PARALLEL_LANE_TOLERANCE,
-  OBSTACLE_REPAIR_NODE_PADDING,
   prioritizeLaneValues,
   RESIDUAL_PARALLEL_LANE_GAP,
   sortedUniqueNumbers,
   type DisplayPoint,
   type DisplaySegment,
 } from './baseReactFlowDisplayGeometry';
+
+import { COMMERCIAL_BUSINESS_NODE_CLEARANCE as NODE_ROUTE_CLEARANCE } from '../../strategies/shared/edgeBusinessNodeClearanceRepair';
 
 const RESIDUAL_PARALLEL_OVERLAP = 16;
 const OBSTACLE_REPAIR_TINY_SEGMENT = 24;
@@ -68,24 +69,24 @@ export const buildObstacleSkirtCandidates = (
         const nextAfterSegment = path[segmentIndex + 2];
         const horizontalMin = Math.min(start.x, end.x);
         const horizontalMax = Math.max(start.x, end.x);
-        const leftLane = Math.round(rect.x - OBSTACLE_REPAIR_NODE_PADDING - 1);
-        const rightLane = Math.round(rect.x + rect.width + OBSTACLE_REPAIR_NODE_PADDING + 1);
+        const leftLane = Math.round(rect.x - NODE_ROUTE_CLEARANCE - 1);
+        const rightLane = Math.round(rect.x + rect.width + NODE_ROUTE_CLEARANCE + 1);
         const nearX = horizontalDirection >= 0 ? leftLane : rightLane;
         const farX = horizontalDirection >= 0 ? rightLane : leftLane;
         const commercialTopY = rect.y
-          - OBSTACLE_REPAIR_NODE_PADDING
+          - NODE_ROUTE_CLEARANCE
           - RESIDUAL_PARALLEL_LANE_GAP * 2;
         const commercialBottomY = rect.y
           + rect.height
-          + OBSTACLE_REPAIR_NODE_PADDING
+          + NODE_ROUTE_CLEARANCE
           + RESIDUAL_PARALLEL_LANE_GAP * 2;
         const detourLanes = sortedUniqueNumbers([
-          rect.y - OBSTACLE_REPAIR_NODE_PADDING - 1,
-          rect.y - OBSTACLE_REPAIR_NODE_PADDING - 8,
-          rect.y + rect.height + OBSTACLE_REPAIR_NODE_PADDING + 1,
-          rect.y + rect.height + OBSTACLE_REPAIR_NODE_PADDING + 8,
-          rect.y - OBSTACLE_REPAIR_NODE_PADDING - RESIDUAL_PARALLEL_LANE_GAP,
-          rect.y + rect.height + OBSTACLE_REPAIR_NODE_PADDING + RESIDUAL_PARALLEL_LANE_GAP,
+          rect.y - NODE_ROUTE_CLEARANCE - 1,
+          rect.y - NODE_ROUTE_CLEARANCE - 8,
+          rect.y + rect.height + NODE_ROUTE_CLEARANCE + 1,
+          rect.y + rect.height + NODE_ROUTE_CLEARANCE + 8,
+          rect.y - NODE_ROUTE_CLEARANCE - RESIDUAL_PARALLEL_LANE_GAP,
+          rect.y + rect.height + NODE_ROUTE_CLEARANCE + RESIDUAL_PARALLEL_LANE_GAP,
           commercialTopY,
           commercialBottomY,
         ], start.y);
@@ -112,8 +113,8 @@ export const buildObstacleSkirtCandidates = (
             { x: nearX, y: nextAfterSegment.y },
             ...path.slice(segmentIndex + 2),
           ])) return candidates;
-          const outerTopY = Math.round(Math.min(...obstacles.map(obstacle => obstacle.y)) - OBSTACLE_REPAIR_NODE_PADDING - RESIDUAL_PARALLEL_LANE_GAP);
-          const outerBottomY = Math.round(Math.max(...obstacles.map(obstacle => obstacle.y + obstacle.height)) + OBSTACLE_REPAIR_NODE_PADDING + RESIDUAL_PARALLEL_LANE_GAP);
+          const outerTopY = Math.round(Math.min(...obstacles.map(obstacle => obstacle.y)) - NODE_ROUTE_CLEARANCE - RESIDUAL_PARALLEL_LANE_GAP);
+          const outerBottomY = Math.round(Math.max(...obstacles.map(obstacle => obstacle.y + obstacle.height)) + NODE_ROUTE_CLEARANCE + RESIDUAL_PARALLEL_LANE_GAP);
           for (const outerY of sortedUniqueNumbers([outerTopY, outerBottomY], start.y)) {
             if (appendCandidate([
               ...path.slice(0, segmentIndex + 1),
@@ -212,24 +213,24 @@ export const buildObstacleSkirtCandidates = (
         const nextAfterSegment = path[segmentIndex + 2];
         const verticalMin = Math.min(start.y, end.y);
         const verticalMax = Math.max(start.y, end.y);
-        const topLane = Math.round(rect.y - OBSTACLE_REPAIR_NODE_PADDING - 1);
-        const bottomLane = Math.round(rect.y + rect.height + OBSTACLE_REPAIR_NODE_PADDING + 1);
+        const topLane = Math.round(rect.y - NODE_ROUTE_CLEARANCE - 1);
+        const bottomLane = Math.round(rect.y + rect.height + NODE_ROUTE_CLEARANCE + 1);
         const nearY = verticalDirection >= 0 ? topLane : bottomLane;
         const farY = verticalDirection >= 0 ? bottomLane : topLane;
         const commercialLeftX = rect.x
-          - OBSTACLE_REPAIR_NODE_PADDING
+          - NODE_ROUTE_CLEARANCE
           - RESIDUAL_PARALLEL_LANE_GAP * 2;
         const commercialRightX = rect.x
           + rect.width
-          + OBSTACLE_REPAIR_NODE_PADDING
+          + NODE_ROUTE_CLEARANCE
           + RESIDUAL_PARALLEL_LANE_GAP * 2;
         const detourLanes = sortedUniqueNumbers([
-          rect.x - OBSTACLE_REPAIR_NODE_PADDING - 1,
-          rect.x - OBSTACLE_REPAIR_NODE_PADDING - 8,
-          rect.x + rect.width + OBSTACLE_REPAIR_NODE_PADDING + 1,
-          rect.x + rect.width + OBSTACLE_REPAIR_NODE_PADDING + 8,
-          rect.x - OBSTACLE_REPAIR_NODE_PADDING - RESIDUAL_PARALLEL_LANE_GAP,
-          rect.x + rect.width + OBSTACLE_REPAIR_NODE_PADDING + RESIDUAL_PARALLEL_LANE_GAP,
+          rect.x - NODE_ROUTE_CLEARANCE - 1,
+          rect.x - NODE_ROUTE_CLEARANCE - 8,
+          rect.x + rect.width + NODE_ROUTE_CLEARANCE + 1,
+          rect.x + rect.width + NODE_ROUTE_CLEARANCE + 8,
+          rect.x - NODE_ROUTE_CLEARANCE - RESIDUAL_PARALLEL_LANE_GAP,
+          rect.x + rect.width + NODE_ROUTE_CLEARANCE + RESIDUAL_PARALLEL_LANE_GAP,
           commercialLeftX,
           commercialRightX,
         ], start.x);
@@ -256,8 +257,8 @@ export const buildObstacleSkirtCandidates = (
             { x: nextAfterSegment.x, y: nearY },
             ...path.slice(segmentIndex + 2),
           ])) return candidates;
-          const outerLeftX = Math.round(Math.min(...obstacles.map(obstacle => obstacle.x)) - OBSTACLE_REPAIR_NODE_PADDING - RESIDUAL_PARALLEL_LANE_GAP);
-          const outerRightX = Math.round(Math.max(...obstacles.map(obstacle => obstacle.x + obstacle.width)) + OBSTACLE_REPAIR_NODE_PADDING + RESIDUAL_PARALLEL_LANE_GAP);
+          const outerLeftX = Math.round(Math.min(...obstacles.map(obstacle => obstacle.x)) - NODE_ROUTE_CLEARANCE - RESIDUAL_PARALLEL_LANE_GAP);
+          const outerRightX = Math.round(Math.max(...obstacles.map(obstacle => obstacle.x + obstacle.width)) + NODE_ROUTE_CLEARANCE + RESIDUAL_PARALLEL_LANE_GAP);
           for (const outerX of sortedUniqueNumbers([outerLeftX, outerRightX], start.x)) {
             if (appendCandidate([
               ...path.slice(0, segmentIndex + 1),
@@ -404,8 +405,8 @@ export const buildObstacleOuterEscapeCandidates = (
       RESIDUAL_PARALLEL_LANE_GAP * 3,
       RESIDUAL_PARALLEL_LANE_GAP * 4,
     ]) {
-      const beforeNode = Math.round(rect.y - OBSTACLE_REPAIR_NODE_PADDING - clearance);
-      const afterNode = Math.round(rect.y + rect.height + OBSTACLE_REPAIR_NODE_PADDING + clearance);
+      const beforeNode = Math.round(rect.y - NODE_ROUTE_CLEARANCE - clearance);
+      const afterNode = Math.round(rect.y + rect.height + NODE_ROUTE_CLEARANCE + clearance);
       add(bridgeYLanes, beforeNode);
       add(bridgeYLanes, beforeNode + 1);
       add(bridgeYLanes, afterNode);
@@ -498,7 +499,7 @@ export const buildWholePathOuterLaneCandidates = (
   const maxX = Math.max(...obstacles.map(rect => rect.x + rect.width));
   const minY = Math.min(...obstacles.map(rect => rect.y));
   const maxY = Math.max(...obstacles.map(rect => rect.y + rect.height));
-  const laneGap = OBSTACLE_REPAIR_NODE_PADDING + RESIDUAL_PARALLEL_LANE_GAP;
+  const laneGap = NODE_ROUTE_CLEARANCE + RESIDUAL_PARALLEL_LANE_GAP;
   const hitRects = collectPathHitObstacleRects(path, obstacles).slice(0, 10);
   const globalXLanes = [
     minX - laneGap,

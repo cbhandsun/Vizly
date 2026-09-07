@@ -17,6 +17,7 @@ import {
 } from '../baseReactFlowDisplayObstacleRepair';
 import { DISPLAY_FINAL_OVERLAP_OBSTACLE_REPAIR_OPTIONS } from '../baseReactFlowDisplayRenderPipeline';
 import { createDisplayTerminalValidationSnapshot } from '../baseReactFlowTerminalValidation';
+import { segmentToClearanceRectDistance } from '../../../strategies/shared/edgeNodeClearanceGeometry';
 
 describe('display obstacle candidates', () => {
   it('does not expand an explicit bounded quality budget on a medium graph', () => {
@@ -134,6 +135,14 @@ describe('display obstacle candidates', () => {
     expect(countDisplayObstacleHits(repaired, nodes)).toBe(0);
     expect(quality.nonOrthogonalSegments).toBe(0);
     expect(quality.strictCrossings).toBe(0);
+    // Obstacle repair must not replace a collision with the former 9px skirt,
+    // which the final 48px commercial gate rejects after layout calculation.
+    const repairedPath = getDisplayComputedPath(repaired[0]);
+    for (let index = 1; index < repairedPath.length; index += 1) {
+      expect(segmentToClearanceRectDistance({ a: repairedPath[index - 1], b: repairedPath[index] }, {
+        x: 150, y: -40, width: 100, height: 80,
+      })).toBeGreaterThanOrEqual(48);
+    }
   });
 
   it('filters terminal-regressing shortcuts before candidate truncation', () => {

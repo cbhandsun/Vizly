@@ -1,5 +1,5 @@
 import type { Edge } from '@xyflow/react';
-import type { RoutingPatch } from '../../routing/routingPatch';
+import { ROUTING_PATCH_DATA_KEYS, type RoutingPatch } from '../../routing/routingPatch';
 
 import {
   baseReactFlowDisplayOutputRouteSignatureMatches,
@@ -92,10 +92,10 @@ export const mergeTrustedBaseReactFlowPrecompiledRouteArtifact = (
 };
 
 /**
- * Generated route artifacts carry a complete `treeRouting` contract. The
+ * Generated route artifacts carry a complete routing-data contract. The
  * ordinary Worker/cache patch merger is intentionally recursive because those
  * patches are incremental. Reusing it without this replacement step can retain
- * stale source points or effective handles that are absent from the generated
+ * stale source paths, jump hints or trunk flags absent from the generated
  * route and invalidate the artifact's output signature.
  */
 export const mergeBaseReactFlowPrecompiledRoutePatches = (
@@ -110,18 +110,16 @@ export const mergeBaseReactFlowPrecompiledRoutePatches = (
       !patchData
       || typeof patchData !== 'object'
       || Array.isArray(patchData)
-      || !Object.prototype.hasOwnProperty.call(patchData, 'treeRouting')
     ) return edge;
     const edgeData = edge.data && typeof edge.data === 'object' && !Array.isArray(edge.data)
       ? edge.data
       : {};
-    return {
-      ...edge,
-      data: {
-        ...edgeData,
-        treeRouting: patchData.treeRouting,
-      },
-    };
+    const data: Record<string, unknown> = { ...edgeData };
+    for (const key of ROUTING_PATCH_DATA_KEYS) {
+      if (Object.prototype.hasOwnProperty.call(patchData, key)) data[key] = patchData[key];
+      else delete data[key];
+    }
+    return { ...edge, data };
   });
 };
 

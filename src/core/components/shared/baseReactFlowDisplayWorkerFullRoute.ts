@@ -72,7 +72,7 @@ export const runBaseReactFlowDisplayWorkerFullRoute = ({
   };
   const fullRouteEdges = createBaseReactFlowFullRouteEdges({
     ...commonInput,
-    forceFullQuality: request.qualityMode === 'full' || escalatedFromInteractive,
+    forceFullQuality: commonInput.forceFullQuality || escalatedFromInteractive,
     preparedInteractiveEdges,
     onPhaseTrace,
     evaluationSession: fullRouteEvaluation,
@@ -204,7 +204,7 @@ export const runBaseReactFlowDisplayWorkerFullRoute = ({
       finalEvaluation: fullRouteFinalEvaluation,
       isLargeGraph: request.isLargeGraph,
       onPhaseTrace,
-      preferredEdges: request.edges,
+      preferredEdges: commonInput.edges,
     });
     return completeFullRouteFinalization(repairedResponse);
   }
@@ -221,7 +221,7 @@ export const runBaseReactFlowDisplayWorkerFullRoute = ({
     finalEvaluation: fullRouteFinalEvaluation,
     isLargeGraph: request.isLargeGraph,
     onPhaseTrace,
-    preferredEdges: request.edges,
+    preferredEdges: commonInput.edges,
   });
   return completeFullRouteFinalization(finalizedResponse);
 };

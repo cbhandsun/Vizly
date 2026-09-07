@@ -34,7 +34,6 @@ import { repairBoundedReverseParallelOverlaps } from './baseReactFlowDisplayReve
 import { commitDisplayEdgesForRenderMode } from './baseReactFlowDisplayRenderPipeline';
 import { startDisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
 import type { BaseReactFlowDisplayEdgesArgs } from './baseReactFlowDisplayFullRouteTypes';
-import { isBaseDisplayFinalized } from './baseReactFlowDisplayEdgeCore';
 
 /**
  * Closes the final display contract after the full-route seed has completed.
@@ -78,8 +77,7 @@ export const closeBaseReactFlowFinalDisplayRoute = ({
     : evaluationSession.hardReport(preFinalizerEdges);
   const canReusePreFinalizer = preFinalizerReport.hardClean
     && countRenderUnsafeEndpointStubs(preFinalizerEdges) === 0;
-  const finalizedEdges = isBaseDisplayFinalized(preFinalizerEdges, inputSignature)
-    || canReusePreFinalizer
+  const finalizedEdges = canReusePreFinalizer
     ? preFinalizerEdges
     : finalizeBaseReactFlowDisplayEdges(
       preFinalizerEdges,

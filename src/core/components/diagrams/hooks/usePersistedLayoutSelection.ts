@@ -12,14 +12,20 @@ export { parsePersistedLayoutSelection } from '../layoutSelectionPersistence';
 export const usePersistedLayoutSelection = (diagramId?: string) => {
   const [state, setState] = useState({ scope: diagramId, selection: DEFAULT_LAYOUT_SELECTION });
   const selection = state.scope === diagramId ? state.selection : DEFAULT_LAYOUT_SELECTION;
-  const update = useCallback((patch: Partial<LayoutSelection>) => {
-    setState(previous => ({ scope: diagramId, selection: {
-      ...(previous.scope === diagramId ? previous.selection : DEFAULT_LAYOUT_SELECTION), ...patch,
-    } }));
+  const update = useCallback((patch: Partial<Pick<LayoutSelection, 'strategy' | 'direction' | 'nodeLayout'>>) => {
+    setState(previous => {
+      const current = previous.scope === diagramId ? previous.selection : DEFAULT_LAYOUT_SELECTION;
+      const { laneRankDecision: _staleDecision, ...withoutDecision } = current;
+      return { scope: diagramId, selection: { ...withoutDecision, ...patch } };
+    });
   }, [diagramId]);
   const setLastDomainStrategy = useCallback((strategy: string) => update({ strategy }), [update]);
   const setLastDomainDirection = useCallback((direction: FlowchartLayoutDirection) => update({ direction }), [update]);
   const setLastNodeLayout = useCallback((nodeLayout: string) => update({ nodeLayout }), [update]);
+  /** Only a successful layout transaction may replace the complete persisted selection. */
+  const commitLayoutSelection = useCallback((next: LayoutSelection) => {
+    setState({ scope: diagramId, selection: next });
+  }, [diagramId]);
   const restoreLayoutSelection = useCallback((metadata: unknown) => {
     setState({
       scope: diagramId,
@@ -28,7 +34,7 @@ export const usePersistedLayoutSelection = (diagramId?: string) => {
   }, [diagramId]);
   return { lastDomainStrategy: selection.strategy, lastDomainDirection: selection.direction,
     lastNodeLayout: selection.nodeLayout, layoutSelection: selection, restoreLayoutSelection,
-    setLastDomainStrategy, setLastDomainDirection, setLastNodeLayout };
+    setLastDomainStrategy, setLastDomainDirection, setLastNodeLayout, commitLayoutSelection };
 };
 
 /** Compose layout metadata with pages without changing either owner's state model. */

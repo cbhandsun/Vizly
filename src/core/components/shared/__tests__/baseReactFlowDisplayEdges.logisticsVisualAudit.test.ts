@@ -42,7 +42,8 @@ import { parseBaseReactFlowPrecompiledRouteArtifact } from '../baseReactFlowPrec
 import { projectBaseReactFlowDisplayWorkerInput } from '../baseReactFlowDisplayWorkerClient';
 import { GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_LOADERS } from '../generated/baseReactFlowPrecompiledRouteLoaders';
 import { getGeneratedPrecompiledRouteArtifactForTest } from './fixtures/generatedPrecompiledRouteArtifacts';
-import { withAbsoluteNodePositions } from './baseReactFlowDisplayEdges.testUtils';
+import { getCapturedLogisticsDualTrunkEdges } from './fixtures/logisticsDualTrunkFixture';
+import { withAbsoluteNodePositions, paintedDisplayPaths } from './baseReactFlowDisplayEdges.testUtils';
 import {
   applySharedTrunkPaintPlan,
   createSharedTrunkJunctionFragments,
@@ -73,10 +74,6 @@ const edgePath = (edge: Edge | undefined): Point[] => {
   });
 };
 
-const toSvgPath = (points: Point[]): string => points
-  .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
-  .join(' ');
-
 const LOGISTICS_NEAR_BEND_CROSSING_PAIRS = [
   'edge-loms-customs|edge-tms-carrier',
   'edge-loms-visibility|edge-tms-bms',
@@ -94,17 +91,18 @@ const auditNode = (node: Node): RenderedAuditNode => {
   };
 };
 
-const renderedRoutingAudit = (edges: Edge[], nodes: Node[]) => (
-  auditRenderedEdgeRouting(
+const renderedRoutingAudit = (edges: Edge[], nodes: Node[]) => {
+  const painted = paintedDisplayPaths(edges);
+  return auditRenderedEdgeRouting(
     edges.map(edge => ({
       id: edge.id,
       source: edge.source,
       target: edge.target,
-      path: toSvgPath(edgePath(edge)),
+      path: painted.get(edge.id) ?? '',
     })),
     nodes.map(auditNode),
-  )
-);
+  );
+};
 
 const renderedStrictCrossingPairs = (edges: Edge[], nodes: Node[]): string[] => (
   renderedRoutingAudit(edges, nodes).errors.flatMap(finding => (
@@ -577,19 +575,8 @@ describe('baseReactFlowDisplayEdges logistics visual audit', () => {
     expect(visibilityTargetTrunk?.commonStemLength, diagnostics).toBeGreaterThanOrEqual(48);
   }, 120_000);
 
-  it('keeps the generated browser routes commercially clean and idempotent', async () => {
-    const entry = Object.entries(GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_LOADERS)
-      .find(([, descriptor]) => descriptor.presetId === 'logistics-architecture-v1');
-    if (!entry) throw new Error('expected the Logistics precompiled loader');
-    const [inputSignature, descriptor] = entry;
-    const artifact = parseBaseReactFlowPrecompiledRouteArtifact(
-      getGeneratedPrecompiledRouteArtifactForTest('logistics-architecture-v1'), {
-      inputSignature,
-      inputGeometryDigest: descriptor.geometryDigest,
-      sourceHash: descriptor.sourceHash,
-    });
-    if (!artifact) throw new Error('expected the Logistics artifact to parse');
-    artifact.edges = restoreBrowserColdRequestRouteHandles(artifact.edges);
+  it('keeps the captured dual-trunk browser routes commercially clean and idempotent', async () => {
+    const artifact = { edges: restoreBrowserColdRequestRouteHandles(getCapturedLogisticsDualTrunkEdges()) };
     const absoluteNodes = withAbsoluteNodePositions(browserLogisticsNodes);
     const wrapped = repairBaseReactFlowFinalEndpointOrder(artifact.edges, absoluteNodes);
     const sourceTrunkRestored = repairFinalSharedSourceTerminalTrunks(
@@ -819,11 +806,12 @@ describe('baseReactFlowDisplayEdges logistics visual audit', () => {
         .find(edge => edge.id === 'edge-loms-customs'),
     );
     const renderedNodes = absoluteNodes.map(auditNode);
+    const painted = paintedDisplayPaths(result);
     const renderedEdges: RenderedAuditEdge[] = result.map(edge => ({
       id: edge.id,
       source: edge.source,
       target: edge.target,
-      path: toSvgPath(edgePath(edge)),
+      path: painted.get(edge.id) ?? '',
     }));
     const audit = auditRenderedEdgeRouting(renderedEdges, renderedNodes);
     const nearNodeWarnings = audit.warnings.filter(
@@ -888,6 +876,7 @@ describe('baseReactFlowDisplayEdges logistics visual audit', () => {
       };
     };
     const contracts = {
+      captured: routeContract(getCapturedLogisticsDualTrunkEdges(), precompiledAbsoluteNodes),
       synchronous: routeContract(result, absoluteNodes),
       precompiled: routeContract(precompiledResult, precompiledAbsoluteNodes),
       worker: routeContract(workerResult, absoluteNodes),
@@ -945,36 +934,25 @@ describe('baseReactFlowDisplayEdges logistics visual audit', () => {
           .toBeGreaterThanOrEqual(48);
       }
     }
-    expect(contracts.precompiled.wmsBmsSourceHandle, diagnostics).toBe('bottom');
-    expect(contracts.precompiled.wmsSourceTrunk?.edgeIds, diagnostics)
+    expect(contracts.captured.wmsBmsSourceHandle, diagnostics).toBe('bottom');
+    expect(contracts.captured.wmsSourceTrunk?.edgeIds, diagnostics)
       .toEqual([...WMS_COMMERCIAL_SOURCE_TRUNK_EDGES]);
-    expect(contracts.precompiled.wmsSourceTrunk?.commonStemLength, diagnostics)
+    expect(contracts.captured.wmsSourceTrunk?.commonStemLength, diagnostics)
       .toBeGreaterThanOrEqual(48);
-    expect(contracts.precompiled.lomsSourceTrunk?.edgeIds, diagnostics)
+    expect(contracts.captured.lomsSourceTrunk?.edgeIds, diagnostics)
       .toEqual(expect.arrayContaining([...LOMS_COMMERCIAL_SOURCE_TRUNK_EDGES]));
-    expect(contracts.precompiled.tmsSourceTrunk?.edgeIds, diagnostics)
+    expect(contracts.captured.tmsSourceTrunk?.edgeIds, diagnostics)
       .toEqual([...TMS_COMMERCIAL_SOURCE_TRUNK_EDGES]);
-    expect(contracts.precompiled.visibilityTargetTrunk?.edgeIds, diagnostics)
+    expect(contracts.captured.visibilityTargetTrunk?.edgeIds, diagnostics)
       .toEqual([...VISIBILITY_COMMERCIAL_TARGET_TRUNK_EDGES]);
-    expect(contracts.precompiled.commercialTrunkSemantics.dualTrunkEdgeRoles, diagnostics).toEqual([
+    expect(contracts.captured.commercialTrunkSemantics.dualTrunkEdgeRoles, diagnostics).toEqual([
       'l-oms:source',
       'visibility:target',
     ]);
   }, 120_000);
 
   it('pulls an overextended shared data branch back into a clear interior corridor', async () => {
-    const entry = Object.entries(GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_LOADERS)
-      .find(([, descriptor]) => descriptor.presetId === 'logistics-architecture-v1');
-    if (!entry) throw new Error('expected the Logistics precompiled loader');
-    const [inputSignature, descriptor] = entry;
-    const artifact = parseBaseReactFlowPrecompiledRouteArtifact(
-      getGeneratedPrecompiledRouteArtifactForTest('logistics-architecture-v1'), {
-      inputSignature,
-      inputGeometryDigest: descriptor.geometryDigest,
-      sourceHash: descriptor.sourceHash,
-    });
-    if (!artifact) throw new Error('expected the Logistics artifact to parse');
-    artifact.edges = restoreBrowserColdRequestRouteHandles(artifact.edges);
+    const artifact = { edges: restoreBrowserColdRequestRouteHandles(getCapturedLogisticsDualTrunkEdges()) };
     const nodes = withAbsoluteNodePositions(browserLogisticsNodes);
     const repaired = repairBaseReactFlowFinalCommercialDetours(artifact.edges, nodes);
     const before = edgePath(artifact.edges.find(edge => edge.id === 'edge-wms-visibility'));

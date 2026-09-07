@@ -1,4 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
+import { isReadableOrthogonalCrossing } from '../../../routing/orthogonalCrossingPolicy';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as qualitySeed from '../baseReactFlowDisplayQualitySeedPipeline';
 import * as clearanceRepair from '../baseReactFlowDisplayBusinessNodeClearance';
@@ -82,7 +83,7 @@ const referenceDisplayStrictCrossingHits = (
       const crosses = first.axis === 'h'
         ? displayStrictCrossesHorizontal(first.a, first.b, second)
         : displayStrictCrossesVertical(first.a, first.b, second);
-      if (crosses) hits.push({ a: first, b: second });
+      if (crosses && !isReadableOrthogonalCrossing(first, second)) hits.push({ a: first, b: second });
     }
   }
   return hits;
@@ -152,7 +153,11 @@ describe('bounded display crossing cluster repair', () => {
     expect(displayCrossingClusterPathSignature([])).toBe('');
   });
 
-  it('can move a small interacting edge cluster without weakening hard quality', () => {
+  it.each([
+    { unrelatedCount: 0, translated: false },
+    { unrelatedCount: 21, translated: false },
+    { unrelatedCount: 21, translated: true },
+  ])('repairs a small cluster with $unrelatedCount unrelated edges, translated=$translated', ({ unrelatedCount, translated }) => {
     const nodes: Node[] = [
       node('n0', 100, 587, 420, 159),
       node('n1', 148, 1613, 332, 159),
@@ -179,6 +184,28 @@ describe('bounded display crossing cluster repair', () => {
         { x: 514, y: 2710 }, { x: 310, y: 2710 }, { x: 310, y: 2807 },
       ]),
     ];
+    for (let index = 0; index < unrelatedCount; index += 1) {
+      const x = 10_000 + index * 400;
+      nodes.push(node(`unrelated-source-${index}`, x, 0, 80, 80));
+      nodes.push(node(`unrelated-target-${index}`, x, 400, 80, 80));
+      edges.push(edge(`unrelated-${index}`, `unrelated-source-${index}`, `unrelated-target-${index}`, [
+        { x: x + 40, y: 80 }, { x: x + 40, y: 400 },
+      ]));
+    }
+    if (translated) {
+      for (const item of nodes) {
+        item.id = `renamed-${item.id}`;
+        item.position = { x: item.position.x - 2300, y: item.position.y + 1700 };
+      }
+      for (const item of edges) {
+        item.id = `renamed-${item.id}`;
+        item.source = `renamed-${item.source}`;
+        item.target = `renamed-${item.target}`;
+        item.data = { ...item.data, computedPath: getDisplayComputedPath(item).map(point => ({
+          x: point.x - 2300, y: point.y + 1700,
+        })) };
+      }
+    }
     const originalEdges = JSON.parse(JSON.stringify(edges)) as Edge[];
     const baselineQuality = calculateEdgePathQualityScore(edges);
     const baselineObstacleHits = countDisplayObstacleHits(edges, nodes);
@@ -189,6 +216,7 @@ describe('bounded display crossing cluster repair', () => {
     expect(repaired).not.toBe(edges);
     expect(hasDisplayCrossingClusterFixedPoint(edges, nodes)).toBe(false);
     expect(edges).toEqual(originalEdges);
+    expect(repaired.slice(4)).toEqual(edges.slice(4));
     expect(repairedQuality.strictCrossings).toBeLessThan(baselineQuality.strictCrossings);
     expect(repairedQuality.nonOrthogonalSegments).toBeLessThanOrEqual(baselineQuality.nonOrthogonalSegments);
     expect(repairedQuality.reverseOverlap).toBeLessThanOrEqual(baselineQuality.reverseOverlap);
@@ -218,7 +246,7 @@ describe('bounded display crossing cluster repair', () => {
     }
   }, 15_000);
 
-  it('does not enter bounded cluster search for graphs above the safety limit', () => {
+  it('preserves a larger graph with no strict crossing', () => {
     const nodes = Array.from({ length: 26 }, (_, index) => node(`n${index}`, index * 100, 0, 60, 40));
     const edges = Array.from({ length: 25 }, (_, index) => edge(
       `e${index}`,

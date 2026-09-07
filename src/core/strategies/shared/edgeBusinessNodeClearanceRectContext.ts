@@ -50,5 +50,21 @@ export const createBusinessNodeClearanceRectContext = (
     terminalRectCache.set(key, rects);
     return rects;
   };
-  return { containerRects, obstacles, rectsForTerminals };
+  const contains = (outer: Rect, inner: Rect): boolean => (
+    outer.x <= inner.x && outer.y <= inner.y
+    && outer.x + outer.width >= inner.x + inner.width
+    && outer.y + outer.height >= inner.y + inner.height
+  );
+  // A visual wrapper around exactly the same business nodes adds no domain
+  // partition. Do not turn its smaller padding into another hard routing wall.
+  const membership = containerRects.map(rect => businessEntries
+    .flatMap(([id, businessRect]) => contains(rect, businessRect) ? [id] : [])
+    .sort()).map(ids => JSON.stringify(ids));
+  const effectiveContainerRects = containerRects.filter((rect, index) => !containerRects.some(
+    (other, otherIndex) => otherIndex !== index && contains(other, rect)
+      && membership[index] !== '[]' && membership[index] === membership[otherIndex]
+      && (other.x < rect.x || other.y < rect.y
+        || other.width > rect.width || other.height > rect.height || otherIndex < index),
+  ));
+  return { containerRects: effectiveContainerRects, obstacles, rectsForTerminals };
 };

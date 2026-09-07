@@ -117,11 +117,12 @@ describe('buildTerminalCapDetourCandidates', () => {
     ]);
   });
 
-  it('repairs the crossing with exact hard-quality and obstacle gates', () => {
+  it('retains a readable crossing without an unnecessary terminal-cap detour', () => {
     const edges = [mover, barrier];
-    expect(calculateEdgePathQualityScore(edges).strictCrossings).toBe(1);
+    expect(calculateEdgePathQualityScore(edges)).toMatchObject({ strictCrossings: 0, bridgedCrossings: 1 });
 
     const repaired = repairFinalResidualStrictCrossings(edges, nodes);
+    expect(repaired).toBe(edges);
     const paths = repaired.map(edge => ({
       id: edge.id,
       path: ((edge.data as any)?.computedPath || []) as Array<{ x: number; y: number }>,

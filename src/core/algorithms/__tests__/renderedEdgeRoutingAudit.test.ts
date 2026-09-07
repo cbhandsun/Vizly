@@ -174,6 +174,30 @@ describe('auditRenderedEdgeRouting', () => {
     expect(result.errors.some(error => error.rule === 'edge-parallel-overlap')).toBe(false);
   });
 
+  it('preserves shared prefix identity when only one painted member contains a jump', () => {
+    const result = auditRenderedEdgeRouting([
+      { id: 'a', source: 'hub', target: 'upper', path: 'M 100 50 L 180 50 L 180 140 L 214 140 A 6 6 0 0 1 226 140 L 260 140 L 260 20 L 320 20' },
+      { id: 'b', source: 'hub', target: 'lower', path: 'M 100 50 L 180 50 L 180 140 L 300 140 L 300 260 L 320 260' },
+    ], [
+      { id: 'hub', x: 0, y: 0, width: 100, height: 100 },
+      { id: 'upper', x: 320, y: -30, width: 100, height: 100 },
+      { id: 'lower', x: 320, y: 210, width: 100, height: 100 },
+    ]);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('preserves shared suffix identity across differently split jump segments', () => {
+    const result = auditRenderedEdgeRouting([
+      { id: 'a', source: 'upper', target: 'hub', path: 'M 100 50 L 260 50 L 260 200 L 294 200 A 6 6 0 0 1 306 200 L 340 200 L 340 240 L 500 240' },
+      { id: 'b', source: 'lower', target: 'hub', path: 'M 100 350 L 260 350 L 260 200 L 340 200 L 340 240 L 500 240' },
+    ], [
+      { id: 'upper', x: 0, y: 0, width: 100, height: 100 },
+      { id: 'lower', x: 0, y: 300, width: 100, height: 100 },
+      { id: 'hub', x: 500, y: 190, width: 100, height: 100 },
+    ]);
+    expect(result.errors).toEqual([]);
+  });
+
   it('protects every segment in a real multi-segment same-target suffix', () => {
     const result = auditRenderedEdgeRouting([
       {

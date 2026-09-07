@@ -1,6 +1,6 @@
 import type { Edge } from '@xyflow/react';
 
-import { findDisplayStrictCrossingHits } from './baseReactFlowDisplayGeometry';
+import { findDisplayGeometricCrossingHits } from './baseReactFlowDisplayGeometry';
 
 /** Marks a bounded isolated shortcut crossing for request-local quality identity. */
 export const withDisplayLocalShortcutSoftCrossingBridge = (
@@ -14,7 +14,7 @@ export const withDisplayLocalShortcutSoftCrossingBridge = (
     || savedLength < 320
   ) return candidateEdge;
 
-  const hits = findDisplayStrictCrossingHits(candidateEdges);
+  const hits = findDisplayGeometricCrossingHits(candidateEdges);
   if (hits.length === 0 || hits.length > 2) return candidateEdge;
   const lineHops = `;${hits.map((hit) => {
     const horizontal = hit.a.axis === 'h' ? hit.a : hit.b;

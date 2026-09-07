@@ -11,7 +11,7 @@ export interface DiagramNodeBounds {
 
 const DEFAULT_NODE_WIDTH = 220;
 const DEFAULT_NODE_HEIGHT = 120;
-const MAX_NODE_DIMENSION = 100_000;
+const MAX_NODE_DIMENSION = 1_000_000_000;
 
 const readPositiveDimension = (value: unknown, fallback: number): number =>
   typeof value === 'number' && Number.isFinite(value) && value > 0
@@ -55,7 +55,7 @@ const resolveNestedPosition = (
 export const computeDiagramNodeBounds = (
   nodes: readonly Node[],
 ): DiagramNodeBounds | null => {
-  const visibleNodes = nodes.filter(node => !node.hidden);
+  const visibleNodes = nodes.filter(node => !node.hidden && node.data?.hidden !== true);
   if (visibleNodes.length === 0) return null;
 
   const nodeById = new Map(nodes.map(node => [node.id, node]));

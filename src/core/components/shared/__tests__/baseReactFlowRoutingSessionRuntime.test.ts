@@ -1,3 +1,4 @@
+import { createLayoutCandidateAcceptance } from '../../../algorithms/layoutCandidateAcceptance';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Edge, Node } from '@xyflow/react';
 
@@ -179,6 +180,47 @@ describe('baseReactFlowRoutingSessionRuntime', () => {
     expect(runtime.isCurrentJob(job)).toBe(false);
   });
 
+  it('rejects synchronous job reentry while preserving the complete current commit', () => {
+    const runtime = createBaseReactFlowRoutingSessionRuntime();
+    const job = runtime.beginJob('layout');
+    const writes: string[] = [];
+    const nestedWrite = vi.fn();
+    expect(runtime.commitJob(job, () => {
+      writes.push('nodes');
+      for (const owner of ['display', 'layout'] as const) {
+        const reentrant = runtime.beginJob(owner);
+        expect(reentrant.signal.aborted).toBe(true);
+        expect(runtime.isCurrentJob(reentrant)).toBe(false);
+        expect(runtime.commitJob(reentrant, nestedWrite)).toEqual({ committed: false });
+      }
+      expect(job.signal.aborted).toBe(false);
+      expect(runtime.isCurrentJob(job)).toBe(true);
+      expect(runtime.cancelJob(job)).toBe(false);
+      expect(runtime.finishJob(job)).toBe(false);
+      expect(runtime.commitJob(job, nestedWrite)).toEqual({ committed: false });
+      writes.push('edges', 'selection');
+    })).toEqual({ committed: true, value: undefined });
+    expect(writes).toEqual(['nodes', 'edges', 'selection']);
+    expect(nestedWrite).not.toHaveBeenCalled();
+    expect(runtime.isCurrentJob(job)).toBe(false);
+    expect(runtime.isCurrentJob(runtime.beginJob('display'))).toBe(true);
+  });
+
+  it('does not publish an acceptance staged before synchronous disposal', () => {
+    const runtime = createBaseReactFlowRoutingSessionRuntime();
+    const nodes: Node[] = [{ id: 'a', position: { x: 0, y: 0 }, width: 100, height: 60, data: {} }];
+    const accepted = createLayoutCandidateAcceptance(nodes, undefined, null);
+    if (!accepted) throw Error('expected valid layout');
+    const job = runtime.beginJob('layout');
+    expect(runtime.commitJob(job, () => {
+      expect(runtime.commitLayoutAcceptance(accepted, nodes, null)).toBe(true);
+      expect(runtime.readLayoutAcceptance()).toBeNull();
+      runtime.dispose();
+    })).toEqual({ committed: false });
+    expect(runtime.readLayoutAcceptance()).toBeNull();
+    expect(job.signal.aborted).toBe(true);
+  });
+
   it('aborts active work and disposes the shared Worker exactly once', () => {
     const runtime = createBaseReactFlowRoutingSessionRuntime();
     const job = runtime.beginJob('display');
@@ -196,4 +238,31 @@ describe('baseReactFlowRoutingSessionRuntime', () => {
     expect(runtime.workerRef.current).toBeNull();
     expect(() => runtime.beginJob('display')).toThrow('routing-session-runtime-disposed');
   });
+});
+
+
+it('publishes a layout envelope only after a successful current-job commit', () => {
+  const runtime = createBaseReactFlowRoutingSessionRuntime();
+  const nodes: Node[] = [{ id: 'a', position: { x: 0, y: 0 }, width: 100, height: 60, data: {} }];
+  const accepted = createLayoutCandidateAcceptance(nodes, undefined, null);
+  if (!accepted) throw Error('expected valid layout');
+  const first = runtime.beginJob('layout');
+  expect(runtime.commitLayoutAcceptance(accepted, nodes, null)).toBe(false);
+  runtime.commitJob(first, () => expect(runtime.commitLayoutAcceptance(accepted, nodes, null)).toBe(true));
+  expect(runtime.readLayoutAcceptance()).toBe(accepted);
+  const shifted = [{ ...nodes[0], position: { x: 200, y: 0 } }];
+  const next = createLayoutCandidateAcceptance(shifted, undefined, null);
+  if (!next) throw Error('expected next layout');
+  const failed = runtime.beginJob('layout');
+  expect(() => runtime.commitJob(failed, () => {
+    expect(runtime.commitLayoutAcceptance(next, shifted, null)).toBe(true);
+    throw Error('state writer failed');
+  })).toThrow('state writer failed');
+  expect(runtime.readLayoutAcceptance()).toBe(accepted);
+  const stale = runtime.beginJob('layout');
+  runtime.beginJob('display');
+  expect(runtime.commitJob(stale, () => runtime.commitLayoutAcceptance(next, shifted, null))).toEqual({ committed: false });
+  expect(runtime.readLayoutAcceptance()).toBe(accepted);
+  runtime.dispose();
+  expect(runtime.readLayoutAcceptance()).toBeNull();
 });

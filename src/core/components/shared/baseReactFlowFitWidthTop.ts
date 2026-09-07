@@ -1,5 +1,6 @@
 import type { Edge, Node, XYPosition } from '@xyflow/react';
 import { isBaseReactFlowNodeHidden } from './baseReactFlowRenderableNodes';
+import { extendDiagramBoundsWithEdges } from './diagramContentBounds';
 
 type Bounds = {
   minX: number;
@@ -131,6 +132,7 @@ export const expandBaseReactFlowBoundsForEdges = ({
   bounds: Bounds;
   edges: Edge[];
 }): Bounds & { contentWidth: number; contentHeight: number } => {
+  bounds = extendDiagramBoundsWithEdges(bounds, edges);
   let maxStrokeWidth = 0;
   let hasEdgeLabel = false;
   let hasSmartEdge = false;

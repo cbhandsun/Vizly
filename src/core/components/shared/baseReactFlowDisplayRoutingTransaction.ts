@@ -1,7 +1,7 @@
 import type { Edge } from '@xyflow/react';
 
 import { parseRoutingLineHops } from '../../routing/routingLineHops';
-import type { RoutingPatch } from '../../routing/routingPatch';
+import { ROUTING_PATCH_DATA_KEYS, type RoutingPatch } from '../../routing/routingPatch';
 import { edgeRoutingQualityIntentToken } from '../../strategies/shared/edgeRoutingQualityIntent';
 import {
   baseReactFlowDisplayOutputRouteSignatureMatches,
@@ -99,6 +99,19 @@ export const createBaseReactFlowDisplayEdgePatches = (
         hasOwnRoutingProperty(sourceEdge, key)
         && !hasOwnRoutingProperty(routedEdge, key)
       ) patch[key] = undefined;
+    }
+    // A complete routed snapshot may clear an older router-owned value.
+    // Encode those deletions for structured-clone Worker/cache replay too;
+    // ordinary business metadata still uses the non-destructive delta merge.
+    if (isRoutingRecord(sourceEdge.data)) {
+      const routedData = isRoutingRecord(routedEdge.data) ? routedEdge.data : {};
+      const dataPatch = isRoutingRecord(patch.data) ? patch.data : {};
+      for (const key of ROUTING_PATCH_DATA_KEYS) {
+        if (hasOwnRoutingProperty(sourceEdge.data, key) && !hasOwnRoutingProperty(routedData, key)) {
+          dataPatch[key] = undefined;
+        }
+      }
+      if (Object.keys(dataPatch).length > 0) patch.data = dataPatch;
     }
     patches.push({
       id: routedEdge.id,

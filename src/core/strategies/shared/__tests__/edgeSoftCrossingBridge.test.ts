@@ -12,7 +12,7 @@ const edgeWithPath = (
   lineHops?: string,
 ): Edge => ({
   id,
-  source: `${id}-source`,
+  source: 'shared-source',
   target: `${id}-target`,
   data: { computedPath, h: lineHops },
 });
@@ -24,8 +24,8 @@ const pairStrictCrossings = (first: Edge, second: Edge): number => calculateEdge
   buildEdgeSegments(second.data?.computedPath as Array<{ x: number; y: number }>, 1),
 ).strictCrossings;
 
-describe('explicit soft crossing bridge quality intent', () => {
-  it('explains only the declared edge and exact crossing coordinate', () => {
+describe('geometry-owned crossing bridge quality', () => {
+  it('classifies clear crossings from geometry without trusting a declaration', () => {
     const horizontal = edgeWithPath(
       'horizontal',
       [{ x: 0, y: 50 }, { x: 100, y: 50 }],
@@ -41,7 +41,7 @@ describe('explicit soft crossing bridge quality intent', () => {
         ';51,50;',
       ),
       vertical,
-    )).toBe(1);
+    )).toBe(0);
   });
 
   it('does not explain a crossing within 24px of a bend or terminal', () => {
@@ -63,6 +63,6 @@ describe('explicit soft crossing bridge quality intent', () => {
     };
     const vertical = edgeWithPath('vertical', [{ x: 50, y: 0 }, { x: 50, y: 100 }]);
 
-    expect(pairStrictCrossings(horizontal, vertical)).toBe(1);
+    expect(pairStrictCrossings(horizontal, vertical)).toBe(0);
   });
 });

@@ -7,6 +7,7 @@ import { finalizeBaseReactFlowExactCommercialClearance } from '../baseReactFlowD
 import { getEdgePath } from '../../../strategies/shared/edgeRoutingPathGeometry';
 import { segmentIntersectsClearanceRect } from '../../../strategies/shared/edgeNodeClearanceGeometry';
 import { auditFinalSameSideEndpointOrder } from '../../../strategies/shared/edgeFinalSameSideEndpointOrderRepair';
+import { pairedDisplayClearanceCandidates } from '../baseReactFlowDisplayPairedClearanceCandidates';
 
 const node = (id: string, x: number, y: number): Node => ({ id, position: { x, y }, data: {}, width: 80, height: 60 });
 const nodes = [node('source', 0, 0), node('obstacle', 140, 68), node('target', 300, 0)];
@@ -14,6 +15,46 @@ const edges: Edge[] = [{ id: 'edge', source: 'source', target: 'target', sourceH
   data: { computedPath: [{ x: 80, y: 30 }, { x: 300, y: 30 }] } }];
 
 describe('bounded Worker perimeter closure', () => {
+  it.each([false, true])('moves neighbouring clearance lanes atomically (transposed=%s)', transposed => {
+    const pairedNodes: Node[] = [
+      { ...node('first', 599, 1956), width: 198, height: 96 },
+      { ...node('second', 599, 2212), width: 198, height: 96 },
+      { ...node('sink', 1048, 1444), width: 216, height: 96 },
+      { ...node('blocker', 599, 1700), width: 216, height: 96 },
+    ];
+    const pairedEdges: Edge[] = [
+      { id: 'first-link', source: 'first', target: 'sink', sourceHandle: 'right', targetHandle: 'bottom', data: {
+        computedPath: [{ x: 797, y: 2004 }, { x: 855, y: 2004 }, { x: 855, y: 1596 }, { x: 1156, y: 1596 }, { x: 1156, y: 1540 }],
+      } },
+      { id: 'second-link', source: 'second', target: 'sink', sourceHandle: 'right', targetHandle: 'bottom', data: {
+        computedPath: [{ x: 797, y: 2260 }, { x: 863, y: 2260 }, { x: 863, y: 1652 }, { x: 1156, y: 1652 }, { x: 1156, y: 1540 }],
+      } },
+    ];
+    if (transposed) {
+      for (const item of pairedNodes) {
+        item.position = { x: item.position.y, y: item.position.x };
+        [item.width, item.height] = [item.height, item.width];
+      }
+      for (const edge of pairedEdges) {
+        edge.sourceHandle = 'bottom';
+        edge.targetHandle = 'right';
+        edge.data = { ...edge.data, computedPath: getEdgePath(edge).map(point => ({ x: point.y, y: point.x })) };
+      }
+    }
+    const before = structuredClone({ pairedNodes, pairedEdges });
+    const baseline = getExactDisplayHardReport(pairedEdges, pairedNodes);
+    expect(baseline.commercialClearanceViolations).toBe(1);
+    const repaired = repairBaseReactFlowDisplayPerimeterClosure(pairedEdges, pairedNodes);
+    const report = getExactDisplayHardReport(repaired, pairedNodes);
+    expect(report.hardClean).toBe(true);
+    expect(report.quality.bends).toBe(baseline.quality.bends);
+    expect(report.quality.totalLength).toBe(baseline.quality.totalLength);
+    expect({ pairedNodes, pairedEdges }).toEqual(before);
+    expect(repairBaseReactFlowDisplayPerimeterClosure(repaired, pairedNodes)).toBe(repaired);
+    const forbidden = pairedEdges.map(edge => ({ ...edge, data: { ...edge.data, sourcePortPolicy: 'forbidden', targetPortPolicy: 'forbidden' } }));
+    expect([...pairedDisplayClearanceCandidates(forbidden, pairedNodes)]).toEqual([]);
+  });
+
   it('closes a trapped corridor without mutating input or traversing endpoint interiors', () => {
     const before = structuredClone({ nodes, edges });
     const repaired = repairBaseReactFlowDisplayPerimeterClosure(edges, nodes);
@@ -97,6 +138,40 @@ describe('bounded Worker perimeter closure', () => {
     expect(finalizeBaseReactFlowExactCommercialClearance({ exactBaseline: baseline, repairNodes: nodes, exactReport })).toBe(baseline);
     const incremental = { ...baseline, routeResolution: 'incremental-route' as const };
     expect(finalizeBaseReactFlowExactCommercialClearance({ exactBaseline: incremental, repairNodes: nodes, eligibleEdgeIds: new Set() })).toBe(incremental);
+  });
+
+  it.each([false, true])('preserves deeper branch bends when moving a shared trunk (reverse=%s)', reverse => {
+    const branchNodes: Node[] = [
+      { ...node('source', -72, 0), width: 144, height: 96 },
+      { ...node('atp', 168, -374), width: 120, height: 72 },
+      { ...node('reservation', 268, -181), width: 122, height: 72 },
+      { ...node('batch', 452, 205), width: 120, height: 72 },
+    ];
+    const branchEdges: Edge[] = [
+      { id: 'atp', source: 'source', target: 'atp', sourceHandle: 'top', targetHandle: 'left',
+        data: { computedPath: [{ x: 0, y: 0 }, { x: 0, y: -338 }, { x: 168, y: -338 }] } },
+      { id: 'reservation', source: 'source', target: 'reservation', sourceHandle: 'top', targetHandle: 'left',
+        data: { computedPath: [{ x: 0, y: 0 }, { x: 0, y: -145 }, { x: 268, y: -145 }] } },
+      { id: 'batch', source: 'source', target: 'batch', sourceHandle: 'top', targetHandle: 'left',
+        data: { computedPath: [{ x: 0, y: 0 }, { x: 0, y: -72 }, { x: 297, y: -72 }, { x: 297, y: 241 }, { x: 452, y: 241 }] } },
+    ];
+    if (reverse) {
+      for (const edge of branchEdges) {
+        const reversedPath = getEdgePath(edge).toReversed();
+        [edge.source, edge.target] = [edge.target, edge.source];
+        [edge.sourceHandle, edge.targetHandle] = [edge.targetHandle, edge.sourceHandle];
+        edge.data = { ...edge.data, computedPath: reversedPath };
+      }
+    }
+    const before = structuredClone(branchEdges);
+    expect(getExactDisplayHardReport(branchEdges, branchNodes).commercialClearanceViolations).toBe(1);
+    const repaired = repairBaseReactFlowDisplayPerimeterClosure(branchEdges, branchNodes);
+    expect(getExactDisplayHardReport(repaired, branchNodes).hardClean).toBe(true);
+    expect(getEdgePath(repaired[0])).toEqual(getEdgePath(branchEdges[0]));
+    expect(getEdgePath(repaired[1])).toEqual(getEdgePath(branchEdges[1]));
+    expect(auditFinalSameSideEndpointOrder(repaired, branchNodes).legalSharedTrunks.map(trunk => trunk.id))
+      .toEqual(auditFinalSameSideEndpointOrder(branchEdges, branchNodes).legalSharedTrunks.map(trunk => trunk.id));
+    expect(branchEdges).toEqual(before);
   });
 
   it('bounds empty, malformed and oversized internal geometry', () => {

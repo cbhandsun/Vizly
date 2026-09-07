@@ -1,3 +1,7 @@
+import {
+  countRenderUnsafeEndpointStubs,
+  MIN_RENDER_SAFE_ENDPOINT_STUB,
+} from './baseReactFlowDisplayEndpointStubMetrics';
 import type { Edge, Node } from '@xyflow/react';
 
 import { normalizeHandle } from '../../routing/utils/handleUtils';
@@ -273,6 +277,7 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
   if (diagnostics) diagnostics.candidateEdgeCount = rankedEdgeIndexes.length;
 
   let best = edges;
+  const baselineUnsafeEndpointStubs = countRenderUnsafeEndpointStubs(edges);
   let bestQuality = baselineQuality;
   let bestScore = loopDefectScore(baselineQuality, edges);
   let evaluations = 0;
@@ -304,6 +309,7 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
     const [allChangedIndexes, candidateQuality] = knownEvaluation
       ?? evaluateCandidateQuality(candidate, changedIndexes);
     if (!hardLoopDefectsDoNotRegress(baselineQuality, candidateQuality)) return false;
+    if (countRenderUnsafeEndpointStubs(candidate) > baselineUnsafeEndpointStubs) return false;
     const candidateScore = loopDefectScore(candidateQuality, candidate);
     if (candidateScore >= bestScore) return false;
     if (
@@ -349,8 +355,9 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
       || strictClosureEvaluations > 1
     ) return false;
     const [, candidateQuality] = knownEvaluation;
+    const needsStubClosure = countRenderUnsafeEndpointStubs(candidate) > baselineUnsafeEndpointStubs;
     if (
-      candidateQuality.strictCrossings <= baselineQuality.strictCrossings
+      (!needsStubClosure && candidateQuality.strictCrossings <= baselineQuality.strictCrossings)
       || candidateQuality.strictCrossings > baselineQuality.strictCrossings + 2
       || candidateQuality.detourPenalty >= baselineQuality.detourPenalty
       || candidateQuality.nonOrthogonalSegments > baselineQuality.nonOrthogonalSegments
@@ -462,10 +469,9 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
     const primaryEvaluationLimit = Math.min(
       edgeEvaluationLimit,
       edgeEvaluationStart + (
-        // Tiny atomic repairs rely on paired terminal-lane variants; let that
-        // search keep the whole edge budget instead of accepting a merely
-        // adequate single-edge port switch first.
-        rankedEdgeIndexes.length <= 2
+        // Hard-defect repairs may need paired lane changes. A clean detour
+        // should first try a direct route, including a readable crossing.
+        !detourPolishMode && rankedEdgeIndexes.length <= 2
           ? 0
           : Math.max(4, Math.ceil(perEdgeEvaluationBudget * 0.75))
       ),
@@ -609,7 +615,7 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
                 'source',
                 sourceRect,
                 sourceSide,
-                48,
+                MIN_RENDER_SAFE_ENDPOINT_STUB,
                 2,
               ),
               ...buildSharedNodeTerminalSideCandidates(
@@ -617,7 +623,7 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
                 'source',
                 sourceRect,
                 sourceSide,
-                48,
+                MIN_RENDER_SAFE_ENDPOINT_STUB,
                 4,
               ),
             ]
@@ -629,7 +635,7 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
                 'target',
                 targetRect,
                 targetSide,
-                48,
+                MIN_RENDER_SAFE_ENDPOINT_STUB,
                 2,
               ),
               ...buildSharedNodeTerminalSideCandidates(
@@ -637,7 +643,7 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
                 'target',
                 targetRect,
                 targetSide,
-                48,
+                MIN_RENDER_SAFE_ENDPOINT_STUB,
                 4,
               ),
             ]
@@ -650,7 +656,7 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
             targetRect,
             sourceSide,
             targetSide,
-            48,
+            MIN_RENDER_SAFE_ENDPOINT_STUB,
           ),
         ];
         for (const candidatePath of candidatePaths) {

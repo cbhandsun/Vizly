@@ -24,7 +24,7 @@ import {
 import { displayTerminalRoleNeedsDeclaredAxisRepair } from './baseReactFlowDisplayTerminalPortRepair';
 import { createDisplayTerminalValidationSnapshot } from './baseReactFlowTerminalAxisRepair';
 
-const MIN_RENDER_SAFE_ENDPOINT_STUB = 56;
+import { MIN_RENDER_SAFE_ENDPOINT_STUB } from './baseReactFlowDisplayEndpointStubMetrics';
 
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 

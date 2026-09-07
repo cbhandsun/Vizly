@@ -90,6 +90,35 @@ const edge = (source = 'source', target = 'target'): Edge => ({
 });
 
 describe('routing obstacle evaluation context', () => {
+  it('preserves exact obstacle counts for ephemeral candidate points without reference caching', () => {
+    const obstacles = new Map<string, Rect>([
+      ['source', { x: 0, y: 0, width: 20, height: 20 }],
+      ['target', { x: 100, y: 0, width: 20, height: 20 }],
+      ['block', { x: 40, y: -10, width: 20, height: 40 }],
+    ]);
+    const candidateEdge = edge();
+    const context = createRoutingObstacleEvaluationContext(candidateEdge, obstacles, {
+      cachePointReferences: false,
+    });
+    for (const y of [-1000, -18, 0, 10, 38, 1000]) {
+      for (const delta of [0, 0.25, 0.5, 10]) {
+        const path = [{ x: 0, y }, { x: 120, y: y + delta }];
+        const reference = createRoutingObstacleEvaluationContext(candidateEdge, obstacles);
+        const expected = reference.evaluate(path);
+        if (delta === 0) expect(expected).toEqual(legacyEvaluation(path, candidateEdge, obstacles));
+        expect(context.evaluate(path)).toEqual(expected);
+        expect(context.countPathHits(path)).toBe(expected.routingObstacleHits);
+        expect(context.evaluate(path.map(point => ({ ...point })))).toEqual(expected);
+        path[0].y += 200;
+        path[1].y += 200;
+        expect(context.evaluate(path)).toEqual(reference.evaluate(path));
+      }
+    }
+    expect(context.countPathHits([])).toBe(0);
+    expect(context.countPathHits([{ x: 0, y: 0 }])).toBe(0);
+    expect(context.countUnrelatedObstacleHits([{ x: 0, y: 10 }, { x: 120, y: 10 }], 0)).toBe(1);
+    expect(context.readMetrics().cacheHitCount).toBeGreaterThan(0);
+  });
   it('checks diagonal geometry without mistaking a bounding-box overlap or corner touch for traversal', () => {
     const rect = { x: 20, y: 20, width: 40, height: 40 };
     const outside = { a: { x: 0, y: 40 }, b: { x: 40, y: 0 } };

@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi } from 'vitest';
+import { assertPaintedCrossingCoverage } from '../../components/shared/__tests__/baseReactFlowDisplayQualityGateAssertions';
+import { calculateEdgePathQualityScore } from '../shared/edgeStrictCrossingGuard';
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 import { LayoutType } from '../../types/layout';
 import type { StandardDiagramData } from '../../models/DiagramModels';
@@ -18,6 +20,18 @@ import {
 } from '../../components/shared/baseReactFlowDisplayEdges';
 import { detectLocalDoglegRisks } from '../../algorithms/localDoglegQuality';
 import { countUnrelatedObstacleHits } from '../shared/edgeWaypointCandidateRepair';
+import { findDisplayGeometricCrossingHits } from '../../components/shared/baseReactFlowDisplayGeometry';
+import { isReadableOrthogonalCrossing } from '../../routing/orthogonalCrossingPolicy';
+import { withDisplayAbsolutePositions } from '../../components/shared/baseReactFlowDisplayEdgeCore';
+import { getExactDisplayHardReport } from '../../components/shared/baseReactFlowDisplayWorkerResponse';
+import { prepareLayeredLayoutEdges } from '../../components/diagrams/hooks/layeredLayoutEdgePreparation';
+import { clearBaseReactFlowLayoutEdgeRoutingData } from '../../components/shared/baseReactFlowLayoutEdgeRoutingData';
+import { seedBaseReactFlowStagedLayoutEdges } from '../../components/shared/baseReactFlowLayoutRoutingTransaction';
+import { projectBaseReactFlowDisplayWorkerInput } from '../../components/shared/baseReactFlowDisplayWorkerProjection';
+import { createBaseReactFlowDisplayEdgePatches } from '../../components/shared/baseReactFlowDisplayRoutingTransaction';
+import { computeBaseReactFlowDisplayEdgesWorkerResponse } from '../../components/shared/baseReactFlowDisplayEdges.worker';
+import { computeBaseReactFlowDisplayInputIdentityBundle } from '../../components/shared/baseReactFlowDisplayInputIdentity';
+import { createDisplayRoutingIdentity } from '../../routing/routingSessionIdentity';
 
 type PathPoint = { x: number; y: number };
 
@@ -75,6 +89,101 @@ const absolutePositionOf = (node: ReactFlowNode, nodes: ReactFlowNode[]) => {
 };
 
 describe('DomainDagreLayoutStrategy', () => {
+    it.each(['TB', 'LR'] as const)('preserves external component geometry during automatic %s direct and subgroup packing', async direction => {
+        for (const grouped of [false, true]) {
+            const group = grouped ? 'contents' : '';
+            const process = ['start', 'middle', 'end', 'external-in', 'external-out'].map(id => makeNode(id, 'domain-a', group));
+            const cards = Array.from({ length: 6 }, (_, index) => makeNode(`free-${index}`, 'domain-a', group));
+            const outside = makeNode('outside', 'domain-b', '');
+            const input = [...process, ...cards, outside];
+            const edges: Edge[] = [
+                { id: 'start-middle', source: 'start', target: 'middle' },
+                { id: 'middle-end', source: 'middle', target: 'end' },
+                { id: 'outside-start', source: 'outside', target: 'start' },
+                { id: 'external-in-outside', source: 'external-in', target: 'outside' },
+                { id: 'outside-external-out', source: 'outside', target: 'external-out' },
+            ];
+            const before = structuredClone(input);
+            const result = await new DomainDagreLayoutStrategy().calculateLayout(input, edges, {
+                type: LayoutType.DAGRE, direction, domainPlacement: 'topology', nodeLayout: LayoutType.DAGRE,
+                generateDomainGroups: true, generateSubDomainGroups: grouped, edgeRoutingQuality: 'interactive',
+                domainOrder: ['domain-a', 'domain-b'],
+            });
+            const positions = new Map(result.nodes.map(node => [node.id, absolutePositionOf(node, result.nodes)]));
+            const flow = direction === 'TB' ? 'y' : 'x';
+            const centers = new Map(result.nodes.map(node => [node.id,
+                absolutePositionOf(node, result.nodes)[flow] + sizeOf(node)[direction === 'TB' ? 'height' : 'width'] / 2]));
+            expect(centers.get('external-in')).toBe(centers.get('start'));
+            expect(centers.get('external-out')).toBe(centers.get('start'));
+            expect(new Set(cards.map(node => positions.get(node.id)?.[flow])).size).toBeGreaterThan(1);
+            expect(input).toEqual(before);
+        }
+    });
+
+    it.each([LayoutType.GRID, LayoutType.FLOW])('keeps cross-domain process bands in %s while independently packing disconnected cards', async nodeLayout => {
+        const process = [makeNode('first', 'domain-a', ''), makeNode('middle', 'domain-b', ''), makeNode('last', 'domain-a', '')];
+        const cards = Array.from({ length: 6 }, (_, index) => makeNode(`independent-${index}`, 'domain-a', ''));
+        const input = [...process, ...cards];
+        const edges: Edge[] = [{ id: 'first-middle', source: 'first', target: 'middle' },
+            { id: 'middle-last', source: 'middle', target: 'last' }];
+        const options = { type: LayoutType.SWIMLANE, direction: 'TB' as const, domainPlacement: 'ordered-lanes' as const,
+            edgeRoutingQuality: 'interactive' as const, generateDomainGroups: true, generateSubDomainGroups: false,
+            spacing: { horizontal: 120, vertical: 120 }, domainOrder: ['domain-a', 'domain-b'] };
+        const strategy = new DomainDagreLayoutStrategy();
+        const automatic = await strategy.calculateLayout(input, edges, { ...options, nodeLayout: LayoutType.DAGRE });
+        const grid = await strategy.calculateLayout(input, edges, { ...options, nodeLayout });
+        expect(grid.metadata?.laneRankDecision?.applied).toBe(automatic.metadata?.laneRankDecision?.applied);
+        expect(grid.metadata?.laneRankDecision).toBeDefined();
+        const position = (id: string, result: typeof grid) => {
+            const node = result.nodes.find(value => value.id === id);
+            if (!node) throw Error('missing candidate member');
+            return absolutePositionOf(node, result.nodes);
+        };
+        for (const node of process) expect(position(node.id, grid).y).toBe(position(node.id, automatic).y);
+        expect(new Set(cards.map(node => position(node.id, grid).x)).size).toBeGreaterThan(1);
+        expect(new Set(cards.map(node => position(node.id, grid).y)).size).toBeGreaterThan(1);
+        expect(cards.map(node => position(node.id, grid))).not.toEqual(cards.map(node => position(node.id, automatic)));
+        expect(new Set(grid.nodes.filter(node => node.type === 'titleGroup').map(node => sizeOf(node).height)).size).toBe(1);
+        expect(grid.edges?.every(edge => computedPathOf(edge).length >= 2)).toBe(true);
+    });
+
+    it.each(['TB', 'LR', 'BT', 'RL'] as const)('keeps empty, singleton and uneven edgeless domains valid in %s', async direction => {
+        const fixtures: ReactFlowNode[][] = [
+            [],
+            [makeNode('single', 'only-domain', '')],
+            Array.from({ length: 13 }, (_, index) => makeNode(
+                'isolated-' + index,
+                index === 12 ? 'sparse' : 'dense',
+                index === 12 ? 'one' : index < 6 ? 'first' : 'second',
+            )),
+        ];
+        for (const nodes of fixtures) {
+            const before = structuredClone(nodes);
+            const result = await new DomainDagreLayoutStrategy().calculateLayout(nodes, [], {
+                type: LayoutType.SWIMLANE, direction,
+                domainPlacement: 'ordered-lanes', generateDomainGroups: true, generateSubDomainGroups: true,
+            });
+            expect(result.edges ?? []).toEqual([]);
+            const originalIds = new Set(nodes.map(node => node.id));
+            const leaves = result.nodes.filter(node => originalIds.has(node.id));
+            expect(leaves.map(node => node.id).sort()).toEqual([...originalIds].sort());
+            expect(result.nodes.every(node => Number.isFinite(node.position.x) && Number.isFinite(node.position.y))).toBe(true);
+            for (let i = 0; i < leaves.length; i += 1) for (let j = i + 1; j < leaves.length; j += 1) {
+                const a = absolutePositionOf(leaves[i], result.nodes), b = absolutePositionOf(leaves[j], result.nodes);
+                const as = sizeOf(leaves[i]), bs = sizeOf(leaves[j]);
+                expect(a.x + as.width <= b.x || b.x + bs.width <= a.x
+                    || a.y + as.height <= b.y || b.y + bs.height <= a.y).toBe(true);
+            }
+            const domains = result.nodes.filter(node => node.type === 'titleGroup');
+            const flowSize = direction === 'TB' || direction === 'BT' ? 'height' : 'width';
+            if (nodes.length > 1) {
+                expect(domains).toHaveLength(2);
+                expect(new Set(domains.map(node => sizeOf(node)[flowSize])).size).toBe(1);
+            }
+            expect(nodes).toEqual(before);
+        }
+    });
+
     it('composes horizontal swimlanes with selectable vertical node layout and equal domain widths', async () => {
         const nodes: ReactFlowNode[] = [
             makeNode('a-1', 'domain-a', 'sub-a1'),
@@ -568,8 +677,8 @@ describe('DomainDagreLayoutStrategy', () => {
             domainOrder: presetLayout.domainOrder,
             subDomainOrder: presetLayout.subDomainOrder,
         } as unknown as import('../../types/layout').LayoutOptions);
-        // Exercise the cyclic cross-domain lane cluster here; the adjacent
-        // standard-conversion regression covers the complete fixture render.
+        // Keep the complete graph through the production layout transaction:
+        // filtering before routing removes the peers that constrain hub ports.
         const cyclicLaneIds = new Set([
             'edge-loms-wms',
             'edge-loms-tms',
@@ -582,22 +691,68 @@ describe('DomainDagreLayoutStrategy', () => {
             'edge-tms-visibility',
             'edge-tms-downstream',
         ]);
-        const displayEdges = createBaseReactFlowDisplayEdges({
-            edges: result.edges.filter(edge => cyclicLaneIds.has(edge.id)),
-            nodes: result.nodes,
-            enableSmartEdges: true,
-            smartEdgePadding: 20,
-            isLargeGraph: false,
-            displayEdgeEpoch: computeBaseReactFlowDisplayEdgeEpoch({
-                nodes: result.nodes,
-                edges: result.edges,
-            }),
+        const sourceEdges = prepareLayeredLayoutEdges(result.nodes, result.edges, 'LR', { promoteLockedComputedPath: true });
+        const unseeded = sourceEdges.map(edge => ({ ...edge, data: clearBaseReactFlowLayoutEdgeRoutingData(edge.data) }));
+        const projected = projectBaseReactFlowDisplayWorkerInput({ nodes: result.nodes, edges: unseeded });
+        const seed = seedBaseReactFlowStagedLayoutEdges({ sourceNodes: result.nodes, sourceEdges });
+        const fallback = seedBaseReactFlowStagedLayoutEdges({ sourceNodes: result.nodes, sourceEdges: unseeded });
+        const candidatePatches = createBaseReactFlowDisplayEdgePatches(projected.edges, seed);
+        const fallbackCandidatePatches = createBaseReactFlowDisplayEdgePatches(projected.edges, fallback);
+        if (!candidatePatches || !fallbackCandidatePatches) throw new Error('Invalid layout candidate patches');
+        const commonInput = { ...projected, enableSmartEdges: true, smartEdgePadding: 20, isLargeGraph: false };
+        const identity = computeBaseReactFlowDisplayInputIdentityBundle(commonInput);
+        const response = computeBaseReactFlowDisplayEdgesWorkerResponse({
+            ...commonInput, operation: 'repair-validate-or-route', requestId: 'cyclic-logistics-layout',
+            candidatePatches, fallbackCandidatePatches, candidateSource: 'persistent', qualityMode: 'full',
+            inputIdentity: createDisplayRoutingIdentity(identity.cacheSignature, identity.geometryDigest),
+            displayEdgeEpoch: computeBaseReactFlowDisplayEdgeEpoch(projected),
         });
+        expect(response.hardClean).toBe(true);
+        expect(response.hardReport).toMatchObject({
+            obstacleHits: 0, terminalsAttached: true, terminalsAnchored: true,
+            minimumClearanceViolations: 0, commercialClearanceViolations: 0,
+        });
+        if (!response.edges) throw new Error('Expected complete Worker routing output');
+        expect(response.edges.map(edge => edge.id).sort()).toEqual(result.edges.map(edge => edge.id).sort());
+        const displayEdges = response.edges.filter(edge => cyclicLaneIds.has(edge.id));
+        expect(displayEdges).toHaveLength(cyclicLaneIds.size);
 
         expect(nonOrthogonalSegments(displayEdges)).toEqual([]);
         expect(shortEndpointStubs(displayEdges, 48)).toEqual([]);
-        expect(unrelatedStrictCrossings(displayEdges)).toEqual([]);
+        const absoluteNodes = withDisplayAbsolutePositions(projected.nodes, new Map(projected.nodes.map(node => [node.id, node])));
+        expect(getExactDisplayHardReport(displayEdges, absoluteNodes)).toMatchObject({
+            obstacleHits: 0, terminalsAttached: true, terminalsAnchored: true,
+        });
+        const rawCrossings = findDisplayGeometricCrossingHits(displayEdges);
+        const quality = calculateEdgePathQualityScore(displayEdges);
+        // Centerline intersections are allowed only with the production
+        // endpoint/bend clearance and an actual painted bridge at every hit.
+        expect(rawCrossings.every(hit => isReadableOrthogonalCrossing(hit.a, hit.b))).toBe(true);
+        expect(quality.strictCrossings).toBe(0);
+        expect(quality.bridgedCrossings ?? 0).toBe(rawCrossings.length);
+        assertPaintedCrossingCoverage(displayEdges);
     }, 15_000);
+
+    it('distinguishes a painted ordinary crossing from a crossing beside a bend or endpoint', () => {
+        for (const withBends of [false, true]) for (const x of [23, 24, 50, 76, 77]) {
+            const edges: Edge[] = [
+                { id: 'horizontal', source: 'a', target: 'b', data: { computedPath: withBends
+                    ? [{ x: 0, y: -50 }, { x: 0, y: 50 }, { x: 100, y: 50 }, { x: 100, y: 150 }]
+                    : [{ x: 0, y: 50 }, { x: 100, y: 50 }] } },
+                { id: 'vertical', source: 'c', target: 'd', data: { computedPath: [{ x, y: 0 }, { x, y: 100 }] } },
+            ];
+            const rawCrossings = findDisplayGeometricCrossingHits(edges);
+            const quality = calculateEdgePathQualityScore(edges);
+            expect(rawCrossings).toHaveLength(1);
+            if (x >= 24 && x <= 76) {
+                expect(quality).toMatchObject({ strictCrossings: 0, bridgedCrossings: 1 });
+                assertPaintedCrossingCoverage(edges);
+            } else {
+                expect(quality.strictCrossings).toBe(1);
+                expect(quality.bridgedCrossings ?? 0).toBe(0);
+            }
+        }
+    });
 
     it('keeps Logistics explicit hub lanes displayable after standard conversion', async () => {
         const canvas = await standardDataToCanvas(fixtureData(logisticsStandardData));
@@ -626,7 +781,10 @@ describe('DomainDagreLayoutStrategy', () => {
         expect(axisOf(displayTmsBms[displayTmsBms.length - 2], displayTmsBms[displayTmsBms.length - 1])).toBe('v');
         expect(nonOrthogonalSegments(displayEdges)).toEqual([]);
         expect(shortEndpointStubs(displayEdges, 48)).toEqual([]);
-        expect(unrelatedStrictCrossings(displayEdges)).toEqual([]);
+        // Ordinary crossings may remain, but every crossing must have a real
+        // painted bridge and none may violate the endpoint/bend safety policy.
+        expect(calculateEdgePathQualityScore(displayEdges).strictCrossings).toBe(0);
+        assertPaintedCrossingCoverage(displayEdges);
     }, 15_000);
 
     it('separates opposite-role Transport hub lanes after dagre routing', async () => {
@@ -749,56 +907,6 @@ function nonOrthogonalSegments(edges: Edge[]): Array<{ edgeId: string; segment: 
         }
         return issues;
     });
-}
-
-function unrelatedStrictCrossings(
-    edges: Edge[],
-): Array<{ edgeIds: [string, string]; point: { x: number; y: number } }> {
-    const crossings: Array<{ edgeIds: [string, string]; point: { x: number; y: number } }> = [];
-    for (let i = 0; i < edges.length; i++) {
-        for (let j = i + 1; j < edges.length; j++) {
-            const first = edges[i];
-            const second = edges[j];
-            if (first.source === second.source || first.target === second.target) continue;
-
-            const firstPath = pathFor(edges, first.id || '');
-            const secondPath = pathFor(edges, second.id || '');
-            for (let a = 0; a < firstPath.length - 1; a++) {
-                for (let b = 0; b < secondPath.length - 1; b++) {
-                    const point = strictCrossingPoint(firstPath[a], firstPath[a + 1], secondPath[b], secondPath[b + 1]);
-                    if (point) crossings.push({ edgeIds: [first.id || '', second.id || ''], point });
-                }
-            }
-        }
-    }
-    return crossings;
-}
-
-function strictCrossingPoint(
-    a1: { x: number; y: number },
-    a2: { x: number; y: number },
-    b1: { x: number; y: number },
-    b2: { x: number; y: number },
-): { x: number; y: number } | null {
-    const aAxis = axisOf(a1, a2);
-    const bAxis = axisOf(b1, b2);
-    if (!aAxis || !bAxis || aAxis === bAxis) return null;
-
-    const h1 = aAxis === 'h' ? a1 : b1;
-    const h2 = aAxis === 'h' ? a2 : b2;
-    const v1 = aAxis === 'v' ? a1 : b1;
-    const v2 = aAxis === 'v' ? a2 : b2;
-    const x = v1.x;
-    const y = h1.y;
-    if (
-        x > Math.min(h1.x, h2.x) + 1
-        && x < Math.max(h1.x, h2.x) - 1
-        && y > Math.min(v1.y, v2.y) + 1
-        && y < Math.max(v1.y, v2.y) - 1
-    ) {
-        return { x, y };
-    }
-    return null;
 }
 
 function segmentLength(a: { x: number; y: number }, b: { x: number; y: number }): number {

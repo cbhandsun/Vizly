@@ -92,6 +92,53 @@ describe('domain Dagre layout boundary', () => {
     ], 200, 80)).toEqual([]);
   });
 
+  it('converts hierarchical input to one absolute work space and removes stale runtime geometry', () => {
+    const input = [
+      { id: 'domain', type: 'titleGroup', position: { x: 100, y: 200 }, data: { domain: 'business' } },
+      { id: 'group', type: 'subGroup', parentId: 'domain', position: { x: 20, y: 30 }, data: { subDomain: 'process' } },
+      { id: 'leaf', parentId: 'group', extent: 'parent', position: { x: 4, y: 5 },
+        positionAbsolute: { x: 9999, y: -9999 }, data: {} },
+    ];
+    const before = structuredClone(input);
+    const nodes = normalizeDomainDagreNodes(input, 200, 80);
+    expect(nodes[2].position).toEqual({ x: 124, y: 235 });
+    expect(nodes[2].data).toEqual({ domain: 'business', subDomain: 'process' });
+    expect(nodes.every(node => !node.parentId && !node.extent && !('positionAbsolute' in node))).toBe(true);
+    expect(normalizeDomainDagreNodes(nodes, 200, 80)).toEqual(nodes);
+    expect(input).toEqual(before);
+  });
+
+  it('bounds extreme input ancestry without trusting inherited object keys', () => {
+    const nodes = normalizeDomainDagreNodes([
+      { id: '__proto__', parentId: 'b', position: { x: 900000, y: 900000 }, data: {} },
+      { id: 'b', type: 'group', position: { x: 900000, y: 900000 }, data: {} },
+    ], 200, 80);
+    expect(nodes.map(node => node.position)).toEqual([
+      { x: 1000000, y: 1000000 }, { x: 900000, y: 900000 },
+    ]);
+  });
+
+  it('rejects duplicate, cyclic and missing hierarchy references before layout can discard them', () => {
+    const node = { id: 'a', position: { x: 0, y: 0 }, data: {} };
+    for (const input of [[node, node], [{ ...node, parentId: 'a' }],
+      [{ ...node, parentId: 'b' }, { ...node, id: 'b', parentId: 'a' }], [{ ...node, parentId: 'absent' }]]) {
+      expect(() => normalizeDomainDagreNodes(input, 200, 80)).toThrow('Invalid input hierarchy for domain layout');
+    }
+    expect(() => normalizeDomainDagreNodes([node, { ...node, id: 'b', parentId: 'a' }], 200, 80))
+      .toThrow('Invalid input hierarchy for domain layout');
+  });
+
+  it('accepts exactly twenty parents and rejects deeper chains before clearing hierarchy metadata', () => {
+    const chain = (parents: number) => Array.from({ length: parents + 1 }, (_, index) => ({
+      id: `node-${index}`, type: index === parents ? 'custom' : 'group', data: {},
+      parentId: index ? `node-${index - 1}` : undefined, position: { x: 1, y: 2 },
+    }));
+    expect(normalizeDomainDagreNodes(chain(20), 200, 80).at(-1)?.position).toEqual({ x: 21, y: 42 });
+    for (const depth of [21, 9999]) {
+      expect(() => normalizeDomainDagreNodes(chain(depth).reverse(), 200, 80)).toThrow('Invalid input hierarchy for domain layout');
+    }
+  });
+
   it('falls back from invalid node dimensions', () => {
     const node = {
       id: 'node', data: {}, position: { x: 0, y: 0 }, width: -1, height: Number.NaN,

@@ -117,4 +117,19 @@ describe('prepareDomainDagreInteractiveEdges', () => {
     expect(edge.targetHandle).toBe('left');
     expect(edge.data?.algorithm).toBe('domain-dagre-interactive');
   });
+
+  it('preserves empty authored terminals when an endpoint is unavailable', () => {
+    const nodes = [node('source', 0, 0)];
+    const [edge] = prepareDomainDagreInteractiveEdges({
+      nodes,
+      edges: [{
+        id: 'missing-target', source: 'source', target: 'missing', sourceHandle: null, targetHandle: '',
+        data: { sourceHandleLocked: true, targetPortPolicy: 'fixed-pos' },
+      }],
+      options: { type: LayoutType.DAGRE, direction: 'LR' },
+      nodeById: new Map(nodes.map(item => [item.id, item])),
+    });
+
+    expect(edge).toMatchObject({ sourceHandle: null, targetHandle: '' });
+  });
 });

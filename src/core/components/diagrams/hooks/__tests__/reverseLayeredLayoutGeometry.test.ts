@@ -190,7 +190,7 @@ describe('reverseLayeredLayoutGeometry', () => {
   });
 
   it.each([
-    ['BT', LayoutType.DAGRE], ['RL', LayoutType.DAGRE], ['BT', LayoutType.FLOW], ['RL', LayoutType.FLOW],
+    ['BT', LayoutType.DAGRE], ['RL', LayoutType.DAGRE],
   ] as const)('uses native semantic lane ranking in %s/%s so headers stay above their children', async (direction, nodeLayout) => {
     const nodes: Node[] = [
       { id: 'domain', type: 'titleGroup', position: { x: 0, y: 0 }, data: { domain: 'a' } },
@@ -214,5 +214,20 @@ describe('reverseLayeredLayoutGeometry', () => {
     for (const child of [source, target]) expect(child.position.y - sub.position.y).toBeGreaterThanOrEqual(32);
     const flow = direction === 'BT' ? 'y' : 'x';
     expect(source.position[flow]).toBeGreaterThan(target.position[flow]);
+  });
+
+  it.each(['BT', 'RL'] as const)('reflects explicit flow content in %s instead of claiming native semantic ranks', async direction => {
+    const nodes: Node[] = ['a', 'b', 'c', 'd'].map((id, index) => ({ id,
+      position: { x: (index % 2) * 240, y: Math.floor(index / 2) * 180 }, width: 160, height: 80, data: {} }));
+    const calculateLayout = vi.fn(async () => ({ nodes, edges: [] }));
+    const result = await calculateLayeredLayoutWithReverse({ calculateLayout }, nodes, [], {
+      type: LayoutType.DAGRE, domainPlacement: 'ordered-lanes', nodeLayout: LayoutType.FLOW,
+    }, direction, true);
+    expect(calculateLayout).toHaveBeenCalledWith(nodes, [], expect.objectContaining({
+      direction: direction === 'BT' ? 'TB' : 'LR',
+    }), undefined);
+    expect(result).toEqual(reverseLayeredLayoutGeometry({ nodes, edges: [] }, direction));
+    expect(new Set(result.nodes.map(node => node.position.x)).size).toBe(2);
+    expect(new Set(result.nodes.map(node => node.position.y)).size).toBe(2);
   });
 });

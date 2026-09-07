@@ -40,8 +40,8 @@ describe('repairBoundedHubPortRoleTransaction', () => {
     const nodes = [
       node('hub', 0, 0, 100, 100),
       node('primary-destination', 0, -200, 100, 100),
-      node('left-system', -30, 125, 50, 50),
-      node('right-system', 80, 125, 50, 50),
+      node('left-system', -10, 125, 50, 50),
+      node('right-system', 100, 125, 50, 50),
       node('companion-source', 250, 275, 50, 50),
     ];
     const seed = [
@@ -50,8 +50,8 @@ describe('repairBoundedHubPortRoleTransaction', () => {
         { x: 50, y: -100 },
       ]),
       edge('primary-crossing', 'left-system', 'right-system', 'right', 'left', [
-        { x: 20, y: 150 },
-        { x: 80, y: 150 },
+        { x: 40, y: 150 },
+        { x: 100, y: 150 },
       ]),
       edge('hub-incoming', 'companion-source', 'hub', 'left', 'bottom', [
         { x: 250, y: 300 },

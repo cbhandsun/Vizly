@@ -39,36 +39,50 @@ const isGroupType = (type: unknown): boolean =>
 
 /**
  * ELK child coordinates are relative to their compound parent. React Flow uses
- * the same contract whenever `parentId` is present, so only root children may
- * receive the canvas padding/absolute offset. Writing accumulated coordinates
- * into nested nodes makes React Flow add every parent a second time and also
- * gives the edge router a different graph from the one ELK actually ranked.
+ * the same contract. The returned ELK tree is authoritative: layout switches
+ * deliberately clear the previous hierarchy, so it cannot determine whether
+ * a new compound child uses relative coordinates. Only root children receive
+ * the canvas padding/absolute offset.
  */
 export const applyElkResultNodeGeometry = (
   children: ElkNode[] | undefined,
   nodeById: Map<string, ReactFlowNode>,
   padding: { x: number; y: number },
-): void => {
+): ReactFlowNode[] => {
+  const orderedNodes: ReactFlowNode[] = [];
+  const visited = new Set<string>();
   const visit = (
     node: ElkNode,
     parentAbsoluteX: number,
     parentAbsoluteY: number,
     parentElkId?: string,
   ) => {
-    const localX = finiteNumber(node.x, 0);
-    const localY = finiteNumber(node.y, 0);
+    // Omitted coordinates have ELK's zero origin; supplied invalid geometry
+    // must remain visible to final acceptance instead of becoming a valid box.
+    const localX = node.x ?? 0;
+    const localY = node.y ?? 0;
     const absoluteX = parentAbsoluteX + localX;
     const absoluteY = parentAbsoluteY + localY;
     const targetNode = nodeById.get(node.id);
     if (targetNode) {
-      const usesElkParent = Boolean(parentElkId && targetNode.parentId === parentElkId);
-      targetNode.position = usesElkParent
-        ? { x: localX, y: localY }
-        : { x: absoluteX, y: absoluteY };
+      if (!visited.has(node.id)) orderedNodes.push(targetNode);
+      visited.add(node.id);
+      if (parentElkId && nodeById.has(parentElkId)) {
+        targetNode.parentId = parentElkId;
+        targetNode.extent = 'parent';
+        targetNode.position = { x: localX, y: localY };
+      } else {
+        delete targetNode.parentId;
+        delete targetNode.extent;
+        targetNode.position = { x: absoluteX, y: absoluteY };
+      }
+      if ('positionAbsolute' in targetNode) delete targetNode.positionAbsolute;
 
-      const width = finiteNumber(node.width, 0);
-      const height = finiteNumber(node.height, 0);
-      if (width > 0 && height > 0 && isGroupType(targetNode.type)) {
+      const width = node.width ?? targetNode.measured?.width ?? targetNode.width;
+      const height = node.height ?? targetNode.measured?.height ?? targetNode.height;
+      if (width !== undefined && height !== undefined) {
+        targetNode.width = width;
+        targetNode.height = height;
         targetNode.style = { ...targetNode.style, width, height };
         targetNode.measured = { width, height };
       }
@@ -83,6 +97,9 @@ export const applyElkResultNodeGeometry = (
   };
 
   children?.forEach(child => visit(child, padding.x, padding.y));
+  // React Flow resolves a parent while visiting the node array. Preserve ELK
+  // preorder even when grouping preparation appended containers after leaves.
+  return [...orderedNodes, ...[...nodeById.values()].filter(node => !visited.has(node.id))];
 };
 
 export abstract class AbstractElkLayoutStrategy implements ILayoutStrategy {
@@ -170,14 +187,14 @@ export abstract class AbstractElkLayoutStrategy implements ILayoutStrategy {
       const result = context?.elkLayoutRunner
         ? await context.elkLayoutRunner.run(elkGraph, requestOptions)
         : await runElkLayout(elkGraph, requestOptions);
-      applyElkResultNodeGeometry(result.children, idMap, padding);
+      const orderedNodes = applyElkResultNodeGeometry(result.children, idMap, padding);
 
       const routes = collectDomainElkLayoutRoutes(
         result.edges,
         { x: padding.x, y: padding.y },
       );
       return {
-        nodes: updatedNodes,
+        nodes: orderedNodes,
         edges: applyDomainElkLayoutRoutes(edges, routes),
       };
     } catch (error) {

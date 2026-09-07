@@ -1,0 +1,3125 @@
+{
+  "operation": "repair-validate-or-route",
+  "requestId": "layout:3",
+  "edges": [
+    {
+      "id": "e18",
+      "source": "alloc-mixed",
+      "target": "check-source",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "beautified": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "layoutDirection": "LR"
+      }
+    },
+    {
+      "id": "e-rate-applied",
+      "source": "apply-satisfaction-rate",
+      "target": "calc-theory-ratio",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "label": "修正需求 (Q*Rate)",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexTarget": 0,
+        "_orderTotalTarget": 2,
+        "beautified": true,
+        "orthogonalSanitized": true,
+        "crossingOptimized": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "layoutDirection": "LR"
+      }
+    },
+    {
+      "id": "e9",
+      "source": "calc-real-ratio",
+      "target": "fix-quota",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "label": "Real_Ratio",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "beautified": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "detachedOverlapSeparated": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "layoutDirection": "LR"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "calc-theory-ratio",
+      "target": "sort-demand",
+      "sourceHandle": "right",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "Max_Ratio",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "layerControlPoints": [
+          {
+            "x": 409,
+            "y": 2175
+          },
+          {
+            "x": 575,
+            "y": 1833
+          }
+        ],
+        "isLongEdge": true,
+        "orthogonalSanitized": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": true,
+        "crossingOptimized": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "localDoglegRepaired": true,
+        "detachedOverlapSeparated": true,
+        "displayNodeClearanceRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "layoutDirection": "LR"
+      }
+    },
+    {
+      "id": "e-shortage-yes",
+      "source": "check-inv-sufficiency",
+      "target": "apply-satisfaction-rate",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "label": "缺货 (Inv < Demand)",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexSource": 0,
+        "_orderTotalSource": 2,
+        "beautified": true,
+        "orthogonalSanitized": true,
+        "crossingOptimized": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "layoutDirection": "LR"
+      }
+    },
+    {
+      "id": "e-shortage-no",
+      "source": "check-inv-sufficiency",
+      "target": "calc-theory-ratio",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "label": "充足",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexSource": 1,
+        "_orderTotalSource": 2,
+        "_orderIndexTarget": 1,
+        "_orderTotalTarget": 2,
+        "layerControlPoints": [
+          {
+            "x": 243,
+            "y": 2260
+          }
+        ],
+        "isLongEdge": true,
+        "beautified": true,
+        "orthogonalSanitized": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": false,
+        "crossingOptimized": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "localDoglegRepaired": true,
+        "detachedOverlapSeparated": true,
+        "displayNodeClearanceRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "layoutDirection": "LR"
+      }
+    },
+    {
+      "id": "e5",
+      "source": "check-limit",
+      "target": "pool-a-entry",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "label": "Yes (未满)",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexSource": 0,
+        "_orderTotalSource": 2,
+        "beautified": true,
+        "orthogonalSanitized": true,
+        "crossingOptimized": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "layoutDirection": "LR"
+      }
+    },
+    {
+      "id": "e6",
+      "source": "check-limit",
+      "target": "pool-b-entry",
+      "sourceHandle": "bottom",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "label": "No (溢出)",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexSource": 1,
+        "_orderTotalSource": 2,
+        "layerControlPoints": [
+          {
+            "x": 741,
+            "y": 2004
+          }
+        ],
+        "isLongEdge": true,
+        "beautified": true,
+        "orthogonalSanitized": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": true,
+        "crossingOptimized": true,
+        "localDoglegRepaired": true,
+        "detachedOverlapSeparated": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "displayNodeClearanceRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "layoutDirection": "LR"
+      }
+    },
+    {
+      "id": "e12",
+      "source": "check-rem",
+      "target": "sort-rem-round",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "label": "有剩余",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexSource": 0,
+        "_orderTotalSource": 2,
+        "beautified": true,
+        "crossingOptimized": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "layoutDirection": "LR"
+      }
+    },
+    {
+      "id": "e13",
+      "source": "check-rem",
+      "target": "task-direct-a",
+      "sourceHandle": "left",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "耗尽",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexSource": 1,
+        "_orderTotalSource": 2,
+        "_orderIndexTarget": 0,
+        "_orderTotalTarget": 2,
+        "layerControlPoints": [
+          {
+            "x": 209,
+            "y": 3507
+          }
+        ],
+        "isLongEdge": true,
+        "beautified": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": true,
+        "crossingOptimized": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "localDoglegRepaired": true,
+        "displayNodeClearanceRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "layoutDirection": "LR"
+      }
+    },
+    {
+      "id": "e20",
+      "source": "check-source",
+      "target": "task-direct-b",
+      "sourceHandle": "bottom",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "拣选捡漏",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexSource": 1,
+        "_orderTotalSource": 2,
+        "layerControlPoints": [
+          {
+            "x": 513,
+            "y": 3738
+          },
+          {
+            "x": 358,
+            "y": 4044
+          }
+        ],
+        "isLongEdge": true,
+        "orthogonalSanitized": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": false,
+        "crossingOptimized": true,
+        "detachedOverlapSeparated": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "layoutDirection": "LR"
+      }
+    },
+    {
+      "id": "e19",
+      "source": "check-source",
+      "target": "task-rep-b",
+      "sourceHandle": "bottom",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "用到存储",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexSource": 0,
+        "_orderTotalSource": 2,
+        "layerControlPoints": [
+          {
+            "x": 435,
+            "y": 3763
+          }
+        ],
+        "isLongEdge": true,
+        "orthogonalSanitized": true,
+        "crossingOptimized": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "layoutDirection": "LR",
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": true
+      }
+    },
+    {
+      "id": "e10",
+      "source": "fix-quota",
+      "target": "greedy-spec",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "Quota A",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexSource": 0,
+        "_orderTotalSource": 2,
+        "layerControlPoints": [
+          {
+            "x": 891,
+            "y": 2143
+          },
+          {
+            "x": 553,
+            "y": 2537
+          }
+        ],
+        "isLongEdge": true,
+        "orthogonalSanitized": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": false,
+        "crossingOptimized": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "layoutDirection": "LR"
+      }
+    },
+    {
+      "id": "e16",
+      "source": "fix-quota",
+      "target": "merge-res",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "余量传递",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexSource": 1,
+        "_orderTotalSource": 2,
+        "_orderIndexTarget": 1,
+        "_orderTotalTarget": 2,
+        "layerControlPoints": [
+          {
+            "x": 1042,
+            "y": 2143
+          },
+          {
+            "x": 856,
+            "y": 2537
+          }
+        ],
+        "isLongEdge": true,
+        "orthogonalSanitized": true,
+        "crossingOptimized": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "localDoglegRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "layoutDirection": "LR"
+      }
+    },
+    {
+      "id": "e11",
+      "source": "greedy-spec",
+      "target": "check-rem",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "beautified": true,
+        "orthogonalSanitized": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "layoutDirection": "LR"
+      }
+    },
+    {
+      "id": "e-check-inv",
+      "source": "init-data",
+      "target": "check-inv-sufficiency",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "label": "基础数据",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "beautified": true,
+        "orthogonalSanitized": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "layoutDirection": "LR"
+      }
+    },
+    {
+      "id": "e17",
+      "source": "merge-res",
+      "target": "alloc-mixed",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "beautified": true,
+        "orthogonalSanitized": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "layoutDirection": "LR"
+      }
+    },
+    {
+      "id": "e7",
+      "source": "pool-a-entry",
+      "target": "calc-real-ratio",
+      "sourceHandle": "right",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "汇聚",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexTarget": 0,
+        "_orderTotalTarget": 2,
+        "layerControlPoints": [
+          {
+            "x": 984,
+            "y": 1748
+          }
+        ],
+        "isLongEdge": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": true,
+        "sameNodeInOutCrossingRepaired": true,
+        "crossingOptimized": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "detachedOverlapSeparated": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "layoutDirection": "LR"
+      }
+    },
+    {
+      "id": "e8",
+      "source": "pool-b-entry",
+      "target": "calc-real-ratio",
+      "sourceHandle": "right",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "汇聚",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexSource": 1,
+        "_orderTotalSource": 2,
+        "_orderIndexTarget": 1,
+        "_orderTotalTarget": 2,
+        "layerControlPoints": [
+          {
+            "x": 985,
+            "y": 1876
+          }
+        ],
+        "isLongEdge": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": false,
+        "sameNodeInOutCrossingRepaired": true,
+        "crossingOptimized": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "layoutDirection": "LR"
+      }
+    },
+    {
+      "id": "e15",
+      "source": "pool-b-entry",
+      "target": "merge-res",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "Pool B Demand",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexSource": 0,
+        "_orderTotalSource": 2,
+        "_orderIndexTarget": 0,
+        "_orderTotalTarget": 2,
+        "layerControlPoints": [
+          {
+            "x": 705,
+            "y": 2596
+          }
+        ],
+        "isLongEdge": true,
+        "crossingOptimized": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": true,
+        "orthogonalSanitized": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "localDoglegRepaired": true,
+        "detachedOverlapSeparated": true,
+        "globalWaypointRefined": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "layoutDirection": "LR"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "sort-demand",
+      "target": "check-limit",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "label": "循环处理",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "beautified": true,
+        "orthogonalSanitized": true,
+        "crossingOptimized": true,
+        "sameNodeInOutCrossingRepaired": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "localDoglegRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "layoutDirection": "LR"
+      }
+    },
+    {
+      "id": "e14",
+      "source": "sort-rem-round",
+      "target": "task-direct-a",
+      "sourceHandle": "left",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "分配完",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexTarget": 1,
+        "_orderTotalTarget": 2,
+        "layerControlPoints": [
+          {
+            "x": 209,
+            "y": 3629
+          }
+        ],
+        "isLongEdge": true,
+        "beautified": true,
+        "crossingOptimized": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "localDoglegRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "layoutDirection": "LR",
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": true
+      }
+    },
+    {
+      "id": "e1",
+      "source": "start-calc",
+      "target": "init-data",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "beautified": true,
+        "orthogonalSanitized": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "layoutDirection": "LR"
+      }
+    },
+    {
+      "id": "e21",
+      "source": "task-direct-a",
+      "target": "end-wms",
+      "sourceHandle": "right",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexTarget": 1,
+        "_orderTotalTarget": 3,
+        "layerControlPoints": [
+          {
+            "x": 202,
+            "y": 4221
+          }
+        ],
+        "isLongEdge": true,
+        "beautified": true,
+        "orthogonalSanitized": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": false,
+        "crossingOptimized": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "localDoglegRepaired": true,
+        "displayNodeClearanceRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "layoutDirection": "LR"
+      }
+    },
+    {
+      "id": "e23",
+      "source": "task-direct-b",
+      "target": "end-wms",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexTarget": 2,
+        "_orderTotalTarget": 3,
+        "beautified": true,
+        "orthogonalSanitized": true,
+        "crossingOptimized": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "layoutDirection": "LR"
+      }
+    },
+    {
+      "id": "e22",
+      "source": "task-rep-b",
+      "target": "end-wms",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "parallelOffset": 0,
+        "parallelIndex": 0,
+        "parallelTotal": 1,
+        "_orderIndexTarget": 0,
+        "_orderTotalTarget": 3,
+        "layerControlPoints": [
+          {
+            "x": 202,
+            "y": 4349
+          }
+        ],
+        "isLongEdge": true,
+        "beautified": true,
+        "orthogonalSanitized": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": false,
+        "crossingOptimized": true,
+        "localDoglegRepaired": true,
+        "detachedOverlapSeparated": true,
+        "endpointLaneNudged": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "globalWaypointRefined": true,
+        "displayNodeClearanceRepaired": true,
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "layoutDirection": "LR"
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "id": "titlegroup-策略计算",
+      "type": "titleGroup",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "positionAbsolute": {
+        "x": 0,
+        "y": 0
+      },
+      "width": 3892,
+      "height": 1211,
+      "measured": {
+        "width": 3892,
+        "height": 1211
+      },
+      "style": {
+        "width": 3892,
+        "height": 1211
+      },
+      "data": {}
+    },
+    {
+      "id": "titlegroup-资源分配",
+      "type": "titleGroup",
+      "position": {
+        "x": 0,
+        "y": 1331
+      },
+      "positionAbsolute": {
+        "x": 0,
+        "y": 1331
+      },
+      "width": 3892,
+      "height": 624,
+      "measured": {
+        "width": 3892,
+        "height": 624
+      },
+      "style": {
+        "width": 3892,
+        "height": 624
+      },
+      "data": {}
+    },
+    {
+      "id": "titlegroup-作业执行",
+      "type": "titleGroup",
+      "position": {
+        "x": 0,
+        "y": 2075
+      },
+      "positionAbsolute": {
+        "x": 0,
+        "y": 2075
+      },
+      "width": 3892,
+      "height": 744,
+      "measured": {
+        "width": 3892,
+        "height": 744
+      },
+      "style": {
+        "width": 3892,
+        "height": 744
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-策略计算-数据准备",
+      "type": "subGroup",
+      "parentId": "titlegroup-策略计算",
+      "position": {
+        "x": 88,
+        "y": 88
+      },
+      "positionAbsolute": {
+        "x": 88,
+        "y": 88
+      },
+      "width": 3772,
+      "height": 251,
+      "measured": {
+        "width": 3772,
+        "height": 251
+      },
+      "style": {
+        "width": 3771.5,
+        "height": 251
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-策略计算-初分逻辑",
+      "type": "subGroup",
+      "parentId": "titlegroup-策略计算",
+      "position": {
+        "x": 88,
+        "y": 459
+      },
+      "positionAbsolute": {
+        "x": 88,
+        "y": 459
+      },
+      "width": 3772,
+      "height": 408,
+      "measured": {
+        "width": 3772,
+        "height": 408
+      },
+      "style": {
+        "width": 3771.5,
+        "height": 408
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-策略计算-库存修正",
+      "type": "subGroup",
+      "parentId": "titlegroup-策略计算",
+      "position": {
+        "x": 88,
+        "y": 987
+      },
+      "positionAbsolute": {
+        "x": 88,
+        "y": 987
+      },
+      "width": 3772,
+      "height": 192,
+      "measured": {
+        "width": 3772,
+        "height": 192
+      },
+      "style": {
+        "width": 3771.5,
+        "height": 192
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-资源分配-直拣池分配",
+      "type": "subGroup",
+      "parentId": "titlegroup-资源分配",
+      "position": {
+        "x": 88,
+        "y": 88
+      },
+      "positionAbsolute": {
+        "x": 88,
+        "y": 1419
+      },
+      "width": 3772,
+      "height": 192,
+      "measured": {
+        "width": 3772,
+        "height": 192
+      },
+      "style": {
+        "width": 3771.5,
+        "height": 192
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-资源分配-补货池分配",
+      "type": "subGroup",
+      "parentId": "titlegroup-资源分配",
+      "position": {
+        "x": 88,
+        "y": 400
+      },
+      "positionAbsolute": {
+        "x": 88,
+        "y": 1731
+      },
+      "width": 3772,
+      "height": 192,
+      "measured": {
+        "width": 3772,
+        "height": 192
+      },
+      "style": {
+        "width": 3771.5,
+        "height": 192
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-作业执行-作业执行",
+      "type": "subGroup",
+      "parentId": "titlegroup-作业执行",
+      "position": {
+        "x": 88,
+        "y": 88
+      },
+      "positionAbsolute": {
+        "x": 88,
+        "y": 2163
+      },
+      "width": 3772,
+      "height": 624,
+      "measured": {
+        "width": 3772,
+        "height": 624
+      },
+      "style": {
+        "width": 3771.5,
+        "height": 624
+      },
+      "data": {}
+    },
+    {
+      "id": "start-calc",
+      "type": "custom",
+      "parentId": "subgroup-策略计算-数据准备",
+      "position": {
+        "x": 112,
+        "y": 64
+      },
+      "positionAbsolute": {
+        "x": 200,
+        "y": 152
+      },
+      "width": 172,
+      "height": 96,
+      "measured": {
+        "width": 172,
+        "height": 96
+      },
+      "style": {
+        "width": 172,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "init-data",
+      "type": "custom",
+      "parentId": "subgroup-策略计算-数据准备",
+      "position": {
+        "x": 668,
+        "y": 64
+      },
+      "positionAbsolute": {
+        "x": 756,
+        "y": 152
+      },
+      "width": 211,
+      "height": 96,
+      "measured": {
+        "width": 211,
+        "height": 96
+      },
+      "style": {
+        "width": 211,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "check-inv-sufficiency",
+      "type": "custom",
+      "parentId": "subgroup-策略计算-数据准备",
+      "position": {
+        "x": 1071,
+        "y": 64
+      },
+      "positionAbsolute": {
+        "x": 1159,
+        "y": 152
+      },
+      "width": 204,
+      "height": 96,
+      "measured": {
+        "width": 204,
+        "height": 96
+      },
+      "style": {
+        "width": 204,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "apply-satisfaction-rate",
+      "type": "custom",
+      "parentId": "subgroup-策略计算-数据准备",
+      "position": {
+        "x": 1467,
+        "y": 123
+      },
+      "positionAbsolute": {
+        "x": 1555,
+        "y": 211
+      },
+      "width": 273,
+      "height": 96,
+      "measured": {
+        "width": 273,
+        "height": 96
+      },
+      "style": {
+        "width": 273,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "calc-theory-ratio",
+      "type": "custom",
+      "parentId": "subgroup-策略计算-数据准备",
+      "position": {
+        "x": 1836,
+        "y": 64
+      },
+      "positionAbsolute": {
+        "x": 1924,
+        "y": 152
+      },
+      "width": 246,
+      "height": 96,
+      "measured": {
+        "width": 246,
+        "height": 96
+      },
+      "style": {
+        "width": 246,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "sort-demand",
+      "type": "custom",
+      "parentId": "subgroup-策略计算-初分逻辑",
+      "position": {
+        "x": 2178,
+        "y": 64
+      },
+      "positionAbsolute": {
+        "x": 2266,
+        "y": 523
+      },
+      "width": 204,
+      "height": 96,
+      "measured": {
+        "width": 204,
+        "height": 96
+      },
+      "style": {
+        "width": 204,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "check-limit",
+      "type": "custom",
+      "parentId": "subgroup-策略计算-初分逻辑",
+      "position": {
+        "x": 2478,
+        "y": 64
+      },
+      "positionAbsolute": {
+        "x": 2566,
+        "y": 523
+      },
+      "width": 249,
+      "height": 96,
+      "measured": {
+        "width": 249,
+        "height": 96
+      },
+      "style": {
+        "width": 249,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "pool-a-entry",
+      "type": "custom",
+      "parentId": "subgroup-策略计算-初分逻辑",
+      "position": {
+        "x": 2823,
+        "y": 64
+      },
+      "positionAbsolute": {
+        "x": 2911,
+        "y": 523
+      },
+      "width": 217,
+      "height": 96,
+      "measured": {
+        "width": 217,
+        "height": 96
+      },
+      "style": {
+        "width": 217,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "pool-b-entry",
+      "type": "custom",
+      "parentId": "subgroup-策略计算-初分逻辑",
+      "position": {
+        "x": 2919.5,
+        "y": 280
+      },
+      "positionAbsolute": {
+        "x": 3007.5,
+        "y": 739
+      },
+      "width": 216,
+      "height": 96,
+      "measured": {
+        "width": 216,
+        "height": 96
+      },
+      "style": {
+        "width": 216,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "calc-real-ratio",
+      "type": "custom",
+      "parentId": "subgroup-策略计算-库存修正",
+      "position": {
+        "x": 3231.5,
+        "y": 64
+      },
+      "positionAbsolute": {
+        "x": 3319.5,
+        "y": 1051
+      },
+      "width": 192,
+      "height": 96,
+      "measured": {
+        "width": 192,
+        "height": 96
+      },
+      "style": {
+        "width": 192,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "fix-quota",
+      "type": "custom",
+      "parentId": "subgroup-策略计算-库存修正",
+      "position": {
+        "x": 3519.5,
+        "y": 64
+      },
+      "positionAbsolute": {
+        "x": 3607.5,
+        "y": 1051
+      },
+      "width": 252,
+      "height": 96,
+      "measured": {
+        "width": 252,
+        "height": 96
+      },
+      "style": {
+        "width": 252,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "greedy-spec",
+      "type": "custom",
+      "parentId": "subgroup-资源分配-直拣池分配",
+      "position": {
+        "x": 304,
+        "y": 64
+      },
+      "positionAbsolute": {
+        "x": 392,
+        "y": 1483
+      },
+      "width": 220,
+      "height": 96,
+      "measured": {
+        "width": 220,
+        "height": 96
+      },
+      "style": {
+        "width": 220,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "check-rem",
+      "type": "custom",
+      "parentId": "subgroup-资源分配-直拣池分配",
+      "position": {
+        "x": 716,
+        "y": 75.5
+      },
+      "positionAbsolute": {
+        "x": 804,
+        "y": 1494.5
+      },
+      "width": 217,
+      "height": 73,
+      "measured": {
+        "width": 217,
+        "height": 73
+      },
+      "style": {
+        "width": 217,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "sort-rem-round",
+      "type": "custom",
+      "parentId": "subgroup-资源分配-直拣池分配",
+      "position": {
+        "x": 1129,
+        "y": 64
+      },
+      "positionAbsolute": {
+        "x": 1217,
+        "y": 1483
+      },
+      "width": 204,
+      "height": 96,
+      "measured": {
+        "width": 204,
+        "height": 96
+      },
+      "style": {
+        "width": 204,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "merge-res",
+      "type": "custom",
+      "parentId": "subgroup-资源分配-补货池分配",
+      "position": {
+        "x": 404.5,
+        "y": 64
+      },
+      "positionAbsolute": {
+        "x": 492.5,
+        "y": 1795
+      },
+      "width": 211,
+      "height": 96,
+      "measured": {
+        "width": 211,
+        "height": 96
+      },
+      "style": {
+        "width": 211,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "alloc-mixed",
+      "type": "custom",
+      "parentId": "subgroup-资源分配-补货池分配",
+      "position": {
+        "x": 818.5,
+        "y": 64
+      },
+      "positionAbsolute": {
+        "x": 906.5,
+        "y": 1795
+      },
+      "width": 204,
+      "height": 96,
+      "measured": {
+        "width": 204,
+        "height": 96
+      },
+      "style": {
+        "width": 204,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "check-source",
+      "type": "custom",
+      "parentId": "subgroup-资源分配-补货池分配",
+      "position": {
+        "x": 1221,
+        "y": 75.5
+      },
+      "positionAbsolute": {
+        "x": 1309,
+        "y": 1806.5
+      },
+      "width": 212,
+      "height": 73,
+      "measured": {
+        "width": 212,
+        "height": 73
+      },
+      "style": {
+        "width": 212,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "task-direct-a",
+      "type": "custom",
+      "parentId": "subgroup-作业执行-作业执行",
+      "position": {
+        "x": 121.5,
+        "y": 64
+      },
+      "positionAbsolute": {
+        "x": 209.5,
+        "y": 2227
+      },
+      "width": 172,
+      "height": 96,
+      "measured": {
+        "width": 172,
+        "height": 96
+      },
+      "style": {
+        "width": 172,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "task-rep-b",
+      "type": "custom",
+      "parentId": "subgroup-作业执行-作业执行",
+      "position": {
+        "x": 208,
+        "y": 280
+      },
+      "positionAbsolute": {
+        "x": 296,
+        "y": 2443
+      },
+      "width": 191,
+      "height": 96,
+      "measured": {
+        "width": 191,
+        "height": 96
+      },
+      "style": {
+        "width": 191,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "task-direct-b",
+      "type": "custom",
+      "parentId": "subgroup-作业执行-作业执行",
+      "position": {
+        "x": 313.5,
+        "y": 496
+      },
+      "positionAbsolute": {
+        "x": 401.5,
+        "y": 2659
+      },
+      "width": 172,
+      "height": 96,
+      "measured": {
+        "width": 172,
+        "height": 96
+      },
+      "style": {
+        "width": 172,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "end-wms",
+      "type": "custom",
+      "parentId": "subgroup-作业执行-作业执行",
+      "position": {
+        "x": 687,
+        "y": 280
+      },
+      "positionAbsolute": {
+        "x": 775,
+        "y": 2443
+      },
+      "width": 174,
+      "height": 96,
+      "measured": {
+        "width": 174,
+        "height": 96
+      },
+      "style": {
+        "width": 174,
+        "height": 96
+      },
+      "data": {}
+    }
+  ],
+  "enableSmartEdges": true,
+  "smartEdgePadding": 20,
+  "isLargeGraph": false,
+  "displayEdgeEpoch": 0,
+  "qualityMode": "full",
+  "inputIdentity": {
+    "routingVersion": "18",
+    "visualVersion": "balanced-crossing-gate-v2",
+    "inputSignature": "1617058437",
+    "inputGeometryDigest": "geometry-v1:87060aa0d16f1b70a752db8c2be1eb34"
+  },
+  "candidatePatches": [
+    {
+      "id": "e18",
+      "source": "alloc-mixed",
+      "target": "check-source",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1111,
+            "y": 1843
+          },
+          {
+            "x": 1309,
+            "y": 1843
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-rate-applied",
+      "source": "apply-satisfaction-rate",
+      "target": "calc-theory-ratio",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1828,
+            "y": 259
+          },
+          {
+            "x": 1876,
+            "y": 259
+          },
+          {
+            "x": 1876,
+            "y": 200
+          },
+          {
+            "x": 1924,
+            "y": 200
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e9",
+      "source": "calc-real-ratio",
+      "target": "fix-quota",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 3512,
+            "y": 1099
+          },
+          {
+            "x": 3608,
+            "y": 1099
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e3",
+      "source": "calc-theory-ratio",
+      "target": "sort-demand",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2170,
+            "y": 200
+          },
+          {
+            "x": 2368,
+            "y": 200
+          },
+          {
+            "x": 2368,
+            "y": 523
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-shortage-yes",
+      "source": "check-inv-sufficiency",
+      "target": "apply-satisfaction-rate",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1363,
+            "y": 200
+          },
+          {
+            "x": 1499,
+            "y": 200
+          },
+          {
+            "x": 1499,
+            "y": 259
+          },
+          {
+            "x": 1555,
+            "y": 259
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-shortage-no",
+      "source": "check-inv-sufficiency",
+      "target": "calc-theory-ratio",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1363,
+            "y": 200
+          },
+          {
+            "x": 1924,
+            "y": 200
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e5",
+      "source": "check-limit",
+      "target": "pool-a-entry",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2815,
+            "y": 571
+          },
+          {
+            "x": 2911,
+            "y": 571
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e6",
+      "source": "check-limit",
+      "target": "pool-b-entry",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2691,
+            "y": 619
+          },
+          {
+            "x": 2691,
+            "y": 787
+          },
+          {
+            "x": 3008,
+            "y": 787
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e12",
+      "source": "check-rem",
+      "target": "sort-rem-round",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1021,
+            "y": 1531
+          },
+          {
+            "x": 1217,
+            "y": 1531
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e13",
+      "source": "check-rem",
+      "target": "task-direct-a",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 804,
+            "y": 1531
+          },
+          {
+            "x": 636,
+            "y": 1531
+          },
+          {
+            "x": 636,
+            "y": 1603
+          },
+          {
+            "x": 296,
+            "y": 1603
+          },
+          {
+            "x": 296,
+            "y": 2227
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e20",
+      "source": "check-source",
+      "target": "task-direct-b",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1415,
+            "y": 1880
+          },
+          {
+            "x": 1415,
+            "y": 2811
+          },
+          {
+            "x": 488,
+            "y": 2811
+          },
+          {
+            "x": 488,
+            "y": 2755
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e19",
+      "source": "check-source",
+      "target": "task-rep-b",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1415,
+            "y": 1880
+          },
+          {
+            "x": 1415,
+            "y": 2707
+          },
+          {
+            "x": 597.5,
+            "y": 2707
+          },
+          {
+            "x": 597.5,
+            "y": 2635
+          },
+          {
+            "x": 392,
+            "y": 2635
+          },
+          {
+            "x": 392,
+            "y": 2539
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e10",
+      "source": "fix-quota",
+      "target": "greedy-spec",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 3734,
+            "y": 1147
+          },
+          {
+            "x": 3734,
+            "y": 1427
+          },
+          {
+            "x": 502,
+            "y": 1427
+          },
+          {
+            "x": 502,
+            "y": 1483
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e16",
+      "source": "fix-quota",
+      "target": "merge-res",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 3734,
+            "y": 1147
+          },
+          {
+            "x": 3734,
+            "y": 1683
+          },
+          {
+            "x": 598,
+            "y": 1683
+          },
+          {
+            "x": 598,
+            "y": 1795
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e11",
+      "source": "greedy-spec",
+      "target": "check-rem",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 612,
+            "y": 1531
+          },
+          {
+            "x": 804,
+            "y": 1531
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-check-inv",
+      "source": "init-data",
+      "target": "check-inv-sufficiency",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 967,
+            "y": 200
+          },
+          {
+            "x": 1159,
+            "y": 200
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e17",
+      "source": "merge-res",
+      "target": "alloc-mixed",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 704,
+            "y": 1843
+          },
+          {
+            "x": 907,
+            "y": 1843
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e7",
+      "source": "pool-a-entry",
+      "target": "calc-real-ratio",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 3128,
+            "y": 571
+          },
+          {
+            "x": 3416,
+            "y": 571
+          },
+          {
+            "x": 3416,
+            "y": 1051
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e8",
+      "source": "pool-b-entry",
+      "target": "calc-real-ratio",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 3224,
+            "y": 787
+          },
+          {
+            "x": 3416,
+            "y": 787
+          },
+          {
+            "x": 3416,
+            "y": 1051
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e15",
+      "source": "pool-b-entry",
+      "target": "merge-res",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 3116,
+            "y": 835
+          },
+          {
+            "x": 3116,
+            "y": 1683
+          },
+          {
+            "x": 598,
+            "y": 1683
+          },
+          {
+            "x": 598,
+            "y": 1795
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e4",
+      "source": "sort-demand",
+      "target": "check-limit",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2470,
+            "y": 571
+          },
+          {
+            "x": 2566,
+            "y": 571
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e14",
+      "source": "sort-rem-round",
+      "target": "task-direct-a",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1217,
+            "y": 1531
+          },
+          {
+            "x": 1045,
+            "y": 1531
+          },
+          {
+            "x": 1045,
+            "y": 1591.5
+          },
+          {
+            "x": 780,
+            "y": 1591.5
+          },
+          {
+            "x": 780,
+            "y": 1603
+          },
+          {
+            "x": 296,
+            "y": 1603
+          },
+          {
+            "x": 296,
+            "y": 2227
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e1",
+      "source": "start-calc",
+      "target": "init-data",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 372,
+            "y": 200
+          },
+          {
+            "x": 756,
+            "y": 200
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e21",
+      "source": "task-direct-a",
+      "target": "end-wms",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 382,
+            "y": 2275
+          },
+          {
+            "x": 862,
+            "y": 2275
+          },
+          {
+            "x": 862,
+            "y": 2443
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e23",
+      "source": "task-direct-b",
+      "target": "end-wms",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 574,
+            "y": 2707
+          },
+          {
+            "x": 663,
+            "y": 2707
+          },
+          {
+            "x": 663,
+            "y": 2491
+          },
+          {
+            "x": 775,
+            "y": 2491
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e22",
+      "source": "task-rep-b",
+      "target": "end-wms",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 487,
+            "y": 2491
+          },
+          {
+            "x": 775,
+            "y": 2491
+          }
+        ],
+        "algorithm": "elk-layout-candidate",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    }
+  ],
+  "fallbackCandidatePatches": [
+    {
+      "id": "e18",
+      "source": "alloc-mixed",
+      "target": "check-source",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1110.5,
+            "y": 1843
+          },
+          {
+            "x": 1309,
+            "y": 1843
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-rate-applied",
+      "source": "apply-satisfaction-rate",
+      "target": "calc-theory-ratio",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1828,
+            "y": 259
+          },
+          {
+            "x": 1876,
+            "y": 259
+          },
+          {
+            "x": 1876,
+            "y": 200
+          },
+          {
+            "x": 1924,
+            "y": 200
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e9",
+      "source": "calc-real-ratio",
+      "target": "fix-quota",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 3511.5,
+            "y": 1099
+          },
+          {
+            "x": 3607.5,
+            "y": 1099
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e3",
+      "source": "calc-theory-ratio",
+      "target": "sort-demand",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2170,
+            "y": 200
+          },
+          {
+            "x": 2269,
+            "y": 200
+          },
+          {
+            "x": 2269,
+            "y": 475
+          },
+          {
+            "x": 2368,
+            "y": 475
+          },
+          {
+            "x": 2368,
+            "y": 523
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-shortage-yes",
+      "source": "check-inv-sufficiency",
+      "target": "apply-satisfaction-rate",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1363,
+            "y": 200
+          },
+          {
+            "x": 1459,
+            "y": 200
+          },
+          {
+            "x": 1459,
+            "y": 259
+          },
+          {
+            "x": 1555,
+            "y": 259
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-shortage-no",
+      "source": "check-inv-sufficiency",
+      "target": "calc-theory-ratio",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1363,
+            "y": 200
+          },
+          {
+            "x": 1924,
+            "y": 200
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e5",
+      "source": "check-limit",
+      "target": "pool-a-entry",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2815,
+            "y": 571
+          },
+          {
+            "x": 2911,
+            "y": 571
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e6",
+      "source": "check-limit",
+      "target": "pool-b-entry",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2690.5,
+            "y": 619
+          },
+          {
+            "x": 2690.5,
+            "y": 667
+          },
+          {
+            "x": 2849,
+            "y": 667
+          },
+          {
+            "x": 2849,
+            "y": 787
+          },
+          {
+            "x": 3007.5,
+            "y": 787
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e12",
+      "source": "check-rem",
+      "target": "sort-rem-round",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1021,
+            "y": 1531
+          },
+          {
+            "x": 1217,
+            "y": 1531
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e13",
+      "source": "check-rem",
+      "target": "task-direct-a",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 804,
+            "y": 1531
+          },
+          {
+            "x": 295.5,
+            "y": 1531
+          },
+          {
+            "x": 295.5,
+            "y": 2227
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "terminalPortBridgeRepaired": true
+      }
+    },
+    {
+      "id": "e20",
+      "source": "check-source",
+      "target": "task-direct-b",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1415,
+            "y": 1879.5
+          },
+          {
+            "x": 1415,
+            "y": 2803
+          },
+          {
+            "x": 487.5,
+            "y": 2803
+          },
+          {
+            "x": 487.5,
+            "y": 2755
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "terminalPortBridgeRepaired": true
+      }
+    },
+    {
+      "id": "e19",
+      "source": "check-source",
+      "target": "task-rep-b",
+      "targetHandle": "top",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1415,
+            "y": 1879.5
+          },
+          {
+            "x": 1415,
+            "y": 2209.25
+          },
+          {
+            "x": 391.5,
+            "y": 2209.25
+          },
+          {
+            "x": 391.5,
+            "y": 2443
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "terminalPortBridgeRepaired": true
+      }
+    },
+    {
+      "id": "e10",
+      "source": "fix-quota",
+      "target": "greedy-spec",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 3733.5,
+            "y": 1147
+          },
+          {
+            "x": 3733.5,
+            "y": 1315
+          },
+          {
+            "x": 502,
+            "y": 1315
+          },
+          {
+            "x": 502,
+            "y": 1483
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e16",
+      "source": "fix-quota",
+      "target": "merge-res",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 3733.5,
+            "y": 1147
+          },
+          {
+            "x": 3733.5,
+            "y": 1471
+          },
+          {
+            "x": 598,
+            "y": 1471
+          },
+          {
+            "x": 598,
+            "y": 1795
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e11",
+      "source": "greedy-spec",
+      "target": "check-rem",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 612,
+            "y": 1531
+          },
+          {
+            "x": 804,
+            "y": 1531
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e-check-inv",
+      "source": "init-data",
+      "target": "check-inv-sufficiency",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 967,
+            "y": 200
+          },
+          {
+            "x": 1159,
+            "y": 200
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e17",
+      "source": "merge-res",
+      "target": "alloc-mixed",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 703.5,
+            "y": 1843
+          },
+          {
+            "x": 906.5,
+            "y": 1843
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e7",
+      "source": "pool-a-entry",
+      "target": "calc-real-ratio",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 3128,
+            "y": 571
+          },
+          {
+            "x": 3415.5,
+            "y": 571
+          },
+          {
+            "x": 3415.5,
+            "y": 1051
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "terminalPortBridgeRepaired": true
+      }
+    },
+    {
+      "id": "e8",
+      "source": "pool-b-entry",
+      "target": "calc-real-ratio",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 3223.5,
+            "y": 787
+          },
+          {
+            "x": 3319.5,
+            "y": 787
+          },
+          {
+            "x": 3319.5,
+            "y": 1051
+          },
+          {
+            "x": 3415.5,
+            "y": 1051
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e15",
+      "source": "pool-b-entry",
+      "target": "merge-res",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 3115.5,
+            "y": 835
+          },
+          {
+            "x": 3115.5,
+            "y": 1315
+          },
+          {
+            "x": 598,
+            "y": 1315
+          },
+          {
+            "x": 598,
+            "y": 1795
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e4",
+      "source": "sort-demand",
+      "target": "check-limit",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2470,
+            "y": 571
+          },
+          {
+            "x": 2566,
+            "y": 571
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e14",
+      "source": "sort-rem-round",
+      "target": "task-direct-a",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1217,
+            "y": 1531
+          },
+          {
+            "x": 1169,
+            "y": 1531
+          },
+          {
+            "x": 1169,
+            "y": 2179
+          },
+          {
+            "x": 295.5,
+            "y": 2179
+          },
+          {
+            "x": 295.5,
+            "y": 2227
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "terminalPortBridgeRepaired": true
+      }
+    },
+    {
+      "id": "e1",
+      "source": "start-calc",
+      "target": "init-data",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 372,
+            "y": 200
+          },
+          {
+            "x": 756,
+            "y": 200
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e21",
+      "source": "task-direct-a",
+      "target": "end-wms",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 381.5,
+            "y": 2275
+          },
+          {
+            "x": 621.75,
+            "y": 2275
+          },
+          {
+            "x": 621.75,
+            "y": 2443
+          },
+          {
+            "x": 862,
+            "y": 2443
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e23",
+      "source": "task-direct-b",
+      "target": "end-wms",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 573.5,
+            "y": 2707
+          },
+          {
+            "x": 674.25,
+            "y": 2707
+          },
+          {
+            "x": 674.25,
+            "y": 2491
+          },
+          {
+            "x": 775,
+            "y": 2491
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    },
+    {
+      "id": "e22",
+      "source": "task-rep-b",
+      "target": "end-wms",
+      "type": "stablePath",
+      "data": {
+        "computedPath": [
+          {
+            "x": 487,
+            "y": 2491
+          },
+          {
+            "x": 775,
+            "y": 2491
+          }
+        ],
+        "algorithm": "display-stable-fallback",
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true
+      }
+    }
+  ],
+  "candidateSource": "persistent",
+  "stopAfterObstacleFailure": false
+}

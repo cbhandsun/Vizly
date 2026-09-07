@@ -135,6 +135,10 @@ export function buildBoundedResidualOverlapMazeCandidate(
       penaltyEdges: edges,
       penaltyEdgeIndex: movingEdgeIndex,
       gridNodes,
+      terminalCaps: preserveTerminalCaps ? {
+        startPredecessor: movingPath[0],
+        endSuccessor: movingPath[movingPath.length - 1],
+      } : undefined,
       diagnostics: options.diagnostics,
     },
   );

@@ -2,7 +2,10 @@ import type { Edge, Node } from '@xyflow/react';
 import { buildEndpointOrthogonalFallbackPath, lockComputedPathOnEdge } from './shared/edgeFallbackPath';
 import { chooseCommercialSingleEdgeRouteCandidate } from './shared/edgeCommercialRouteGuard';
 import { repairSharedTrunkAwareObstacles } from './shared/edgeRoutingWaypointRefinement';
-import { asRoutingRecord, readManualHandleLocks } from './domainDagreEdgePreparationSupport';
+import {
+  edgeTerminalSideCanSwitch,
+  resolveEdgeTerminalHandleForSide,
+} from '../routing/utils/edgeTerminalPolicy';
 import { getEdgePath } from './shared/edgeRoutingPathGeometry';
 import { normalizeHandle } from '../routing/utils/handleUtils';
 
@@ -43,12 +46,13 @@ export const repairDomainLanePortRoutes = (edges: Edge[], nodes: Node[], maxPass
       const source = nodeById.get(edge.source);
       const target = nodeById.get(edge.target);
       if (!source || !target) continue;
-      const locks = readManualHandleLocks(asRoutingRecord(edge.data));
-      const sourceSides = locks.source && edge.sourceHandle ? [edge.sourceHandle] : SIDES;
-      const targetSides = locks.target && edge.targetHandle ? [edge.targetHandle] : SIDES;
+      const sourceSides = SIDES.filter(side => edgeTerminalSideCanSwitch(edge, 'source', side));
+      const targetSides = SIDES.filter(side => edgeTerminalSideCanSwitch(edge, 'target', side));
       const candidates: Edge[][] = [current];
-      for (const sourceHandle of sourceSides) {
-        for (const targetHandle of targetSides) {
+      for (const sourceSide of sourceSides) {
+        for (const targetSide of targetSides) {
+          const sourceHandle = resolveEdgeTerminalHandleForSide(edge, 'source', sourceSide);
+          const targetHandle = resolveEdgeTerminalHandleForSide(edge, 'target', targetSide);
           for (const stubLength of [56, 112, 168]) {
             const candidate = { ...edge, sourceHandle, targetHandle, data: { ...edge.data } };
             lockComputedPathOnEdge(candidate, buildEndpointOrthogonalFallbackPath({
@@ -60,8 +64,8 @@ export const repairDomainLanePortRoutes = (edges: Edge[], nodes: Node[], maxPass
             // into its node. Such a candidate cannot pass the final contract.
             if (
               path.length < 2
-              || !pointsOutward(path[0], path[1], sourceHandle)
-              || !pointsOutward(path[path.length - 1], path[path.length - 2], targetHandle)
+              || !pointsOutward(path[0], path[1], sourceSide)
+              || !pointsOutward(path[path.length - 1], path[path.length - 2], targetSide)
             ) continue;
             candidates.push(current.map((item, position) => position === index ? routed : item));
           }

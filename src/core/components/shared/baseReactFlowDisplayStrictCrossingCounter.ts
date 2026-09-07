@@ -1,6 +1,7 @@
 import type { DisplayPoint, DisplaySegment } from './baseReactFlowDisplayGeometry';
+import { isReadableOrthogonalCrossing, type CrossingSegment } from '../../routing/orthogonalCrossingPolicy';
 
-type Span = Readonly<{ fixed: number; min: number; max: number }>;
+type Span = Readonly<{ fixed: number; min: number; max: number; segment: CrossingSegment }>;
 export type DisplayStrictCrossingCounterMetrics = { candidateVisitCount: number };
 const EPS = 0.5;
 
@@ -17,8 +18,8 @@ const firstAbove = (spans: readonly Span[], value: number): number => {
 
 /**
  * Snapshot a caller-filtered set of blockers for a candidate search. Like the
- * standalone display scorer, this counts every supplied segment, including
- * related/self segments; filtering remains the caller's responsibility.
+ * standalone display scorer, this counts unresolved crossings for supplied
+ * segments, including related/self segments; edge filtering belongs to callers.
  * No route or user metadata is retained and no mutable input reference is cached.
  */
 export const createDisplayStrictCrossingCounter = (
@@ -34,7 +35,9 @@ export const createDisplayStrictCrossingCounter = (
     // NaN can never satisfy the original strict comparisons, and must not
     // poison the sorted coordinate index. Infinite bounds retain old semantics.
     if ([span.fixed, span.min, span.max].some(Number.isNaN)) continue;
-    (segment.axis === 'h' ? horizontal : vertical).push(span);
+    (segment.axis === 'h' ? horizontal : vertical).push({
+      ...span, segment: { a: { ...segment.a }, b: { ...segment.b } },
+    });
   }
   horizontal.sort((a, b) => a.fixed - b.fixed);
   vertical.sort((a, b) => a.fixed - b.fixed);
@@ -52,10 +55,12 @@ export const createDisplayStrictCrossingCounter = (
       const fixed = isHorizontal ? a.y : a.x;
       const min = (isHorizontal ? Math.min(a.x, b.x) : Math.min(a.y, b.y)) + EPS;
       const max = (isHorizontal ? Math.max(a.x, b.x) : Math.max(a.y, b.y)) - EPS;
+      const candidate = { a, b };
       for (let cursor = firstAbove(spans, min); cursor < spans.length && spans[cursor].fixed < max; cursor += 1) {
         if (metrics) metrics.candidateVisitCount += 1;
         const other = spans[cursor];
-        if (fixed > other.min + EPS && fixed < other.max - EPS) crossings += 1;
+        if (fixed > other.min + EPS && fixed < other.max - EPS
+          && !isReadableOrthogonalCrossing(candidate, other.segment)) crossings += 1;
       }
     }
     return crossings;

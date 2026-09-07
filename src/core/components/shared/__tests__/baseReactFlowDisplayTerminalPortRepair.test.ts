@@ -284,7 +284,7 @@ describe('baseReactFlowDisplayTerminalPortRepair', () => {
     );
   });
 
-  it('rejects an obstacle-only improvement that leaves the declared terminal axis invalid', () => {
+  it('repairs free terminal roles only when the resulting axes are attached and anchored', () => {
     const nodes: Node[] = [
       node('operation', 3495.6, 776.5, 216, 73),
       node('loading-handover', 4042.6, 1223, 130, 60),
@@ -323,7 +323,7 @@ describe('baseReactFlowDisplayTerminalPortRepair', () => {
     const repaired = repairAxisMismatchedTerminalsWithBoundedPortRoles(edges, nodes, 16);
     const repairedQuality = calculateEdgePathQualityScore(repaired);
 
-    expect(repaired[0]).toBe(loading);
+    expect(displayEdgesHaveNodeAnchoredTerminals([repaired[0]], nodes)).toBe(true);
     expect(
       countDisplayObstacleHits(repaired, nodes),
       JSON.stringify((repaired[0].data as any)?.computedPath, null, 2),

@@ -133,7 +133,7 @@ describe('baseReactFlowDisplayFinalHardContract', () => {
     expect(feedback?.targetHandle).not.toBe('right');
   });
 
-  it('moves a crossed short fan-out branch onto a safe same-source peer trunk', () => {
+  it('keeps a shorter fan-out branch when its remote crossings can be bridged', () => {
     const nodes: Node[] = [
       node('operation', 3997.65, 776.5, 319, 73),
       node('loading', 4651.65, 1223, 178, 60),
@@ -180,10 +180,10 @@ describe('baseReactFlowDisplayFinalHardContract', () => {
     expect(outcome.report.hardClean, JSON.stringify(outcome.report, null, 2)).toBe(true);
     expect(outcome.report.quality.strictCrossings).toBe(0);
     expect(outcome.report.obstacleHits).toBe(0);
-    expect(loading?.sourceHandle).toBe('right');
+    expect(loading?.sourceHandle).toBe('bottom');
+    expect(outcome.report.quality.bridgedCrossings).toBeGreaterThan(0);
     expect(loading?.data?.computedPath).toEqual([
-      { x: 4317, y: 850 }, { x: 4372, y: 850 },
-      { x: 4372, y: 1253 }, { x: 4651.65, y: 1253 },
+      { x: 4317, y: 850 }, { x: 4317, y: 1253 }, { x: 4652, y: 1253 },
     ]);
   });
 });

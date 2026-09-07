@@ -8,6 +8,23 @@ import {
 import { TEST_ROUTING_HARD_REPORT } from './displayRoutingRenderAuthorityTestFixture';
 
 describe('routing hard-report boundary', () => {
+  it('preserves crossing diagnostics in the immutable report and digest', () => {
+    const report = cloneRoutingHardReport({
+      ...TEST_ROUTING_HARD_REPORT,
+      quality: { ...TEST_ROUTING_HARD_REPORT.quality, bridgedCrossings: 3 },
+    });
+    if (!report) throw new Error('expected bridged-crossing report');
+    expect(report.quality.bridgedCrossings).toBe(3);
+    expect(computeDisplayRoutingHardReportDigest(report))
+      .not.toBe(computeDisplayRoutingHardReportDigest(TEST_ROUTING_HARD_REPORT));
+  });
+
+  it.each([-1, 0.5, NaN, Infinity, 1e20, '2', null, '<script>'])('rejects invalid crossing counts: %j', bridgedCrossings => {
+    expect(cloneRoutingHardReport({
+      ...TEST_ROUTING_HARD_REPORT,
+      quality: { ...TEST_ROUTING_HARD_REPORT.quality, bridgedCrossings },
+    })).toBeNull();
+  });
   it('copies and deeply freezes the bounded aggregate report', () => {
     const source = {
       ...TEST_ROUTING_HARD_REPORT,
