@@ -282,10 +282,10 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
     let labelY = manualLabelPosition?.y ?? initialLabelPosition.y;
 
     const labelOffset = readPoint(edgeData?.labelOffset);
-    const hasManualLabelPosition = !!labelOffset
-        || !!manualLabelPosition
+    const hasFixedLabelPosition = !!manualLabelPosition
         || (typeof edgeData?.absoluteLabelX === 'number' && Number.isFinite(edgeData.absoluteLabelX))
         || (typeof edgeData?.absoluteLabelY === 'number' && Number.isFinite(edgeData.absoluteLabelY));
+    const hasManualLabelPosition = !!labelOffset || hasFixedLabelPosition;
 
     if (labelOffset) {
         labelX += Number(labelOffset.x) || 0;
@@ -323,7 +323,9 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
         text: label ? String(label) : '',
         size: labelSize,
         scale: labelScale,
-        manual: hasManualLabelPosition,
+        // Relative offsets remain saved in diagram coordinates. Readability
+        // scaling may reflow their text; fixed absolute positions stay pinned.
+        manual: hasFixedLabelPosition || (!!labelOffset && labelScale <= 1),
         obstacles: labelObstacles,
     });
     if (labelPlacement) {
