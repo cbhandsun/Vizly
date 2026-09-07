@@ -1,7 +1,7 @@
 type Viewport = { x: number; y: number; zoom: number };
 
 import { isUsablePersistedDiagramViewport } from '../../utils/viewportPersistence';
-import { MAX_EDGE_LABEL_SCALE, MIN_READABLE_EDGE_LABEL_ZOOM } from '../../rendering/edgeLabelScale';
+import { resolveEdgeLabelScale } from '../../rendering/edgeLabelScale';
 
 type ReactFlowViewportInstance = {
   setViewport: (viewport: Viewport) => void;
@@ -27,10 +27,7 @@ export const resolveBaseReactFlowContainerClassName = ({
   isLayoutStable ? '' : 'vizly-layout-committing',
 ].filter(Boolean).join(' ');
 
-export const resolveBaseReactFlowEdgeLabelScale = (zoom: number): number => {
-  if (!Number.isFinite(zoom) || zoom <= 0) return 1;
-  return Math.min(MAX_EDGE_LABEL_SCALE, Math.max(1, MIN_READABLE_EDGE_LABEL_ZOOM / zoom));
-};
+export const resolveBaseReactFlowEdgeLabelScale = resolveEdgeLabelScale;
 
 export const syncBaseReactFlowZoomClass = ({
   container,

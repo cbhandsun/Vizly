@@ -12,6 +12,7 @@ export interface DiagramFitSafeArea {
 }
 
 export interface DiagramFitViewportInput {
+  labelMeasurements?: readonly DiagramFitLabelMeasurement[];
   bounds: {
     minX: number;
     minY: number;
@@ -28,6 +29,14 @@ export interface DiagramFitViewport {
   x: number;
   y: number;
   zoom: number;
+}
+
+export interface DiagramFitLabelMeasurement {
+  centerX: number;
+  centerY: number;
+  width: number;
+  height: number;
+  readabilityScaled: boolean;
 }
 
 export interface DiagramFitLayout {

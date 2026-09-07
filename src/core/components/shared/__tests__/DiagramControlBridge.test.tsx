@@ -100,7 +100,7 @@ describe('DiagramControlBridge layout commit fit', () => {
     await expect(result).resolves.toBe('applied');
   });
 
-  it('remeasures a retained label after target zoom changes its semantic scale', async () => {
+  it('fits retained labels using their target zoom dimensions without another paint correction', async () => {
     const container = document.createElement('div');
     container.id = 'diagram-label-fit';
     container.className = 'react-flow';
@@ -128,10 +128,8 @@ describe('DiagramControlBridge layout commit fit', () => {
     await waitFor(() => expect(harness.setViewport).toHaveBeenCalledTimes(1));
     await act(async () => { frames.shift()?.(0); });
     await act(async () => { frames.shift()?.(16); });
-    await waitFor(() => expect(harness.setViewport).toHaveBeenCalledTimes(2));
-    await act(async () => { frames.shift()?.(32); });
-    await act(async () => { frames.shift()?.(48); });
     await expect(result).resolves.toBe('applied');
+    expect(harness.setViewport).toHaveBeenCalledOnce();
     expect(label.getBoundingClientRect().right).toBeLessThanOrEqual(1280 - 60 - 8);
   });
 
