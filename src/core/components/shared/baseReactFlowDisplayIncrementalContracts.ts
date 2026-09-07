@@ -1,8 +1,12 @@
 import type { Edge, Node } from '@xyflow/react';
 
-import { COMMERCIAL_BUSINESS_NODE_CLEARANCE } from '../../strategies/shared/edgeBusinessNodeClearanceRepair';
+import {
+  COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+  repairBusinessNodeClearanceRisks,
+} from '../../strategies/shared/edgeBusinessNodeClearanceRepair';
 import { createNodeClearanceEvaluationContext } from '../../strategies/shared/edgeWaypointCandidateRepair';
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
+import { lockFinalDisplayComputedPaths } from './baseReactFlowDisplayEdgeConversions';
 import { getDisplayComputedPath } from './baseReactFlowDisplayGeometry';
 import type { BaseReactFlowRoutingChangeSet } from './baseReactFlowDisplayRoutingChangeSet';
 
@@ -71,6 +75,46 @@ export const preservesBaseReactFlowIncrementalBoundary = (
     mutableIds.has(edge.id) || edge === baselineEdges[index]
   ))
 );
+
+/** Lock only the transaction's mutable routes. Frozen precompiled edges may
+ * omit runtime lock flags; materializing those flags would replace their
+ * identities and invalidate an otherwise legal incremental candidate.
+ * Preserve the candidate's frozen entries so boundary checks still detect
+ * any unauthorized changes made before this step.
+ */
+export const lockBaseReactFlowIncrementalComputedPaths = (
+  edges: Edge[],
+  nodes: Node[],
+  mutableIds: ReadonlySet<string>,
+): Edge[] => {
+  const mutableEdges = edges.filter(edge => mutableIds.has(edge.id));
+  if (mutableEdges.length === 0) return edges;
+  const lockedById = new Map(
+    lockFinalDisplayComputedPaths(mutableEdges, nodes).map(edge => [edge.id, edge]),
+  );
+  return edges.map(edge => lockedById.get(edge.id) ?? edge);
+};
+
+export const repairBaseReactFlowIncrementalClearance = ({
+  edges, nodes, baselineEdges, mutableIds, clearanceIds, hardReport,
+}: {
+  edges: Edge[];
+  nodes: Node[];
+  baselineEdges: Edge[];
+  mutableIds: ReadonlySet<string>;
+  clearanceIds: ReadonlySet<string>;
+  hardReport: (edges: Edge[]) => BaseDisplayBoundedCandidateReport;
+}): Edge[] => repairBusinessNodeClearanceRisks(edges, nodes, {
+  eligibleEdgeIds: clearanceIds,
+  minimumClearance: COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+  validateCandidate: ({ candidateEdges }) => {
+    if (!preservesBaseReactFlowIncrementalBoundary(baselineEdges, candidateEdges, mutableIds)) {
+      return false;
+    }
+    const report = hardReport(candidateEdges);
+    return report.hardClean || baseReactFlowReportHasOnlyStrictDefects(report);
+  },
+});
 
 export const baseReactFlowIncrementalEdgesHaveNodeClearance = (
   edges: readonly Edge[],

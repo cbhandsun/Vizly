@@ -46,6 +46,10 @@ export const finalizeDisplayWorkerIncrementalCandidate = ({
     affectedEdgeCount: incremental.affectedEdgeCount,
     fallbackLevel: 'none',
   }, eligibleEdgeIds);
+  if (response.hardClean !== true) {
+    timer.finish('fallback', 0);
+    return null;
+  }
   if (!displayIncrementalCandidateRequiresTopologyCommitGate(request.changeSet.classification)) {
     return finishDisplayWorkerFinalization(timer, response, 0);
   }

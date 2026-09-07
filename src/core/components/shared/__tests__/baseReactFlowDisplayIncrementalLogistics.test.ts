@@ -174,6 +174,21 @@ describe('Logistics incremental display routing', () => {
     );
     expect(report?.hardClean, diagnostics).toBe(true);
     expect(response.hardReport, diagnostics).toEqual(report);
+    if (!response.edges) throw new Error('expected the incremental route edges');
+    const responseById = new Map(response.edges.map(edge => [edge.id, edge]));
+    for (const baselineEdge of baselineEdges) {
+      const responseEdge = responseById.get(baselineEdge.id);
+      if (!responseEdge) throw new Error('expected every baseline edge to remain present');
+      if (affectedClosure.mutableEdgeIds.includes(baselineEdge.id)) {
+        expect(createNodeClearanceEvaluationContext(nextNodes, responseEdge).score(
+          getDisplayComputedPath(responseEdge), COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+        ), diagnostics).toBeLessThanOrEqual(0.5);
+      } else {
+        expect(doBaseReactFlowDisplayRoutesMatchExactly(
+          [baselineEdge], [responseEdge],
+        ), diagnostics).toBe(true);
+      }
+    }
     const reconnectCandidateTrace = response.phaseTrace?.find(
       trace => trace.phase === 'local-reconnect-candidates',
     );
