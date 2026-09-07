@@ -16,6 +16,7 @@ import {
   productionChunkFileNames,
 } from '../../../../vite-plugins/buildChunkGroups';
 import { minifyLocaleJsonAsset } from '../../../../vite-plugins/minifyLocaleAssets';
+import { assertDisplayWorkerChunkIsolation } from '../../../../vite-plugins/displayWorkerChunkIsolation';
 import {
   classifyDisplayRoutingChunkGraph,
   createDisplayRoutingChunkClassifier,
@@ -24,6 +25,71 @@ import {
 
 const displayWorkerId = 'C:\\repo\\src\\core\\components\\shared\\baseReactFlowDisplayEdges.worker.ts';
 const appEntryId = 'C:/repo/src/main.tsx';
+
+describe('emitted display Worker isolation', () => {
+  const chunk = (fileName: string, imports: string[] = [], modules: string[] = []) => ({
+    fileName,
+    facadeModuleId: fileName === 'worker.js' ? displayWorkerId : null,
+    imports,
+    modules: Object.fromEntries(modules.map(id => [id, { renderedLength: 100 }])),
+  });
+
+  it('allows shared routing chunks and cycles without reaching unrelated UI entries', () => {
+    expect(() => assertDisplayWorkerChunkIsolation([
+      chunk('worker.js', ['routing.js']),
+      chunk('routing.js', ['neutral.js']),
+      chunk('neutral.js', ['routing.js'], ['C:/repo/src/core/routing/persistedRoutingCandidate.ts']),
+      chunk('ui.js', [], ['C:/repo/node_modules/react/index.js']),
+    ])).not.toThrow();
+  });
+
+  it.each([
+    'react/index.js', 'react-dom/client.js', 'antd/es/index.js',
+    '@ant-design/cssinjs/es/index.js', '@rc-component/util/es/index.js', 'rc-util/es/index.js',
+  ])('rejects a parser co-located with %s in a transitive chunk', modulePath => {
+    const id = `C:\\repo\\node_modules\\${modulePath.replaceAll('/', '\\')}?commonjs-proxy`;
+    expect(() => assertDisplayWorkerChunkIsolation([
+      chunk('worker.js', ['routing.js']),
+      chunk('routing.js', ['runtime.js']),
+      chunk('runtime.js', [], ['C:/repo/src/core/routing/persistedRoutingCandidate.ts', id]),
+    ])).toThrow('Display Worker imports UI runtime in runtime.js');
+  });
+
+  it('ignores fully tree-shaken UI modules while checking remaining code', () => {
+    const removed = chunk('shared.js');
+    removed.modules['C:/repo/node_modules/react/index.js'] = { renderedLength: 0 };
+    expect(() => assertDisplayWorkerChunkIsolation([
+      chunk('worker.js', ['shared.js']), removed,
+    ])).not.toThrow();
+  });
+
+  it('rejects missing entries, duplicate names, and unresolved static imports', () => {
+    expect(() => assertDisplayWorkerChunkIsolation([])).toThrow('found 0');
+    expect(() => assertDisplayWorkerChunkIsolation([
+      chunk('worker.js'), { ...chunk('second.js'), facadeModuleId: displayWorkerId },
+    ])).toThrow('found 2');
+    expect(() => assertDisplayWorkerChunkIsolation([
+      chunk('worker.js'), chunk('shared.js'), chunk('shared.js'),
+    ])).toThrow('duplicate chunk names');
+    expect(() => assertDisplayWorkerChunkIsolation([
+      chunk('worker.js', ['missing.js']),
+    ])).toThrow('static import is missing: missing.js');
+  });
+
+  it('runs the isolation check from the production build hook', () => {
+    const hook = sharedModuleWorkersPlugin('C:/repo').generateBundle;
+    const disabledHook = sharedModuleWorkersPlugin('C:/repo', { displayWorker: false }).generateBundle;
+    if (typeof hook !== 'function' || typeof disabledHook !== 'function') {
+      throw new Error('generateBundle hook missing');
+    }
+    const bundle = {
+      worker: { type: 'chunk', ...chunk('worker.js', ['ui.js']) },
+      ui: { type: 'chunk', ...chunk('ui.js', [], ['C:/repo/node_modules/react/index.js']) },
+    };
+    expect(() => Reflect.apply(hook, {}, [{}, bundle, false])).toThrow('imports UI runtime');
+    expect(() => Reflect.apply(disabledHook, {}, [{}, {}, false])).not.toThrow();
+  });
+});
 
 const classifyGraph = (
   graph: Map<string, ChunkGraphModuleInfo | null>,
@@ -201,6 +267,9 @@ describe('sharedModuleWorkers Vite plugin', () => {
       'C:/repo/src/core/config/DiagramConfigDefaults.ts',
       'C:/repo/src/core/config/DiagramConfigManager.ts',
       'C:/repo/src/core/routing/routingVersion.ts',
+      'C:/repo/src/core/routing/persistedRoutingCandidate.ts',
+      'C:/repo/src/core/routing/routingLineHops.ts',
+      'C:/repo/src/core/routing/routingBoundaryLimits.ts',
       'C:/repo/src/core/routing/utils/handleUtils.ts',
       'C:/repo/src/core/types/flow.ts',
       'C:/repo/src/core/utils/boundedResponse.ts',

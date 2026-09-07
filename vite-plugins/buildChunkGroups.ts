@@ -25,6 +25,10 @@ const DISPLAY_ROUTING_NEUTRAL_MODULES = new Set([
   '/src/core/config/DiagramConfigDefaults.ts',
   '/src/core/config/DiagramConfigManager.ts',
   '/src/core/routing/routingVersion.ts',
+  // Clipboard consumers must not co-locate these Worker parsers with UI code.
+  '/src/core/routing/persistedRoutingCandidate.ts',
+  '/src/core/routing/routingLineHops.ts',
+  '/src/core/routing/routingBoundaryLimits.ts',
   '/src/core/routing/utils/handleUtils.ts',
   '/src/core/types/flow.ts',
   '/src/core/utils/boundedResponse.ts',
