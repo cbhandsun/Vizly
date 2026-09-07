@@ -38,3 +38,19 @@ export const assertDisplayWorkerChunkIsolation = (chunks: readonly DisplayWorker
     pending.push(...chunk.imports);
   }
 };
+
+/** Runs inside Vite's independent display Worker build, before assets are emitted. */
+export const displayWorkerChunkIsolationPlugin = (): Plugin => ({
+  name: 'vizly:display-worker-chunk-isolation',
+  apply: 'build',
+  generateBundle(_options, bundle) {
+    const chunks = Object.values(bundle).filter(chunk => chunk.type === 'chunk');
+    assertDisplayWorkerChunkIsolation(chunks);
+    const entry = chunks.find(chunk => chunk.facadeModuleId !== null
+      && normalizeModuleId(chunk.facadeModuleId).endsWith(WORKER_ENTRY_SUFFIX));
+    if (!entry || entry.imports.length > 0) {
+      throw new Error('Display Worker cold startup requires a self-contained entry without static imports');
+    }
+  },
+});
+import type { Plugin } from 'vite';

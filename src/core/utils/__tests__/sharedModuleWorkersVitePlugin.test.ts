@@ -16,7 +16,7 @@ import {
   productionChunkFileNames,
 } from '../../../../vite-plugins/buildChunkGroups';
 import { minifyLocaleJsonAsset } from '../../../../vite-plugins/minifyLocaleAssets';
-import { assertDisplayWorkerChunkIsolation } from '../../../../vite-plugins/displayWorkerChunkIsolation';
+import { assertDisplayWorkerChunkIsolation, displayWorkerChunkIsolationPlugin } from '../../../../vite-plugins/displayWorkerChunkIsolation';
 import {
   classifyDisplayRoutingChunkGraph,
   createDisplayRoutingChunkClassifier,
@@ -32,6 +32,34 @@ describe('emitted display Worker isolation', () => {
     facadeModuleId: fileName === 'worker.js' ? displayWorkerId : null,
     imports,
     modules: Object.fromEntries(modules.map(id => [id, { renderedLength: 100 }])),
+  });
+
+  it('guards the native Worker build against static fetch chains and UI dependencies', () => {
+    const plugin = displayWorkerChunkIsolationPlugin();
+    const hook = plugin.generateBundle;
+    if (typeof hook !== 'function') throw new Error('generateBundle hook missing');
+    const invoke = (bundle: unknown) => Reflect.apply(hook, {}, [{}, bundle, false]);
+    const worker = { type: 'chunk', ...chunk('worker.js') };
+    expect(() => invoke({ worker })).not.toThrow();
+    expect(() => invoke({})).toThrow('found 0');
+    expect(() => invoke({
+      worker: { ...worker, imports: ['routing.js'] },
+      routing: { type: 'chunk', ...chunk('routing.js') },
+    })).toThrow('self-contained entry without static imports');
+    expect(() => invoke({ worker: {
+      type: 'chunk', ...chunk('worker.js', [], ['C:/repo/node_modules/react/index.js']),
+    } })).toThrow('imports UI runtime');
+    expect(plugin.apply).toBe('build');
+  });
+
+  it('installs isolation in the native Worker build while retaining lazy creation', () => {
+    const config = readFileSync(resolve(process.cwd(), 'vite.config.ts'), 'utf8');
+    expect(config).toContain('plugins: () => [elkWorkerAssetPlugin(projectRoot), displayWorkerChunkIsolationPlugin()]');
+    expect(config).not.toContain('sharedModuleWorkersPlugin(projectRoot)');
+    expect(config).not.toContain('displayRoutingChunks.plugin');
+    const client = readFileSync(resolve(process.cwd(),
+      'src/core/components/shared/baseReactFlowDisplayWorkerClient.ts'), 'utf8');
+    expect(client).toContain("new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', import.meta.url)");
   });
 
   it('allows shared routing chunks and cycles without reaching unrelated UI entries', () => {
