@@ -148,6 +148,7 @@ export const arrangeEdgeLabels = (inputs: readonly EdgeLabelArrangementInput[]):
   for (const input of labels) {
     let best: EdgeLabelPlacement | undefined;
     let bestCost = Infinity;
+    let bestContentConflicts = Infinity;
     // Search obstacle-adjacent intervals only when the cheaper fixed anchors
     // cannot place this label. Keep the same collision checks and manual intent.
     for (const obstacleBoundaries of [false, true]) {
@@ -167,9 +168,13 @@ export const arrangeEdgeLabels = (inputs: readonly EdgeLabelArrangementInput[]):
         )).length;
         const conflicts = nodeConflicts + labelConflicts + terminalConflicts + pathConflicts
           + Number(Boolean(blockedLeader)) + leaderLabelConflicts;
+        // Never trade covered text or a business node for fewer line crossings.
+        // Remaining line/leader conflicts still report an unresolved placement.
+        const contentConflicts = nodeConflicts + labelConflicts;
         const cost = conflicts * 1_000_000 + distance(center, input.preferredCenter)
           + distance(anchor, input.anchor) * 0.25;
-        if (cost < bestCost) {
+        if (contentConflicts < bestContentConflicts || (contentConflicts === bestContentConflicts && cost < bestCost)) {
+          bestContentConflicts = contentConflicts;
           bestCost = cost;
           best = { center, rect, anchor, leaderEnd: blockedLeader ? undefined : end,
             status: input.manual ? 'manual' : conflicts ? 'unresolved' : 'placed', conflicts };

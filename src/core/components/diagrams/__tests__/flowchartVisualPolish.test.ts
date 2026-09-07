@@ -90,19 +90,18 @@ describe('flowchart visual polish stylesheet', () => {
         );
     });
 
-    it('applies a low-zoom label budget with explicit main-route and trace restoration', () => {
+    it('keeps initial overview labels and their leaders visible without hovering an edge', () => {
         const legacyStylesheet = readRelativeFile('../FlowchartDesigner.css');
+        const polishStylesheet = readRelativeFile('../FlowchartVisualPolish.css');
 
-        expect(legacyStylesheet).toContain('.diagram-zoomed-out .stable-path-edge-label');
-        expect(legacyStylesheet).toContain('.diagram-zoomed-out .vizly-edge-label');
         expect(legacyStylesheet).not.toMatch(
             /\.diagram-zoomed-out \.react-flow__edge-path\s*\{[^}]*stroke-dasharray:\s*none/s,
         );
-        expect(legacyStylesheet).toContain('.stable-path-edge-label--primary');
-        expect(legacyStylesheet).toContain('.stable-path-edge-label--trace-active');
-        expect(legacyStylesheet).toMatch(
-            /\.diagram-zoomed-out \.stable-path-edge-label:is\([\s\S]*?:focus-visible[\s\S]*?\)\s*\{[^}]*display:\s*block\s*!important;/s,
-        );
+        for (const stylesheet of [legacyStylesheet, polishStylesheet]) {
+            expect(stylesheet).not.toMatch(
+                /\.diagram-zoomed-out[^{}]*\.(?:stable-path-edge-label|vizly-edge-label|edge-label-container|react-flow__edge-text)[^{}]*\{[^}]*display:\s*none/s,
+            );
+        }
     });
 
     it('gives hover, selection, and focus a non-color trace hierarchy', () => {

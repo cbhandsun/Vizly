@@ -248,7 +248,6 @@ const auditFinalSvg = async (session, route, label) => {
     expectedSignature: route.routing.outputRouteSignature,
     expectedEdgeCount: route.response.edges.length,
     expectedLabelCount: null,
-    requireOverviewPrimaryLabel: false,
   });
   return {
     obstacleHits: audit.intersections.length,

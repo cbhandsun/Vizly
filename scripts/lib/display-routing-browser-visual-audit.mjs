@@ -5,7 +5,6 @@ export const assertDisplayRoutingVisualScaleAudit = ({
   expectedZoom = null,
   expectedEdgeCount = 14,
   expectedLabelCount = expectedEdgeCount,
-  requireOverviewPrimaryLabel = true,
 }) => {
   const expectsOverviewLod = audit?.zoom < 0.4;
   const invalid = !audit
@@ -33,12 +32,8 @@ export const assertDisplayRoutingVisualScaleAudit = ({
     || audit.scannedNodeCount < 1
     || audit.labelLabelOverlapCount !== 0
     || audit.labelNodeOverlapCount !== 0
-    || (expectsOverviewLod
-      ? (!audit.zoomedOut
-        || (requireOverviewPrimaryLabel && audit.visiblePrimaryLabelCount < 1)
-        || (audit.activeTraceEdgeCount === 0 && audit.visibleDetailLabelCount !== 0)
-        || audit.visibleDetailLabelCount > audit.activeTraceEdgeCount)
-      : (audit.zoomedOut || audit.visibleLabelCount !== audit.labelCount))
+    || audit.zoomedOut !== expectsOverviewLod
+    || audit.visibleLabelCount !== audit.labelCount
     || (audit.visibleLabelCount > 0 && (
       !Number.isFinite(audit.minimumVisibleLabelHeight)
       || audit.minimumVisibleLabelHeight < 9
@@ -136,6 +131,8 @@ export const assertDisplayRoutingVisualScaleAudit = ({
       visibleLabelCount: audit?.visibleLabelCount,
       visiblePrimaryLabelCount: audit?.visiblePrimaryLabelCount,
       visibleDetailLabelCount: audit?.visibleDetailLabelCount,
+      minimumVisibleLabelHeight: audit?.minimumVisibleLabelHeight,
+      maximumVisibleLabelHeight: audit?.maximumVisibleLabelHeight,
       invalidVisibleLabelFontSizeCount: audit?.invalidVisibleLabelFontSizeCount,
     };
     throw new Error(`Fixed visual scale audit failed at ${name}: ${JSON.stringify(summary)}`);

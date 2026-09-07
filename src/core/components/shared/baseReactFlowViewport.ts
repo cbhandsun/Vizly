@@ -1,15 +1,13 @@
 type Viewport = { x: number; y: number; zoom: number };
 
 import { isUsablePersistedDiagramViewport } from '../../utils/viewportPersistence';
+import { MAX_EDGE_LABEL_SCALE, MIN_READABLE_EDGE_LABEL_ZOOM } from '../../rendering/edgeLabelScale';
 
 type ReactFlowViewportInstance = {
   setViewport: (viewport: Viewport) => void;
 };
 
 export type BaseReactFlowInitialFitMode = 'fitWidthTop' | 'fitAll' | 'none' | 'restoreOrFitAll';
-
-const MIN_READABLE_EDGE_LABEL_ZOOM = 0.72;
-const MAX_EDGE_LABEL_SCALE = 2.4;
 
 export const isBaseReactFlowZoomedOut = (viewport: Viewport): boolean => (
   Number.isFinite(viewport.zoom) && viewport.zoom < 0.4
