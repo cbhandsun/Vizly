@@ -59,7 +59,9 @@ vi.mock('@xyflow/react', async () => {
       'data-interaction-width': interactionWidth,
       style,
     }),
-    EdgeLabelRenderer: ({ children }: { children: React.ReactNode }) => ReactModule.createElement(ReactModule.Fragment, null, children),
+    // Match the real HTML label portal's namespace so DOM size mocks measure
+    // HTML elements, rather than creating an unmeasurable SVG <div>.
+    EdgeLabelRenderer: ({ children }: { children: React.ReactNode }) => ReactModule.createElement('foreignObject', null, children),
     useStore: (selector: (state: typeof reactFlowStoreMock) => unknown) => selector(reactFlowStoreMock),
     useStoreApi: () => ReactModule.useMemo(() => ({ getState: getStateMock }), []),
   };
@@ -478,10 +480,15 @@ describe('StablePathEdge', () => {
       {createStablePathEdgeElement(props)}
     </EdgeLabelObstacleContext.Provider>;
     try {
-      reactFlowStoreMock.transform = [0, 0, 0.15];
+      reactFlowStoreMock.transform = [0, 0, 0.65];
       const view = render(element());
       await act(async () => { await Promise.resolve(); });
       const label = screen.getByText('Saved offset');
+      expect(label).toBeInstanceOf(HTMLDivElement);
+      expect(label.style.transform).toContain('translate(92px,6px)');
+      reactFlowStoreMock.transform = [0, 0, 0.15];
+      view.rerender(element());
+      await act(async () => { await Promise.resolve(); });
       const match = label.style.transform.match(/translate\((-?[\d.]+)px,(-?[\d.]+)px\)/);
       expect(match).not.toBeNull();
       const scale = resolveBaseReactFlowEdgeLabelScale(0.15);

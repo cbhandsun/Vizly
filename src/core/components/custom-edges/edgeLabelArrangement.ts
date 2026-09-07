@@ -11,6 +11,7 @@ export interface EdgeLabelArrangementInput {
   size?: EdgeLabelSize;
   scale: number;
   manual: boolean;
+  allowManualReflow?: boolean;
   obstacles: readonly Rect[];
 }
 
@@ -127,7 +128,7 @@ const candidatesFor = (input: EdgeLabelArrangementInput, obstacleBoundaries = fa
 };
 
 /** Bounded deterministic greedy packing. It never modifies routes or hides text.
- * Manual labels reserve space first; automatic labels use up to eight nearby
+ * Fixed manual labels reserve space first; automatic labels use up to eight nearby
  * semantic segments and a 320px retreat. If fixed anchors fail, each segment
  * also tries eight nearby obstacle-boundary centers within a 320px along-axis
  * retreat. Their leaders stay on the semantic path. Exhaustion is unresolved,
@@ -143,17 +144,27 @@ export const arrangeEdgeLabels = (inputs: readonly EdgeLabelArrangementInput[]):
     .map(point => ({ x: point.x - 12, y: point.y - 12, width: 24, height: 24 }));
   const result = new Map<string, EdgeLabelPlacement>();
   const occupied: EdgeLabelPlacement[] = [];
-  const labels = valid.filter(input => input.text).sort((a, b) => Number(b.manual) - Number(a.manual)
+  const labels = valid.filter(input => input.text).sort((a, b) => (
+    Number(b.manual && !b.allowManualReflow) - Number(a.manual && !a.allowManualReflow)
+  ) || Number(b.manual) - Number(a.manual)
     || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   for (const input of labels) {
+    const preferredRect = estimateEdgeLabelRect(input.preferredCenter, input.text, input.scale, input.size);
+    // Only a readability-scaled relative offset may leave its saved position,
+    // and only when that position would cover content. Its input stays intact.
+    const reflowManual = input.manual && input.allowManualReflow === true && (
+      nodes.some(node => edgeLabelRectsConflict(preferredRect, node, 10))
+      || occupied.some(other => edgeLabelRectsConflict(preferredRect, other.rect))
+    );
+    const searchInput = reflowManual ? { ...input, manual: false } : input;
     let best: EdgeLabelPlacement | undefined;
     let bestCost = Infinity;
     let bestContentConflicts = Infinity;
     // Search obstacle-adjacent intervals only when the cheaper fixed anchors
     // cannot place this label. Keep the same collision checks and manual intent.
     for (const obstacleBoundaries of [false, true]) {
-      if (obstacleBoundaries && (input.manual || best?.conflicts === 0)) break;
-      for (const center of candidatesFor(input, obstacleBoundaries)) {
+      if (obstacleBoundaries && (searchInput.manual || best?.conflicts === 0)) break;
+      for (const center of candidatesFor(searchInput, obstacleBoundaries)) {
         const rect = estimateEdgeLabelRect(center, input.text, input.scale, input.size);
         const anchor = nearestAnchor(center, input.labelPath);
         const end = leaderEnd(anchor, center, rect);
@@ -177,7 +188,7 @@ export const arrangeEdgeLabels = (inputs: readonly EdgeLabelArrangementInput[]):
           bestContentConflicts = contentConflicts;
           bestCost = cost;
           best = { center, rect, anchor, leaderEnd: blockedLeader ? undefined : end,
-            status: input.manual ? 'manual' : conflicts ? 'unresolved' : 'placed', conflicts };
+            status: searchInput.manual ? 'manual' : conflicts ? 'unresolved' : 'placed', conflicts };
         }
         if (conflicts === 0 && distance(center, input.preferredCenter) < 0.01) break;
       }

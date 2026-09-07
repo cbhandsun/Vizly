@@ -112,6 +112,24 @@ describe('global edge label arrangement regression', () => {
     expect(a && z && edgeLabelRectsConflict(a.rect, z.rect)).toBe(false);
   });
 
+  it('keeps a safe scaled relative offset fixed even when its text crosses a line', () => {
+    const entry = { ...input('safe'), preferredCenter: { x: 150, y: 0 }, scale: 4.8,
+      manual: true, allowManualReflow: true };
+    expect(arrangeEdgeLabels([entry]).get(entry.id)?.center).toEqual(entry.preferredCenter);
+  });
+
+  it('reflows an obstructed relative offset around a fixed absolute label without mutating either anchor', () => {
+    const fixed = { ...input('z'), manual: true };
+    const relative = { ...input('a'), manual: true, allowManualReflow: true, scale: 4.8 };
+    const before = structuredClone([relative, fixed]);
+    const plan = arrangeEdgeLabels([relative, fixed]);
+    const moved = plan.get('a');
+    const pinned = plan.get('z');
+    expect(pinned?.center).toEqual(fixed.preferredCenter);
+    expect(moved && pinned && edgeLabelRectsConflict(moved.rect, pinned.rect, 0)).toBe(false);
+    expect([relative, fixed]).toEqual(before);
+  });
+
   it('avoids nodes and arrow clearance and never draws a leader through nodes', () => {
     const nodes = [{ x: 90, y: 25, width: 120, height: 80 }];
     const result = arrangeEdgeLabels([{ ...input('a'), obstacles: nodes }]).get('a');

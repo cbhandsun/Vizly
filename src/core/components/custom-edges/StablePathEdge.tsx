@@ -323,9 +323,10 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
         text: label ? String(label) : '',
         size: labelSize,
         scale: labelScale,
-        // Relative offsets remain saved in diagram coordinates. Readability
-        // scaling may reflow their text; fixed absolute positions stay pinned.
-        manual: hasFixedLabelPosition || (!!labelOffset && labelScale <= 1),
+        manual: hasManualLabelPosition,
+        // Keep safe saved offsets fixed; reflow enlarged text only if it covers
+        // content. Explicit absolute positions stay pinned at every zoom.
+        allowManualReflow: !!labelOffset && !hasFixedLabelPosition && labelScale > 1,
         obstacles: labelObstacles,
     });
     if (labelPlacement) {
