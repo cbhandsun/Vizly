@@ -1,5 +1,5 @@
 import type { Edge } from '@xyflow/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   shouldMaterializeDetachedMicroAlternative,
@@ -21,6 +21,117 @@ import {
 } from '../baseReactFlowDisplayChangedEdgePromotion';
 import { createDisplayQualityGlobalRefineSession } from '../baseReactFlowDisplayQualityGlobalRefine';
 import { repairBaseReactFlowQualityStructuralCrossings } from '../baseReactFlowDisplayQualityStructuralCrossing';
+import { tryDisplayQualityEarlyClosure } from '../baseReactFlowDisplayQualityEarlyClosure';
+import * as skirtRepair from '../baseReactFlowDisplayCrossedSpineSkirtRepair';
+import * as postRender from '../baseReactFlowDisplayFullRoutePostRenderPhase';
+import * as stubRepair from '../baseReactFlowDisplayEndpointStubRepair';
+import { createBaseReactFlowFinalEndpointEvaluation } from '../baseReactFlowDisplayFinalEndpointEvaluation';
+import { resolveDisplayQualityBudget } from '../baseReactFlowDisplayEvaluation';
+import { createDisplayRoutingTopologyPlan } from '../baseReactFlowDisplayRoutingTopologyPlan';
+import type { BaseReactFlowFullRouteContext } from '../baseReactFlowDisplayFullRouteTypes';
+
+describe('tryDisplayQualityEarlyClosure', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const fixture = () => {
+    const edges: Edge[] = [{ id: 'edge', source: 'source', target: 'target',
+      sourceHandle: 'bottom', targetHandle: 'top',
+      data: { computedPath: [{ x: 50, y: 60 }, { x: 50, y: 200 }] } }];
+    const nodes = [
+      { id: 'source', position: { x: 0, y: 0 }, width: 100, height: 60, data: {} },
+      { id: 'target', position: { x: 0, y: 200 }, width: 100, height: 60, data: {} },
+    ];
+    const evaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
+    const cleanReport = evaluation.hardReport(edges);
+    const crossedReport = { ...cleanReport, hardClean: false,
+      quality: { ...cleanReport.quality, strictCrossings: 2 } };
+    const report = vi.spyOn(evaluation, 'hardReport')
+      .mockImplementation(candidate => candidate === edges ? crossedReport : cleanReport);
+    const context: BaseReactFlowFullRouteContext = {
+      inputSignature: 'test', routeSeedEdges: edges, normalizedEdges: edges,
+      repairNodes: nodes, renderNodes: nodes, enableSmartEdges: true,
+      smartEdgePadding: 20, isLargeGraph: false, layoutDirection: 'TB',
+      qualityBudget: resolveDisplayQualityBudget(edges, nodes, false, true),
+      useBoundedLargeRepair: false, canReusePreparedGlobalRouting: false,
+      reusePreparedGlobalRouting: false, evaluationSession: evaluation,
+      topologyPlan: createDisplayRoutingTopologyPlan(nodes, edges), onPhaseTrace: vi.fn(),
+    };
+    const skirt = structuredClone(edges);
+    const closed = structuredClone(edges);
+    const repair = vi.spyOn(skirtRepair, 'repairCrossedSpineWithOuterSkirt').mockReturnValue(skirt);
+    const close = vi.spyOn(postRender, 'runBaseReactFlowFullRoutePostRenderPhase')
+      .mockReturnValue({ kind: 'finalized', edges: closed });
+    return { edges, skirt, closed, context, report, cleanReport, crossedReport, repair, close };
+  };
+
+  it('accepts a complete safe closure and reports its work once', () => {
+    const f = fixture();
+    const before = structuredClone(f.edges);
+    expect(tryDisplayQualityEarlyClosure(f.context, f.edges)).toBe(f.closed);
+    expect(f.edges).toEqual(before);
+    expect(f.close).toHaveBeenCalledTimes(1);
+    expect(f.context.onPhaseTrace).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      phase: 'quality-crossing-early-closure', resolution: 'accepted',
+    }));
+  });
+
+  it.each(['empty', 'large', 'bounded'] as const)('does not speculate for %s routes', mode => {
+    const f = fixture();
+    const edges = mode === 'empty' ? [] : mode === 'large'
+      ? Array.from({ length: 25 }, () => f.edges[0]) : f.edges;
+    expect(tryDisplayQualityEarlyClosure({ ...f.context, useBoundedLargeRepair: mode === 'bounded' }, edges))
+      .toBeNull();
+    expect(f.repair).not.toHaveBeenCalled();
+    expect(f.close).not.toHaveBeenCalled();
+  });
+
+  it('continues the original pipeline when there are obstacles or no crossed spine', () => {
+    const f = fixture();
+    f.report.mockReturnValue({ ...f.crossedReport, obstacleHits: 1 });
+    expect(tryDisplayQualityEarlyClosure(f.context, f.edges)).toBeNull();
+    f.report.mockReturnValue(f.cleanReport);
+    expect(tryDisplayQualityEarlyClosure(f.context, f.edges)).toBeNull();
+    expect(f.repair).not.toHaveBeenCalled();
+  });
+
+  it('does not run residual closure while the skirt leaves a strict crossing', () => {
+    const f = fixture();
+    f.report.mockReturnValue(f.crossedReport);
+    expect(tryDisplayQualityEarlyClosure(f.context, f.edges)).toBeNull();
+    expect(f.close).not.toHaveBeenCalled();
+  });
+
+  it.each(['empty', 'identity', 'invalid-path', 'hard-defect', 'unsafe-stub', 'commercial-bends'] as const)(
+    'rejects a %s candidate and leaves the original route available', failure => {
+      const f = fixture();
+      if (failure === 'empty') f.closed.length = 0;
+      if (failure === 'identity') f.closed[0].id = 'different';
+      if (failure === 'invalid-path') f.closed[0].data = { computedPath: [] };
+      if (failure === 'unsafe-stub') {
+        f.closed[0].data = { computedPath: [
+          { x: 50, y: 60 }, { x: 50, y: 65 }, { x: 100, y: 65 }, { x: 100, y: 200 },
+        ] };
+        vi.spyOn(stubRepair, 'repairRenderSafeEndpointStubs').mockReturnValue(f.closed);
+      }
+      if (failure === 'commercial-bends') f.closed[0].data = { computedPath: [
+        { x: 50, y: 60 }, { x: 50, y: 100 }, { x: 100, y: 100 }, { x: 100, y: 140 },
+        { x: 150, y: 140 }, { x: 150, y: 180 }, { x: 200, y: 180 }, { x: 200, y: 220 },
+        { x: 250, y: 220 }, { x: 250, y: 260 },
+      ] };
+      if (failure === 'hard-defect') f.report.mockImplementation(candidate => (
+        candidate === f.skirt ? f.cleanReport : f.crossedReport
+      ));
+      expect(tryDisplayQualityEarlyClosure(f.context, f.edges)).toBeNull();
+      expect(f.context.onPhaseTrace).toHaveBeenCalledWith(expect.objectContaining({ resolution: 'fallback' }));
+    },
+  );
+
+  it('propagates a failed closure without converting it into success', () => {
+    const f = fixture();
+    f.close.mockImplementation(() => { throw new Error('closure failed'); });
+    expect(() => tryDisplayQualityEarlyClosure(f.context, f.edges)).toThrow('closure failed');
+  });
+});
 
 describe('baseReactFlowDisplayFullRouteQualityPhase', () => {
   it('reports each structural crossing repair stage without changing a clean route', () => {

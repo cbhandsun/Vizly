@@ -60,6 +60,7 @@ import { createDisplayQualityCrossingCandidates } from './baseReactFlowDisplayQu
 import { repairDisplayQualityTopology } from './baseReactFlowDisplayQualityTopology';
 import { repairBaseReactFlowQualityStructuralCrossings } from './baseReactFlowDisplayQualityStructuralCrossing';
 import { createDisplayQualityPostEndpointAlternatives } from './baseReactFlowDisplayQualityPostEndpointAlternatives';
+import { tryDisplayQualityEarlyClosure } from './baseReactFlowDisplayQualityEarlyClosure';
 
 export {
   boundedQualityPolishNeedsMicroRepair,
@@ -76,16 +77,19 @@ export {
   repairSharedTargetEntryStrictCrossingsIfNeeded,
 } from './baseReactFlowDisplaySharedTargetEntry';
 
-export const createBaseReactFlowFullRouteQualityEdges = ({
-  normalizedEdges,
-  repairNodes,
-  layoutDirection,
-  useBoundedLargeRepair,
-  canReusePreparedGlobalRouting,
-  reusePreparedGlobalRouting,
-  onPhaseTrace,
-  topologyPlan,
-}: BaseReactFlowFullRouteContext): Edge[] => {
+export const createBaseReactFlowFullRouteQualityEdges = (
+  context: BaseReactFlowFullRouteContext,
+): Edge[] => {
+  const {
+    normalizedEdges,
+    repairNodes,
+    layoutDirection,
+    useBoundedLargeRepair,
+    canReusePreparedGlobalRouting,
+    reusePreparedGlobalRouting,
+    onPhaseTrace,
+    topologyPlan,
+  } = context;
   const doglegRepairSession = createDisplayQualityDoglegRepairSession(repairNodes);
   const repairDoglegs = doglegRepairSession.run;
   const topologySeedTimer = startDisplayRoutingPhaseTrace({
@@ -304,6 +308,15 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
       evaluationCount: finalDoglegDiagnostics.qualityEvaluationCount,
     },
   );
+  const earlyClosed = tryDisplayQualityEarlyClosure({
+    ...context, onPhaseTrace: recordCrossingPhaseTrace,
+  }, repairedEdges);
+  if (earlyClosed) {
+    globalRefineTimer.finish('accepted', earlyClosed.length);
+    crossingSweepTimer.finish('accepted', earlyClosed.length);
+    crossingPhaseTrace.forEach(trace => onPhaseTrace?.(trace));
+    return earlyClosed;
+  }
   const sharedTargetTimer = startDisplayRoutingPhaseTrace({
     phase: 'quality-crossing-global-refine-shared-target',
     candidateCount: repairedEdges.length,

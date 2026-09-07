@@ -2,7 +2,7 @@
   "schema": "vizly-precompiled-display-route-manifest-v3",
   "routingVersion": "18",
   "identitySourceHash": "source-v1:752776072602ff4e8a4892530e3faea55f7502310613fe616e04061f339c270a",
-  "routingSourceHash": "source-v1:463da66a8e22bb1ac75a59eddd90cd234d68673096548a933c57cc8f965e8acb",
+  "routingSourceHash": "source-v1:d7850eee34e4e5a4577703284351adc110ee6a54d48f5074e519eda2e12b6cfd",
   "entries": [
     {
       "presetId": "logistics-architecture-v1",
@@ -12,7 +12,7 @@
       "sourceHash": "source-v1:da286fbefa1a0d0a3ba3bf5a6589d2edba849af0f477ddb910ecad4d91649986",
       "inputSignature": "1512289068",
       "inputGeometryDigest": "geometry-v1:e262270c015d6a0c3e84c11c0c519d20",
-      "outputRouteSignature": "route-v2:14:55:463ec2846aa56c4a"
+      "outputRouteSignature": "route-v2:14:55:d0019013b866bbd1"
     },
     {
       "presetId": "wms-demand-allocation-strategy-v2",
