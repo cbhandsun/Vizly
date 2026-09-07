@@ -6,6 +6,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestDisplayRoutingRenderAuthority } from '../../../routing/__tests__/displayRoutingRenderAuthorityTestFixture';
 
 import { StablePathEdge } from '../StablePathEdge';
+import { EdgeLabelObstacleContext } from '../edgeLabelObstacleContext';
+import { edgeLabelRectsConflict } from '../edgeLabelArrangement';
+import { resolveBaseReactFlowEdgeLabelScale } from '../../shared/baseReactFlowViewport';
 import {
   createRoutingSessionEdgeRenderAdapter,
   STANDALONE_EDGE_RENDER_ADAPTER,
@@ -18,6 +21,7 @@ const { useLineJumpsMock, reactFlowStoreMock, getStateMock } = vi.hoisted(() => 
   useLineJumpsMock: vi.fn(() => ({ jumps: [], jumpPath: null })),
   reactFlowStoreMock: {
     edges: [],
+    transform: [0, 0, 1],
     nodeLookup: new Map<string, unknown>(),
   },
 }));
@@ -55,7 +59,9 @@ vi.mock('@xyflow/react', async () => {
       'data-interaction-width': interactionWidth,
       style,
     }),
-    EdgeLabelRenderer: ({ children }: { children: React.ReactNode }) => ReactModule.createElement(ReactModule.Fragment, null, children),
+    // Match the real HTML label portal's namespace so DOM size mocks measure
+    // HTML elements, rather than creating an unmeasurable SVG <div>.
+    EdgeLabelRenderer: ({ children }: { children: React.ReactNode }) => ReactModule.createElement('foreignObject', null, children),
     useStore: (selector: (state: typeof reactFlowStoreMock) => unknown) => selector(reactFlowStoreMock),
     useStoreApi: () => ReactModule.useMemo(() => ({ getState: getStateMock }), []),
   };
@@ -127,6 +133,7 @@ describe('StablePathEdge', () => {
     useLineJumpsMock.mockReset();
     useLineJumpsMock.mockReturnValue({ jumps: [], jumpPath: null });
     reactFlowStoreMock.nodeLookup.clear();
+    reactFlowStoreMock.transform = [0, 0, 1];
   });
 
   it.each([false, true])('mounts a complete markerless trace on an unshared edge (selected=%s)', selected => {
@@ -448,7 +455,8 @@ describe('StablePathEdge', () => {
     expect(label.style.transform).not.toContain('1800px');
   });
 
-  it('preserves an explicit manual labelPosition and offset through rerenders', async () => {
+  it.each([1, 0.15])('preserves an explicit manual labelPosition and offset through rerenders at zoom %s', async zoom => {
+    reactFlowStoreMock.transform = [0, 0, zoom];
     const props = { label: 'Manual condition', data: {
       computedPath: [{ x: 0, y: 0 }, { x: 80, y: 0 }, { x: 80, y: 40 }],
       labelPosition: { x: 37, y: 59 }, labelOffset: { x: 5, y: -9 },
@@ -459,6 +467,40 @@ describe('StablePathEdge', () => {
     view.rerender(createStablePathEdgeElement({ ...props, selected: true }));
     await act(async () => { await Promise.resolve(); });
     expect(screen.getByText('Manual condition').style.transform).toContain('translate(42px,50px)');
+  });
+
+  it('reflows a saved relative offset at overview zoom without changing its persisted position', async () => {
+    const width = vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(96);
+    const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(22);
+    const obstacle = { x: 160, y: -30, width: 80, height: 60 };
+    const props = { label: 'Saved offset', sourceX: 0, sourceY: 0, targetX: 200, targetY: 0,
+      data: { computedPath: [{ x: 0, y: 0 }, { x: 200, y: 0 }], labelOffset: { x: -8, y: 6 } } };
+    const before = structuredClone(props);
+    const element = () => <EdgeLabelObstacleContext.Provider value={[obstacle]}>
+      {createStablePathEdgeElement(props)}
+    </EdgeLabelObstacleContext.Provider>;
+    try {
+      reactFlowStoreMock.transform = [0, 0, 0.65];
+      const view = render(element());
+      await act(async () => { await Promise.resolve(); });
+      const label = screen.getByText('Saved offset');
+      expect(label).toBeInstanceOf(HTMLDivElement);
+      expect(label.style.transform).toContain('translate(92px,6px)');
+      reactFlowStoreMock.transform = [0, 0, 0.15];
+      view.rerender(element());
+      await act(async () => { await Promise.resolve(); });
+      const match = label.style.transform.match(/translate\((-?[\d.]+)px,(-?[\d.]+)px\)/);
+      expect(match).not.toBeNull();
+      const scale = resolveBaseReactFlowEdgeLabelScale(0.15);
+      const rect = { x: Number(match?.[1]) - 97 * scale / 2, y: Number(match?.[2]) - 23 * scale / 2,
+        width: 97 * scale, height: 23 * scale };
+      expect(edgeLabelRectsConflict(rect, obstacle, 0)).toBe(false);
+      reactFlowStoreMock.transform = [0, 0, 1];
+      view.rerender(element());
+      await act(async () => { await Promise.resolve(); });
+      expect(label.style.transform).toContain('translate(92px,6px)');
+      expect(props).toEqual(before);
+    } finally { width.mockRestore(); height.mockRestore(); }
   });
 
   it('globally separates two actual measured labels sharing a final route without losing text', async () => {

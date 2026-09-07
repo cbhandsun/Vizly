@@ -8,11 +8,23 @@ import {
   isUsableBaseReactFlowViewport,
   resolveBaseReactFlowContainerClassName,
   resolveBaseReactFlowInitialFitMode,
+  resolveBaseReactFlowEdgeLabelScale,
   restoreBaseReactFlowViewportOnInit,
   syncBaseReactFlowZoomClass,
 } from '../baseReactFlowViewport';
 
 describe('baseReactFlowViewport', () => {
+  it.each([0.05, 0.1, 0.1345576246460139, 0.2, 0.3, 0.72, 1])(
+    'keeps overview label text readable at zoom %s', zoom => {
+      expect(zoom * resolveBaseReactFlowEdgeLabelScale(zoom)).toBeGreaterThanOrEqual(0.72 - 1e-9);
+    },
+  );
+  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])('bounds invalid label zoom %s', zoom => {
+    expect(resolveBaseReactFlowEdgeLabelScale(zoom)).toBe(1);
+  });
+  it('bounds scale for positive underflow instead of producing infinite rectangles', () => {
+    expect(resolveBaseReactFlowEdgeLabelScale(Number.MIN_VALUE)).toBe(14.4);
+  });
   it('preserves semantic zoom when the layout committing class is released', () => {
     expect(resolveBaseReactFlowContainerClassName({
       baseClassName: 'diagram-preview-root',

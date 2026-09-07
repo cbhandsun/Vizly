@@ -282,10 +282,10 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
     let labelY = manualLabelPosition?.y ?? initialLabelPosition.y;
 
     const labelOffset = readPoint(edgeData?.labelOffset);
-    const hasManualLabelPosition = !!labelOffset
-        || !!manualLabelPosition
+    const hasFixedLabelPosition = !!manualLabelPosition
         || (typeof edgeData?.absoluteLabelX === 'number' && Number.isFinite(edgeData.absoluteLabelX))
         || (typeof edgeData?.absoluteLabelY === 'number' && Number.isFinite(edgeData.absoluteLabelY));
+    const hasManualLabelPosition = !!labelOffset || hasFixedLabelPosition;
 
     if (labelOffset) {
         labelX += Number(labelOffset.x) || 0;
@@ -324,6 +324,9 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
         size: labelSize,
         scale: labelScale,
         manual: hasManualLabelPosition,
+        // Keep safe saved offsets fixed; reflow enlarged text only if it covers
+        // content. Explicit absolute positions stay pinned at every zoom.
+        allowManualReflow: !!labelOffset && !hasFixedLabelPosition && labelScale > 1,
         obstacles: labelObstacles,
     });
     if (labelPlacement) {

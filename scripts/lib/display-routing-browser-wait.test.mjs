@@ -1,3 +1,4 @@
+import vm from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 
 import { waitForDisplayRoutingBrowserValue } from './display-routing-browser-wait.mjs';
@@ -25,6 +26,40 @@ describe('display routing browser wait', () => {
     await expect(waitForDisplayRoutingBrowserValue(session, 'ready', 0))
       .rejects.toThrow(/"requestCount": 1/);
     expect(session.evaluate).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['complete', 'http:', { script: 2, resource: 1, rejection: 0 }, 1],
+    ['loading', 'about:', undefined, undefined],
+    ['complete', 'chrome-error:', undefined, 0],
+    ['secret', 'secret', { script: Infinity, resource: -1, rejection: 'secret' }, NaN],
+    ['interactive', 'https:', { script: 999_999, resource: 0, rejection: 0 }, 999_999],
+  ])('reports safe page startup diagnostics for %s / %s', async (readyState, protocol, errors, children) => {
+    let diagnostics;
+    const session = { evaluate: async expression => {
+      diagnostics = vm.runInNewContext(expression, {
+        window: {
+          location: { protocol, href: 'https://private/?token=secret#user-document' },
+          __vizlyBrowserBootErrors: errors,
+        },
+        document: {
+          readyState,
+          body: { textContent: 'secret user-document' },
+          querySelector: () => children === undefined ? null : { childElementCount: children },
+          querySelectorAll: () => [],
+        },
+      });
+      return diagnostics;
+    } };
+    await expect(waitForDisplayRoutingBrowserValue(session, 'ready', 0)).rejects.toThrow(/"page"/);
+    expect(diagnostics.page).toMatchObject({
+      readyState: readyState === 'secret' ? 'unknown' : readyState,
+      protocol: protocol === 'secret' ? 'other' : protocol,
+      captureInstalled: !!errors,
+      rootChildCount: Number.isSafeInteger(children) ? Math.min(100_000, children) : null,
+      scriptErrors: errors?.script === 2 ? 2 : (errors?.script === 999_999 ? 100_000 : null),
+    });
+    expect(JSON.stringify(diagnostics)).not.toMatch(/secret|user-document|https:\/\//);
   });
 });
 

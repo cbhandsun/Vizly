@@ -65,6 +65,21 @@ describe('browser drag release capture', () => {
 });
 
 describe('display routing browser capture', () => {
+  it('counts boot failures without retaining exception messages, URLs, or rejection contents', () => {
+    const { window, listeners } = releaseHarness();
+    const sensitive = 'Bearer secret user document';
+    expect(window.__vizlyBrowserBootErrors).toEqual({ script: 0, resource: 0, rejection: 0 });
+    listeners.get('error').listener({ target: window, message: sensitive });
+    listeners.get('error').listener({ target: { src: sensitive } });
+    listeners.get('unhandledrejection').listener({ reason: sensitive });
+    expect(window.__vizlyBrowserBootErrors).toEqual({ script: 1, resource: 1, rejection: 1 });
+    expect(listeners.get('error').capture).toBe(true);
+    window.__vizlyBrowserBootErrors.script = 100_000;
+    listeners.get('error').listener({ target: window, message: sensitive });
+    expect(window.__vizlyBrowserBootErrors.script).toBe(100_000);
+    expect(JSON.stringify(window.__vizlyBrowserBootErrors)).not.toContain(sensitive);
+  });
+
   it('retains layout lifecycle events under a flood of diagnostic completions within the original event cap', () => {
     const tasks = [];
     let frame;

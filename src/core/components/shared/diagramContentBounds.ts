@@ -71,13 +71,13 @@ export const computeDiagramContentBounds = (
 };
 
 /** Explicit fit is infrequent: read final label rectangles without modifying the DOM. */
-export const readDiagramRenderedLabelBounds = (
+export const readDiagramRenderedLabels = (
   canvas: HTMLElement,
   viewport: Readonly<{ x: number; y: number; zoom: number }>,
-): DiagramContentRect[] => {
+): Array<{ rect: DiagramContentRect; readabilityScaled: boolean }> => {
   if (![viewport.x, viewport.y, viewport.zoom].every(finiteCoordinate) || viewport.zoom <= 0) return [];
   const origin = canvas.getBoundingClientRect();
-  const result: DiagramContentRect[] = [];
+  const result: Array<{ rect: DiagramContentRect; readabilityScaled: boolean }> = [];
   const labels = canvas.querySelectorAll('.vizly-edge-label, .react-flow__edge-textwrapper');
   for (const label of Array.from(labels).slice(0, MAX_EDGES)) {
     const rect = label.getBoundingClientRect();
@@ -87,7 +87,12 @@ export const readDiagramRenderedLabelBounds = (
       width: rect.width / viewport.zoom,
       height: rect.height / viewport.zoom,
     };
-    if (validRect(projected)) result.push(projected);
+    if (validRect(projected)) result.push({ rect: projected, readabilityScaled: label.matches('.vizly-edge-label') });
   }
   return result;
 };
+
+export const readDiagramRenderedLabelBounds = (
+  canvas: HTMLElement,
+  viewport: Readonly<{ x: number; y: number; zoom: number }>,
+): DiagramContentRect[] => readDiagramRenderedLabels(canvas, viewport).map(label => label.rect);

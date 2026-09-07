@@ -80,6 +80,15 @@ it('the visual gate independently rejects missing coverage and label collisions'
   };
   const assertAudit = audit => assertDisplayRoutingVisualScaleAudit({ name: 'coverage', audit, expectedSignature: 'route', expectedEdgeCount: 1 });
   expect(() => assertAudit(clean)).not.toThrow();
+  const overview = { ...clean, zoom: 0.2, zoomedOut: true, activeTraceEdgeCount: 0,
+    visiblePrimaryLabelCount: 0, visibleDetailLabelCount: 1 };
+  expect(() => assertAudit(overview)).not.toThrow();
+  for (const zoom of [0.2, 0.399, 0.4, 1]) {
+    expect(() => assertAudit({ ...overview, zoom, zoomedOut: zoom < 0.4,
+      visibleLabelCount: 0, visibleDetailLabelCount: 0,
+      minimumVisibleLabelHeight: null, maximumVisibleLabelHeight: null,
+    })).toThrow(/Fixed visual scale audit failed/);
+  }
   for (const defect of [{ nodeScanComplete: false }, { nodeScanComplete: undefined }, { scannedNodeCount: 0 }, { labelLabelOverlapCount: 1 }, { labelLabelOverlapCount: undefined }]) {
     expect(() => assertAudit({ ...clean, ...defect })).toThrow(/Fixed visual scale audit failed/);
   }

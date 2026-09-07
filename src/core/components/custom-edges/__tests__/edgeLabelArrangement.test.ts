@@ -1,4 +1,5 @@
 import shortBranchInputs from './shortBranchLabelArrangement.json';
+import overviewInputs from './overviewLabelArrangement.json';
 import { describe, expect, it } from 'vitest';
 import { arrangeEdgeLabels, edgeLabelRectsConflict, edgeLabelSegmentIntersectsRect,
   type EdgeLabelArrangementInput } from '../edgeLabelArrangement';
@@ -10,6 +11,16 @@ const input = (id: string, y = 0): EdgeLabelArrangementInput => ({
 });
 
 describe('global edge label arrangement regression', () => {
+  it('keeps readable overview labels clear of business nodes after a saved WMS reload', () => {
+    const entries = overviewInputs.labels.map(input => ({ ...input, obstacles: overviewInputs.obstacles }));
+    const result = arrangeEdgeLabels(entries);
+    const placements = [...result.values()];
+    expect(placements).toHaveLength(entries.length);
+    for (const [id, placement] of result) {
+      expect(overviewInputs.obstacles.some(node => edgeLabelRectsConflict(placement.rect, node, 0)), id).toBe(false);
+      expect(placements.some(other => other !== placement && edgeLabelRectsConflict(placement.rect, other.rect, 0)), id).toBe(false);
+    }
+  });
   it.each([false, true])('places a scaled short-branch callout outside the segment while keeping its anchor (transpose=%s)', transpose => {
     const point = (p: { x: number; y: number }) => transpose ? { x: p.y, y: p.x } : p;
     const entries = shortBranchInputs.map(entry => ({ ...entry,
@@ -82,7 +93,7 @@ describe('global edge label arrangement regression', () => {
     expect(a && b && edgeLabelRectsConflict(a.rect, b.rect)).toBe(false);
   });
 
-  it.each([1, 1.44, 2.4])('uses unscaled measurements once at readability scale %s', scale => {
+  it.each([1, 1.44, 2.4, 5.35, 14.4])('uses unscaled measurements once at readability scale %s', scale => {
     const plan = arrangeEdgeLabels([{ ...input('a'), scale }, { ...input('b'), scale }]);
     const a = plan.get('a');
     const b = plan.get('b');
@@ -99,6 +110,24 @@ describe('global edge label arrangement regression', () => {
     const a = plan.get('a');
     const z = plan.get('z');
     expect(a && z && edgeLabelRectsConflict(a.rect, z.rect)).toBe(false);
+  });
+
+  it('keeps a safe scaled relative offset fixed even when its text crosses a line', () => {
+    const entry = { ...input('safe'), preferredCenter: { x: 150, y: 0 }, scale: 4.8,
+      manual: true, allowManualReflow: true };
+    expect(arrangeEdgeLabels([entry]).get(entry.id)?.center).toEqual(entry.preferredCenter);
+  });
+
+  it('reflows an obstructed relative offset around a fixed absolute label without mutating either anchor', () => {
+    const fixed = { ...input('z'), manual: true };
+    const relative = { ...input('a'), manual: true, allowManualReflow: true, scale: 4.8 };
+    const before = structuredClone([relative, fixed]);
+    const plan = arrangeEdgeLabels([relative, fixed]);
+    const moved = plan.get('a');
+    const pinned = plan.get('z');
+    expect(pinned?.center).toEqual(fixed.preferredCenter);
+    expect(moved && pinned && edgeLabelRectsConflict(moved.rect, pinned.rect, 0)).toBe(false);
+    expect([relative, fixed]).toEqual(before);
   });
 
   it('avoids nodes and arrow clearance and never draws a leader through nodes', () => {

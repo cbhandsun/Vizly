@@ -606,10 +606,6 @@
     outline-offset: 2px;
 }
 
-.diagram-zoomed-out .stable-path-edge-label-leader[data-edge-label-priority='detail'][data-edge-trace-state='idle'] {
-    display: none;
-}
-
 .diagram-root .edge-label-premium:hover {
     border-color: var(--flow-visual-accent-ring);
     box-shadow:

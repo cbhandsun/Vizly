@@ -1,4 +1,5 @@
 import { estimateEdgeLabelSize, readEdgeLabelSize, type EdgeLabelSize } from './edgeLabelMeasurement';
+import { MAX_EDGE_LABEL_SCALE } from '../../rendering/edgeLabelScale';
 
 export type EdgeLabelPoint = { x: number; y: number };
 export type EdgeLabelRect = { x: number; y: number; width: number; height: number };
@@ -54,7 +55,7 @@ export const estimateEdgeLabelRect = (
 ): EdgeLabelRect => {
   const normalizedCenter = normalizePoint(center) ?? { x: 0, y: 0 };
   const text = normalizeLabelText(labelText);
-  const scale = clampNumber(labelScale, 1, 2.4) ?? 1;
+  const scale = clampNumber(labelScale, 1, MAX_EDGE_LABEL_SCALE) ?? 1;
   const size = readEdgeLabelSize(measuredSize) ?? estimateEdgeLabelSize(text);
   const width = size.width * scale;
   const height = size.height * scale;
@@ -187,7 +188,7 @@ export const getEdgeLabelAutoOffset = (
     ? peerPaths.map(normalizePath).filter(points => points.length >= 2)
     : [];
   const safeObstacles = normalizeRects(obstacles);
-  const safeLabelScale = clampNumber(labelScale, 1, 2.4) ?? 1;
+  const safeLabelScale = clampNumber(labelScale, 1, MAX_EDGE_LABEL_SCALE) ?? 1;
   const nearest = nearestOwnSegment(safeOwnPath, safeLabelPoint);
   if (!nearest) return { x: 0, y: 0 };
 
