@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { collectJournaledRoutingSamples, createRoutingSampleJournal,
   createRoutingSampleFailure, projectRoutingJournalFailure, projectRoutingJournalSample } from './display-routing-sample-journal.mjs';
+import { projectRoutingWaitFailureEvidence } from './display-routing-wait-failure-evidence.mjs';
 
 vi.mock('node:fs/promises', async importOriginal => {
   const actual = await importOriginal();
@@ -30,6 +31,62 @@ const records = async directory => {
 };
 
 describe('routing sample journal', () => {
+  const lifecycle = () => ({schema:'browser-lifecycle-v1',observation:'root-observed',
+    page:{readyState:'complete',protocol:'http:',captureInstalled:true,rootChildCount:1,resourceErrors:2,
+      url:'https://private.invalid/?token=secret',body:'private document'},
+    milestones:{domReadyMs:20,workerConstructedMs:null},routing:{stage:'unknown',workerStartCount:0},
+    requestCount:0,responseCount:0,requests:[{token:'secret'}]});
+  const waitFailure = (diagnostics = lifecycle(), lastObservedDiagnostics = null, newline='\n') => new Error(
+    `Child sample failed: Error: Browser state wait failed${newline}${JSON.stringify({waitStatus:'not-ready',
+      evidenceStatus:diagnostics ? 'available':'evaluation-timeout',diagnostics,lastObservedDiagnostics})}\n at private-stack`,
+  );
+  it.each(['\n','\r\n'])('preserves bounded startup evidence across child stderr (%j)', newline => {
+    const projected=projectRoutingJournalFailure(waitFailure(lifecycle(),null,newline));
+    expect(projected.waitEvidence).toMatchObject({schema:'routing-wait-failure-v1',waitStatus:'not-ready',
+      diagnostics:{observation:'root-observed',page:{readyState:'complete',resourceErrors:2},
+        routing:{stage:'unknown',workerStartCount:0},requestCount:0,responseCount:0}});
+    expect(JSON.stringify(projected)).not.toMatch(/secret|private|url|body|requests/);
+  });
+  it('keeps the last host observation if the final diagnostic read times out',()=>{
+    const projected=projectRoutingWaitFailureEvidence(waitFailure(null,lifecycle()));
+    expect(projected).toMatchObject({evidenceStatus:'evaluation-timeout',diagnostics:null,
+      lastObservedDiagnostics:{observation:'root-observed'}});
+  });
+  it('uses the structured stage rather than unrelated stack text',()=>{
+    const source=lifecycle();
+    source.routing.stage='worker-response-error';
+    const error=waitFailure(source);
+    error.message='{"stage":"final-applied"}\n'+error.message;
+    expect(projectRoutingJournalFailure(error).observedRoutingStage).toBe('worker-response-error');
+  });
+  it('rejects malformed, excessive and foreign envelopes and nulls invalid fields',()=>{
+    for(const value of [null,{},'text',new Error('Browser state wait failed\n{broken'),
+      new Error('Browser state wait failed\n'+ '['.repeat(40)),
+      new Error('Browser state wait failed\n'+JSON.stringify({nested:Array.from({length:40}).reduce(value=>({nested:value}),{})})),
+      new Error('Browser state wait failed\n{'+ ' '.repeat(65536)+'}'),
+      waitFailure({schema:'foreign',body:'private'}),waitFailure(null,null)]) {
+      expect(projectRoutingWaitFailureEvidence(value)).toBeNull();
+    }
+    const source=lifecycle();
+    Object.assign(source.page,{readyState:'private',resourceErrors:-1,rootChildCount:Infinity,captureInstalled:'secret'});
+    Object.assign(source.milestones,{domReadyMs:600001,workerConstructedMs:'token'});
+    const projected=projectRoutingWaitFailureEvidence(waitFailure(source));
+    expect(projected.diagnostics.page).toMatchObject({readyState:null,resourceErrors:null,rootChildCount:null,captureInstalled:null});
+    expect(projected.diagnostics.milestones).toMatchObject({domReadyMs:null,workerConstructedMs:null});
+    expect(JSON.stringify(projected)).not.toMatch(/secret|private|token/);
+  });
+  it('parses quoted braces safely and retains evidence through typed child failures and the real journal',async()=>{
+    const directory=await createDirectory();
+    const source=lifecycle();
+    source.page.body='private } ] \\" { [ text';
+    const error=createRoutingSampleFailure('child-exit-failed',waitFailure(source));
+    expect(projectRoutingWaitFailureEvidence(error)?.diagnostics.page.resourceErrors).toBe(2);
+    await expect(collectJournaledRoutingSamples({kind:'cold',sampleCount:1,directory,
+      runSample:async()=>{throw error;}})).rejects.toThrow('resourceErrors');
+    const [entries]=await records(directory);
+    expect(entries.at(-1).failure.waitEvidence.diagnostics.page.resourceErrors).toBe(2);
+    expect(JSON.stringify(entries)).not.toMatch(/secret|private/);
+  });
   it('persists the precise safe sample category in both journal and terminal failure', async () => {
     const directory = await createDirectory();
     const error = createRoutingSampleFailure('child-exit-failed', {

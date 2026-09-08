@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { projectDisplayRoutingEditStability } from './display-routing-edit-stability.mjs';
 import { projectPrecompiledRouteLongTasks } from './precompiled-display-route-long-tasks.mjs';
 import { projectPrecompiledWorkerExecution } from './precompiled-display-route-worker-execution.mjs';
+import { projectRoutingWaitFailureEvidence } from './display-routing-wait-failure-evidence.mjs';
 
 const metric = value => Number.isFinite(value) && value >= 0 && value <= 1e15 ? value : null;
 const fields = (value, keys) => Object.fromEntries(keys.map(key => [key, metric(value?.[key])]));
@@ -22,6 +23,7 @@ export const createRoutingSampleFailure = (sampleFailureCode, diagnostic = null)
   const error = new Error(JSON.stringify({ waitStatus: safe.observedWaitStatus,
     stage: safe.observedRoutingStage }));
   error.sampleFailureCode = sampleFailureCode;
+  if (safe.waitEvidence) error.waitEvidence = safe.waitEvidence;
   return error;
 };
 
@@ -59,11 +61,16 @@ export const projectRoutingJournalFailure = (error, code = 'sample-failed') => {
   const message = typeof error?.message === 'string' ? error.message.slice(0, 65_536) : '';
   const wait = message.match(/"waitStatus":\s*"(not-ready|evaluation-failed|evaluation-timeout|invalid-evaluation|predicate-failed|quality-rejected)"/);
   const stage = message.match(/"stage":\s*"(scheduled|routing|worker-post|worker-phase|worker-response|worker-error|worker-message-error|worker-cancelled|worker-timeout|final-quality-rejected|final-safety-rejected|final-applied)"/);
+  const waitEvidence = projectRoutingWaitFailureEvidence(error);
+  const observedStage = waitEvidence
+    ? (waitEvidence.diagnostics ?? waitEvidence.lastObservedDiagnostics)?.routing.stage
+    : stage?.[1];
   return { code,
+    ...(waitEvidence ? { waitEvidence } : {}),
     ...(code === 'sample-failed' && sampleFailureCodes.includes(error?.sampleFailureCode)
       ? { sampleFailureCode: error.sampleFailureCode } : {}),
-    observedWaitStatus: wait?.[1] ?? null,
-    observedRoutingStage: stage?.[1] ?? null };
+    observedWaitStatus: waitEvidence?.waitStatus ?? wait?.[1] ?? null,
+    observedRoutingStage: observedStage === 'unknown' ? null : observedStage ?? null };
 };
 
 export const createRoutingSampleJournal = async ({ kind, sampleCount,
