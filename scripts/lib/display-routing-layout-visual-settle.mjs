@@ -31,6 +31,9 @@ const boundedCount = value => (
   Number.isSafeInteger(value) && value >= 0 && value <= 100_000 ? value : null
 );
 
+const committedSignature = value => typeof value === 'string' && value.length <= 64
+  && /^route-v2:\d{1,3}:\d{1,6}:[0-9a-f]{16}$/.test(value) ? value : null;
+
 /**
  * Reads only aggregate presentation evidence. It deliberately avoids returning
  * node ids, SVG path data, or diagram content to the host verifier.
@@ -45,6 +48,17 @@ export const readDisplayRoutingLayoutVisualSnapshot = (optionsValue) => {
   const expectedNodeCount = boundedCount(options.expectedNodeCount);
   const expectedEdgeCount = boundedCount(options.expectedEdgeCount);
   const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
+  const expectedCommittedRouteSignature = committedSignature(options.expectedCommittedRouteSignature);
+  // Cache reuse can remove a request id after a verified transaction. Callers
+  // must explicitly choose this mode; an invalid/mismatched request id cannot
+  // silently fall back to a cache signature.
+  const committedCacheMatches = options.expectedRequestId === undefined
+    && expectedCommittedRouteSignature !== null
+    && routing.cacheTrustLevel === 'runtime-committed'
+    && routing.outputRouteSignature === expectedCommittedRouteSignature;
+  const identityMatches = options.expectedCommittedRouteSignature === undefined
+    ? expectedRequestId !== null && routing.requestId === expectedRequestId
+    : committedCacheMatches;
   const instance = window.reactFlowInstance;
   const viewportValue = instance?.getViewport?.();
   const viewport = {
@@ -99,10 +113,9 @@ export const readDisplayRoutingLayoutVisualSnapshot = (optionsValue) => {
     && renderedNodeCount === expectedNodeCount
     && renderedEdgeCount === expectedEdgeCount
     && renderedPathCount === expectedEdgeCount;
-  const ready = expectedRequestId !== null
+  const ready = identityMatches
     && routing.stage === 'final-applied'
     && routing.renderAuthorityStatus === 'accepted'
-    && routing.requestId === expectedRequestId
     && Boolean(layoutTrigger)
     && !committing
     && !layoutBusy
@@ -115,6 +128,7 @@ export const readDisplayRoutingLayoutVisualSnapshot = (optionsValue) => {
     sampledAt,
     ready,
     requestId: typeof routing.requestId === 'string' ? routing.requestId : null,
+    committedRouteSignature: committedCacheMatches ? expectedCommittedRouteSignature : null,
     stage: typeof routing.stage === 'string' ? routing.stage : null,
     committing,
     layoutBusy,
@@ -135,6 +149,7 @@ export const displayRoutingLayoutVisualSnapshotsMatch = (left, right) => Boolean
   left?.ready
   && right?.ready
   && left.requestId === right.requestId
+  && left.committedRouteSignature === right.committedRouteSignature
   && left.nodeCount === right.nodeCount
   && left.edgeCount === right.edgeCount
   && left.renderedNodeCount === right.renderedNodeCount
@@ -190,6 +205,7 @@ export const resolveDisplayRoutingLayoutVisualStability = (
 
 export const displayRoutingLayoutVisualSnapshotExpression = options => `(() => {
   const boundedCount = ${boundedCount.toString()};
+  const committedSignature = ${committedSignature.toString()};
   const fingerprintValues = ${fingerprintValues.toString()};
   const readSnapshot = ${readDisplayRoutingLayoutVisualSnapshot.toString()};
   return readSnapshot(${JSON.stringify(options)});
@@ -198,6 +214,7 @@ export const displayRoutingLayoutVisualSnapshotExpression = options => `(() => {
 export const waitForStableDisplayRoutingLayoutVisual = async ({
   session,
   expectedRequestId,
+  expectedCommittedRouteSignature,
   expectedNodeCount,
   expectedEdgeCount,
   timeoutMs = DEFAULT_TIMEOUT_MS,
@@ -209,7 +226,10 @@ export const waitForStableDisplayRoutingLayoutVisual = async ({
   if (!session || typeof session.evaluate !== 'function') {
     throw new Error('A browser session is required to verify layout visual stability');
   }
-  if (typeof expectedRequestId !== 'string' || expectedRequestId.length === 0) {
+  const requestMode = typeof expectedRequestId === 'string' && expectedRequestId.length > 0
+    && expectedRequestId.length <= 500 && expectedCommittedRouteSignature === undefined;
+  const cacheMode = expectedRequestId === undefined && committedSignature(expectedCommittedRouteSignature) !== null;
+  if (!requestMode && !cacheMode) {
     throw new Error('A committed layout request id is required to verify visual stability');
   }
   if (boundedCount(expectedNodeCount) === null || boundedCount(expectedEdgeCount) === null) {
@@ -221,6 +241,7 @@ export const waitForStableDisplayRoutingLayoutVisual = async ({
     : DEFAULT_SAMPLE_INTERVAL_MS;
   const expression = displayRoutingLayoutVisualSnapshotExpression({
     expectedRequestId,
+    expectedCommittedRouteSignature,
     expectedNodeCount,
     expectedEdgeCount,
   });
