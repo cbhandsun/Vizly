@@ -106,10 +106,14 @@ export const assertTopologyEditStability = (operationId, evidence) => {
   const intent = projectDisplayRoutingEditStability(evidence?.intent);
   const outside = projectDisplayRoutingEditStability(evidence?.outsideRoutingGroup);
   if (!intent || !outside) throw new Error('Incomplete topology stability evidence');
+  // These edit operations update explicit nodes (including moved descendants),
+  // not the positions of retained nodes outside that scope. Router-selected
+  // mutable edge groups must not exempt unrelated node movement.
+  if (intent.movedNodeCount !== 0) throw new Error('Topology edit changed retained diagram positions');
   // The audit node is deliberately isolated and outside the existing diagram.
   // Adding/removing it has no legitimate effect on retained positions or routes.
   if (['node-add', 'node-remove'].includes(operationId)
-    && (intent.movedNodeCount !== 0 || intent.changedPortCount !== 0 || intent.changedGeometryCount !== 0
+    && (intent.changedPortCount !== 0 || intent.changedGeometryCount !== 0
       || Math.abs(intent.afterPathLength - intent.beforePathLength) > 0.01
       || intent.afterBendCount !== intent.beforeBendCount)) {
     throw new Error('Isolated node edit changed retained diagram structure');

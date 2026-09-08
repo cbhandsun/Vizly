@@ -14,6 +14,21 @@ const setup = () => {
 };
 
 describe('topology edit stability', () => {
+  it.each(['node-resize', 'multi-node-move', 'compound-subtree-move', 'edge-add',
+    'port-policy', 'edge-remove', 'container-collapse', 'container-expand'])(
+    'rejects movement of an unrelated node during %s', async operation => {
+      const { graph, session } = setup();
+      graph.nodes.push(node('unrelated'));
+      await captureTopologyStabilityBaseline(session);
+      const initial = await readTopologyEditStability(session, operation, []);
+      expect(() => assertTopologyEditStability(operation, initial)).not.toThrow();
+      await captureTopologyStabilityBaseline(session);
+      graph.nodes.at(-1).position.x = 20;
+      const evidence = await readTopologyEditStability(session, operation, ['edge']);
+      expect(evidence.intent.movedNodeCount).toBe(1);
+      expect(() => assertTopologyEditStability(operation, evidence)).toThrow('retained diagram positions');
+    },
+  );
   it('reports missing endpoints and rendered membership without exporting graph identifiers', () => {
     const { graph, window } = setup();
     graph.edges[0].target = 'private-missing-node';
