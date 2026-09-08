@@ -32,7 +32,7 @@ export const captureBusinessHistoryState = async (session, phase) => {
 };
 
 export const verifyBusinessHistoryRoundtrip = async ({ session, editedNodeId, waitForValue, readFinalRouteExpression, auditFinalSvg,
-  waitForVisual = waitForStableDisplayRoutingLayoutVisual }) => {
+  waitForVisual = waitForStableDisplayRoutingLayoutVisual, beforeVisualCheck = async () => {} }) => {
   const operations = [];
   try {
     for (const [operation, phase, modifiers] of [['undo', 'before', 2], ['redo', 'after', 10]]) {
@@ -42,15 +42,19 @@ export const verifyBusinessHistoryRoundtrip = async ({ session, editedNodeId, wa
         const read = ${readTopologyStabilitySnapshot.toString()};
         const measure = ${measureDisplayRoutingEditStability.toString()};
         const baseline = window.__vizlyBusinessHistory?.[${JSON.stringify(phase)}];
-        if (!baseline) throw new Error('Missing history baseline');
+        // Pending edits may expose provisional paths. Their node positions are
+        // the redo target, but unrelated routes stay anchored to the last commit.
+        const committedBefore = window.__vizlyBusinessHistory?.before;
+        if (!baseline || !committedBefore) throw new Error('Missing history baseline');
         const current = read();
         const metrics = measure(baseline, current, []);
         return metrics.movedNodeCount === 0 && metrics.addedNodeCount === 0 && metrics.removedNodeCount === 0
           && metrics.addedEdgeCount === 0 && metrics.removedEdgeCount === 0 && metrics.rewiredEdgeCount === 0
-          ? { stability: metrics, retained: measure(baseline, current, [${JSON.stringify(editedNodeId)}]) } : null;
+          ? { stability: metrics, retained: measure(committedBefore, current, [${JSON.stringify(editedNodeId)}]) } : null;
       })()`;
       await waitForValue(session, expression, `business ${operation} positions`);
       const route = await waitForValue(session, readFinalRouteExpression(''), `business ${operation} route`);
+      await beforeVisualCheck(operation);
       await waitForVisual({ session,
         ...(route.routing.requestId ? { expectedRequestId: route.routing.requestId }
           : { expectedCommittedRouteSignature: route.response.outputRouteSignature }),

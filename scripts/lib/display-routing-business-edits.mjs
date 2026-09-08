@@ -15,6 +15,7 @@ import { displayRoutingTopologyRequestMatchesResponse, displayRoutingTopologyRes
 import { waitForStableDisplayRoutingLayoutVisual } from './display-routing-layout-visual-settle.mjs';
 import { startEditProcessSampling, stopEditProcessSampling } from './display-routing-edit-process.mjs';
 import { captureBusinessHistoryState, verifyBusinessHistoryRoundtrip } from './display-routing-history-edits.mjs';
+import { installHeldRoutingResponse } from './display-routing-held-response.mjs';
 
 export const businessEditFinalRouteExpression = (nodeId, previousRequestId) => `(() => {
   const displayRoutingTopologyRequestMatchesResponse = ${displayRoutingTopologyRequestMatchesResponse.toString()};
@@ -175,7 +176,30 @@ export const verifyDisplayRoutingBusinessEdits = async ({ baseUrl, prepareSessio
       const history = await verifyBusinessHistoryRoundtrip({ session, editedNodeId: selected.nodeId,
         waitForValue, readFinalRouteExpression, auditFinalSvg });
       onProgress({ event: 'business-edit-history-passed', presetId: target.presetId, operations: history.map(item => item.operation) });
-      return { presetId: target.presetId, canonicalMount, initialAudit, operations, history };
+      let pendingHistory;
+      if (target === DISPLAY_ROUTING_MATRIX_PRESET_TARGETS[0]) {
+        await captureBusinessHistoryState(session, 'before');
+        await session.evaluate(`window.__vizlyHeldRoutingResponse = (${installHeldRoutingResponse.toString()})()`);
+        try {
+          await dragBusinessNode(session, selected.nodeId, 1);
+          await waitForValue(session, 'window.__vizlyHeldRoutingResponse.state().held', 'held incremental response');
+          await stopEditProcessSampling(session);
+          await captureBusinessHistoryState(session, 'after');
+          pendingHistory = await verifyBusinessHistoryRoundtrip({ session, editedNodeId: selected.nodeId,
+            waitForValue, readFinalRouteExpression, auditFinalSvg,
+            beforeVisualCheck: async operation => {
+              if (operation === 'undo') await session.evaluate('window.__vizlyHeldRoutingResponse.release()');
+            } });
+          const hold = await session.evaluate('window.__vizlyHeldRoutingResponse.state()');
+          if (!hold?.matched || !hold.held || !hold.released || hold.overflow || hold.disposed) {
+            throw new Error('Pending history response injection incomplete');
+          }
+          onProgress({ event: 'business-edit-pending-history-passed', presetId: target.presetId, hold });
+        } finally {
+          await session.evaluate('window.__vizlyHeldRoutingResponse?.dispose(); delete window.__vizlyHeldRoutingResponse; delete window.__vizlyBusinessHistory; delete window.__vizlyTopologyStabilityBaseline');
+        }
+      }
+      return { presetId: target.presetId, canonicalMount, initialAudit, operations, history, pendingHistory };
     }));
   }
   return results;

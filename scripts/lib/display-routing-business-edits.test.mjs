@@ -9,6 +9,7 @@ import { createDisplayRoutingMatrixCaseIds, parseDisplayRoutingMatrixCase } from
 import { verifyDisplayRoutingBrowserCases } from './display-routing-matrix-browser-cases.mjs';
 import { createEditProcessSampler, readEditProcessDomPoints, projectEditProcessReport } from './display-routing-edit-process.mjs';
 import { assertHistoryRestored, assertHistoryRetainedRoutes, captureBusinessHistoryState, verifyBusinessHistoryRoundtrip } from './display-routing-history-edits.mjs';
+import { installHeldRoutingResponse } from './display-routing-held-response.mjs';
 
 const node = id => ({ id, position: { x: 0, y: 0 } });
 const nodes = [node('a'), node('b'), node('c')];
@@ -16,7 +17,119 @@ const edges = [{ id: 'ab', source: 'a', target: 'b', data: { computedPath: [{ x:
   { id: 'bc', source: 'b', target: 'c', data: { computedPath: [{ x: 10, y: 0 }, { x: 20, y: 0 }] } }];
 const validMetrics = () => measureDisplayRoutingEditStability({ nodes, edges }, { nodes, edges }, ['a']);
 
+const heldResponseHarness = () => {
+  class Event {
+    constructor(type, { data }) { this.type = type; this.data = data; this.stopped = false; }
+    stopImmediatePropagation() { this.stopped = true; }
+  }
+  class Worker {
+    listeners = [];
+    posted = [];
+    postMessage(...args) { if (this.fail) throw new Error('send failed'); this.posted.push(args); }
+    addEventListener(_type, listener, capture = false) { this.listeners.push({ listener, capture }); }
+    removeEventListener(_type, listener) { this.listeners = this.listeners.filter(item => item.listener !== listener); }
+    dispatchEvent(event) {
+      for (const item of [...this.listeners].sort((a, b) => Number(b.capture) - Number(a.capture))) {
+        item.listener(event);
+        if (event.stopped) break;
+      }
+    }
+  }
+  const original = Worker.prototype.postMessage;
+  const hold = vm.runInNewContext(`(${installHeldRoutingResponse.toString()})()`, { window: { Worker }, MessageEvent: Event });
+  const worker = new Worker();
+  const received = [];
+  worker.addEventListener('message', event => received.push(event.data));
+  const emit = data => worker.dispatchEvent(new Event('message', { data }));
+  const final = { requestId: 'held', routingPatches: [], hardClean: true };
+  return { Worker, original, hold, worker, received, emit, final };
+};
+
+describe('deterministic pending routing response', () => {
+  it.each([null, {}, { operation: 'incremental-route' }, { operation: 'incremental-route', requestId: '' },
+    { operation: 'incremental-route', requestId: 3 }, { operation: 'incremental-route', requestId: 'x'.repeat(513) }])('does not arm on malformed request identity', message => {
+    const h = heldResponseHarness(); h.worker.postMessage(message);
+    expect(h.hold.state().matched).toBe(false);
+    expect(h.worker.posted).toHaveLength(1);
+    h.hold.dispose();
+  });
+  it('does not overwrite a newer prototype hook when disposed', () => {
+    const h = heldResponseHarness(); const newer = () => {};
+    h.Worker.prototype.postMessage = newer;
+    h.hold.dispose();
+    expect(h.Worker.prototype.postMessage).toBe(newer);
+  });
+  it('holds only the matched final response and explicitly releases it once', () => {
+    const h = heldResponseHarness();
+    h.worker.postMessage({ operation: 'other', requestId: 'other' });
+    expect(h.hold.state().matched).toBe(false);
+    h.worker.postMessage({ operation: 'incremental-route', requestId: 'held' }, ['transfer']);
+    expect(h.Worker.prototype.postMessage).toBe(h.original);
+    h.emit({ ...h.final, requestId: 'other' });
+    h.emit({ requestId: 'held', phaseProgress: {} });
+    expect(h.received).toHaveLength(2);
+    h.emit(h.final);
+    expect(h.received).toHaveLength(2);
+    expect(h.hold.state()).toEqual({ matched: true, held: true, released: false, overflow: false, disposed: false });
+    expect(h.worker.posted.at(-1)[1]).toEqual(['transfer']);
+    h.hold.release();
+    expect(h.received.at(-1)).toBe(h.final);
+    expect(() => h.hold.release()).toThrow('Invalid held');
+    h.hold.dispose();
+    expect(h.worker.listeners).toHaveLength(1);
+  });
+  it('disposes without replaying a queued response and rejects premature release', () => {
+    const h = heldResponseHarness();
+    expect(() => h.hold.release()).toThrow('Invalid held');
+    h.worker.postMessage({ operation: 'incremental-route', requestId: 'held' });
+    h.emit(h.final); h.hold.dispose();
+    expect(h.received).toEqual([]);
+    expect(() => h.hold.release()).toThrow('Invalid held');
+    expect(h.worker.listeners).toHaveLength(1);
+  });
+  it('reports duplicate finals instead of retaining an unbounded response queue', () => {
+    const h = heldResponseHarness();
+    h.worker.postMessage({ operation: 'incremental-route', requestId: 'held' });
+    h.emit(h.final); h.emit(h.final);
+    expect(h.hold.state().overflow).toBe(true);
+    expect(() => h.hold.release()).toThrow('Invalid held');
+    h.hold.dispose();
+  });
+  it('restores the prototype and listeners on send failure or unused disposal', () => {
+    const unused = heldResponseHarness(); unused.hold.dispose();
+    expect(unused.Worker.prototype.postMessage).toBe(unused.original);
+    const h = heldResponseHarness(); h.worker.fail = true;
+    expect(() => h.worker.postMessage({ operation: 'incremental-route', requestId: 'held' })).toThrow('send failed');
+    expect(h.hold.state().disposed).toBe(true);
+    expect(h.worker.listeners).toHaveLength(1);
+    expect(h.Worker.prototype.postMessage).toBe(h.original);
+  });
+});
+
 describe('business history restoration contract', () => {
+  it('compares retained redo routes to the committed state, not a pending preview', async () => {
+    const before = structuredClone({ nodes, edges });
+    const after = structuredClone(before);
+    after.nodes[0].position.x = 20;
+    after.edges[1].data.computedPath[0].x = 99;
+    let current = after;
+    const window = { __vizlyBusinessHistory: { before, after }, reactFlowInstance: {
+      getNodes: () => current.nodes, getEdges: () => current.edges,
+    } };
+    const session = {
+      send: async (_method, event) => {
+        if (event.type === 'keyDown') current = event.modifiers === 2 ? before : { nodes: after.nodes, edges: before.edges };
+      },
+      evaluate: async expression => vm.runInNewContext(expression, { window }),
+    };
+    const route = { routing: { requestId: 'current' }, request: { nodes }, response: { edges } };
+    const restored = await verifyBusinessHistoryRoundtrip({ session, editedNodeId: 'a',
+      waitForValue: async (_session, expression, label) => label.endsWith(' route') ? route : session.evaluate(expression),
+      readFinalRouteExpression: () => 'route', waitForVisual: async () => {}, auditFinalSvg: async () => ({}) });
+    expect(restored[1].stability.changedGeometryCount).toBe(1);
+    expect(restored[1].retained.changedGeometryCount).toBe(0);
+    expect(window.__vizlyBusinessHistory).toBeUndefined();
+  });
   it.each([null, { ...validMetrics(), comparedEdgeCount: 0 }, { ...validMetrics(), changedPortCount: 1 },
     { ...validMetrics(), changedPathCount: 1, changedGeometryCount: 1 }])('rejects missing or changed nonincident routes', value => {
     expect(() => assertHistoryRetainedRoutes(value)).toThrow('retained');
