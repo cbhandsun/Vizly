@@ -9,6 +9,7 @@ import { applyElkResultNodeGeometry } from '../AbstractElkLayoutStrategy';
 import { DomainCompoundElkLayoutStrategy } from '../DomainCompoundElkLayoutStrategy';
 import { DomainElkLayoutStrategy } from '../DomainElkLayoutStrategy';
 import { evaluateLayoutGeometry } from '../../algorithms/layoutGeometryConstraints';
+import systemsInteraction from '../../../data/standardized/SystemsInteractionStandardData.json';
 
 const elkMocks = vi.hoisted(() => ({
   runElkLayout: vi.fn(),
@@ -30,6 +31,9 @@ vi.mock('../../components/layout/LayoutOptimizer', () => ({
 }));
 
 class InspectableDomainCompoundElkLayoutStrategy extends DomainCompoundElkLayoutStrategy {
+  prepareGraph(nodes: Node[], edges: Edge[], options: LayoutOptions): ElkNode {
+    return this.buildElkGraph(this.prepareData(nodes, options).updatedNodes, edges, options);
+  }
   buildGraph(nodes: Node[], edges: Edge[], options: LayoutOptions): ElkNode {
     return this.buildElkGraph(nodes, edges, options);
   }
@@ -57,6 +61,38 @@ beforeEach(() => {
 });
 
 describe('DomainCompoundElkLayoutStrategy', () => {
+  it.each(['TB', 'BT', 'LR', 'RL'] as const)('keeps explicit primary flow forward across feedback groups in %s', async direction => {
+    const { default: ELK } = await import('elkjs/lib/elk.bundled.js');
+    const nodes: Node[] = systemsInteraction.nodes.map(value => ({
+      id: value.id, type: 'custom', data: { ...value }, position: { x: 0, y: 0 },
+      width: 280, height: 120, measured: { width: 280, height: 120 },
+    }));
+    const edges: Edge[] = systemsInteraction.edges.map(value => ({
+      id: value.id, source: value.source, target: value.target, type: 'advanced-smart-step',
+      className: value.type === 'main' ? 'vizly-edge-role-main' : undefined,
+    }));
+    const graph = new InspectableDomainCompoundElkLayoutStrategy().prepareGraph(nodes, edges, {
+      ...systemsInteraction.layout, type: LayoutType.ELK, direction,
+      padding: { top: 40, right: 40, bottom: 40, left: 40 }, spacing: { horizontal: 120, vertical: 120 },
+    });
+    const result = await new ELK().layout(graph);
+    const positions = new Map<string, number>();
+    const axis = direction === 'TB' || direction === 'BT' ? 'y' : 'x';
+    const sign = direction === 'BT' || direction === 'RL' ? -1 : 1;
+    const visit = (parent: ElkNode, origin = 0): void => {
+      for (const child of parent.children ?? []) {
+        const coordinate = origin + (child[axis] ?? 0);
+        positions.set(child.id, coordinate);
+        visit(child, coordinate);
+      }
+    };
+    visit(result);
+    for (const edge of systemsInteraction.edges.filter(value => value.type === 'main')) {
+      const source = positions.get(edge.source), target = positions.get(edge.target);
+      if (source === undefined || target === undefined) throw new Error('Missing main-flow endpoint');
+      expect(sign * (target - source), edge.id).toBeGreaterThanOrEqual(0);
+    }
+  }, 15_000);
   it('reconstructs the returned hierarchy after layout-switch preparation removed parent ids', () => {
     const domain = node('domain', 'titleGroup', { domain: 'A' });
     const subgroup = node('subgroup', 'subGroup', { domain: 'A', subDomain: 'One' });

@@ -19,6 +19,7 @@ import {
   resolveDomainElkEdgeRouting,
   resolveDomainElkSpacing,
   resolveDomainElkThoroughness,
+  resolveDomainElkMainFlowOptions,
 } from './domainElkLayoutProfile';
 import {
   applyDomainElkLayoutRoutes,
@@ -133,7 +134,8 @@ export class DomainElkLayoutStrategy implements ILayoutStrategy {
             'elk.spacing.labelLabel': String(labelSpacing),
           },
           children: layoutCandidates.map(n => ({ id: n.id, width: getW(n), height: getH(n) })),
-          edges: scopedEdges.map(e => ({ id: e.id || `${e.source}->${e.target}`, sources: [e.source], targets: [e.target] })),
+          edges: scopedEdges.map(e => ({ id: e.id || `${e.source}->${e.target}`, sources: [e.source], targets: [e.target],
+            layoutOptions: resolveDomainElkMainFlowOptions(e, scopedEdges.length) })),
         }
         const requestOptions = { signal: context?.signal }
         const res = context?.elkLayoutRunner

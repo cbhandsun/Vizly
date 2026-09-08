@@ -5,6 +5,7 @@ import {
   resolveDomainElkEdgeRouting,
   resolveDomainElkSpacing,
   resolveDomainElkThoroughness,
+  resolveDomainElkMainFlowOptions,
 } from '../domainElkLayoutProfile';
 import {
   applyDomainElkLayoutRoutes,
@@ -12,6 +13,27 @@ import {
 } from '../domainElkLayoutRoutes';
 
 describe('domainElkLayoutProfile', () => {
+  it('preserves explicit main-flow intent after conversion to a renderer type', () => {
+    expect(resolveDomainElkMainFlowOptions({ type: 'main' }, 16))
+      .toEqual({ 'elk.layered.priority.direction': '17' });
+    expect(resolveDomainElkMainFlowOptions({ type: 'advanced-smart-step', className: 'selected vizly-edge-role-main' }, 16))
+      .toEqual({ 'elk.layered.priority.direction': '17' });
+    expect(resolveDomainElkMainFlowOptions({ type: 'advanced-smart-step' }, 16)).toBeUndefined();
+    for (const type of ['feedback', 'data', 'dependency', '', undefined, 1, {}, []]) {
+      expect(resolveDomainElkMainFlowOptions({ type }, 16)).toBeUndefined();
+    }
+  });
+  it('rejects invalid graph limits and ambiguous semantic classes', () => {
+    for (const count of [0, -1, NaN, Infinity, 1.5, 10_001]) {
+      expect(resolveDomainElkMainFlowOptions({ type: 'main' }, count)).toBeUndefined();
+    }
+    for (const className of [null, 1, {}, 'a'.repeat(513), 'vizly-edge-role-data',
+      'vizly-edge-role-main vizly-edge-role-status', 'vizly-edge-role-main<script>']) {
+      expect(resolveDomainElkMainFlowOptions({ type: 'main', className }, 16)).toBeUndefined();
+    }
+    expect(resolveDomainElkMainFlowOptions({ type: 'main' }, 10_000))
+      .toEqual({ 'elk.layered.priority.direction': '10001' });
+  });
   it('uses official ELK layered quality option identifiers', () => {
     expect(DOMAIN_ELK_LAYERED_QUALITY_OPTIONS).toMatchObject({
       'elk.layered.considerModelOrder.strategy': 'NONE',

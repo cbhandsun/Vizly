@@ -1,5 +1,20 @@
 export type DomainElkEdgeRouting = 'ORTHOGONAL' | 'POLYLINE' | 'SPLINES';
 
+/** Explicit flow semantics only: renderer names, labels and colors are not intent.
+ * Scale the preference above the ordinary edge count in this bounded graph. ELK still
+ * owns cycle breaking, including unavoidable cycles among main edges. */
+export const resolveDomainElkMainFlowOptions = (
+  edge: { type?: unknown; className?: unknown }, edgeCount: number,
+): Record<string, string> | undefined => {
+  if (!Number.isInteger(edgeCount) || edgeCount < 1 || edgeCount > 10_000) return undefined;
+  if (edge.className !== undefined && (typeof edge.className !== 'string' || edge.className.length > 512)) return undefined;
+  const roles = typeof edge.className === 'string'
+    ? [...new Set(edge.className.split(/\s+/).filter(token => token.startsWith('vizly-edge-role-')))] : [];
+  const main = roles.length ? roles.length === 1 && roles[0] === 'vizly-edge-role-main'
+    : typeof edge.type === 'string' && edge.type.trim().toLowerCase() === 'main';
+  return main ? { 'elk.layered.priority.direction': String(edgeCount + 1) } : undefined;
+};
+
 export const DOMAIN_ELK_LAYERED_QUALITY_OPTIONS = Object.freeze({
   'elk.layered.considerModelOrder.strategy': 'NONE',
   'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',

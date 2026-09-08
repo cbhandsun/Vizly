@@ -3,7 +3,7 @@ import type { ElkNode } from 'elkjs';
 
 import type { LayoutOptions } from '../types/layout';
 import { AbstractElkLayoutStrategy } from './AbstractElkLayoutStrategy';
-import { DOMAIN_ELK_LAYERED_QUALITY_OPTIONS } from './domainElkLayoutProfile';
+import { DOMAIN_ELK_LAYERED_QUALITY_OPTIONS, resolveDomainElkMainFlowOptions } from './domainElkLayoutProfile';
 
 const GROUP_TYPES = new Set(['subGroup', 'titleGroup', 'group', 'domain']);
 
@@ -187,6 +187,7 @@ export class DomainCompoundElkLayoutStrategy extends AbstractElkLayoutStrategy {
           id: edge.id || `${edge.source}->${edge.target}`,
           sources: [edge.source],
           targets: [edge.target],
+          layoutOptions: resolveDomainElkMainFlowOptions(edge, edges.length),
         })),
     };
   }
