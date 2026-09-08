@@ -11,6 +11,23 @@ const input = (id: string, y = 0): EdgeLabelArrangementInput => ({
 });
 
 describe('global edge label arrangement regression', () => {
+  it('keeps established placements when pruning candidates with worse content conflicts', () => {
+    const entries = overviewInputs.labels.map(label => ({ ...label, obstacles: overviewInputs.obstacles }));
+    const result = arrangeEdgeLabels(entries);
+    // Captured from the exhaustive implementation: clearing content has priority,
+    // but equal-content candidates must still compete on route/leader cost.
+    for (const [id, x, y, anchorX, anchorY] of [
+      ['e-alert-labor', 5414, 2146.534974489796, 5414, 2035],
+      ['e-alloc-rollback', 1455, 2336.534974489796, 1455, 2165],
+      ['e-allocation-task', 1705.3, 1588.5349744897958, 1565.8, 1466],
+      ['e-atp', 1455.5, 1111.534974489796, 1455.5, 1000],
+    ] as const) {
+      expect(result.get(id)).toMatchObject({
+        center: { x, y }, anchor: { x: anchorX, y: anchorY }, status: 'placed', conflicts: 0,
+      });
+    }
+    expect(arrangeEdgeLabels([...entries].reverse())).toEqual(result);
+  });
   it('keeps readable overview labels clear of business nodes after a saved WMS reload', () => {
     const entries = overviewInputs.labels.map(input => ({ ...input, obstacles: overviewInputs.obstacles }));
     const result = arrangeEdgeLabels(entries);

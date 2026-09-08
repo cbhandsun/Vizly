@@ -166,12 +166,17 @@ export const arrangeEdgeLabels = (inputs: readonly EdgeLabelArrangementInput[]):
       if (obstacleBoundaries && (searchInput.manual || best?.conflicts === 0)) break;
       for (const center of candidatesFor(searchInput, obstacleBoundaries)) {
         const rect = estimateEdgeLabelRect(center, input.text, input.scale, input.size);
-        const anchor = nearestAnchor(center, input.labelPath);
-        const end = leaderEnd(anchor, center, rect);
         const nodeConflicts = nodes.filter(node => edgeLabelRectsConflict(rect, node, 10)).length;
         const labelConflicts = occupied.filter(other => edgeLabelRectsConflict(rect, other.rect)).length;
+        const contentConflicts = nodeConflicts + labelConflicts;
+        // Content conflicts are the primary ordering key. A worse candidate
+        // cannot win regardless of route/leader cost, and cannot be conflict-free.
+        if (contentConflicts > bestContentConflicts) continue;
+        const anchor = nearestAnchor(center, input.labelPath);
+        const end = leaderEnd(anchor, center, rect);
         const terminalConflicts = terminals.filter(terminal => edgeLabelRectsConflict(rect, terminal, 4)).length;
-        const pathConflicts = paths.filter(path => pathHits(path, expand(rect, 8))).length;
+        const pathRect = expand(rect, 8);
+        const pathConflicts = paths.filter(path => pathHits(path, pathRect)).length;
         const blockedLeader = end && nodes.some(node => edgeLabelSegmentIntersectsRect(anchor, end, expand(node, 2)));
         const leaderLabelConflicts = occupied.filter(other => (
           (end && edgeLabelSegmentIntersectsRect(anchor, end, expand(other.rect, 2)))
@@ -181,7 +186,6 @@ export const arrangeEdgeLabels = (inputs: readonly EdgeLabelArrangementInput[]):
           + Number(Boolean(blockedLeader)) + leaderLabelConflicts;
         // Never trade covered text or a business node for fewer line crossings.
         // Remaining line/leader conflicts still report an unresolved placement.
-        const contentConflicts = nodeConflicts + labelConflicts;
         const cost = conflicts * 1_000_000 + distance(center, input.preferredCenter)
           + distance(anchor, input.anchor) * 0.25;
         if (contentConflicts < bestContentConflicts || (contentConflicts === bestContentConflicts && cost < bestCost)) {
