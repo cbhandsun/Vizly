@@ -458,3 +458,10 @@ I5（加载与成本余量）可在 I2 后作为独立批次插入；只读调�
 - 原检查仅对孤立节点增删阻断无关节点移动；八个新增回归在旧实现中全部未能阻断，证明缺口。现在十项操作都要求显式编辑对象及其后代之外的保留节点位置不变，沿用既有位移比较容差；路由器扩大可变连线组不能豁免节点移动。
 - 没有把折叠/展开的节点集合变化当作异常，也没有把所有连线路径变化一律归零。已有孤立节点端口、几何、长度及拐点保持要求保留。
 - 定向 14 项测试通过；真实浏览器十项操作全部通过，各操作组外节点位移为零、比较节点数为 6–14。折叠和展开仍各记录一条组外几何变化，必要性及受影响集合口径留待后续研究。日志 `tmp/i2-position-contract-before.log`、`tmp/i2-position-contract-browser.log`。
+
+### f655485f 验收与 I2f 请求组口径
+
+- `f655485f` 的 [完整 CI 34204769163](https://github.com/cbhandsun/Vizly/actions/runs/34204769163) 全部成功，包括覆盖率；[性能 34204769172](https://github.com/cbhandsun/Vizly/actions/runs/34204769172) 的冷启动、增量和交互绘制全部成功。I5a 与 I2e 本批远端验收完成。
+- 对折叠/展开增加三次有不同假设的数值诊断：提交前与 Worker 输入路径不同，最终路径再次变化；节点位置、尺寸保持，观测到的端口位置不足以解释目标端点横移 36 单位。路径总长往返变化约 34，拐点数保持。未据此改动算法。日志 `tmp/i2-collapse-route-diagnostic.log`、`tmp/i2-collapse-size-diagnostic.log`、`tmp/i2-collapse-handle-diagnostic.log`。
+- 代码确认 `createExactTopologySessionReplay` 可将 incident context 连线加入 eligible 集合，且折叠实测发生 full 回退。矩阵之前却把请求 `mutableEdgeIds` 对应指标命名为最终“组外”，含义过强。现在改名 `outsideRequestedRoutingGroup` / `observedRequestedMutableEdgeCount`，同一集合中的变化仍全部保留，既有门禁保持；15 项定向测试通过，含请求组外路径变化不被隐藏的回归。
+- 尚未证明该连线改变的必要性，也尚无最终 eligible ID 集合的协议证据。下一步应补最终影响组的有界证据，再对保留旧路径的可行性作最小反例实验，不能通过扩大报告中的排除集合制造稳定结论。

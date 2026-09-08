@@ -79,6 +79,9 @@ export const captureTopologyStabilityBaseline = session => session.evaluate(`(()
   return true;
 })()`);
 
+// The request closure can expand inside the Worker, or fall back to a full route.
+// This comparison deliberately preserves changes outside the ORIGINAL request;
+// it must not be presented as an audit of the final transaction's eligible set.
 export const readTopologyEditStability = (session, operationId, mutableEdgeIds) => session.evaluate(`(() => {
   const read = ${readTopologyStabilitySnapshot.toString()};
   const measure = ${measureDisplayRoutingEditStability.toString()};
@@ -94,8 +97,8 @@ export const readTopologyEditStability = (session, operationId, mutableEdgeIds) 
     const observedEdges = new Set([...before.edges, ...after.edges].map(edge => edge.id));
     const observedMutable = [...new Set(mutable)].filter(id => observedEdges.has(id));
     return {
-      intent, outsideRoutingGroup: measure(before, after, selected, observedMutable),
-      explicitOrDescendantNodeCount: selected.length, observedMutableEdgeCount: observedMutable.length,
+      intent, outsideRequestedRoutingGroup: measure(before, after, selected, observedMutable),
+      explicitOrDescendantNodeCount: selected.length, observedRequestedMutableEdgeCount: observedMutable.length,
       beforeHiddenNodeCount: before.hiddenNodeCount, afterHiddenNodeCount: after.hiddenNodeCount,
       beforeHiddenEdgeCount: before.excludedHiddenEdgeCount, afterHiddenEdgeCount: after.excludedHiddenEdgeCount,
     };
@@ -104,7 +107,7 @@ export const readTopologyEditStability = (session, operationId, mutableEdgeIds) 
 
 export const assertTopologyEditStability = (operationId, evidence) => {
   const intent = projectDisplayRoutingEditStability(evidence?.intent);
-  const outside = projectDisplayRoutingEditStability(evidence?.outsideRoutingGroup);
+  const outside = projectDisplayRoutingEditStability(evidence?.outsideRequestedRoutingGroup);
   if (!intent || !outside) throw new Error('Incomplete topology stability evidence');
   // These edit operations update explicit nodes (including moved descendants),
   // not the positions of retained nodes outside that scope. Router-selected

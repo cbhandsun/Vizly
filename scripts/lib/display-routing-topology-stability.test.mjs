@@ -78,8 +78,19 @@ describe('topology edit stability', () => {
     graph.edges[0].data.computedPath[1].y = 20;
     const result = await readTopologyEditStability(session, 'port-policy', ['edge']);
     expect(result.intent).toMatchObject({ comparedEdgeCount: 1, changedPortCount: 1, changedGeometryCount: 1 });
-    expect(result.outsideRoutingGroup).toMatchObject({ comparedEdgeCount: 0, changedPortCount: 0 });
-    expect(result.observedMutableEdgeCount).toBe(1);
+    expect(result.outsideRequestedRoutingGroup).toMatchObject({ comparedEdgeCount: 0, changedPortCount: 0 });
+    expect(result.observedRequestedMutableEdgeCount).toBe(1);
+  });
+
+  it('preserves route changes outside the initial request without claiming the final group is known', async () => {
+    const { graph, session } = setup();
+    await captureTopologyStabilityBaseline(session);
+    graph.edges[0].data.computedPath[1].y = 20;
+    const result = await readTopologyEditStability(session, 'container-expand', []);
+    expect(result.outsideRequestedRoutingGroup).toMatchObject({ comparedEdgeCount: 1, changedGeometryCount: 1 });
+    expect(result.observedRequestedMutableEdgeCount).toBe(0);
+    expect(result).not.toHaveProperty('outsideRoutingGroup');
+    expect(() => assertTopologyEditStability('container-expand', result)).not.toThrow();
   });
 
   it('includes descendants in explicit movement and reports hidden route-set changes', async () => {
