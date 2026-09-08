@@ -6,6 +6,7 @@ import wmsProcess from '../../../data/standardized/WmsProcessFlowStandardData.js
 import demandAllocation from '../../../data/standardized/DeamndAllocation.json';
 import enterpriseArchitecture from '../../../data/standardized/ArchitectureStandardData.json';
 import { DomainDagreLayoutStrategy } from '../DomainDagreLayoutStrategy';
+import { measureRoutedLayoutQuality } from '../../components/shared/__tests__/routedLayoutQuality';
 import { LayoutType } from '../../types/layout';
 import { withDisplayAbsolutePositions } from '../../components/shared/baseReactFlowDisplayEdgeCore';
 import { computeBaseReactFlowDisplayEdgesWorkerResponse } from '../../components/shared/baseReactFlowDisplayEdges.worker';
@@ -181,6 +182,20 @@ describe('shared process ranks with local branch separation', () => {
       quality: { nonOrthogonalSegments: 0, strictCrossings: 0, reverseOverlap: 0, unrelatedOverlap: 0 },
     });
     if (!response.edges) throw new Error('Missing full-route response edges');
+    if (productionGeometry) {
+      // Real routed baselines: a smaller lane envelope alone previously let
+      // LR crossings grow from 12 to 29 while every hard-quality check passed.
+      // Keep readability independent of the routing safety assertions below.
+      const quality = measureRoutedLayoutQuality(original.nodes, response.edges, direction);
+      expect(quality).not.toBeNull();
+      if (!quality) throw new Error('Missing complete routed layout measurement');
+      const baseline = horizontal
+        ? { width: 3911, height: 6698, pathLength: 76314, bends: 64, crossings: 12, backwardTravel: 6925 }
+        : { width: 4191, height: 1517, pathLength: 34046, bends: 43, crossings: 4, backwardTravel: 2080.5 };
+      for (const key of ['width', 'height', 'pathLength', 'bends', 'crossings', 'backwardTravel'] as const) {
+        expect(quality[key], `Routed readability regressed: ${key}`).toBeLessThanOrEqual(baseline[key] + 0.01);
+      }
+    }
     expect(
       auditBaseReactFlowDisplayCommercialQuality(response.edges),
       JSON.stringify(response.edges.map(edge => ({ id: edge.id, path: edge.data?.computedPath }))),
