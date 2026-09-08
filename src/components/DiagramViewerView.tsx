@@ -20,6 +20,7 @@ import { CloudSaveAuthRecovery } from './diagrams/CloudSaveAuthRecovery';
 import { loadLayoutPresetMapForDiagram } from '@/data/standardized/layoutPresetMapLoader';
 import { shouldHideDiagramViewerCenterIsland } from './diagramViewerChrome';
 import { SettingsPanelBoundary } from './ui/SettingsPanelBoundary';
+import { DraggableSettingsPanel } from './ui/DraggableSettingsPanel';
 
 const RoutingDebugPanel = import.meta.env.DEV
     ? lazy(() => import('./debug/RoutingDebugPanel').then(module => ({ default: module.RoutingDebugPanel })))
@@ -34,7 +35,6 @@ const ShareDialog = lazy(() => import('@/components/diagrams/ShareDialog'));
 const VersionHistoryPanel = lazy(() => import('./diagrams/ui/VersionHistoryPanel').then(module => ({ default: module.VersionHistoryPanel })));
 const CloudStorageManagerModal = lazy(() => import('./storage/CloudStorageManagerModal').then(module => ({ default: module.CloudStorageManagerModal })));
 const MermaidImportModal = lazy(() => import('./ui/MermaidImportModal').then(module => ({ default: module.MermaidImportModal })));
-const DraggableSettingsPanel = lazy(() => import('./ui/DraggableSettingsPanel').then(module => ({ default: module.DraggableSettingsPanel })));
 const TemplateCascaderMenu = lazy(() => import('./diagrams/ui/TemplateCascaderMenu').then(module => ({ default: module.TemplateCascaderMenu })));
 
 const renderVersionHistoryPanel = (props: { diagramId: string; isOpen: boolean; onClose: () => void }) => (

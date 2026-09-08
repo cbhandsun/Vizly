@@ -381,6 +381,17 @@ describe('DiagramViewer regression', () => {
         expect(screen.getByTestId('diagram')).toHaveAttribute('data-readonly', 'true');
     });
 
+    it('opens the settings shell synchronously instead of suspending its existing content', () => {
+        render(
+            <MemoryRouter initialEntries={['/diagram?diagram=test-diagram']}>
+                <DiagramViewer />
+            </MemoryRouter>
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'open-settings' }));
+        expect(screen.getByTestId('settings-panel')).toBeInTheDocument();
+        expect(document.querySelector('[data-settings-panel-phase="loading"]')).toBeNull();
+    });
+
     it('guards settings document mutations after the designer locks the canvas', async () => {
         configValueSetterMock.mockClear();
 
