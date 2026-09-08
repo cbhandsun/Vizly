@@ -40,8 +40,15 @@ describe('semantic swimlane process geometry', () => {
     const peers = arranged.filter(node => node.id.startsWith('child-')).sort((a, b) => a.position[flow] - b.position[flow]);
     const columns = new Set(peers.map(node => node.position[cross])).size;
     expect(columns).toBeLessThanOrEqual(count);
-    if (count !== 9) expect(columns).toBe(1);
-    else expect(columns).toBe(count); // Expensive flow expansion retains the baseline packing.
+    if (count === 4 || count === 5) expect(columns).toBe(count % 2 === 0 ? 2 : 3);
+    if (count === 9) expect(columns).toBe(count); // Expensive flow expansion retains the baseline packing.
+    else {
+      const flowDimension = horizontal ? 'width' : 'height';
+      const extent = Math.max(...peers.map(node => node.position[flow] + getNodeDimensions(node)[flowDimension]))
+        - Math.min(...peers.map(node => node.position[flow]));
+      const serialExtent = peers.reduce((sum, node) => sum + getNodeDimensions(node)[flowDimension], 0) + 48 * (count - 1);
+      expect(extent).toBeLessThan(serialExtent);
+    }
     // Unequal peers may retain another column. Clearance is a rectangle
     // constraint, not a requirement that every branch use one exact column.
     for (let first = 0; first < peers.length; first++) {

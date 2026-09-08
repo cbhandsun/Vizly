@@ -91,6 +91,37 @@ export function assignDomainDagreLaneCoordinates(
         occupiedWidth = Math.max(occupiedWidth, c + crossSize(node));
         replacements.set(node.id, { ...node, position: at(bucketCross + inset + c, node.position[flow]) });
       }
+      const processIds = new Set(process.map(node => node.id));
+      for (const hubInput of process.length <= 256 && edges.length <= 1024 ? process : []) {
+        const hub = replacements.get(hubInput.id);
+        if (!hub) continue;
+        const neighborIds = new Set(edges.filter(edge => edge.source === hub.id || edge.target === hub.id)
+          .map(edge => edge.source === hub.id ? edge.target : edge.source));
+        const peers = [...neighborIds].filter(id => processIds.has(id)).flatMap(id => {
+          const node = replacements.get(id);
+          return node ? [node] : [];
+        });
+        if (peers.length < 4) continue;
+        if (!peers.some((node, index) => peers.slice(index + 1).some(other =>
+          node.position[flow] === other.position[flow] && node.position[cross] !== other.position[cross]))) continue;
+        let channel = hub.position[cross] + crossSize(hub) / 2;
+        const left = peers.filter(node => node.position[cross] + crossSize(node) <= channel);
+        const right = peers.filter(node => node.position[cross] >= channel);
+        if (!left.length || !right.length) continue;
+        // Reserve a render-safe terminal plus one parallel routing track.
+        const channelMargin = 56 + 24;
+        channel = Math.max(channel, bucketCross + inset + Math.max(...left.map(crossSize)) + channelMargin);
+        replacements.set(hub.id, { ...hub, position: at(channel - crossSize(hub) / 2, hub.position[flow]) });
+        occupiedWidth = Math.max(occupiedWidth, channel + crossSize(hub) / 2 - bucketCross - inset);
+        for (const node of [...left, ...right]) {
+          const next = left.includes(node)
+            ? channel - channelMargin - crossSize(node)
+            : channel + channelMargin;
+          if (next < bucketCross + inset) continue;
+          replacements.set(node.id, { ...node, position: at(next, node.position[flow]) });
+          occupiedWidth = Math.max(occupiedWidth, next - bucketCross - inset + crossSize(node));
+        }
+      }
       // Explicit Grid/Flow uses the bounded card packer; automatic keeps its
       // linear fill inside the same common lane envelope.
       let column = process.length ? occupiedWidth + crossGap : 0;

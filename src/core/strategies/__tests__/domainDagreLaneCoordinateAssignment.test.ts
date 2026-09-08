@@ -7,6 +7,50 @@ const node = (id: string, x: number, y: number, width = 240, height = 80): Node 
   id, position: { x, y }, width, height, measured: { width, height }, data: {},
 });
 describe('final swimlane coordinate assignment', () => {
+  it('leaves common-channel refinement bounded on oversized edge input', () => {
+    const input = [{ ...node('domain', 0, 0, 1000, 1600), type: 'titleGroup' },
+      node('hub', 205, 200, 260), node('a', 64, 800, 210), node('b', 394, 800, 212),
+      node('c', 104, 960, 191), node('d', 415, 960, 151)];
+    const edges = Array.from({ length: 1025 }, (_, i) => ({ id: `e${i}`, source: 'hub', target: ['a', 'b', 'c', 'd'][i % 4] }));
+    const replacements = new Map(input.map(value => [value.id, value]));
+    assignDomainDagreLaneCoordinates(replacements, [{ domainId: 'domain', buckets: [{ id: 'domain',
+      nodeIds: input.slice(1).map(value => value.id) }] }], edges, false, 120, 96);
+    const first = replacements.get('a'), second = replacements.get('c');
+    if (!first || !second) throw new Error('Missing branch nodes');
+    expect(first.position.x + Number(first.width)).not.toBe(second.position.x + Number(second.width));
+    expect(replacements.get('hub')?.position.y).toBe(200);
+  });
+  it.each([false, true])('reserves one common channel across unequal paired rows, horizontal=%s', horizontal => {
+    const input = [
+      { ...node('domain', 0, 0, 1000, 1600), type: 'titleGroup' },
+      node('hub', 205, 200, 260, 96),
+      node('left-1', 64, 800, 210), node('right-1', 394, 800, 212),
+      node('left-2', 104, 960, 191), node('right-2', 415, 960, 151),
+      node('center-last', 240, 1120, 190),
+    ].map(value => horizontal ? { ...value, position: { x: value.position.y, y: value.position.x },
+      width: value.height, height: value.width, measured: { width: value.height, height: value.width } } : value);
+    const before = structuredClone(input);
+    const edges = input.slice(2).map(value => ({ id: `e-${value.id}`, source: 'hub', target: value.id }));
+    const replacements = new Map(input.map(value => [value.id, value]));
+    assignDomainDagreLaneCoordinates(replacements, [{ domainId: 'domain', buckets: [{ id: 'domain',
+      nodeIds: input.slice(1).map(value => value.id) }] }], [...edges, ...edges], horizontal, 120, 96);
+    const cross = horizontal ? 'y' : 'x', size = horizontal ? 'height' : 'width';
+    const get = (id: string) => { const value = replacements.get(id); if (!value) throw new Error('Missing node'); return value; };
+    const hub = get('hub'), channel = hub.position[cross] + Number(hub[size]) / 2;
+    const leftEnds = ['left-1', 'left-2'].map(id => get(id).position[cross] + Number(get(id)[size]));
+    const rightStarts = ['right-1', 'right-2'].map(id => get(id).position[cross]);
+    expect(new Set(leftEnds).size).toBe(1);
+    expect(new Set(rightStarts).size).toBe(1);
+    expect(channel - leftEnds[0]).toBeGreaterThanOrEqual(80);
+    expect(rightStarts[0] - channel).toBeGreaterThanOrEqual(80);
+    for (const value of input.slice(1)) {
+      const output = get(value.id);
+      expect(output.position[horizontal ? 'x' : 'y']).toBe(value.position[horizontal ? 'x' : 'y']);
+      expect(output.position[cross]).toBeGreaterThanOrEqual(0);
+      expect(output.position[cross] + Number(output[size])).toBeLessThanOrEqual(Number(get('domain')[size]));
+    }
+    expect(input).toEqual(before);
+  });
   it.each([false, true])('fills unconnected content using the existing lane extent, horizontal=%s', horizontal => {
     const chain = Array.from({ length: 6 }, (_, index) => node(`c${index}`, 64, 200 + index * 144));
     const isolated = Array.from({ length: 12 }, (_, index) => node(`i${index}`, 424 + index * 360, 200));

@@ -226,6 +226,20 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
       const reuseSpacing = compactFan && domainPeers.every(node => (
         Math.max(0, flowSize(node) + COMMERCIAL_BUSINESS_NODE_CLEARANCE - flowGap) <= crossSize(node)
       ));
+      if (reuseSpacing) {
+        const ordered = domainPeers.toSorted((a, b) => center(replacements.get(a.id) ?? a) - center(replacements.get(b.id) ?? b));
+        let rowStart = Math.min(...ordered.map(node => (replacements.get(node.id) ?? node).position[flow])) + flowOffset + Math.max(64, flowGap);
+        const arranged: Node[] = [];
+        for (let index = 0; index < ordered.length; index += 2) {
+          const row = ordered.slice(index, index + 2).map(node => replacements.get(node.id) ?? node);
+          for (const current of row) {
+            maximumPeerOffset = Math.max(maximumPeerOffset, rowStart - current.position[flow] - flowOffset);
+            arranged.push(moveAlong(current, flow, rowStart));
+          }
+          rowStart += Math.max(flowGap, ...row.map(node => flowSize(node) + COMMERCIAL_BUSINESS_NODE_CLEARANCE));
+        }
+        return arranged;
+      }
       let peerOffset = compactFan ? 64 : 0;
       let previousFlowEnd: number | undefined;
       return domainPeers
