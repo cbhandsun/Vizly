@@ -3,6 +3,9 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { DISPLAY_ROUTING_TOPOLOGY_CASE_ID } from './display-routing-matrix-cases.mjs';
 import { readDisplayRoutingNodeDragTarget } from './display-routing-browser-geometry.mjs';
 import { withPrecompiledRouteBrowser } from './precompiled-display-route-cdp.mjs';
+import { waitForDisplayRoutingBrowserValue } from './display-routing-browser-wait.mjs';
+import { captureTopologyStabilityBaseline, readTopologyEditStability, assertTopologyEditStability, readTopologyVisibilityEvidence }
+  from './display-routing-topology-stability.mjs';
 import {
   countDisplayRoutingTopologyFinalResponses,
   displayRoutingTopologyRequestMatchesResponse,
@@ -218,6 +221,11 @@ export const displayRoutingTopologyRenderIsCommitted = routing => (
   && typeof routing?.outputRouteSignature === 'string'
 );
 
+export const displayRoutingTopologyDomMatchesEdges = (rendered, committed) => (
+  Number.isSafeInteger(rendered) && Number.isSafeInteger(committed)
+  && rendered >= 0 && committed <= 5_000 && rendered === committed
+);
+
 /**
  * A successful Worker commit can immediately be republished from the trusted
  * committed snapshot. That intentionally clears the global request id so a
@@ -243,6 +251,7 @@ export const displayRoutingTopologyTransactionIsCommitted = (
 const readOperationResultExpression = operationCase => `(() => {
   const committedEdgesMatchWorkerPatches = ${displayRoutingCommittedEdgesMatchWorkerPatches.toString()};
   const renderIsCommitted = ${displayRoutingTopologyRenderIsCommitted.toString()};
+  const domMatchesEdges = ${displayRoutingTopologyDomMatchesEdges.toString()};
   const displayRoutingTopologyRequestMatchesResponse = ${displayRoutingTopologyRequestMatchesResponse.toString()};
   const displayRoutingTopologyResponseIsFinal = ${displayRoutingTopologyResponseIsFinal.toString()};
   const findFinalResponse = ${findDisplayRoutingTopologyFinalResponse.toString()};
@@ -257,6 +266,7 @@ const readOperationResultExpression = operationCase => `(() => {
   const response = request ? findFinalResponse(request, responses) : null;
   const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
   const committedEdges = window.reactFlowInstance?.getEdges?.() || [];
+  const renderedEdgeCount = document.querySelectorAll('.react-flow__edge').length;
   if (
     !request
     || !response
@@ -266,6 +276,7 @@ const readOperationResultExpression = operationCase => `(() => {
     || response.hardReport?.hardClean !== true
     || !Array.isArray(committedEdges)
     || !committedEdgesMatchWorkerPatches(committedEdges, response.routingPatches)
+    || !domMatchesEdges(renderedEdgeCount, committedEdges.length)
   ) return null;
   return {
     operationId: ${JSON.stringify(operationCase.id)},
@@ -275,7 +286,7 @@ const readOperationResultExpression = operationCase => `(() => {
     changeSet: request.changeSet,
     requestEdgeCount: request.edges?.length,
     responseEdgeCount: committedEdges.length,
-    renderedEdgeCount: document.querySelectorAll('.react-flow__edge').length,
+    renderedEdgeCount,
     request,
     response: { ...response, edges: committedEdges },
     routing: {
@@ -290,26 +301,21 @@ const readOperationResultExpression = operationCase => `(() => {
   };
 })()`;
 
-const waitForOperationResult = async (session, operationCase) => {
+export const waitForOperationResult = async (session, operationCase) => {
   const expression = readOperationResultExpression(operationCase);
-  const deadline = Date.now() + WAIT_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    const result = await session.evaluate(expression);
-    if (result) return result;
-    await delay(100);
-  }
-  const diagnostics = await session.evaluate(`(() => {
+  const diagnosticsExpression = `(() => {
     const projectDiagnostics = ${projectDisplayRoutingTopologyDiagnostics.toString()};
-    return projectDiagnostics({
+    const visibility = ${readTopologyVisibilityEvidence.toString()};
+    return { operationId: ${JSON.stringify(operationCase.id)}, visibility: visibility(), ...projectDiagnostics({
       routing: window.__vizlyBaseReactFlowDisplayRouting || {},
       requests: window.__vizlyRoutingRequests || [],
       responses: window.__vizlyRoutingResponses || [],
       nodeCount: window.reactFlowInstance?.getNodes?.().length ?? null,
       edgeCount: window.reactFlowInstance?.getEdges?.().length ?? null,
       renderedEdgeCount: document.querySelectorAll('.react-flow__edge').length,
-    });
-  })()`);
-  throw new Error(`Timed out waiting for ${operationCase.id}:\n${JSON.stringify(diagnostics, null, 2)}`);
+    }) };
+  })()`;
+  return waitForDisplayRoutingBrowserValue(session, expression, WAIT_TIMEOUT_MS, { diagnosticsExpression });
 };
 
 const prepareOperationCapture = async session => session.evaluate(`(() => {
@@ -739,6 +745,7 @@ const verifyOperationGroup = ({
   const baselineEdgeCount = initial.response.edges.length;
   const operationResults = [];
   for (const operationCase of operationCases) {
+    await captureTopologyStabilityBaseline(session);
     const counterBaseline = await prepareOperationCapture(session);
     const applied = await APPLY_OPERATION[operationCase.id](session);
     if (!applied) throw new Error(`Could not apply browser topology operation: ${operationCase.id}`);
@@ -749,7 +756,10 @@ const verifyOperationGroup = ({
       counterBaseline,
       baselineEdgeCount,
     });
+    const editStability = await readTopologyEditStability(session, operationCase.id, result.request.mutableEdgeIds);
+    assertTopologyEditStability(operationCase.id, editStability);
     operationResults.push({
+      editStability,
       id: operationCase.id,
       classification: result.changeSet.classification,
       reason: result.changeSet.reason,

@@ -126,6 +126,9 @@ describe('incremental edit stability', () => {
     }
     const deep = { nodes: Array.from({ length: 130 }, (_, i) => node(String(i), 0, 0, i < 129 ? String(i + 1) : undefined)), edges: [] };
     expect(() => measure(deep, deep, [])).toThrow(/Invalid/);
+    for (const excluded of [null, ['missing'], [42], Array(5_001).fill('edge')]) {
+      expect(() => measure(fixture(), fixture(), [], excluded)).toThrow(/Invalid/);
+    }
   });
 
   it('keeps content in the browser and exports only allowlisted aggregate metrics', async () => {

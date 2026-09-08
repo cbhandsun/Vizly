@@ -1,5 +1,6 @@
 import { memo, type CSSProperties } from 'react';
-import { Handle, Position, NodeResizer, type Node, type NodeProps } from '@xyflow/react';
+import { NodeResizer, type Node, type NodeProps } from '@xyflow/react';
+import { GroupNodeHandles } from './GroupNodeHandles';
 import type { GroupNodeData } from '../../models/DiagramModels';
 import { useTheme } from '../../themes/useCoreTheme';
 import { resolveThemeDomainKey, getDomainTheme } from '../../utils/domainKey';
@@ -256,15 +257,7 @@ const SubGroupNode = ({ id, data, zIndex, selected, isConnectable }: NodeProps<N
         )}
       </div>
 
-      {isConnectable && (
-        <>
-          {/* [FIX] Handle id 统一长格式，与 FlowchartNode 和路由策略对齐 */}
-          <Handle type="target" position={Position.Top} id="top" isConnectable={isConnectable} className="sub-group-handle" />
-          <Handle type="source" position={Position.Bottom} id="bottom" isConnectable={isConnectable} className="sub-group-handle" />
-          <Handle type="source" position={Position.Left} id="left" isConnectable={isConnectable} className="sub-group-handle" />
-          <Handle type="source" position={Position.Right} id="right" isConnectable={isConnectable} className="sub-group-handle" />
-        </>
-      )}
+      <GroupNodeHandles className="sub-group-handle" isConnectable={isConnectable} />
     </div>
   );
 };

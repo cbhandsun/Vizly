@@ -4,7 +4,7 @@ import { replayDisplayRoutingResponseEdges, selectDisplayRoutingAuditRoute } fro
  * for browser injection: graph content stays in the page; only aggregates leave.
  * Unrelated edges have neither endpoint in the explicitly edited node set.
  */
-export const measureDisplayRoutingEditStability = (before, after, editedNodeIds) => {
+export const measureDisplayRoutingEditStability = (before, after, editedNodeIds, excludedEdgeIds = []) => {
   const invalid = () => { throw new Error('Invalid edit stability snapshot'); };
   const list = (value, limit) => {
     if (!Array.isArray(value) || value.length > limit) invalid();
@@ -62,6 +62,8 @@ export const measureDisplayRoutingEditStability = (before, after, editedNodeIds)
   const first = parse(before);
   const last = parse(after);
   const edited = new Set(list(editedNodeIds, 5_000).map(id));
+  const excludedEdges = new Set(list(excludedEdgeIds, 5_000).map(id));
+  for (const key of excludedEdges) if (!first.edges.has(key) && !last.edges.has(key)) invalid();
   for (const key of edited) if (!first.nodes.has(key) && !last.nodes.has(key)) invalid();
   const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const pathLength = path => path.slice(1).reduce((sum, p, i) => sum + distance(path[i], p), 0);
@@ -124,7 +126,7 @@ export const measureDisplayRoutingEditStability = (before, after, editedNodeIds)
       result.rewiredEdgeCount += 1;
       continue;
     }
-    if (edited.has(edge.source) || edited.has(edge.target)) continue;
+    if (edited.has(edge.source) || edited.has(edge.target) || excludedEdges.has(key)) continue;
     result.comparedEdgeCount += 1;
     if (edge.sourceHandle !== next.sourceHandle || edge.targetHandle !== next.targetHandle) {
       result.changedPortCount += 1;

@@ -1,5 +1,6 @@
 import React, { type CSSProperties } from 'react';
-import { Handle, Position, NodeResizer, type Node, type NodeProps } from '@xyflow/react';
+import { NodeResizer, type Node, type NodeProps } from '@xyflow/react';
+import { GroupNodeHandles } from './GroupNodeHandles';
 import { useTheme } from '../../themes/useCoreTheme';
 import { resolveThemeDomainKey, getDomainTheme } from '../../utils/domainKey';
 import type { Theme } from '../../themes/types/ThemeTypes';
@@ -38,7 +39,7 @@ interface TitleGroupNodeData extends Record<string, unknown> {
 
 type TitleGroupCssProperties = CSSProperties & Record<`--${string}`, string>;
 
-const TitleGroupNode = React.memo(({ id, data, selected }: NodeProps<Node<TitleGroupNodeData>>) => {
+const TitleGroupNode = React.memo(({ id, data, selected, isConnectable }: NodeProps<Node<TitleGroupNodeData>>) => {
   const { t } = useTranslation();
   const [theme] = useTheme({ autoInitialize: true });
   const preset = useDiagramStylePreset_v2();
@@ -244,11 +245,7 @@ const TitleGroupNode = React.memo(({ id, data, selected }: NodeProps<Node<TitleG
         {/* Children rendered by React Flow via nested nodes, this div just provides background/border */}
       </div>
 
-      {/* [FIX] Handle id 统一使用长格式，与 FlowchartNode 和 DomainDagreLayoutStrategy 的 sourceHandle 对齐 */}
-      <Handle type="target" position={Position.Top} id="top" className="title-group-handle" />
-      <Handle type="source" position={Position.Bottom} id="bottom" className="title-group-handle" />
-      <Handle type="source" position={Position.Left} id="left" className="title-group-handle" />
-      <Handle type="source" position={Position.Right} id="right" className="title-group-handle" />
+      <GroupNodeHandles className="title-group-handle" isConnectable={isConnectable} />
     </div>
   );
 });

@@ -2,8 +2,21 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const workflow = readFileSync('.github/workflows/display-routing-matrix.yml', 'utf8');
+const requiredCi = readFileSync('.github/workflows/ci.yml', 'utf8');
 
 describe('display routing matrix workflow', () => {
+  it('gates topology editing in required CI after clearing saved-mode filters', () => {
+    const topology = requiredCi.indexOf("$env:DISPLAY_ROUTING_MATRIX_CASE = 'topology-edit-cycle'");
+    expect(topology).toBeGreaterThan(0);
+    for (const name of ['DISPLAY_ROUTING_MATRIX_SAVED_RELOAD', 'DISPLAY_ROUTING_MATRIX_PRESET']) {
+      const cleared = requiredCi.indexOf(`Remove-Item Env:${name}`);
+      expect(cleared).toBeGreaterThanOrEqual(0);
+      expect(cleared).toBeLessThan(topology);
+    }
+    expect(requiredCi.slice(topology)).toMatch(/topology-edit-cycle'\s+npm run verify:display-routing-matrix\s+if \(\$LASTEXITCODE -ne 0\)/);
+    expect(requiredCi.match(/topology-edit-cycle/g)).toHaveLength(1);
+    expect(requiredCi.slice(topology)).toContain('Stop-Process -Id $savedPreview.Id');
+  });
   it('runs every canonical preset through one continuous 16-layout sequence', () => {
     for (const presetId of [
       'logistics-architecture-v1',

@@ -82,6 +82,9 @@ jobs:
             $env:DISPLAY_ROUTING_MATRIX_CASE = 'multi-page-roundtrip'
             npm run verify:display-routing-matrix
             if ($LASTEXITCODE -ne 0) { throw 'Multi-page routing roundtrip failed.' }
+            $env:DISPLAY_ROUTING_MATRIX_CASE = 'topology-edit-cycle'
+            npm run verify:display-routing-matrix
+            if ($LASTEXITCODE -ne 0) { throw 'Topology editing stability failed.' }
           } finally {
             if (-not $savedPreview.HasExited) { Stop-Process -Id $savedPreview.Id -Force }
           }

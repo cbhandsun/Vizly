@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   assertDisplayRoutingTopologyOperationGroupResult,
@@ -8,10 +8,42 @@ import {
   findDisplayRoutingTopologyFinalResponse,
   displayRoutingTopologyRequestMatchesResponse,
   displayRoutingTopologyRenderIsCommitted,
+  displayRoutingTopologyDomMatchesEdges,
   displayRoutingTopologyTransactionIsCommitted,
   projectDisplayRoutingTopologyAssertionDiagnostics,
   projectDisplayRoutingTopologyDiagnostics,
+  waitForOperationResult,
 } from './display-routing-browser-topology-matrix.mjs';
+
+describe('topology DOM commit boundary', () => {
+  it('bounds a hung topology evaluation and diagnostic read without leaking CDP errors', async () => {
+    vi.useFakeTimers();
+    try {
+      const session = { evaluate: vi.fn(() => new Promise(() => {})) };
+      const pending = waitForOperationResult(session, { id: 'container-collapse' }).catch(error => error);
+      await vi.advanceTimersByTimeAsync(61_000);
+      const failure = await pending;
+      expect(failure.message).toContain('evaluation-timeout');
+      expect(session.evaluate).toHaveBeenCalledTimes(2);
+      expect(vi.getTimerCount()).toBe(0);
+      session.evaluate.mockRejectedValue(new Error('Bearer private-content'));
+      const rejected = await waitForOperationResult(session, { id: 'container-collapse' }).catch(error => error);
+      expect(rejected.message).toContain('evaluation-failed');
+      expect(rejected.message).not.toMatch(/Bearer|private-content/);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('waits for all committed edges to render without weakening the final count contract', () => {
+    expect(displayRoutingTopologyDomMatchesEdges(5, 7)).toBe(false);
+    expect(displayRoutingTopologyDomMatchesEdges(7, 7)).toBe(true);
+    expect(displayRoutingTopologyDomMatchesEdges(0, 0)).toBe(true);
+    for (const value of [null, '7', NaN, Infinity, -1, 5_001]) {
+      expect(displayRoutingTopologyDomMatchesEdges(value, value)).toBe(false);
+    }
+  });
+});
 
 const topologyCase = Object.freeze({
   id: 'edge-add',
