@@ -87,6 +87,9 @@ jobs:
             $env:DISPLAY_ROUTING_MATRIX_CASE = 'topology-edit-cycle'
             npm run verify:display-routing-matrix
             if ($LASTEXITCODE -ne 0) { throw 'Topology editing stability failed.' }
+            $env:DISPLAY_ROUTING_MATRIX_CASE = 'business-edit-stability'
+            npm run verify:display-routing-matrix
+            if ($LASTEXITCODE -ne 0) { throw 'Business diagram editing stability failed.' }
           } finally {
             if (-not $savedPreview.HasExited) { Stop-Process -Id $savedPreview.Id -Force }
           }

@@ -101,6 +101,7 @@ describe('display routing browser multi-page matrix', () => {
   });
 
   it('runs only the requested production-browser scenario', async () => {
+    const verifyBusinessEdits = vi.fn();
     const verifyTopology = vi.fn(async () => ({ id: 'topology-edit-cycle' }));
     const verifyMultiPage = vi.fn(async options => {
       await options.waitForInitialRoute('session', 'initial');
@@ -117,6 +118,7 @@ describe('display routing browser multi-page matrix', () => {
       auditFinalSvg: vi.fn(),
       verifyTopology,
       verifyMultiPage,
+      verifyBusinessEdits,
     };
     await expect(verifyDisplayRoutingBrowserCases({
       ...common,
@@ -124,6 +126,7 @@ describe('display routing browser multi-page matrix', () => {
     })).resolves.toEqual({
       topologyResults: [],
       multiPageResults: [{ id: 'multi-page-roundtrip' }],
+      businessEditResults: [],
     });
     expect(verifyTopology).not.toHaveBeenCalled();
     expect(waitForValue).toHaveBeenNthCalledWith(1, 'session', 'initial:', 'initial initial route');
@@ -136,9 +139,11 @@ describe('display routing browser multi-page matrix', () => {
     })).resolves.toEqual({
       topologyResults: [{ id: 'topology-edit-cycle' }],
       multiPageResults: [],
+      businessEditResults: [],
     });
     expect(verifyTopology).toHaveBeenCalledTimes(1);
     expect(verifyMultiPage).not.toHaveBeenCalled();
+    expect(verifyBusinessEdits).not.toHaveBeenCalled();
   });
 
   it('accepts isolated page content, layouts and markers after a durable reload', () => {

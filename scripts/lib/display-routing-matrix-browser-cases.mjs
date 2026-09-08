@@ -1,8 +1,10 @@
 import { verifyDisplayRoutingMultiPageMatrix } from './display-routing-browser-multipage-matrix.mjs';
 import { verifyDisplayRoutingTopologyMatrix } from './display-routing-browser-topology-matrix.mjs';
+import { verifyDisplayRoutingBusinessEdits } from './display-routing-business-edits.mjs';
 import {
   DISPLAY_ROUTING_MULTI_PAGE_CASE_ID,
   DISPLAY_ROUTING_TOPOLOGY_CASE_ID,
+  DISPLAY_ROUTING_BUSINESS_EDIT_CASE_ID,
 } from './display-routing-matrix-cases.mjs';
 
 export const verifyDisplayRoutingBrowserCases = async ({
@@ -12,8 +14,10 @@ export const verifyDisplayRoutingBrowserCases = async ({
   waitForValue,
   readFinalRouteExpression,
   auditFinalSvg,
+  onProgress,
   verifyTopology = verifyDisplayRoutingTopologyMatrix,
   verifyMultiPage = verifyDisplayRoutingMultiPageMatrix,
+  verifyBusinessEdits = verifyDisplayRoutingBusinessEdits,
 }) => {
   const waitForInitialRoute = (session, label) => waitForValue(
     session,
@@ -37,5 +41,7 @@ export const verifyDisplayRoutingBrowserCases = async ({
       auditFinalSvg,
     })]
     : [];
-  return { topologyResults, multiPageResults };
+  const businessEditResults = !requestedCase || requestedCase === DISPLAY_ROUTING_BUSINESS_EDIT_CASE_ID
+    ? await verifyBusinessEdits({ baseUrl, prepareSession, waitForValue, readFinalRouteExpression, auditFinalSvg, onProgress }) : [];
+  return { topologyResults, multiPageResults, businessEditResults };
 };

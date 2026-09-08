@@ -756,9 +756,10 @@ for (const layoutCase of DISPLAY_ROUTING_LAYOUT_CASES) {
     layoutResults.push(await verifyLayout(layoutCase));
   }
 }
-const { topologyResults, multiPageResults } = await verifyDisplayRoutingBrowserCases({
+const { topologyResults, multiPageResults, businessEditResults } = await verifyDisplayRoutingBrowserCases({
   requestedCase: REQUESTED_CASE, baseUrl: BASE_URL, prepareSession, waitForValue,
   readFinalRouteExpression, auditFinalSvg,
+  onProgress: report => console.log(JSON.stringify(report)),
 });
 console.log(JSON.stringify({
   viewport: MATRIX_VIEWPORT,
@@ -766,4 +767,5 @@ console.log(JSON.stringify({
   layoutResults,
   topologyResults,
   multiPageResults,
+  businessEditResults,
 }, null, 2));
