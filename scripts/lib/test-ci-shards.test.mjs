@@ -16,6 +16,22 @@ import {
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
 
 describe('test:ci shard catalog', () => {
+  it('defaults Worker boundary logic to Node while explicitly preserving DOM-dependent cases', () => {
+    const workerShard = packageJson.scripts['test:ci:core-components-shared-worker-boundary'];
+    expect(workerShard).toContain('--environment=node');
+    expect(workerShard).toContain('--maxWorkers=2');
+    expect(workerShard).toContain('scripts/lib/display-routing-sample-journal.test.mjs');
+    for (const name of ['baseReactFlowDisplayFailure.test.tsx', 'useBaseReactFlowDisplayRouting.failure.test.tsx',
+      'baseReactFlowDisplayGeometryBarrier.test.ts', 'baseReactFlowDisplayWorkerSession.test.ts',
+      'baseReactFlowDisplayWorkerCancellation.test.ts', 'baseReactFlowDisplayWorkerCandidateCommercialClosure.test.ts',
+      'baseReactFlowDisplayWorkerPrewarmCommit.test.ts', 'baseReactFlowPrecompiledCaptureMode.test.ts',
+      'baseReactFlowLayoutRoutingCandidate.test.ts', 'baseReactFlowPrecompiledRouteRegistry.test.ts',
+      'baseReactFlowDisplayWorkerLifecycle.test.ts', 'baseReactFlowDisplayWorkerRoutingPatches.test.ts']) {
+      const path = `src/core/components/shared/__tests__/${name}`;
+      expect(workerShard.split(' ').filter(argument => argument === path)).toHaveLength(1);
+      expect(readFileSync(path, 'utf8').split(/\r?\n/)[0]).toBe('// @vitest-environment jsdom');
+    }
+  });
   it('keeps every shard in exactly one non-empty CI group', () => {
     const grouped = Object.values(TEST_CI_SHARD_GROUPS).flat();
     expect(TEST_CI_GROUP_NAMES).toEqual(['foundation', 'ui', 'flow', 'core', 'routing']);

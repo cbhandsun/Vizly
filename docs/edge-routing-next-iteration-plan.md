@@ -445,3 +445,10 @@ I5（加载与成本余量）可在 I2 后作为独立批次插入；只读调�
 - 冷启动三图各十样本，物流 p95 847ms、需求分配 676ms、WMS 4724ms。远端八个启动故障场景实际执行通过；两种大图的三个稳定性样本均记录为零长任务，无丢样与非法记录。日志 `tmp/i1-diagnostics-remote-cold-success.log`、`tmp/i1-diagnostics-remote-smoke-success.log`。
 - 本地 `verify` 的完整静态部分通过；统一测试执行至 Worker 边界分片时，核对远端同一提交已完成相同五组测试及覆盖率，主动停止剩余重复本地测试。本地进程因此返回非零，不能标为本地完整 verify 成功；完整验收依据是上述远端结果，已完成本地分片日志保留于 `tmp/i1-diagnostics-batch-verify.log`。无测试删除、预算放宽或失败重跑。
 - 导航前启动 CPU profiler 的一次 WMS 诊断采得一条长任务：相对稳定窗口 2871ms，持续 93ms。包括导航的 CPU 汇总不能直接归因这条任务，未复现历史两条超预算；该结果只作诊断，不作门禁或优化收益证据。日志 `tmp/i1-wms-early-task-profile.log`。
+
+### I5a：减少 Worker 边界测试的环境初始化成本
+
+- 同一 15 个脚本文件 / 254 项测试在默认环境与 Node 下均通过，Vitest 时长 52.93s → 8.05s，执行逻辑约 1s，主要差异为 jsdom 初始化。继续核查核心测试后，最终保持原分片归属，将 Worker 边界分片默认设为 Node；需要浏览器的测试保留显式 jsdom，新补五个依赖历史/位置或浏览器 Worker 能力的文件声明。
+- 新环境首轮揭示三个额外隐式浏览器依赖，记录失败后补正确环境声明，未改动生产能力检测、断言或测试范围。分片配置回归要求默认 Node、原并发 2，以及全部十二个 DOM 依赖文件的显式声明。
+- 原分组命令的两个受影响分片共 103 文件 / 1249 项全部通过，Vitest 总时长 29.35 + 233.52 = 262.87s；最终相同文件与测试数全部通过，总时长 32.07 + 85.43 = 117.50s。一次本机串行对照减少约 55.3%，最慢分片 233.52s → 85.43s。该结果不代表整条 CI 的同比收益，未提高并发、超时或任何预算，也未新增测试进程/分片。
+- 对照与最终日志：`tmp/i5-script-tests-jsdom-baseline.log`、`tmp/i5-script-tests-node-comparison.log`、`tmp/i5-node-shard-before.log`、`tmp/i5-worker-shard-before.log`、`tmp/i5-node-shard-accepted.log`、`tmp/i5-worker-shard-accepted.log`。仅测试编排与环境声明变化，不涉及依赖升级、产品代码或构建产物更新。
