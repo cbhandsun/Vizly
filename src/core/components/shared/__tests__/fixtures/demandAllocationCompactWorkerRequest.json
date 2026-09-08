@@ -1765,10 +1765,10 @@
   "displayEdgeEpoch": 0,
   "qualityMode": "full",
   "inputIdentity": {
-    "routingVersion": "20",
+    "routingVersion": "21",
     "visualVersion": "balanced-crossing-gate-v2",
-    "inputSignature": "150129256",
-    "inputGeometryDigest": "geometry-v1:2a5d04c1bdbbe0752f92df5304d6afc1"
+    "inputSignature": "2168836421",
+    "inputGeometryDigest": "geometry-v1:e7f0a1b06d6b9fac9f094c3a606c28a8"
   },
   "candidatePatches": [
     {

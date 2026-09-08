@@ -165,6 +165,20 @@ describe('initial obstacle-aware display routing', () => {
     expect(seedObstacleAwareDisplayRoutes([proposal, cleanPeer], nodes)[1]).toBe(cleanPeer);
   });
 
+  it('retains generated topology when complete candidate comparison exceeds its work budget', () => {
+    const nodes = [node('source', 0, 0), node('target', 600, 0), node('blocker', 240, 0)];
+    for (const [edgeCount, pointCount] of [[129, 2], [9, 128]]) {
+      const edges: Edge[] = Array.from({ length: edgeCount }, (_, index) => ({
+        ...edge, id: `generated-${index}`, sourceHandle: 'right', targetHandle: 'left',
+        data: { algorithm: 'domain-dagre-simplified', layoutPathLocked: true,
+          computedPath: Array.from({ length: pointCount }, (_, pointIndex) => ({
+            x: 100 + 500 * pointIndex / (pointCount - 1), y: 30,
+          })) },
+      }));
+      expect(seedObstacleAwareDisplayRoutes(edges, nodes)).toBe(edges);
+    }
+  });
+
   it('defers incomplete, invalid, extreme and over-budget geometry to the measured routing pipeline', () => {
     const input = [edge];
     const valid = [node('source', 0, 0), node('target', 0, 300)];

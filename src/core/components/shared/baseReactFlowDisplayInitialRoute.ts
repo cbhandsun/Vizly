@@ -10,6 +10,7 @@ import { anchorForHandle, compactOrthogonalPath, type NodeRect } from './baseRea
 import { fastDisplayHardSafetyIsClean } from './baseReactFlowFastEdgeSafety';
 import { getInteractiveGlobalCandidateEdgeBudget } from './baseReactFlowDisplayBoundedSeedPolicy';
 import { scoreNodeClearanceRisk } from '../../strategies/shared/edgeWaypointCandidateRepair';
+import { chooseCommercialRouteCandidate } from '../../strategies/shared/edgeCommercialRouteGuard';
 
 const SIDES: readonly SharedNodePortSide[] = ['bottom', 'top', 'right', 'left'];
 const MAX_SEED_NODES = 96;
@@ -97,6 +98,15 @@ export const seedObstacleAwareDisplayRoutes = (edges: Edge[], inputNodes: Node[]
   const xLanes = [...new Set([...obstacles.values()].flatMap(r => [r.x - COMMERCIAL_BUSINESS_NODE_CLEARANCE, r.x + r.width + COMMERCIAL_BUSINESS_NODE_CLEARANCE]))];
   const yLanes = [...new Set([...obstacles.values()].flatMap(r => [r.y - COMMERCIAL_BUSINESS_NODE_CLEARANCE, r.y + r.height + COMMERCIAL_BUSINESS_NODE_CLEARANCE]))];
   let changed = false;
+  // Comparing complete generated routes preserves their shared topology. Bound
+  // this optional comparison separately from obstacle candidate construction.
+  const canCompareGeneratedRoutes = edges.length <= 128
+    && edges.every(edge => {
+      const path = getDisplayComputedPath(edge);
+      return path.length >= 2 && path.length <= 128;
+    })
+    && edges.reduce((count, edge) => count + getDisplayComputedPath(edge).length, 0) <= 1024;
+  let rebuiltSimplifiedRoute = false;
   const seeded = edges.map(edge => {
     const path = getDisplayComputedPath(edge);
     const waypoints = edge.data?.waypoints;
@@ -106,6 +116,7 @@ export const seedObstacleAwareDisplayRoutes = (edges: Edge[], inputNodes: Node[]
     // Reconstruct only a proposal that violates the display clearance contract;
     // unknown provenance and authored waypoints retain their existing ownership.
     const rebuildSimplifiedLayoutPath = edge.data?.algorithm === 'domain-dagre-simplified'
+      && canCompareGeneratedRoutes
       && path.length >= 2 && path.length <= 128 && !preservesAuthoredPath
       && scoreNodeClearanceRisk(path, nodes, edge, COMMERCIAL_BUSINESS_NODE_CLEARANCE) > 0.5;
     if (preservesAuthoredPath) return edge;
@@ -155,6 +166,7 @@ export const seedObstacleAwareDisplayRoutes = (edges: Edge[], inputNodes: Node[]
     }
     if (!best) return edge;
     changed = true;
+    rebuiltSimplifiedRoute ||= rebuildSimplifiedLayoutPath;
     return {
       ...edge,
       sourceHandle: resolveEdgeTerminalHandleForSide(edge, 'source', best.sourceSide),
@@ -162,5 +174,8 @@ export const seedObstacleAwareDisplayRoutes = (edges: Edge[], inputNodes: Node[]
       data: { ...edge.data, computedPath: best.path, layoutPathLocked: true, _layoutPathLocked: true, algorithm: 'display-obstacle-seed' },
     };
   });
-  return changed ? seeded : edges;
+  if (!changed) return edges;
+  return rebuiltSimplifiedRoute
+    ? chooseCommercialRouteCandidate(nodes, edges, seeded)
+    : seeded;
 };

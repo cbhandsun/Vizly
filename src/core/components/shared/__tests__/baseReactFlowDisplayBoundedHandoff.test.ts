@@ -11,9 +11,27 @@ import type { BaseDisplayBoundedCandidateReport } from '../baseReactFlowDisplayE
 import { createBaseReactFlowFinalEndpointEvaluation } from '../baseReactFlowDisplayFinalEndpointEvaluation';
 import { baseNodes } from './baseReactFlowDisplayEdges.testUtils';
 import rejectedLayoutSeed from './fixtures/rejectedLayoutSeed.json';
+import jointLayoutSeed from './fixtures/jointLayoutSeed.json';
+import { seedObstacleAwareDisplayRoutes } from '../baseReactFlowDisplayInitialRoute';
 import { computeBaseReactFlowDisplayEdgesWorkerResponse } from '../baseReactFlowDisplayEdges.worker';
 import { computeBaseReactFlowDisplayInputIdentityBundle } from '../baseReactFlowDisplayInputIdentity';
 import { createDisplayRoutingIdentity } from '../baseReactFlowDisplayRoutingSession';
+
+it('preserves generated group topology when independent clearance seeds degrade the joint route', () => {
+  const fixture = structuredClone(jointLayoutSeed);
+  const before = structuredClone(fixture);
+  expect(seedObstacleAwareDisplayRoutes(fixture.edges, fixture.nodes)).toBe(fixture.edges);
+  const input = { ...fixture, enableSmartEdges: true, smartEdgePadding: 20, isLargeGraph: false };
+  const identity = computeBaseReactFlowDisplayInputIdentityBundle(input);
+  const result = computeBaseReactFlowDisplayEdgesWorkerResponse({ ...input,
+    requestId: 'joint-layout-seed', operation: 'route', displayEdgeEpoch: 0, qualityMode: 'full',
+    inputIdentity: createDisplayRoutingIdentity(identity.cacheSignature, identity.geometryDigest),
+  });
+  expect(result.hardReport).toMatchObject({ hardClean: true, commercialClearanceViolations: 0,
+    quality: { hairpins: 0, strictCrossings: 0, unrelatedOverlap: 0 } });
+  expect(result.edges).toHaveLength(input.edges.length);
+  expect(fixture).toEqual(before);
+}, 15_000);
 
 it('fully reroutes a rejected automatic layout seed instead of retaining its locked paths', () => {
   const fixture = structuredClone(rejectedLayoutSeed);

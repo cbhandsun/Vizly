@@ -1,6 +1,6 @@
-// Regenerate automatic Dagre proposals so their provenance is available before
-// the display router decides whether an unsafe path may be reconstructed.
-export const EDGE_ROUTING_CACHE_VERSION = '20';
+// Reevaluate generated route groups after joint seed selection replaces
+// unconditional acceptance of independent clearance reconstruction.
+export const EDGE_ROUTING_CACHE_VERSION = '21';
 
 /**
  * Version of the renderer-facing commercial quality contract. Keep this

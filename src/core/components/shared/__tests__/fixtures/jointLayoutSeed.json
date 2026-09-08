@@ -1,0 +1,896 @@
+{
+  "nodes": [
+    {
+      "id": "n0",
+      "type": "subGroup",
+      "position": {
+        "x": 111.40000000000003,
+        "y": 283
+      },
+      "positionAbsolute": {
+        "x": 111.40000000000003,
+        "y": 283
+      },
+      "measured": {
+        "width": 276.79999999999995,
+        "height": 742
+      },
+      "style": {
+        "width": 276.79999999999995,
+        "height": 742
+      },
+      "data": {}
+    },
+    {
+      "id": "n1",
+      "type": "subGroup",
+      "position": {
+        "x": 359.6,
+        "y": 1185
+      },
+      "positionAbsolute": {
+        "x": 359.6,
+        "y": 1185
+      },
+      "measured": {
+        "width": 304.4,
+        "height": 998
+      },
+      "style": {
+        "width": 304.4,
+        "height": 998
+      },
+      "data": {}
+    },
+    {
+      "id": "n2",
+      "type": "custom",
+      "position": {
+        "x": 50,
+        "y": 50
+      },
+      "positionAbsolute": {
+        "x": 50,
+        "y": 50
+      },
+      "width": 184,
+      "height": 73,
+      "measured": {
+        "width": 184,
+        "height": 73
+      },
+      "style": {
+        "width": 184,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n3",
+      "type": "custom",
+      "position": {
+        "x": 554,
+        "y": 50
+      },
+      "positionAbsolute": {
+        "x": 554,
+        "y": 50
+      },
+      "width": 224,
+      "height": 73,
+      "measured": {
+        "width": 224,
+        "height": 73
+      },
+      "style": {
+        "width": 224,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n4",
+      "type": "custom",
+      "parentId": "n0",
+      "position": {
+        "x": 48,
+        "y": 74
+      },
+      "positionAbsolute": {
+        "x": 159.40000000000003,
+        "y": 357
+      },
+      "width": 192,
+      "height": 96,
+      "measured": {
+        "width": 192,
+        "height": 96
+      },
+      "style": {
+        "width": 192,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "n5",
+      "type": "custom",
+      "parentId": "n0",
+      "position": {
+        "x": 58.5,
+        "y": 330
+      },
+      "positionAbsolute": {
+        "x": 169.90000000000003,
+        "y": 613
+      },
+      "width": 171,
+      "height": 96,
+      "measured": {
+        "width": 171,
+        "height": 96
+      },
+      "style": {
+        "width": 171,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "n6",
+      "type": "custom",
+      "parentId": "n0",
+      "position": {
+        "x": 56,
+        "y": 586
+      },
+      "positionAbsolute": {
+        "x": 167.40000000000003,
+        "y": 869
+      },
+      "width": 176,
+      "height": 96,
+      "measured": {
+        "width": 176,
+        "height": 96
+      },
+      "style": {
+        "width": 176,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "n7",
+      "type": "custom",
+      "parentId": "n1",
+      "position": {
+        "x": 64,
+        "y": 74
+      },
+      "positionAbsolute": {
+        "x": 423.6,
+        "y": 1259
+      },
+      "width": 184,
+      "height": 96,
+      "measured": {
+        "width": 184,
+        "height": 96
+      },
+      "style": {
+        "width": 184,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "n8",
+      "type": "custom",
+      "parentId": "n1",
+      "position": {
+        "x": 48,
+        "y": 330
+      },
+      "positionAbsolute": {
+        "x": 407.6,
+        "y": 1515
+      },
+      "width": 216,
+      "height": 96,
+      "measured": {
+        "width": 216,
+        "height": 96
+      },
+      "style": {
+        "width": 216,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "n9",
+      "type": "custom",
+      "parentId": "n1",
+      "position": {
+        "x": 72,
+        "y": 586
+      },
+      "positionAbsolute": {
+        "x": 431.6,
+        "y": 1771
+      },
+      "width": 168,
+      "height": 96,
+      "measured": {
+        "width": 168,
+        "height": 96
+      },
+      "style": {
+        "width": 168,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "n10",
+      "type": "custom",
+      "parentId": "n1",
+      "position": {
+        "x": 48,
+        "y": 842
+      },
+      "positionAbsolute": {
+        "x": 407.6,
+        "y": 2027
+      },
+      "width": 216,
+      "height": 96,
+      "measured": {
+        "width": 216,
+        "height": 96
+      },
+      "style": {
+        "width": 216,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "n11",
+      "type": "custom",
+      "position": {
+        "x": 463.3,
+        "y": 2563
+      },
+      "positionAbsolute": {
+        "x": 463.3,
+        "y": 2563
+      },
+      "width": 97,
+      "height": 60,
+      "measured": {
+        "width": 97,
+        "height": 60
+      },
+      "style": {
+        "width": 97,
+        "height": 60
+      },
+      "data": {}
+    },
+    {
+      "id": "n12",
+      "type": "custom",
+      "position": {
+        "x": 454.8,
+        "y": 2343
+      },
+      "positionAbsolute": {
+        "x": 454.8,
+        "y": 2343
+      },
+      "width": 114,
+      "height": 60,
+      "measured": {
+        "width": 114,
+        "height": 60
+      },
+      "style": {
+        "width": 114,
+        "height": 60
+      },
+      "data": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "n2",
+      "target": "n4",
+      "type": "advanced-smart-step",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 142,
+            "y": 50
+          },
+          {
+            "x": 142,
+            "y": 475
+          },
+          {
+            "x": 255,
+            "y": 475
+          },
+          {
+            "x": 255,
+            "y": 453
+          }
+        ],
+        "algorithm": "domain-dagre-simplified",
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e1",
+      "source": "n4",
+      "target": "n5",
+      "type": "advanced-smart-step",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 255,
+            "y": 357
+          },
+          {
+            "x": 255,
+            "y": 709
+          }
+        ],
+        "algorithm": "domain-dagre-simplified",
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e2",
+      "source": "n5",
+      "target": "n6",
+      "type": "advanced-smart-step",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 191,
+            "y": 613
+          },
+          {
+            "x": 191,
+            "y": 965
+          }
+        ],
+        "algorithm": "domain-dagre-simplified",
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e3",
+      "source": "n6",
+      "target": "n8",
+      "type": "advanced-smart-step",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 255,
+            "y": 965
+          },
+          {
+            "x": 255,
+            "y": 983
+          },
+          {
+            "x": 243,
+            "y": 983
+          },
+          {
+            "x": 243,
+            "y": 1497
+          },
+          {
+            "x": 255,
+            "y": 1497
+          },
+          {
+            "x": 255,
+            "y": 1445
+          },
+          {
+            "x": 516,
+            "y": 1445
+          },
+          {
+            "x": 516,
+            "y": 1515
+          }
+        ],
+        "algorithm": "domain-dagre-simplified",
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e4",
+      "source": "n8",
+      "target": "n6",
+      "type": "advanced-smart-step",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 516,
+            "y": 1515
+          },
+          {
+            "x": 516,
+            "y": 1493
+          },
+          {
+            "x": 528,
+            "y": 1493
+          },
+          {
+            "x": 528,
+            "y": 1477
+          },
+          {
+            "x": 516,
+            "y": 1477
+          },
+          {
+            "x": 516,
+            "y": 1467
+          },
+          {
+            "x": 255,
+            "y": 1467
+          },
+          {
+            "x": 255,
+            "y": 965
+          }
+        ],
+        "algorithm": "domain-dagre-simplified",
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e5",
+      "source": "n7",
+      "target": "n8",
+      "type": "advanced-smart-step",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 516,
+            "y": 1355
+          },
+          {
+            "x": 516,
+            "y": 1515
+          }
+        ],
+        "algorithm": "domain-dagre-simplified",
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e6",
+      "source": "n8",
+      "target": "n9",
+      "type": "advanced-smart-step",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 580,
+            "y": 1611
+          },
+          {
+            "x": 580,
+            "y": 1683
+          },
+          {
+            "x": 524,
+            "y": 1683
+          },
+          {
+            "x": 524,
+            "y": 1731
+          },
+          {
+            "x": 516,
+            "y": 1731
+          },
+          {
+            "x": 516,
+            "y": 1739
+          },
+          {
+            "x": 528,
+            "y": 1739
+          },
+          {
+            "x": 528,
+            "y": 1699
+          },
+          {
+            "x": 516,
+            "y": 1699
+          },
+          {
+            "x": 516,
+            "y": 1771
+          }
+        ],
+        "algorithm": "domain-dagre-simplified",
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e7",
+      "source": "n9",
+      "target": "n10",
+      "type": "advanced-smart-step",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 516,
+            "y": 1868
+          },
+          {
+            "x": 516,
+            "y": 2027
+          }
+        ],
+        "algorithm": "domain-dagre-simplified",
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e8",
+      "source": "n10",
+      "target": "n12",
+      "type": "advanced-smart-step",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 516,
+            "y": 2027
+          },
+          {
+            "x": 516,
+            "y": 2403
+          }
+        ],
+        "algorithm": "domain-dagre-simplified",
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e9",
+      "source": "n12",
+      "target": "n11",
+      "type": "advanced-smart-step",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 478,
+            "y": 2404
+          },
+          {
+            "x": 478,
+            "y": 2452
+          },
+          {
+            "x": 534,
+            "y": 2452
+          },
+          {
+            "x": 534,
+            "y": 2514
+          },
+          {
+            "x": 512,
+            "y": 2514
+          },
+          {
+            "x": 512,
+            "y": 2562
+          }
+        ],
+        "algorithm": "domain-dagre-simplified",
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e10",
+      "source": "n3",
+      "target": "n4",
+      "type": "advanced-smart-step",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 698,
+            "y": 50
+          },
+          {
+            "x": 698,
+            "y": 499
+          },
+          {
+            "x": 287,
+            "y": 499
+          },
+          {
+            "x": 287,
+            "y": 453
+          }
+        ],
+        "algorithm": "domain-dagre-simplified",
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e11",
+      "source": "n3",
+      "target": "n7",
+      "type": "advanced-smart-step",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 666,
+            "y": 123
+          },
+          {
+            "x": 666,
+            "y": 1227
+          },
+          {
+            "x": 516,
+            "y": 1227
+          },
+          {
+            "x": 516,
+            "y": 1259
+          }
+        ],
+        "algorithm": "domain-dagre-simplified",
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e12",
+      "source": "n3",
+      "target": "n9",
+      "type": "advanced-smart-step",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 666,
+            "y": 123
+          },
+          {
+            "x": 666,
+            "y": 1699
+          },
+          {
+            "x": 516,
+            "y": 1699
+          },
+          {
+            "x": 516,
+            "y": 1771
+          }
+        ],
+        "algorithm": "domain-dagre-simplified",
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e13",
+      "source": "n7",
+      "target": "n5",
+      "type": "advanced-smart-step",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 516,
+            "y": 1259
+          },
+          {
+            "x": 516,
+            "y": 1241
+          },
+          {
+            "x": 504,
+            "y": 1241
+          },
+          {
+            "x": 504,
+            "y": 727
+          },
+          {
+            "x": 516,
+            "y": 727
+          },
+          {
+            "x": 516,
+            "y": 781
+          },
+          {
+            "x": 255,
+            "y": 781
+          },
+          {
+            "x": 255,
+            "y": 709
+          }
+        ],
+        "algorithm": "domain-dagre-simplified",
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e14",
+      "source": "n10",
+      "target": "n8",
+      "type": "advanced-smart-step",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 612,
+            "y": 2123
+          },
+          {
+            "x": 612,
+            "y": 1515
+          }
+        ],
+        "algorithm": "domain-dagre-simplified",
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    },
+    {
+      "id": "e15",
+      "source": "n10",
+      "target": "n4",
+      "type": "advanced-smart-step",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "data": {
+        "computedPath": [
+          {
+            "x": 420,
+            "y": 2027
+          },
+          {
+            "x": 420,
+            "y": 1957
+          },
+          {
+            "x": 388,
+            "y": 1957
+          },
+          {
+            "x": 388,
+            "y": 485
+          },
+          {
+            "x": 351,
+            "y": 485
+          },
+          {
+            "x": 351,
+            "y": 453
+          },
+          {
+            "x": 255,
+            "y": 453
+          }
+        ],
+        "algorithm": "domain-dagre-simplified",
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        }
+      }
+    }
+  ]
+}
