@@ -2,7 +2,7 @@
   "schema": "vizly-precompiled-display-route-manifest-v3",
   "routingVersion": "18",
   "identitySourceHash": "source-v1:752776072602ff4e8a4892530e3faea55f7502310613fe616e04061f339c270a",
-  "routingSourceHash": "source-v1:49dde47fa3ddd36922cd389191f630733c8430ad66ac50ef5d7f6dace8731bf5",
+  "routingSourceHash": "source-v1:1c006a3a820a57eab62869fbbda627769c05f2c4772b18cb93a4119c23054e66",
   "entries": [
     {
       "presetId": "logistics-architecture-v1",

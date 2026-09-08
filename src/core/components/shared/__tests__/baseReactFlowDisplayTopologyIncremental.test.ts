@@ -103,6 +103,44 @@ const project = ({
 });
 
 describe('base React Flow topology incremental projection', () => {
+  it('reconnects incident edges on a parent-only edit while freezing unrelated paths', () => {
+    const nextNodes = nodes.map(node => node.id === 'source'
+      ? { ...node, parentId: 'auxiliary', position: { x: -180, y: -200 } } : node);
+    const changeSet = createChangeSet(baselineSourceEdges, nextNodes);
+    expect(changeSet.reason).toBe('container-change');
+    expect(changeSet.changedEdgeIds).toEqual([]);
+    const result = project({ nextEdges: baselineSourceEdges, nextNodes, changeSet });
+    expect(result?.changedPresentEdgeIds).toEqual(['edge-alpha']);
+    expect(result?.edges[0].data?.computedPath).toBeUndefined();
+    expect(result?.edges[1].data?.computedPath).toEqual(baselineEdges[1].data?.computedPath);
+    expect(result?.edges[2].data?.computedPath).toEqual(baselineEdges[2].data?.computedPath);
+  });
+
+  it('includes descendant endpoints when their ancestor is reparented', () => {
+    const baselineNodes = nodes.map(node => node.id === 'hub' ? { ...node, parentId: 'source' } : node);
+    const nextNodes = baselineNodes.map(node => node.id === 'source' ? { ...node, parentId: 'auxiliary' } : node);
+    const changeSet = createBaseReactFlowRoutingChangeSet({ previousNodes: baselineNodes,
+      previousEdges: baselineSourceEdges, nextNodes, nextEdges: baselineSourceEdges });
+    const result = createBaseReactFlowTopologyIncrementalProjection({ baselineNodes, baselineSourceEdges,
+      baselineEdges, baselinePatches, nextNodes, nextEdges: baselineSourceEdges, changeSet });
+    expect(result?.changedPresentEdgeIds).toEqual(['edge-alpha', 'edge-beta', 'edge-gamma']);
+  });
+
+  it.each([64, 65])('bounds incident repair on parent-only edits: %i edges', count => {
+    const sources = Array.from({ length: count }, (_, index) => ({ ...baselineSourceEdges[0], id: `edge-${index}` }));
+    const routed = sources.map(edge => ({ ...baselineEdges[0], id: edge.id }));
+    const patches = createBaseReactFlowDisplayEdgePatches(sources, routed);
+    if (!patches) throw new Error('Expected valid fixture patches');
+    const nextNodes = nodes.map(node => node.id === 'source' ? { ...node, parentId: 'auxiliary' } : node);
+    const changeSet = createBaseReactFlowRoutingChangeSet({ previousNodes: nodes, previousEdges: sources,
+      nextNodes, nextEdges: sources });
+    const result = createBaseReactFlowTopologyIncrementalProjection({ baselineNodes: nodes,
+      baselineSourceEdges: sources, baselineEdges: routed, baselinePatches: patches,
+      nextNodes, nextEdges: sources, changeSet });
+    if (count === 64) expect(result?.changedPresentEdgeIds).toHaveLength(64);
+    else expect(result).toBeNull();
+  });
+
   it('keeps incremental candidate diagnostics inside the single final Worker response', () => {
     expect(displayWorkerOperationPublishesBoundedCandidates('incremental-route')).toBe(false);
     expect(displayWorkerOperationPublishesBoundedCandidates('route')).toBe(true);

@@ -6,7 +6,7 @@ import {
   repairBusinessNodeClearanceRisks,
 } from '../../strategies/shared/edgeBusinessNodeClearanceRepair';
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
-import type { BaseReactFlowRoutingChangeSet } from './baseReactFlowDisplayRoutingChangeSet';
+import { createBaseReactFlowRoutingAffectedClosure, type BaseReactFlowRoutingChangeSet } from './baseReactFlowDisplayRoutingChangeSet';
 import {
   createBaseReactFlowFastDisplayEdges,
   lockFinalDisplayComputedPaths,
@@ -266,7 +266,8 @@ const resolveTopologyKind = ({
   ) return 'node-remove';
   if (
     reason === 'container-change'
-    && additions.length + removals.length + changedExisting.length > 0
+    && (additions.length + removals.length + changedExisting.length > 0
+      || (nodeAdditions.length === 0 && nodeRemovals.length === 0 && changedExistingNodes.length > 0))
     && nodeAdditions.length + nodeRemovals.length + changedExistingNodes.length > 0
     && !(nodeAdditions.length > 0 && nodeRemovals.length > 0)
   ) return 'container-change';
@@ -388,8 +389,16 @@ export const createBaseReactFlowTopologyIncrementalProjection = ({
   }
 
   const changedPresentIds = new Set([...additions, ...changedExisting]);
+  // Reparenting can move endpoints without changing edge topology. Include the
+  // existing incident closure (and descendants), never every edge in the graph.
+  if (kind === 'container-change' && changeSet.changedEdgeIds.length === 0) {
+    const closure = createBaseReactFlowRoutingAffectedClosure({ changeSet,
+      previousNodes: baselineNodes, nextNodes, baselineEdges, nextEdges });
+    if (closure.mutableEdgeIds.length > 64) return null;
+    for (const edgeId of closure.mutableEdgeIds) changedPresentIds.add(edgeId);
+  }
   const changedEndpointIds = new Set<string>();
-  for (const edgeId of changeSet.changedEdgeIds) {
+  for (const edgeId of new Set([...changeSet.changedEdgeIds, ...changedPresentIds])) {
     const previous = baselineSourceById.get(edgeId);
     const next = nextEdgeById.get(edgeId);
     if (previous) {
