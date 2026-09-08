@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import {
@@ -17,6 +17,40 @@ import {
 import { isEnterpriseDisplayRoutingSettled } from '../smokeRouteBudgetUtils.mjs';
 
 describe('smoke route modules', () => {
+  it('closes the page target before disconnecting after each sample', async () => {
+    const session = new CdpSession('ws://browser', 'sample-target');
+    const calls = [];
+    session.socket = { readyState: 1, close: () => calls.push('disconnect') };
+    session.send = vi.fn(async () => { calls.push('close-target'); return { success: true }; });
+    await session.disposeTarget();
+    expect(session.send).toHaveBeenCalledWith('Target.closeTarget', { targetId: 'sample-target' }, 10000, false);
+    expect(calls).toEqual(['close-target', 'disconnect']);
+    const source = readFileSync(new URL('../smoke-routes.mjs', import.meta.url), 'utf8');
+    expect(source).toContain('await session.disposeTarget()');
+  });
+
+  it.each([{}, { success: false }, null])('rejects unconfirmed target cleanup: %j', async result => {
+    const session = new CdpSession('ws://browser', 'sample-target');
+    session.socket = { readyState: 1, close: vi.fn() };
+    session.send = vi.fn(async () => result);
+    await expect(session.disposeTarget()).rejects.toThrow('Smoke browser target was not closed');
+    expect(session.socket.close).toHaveBeenCalledOnce();
+  });
+
+  it('disconnects on cleanup failure without swallowing the error', async () => {
+    const session = new CdpSession('ws://browser', 'sample-target');
+    session.socket = { readyState: 1, close: vi.fn() };
+    session.send = vi.fn(async () => { throw new Error('cleanup timeout'); });
+    await expect(session.disposeTarget()).rejects.toThrow('cleanup timeout');
+    expect(session.socket.close).toHaveBeenCalledOnce();
+  });
+
+  it('can dispose before the socket opens', async () => {
+    const session = new CdpSession('ws://browser', 'sample-target');
+    session.send = vi.fn();
+    await session.disposeTarget();
+    expect(session.send).not.toHaveBeenCalled();
+  });
   it.each(['worker-timeout', 'worker-rejected'])(
     'recognizes the exact bounded enterprise timeout in %s state', (stage) => {
       expect(isEnterpriseDisplayRoutingSettled({

@@ -123,6 +123,17 @@ export class CdpSession {
     this.socket?.close();
   }
 
+  async disposeTarget() {
+    try {
+      if (this.socket?.readyState === WebSocket.OPEN) {
+        const result = await this.send('Target.closeTarget', { targetId: this.targetId }, 10000, false);
+        if (result?.success !== true) throw new Error('Smoke browser target was not closed');
+      }
+    } finally {
+      this.close();
+    }
+  }
+
   async onMessage(messageData) {
     const data = typeof messageData === 'string'
       ? messageData

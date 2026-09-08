@@ -617,7 +617,7 @@ const runRouteSample = async (route, sampleIndex = 0) => {
       stabilityBudget: route.stabilityBudget,
     };
   } finally {
-    session.close();
+    await session.disposeTarget();
   }
 };
 
