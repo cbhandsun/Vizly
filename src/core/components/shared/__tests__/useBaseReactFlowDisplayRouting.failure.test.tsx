@@ -115,6 +115,8 @@ describe('display routing rejection lifecycle', () => {
 
   it.each([
     ['display-edge-worker-timeout', 'worker-timeout'],
+    ['display-edge-worker-post-failed', 'worker-failed'],
+    ['display-edge-worker-invalid-response', 'worker-failed'],
     ['private token=user-content', 'worker-failed'],
     ['display-edge-worker-cancelled', null],
   ] as const)('handles worker error %s without untrusted feedback', async (message, expected) => {
@@ -126,6 +128,7 @@ describe('display routing rejection lifecycle', () => {
     if (expected) {
       expect(hook.result.current.edges).toEqual([]);
       expect(JSON.stringify(hook.result.current.failure)).not.toContain('private');
+      expect(hook.result.current.failure?.workerFailureCode).toBe(message.startsWith('private') ? undefined : message);
     }
     hook.unmount();
   });

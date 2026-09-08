@@ -622,7 +622,7 @@ export const useBaseReactFlowDisplayRouting = ({
         workerCompleted = true;
         if (!routingJob || !displayRoutingSessionRuntime.isCurrentJob(routingJob)) return;
         const reason = classifyDisplayWorkerFailure(error);
-        if (reason) rejectCurrentJob(reason);
+        if (reason) rejectCurrentJob(reason, error);
         if (routingJob) displayRoutingSessionRuntime.finishJob(routingJob);
         if (reason && reason !== 'worker-timeout') {
           logBaseReactFlowEventBindingFailure('computeDisplayEdges', reason);

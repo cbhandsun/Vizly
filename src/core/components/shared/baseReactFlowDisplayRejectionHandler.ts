@@ -6,6 +6,7 @@ import {
 import { updateDisplayRoutingDebugState } from './baseReactFlowDisplayRoutingDebug';
 import { logBaseReactFlowQualityFallback } from './baseReactFlowLogging';
 import type { BaseReactFlowRoutingSessionJob, BaseReactFlowRoutingSessionRuntime } from './baseReactFlowRoutingSessionRuntime';
+import { classifyDisplayWorkerFailureCode } from './baseReactFlowDisplayFailureSummary';
 
 type RejectionRequest = Readonly<{
   job: BaseReactFlowRoutingSessionJob | null;
@@ -22,12 +23,12 @@ export const createDisplayRoutingRejectionHandler = ({
   readRequest: () => RejectionRequest | null;
   setFailure: (failure: BaseReactFlowDisplayFailure) => void;
   onFallbackResolved?: () => void;
-}>) => (reason: BaseReactFlowDisplayFailureReason): void => {
+}>) => (reason: BaseReactFlowDisplayFailureReason, error?: unknown): void => {
   const request = readRequest();
   if (!request?.job) return;
   const current = request.input;
   const rejected = createCurrentDisplayFailure({
-    runtime, job: request.job, reason,
+    runtime, job: request.job, reason, workerFailureCode: classifyDisplayWorkerFailureCode(error),
     requested: { inputSignature, inputGeometryDigest },
     current: current
       ? { inputSignature: current.cacheSignature, inputGeometryDigest: current.inputGeometryDigest }

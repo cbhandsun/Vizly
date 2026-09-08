@@ -1,4 +1,5 @@
 import type { BaseReactFlowRoutingSessionJob, BaseReactFlowRoutingSessionRuntime } from './baseReactFlowRoutingSessionRuntime';
+import type { DisplayWorkerFailureCode } from './baseReactFlowDisplayFailureSummary';
 
 export type BaseReactFlowDisplayFailureReason =
   | 'quality-rejected' | 'route-mismatch' | 'receipt-missing'
@@ -13,6 +14,7 @@ export type BaseReactFlowDisplayFailureIdentity = Readonly<{
 export type BaseReactFlowDisplayFailure = BaseReactFlowDisplayFailureIdentity & Readonly<{
   jobId: number;
   reason: BaseReactFlowDisplayFailureReason;
+  workerFailureCode?: DisplayWorkerFailureCode;
 }>;
 
 export const displayFailureMatchesInput = (
@@ -24,18 +26,19 @@ export const displayFailureMatchesInput = (
 
 /** A rejected result has no authority to affect a newer geometry or session job. */
 export const createCurrentDisplayFailure = ({
-  runtime, job, requested, current, reason,
+  runtime, job, requested, current, reason, workerFailureCode,
 }: Readonly<{
   runtime: Pick<BaseReactFlowRoutingSessionRuntime, 'isCurrentJob'>;
   job: BaseReactFlowRoutingSessionJob;
   requested: BaseReactFlowDisplayFailureIdentity;
   current: BaseReactFlowDisplayFailureIdentity | null;
   reason: BaseReactFlowDisplayFailureReason;
+  workerFailureCode?: DisplayWorkerFailureCode;
 }>): BaseReactFlowDisplayFailure | null => (
   current && runtime.isCurrentJob(job)
   && requested.inputSignature === current.inputSignature
   && requested.inputGeometryDigest === current.inputGeometryDigest
-    ? { ...requested, jobId: job.id, reason }
+    ? { ...requested, jobId: job.id, reason, ...(workerFailureCode ? { workerFailureCode } : {}) }
     : null
 );
 

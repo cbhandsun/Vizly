@@ -11,6 +11,7 @@ import { createBaseReactFlowRoutingSessionRuntime } from '../baseReactFlowRoutin
 import { useBaseReactFlowDisplayFailure } from '../useBaseReactFlowDisplayFailure';
 import { BaseReactFlowDisplayStatusOverlay } from '../BaseReactFlowDisplayStatusOverlay';
 import { createDisplayRoutingRejectionHandler } from '../baseReactFlowDisplayRejectionHandler';
+import { classifyDisplayWorkerFailureCode, summarizeDisplayRoutingFailure } from '../baseReactFlowDisplayFailureSummary';
 
 const sourceEdges: Edge[] = [{
   id: 'sb', source: 's', target: 'b', type: 'advanced-smart-step', selected: true,
@@ -21,6 +22,55 @@ const failure: BaseReactFlowDisplayFailure = {
 };
 
 describe('display routing failure terminal', () => {
+  it.each([
+    ['display-edge-worker-unavailable', 'worker-creation'],
+    ['display-edge-worker-post-failed', 'request-post'],
+    ['display-edge-worker-message-error', 'response-decode'],
+    ['display-edge-worker-invalid-response', 'response-validation'],
+    ['display-edge-worker-commit-receipt-mismatch', 'response-validation'],
+    ['display-edge-worker-resolution-mismatch', 'response-validation'],
+    ['display-edge-worker-candidate-mismatch', 'response-validation'],
+    ['display-edge-worker-empty-response', 'response-validation'],
+    ['display-edge-worker-error', 'worker-runtime'],
+    ['display-edge-worker-failed', 'worker-execution'],
+    ['display-edge-worker-timeout', 'worker-wait'],
+  ])('exports exact code %s at %s without graph identity', (message, stage) => {
+    const code = classifyDisplayWorkerFailureCode(new Error(message));
+    expect(code).toBe(message);
+    const summary = summarizeDisplayRoutingFailure({ ...failure, workerFailureCode: code,
+      reason: message === 'display-edge-worker-timeout' ? 'worker-timeout' : 'worker-failed',
+      inputSignature: 'private-content', inputGeometryDigest: 'private-geometry', jobId: Infinity });
+    expect(summary).toMatchObject({ stage, code });
+    expect(JSON.stringify(summary)).not.toContain('private');
+    expect(summary).not.toHaveProperty('jobId');
+  });
+
+  it('rejects malformed summaries and strips unknown error text instead of guessing its stage', () => {
+    for (const value of [null, undefined, [], '', {}, { reason: 1 }, { reason: 'private' }]) {
+      expect(summarizeDisplayRoutingFailure(value)).toBeNull();
+    }
+    for (const error of [null, 'display-edge-worker-timeout', { message: 'display-edge-worker-error' },
+      new Error('display-edge-worker-timeout: private'), new Error('constructor'), new Error('x'.repeat(10000))]) {
+      expect(classifyDisplayWorkerFailureCode(error)).toBeUndefined();
+    }
+    expect(summarizeDisplayRoutingFailure({ reason: 'worker-failed', workerFailureCode: 'private' }))
+      .toEqual({ schema: 'vizly-routing-failure-v1', reason: 'worker-failed', stage: 'unknown', code: null });
+    expect(summarizeDisplayRoutingFailure({ reason: 'quality-rejected', workerFailureCode: 'display-edge-worker-timeout' }))
+      .toMatchObject({ stage: 'quality-acceptance', code: null });
+  });
+
+  it('provides selectable diagnostics and removes them when the failure clears', () => {
+    const view = render(<BaseReactFlowDisplayStatusOverlay isContainerReady failure={{ ...failure,
+      reason: 'worker-timeout', workerFailureCode: 'display-edge-worker-timeout' }} />);
+    const textarea = screen.getByRole('textbox', { name: '连线失败诊断摘要', hidden: true });
+    if (!(textarea instanceof HTMLTextAreaElement)) throw new Error('Missing diagnostic textarea');
+    expect(textarea.readOnly).toBe(true);
+    expect(textarea.value).toBe(JSON.stringify({ schema: 'vizly-routing-failure-v1', reason: 'worker-timeout',
+      stage: 'worker-wait', code: 'display-edge-worker-timeout' }, null, 2));
+    view.rerender(<BaseReactFlowDisplayStatusOverlay isContainerReady failure={null} />);
+    expect(screen.queryByRole('textbox', { hidden: true })).toBeNull();
+    view.unmount();
+  });
   it('blocks unsafe drag and ordinary fallback after final quality rejection', () => {
     const options = {
       sourceEdges, inputSignature: '123', inputGeometryDigest: 'geometry',
