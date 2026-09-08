@@ -4,8 +4,10 @@ import { replayDisplayRoutingResponseEdges, selectDisplayRoutingAuditRoute } fro
  * for browser injection: graph content stays in the page; only aggregates leave.
  * Unrelated edges have neither endpoint in the explicitly edited node set.
  */
-export const measureDisplayRoutingEditStability = (before, after, editedNodeIds, excludedEdgeIds = []) => {
+export const measureDisplayRoutingEditStability = (before, after, editedNodeIds, excludedEdgeIds = [], comparison = 'routes') => {
   const invalid = () => { throw new Error('Invalid edit stability snapshot'); };
+  if (comparison !== 'routes' && comparison !== 'topology') invalid();
+  const compareRoutes = comparison === 'routes';
   const list = (value, limit) => {
     if (!Array.isArray(value) || value.length > limit) invalid();
     return value;
@@ -51,11 +53,12 @@ export const measureDisplayRoutingEditStability = (before, after, editedNodeIds,
       const source = id(edge.source);
       const target = id(edge.target);
       if (edges.has(key) || !nodes.has(source) || !nodes.has(target)) invalid();
-      const path = list(edge.data?.computedPath, 512).map(point);
-      if (path.length < 2) invalid();
+      const path = compareRoutes ? list(edge.data?.computedPath, 512).map(point) : null;
+      if (compareRoutes && path.length < 2) invalid();
       const handle = value => value == null ? null : id(value);
       edges.set(key, { source, target, path,
-        sourceHandle: handle(edge.sourceHandle), targetHandle: handle(edge.targetHandle) });
+        sourceHandle: compareRoutes ? handle(edge.sourceHandle) : null,
+        targetHandle: compareRoutes ? handle(edge.targetHandle) : null });
     }
     return { nodes: absolute, edges };
   };
@@ -128,6 +131,7 @@ export const measureDisplayRoutingEditStability = (before, after, editedNodeIds,
     }
     if (edited.has(edge.source) || edited.has(edge.target) || excludedEdges.has(key)) continue;
     result.comparedEdgeCount += 1;
+    if (!compareRoutes) continue;
     if (edge.sourceHandle !== next.sourceHandle || edge.targetHandle !== next.targetHandle) {
       result.changedPortCount += 1;
     }
@@ -139,6 +143,12 @@ export const measureDisplayRoutingEditStability = (before, after, editedNodeIds,
     result.afterPathLength += pathLength(next.path);
     result.beforeBendCount += bends(edge.path);
     result.afterBendCount += bends(next.path);
+  }
+  if (!compareRoutes) {
+    // Missing route evidence is not zero route change. Omit these metrics so
+    // the full-route projector continues to reject topology-only observations.
+    for (const key of ['changedPortCount', 'changedPathCount', 'changedGeometryCount',
+      'beforePathLength', 'afterPathLength', 'beforeBendCount', 'afterBendCount']) delete result[key];
   }
   return result;
 };
@@ -183,6 +193,18 @@ const METRICS = Object.freeze([
   'afterPathLength', 'beforeBendCount', 'afterBendCount', 'addedNodeCount',
   'removedNodeCount', 'addedEdgeCount', 'removedEdgeCount', 'rewiredEdgeCount',
 ]);
+
+const TOPOLOGY_METRICS = Object.freeze(['comparedNodeCount', 'movedNodeCount',
+  'totalNodeDisplacement', 'maxNodeDisplacement', 'comparedEdgeCount',
+  'addedNodeCount', 'removedNodeCount', 'addedEdgeCount', 'removedEdgeCount', 'rewiredEdgeCount']);
+
+export const projectDisplayRoutingTopologyStability = value => {
+  if (!value || TOPOLOGY_METRICS.some(key => !Number.isFinite(value[key]) || value[key] < 0 || value[key] > 1e15
+    || (key.endsWith('Count') && !Number.isSafeInteger(value[key])))) return null;
+  if (value.movedNodeCount > value.comparedNodeCount
+    || value.maxNodeDisplacement > value.totalNodeDisplacement) return null;
+  return Object.fromEntries(TOPOLOGY_METRICS.map(key => [key, value[key]]));
+};
 
 export const projectDisplayRoutingEditStability = value => {
   if (!value || METRICS.some(key => !Number.isFinite(value[key]) || value[key] < 0 || value[key] > 1e15

@@ -1,9 +1,9 @@
-import { measureDisplayRoutingEditStability, projectDisplayRoutingEditStability } from './display-routing-edit-stability.mjs';
+import { measureDisplayRoutingEditStability, projectDisplayRoutingEditStability, projectDisplayRoutingTopologyStability } from './display-routing-edit-stability.mjs';
 import { readTopologyStabilitySnapshot } from './display-routing-topology-stability.mjs';
 import { waitForStableDisplayRoutingLayoutVisual } from './display-routing-layout-visual-settle.mjs';
 
 export const assertHistoryRestored = value => {
-  const metrics = projectDisplayRoutingEditStability(value);
+  const metrics = projectDisplayRoutingTopologyStability(value);
   if (!metrics || metrics.comparedNodeCount === 0 || metrics.comparedEdgeCount === 0) {
     throw new Error('Incomplete history restoration evidence');
   }
@@ -47,10 +47,10 @@ export const verifyBusinessHistoryRoundtrip = async ({ session, editedNodeId, wa
         const committedBefore = window.__vizlyBusinessHistory?.before;
         if (!baseline || !committedBefore) throw new Error('Missing history baseline');
         const current = read();
-        const metrics = measure(baseline, current, []);
+        const metrics = measure(baseline, current, [], [], 'topology');
         return metrics.movedNodeCount === 0 && metrics.addedNodeCount === 0 && metrics.removedNodeCount === 0
           && metrics.addedEdgeCount === 0 && metrics.removedEdgeCount === 0 && metrics.rewiredEdgeCount === 0
-          ? { stability: metrics, retained: measure(committedBefore, current, [${JSON.stringify(editedNodeId)}]) } : null;
+          ? { stability: metrics } : null;
       })()`;
       await waitForValue(session, expression, `business ${operation} positions`);
       const route = await waitForValue(session, readFinalRouteExpression(''), `business ${operation} route`);
@@ -60,7 +60,13 @@ export const verifyBusinessHistoryRoundtrip = async ({ session, editedNodeId, wa
           : { expectedCommittedRouteSignature: route.response.outputRouteSignature }),
         expectedNodeCount: route.request.nodes.length, expectedEdgeCount: route.response.edges.length });
       // Check again after routing: an obsolete response must not overwrite undo.
-      const observed = await session.evaluate(expression);
+      const observed = await session.evaluate(`(() => {
+        const positions = ${expression};
+        if (!positions) return null;
+        const measure = ${measureDisplayRoutingEditStability.toString()};
+        const current = (${readTopologyStabilitySnapshot.toString()})();
+        return { ...positions, retained: measure(window.__vizlyBusinessHistory?.before, current, [${JSON.stringify(editedNodeId)}]) };
+      })()`);
       const stability = assertHistoryRestored(observed?.stability);
       const retained = assertHistoryRetainedRoutes(observed?.retained);
       operations.push({ operation, stability, retained, ...(await auditFinalSvg(session, route, `business ${operation} route`)) });

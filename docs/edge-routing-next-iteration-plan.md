@@ -8,6 +8,29 @@
 
 ### 当前执行摘要
 
+#### Pending history 验证语义与安全异常证据（本地通过，待远端）
+
+- 旧代码在等待 undo/redo 的节点位置恢复时，调用要求完整路径的路由稳定性度量。新增回归以缺失路径的合法 pending redo 快照复现 `Invalid edit stability snapshot`；历史远端只记录 `Uncaught`，不能据此断言已证明同一根因。旧版本地四图泳道矩阵本轮未复现远端异常。
+- 位置等待现在只比较绝对节点位置、父子结构对应的位置及边拓扑；待最终路由及绘制就绪后，仍严格检查已提交基线的非关联端口和路径保持。拓扑模式不生成路径变化/长度指标，完整路由投影器会拒绝仅有拓扑的结果，避免把缺失证据记成零变化。最终路径仍缺失的反向回归必须失败；未增加超时或业务重试。
+- CDP 异常只保留三种已知验证错误的类别、内置错误类型和有界行列号；未知消息、异常值、URL、堆栈及页面内容不进入错误文本。用于下一次区分快照非法、基线缺失和 store 不可用；不把通用异常直接认定为应用失败或基础设施问题。
+- 远端逐样本记录进一步缩小性能调查范围：增量首开最慢两个样本为 2244/2226ms，Worker 计算分别仅 14.6/14.2ms，往返非计算部分为 2217.4/2199.8ms，均为 validated-candidate。冷启动物流最慢样本 1180ms，其中 handler 就绪等待 637.8ms、计算 533.6ms、投递 0.5ms，主线程观测窗口无长任务。前者缺失完整跨上下文执行时刻，暂不能区分 Worker 启动与响应投递等待；后者启动等待根因仍未确定。
+- 证据：`tmp/pending-history-before.log`、`tmp/pending-history-boundaries.log`、`tmp/pending-history-browser.log`、`tmp/f638-performance-artifacts/`。本批只修改验证脚本，复用 f6389063 的生产构建；候选选择模块仍独立留在工作区，不随本批提交。
+- 三个相关测试文件 195 项通过，Lint、秘密扫描、规模及 CI 收录检查通过。1024×600 下普通业务编辑和泳道编辑两套四图矩阵均通过，包括 pending 响应释放后的撤销/重做及最终可见路径验收。日志：`tmp/pending-history-business-browser.log`、`tmp/pending-history-lint.log`、`tmp/pending-history-secrets.log`、`tmp/pending-history-size.log`、`tmp/pending-history-coverage.log`。本批未重复生产构建和全量测试；远端完整验收仍待完成，性能尾延迟未关闭。
+
+#### 当前远端结果与候选提交边界（2026-09-08）
+
+- `f6389063` 的 [CI](https://github.com/cbhandsun/Vizly/actions/runs/34276959369) 未通过：普通恢复步骤中的泳道编辑稳定性测试，在 pending undo/redo 等待位置恢复时抛出浏览器 `Uncaught`，调用点为 `verifyBusinessHistoryRoundtrip` 的位置等待。现有 CDP 错误只保留通用文本，无法据此确认根因；不能把这个结果标作保存恢复或全部浏览器验收通过。
+- [性能检查](https://github.com/cbhandsun/Vizly/actions/runs/34276959299) 也未通过：冷启动物流 p95 1180ms，预算 1100ms；增量测试的首开样本中位数 26ms、p95 2226ms，预算 750ms，生命周期与逐样本违规列表为空。需检查慢样本的阶段及预计算命中情况，不将其自动归因为布局计算，也不无依据重跑关闭。证据：`tmp/f638-ci-static.log`、`tmp/f638-performance.log`。
+- 已验证现有 Worker 可同时保留两份独立候选凭据：第二个候选完成后仍能提交第一个；被新布局取代的旧任务不能提交。不必新增提交协议或扩大 Worker 会话上限。证据：`tmp/layout-candidate-receipts.test.mjs`、`tmp/layout-candidate-receipts.json`。
+- 本地新增 `layoutCandidateSelection.ts`，只暂存基线及至多一个备选，返回被选候选，不提交可见状态。备选硬质量拒绝保留基线；超时、协议错误及取消继续抛出。11 项测试覆盖选择、无备选、失败及四个取消阶段，已被统一 CI 收录。模块尚未接入 Hook 和界面、未提交，不属于已交付的视觉改善；下一步先定位上述真实失败，再继续接入完整布局比较。
+
+#### 原生复合布局能力核对（2026-09-08）
+
+- 对当前安装的 ELK，以匿名的两个三节点分组、跨组依赖和反馈边核对原生能力：`INCLUDE_CHILDREN` 下仅将子组方向 RIGHT 改为 DOWN，全部节点位置与外框保持一致；改为 `SEPARATE_CHILDREN` 则跨层级连线触发 UnsupportedGraphException。不能假定子组方向配置已经生效，也不能直接切换层级模式解决混合方向。
+- 官方 [Graph Wrapping Strategy](https://eclipse.dev/elk/reference/options/org-eclipse-elk-layered-wrapping-strategy.html) 提供原生折行，匿名图确实由约 1532×175 变为 1192×571。但真实系统图按当前标准数据转换、实测节点尺寸、分层边准备和最终 Worker 路由对照后，MULTI_EDGE 总线长由 12843→20624、主流程反向连接由 0→3；两次路由硬报告通过，不能代替布局整体质量。综合布局测量返回 null，本轮不声明实际适配字号、面积或容器质量改善。
+- 因此停止直接使用原生折行或仅对子组设置方向的路线。仍需完整布局候选与最终路径的共同比较，保留基线、明确阅读收益与流向代价；不继续搜索 ELK 参数组合，也不解除旧布局对复杂拓扑的保护。现有 `stageBaseReactFlowLayoutRouting` 可先路由再提交，但 Hook 当前仅处理单个候选；多候选还需验证独立提交凭据、取消及基线保留，尚未实现。
+- 证据：`tmp/elk-mixed-hierarchy.mjs`、`tmp/elk-mixed-hierarchy.json`、`tmp/elk-wrapping-production.test.mjs`、`tmp/elk-wrapping-production.json`。首轮业务实验直接使用标准数据边类型，未经过画布转换，结果不作为验收；上述数据来自修正为正常转换及分层边准备后的运行。本轮无生产算法改动、无新增构建、无子代理。
+
 #### 生成路径的整组候选选择（本地通过，待远端）
 
 - 系统图 CI 几何的反事实重放确认：保留生成路径时最终硬门禁通过、回折 0、交叉 1、路径长度 10478；直接接受逐边净距重建后最终回折 1、交叉 3、路径长度 11733。局部净距风险下降不能证明整组种子更好。

@@ -4,6 +4,7 @@ import {
   captureDisplayRoutingEditBaseline, measureDisplayRoutingEditStability as measure,
   projectDisplayRoutingEditStability, readDisplayRoutingEditStability,
   summarizeDisplayRoutingEditStability,
+  projectDisplayRoutingTopologyStability,
 } from './display-routing-edit-stability.mjs';
 import { buildDisplayRoutingMachineResult } from './display-routing-browser-result.mjs';
 
@@ -14,6 +15,43 @@ const edge = (id, source, target, path = [{ x: 0, y: 0 }, { x: 10, y: 0 }]) => (
 const fixture = () => ({ nodes: [node('edited'), node('a'), node('b', 10)], edges: [edge('ab', 'a', 'b')] });
 
 describe('incremental edit stability', () => {
+  it('measures topology with pending paths without fabricating route evidence', () => {
+    const before = fixture();
+    const after = fixture();
+    before.edges[0].data.computedPath = null;
+    after.edges[0].data.computedPath = undefined;
+    after.nodes[1].position = { x: 3, y: 4 };
+    const original = structuredClone({ before, after });
+    const measured = measure(before, after, [], [], 'topology');
+    expect(measured).toMatchObject({ comparedNodeCount: 3, movedNodeCount: 1,
+      totalNodeDisplacement: 5, maxNodeDisplacement: 5, comparedEdgeCount: 1 });
+    expect(measured).not.toHaveProperty('changedGeometryCount');
+    expect(projectDisplayRoutingEditStability(measured)).toBeNull();
+    expect(projectDisplayRoutingTopologyStability({ ...measured, secret: 'private' })).toEqual(measured);
+    expect({ before, after }).toEqual(original);
+    expect(() => measure(before, after, [])).toThrow('Invalid edit stability snapshot');
+  });
+
+  it('keeps topology validation strict for malformed, extreme and disconnected inputs', () => {
+    const badPosition = fixture(); badPosition.nodes[0].position.x = Infinity;
+    const missingParent = fixture(); missingParent.nodes[0].parentId = 'missing';
+    const duplicate = fixture(); duplicate.nodes.push(duplicate.nodes[0]);
+    const disconnected = fixture(); disconnected.edges[0].source = 'missing';
+    const oversized = fixture(); oversized.nodes = Array.from({ length: 5001 }, (_, i) => node(String(i)));
+    for (const invalid of [null, {}, badPosition, missingParent, duplicate, disconnected, oversized]) {
+      expect(() => measure(fixture(), invalid, [], [], 'topology')).toThrow('Invalid edit stability snapshot');
+    }
+    expect(() => measure(fixture(), fixture(), [], [], 'unknown')).toThrow('Invalid edit stability snapshot');
+  });
+
+  it('rejects incomplete or inconsistent topology summaries', () => {
+    const valid = measure(fixture(), fixture(), [], [], 'topology');
+    for (const invalid of [null, {}, { ...valid, comparedNodeCount: -1 }, { ...valid, movedNodeCount: 4 },
+      { ...valid, movedNodeCount: 0.5 }, { ...valid, maxNodeDisplacement: 1 }, { ...valid, addedEdgeCount: NaN }]) {
+      expect(projectDisplayRoutingTopologyStability(invalid)).toBeNull();
+    }
+  });
+
   it('summarizes every sample and fails closed on missing, fractional counters or oversized data', () => {
     const metrics = measure(fixture(), fixture(), []);
     const summary = summarizeDisplayRoutingEditStability([metrics, {

@@ -107,6 +107,38 @@ describe('deterministic pending routing response', () => {
 });
 
 describe('business history restoration contract', () => {
+  it.each([true, false])('requires final routes after pending history positions restore (routes ready=%s)', async routesReady => {
+    const before = structuredClone({ nodes, edges });
+    const after = structuredClone(before);
+    after.nodes[0].position.x = 20;
+    after.edges.forEach(edge => { edge.data.computedPath = null; });
+    let current = after;
+    const window = { __vizlyBusinessHistory: { before, after }, reactFlowInstance: {
+      getNodes: () => current.nodes, getEdges: () => current.edges,
+    } };
+    const session = {
+      send: async (_method, event) => {
+        if (event.type === 'keyDown') current = event.modifiers === 2 ? before : after;
+      },
+      evaluate: async expression => vm.runInNewContext(expression, { window }),
+    };
+    const route = { routing: { requestId: 'current' }, request: { nodes }, response: { edges } };
+    const result = verifyBusinessHistoryRoundtrip({ session, editedNodeId: 'a',
+      waitForValue: async (_session, expression, label) => {
+        if (!label.endsWith(' route')) return session.evaluate(expression);
+        if (routesReady) current = { nodes: current.nodes, edges: before.edges };
+        return route;
+      }, readFinalRouteExpression: () => 'route', waitForVisual: async () => {}, auditFinalSvg: async () => ({}) });
+    if (!routesReady) {
+      await expect(result).rejects.toThrow('Invalid edit stability snapshot');
+      expect(window.__vizlyBusinessHistory).toBeUndefined();
+      return;
+    }
+    const restored = await result;
+    expect(restored[1].stability.movedNodeCount).toBe(0);
+    expect(restored[1].retained.changedGeometryCount).toBe(0);
+    expect(window.__vizlyBusinessHistory).toBeUndefined();
+  });
   it('compares retained redo routes to the committed state, not a pending preview', async () => {
     const before = structuredClone({ nodes, edges });
     const after = structuredClone(before);
@@ -126,7 +158,7 @@ describe('business history restoration contract', () => {
     const restored = await verifyBusinessHistoryRoundtrip({ session, editedNodeId: 'a',
       waitForValue: async (_session, expression, label) => label.endsWith(' route') ? route : session.evaluate(expression),
       readFinalRouteExpression: () => 'route', waitForVisual: async () => {}, auditFinalSvg: async () => ({}) });
-    expect(restored[1].stability.changedGeometryCount).toBe(1);
+    expect(restored[1].stability.changedGeometryCount).toBeUndefined();
     expect(restored[1].retained.changedGeometryCount).toBe(0);
     expect(window.__vizlyBusinessHistory).toBeUndefined();
   });
@@ -135,7 +167,7 @@ describe('business history restoration contract', () => {
     expect(() => assertHistoryRetainedRoutes(value)).toThrow('retained');
   });
   it('accepts restored positions and topology while reporting route changes separately', () => {
-    expect(assertHistoryRestored({ ...validMetrics(), changedPathCount: 1, changedGeometryCount: 1 }).changedGeometryCount).toBe(1);
+    expect(assertHistoryRestored({ ...validMetrics(), changedPathCount: 1, changedGeometryCount: 1 }).changedGeometryCount).toBeUndefined();
   });
   it.each(['movedNodeCount', 'addedNodeCount', 'removedNodeCount', 'addedEdgeCount', 'removedEdgeCount', 'rewiredEdgeCount'])('rejects a history mismatch: %s', key => {
     expect(() => assertHistoryRestored({ ...validMetrics(), [key]: 1 })).toThrow('did not restore');

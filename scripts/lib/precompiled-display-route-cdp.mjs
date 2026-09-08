@@ -153,6 +153,22 @@ export const closePrecompiledRouteBrowser = async (
   }
 };
 
+const safeBrowserEvaluationFailure = details => {
+  const description = details?.exception?.description;
+  const firstLine = typeof description === 'string' ? description.slice(0, 256).split(/\r?\n/, 1)[0] : '';
+  const known = new Map([
+    ['Error: Invalid edit stability snapshot', 'invalid-edit-stability-snapshot'],
+    ['Error: Missing history baseline', 'missing-history-baseline'],
+    ['Error: Topology stability store unavailable', 'topology-store-unavailable'],
+  ]);
+  const reason = known.get(firstLine) ?? 'unclassified';
+  const className = ['Error', 'TypeError', 'ReferenceError', 'SyntaxError', 'RangeError'].includes(details?.exception?.className)
+    ? details.exception.className : 'unknown';
+  const location = ['lineNumber', 'columnNumber'].map(key => Number.isSafeInteger(details?.[key])
+    && details[key] >= 0 && details[key] <= 1_000_000 ? details[key] : null);
+  return `Browser evaluation failed: ${JSON.stringify({ reason, className, line: location[0], column: location[1] })}`;
+};
+
 export class CdpPageSession {
   constructor(
     webSocketUrl,
@@ -225,7 +241,7 @@ export class CdpPageSession {
       returnByValue: true,
     });
     if (response.exceptionDetails) {
-      throw new Error(response.exceptionDetails.text || 'Browser evaluation failed');
+      throw new Error(safeBrowserEvaluationFailure(response.exceptionDetails));
     }
     return response.result?.value;
   }

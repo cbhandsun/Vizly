@@ -305,6 +305,42 @@ describe('browser startup lifecycle and safe diagnostics', () => {
 });
 
 describe('precompiled display route CDP boundary', () => {
+  it.each([
+    ['Error: Invalid edit stability snapshot', 'invalid-edit-stability-snapshot'],
+    ['Error: Missing history baseline', 'missing-history-baseline'],
+    ['Error: Topology stability store unavailable', 'topology-store-unavailable'],
+  ])('preserves the safe evaluation reason for %s', async (description, reason) => {
+    const session = new CdpPageSession('ws://local');
+    vi.spyOn(session, 'send').mockResolvedValue({ exceptionDetails: {
+      text: 'PRIVATE-CONTENT', lineNumber: 12, columnNumber: 3,
+      exception: { className: 'Error', description: `${description}\nPRIVATE-CONTENT` },
+    } });
+    const error = await session.evaluate('trusted expression').catch(error => error);
+    expect(error.message).toContain(`"reason":"${reason}"`);
+    expect(error.message).toContain('"line":12');
+    expect(error.message).not.toContain('PRIVATE-CONTENT');
+  });
+
+  it.each([{}, { text: 'PRIVATE-CONTENT', exception: { className: 'PRIVATE-CONTENT',
+    description: 'Bearer PRIVATE-CONTENT', value: 'PRIVATE-CONTENT' }, lineNumber: -1, columnNumber: Infinity },
+  { exception: { className: 'TypeError', description: { secret: 'PRIVATE-CONTENT' } }, lineNumber: '1', columnNumber: 1_000_001 },
+  { exception: { description: `Error: Invalid edit stability snapshot PRIVATE-CONTENT${'x'.repeat(10_000)}` } },
+  ])('bounds unknown evaluation failures without exposing page content', async exceptionDetails => {
+    const session = new CdpPageSession('ws://local');
+    vi.spyOn(session, 'send').mockResolvedValue({ exceptionDetails });
+    const error = await session.evaluate('trusted expression').catch(error => error);
+    expect(error.message).toContain('"reason":"unclassified"');
+    expect(error.message).toContain('"line":null');
+    expect(error.message).not.toContain('PRIVATE-CONTENT');
+    expect(error.message.length).toBeLessThan(200);
+  });
+
+  it('preserves successful evaluation values', async () => {
+    const session = new CdpPageSession('ws://local');
+    vi.spyOn(session, 'send').mockResolvedValue({ result: { value: { ready: true } } });
+    await expect(session.evaluate('trusted expression')).resolves.toEqual({ ready: true });
+  });
+
   it.each([undefined, null, '', 30_000, '45000'])(
     'accepts an empty or bounded command timeout: %s',
     value => expect(parsePrecompiledRouteCdpCommandTimeoutMs(value)).toBe(
