@@ -683,6 +683,6 @@ export function applyDomainDagreEdgeRouting(
         24,
     )
         .forEach((edge, index) => {
-            edges[index] = { ...edge, data: { ...edge.data, algorithm: 'domain-dagre-full' } };
+            edges[index] = { ...edge, data: { ...edge.data, algorithm: 'domain-dagre-simplified' } };
         });
 }

@@ -1,10 +1,10 @@
 {
   "schema": "vizly-precompiled-display-route-v1",
-  "routingVersion": "19",
+  "routingVersion": "20",
   "sourceHash": "source-v1:da286fbefa1a0d0a3ba3bf5a6589d2edba849af0f477ddb910ecad4d91649986",
-  "inputSignature": "2777260315",
-  "inputGeometryDigest": "geometry-v1:a6620bb1684825c1f80cd72db1788465",
-  "outputRouteSignature": "route-v2:14:54:37abcf609de6cd12",
+  "inputSignature": "786451803",
+  "inputGeometryDigest": "geometry-v1:c377340177c45a5d99852c6b354c56d9",
+  "outputRouteSignature": "route-v2:14:55:d0019013b866bbd1",
   "hardClean": true,
   "patches": [
     {
@@ -17,22 +17,23 @@
       "data": {
         "computedPath": [
           {
-            "x": 1039,
-            "y": 653
+            "x": 1065,
+            "y": 652
           },
           {
-            "x": 1039,
-            "y": 742
+            "x": 1065,
+            "y": 730
           },
           {
-            "x": 1667,
-            "y": 742
+            "x": 1649,
+            "y": 730
           },
           {
-            "x": 1667,
-            "y": 822
+            "x": 1649,
+            "y": 823
           }
         ],
+        "sharedTrunkAware": true,
         "sharedTrunkSynthesized": true
       }
     },
@@ -46,14 +47,16 @@
       "data": {
         "computedPath": [
           {
-            "x": 1038.85,
-            "y": 653
+            "x": 1065,
+            "y": 652
           },
           {
-            "x": 1038.85,
-            "y": 811
+            "x": 1065,
+            "y": 812
           }
-        ]
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -62,28 +65,40 @@
       "target": "visibility",
       "type": "stablePath",
       "sourceHandle": "bottom",
-      "targetHandle": "right",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {
-            "x": 1039,
-            "y": 653
+            "x": 1065,
+            "y": 652
           },
           {
-            "x": 1039,
+            "x": 1065,
             "y": 742
           },
           {
-            "x": 1855.75,
+            "x": 1477,
             "y": 742
           },
           {
-            "x": 1855.75,
-            "y": 1599
+            "x": 1477,
+            "y": 1042
           },
           {
-            "x": 1582.3374999999999,
-            "y": 1599
+            "x": 1511,
+            "y": 1042
+          },
+          {
+            "x": 1511,
+            "y": 1256
+          },
+          {
+            "x": 1434,
+            "y": 1256
+          },
+          {
+            "x": 1434,
+            "y": 1540
           }
         ],
         "sharedTrunkAware": true,
@@ -100,22 +115,23 @@
       "data": {
         "computedPath": [
           {
-            "x": 1039,
-            "y": 653
+            "x": 1065,
+            "y": 652
           },
           {
-            "x": 1039,
-            "y": 742
-          },
-          {
-            "x": 191,
-            "y": 742
+            "x": 1065,
+            "y": 722
           },
           {
             "x": 191,
-            "y": 811
+            "y": 722
+          },
+          {
+            "x": 191,
+            "y": 812
           }
         ],
+        "sharedTrunkAware": true,
         "sharedTrunkSynthesized": true
       }
     },
@@ -129,20 +145,20 @@
       "data": {
         "computedPath": [
           {
-            "x": 1064.75,
+            "x": 1054,
             "y": 930
           },
           {
-            "x": 1064.75,
-            "y": 995
+            "x": 1054,
+            "y": 1020
           },
           {
             "x": 812,
-            "y": 995
+            "y": 1020
           },
           {
             "x": 812,
-            "y": 1089
+            "y": 1090
           }
         ],
         "sharedTrunkAware": true,
@@ -171,7 +187,8 @@
             "y": 202
           }
         ],
-        "sharedTrunkAware": true
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -179,28 +196,29 @@
       "source": "tms",
       "target": "downstream",
       "type": "stablePath",
-      "sourceHandle": "top",
+      "sourceHandle": "bottom",
       "targetHandle": "bottom",
       "data": {
         "computedPath": [
           {
-            "x": 1065,
-            "y": 812
+            "x": 1054,
+            "y": 930
           },
           {
-            "x": 1065,
-            "y": 700
-          },
-          {
-            "x": 1961,
-            "y": 700
+            "x": 1054,
+            "y": 986
           },
           {
             "x": 1961,
-            "y": 180
+            "y": 986
+          },
+          {
+            "x": 1961,
+            "y": 179.5
           }
         ],
-        "sharedTrunkAware": true
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -209,22 +227,28 @@
       "target": "visibility",
       "type": "stablePath",
       "sourceHandle": "bottom",
-      "targetHandle": "left",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {
-            "x": 1064.75,
+            "x": 1054,
             "y": 930
           },
           {
-            "x": 1064.75,
-            "y": 1599
+            "x": 1054,
+            "y": 1256
           },
           {
-            "x": 1286.3374999999999,
-            "y": 1599
+            "x": 1434,
+            "y": 1256
+          },
+          {
+            "x": 1434,
+            "y": 1540
           }
-        ]
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -237,22 +261,24 @@
       "data": {
         "computedPath": [
           {
-            "x": 1065,
-            "y": 931
+            "x": 1054,
+            "y": 930
           },
           {
-            "x": 1065,
-            "y": 1000
-          },
-          {
-            "x": 1338,
-            "y": 1000
+            "x": 1054,
+            "y": 1033
           },
           {
             "x": 1338,
-            "y": 1089
+            "y": 1033
+          },
+          {
+            "x": 1338,
+            "y": 1090
           }
-        ]
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -266,7 +292,7 @@
         "computedPath": [
           {
             "x": 895,
-            "y": 181
+            "y": 179.5
           },
           {
             "x": 895,
@@ -278,7 +304,7 @@
           },
           {
             "x": 1065,
-            "y": 533
+            "y": 534
           }
         ]
       }
@@ -294,21 +320,22 @@
         "computedPath": [
           {
             "x": 1530,
-            "y": 1539
+            "y": 1540
           },
           {
             "x": 1530,
-            "y": 1457
+            "y": 1376
           },
           {
-            "x": 1997,
-            "y": 1457
+            "x": 1961,
+            "y": 1376
           },
           {
-            "x": 1997,
-            "y": 181
+            "x": 1961,
+            "y": 180
           }
-        ]
+        ],
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -316,29 +343,24 @@
       "source": "wms",
       "target": "bms",
       "type": "stablePath",
-      "sourceHandle": "bottom",
+      "sourceHandle": "right",
       "targetHandle": "top",
       "data": {
         "computedPath": [
           {
-            "x": 156,
-            "y": 931
-          },
-          {
-            "x": 156,
-            "y": 1010
+            "x": 332,
+            "y": 871
           },
           {
             "x": 731,
-            "y": 1010
+            "y": 871
           },
           {
             "x": 731,
-            "y": 1089
+            "y": 1090
           }
         ],
-        "sharedTrunkAware": true,
-        "sharedTrunkSynthesized": true
+        "sharedTrunkAware": true
       }
     },
     {
@@ -346,29 +368,29 @@
       "source": "wms",
       "target": "visibility",
       "type": "stablePath",
-      "sourceHandle": "bottom",
-      "targetHandle": "left",
+      "sourceHandle": "right",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {
-            "x": 156,
-            "y": 931
-          },
-          {
-            "x": 156,
-            "y": 1010
+            "x": 332,
+            "y": 871
           },
           {
             "x": 388,
-            "y": 1010
+            "y": 871
           },
           {
             "x": 388,
-            "y": 1599
+            "y": 1256
           },
           {
-            "x": 1286.3374999999999,
-            "y": 1599
+            "x": 1434,
+            "y": 1256
+          },
+          {
+            "x": 1434,
+            "y": 1540
           }
         ],
         "sharedTrunkAware": true,
@@ -385,20 +407,12 @@
       "data": {
         "computedPath": [
           {
-            "x": 156,
-            "y": 931
-          },
-          {
-            "x": 156,
-            "y": 1010
+            "x": 181,
+            "y": 930
           },
           {
             "x": 181,
-            "y": 1010
-          },
-          {
-            "x": 181,
-            "y": 1089
+            "y": 1090
           }
         ],
         "sharedTrunkSynthesized": true

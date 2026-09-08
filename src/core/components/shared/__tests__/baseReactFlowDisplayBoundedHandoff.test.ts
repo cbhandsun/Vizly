@@ -17,8 +17,8 @@ import { createDisplayRoutingIdentity } from '../baseReactFlowDisplayRoutingSess
 
 it('fully reroutes a rejected automatic layout seed instead of retaining its locked paths', () => {
   const fixture = structuredClone(rejectedLayoutSeed);
-  // The producer now explicitly identifies its generated full-layout proposals.
-  const edges: Edge[] = fixture.edges.map(edge => ({ ...edge, data: { ...edge.data, algorithm: 'domain-dagre-full' } }));
+  // The simplified producer identifies proposals lacking the full joint repair.
+  const edges: Edge[] = fixture.edges.map(edge => ({ ...edge, data: { ...edge.data, algorithm: 'domain-dagre-simplified' } }));
   const input = { ...fixture, edges, enableSmartEdges: true, smartEdgePadding: 20, isLargeGraph: false };
   const identity = computeBaseReactFlowDisplayInputIdentityBundle(input);
   const result = computeBaseReactFlowDisplayEdgesWorkerResponse({ ...input,

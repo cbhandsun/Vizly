@@ -102,15 +102,15 @@ export const seedObstacleAwareDisplayRoutes = (edges: Edge[], inputNodes: Node[]
     const waypoints = edge.data?.waypoints;
     const preservesAuthoredPath = waypoints !== undefined
       && (!Array.isArray(waypoints) || waypoints.length > 0);
-    // Full Dagre paths are generated proposals, not accepted display geometry.
+    // Simplified Dagre paths have not passed the full generator's joint repair.
     // Reconstruct only a proposal that violates the display clearance contract;
     // unknown provenance and authored waypoints retain their existing ownership.
-    const rebuildFullLayoutPath = edge.data?.algorithm === 'domain-dagre-full'
+    const rebuildSimplifiedLayoutPath = edge.data?.algorithm === 'domain-dagre-simplified'
       && path.length >= 2 && path.length <= 128 && !preservesAuthoredPath
       && scoreNodeClearanceRisk(path, nodes, edge, COMMERCIAL_BUSINESS_NODE_CLEARANCE) > 0.5;
     if (preservesAuthoredPath) return edge;
     if (path.length >= 2 && (
-      (!rebuildRuntimePaths && !rebuildFullLayoutPath)
+      (!rebuildRuntimePaths && !rebuildSimplifiedLayoutPath)
       || readEdgeTerminalPolicy(edge, 'source').sourceExactFixed
       || readEdgeTerminalPolicy(edge, 'target').sourceExactFixed
     )) return edge;

@@ -8,7 +8,7 @@ export const tmsReverseLayoutRequest = {
   isLargeGraph: false,
   displayEdgeEpoch: 0,
   qualityMode: "full",
-  inputIdentity: {"routingVersion":"18","visualVersion":"balanced-crossing-gate-v2","inputSignature":"3521952565","inputGeometryDigest":"geometry-v1:1105b1a84eab5f0c62b695728d2c4da8"},
+  inputIdentity: {"routingVersion":"20","visualVersion":"balanced-crossing-gate-v2","inputSignature":"227496876","inputGeometryDigest":"geometry-v1:f942fb49031d9c112fd73055d328c705"},
   candidateSource: "persistent",
   stopAfterObstacleFailure: false,
   nodes: [

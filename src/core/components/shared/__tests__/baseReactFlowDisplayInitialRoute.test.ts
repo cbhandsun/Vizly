@@ -125,12 +125,12 @@ describe('initial obstacle-aware display routing', () => {
     expect(seedObstacleAwareDisplayRoutes(safe, nodes.slice(0, 2))).toBe(safe);
   });
 
-  it('reconstructs only unsafe full-layout proposals while preserving authored geometry and fixed ports', () => {
+  it('reconstructs only unsafe simplified-layout proposals while preserving authored geometry and fixed ports', () => {
     const blocker = node('blocker', 240, 0);
     const nodes = [node('source', 0, 0), node('target', 600, 0), blocker];
     const proposal: Edge = {
       ...edge, sourceHandle: 'right', targetHandle: 'left',
-      data: { algorithm: 'domain-dagre-full', layoutPathLocked: true,
+      data: { algorithm: 'domain-dagre-simplified', layoutPathLocked: true,
         runtimeHandleLock: { source: true, target: true },
         computedPath: [{ x: 100, y: 30 }, { x: 600, y: 30 }] },
     };
@@ -151,6 +151,7 @@ describe('initial obstacle-aware display routing', () => {
       { ...proposal.data, manualHandles: true },
       { ...proposal.data, algorithm: undefined },
       { ...proposal.data, algorithm: 'elk' },
+      { ...proposal.data, algorithm: 'domain-dagre-full' },
       { ...proposal.data, computedPath: Array.from({ length: 129 }, () => ({ x: 100, y: 30 })) },
     ]) {
       const preserved = [{ ...proposal, data }];
@@ -160,7 +161,7 @@ describe('initial obstacle-aware display routing', () => {
       { ...proposal, data: { ...proposal.data, waypoints: [] } },
     ], nodes);
     expectClearance(emptyWaypoints, blocker);
-    const cleanPeer = { ...routed, id: 'clean-peer', data: { ...routed.data, algorithm: 'domain-dagre-full' } };
+    const cleanPeer = { ...routed, id: 'clean-peer', data: { ...routed.data, algorithm: 'domain-dagre-simplified' } };
     expect(seedObstacleAwareDisplayRoutes([proposal, cleanPeer], nodes)[1]).toBe(cleanPeer);
   });
 

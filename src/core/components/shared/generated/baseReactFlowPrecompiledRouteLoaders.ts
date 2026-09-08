@@ -9,20 +9,20 @@ export type GeneratedBaseReactFlowPrecompiledRouteDescriptor = {
 };
 
 const generatedPrecompiledRouteAsset0 = new URL(
-  './precompiledRoutes/route-2777260315.json',
+  './precompiledRoutes/route-1887175858.json',
   import.meta.url,
 );
 
 const generatedPrecompiledRouteDescriptor0: GeneratedBaseReactFlowPrecompiledRouteDescriptor = {
-  presetId: "logistics-architecture-v1",
-  variantId: "initial",
-  sourceHash: "source-v1:da286fbefa1a0d0a3ba3bf5a6589d2edba849af0f477ddb910ecad4d91649986",
-  geometryDigest: "geometry-v1:a6620bb1684825c1f80cd72db1788465",
+  presetId: "wms-process-flow-v1",
+  variantId: "domain-lanes-lr",
+  sourceHash: "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
+  geometryDigest: "geometry-v1:6dcb6d0ddaa1021d02c4d9c953f2d411",
   load: () => loadBaseReactFlowPrecompiledRouteAsset(generatedPrecompiledRouteAsset0),
 };
 
 const generatedPrecompiledRouteAsset1 = new URL(
-  './precompiledRoutes/route-3641362285.json',
+  './precompiledRoutes/route-3771291181.json',
   import.meta.url,
 );
 
@@ -30,25 +30,25 @@ const generatedPrecompiledRouteDescriptor1: GeneratedBaseReactFlowPrecompiledRou
   presetId: "wms-process-flow-v1",
   variantId: "initial",
   sourceHash: "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
-  geometryDigest: "geometry-v1:37e2fac90d5127d12918da5d9c021df5",
+  geometryDigest: "geometry-v1:30575b39a9389a9da46af6ab710cb6f9",
   load: () => loadBaseReactFlowPrecompiledRouteAsset(generatedPrecompiledRouteAsset1),
 };
 
 const generatedPrecompiledRouteAsset2 = new URL(
-  './precompiledRoutes/route-3868299890.json',
+  './precompiledRoutes/route-786451803.json',
   import.meta.url,
 );
 
 const generatedPrecompiledRouteDescriptor2: GeneratedBaseReactFlowPrecompiledRouteDescriptor = {
-  presetId: "wms-process-flow-v1",
-  variantId: "domain-lanes-lr",
-  sourceHash: "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
-  geometryDigest: "geometry-v1:a4ea5f5d948937f1625a9b0f428e91ad",
+  presetId: "logistics-architecture-v1",
+  variantId: "initial",
+  sourceHash: "source-v1:da286fbefa1a0d0a3ba3bf5a6589d2edba849af0f477ddb910ecad4d91649986",
+  geometryDigest: "geometry-v1:c377340177c45a5d99852c6b354c56d9",
   load: () => loadBaseReactFlowPrecompiledRouteAsset(generatedPrecompiledRouteAsset2),
 };
 
 const generatedPrecompiledRouteAsset3 = new URL(
-  './precompiledRoutes/route-4005634826.json',
+  './precompiledRoutes/route-893060554.json',
   import.meta.url,
 );
 
@@ -56,7 +56,7 @@ const generatedPrecompiledRouteDescriptor3: GeneratedBaseReactFlowPrecompiledRou
   presetId: "wms-demand-allocation-strategy-v2",
   variantId: "initial",
   sourceHash: "source-v1:ea82c502ab6535b5c8f8367c591861e540396a41955a15c6b5f94f922264b7de",
-  geometryDigest: "geometry-v1:8854ca394f8c4169d4603ac9a8f491b5",
+  geometryDigest: "geometry-v1:c73f31a96649385d376b6d1fdafcfa71",
   load: () => loadBaseReactFlowPrecompiledRouteAsset(generatedPrecompiledRouteAsset3),
 };
 
@@ -65,10 +65,10 @@ export const GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_LOADERS: Record<
   string,
   GeneratedBaseReactFlowPrecompiledRouteDescriptor
 > = {
-  "2777260315": generatedPrecompiledRouteDescriptor0,
-  "3641362285": generatedPrecompiledRouteDescriptor1,
-  "3868299890": generatedPrecompiledRouteDescriptor2,
-  "4005634826": generatedPrecompiledRouteDescriptor3,
+  "1887175858": generatedPrecompiledRouteDescriptor0,
+  "3771291181": generatedPrecompiledRouteDescriptor1,
+  "786451803": generatedPrecompiledRouteDescriptor2,
+  "893060554": generatedPrecompiledRouteDescriptor3,
 };
 
 /**
@@ -79,7 +79,7 @@ export const GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_PREFETCH_LOADERS: Recor
   string,
   GeneratedBaseReactFlowPrecompiledRouteDescriptor
 > = {
-  "logistics-architecture-v1": generatedPrecompiledRouteDescriptor0,
   "wms-process-flow-v1": generatedPrecompiledRouteDescriptor1,
+  "logistics-architecture-v1": generatedPrecompiledRouteDescriptor2,
   "wms-demand-allocation-strategy-v2": generatedPrecompiledRouteDescriptor3,
 };
