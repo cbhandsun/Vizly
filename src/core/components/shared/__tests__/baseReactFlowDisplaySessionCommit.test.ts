@@ -8,6 +8,7 @@ import { createDisplayRoutingIdentity } from '../baseReactFlowDisplayRoutingSess
 import { commitBaseReactFlowDisplaySessionResult } from '../baseReactFlowDisplaySessionCommit';
 import { createDisplayRoutingWorkerCommitReceipt } from '../baseReactFlowDisplayWorkerCommitReceipt';
 import { createBaseReactFlowRoutingSessionRuntime } from '../baseReactFlowRoutingSessionRuntime';
+import { readRoutingObservation } from '../baseReactFlowRoutingObservation';
 import { createTestDisplayHardReport } from './baseReactFlowDisplayWorkerTestFixtures';
 
 const sourceNodes: Node[] = [
@@ -73,6 +74,9 @@ describe('baseReactFlowDisplaySessionCommit', () => {
     expect(result.rememberCommittedBaseline).toHaveBeenCalledOnce();
     expect(result.applyFinalGeometry).toHaveBeenCalledOnce();
     expect(result.runtime.isCurrentJob(result.job)).toBe(false);
+    expect(readRoutingObservation(result.job.signal)?.entries.at(-1)?.stage).toBe('commit-accepted');
+    expect(readRoutingObservation(result.rememberCommittedBaseline.mock.calls[0][0]))
+      .toEqual(readRoutingObservation(result.job.signal));
   });
 
   it('fails closed before display mutation when snapshot evidence is invalid', () => {

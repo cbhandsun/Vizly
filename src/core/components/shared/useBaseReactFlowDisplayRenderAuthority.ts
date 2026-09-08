@@ -1,4 +1,5 @@
 import type { Edge } from '@xyflow/react';
+import { bindRoutingObservation, observeRoutingRenderFrame, recordRoutingObservation } from './baseReactFlowRoutingObservation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
@@ -90,6 +91,7 @@ export const useBaseReactFlowCommittedRenderAuthority = (): Readonly<{
     edges: readonly Edge[],
   ): void => {
     const resolution = resolveBaseReactFlowCommittedRenderAuthority(baseline, edges);
+    if (resolution.authority) bindRoutingObservation(baseline, resolution.authority);
     updateDisplayRoutingDebugState({ renderAuthorityIssue: resolution.issue });
     setCommittedRenderAuthority(resolution.authority);
   }, []);
@@ -169,6 +171,12 @@ export const useBaseReactFlowActiveRenderAuthority = ({
   );
   useEffect(() => {
     updateDisplayRoutingDebugState({ renderAuthorityStatus: resolution.status });
-  }, [resolution.status]);
+    if (!resolution.authority) return;
+    const authority = resolution.authority;
+    recordRoutingObservation(authority, 'render-committed');
+    if (typeof requestAnimationFrame !== 'function') return;
+    // A frame callback is observable; it is not proof of pixel visibility.
+    return observeRoutingRenderFrame(authority, requestAnimationFrame, cancelAnimationFrame);
+  }, [resolution.status, resolution.authority]);
   return resolution.authority;
 };

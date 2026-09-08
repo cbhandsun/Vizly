@@ -1,4 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
+import { bindRoutingObservation, recordRoutingObservation } from './baseReactFlowRoutingObservation';
 import type { RoutingPatch } from '../../routing/routingPatch';
 
 import type {
@@ -87,6 +88,7 @@ export const commitBaseReactFlowDisplaySessionResult = ({
       onRejected?.();
       return { accepted: false } as const;
     }
+    bindRoutingObservation(job.signal, baseline);
     rememberCommittedBaseline(baseline, finalEdges);
     applyFinalGeometry();
     if (cacheReplaySignature !== null && cachePatches) {
@@ -101,6 +103,7 @@ export const commitBaseReactFlowDisplaySessionResult = ({
     }
     return { accepted: true } as const;
   });
+  if (result.committed && result.value.accepted) recordRoutingObservation(job.signal, 'commit-accepted');
   return result.committed && result.value.accepted
     ? {
       committed: true,

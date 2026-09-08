@@ -58,6 +58,32 @@ export const readStartupFaultRecovery = kind => {
   try { summary = JSON.parse(textarea.value); } catch { return { valid: false }; }
   const keys = kind === 'startup' ? ['schema', 'stage', 'code', 'elapsedMs'] : ['schema', 'reason', 'stage', 'code'];
   let milestonesValid = true;
+  if (kind !== 'startup') {
+    keys.push('observation');
+    const trace = summary?.observation;
+    const stages = ['job-started', 'job-cancelled', 'job-finished', 'failed', 'commit-accepted',
+      'render-committed', 'render-frame-observed', 'worker-requested', 'worker-available',
+      'worker-post-requested', 'worker-response-validated', 'worker-request-settled'];
+    let lastTime = 0;
+    milestonesValid = trace && typeof trace === 'object' && Object.keys(trace).length === 4
+      && trace.schema === 'vizly-routing-observation-v1' && trace.owner === 'display' && trace.truncated === false
+      && Array.isArray(trace.entries) && trace.entries.length >= 3 && trace.entries.length <= 32
+      && trace.entries.every(entry => {
+        if (!entry || typeof entry !== 'object' || Object.keys(entry).length !== 3
+          || !stages.includes(entry.stage) || !Object.hasOwn(entry, 'elapsedMs')
+          || !Object.hasOwn(entry, 'requestOrdinal')) return false;
+        if (entry.requestOrdinal !== null && (!Number.isSafeInteger(entry.requestOrdinal)
+          || entry.requestOrdinal < 1 || entry.requestOrdinal > 8)) return false;
+        if (entry.stage.startsWith('worker-') !== (entry.requestOrdinal !== null)) return false;
+        if (entry.elapsedMs !== null && (!Number.isSafeInteger(entry.elapsedMs)
+          || entry.elapsedMs < lastTime || entry.elapsedMs > 600000)) return false;
+        if (entry.elapsedMs !== null) lastTime = entry.elapsedMs;
+        return true;
+      }) && trace.entries[0].stage === 'job-started' && trace.entries.at(-1).stage === 'failed'
+      && trace.entries.some(entry => entry.stage === 'worker-requested' && entry.requestOrdinal === 1)
+      && (summary?.code === 'display-edge-worker-unavailable'
+        || trace.entries.some(entry => entry.stage === 'worker-post-requested' && entry.requestOrdinal === 1));
+  }
   if (kind === 'startup' && summary?.code !== 'entry-resource-failed') {
     keys.push('milestones');
     const stages = ['runtime-started', 'runtime-ready', 'readiness-ready', 'mount-requested', 'mount-submitted', 'failed'];

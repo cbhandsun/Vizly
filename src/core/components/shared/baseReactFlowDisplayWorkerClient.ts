@@ -1,4 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
+import { beginRoutingRequestObservation } from './baseReactFlowRoutingObservation';
 import type { MutableRefObject } from 'react';
 import type { RoutingPatch } from '../../routing/routingPatch';
 import {
@@ -323,15 +324,19 @@ export const requestBaseReactFlowDisplayEdgesWorker = ({
   signal?: AbortSignal;
 }): Promise<BaseReactFlowDisplayWorkerResponseResult> => (
   new Promise((resolve, reject) => {
+    const observe = beginRoutingRequestObservation(signal);
     if (signal?.aborted) {
+      observe('worker-request-settled');
       reject(new Error('display-edge-worker-cancelled'));
       return;
     }
     const worker = ensureBaseReactFlowDisplayWorker(workerRef);
     if (!worker || typeof window === 'undefined') {
+      observe('worker-request-settled');
       reject(new Error('display-edge-worker-unavailable'));
       return;
     }
+    observe('worker-available');
     // The idle guard owns error events only between requests. Detach it before
     // installing request-scoped listeners so one error cannot race two owners.
     detachBaseReactFlowDisplayWorkerIdleListeners(worker);
@@ -350,7 +355,7 @@ export const requestBaseReactFlowDisplayEdgesWorker = ({
       signal?.removeEventListener('abort', handleAbort);
       if (terminate) terminateWorker();
       else armBaseReactFlowDisplayWorkerIdleListeners(worker, workerRef);
-      callback();
+      try { callback(); } finally { observe('worker-request-settled'); }
     };
     const handleMessage = (event: MessageEvent<unknown>) => {
       const responseRequestId = readDisplayEdgesWorkerRequestId(event.data);
@@ -469,6 +474,7 @@ export const requestBaseReactFlowDisplayEdgesWorker = ({
           requestId: request.requestId,
           edgeCount: responseEdges.length,
         });
+        observe('worker-response-validated');
         resolve({
           edges: responseEdges,
           routingPatches: safeRoutingPatches,
@@ -521,6 +527,7 @@ export const requestBaseReactFlowDisplayEdgesWorker = ({
     worker.addEventListener('messageerror', handleMessageError);
     signal?.addEventListener('abort', handleAbort, { once: true });
     try {
+      observe('worker-post-requested');
       updateDisplayRoutingDebugState({ stage: 'worker-post', requestId: request.requestId });
       worker.postMessage(request);
     } catch {

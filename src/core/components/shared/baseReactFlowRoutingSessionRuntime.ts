@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { recordRoutingObservation, startRoutingObservation } from './baseReactFlowRoutingObservation';
 import type { MutableRefObject } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 import { layoutCandidateAcceptanceMatches, type LayoutCandidateAcceptance, type LayoutRouteProof } from '../../algorithms/layoutCandidateAcceptance';
@@ -83,12 +84,14 @@ export const createBaseReactFlowRoutingSessionRuntime = (
 
   const finishJob = (job: BaseReactFlowRoutingSessionJob): boolean => {
     if (committingJob || !isCurrentJob(job)) return false;
+    recordRoutingObservation(job.signal, 'job-finished');
     activeJob = null;
     return true;
   };
 
   const cancelJob = (job: BaseReactFlowRoutingSessionJob): boolean => {
     if (committingJob || activeJob?.publicJob !== job) return false;
+    recordRoutingObservation(job.signal, 'job-cancelled');
     activeJob.abortController.abort();
     activeJob = null;
     return true;
@@ -112,7 +115,9 @@ export const createBaseReactFlowRoutingSessionRuntime = (
         return publicJob;
       }
       documentSource = null;
+      if (activeJob) recordRoutingObservation(activeJob.publicJob.signal, 'job-cancelled');
       activeJob?.abortController.abort();
+      startRoutingObservation(publicJob.signal, owner);
       activeJob = { publicJob, abortController };
       return publicJob;
     },
@@ -166,6 +171,7 @@ export const createBaseReactFlowRoutingSessionRuntime = (
       layoutAcceptance = null;
       pendingLayoutAcceptance = null;
       hasPendingLayoutAcceptance = false;
+      if (activeJob) recordRoutingObservation(activeJob.publicJob.signal, 'job-cancelled');
       activeJob?.abortController.abort();
       activeJob = null;
       committingJob = null;

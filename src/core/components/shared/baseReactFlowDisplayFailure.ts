@@ -1,4 +1,5 @@
 import type { BaseReactFlowRoutingSessionJob, BaseReactFlowRoutingSessionRuntime } from './baseReactFlowRoutingSessionRuntime';
+import { bindRoutingObservation, recordRoutingObservation } from './baseReactFlowRoutingObservation';
 import type { DisplayWorkerFailureCode } from './baseReactFlowDisplayFailureSummary';
 
 export type BaseReactFlowDisplayFailureReason =
@@ -34,13 +35,14 @@ export const createCurrentDisplayFailure = ({
   current: BaseReactFlowDisplayFailureIdentity | null;
   reason: BaseReactFlowDisplayFailureReason;
   workerFailureCode?: DisplayWorkerFailureCode;
-}>): BaseReactFlowDisplayFailure | null => (
-  current && runtime.isCurrentJob(job)
-  && requested.inputSignature === current.inputSignature
-  && requested.inputGeometryDigest === current.inputGeometryDigest
-    ? { ...requested, jobId: job.id, reason, ...(workerFailureCode ? { workerFailureCode } : {}) }
-    : null
-);
+}>): BaseReactFlowDisplayFailure | null => {
+  if (!current || !runtime.isCurrentJob(job) || requested.inputSignature !== current.inputSignature
+    || requested.inputGeometryDigest !== current.inputGeometryDigest) return null;
+  const failure = { ...requested, jobId: job.id, reason, ...(workerFailureCode ? { workerFailureCode } : {}) };
+  recordRoutingObservation(job.signal, 'failed');
+  bindRoutingObservation(job.signal, failure);
+  return failure;
+};
 
 export const classifyDisplayFinalRejection = ({
   hardClean, routesMatch, hasReceipt,

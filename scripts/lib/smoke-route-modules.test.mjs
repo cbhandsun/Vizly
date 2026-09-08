@@ -170,6 +170,7 @@ describe('smoke route modules', () => {
   });
 
   it('rejects every missing recovery invariant without echoing the observation', () => {
+    // The shape assertion below remains independent of the browser projection.
     const fault = startupFaultCases[0];
     const valid = { valid: true, code: fault.code, stage: fault.stage, unobscured: true,
       readOnly: true, nodesPreserved: true, privateContentAbsent: true };
@@ -179,6 +180,29 @@ describe('smoke route modules', () => {
         .toThrow('Startup fault recovery contract failed');
     }
     expect(() => assertStartupFaultRecovery(null, fault)).toThrow('Startup fault recovery contract failed');
+  });
+  it('requires bounded content-free request observations for Worker recovery', () => {
+    const valid = { schema: 'vizly-routing-failure-v1', reason: 'worker-failed', stage: 'worker-creation',
+      code: 'display-edge-worker-unavailable', observation: { schema: 'vizly-routing-observation-v1',
+        owner: 'display', truncated: false, entries: [
+          { stage: 'job-started', requestOrdinal: null, elapsedMs: 0 },
+          { stage: 'worker-requested', requestOrdinal: 1, elapsedMs: 1 },
+          { stage: 'failed', requestOrdinal: null, elapsedMs: 2 },
+        ] } };
+    for (const summary of [valid, { ...valid, observation: undefined },
+      { ...valid, observation: { ...valid.observation, token: 'private-fault-marker' } },
+      { ...valid, observation: { ...valid.observation, truncated: true } },
+      { ...valid, observation: { ...valid.observation, entries: Array(33).fill(valid.observation.entries[0]) } },
+      { ...valid, observation: { ...valid.observation, entries: [{ stage: 'private-fault-marker' }] } }]) {
+      const textarea = { value: JSON.stringify(summary), readOnly: true,
+        getBoundingClientRect: () => ({ x: 0, y: 0, width: 200 }) };
+      const panel = { textContent: '', querySelector: selector => selector === 'textarea' ? textarea : null };
+      const result = runInNewContext(`(${readStartupFaultRecovery.toString()})('worker')`, {
+        document: { querySelector: () => panel, querySelectorAll: () => [{}], elementFromPoint: () => textarea },
+      });
+      expect(result.valid).toBe(summary === valid);
+      expect(JSON.stringify(result)).not.toContain('private-fault-marker');
+    }
   });
   it('closes the page target before disconnecting after each sample', async () => {
     const session = new CdpSession('ws://browser', 'sample-target');

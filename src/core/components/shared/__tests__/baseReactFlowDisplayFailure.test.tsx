@@ -8,6 +8,7 @@ import { useBaseReactFlowDisplayRoutingResult } from '../useBaseReactFlowDisplay
 import { classifyDisplayFinalRejection, classifyDisplayWorkerFailure, createCurrentDisplayFailure,
   type BaseReactFlowDisplayFailure } from '../baseReactFlowDisplayFailure';
 import { createBaseReactFlowRoutingSessionRuntime } from '../baseReactFlowRoutingSessionRuntime';
+import { beginRoutingRequestObservation } from '../baseReactFlowRoutingObservation';
 import { useBaseReactFlowDisplayFailure } from '../useBaseReactFlowDisplayFailure';
 import { BaseReactFlowDisplayStatusOverlay } from '../BaseReactFlowDisplayStatusOverlay';
 import { createDisplayRoutingRejectionHandler } from '../baseReactFlowDisplayRejectionHandler';
@@ -22,6 +23,21 @@ const failure: BaseReactFlowDisplayFailure = {
 };
 
 describe('display routing failure terminal', () => {
+  it('exports only the current failure job observation, without accepting a forged trace property', () => {
+    const runtime = createBaseReactFlowRoutingSessionRuntime(); const job = runtime.beginJob('display');
+    const observe = beginRoutingRequestObservation(job.signal); observe('worker-post-requested');
+    const identity = { inputSignature: 'private-content', inputGeometryDigest: 'private-geometry' };
+    const failure = createCurrentDisplayFailure({ runtime, job, requested: identity, current: identity,
+      reason: 'worker-failed', workerFailureCode: 'display-edge-worker-post-failed' });
+    const summary = summarizeDisplayRoutingFailure(failure);
+    expect(summary?.observation?.entries.map(entry => entry.stage)).toEqual([
+      'job-started', 'worker-requested', 'worker-post-requested', 'failed']);
+    expect(JSON.stringify(summary)).not.toContain('private');
+    expect(summarizeDisplayRoutingFailure({ ...failure, observation: { secret: 'private' } })).not.toHaveProperty('observation');
+    runtime.beginJob('display');
+    expect(createCurrentDisplayFailure({ runtime, job, requested: identity, current: identity, reason: 'worker-failed' })).toBeNull();
+    runtime.dispose();
+  });
   it.each([
     ['display-edge-worker-unavailable', 'worker-creation'],
     ['display-edge-worker-post-failed', 'request-post'],

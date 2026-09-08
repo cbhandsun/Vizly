@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Edge, Node } from '@xyflow/react';
 
 import { createBaseReactFlowRoutingSessionRuntime } from '../baseReactFlowRoutingSessionRuntime';
+import { beginRoutingRequestObservation, bindRoutingObservation, observeRoutingRenderFrame, readRoutingObservation,
+  recordRoutingObservation, startRoutingObservation } from '../baseReactFlowRoutingObservation';
 import { addFlowchartAccessibilityLabels } from '../../diagrams/flowchartCanvasAccessibility';
 import { clearBaseReactFlowDisplayCommittedSnapshots } from '../baseReactFlowDisplayCommittedSnapshot';
 import { createBaseReactFlowDocumentSnapshotSource } from '../baseReactFlowDocumentSnapshotSource';
@@ -18,6 +20,85 @@ import { createTestDisplayHardReport } from './baseReactFlowDisplayWorkerTestFix
 afterEach(() => {
   clearBaseReactFlowDisplayCommittedSnapshots();
   clearRoutingOnlyDocumentCandidates();
+});
+
+describe('content-free routing observations', () => {
+  it('ignores cancelled frame callbacks and avoids scheduling repeated observations', () => {
+    const signal = new AbortController().signal; startRoutingObservation(signal, 'display', () => 0);
+    let callback: (() => void) | undefined;
+    const request = vi.fn((next: () => void) => { callback = next; return 7; });
+    const cancel = vi.fn(); const cleanup = observeRoutingRenderFrame(signal, request, cancel);
+    cleanup(); callback?.();
+    expect(cancel).toHaveBeenCalledWith(7);
+    expect(readRoutingObservation(signal)?.entries).toHaveLength(1);
+    observeRoutingRenderFrame(signal, request, cancel); callback?.();
+    expect(readRoutingObservation(signal)?.entries.at(-1)?.stage).toBe('render-frame-observed');
+    observeRoutingRenderFrame(signal, request, cancel);
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+  it('isolates identical job numbers from different canvases and preserves request ordinals', () => {
+    const left = createBaseReactFlowRoutingSessionRuntime();
+    const right = createBaseReactFlowRoutingSessionRuntime();
+    const a = left.beginJob('display'); const b = right.beginJob('layout');
+    expect(a.id).toBe(b.id);
+    const first = beginRoutingRequestObservation(a.signal);
+    const second = beginRoutingRequestObservation(a.signal);
+    second('worker-response-validated'); first('worker-response-validated');
+    expect(readRoutingObservation(a.signal)?.entries.filter(entry => entry.stage === 'worker-response-validated')
+      .map(entry => entry.requestOrdinal)).toEqual([2, 1]);
+    expect(readRoutingObservation(b.signal)).toMatchObject({ owner: 'layout', entries: [{ stage: 'job-started' }] });
+    left.dispose(); right.dispose();
+  });
+  it('freezes cancelled jobs and ignores late responses without contaminating their successor', () => {
+    const runtime = createBaseReactFlowRoutingSessionRuntime(); const old = runtime.beginJob('display');
+    const request = beginRoutingRequestObservation(old.signal);
+    const next = runtime.beginJob('display');
+    request('worker-response-validated');
+    expect(readRoutingObservation(old.signal)?.entries.at(-1)?.stage).toBe('job-cancelled');
+    expect(readRoutingObservation(next.signal)?.entries).toHaveLength(1);
+    runtime.dispose();
+    expect(readRoutingObservation(next.signal)?.entries.at(-1)?.stage).toBe('job-cancelled');
+  });
+  it('binds accepted objects by identity, exports detached values and never reads their payload', () => {
+    const signal = new AbortController().signal; startRoutingObservation(signal, 'display', () => 10);
+    const baseline = { privateContent: 'secret' }; const authority = {};
+    bindRoutingObservation(signal, baseline); bindRoutingObservation(baseline, authority);
+    recordRoutingObservation(signal, 'commit-accepted'); recordRoutingObservation(authority, 'render-committed');
+    recordRoutingObservation(authority, 'render-committed'); recordRoutingObservation(authority, 'render-frame-observed');
+    const report = readRoutingObservation(authority);
+    expect(report?.entries.map(entry => entry.stage)).toEqual([
+      'job-started', 'commit-accepted', 'render-committed', 'render-frame-observed']);
+    expect(JSON.stringify(report)).not.toContain('secret');
+    report?.entries.pop(); expect(readRoutingObservation(authority)?.entries).toHaveLength(4);
+    expect(readRoutingObservation({ ...baseline })).toBeNull();
+  });
+  it('bounds request and event retention and explicitly reports truncation', () => {
+    const signal = new AbortController().signal; startRoutingObservation(signal, 'display', () => 0);
+    for (let index = 0; index < 1000; index += 1) {
+      const request = beginRoutingRequestObservation(signal);
+      request('worker-available'); request('worker-post-requested');
+      request('worker-response-validated'); request('worker-request-settled');
+    }
+    recordRoutingObservation(signal, 'failed');
+    const report = readRoutingObservation(signal);
+    expect(report?.truncated).toBe(true); expect(report?.entries).toHaveLength(32);
+    expect(report?.entries.at(-1)?.stage).toBe('failed');
+    expect(Math.max(...(report?.entries.map(entry => entry.requestOrdinal ?? 0) ?? []))).toBe(8);
+  });
+  it.each([NaN, Infinity, -1, 600_001])('marks invalid timestamps unavailable: %s', time => {
+    let value = 0; const signal = new AbortController().signal;
+    startRoutingObservation(signal, 'display', () => value); value = time;
+    recordRoutingObservation(signal, 'failed');
+    expect(readRoutingObservation(signal)?.entries.at(-1)?.elapsedMs).toBeNull();
+  });
+  it('does not throw or capture payloads when the clock fails', () => {
+    const signal = new AbortController().signal;
+    startRoutingObservation(signal, 'display', () => { throw new Error('private-clock'); });
+    recordRoutingObservation(signal, 'failed');
+    expect(JSON.stringify(readRoutingObservation(signal))).not.toContain('private');
+    expect(readRoutingObservation(signal)?.entries.every(entry => entry.elapsedMs === null)).toBe(true);
+    expect(() => beginRoutingRequestObservation()('worker-available')).not.toThrow();
+  });
 });
 
 const routingOptions = { enableSmartEdges: true, smartEdgePadding: 20, isLargeGraph: false };
