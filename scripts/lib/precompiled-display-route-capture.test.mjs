@@ -1,4 +1,55 @@
 import { describe, expect, it } from 'vitest';
+import vm from 'node:vm';
+import { PRECOMPILED_DISPLAY_ROUTE_BROWSER_CAPTURE_SCRIPT } from './precompiled-display-route-browser-capture.mjs';
+import { displayRoutingBrowserLifecycleExpression } from './display-routing-browser-lifecycle.mjs';
+
+describe('cold browser capture safety', () => {
+  it('captures bounded error codes, milestones and clone failures without exception or page content', () => {
+    const listeners = new Map();
+    class NativeWorker {
+      listeners = new Map();
+      addEventListener(type, callback) { this.listeners.set(type, callback); }
+      postMessage() {}
+    }
+    let cloneFails = false;
+    let now = 100;
+    let frame;
+    const window = { Worker: NativeWorker, addEventListener: (type, callback) => {
+      listeners.set(type, [...(listeners.get(type) || []), callback]);
+    } };
+    const context = vm.createContext({ window, Date: { now: () => now },
+      performance: { now: () => now },
+      requestAnimationFrame: callback => { frame = callback; },
+      document: { querySelector: selector => selector === '#root' ? { childElementCount: 1 }
+        : { getAttribute: () => 'M private path' }, querySelectorAll: () => [],
+        body: { innerText: 'private body' } },
+      structuredClone: value => { if (cloneFails) throw new Error('private clone exception'); return structuredClone(value); },
+    });
+    vm.runInContext(PRECOMPILED_DISPLAY_ROUTE_BROWSER_CAPTURE_SCRIPT, context);
+    const worker = new window.Worker();
+    now = 110;
+    frame();
+    for (let i = 0; i < 20; i += 1) {
+      for (const callback of listeners.get('error')) callback({ target: window, message: 'private token' });
+      for (const callback of listeners.get('unhandledrejection')) callback({ reason: 'private content' });
+      worker.listeners.get('error')({ message: 'private Worker URL' });
+      worker.listeners.get('messageerror')({ data: 'private message' });
+    }
+    worker.postMessage({ operation: 'route', requestId: 'private-request', nodes: [], edges: [] });
+    now = 120;
+    worker.listeners.get('message')({ data: { requestId: 'private-request' } });
+    cloneFails = true;
+    worker.postMessage({ operation: 'route', requestId: 'private-request' });
+    worker.listeners.get('message')({ data: { requestId: 'private-request' } });
+    const evidence = vm.runInContext(displayRoutingBrowserLifecycleExpression, context);
+    expect(evidence).toMatchObject({ requestCount: 1, responseCount: 1, workerErrorCount: 8,
+      legacyPageErrorCount: 8, captureErrorCount: 2, page: { scriptErrors: 20, unhandledRejections: 20 },
+      milestones: { workerConstructedMs: 0, workerRequestMs: 10, workerResponseMs: 20,
+        rootObservedMs: 10, pathObservedMs: 10 } });
+    expect(JSON.stringify([evidence, window.__vizlyPrecompiledRoutePageErrors,
+      window.__vizlyPrecompiledRouteWorkerErrors, window.__vizlyPrecompiledRouteCaptureErrors])).not.toContain('private');
+  });
+});
 
 import {
   createPrecompiledDisplayRouteTimingRecorder,

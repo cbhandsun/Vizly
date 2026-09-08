@@ -1,11 +1,11 @@
 import { mkdir, readFile, readdir, rename, unlink, writeFile } from 'node:fs/promises';
 import { basename, dirname, resolve, sep } from 'node:path';
-import { setTimeout as delay } from 'node:timers/promises';
+import { waitForDisplayRoutingBrowserValue } from './lib/display-routing-browser-wait.mjs';
+import { PRECOMPILED_DISPLAY_ROUTE_BROWSER_CAPTURE_SCRIPT } from './lib/precompiled-display-route-browser-capture.mjs';
 
 import { withPrecompiledRouteBrowser } from './lib/precompiled-display-route-cdp.mjs';
 import { clickPrecompiledDisplayRouteLayoutVariant } from './lib/precompiled-display-route-layout-capture.mjs';
 import {
-  createPrecompiledDisplayRouteTimingRecorder,
   isFreshFullRouteResolution,
   renderPrecompiledDisplayRouteCaptureExpression,
 } from './lib/precompiled-display-route-capture.mjs';
@@ -72,66 +72,6 @@ const writeAtomic = async (path, contents) => {
   await rename(temporary, path);
 };
 
-const captureScript = `(() => {
-  const NativeWorker = window.Worker;
-  const createTimingRecorder = ${createPrecompiledDisplayRouteTimingRecorder.toString()};
-  window.__vizlyDisplayRoutingDiagnosticsEnabled = true;
-  window.__vizlyPrecompiledRouteRequest = null;
-  window.__vizlyPrecompiledRouteResponse = null;
-  window.__vizlyPrecompiledRouteTiming = null;
-  window.__vizlyPrecompiledCommittedRoute = null;
-  window.__vizlyPrecompiledRouteWorkerErrors = [];
-  window.__vizlyPrecompiledRoutePageErrors = [];
-  const recordPageError = value => {
-    window.__vizlyPrecompiledRoutePageErrors.push(String(value || 'page-error').slice(0, 256));
-    window.__vizlyPrecompiledRoutePageErrors = window.__vizlyPrecompiledRoutePageErrors.slice(-8);
-  };
-  window.addEventListener('error', event => recordPageError(event?.message));
-  window.addEventListener('unhandledrejection', event => recordPageError(event?.reason));
-  class CapturingWorker extends NativeWorker {
-    constructor(...args) {
-      super(...args);
-      this.routeTiming = createTimingRecorder(Date.now());
-      this.addEventListener('message', event => {
-        const response = event?.data;
-        const request = window.__vizlyPrecompiledRouteRequest;
-        if (response && request && response.requestId === request.requestId) {
-          window.__vizlyPrecompiledRouteTiming = this.routeTiming.received(response, Date.now(), performance.now());
-          try { window.__vizlyPrecompiledRouteResponse = structuredClone(response); } catch {}
-        }
-      });
-      this.addEventListener('error', event => {
-        window.__vizlyPrecompiledRouteWorkerErrors.push({
-          message: String(event?.message || 'worker-error').slice(0, 256),
-          line: Number.isFinite(event?.lineno) ? event.lineno : null,
-          column: Number.isFinite(event?.colno) ? event.colno : null,
-        });
-        window.__vizlyPrecompiledRouteWorkerErrors =
-          window.__vizlyPrecompiledRouteWorkerErrors.slice(-8);
-      });
-      this.addEventListener('messageerror', () => {
-        window.__vizlyPrecompiledRouteWorkerErrors.push({
-          message: 'worker-message-deserialization-failed',
-          line: null,
-          column: null,
-        });
-        window.__vizlyPrecompiledRouteWorkerErrors =
-          window.__vizlyPrecompiledRouteWorkerErrors.slice(-8);
-      });
-    }
-    postMessage(message, transfer) {
-      if (message && (message.operation === 'route' || message.operation === 'validate-or-route')) {
-        try { window.__vizlyPrecompiledRouteRequest = structuredClone(message); } catch {}
-        this.routeTiming.posted(message.requestId, Date.now(), performance.now());
-      }
-      return typeof transfer === 'undefined'
-        ? super.postMessage(message)
-        : super.postMessage(message, transfer);
-    }
-  }
-  window.Worker = CapturingWorker;
-})()`;
-
 const captureTarget = async (session, target, source, routingVersion) => {
   const preset = JSON.parse(source);
   if (!preset || typeof preset.id !== 'string' || !preset.id) {
@@ -162,117 +102,18 @@ const captureTarget = async (session, target, source, routingVersion) => {
   await session.send('Page.navigate', { url });
   const deadline = Date.now() + readGenerationTimeoutMs();
   if (isLayoutVariant) {
-    let layoutReady = false;
-    while (Date.now() < deadline) {
-      layoutReady = await session.evaluate(`(() => (
-        document.readyState === 'complete'
-        && window.__vizlyBaseReactFlowDisplayRouting?.stage === 'final-applied'
-        && Array.from(document.querySelectorAll('button')).some(
-          button => /自动布局|layout/i.test(button.getAttribute('aria-label') || ''),
-        )
-      ))()`);
-      if (layoutReady) break;
-      await delay(250);
-    }
-    if (!layoutReady) {
-      throw new Error(`Timed out waiting to apply layout variant ${preset.id}:${variantId}`);
-    }
+    await waitForDisplayRoutingBrowserValue(session, `(() => (
+      document.readyState === 'complete'
+      && window.__vizlyBaseReactFlowDisplayRouting?.stage === 'final-applied'
+      && Array.from(document.querySelectorAll('button')).some(
+        button => /自动布局|layout/i.test(button.getAttribute('aria-label') || ''),
+      )
+    ))()`, Math.max(0, deadline - Date.now()), { stopOnQualityRejection: true });
     await clickPrecompiledDisplayRouteLayoutVariant(session, variantId);
   }
-  let captured = null;
-  while (Date.now() < deadline) {
-    try {
-      captured = await session.evaluate(renderPrecompiledDisplayRouteCaptureExpression(
-        preset.id,
-        variantId,
-      ));
-    } catch {
-      captured = null;
-    }
-    if (captured) break;
-    const finalQualityRejected = await session.evaluate(`(() => (
-      window.__vizlyBaseReactFlowDisplayRouting?.stage === 'final-quality-rejected'
-    ))()`);
-    if (finalQualityRejected) break;
-    await delay(500);
-  }
-  if (!captured) {
-    const status = await session.evaluate(`(() => {
-      const routing = window.__vizlyBaseReactFlowDisplayRouting || {};
-      const request = window.__vizlyPrecompiledRouteRequest;
-      const response = window.__vizlyPrecompiledRouteResponse;
-      const compactEdge = edge => ({
-        id: edge?.id,
-        source: edge?.source,
-        target: edge?.target,
-        type: edge?.type,
-        sourceHandle: edge?.sourceHandle,
-        targetHandle: edge?.targetHandle,
-        computedPath: Array.isArray(edge?.data?.computedPath)
-          ? edge.data.computedPath
-          : null,
-        routingData: {
-          auto: edge?.data?.auto,
-          autoSource: edge?.data?.autoSource,
-          autoTarget: edge?.data?.autoTarget,
-          layoutDirection: edge?.data?.layoutDirection,
-          layoutPathLocked: edge?.data?.layoutPathLocked,
-          runtimeHandleLock: edge?.data?.runtimeHandleLock,
-          elkPath: Array.isArray(edge?.data?.elkPath) ? edge.data.elkPath : null,
-          treeRouting: edge?.data?.treeRouting,
-        },
-      });
-      return {
-        stage: routing.stage,
-        signature: routing.signature,
-        inputGeometryDigest: routing.inputGeometryDigest,
-        workerStartCount: routing.workerStartCount,
-        workerAbortCount: routing.workerAbortCount,
-        routeMs: routing.routeMs,
-        requestOperation: request?.operation,
-        requestNodes: Array.isArray(request?.nodes) ? request.nodes.length : null,
-        requestEdges: Array.isArray(request?.edges) ? request.edges.length : null,
-        responseHardClean: response?.hardClean,
-        responseRouteResolution: response?.routeResolution,
-        committedVariantId: window.__vizlyPrecompiledCommittedRoute?.variantId ?? null,
-        committedProvenance: window.__vizlyPrecompiledCommittedRoute?.provenance ?? null,
-        responseError: response?.error,
-        responsePhaseTrace: Array.isArray(response?.phaseTrace) ? response.phaseTrace : null,
-        hardGateDiagnostics: routing.hardGateDiagnostics ?? null,
-        terminalDiagnostics: routing.terminalDiagnostics ?? null,
-        phaseProgressTrace: Array.isArray(routing.phaseProgressTrace)
-          ? routing.phaseProgressTrace
-          : null,
-        lastPhaseTrace: routing.lastPhaseTrace ?? null,
-        requestNodeGeometry: Array.isArray(request?.nodes)
-          ? request.nodes.map(node => ({
-            id: node?.id,
-            parentId: node?.parentId,
-            position: node?.position,
-            positionAbsolute: node?.positionAbsolute,
-            width: node?.width,
-            height: node?.height,
-            measured: node?.measured,
-          }))
-          : null,
-        requestEdgeRoutes: Array.isArray(request?.edges)
-          ? request.edges.map(compactEdge)
-          : null,
-        responseEdges: Array.isArray(response?.edges)
-          ? response.edges.map(compactEdge)
-          : null,
-        workerErrors: Array.isArray(window.__vizlyPrecompiledRouteWorkerErrors)
-          ? window.__vizlyPrecompiledRouteWorkerErrors
-          : [],
-        pageErrors: Array.isArray(window.__vizlyPrecompiledRoutePageErrors)
-          ? window.__vizlyPrecompiledRoutePageErrors
-          : [],
-        documentState: document.readyState,
-        bodyText: document.body?.innerText?.slice(0, 256) ?? null,
-      };
-    })()`);
-    throw new Error(`Timed out generating ${preset.id}:${variantId}: ${JSON.stringify(status)}`);
-  }
+  const captured = await waitForDisplayRoutingBrowserValue(session,
+    renderPrecompiledDisplayRouteCaptureExpression(preset.id, variantId),
+    Math.max(0, deadline - Date.now()), { stopOnQualityRejection: true });
   const {
     routing,
     patches,
@@ -456,7 +297,7 @@ const main = async () => {
     source: await readFile(resolve(ROOT, target.sourcePath), 'utf8'),
   })));
   const captures = await withPrecompiledRouteBrowser(async session => {
-    await session.send('Page.addScriptToEvaluateOnNewDocument', { source: captureScript });
+    await session.send('Page.addScriptToEvaluateOnNewDocument', { source: PRECOMPILED_DISPLAY_ROUTE_BROWSER_CAPTURE_SCRIPT });
     const generated = [];
     for (const item of sources) {
       generated.push(await captureTarget(session, item.target, item.source, routingVersion));

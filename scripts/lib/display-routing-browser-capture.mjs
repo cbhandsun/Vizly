@@ -1,3 +1,5 @@
+import { installDisplayRoutingBrowserBootProbe } from './display-routing-browser-lifecycle.mjs';
+
 /**
  * Installs aggregate-only route and worker probes before the application
  * starts. The browser verifier owns the observations; production routing
@@ -5,25 +7,7 @@
  */
 export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
   const NativeWorker = window.Worker;
-  const bootErrors = { script: 0, resource: 0, rejection: 0 };
-  window.__vizlyBrowserBootErrors = bootErrors;
-  const bootStartedAt = Date.now();
-  const bootMilestones = {};
-  window.__vizlyBrowserBootMilestones = bootMilestones;
-  const markBoot = name => {
-    if (bootMilestones[name] !== undefined) return;
-    bootMilestones[name] = Math.min(600_000, Math.max(0, Date.now() - bootStartedAt));
-  };
-  window.addEventListener?.('DOMContentLoaded', () => markBoot('domReadyMs'), { once: true });
-  window.addEventListener?.('load', () => markBoot('pageLoadedMs'), { once: true });
-  // Keep counts only: exception messages and resource URLs may contain user data.
-  window.addEventListener?.('error', event => {
-    const key = event.target && event.target !== window ? 'resource' : 'script';
-    bootErrors[key] = Math.min(100_000, bootErrors[key] + 1);
-  }, true);
-  window.addEventListener?.('unhandledrejection', () => {
-    bootErrors.rejection = Math.min(100_000, bootErrors.rejection + 1);
-  });
+  const markBoot = (${installDisplayRoutingBrowserBootProbe.toString()})();
   window.__vizlyRoutingRequests = [];
   window.__vizlyRoutingResponses = [];
   window.__vizlyBoundedCandidates = [];

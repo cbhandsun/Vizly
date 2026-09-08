@@ -1,6 +1,12 @@
 import vm from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 
+// Vitest fakes global timers, but not node:timers/promises. Route the polling
+// delay through that same clock so renderer and evidence deadlines are tested.
+vi.mock('node:timers/promises', () => ({
+  setTimeout: (milliseconds) => new Promise(resolve => setTimeout(resolve, milliseconds)),
+}));
+
 import { waitForDisplayRoutingBrowserValue } from './display-routing-browser-wait.mjs';
 import {
   displayRoutingLayoutVisualSnapshotExpression,
@@ -56,13 +62,68 @@ describe('display routing browser wait', () => {
     expect(JSON.stringify(evidence)).not.toMatch(/secret|Infinity/);
   });
 
-  it('returns the first ready browser value', async () => {
+  it.each(['ready', 'Promise.resolve(ready)'])('returns the resolved ready browser value: %s', async expression => {
     const ready = { stage: 'final-applied' };
-    const session = { evaluate: vi.fn().mockResolvedValue(ready) };
+    const session = { evaluate: vi.fn(source => vm.runInNewContext(source, { ready })) };
 
-    await expect(waitForDisplayRoutingBrowserValue(session, 'ready', 1_000))
+    await expect(waitForDisplayRoutingBrowserValue(session, expression, 1_000))
       .resolves.toBe(ready);
-    expect(session.evaluate).toHaveBeenCalledWith('ready');
+    expect(session.evaluate).toHaveBeenCalledOnce();
+  });
+
+  it('awaits false async predicates and safely classifies rejected predicates', async () => {
+    let calls = 0;
+    const context = {
+      next: () => Promise.resolve(++calls > 1 ? { ready: true } : null),
+      window: {},
+      document: { querySelector: () => null, querySelectorAll: () => [] },
+    };
+    const session = { evaluate: source => vm.runInNewContext(source, context) };
+    await expect(waitForDisplayRoutingBrowserValue(session, 'next()', 1_000))
+      .resolves.toEqual({ ready: true });
+    expect(calls).toBe(2);
+    const error = await waitForDisplayRoutingBrowserValue(session,
+      'Promise.reject(new Error("private-content"))', 1_000).catch(value => value);
+    expect(error.message).toContain('predicate-failed');
+    expect(error.message).not.toContain('private-content');
+  });
+
+  it('retains the last host-side evidence when the renderer and final evidence read stop responding', async () => {
+    vi.useFakeTimers();
+    try {
+      const session = { evaluate: vi.fn()
+        .mockImplementationOnce(source => vm.runInNewContext(source, {
+          window: { __vizlyBaseReactFlowDisplayRouting: { stage: 'worker-post' } },
+          document: { querySelector: () => null, querySelectorAll: () => [] },
+        }))
+        .mockImplementation(() => new Promise(() => {})) };
+      const pending = waitForDisplayRoutingBrowserValue(session, 'false', 200).catch(error => error);
+      await vi.advanceTimersByTimeAsync(1_200);
+      const failure = await pending;
+      const diagnostic = JSON.parse(failure.message.split('\n').slice(1).join('\n'));
+      expect(diagnostic).toMatchObject({ waitStatus: 'evaluation-timeout', evidenceStatus: 'evaluation-timeout',
+        diagnostics: null, lastObservedDiagnostics: { routing: { stage: 'worker-post' } } });
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('distinguishes quality rejection and predicate failure without logging thrown contents', async () => {
+    const session = { evaluate: source => vm.runInNewContext(source, {
+      window: { __vizlyBaseReactFlowDisplayRouting: { stage: 'final-quality-rejected' },
+        __vizlyPrecompiledRoutePageErrors: ['secret private message'],
+        __vizlyPrecompiledRouteResponse: { error: 'secret private response', edges: [] } },
+      document: { body: { innerText: 'secret private page' }, querySelector: () => null, querySelectorAll: () => [] },
+    }) };
+    const quality = await waitForDisplayRoutingBrowserValue(session, 'false', 1_000,
+      { stopOnQualityRejection: true }).catch(error => error);
+    expect(quality.message).toContain('quality-rejected');
+    expect(quality.message).toContain('routing-failed');
+    const predicate = await waitForDisplayRoutingBrowserValue(session,
+      '(() => { throw new Error("secret private exception"); })()', 1_000).catch(error => error);
+    expect(predicate.message).toContain('predicate-failed');
+    expect(quality.message + predicate.message).not.toMatch(/secret|private/);
   });
 
   it('reports bounded routing diagnostics after timeout', async () => {
