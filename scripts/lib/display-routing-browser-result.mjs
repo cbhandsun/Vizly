@@ -1,3 +1,5 @@
+import { projectDisplayRoutingEditStability } from './display-routing-edit-stability.mjs';
+
 const finiteMetric = value => Number.isFinite(value) && value >= 0 ? value : null;
 const safeProbeDigest = value => (
   typeof value === 'string' && /^probe-v1:[0-9a-f]{32}$/.test(value) ? value : null
@@ -157,6 +159,7 @@ export const buildDisplayRoutingMachineResult = (results, benchmarkValue = null)
       workerStartCount: finiteMetric(result?.incremental?.routing?.workerStartCountDelta),
       workerAbortCount: finiteMetric(result?.incremental?.routing?.workerAbortCountDelta),
       driftProbe: projectDriftProbe(result?.incremental?.driftProbe),
+      editStability: projectDisplayRoutingEditStability(result?.editStability),
       phaseTrace: projectPhaseTrace(result?.incremental?.response?.phaseTrace),
     };
   }) : [],
@@ -200,6 +203,7 @@ export const formatDisplayRoutingDragResult = (result) => {
       + `closure=${phase('final-safety-closure')?.durationMs}ms, safety=[${safety}], `
       + `mutable=${result.incremental.mutableEdgeCount}, `
       + `affected=${result.incremental.response.affectedEdgeCount}, `
+      + `editStability=${JSON.stringify(projectDisplayRoutingEditStability(result.editStability))}, `
       + `commercialClearanceDegrades=${clearanceRisks.length} (${clearanceSummary}).`,
   };
 };

@@ -46,6 +46,7 @@ import { verifyDisplayRoutingThemeMatrix } from './lib/display-routing-browser-t
 import { verifyDisplayRoutingInteractionStates } from './lib/display-routing-browser-interaction-audit.mjs';
 import { DISPLAY_ROUTING_EXPORT_CAPTURE_SCRIPT, formatDisplayRoutingExportMatrix, verifyDisplayRoutingExportMatrix } from './lib/display-routing-browser-export-audit.mjs';
 import { waitForDisplayRoutingBrowserValue as waitForValue } from './lib/display-routing-browser-wait.mjs';
+import { captureDisplayRoutingEditBaseline, readDisplayRoutingEditStability } from './lib/display-routing-edit-stability.mjs';
 
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '')
   .trim()
@@ -653,6 +654,7 @@ const main = async () => {
         session,
         'initial route',
       );
+      await captureDisplayRoutingEditBaseline(session);
       await prepareDisplayRoutingIncrementalCapture(session);
       let cpuProfileStarted = false;
       const drag = await dragNode(session, dragCase.nodeId, async () => {
@@ -728,8 +730,10 @@ const main = async () => {
       if (!COLLECT_PERFORMANCE_SAMPLES) {
         assertDisplayRoutingPerformanceBudget(dragCase, initial, incremental);
       }
+      const editStability = await readDisplayRoutingEditStability(session, [dragCase.nodeId]);
       return {
         nodeId: dragCase.nodeId,
+        editStability,
         initial,
         incremental,
         initialRenderedObstacleAudit,

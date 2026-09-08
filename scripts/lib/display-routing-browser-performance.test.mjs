@@ -694,6 +694,7 @@ describe('display routing browser performance budget', () => {
       }],
       dragCases: [{
         nodeId: 'wms',
+        editStability: null,
         releaseToFinalMs: 80,
         workerToFinalMs: 60,
         workerRoundTripMs: 45,

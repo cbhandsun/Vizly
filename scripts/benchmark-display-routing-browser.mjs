@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { summarizeDisplayRoutingEditStability } from './lib/display-routing-edit-stability.mjs';
 
 import {
   assertDisplayRoutingPerformanceSummaryBudget,
@@ -120,6 +121,7 @@ const summary = {
     const cases = samples.flatMap(sample => sample.dragCases ?? [])
       .filter(item => item.nodeId === nodeId);
   return [nodeId, {
+      editStability: summarizeDisplayRoutingEditStability(cases.map(item => item.editStability)),
       releaseToFinal: summarizeDisplayRoutingSamples(cases.map(item => item.releaseToFinalMs)),
       workerToFinal: summarizeDisplayRoutingSamples(cases.map(item => item.workerToFinalMs)),
       workerRoundTrip: summarizeDisplayRoutingSamples(cases.map(item => item.workerRoundTripMs)),
