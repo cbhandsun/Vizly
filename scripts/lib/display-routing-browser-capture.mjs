@@ -7,6 +7,15 @@ export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
   const NativeWorker = window.Worker;
   const bootErrors = { script: 0, resource: 0, rejection: 0 };
   window.__vizlyBrowserBootErrors = bootErrors;
+  const bootStartedAt = Date.now();
+  const bootMilestones = {};
+  window.__vizlyBrowserBootMilestones = bootMilestones;
+  const markBoot = name => {
+    if (bootMilestones[name] !== undefined) return;
+    bootMilestones[name] = Math.min(600_000, Math.max(0, Date.now() - bootStartedAt));
+  };
+  window.addEventListener?.('DOMContentLoaded', () => markBoot('domReadyMs'), { once: true });
+  window.addEventListener?.('load', () => markBoot('pageLoadedMs'), { once: true });
   // Keep counts only: exception messages and resource URLs may contain user data.
   window.addEventListener?.('error', event => {
     const key = event.target && event.target !== window ? 'resource' : 'script';
@@ -131,12 +140,14 @@ export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
       return;
     }
     const wrappers = [...document.querySelectorAll('[data-testid^="rf__edge-"]')];
+    if (document.querySelector?.('#root')?.childElementCount > 0) markBoot('rootObservedMs');
     const paths = wrappers.map(wrapper => (
       wrapper.querySelector('.shared-trunk-edge-interaction')
       ?? wrapper.querySelector('.shared-trunk-accent-trace')
       ?? wrapper.querySelector('.react-flow__edge-path')
     )).map(path => path?.getAttribute('d') || '');
     if (paths.length > 0) {
+      if (paths.some(Boolean)) markBoot('pathObservedMs');
       const fingerprint = paths.join('||');
       if (fingerprint !== previousRenderedRouteFingerprint) {
         previousRenderedRouteFingerprint = fingerprint;
@@ -188,6 +199,7 @@ export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
   class CapturingWorker extends NativeWorker {
     constructor(...args) {
       super(...args);
+      markBoot('workerConstructedMs');
       this.__vizlyWorkerInstanceId = 'worker-' + String(workerInstanceSequence += 1);
       this.__vizlyRequestAttemptCounts = new Map();
       this.__vizlyResponseCounts = new Map();
@@ -195,6 +207,7 @@ export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
       this.addEventListener('message', event => {
         const response = event?.data;
         if (!response || typeof response.requestId !== 'string') return;
+        markBoot('workerResponseMs');
         const receivedAt = Date.now();
         // This listener is installed before the application's listener. Defer
         // diagnostic cloning to the next task so both the other listeners and
@@ -265,6 +278,7 @@ export const DISPLAY_ROUTING_BROWSER_CAPTURE_SCRIPT = `(() => {
     }
     postMessage(message, transfer) {
       if (message && typeof message.requestId === 'string') {
+        markBoot('workerRequestMs');
         try {
           const cloneStartedAt = performance.now();
           const capturedRequest = structuredClone(message);

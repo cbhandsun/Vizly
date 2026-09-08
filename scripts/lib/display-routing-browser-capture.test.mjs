@@ -65,6 +65,14 @@ describe('browser drag release capture', () => {
 });
 
 describe('display routing browser capture', () => {
+  it('keeps first observed boot milestones as elapsed times without event contents', () => {
+    const { window, listeners } = releaseHarness();
+    listeners.get('DOMContentLoaded').listener({ detail: 'secret' });
+    listeners.get('load').listener({ detail: 'secret' });
+    expect(window.__vizlyBrowserBootMilestones).toEqual({ domReadyMs: 0, pageLoadedMs: 0 });
+    expect(JSON.stringify(window.__vizlyBrowserBootMilestones)).not.toContain('secret');
+  });
+
   it('counts boot failures without retaining exception messages, URLs, or rejection contents', () => {
     const { window, listeners } = releaseHarness();
     const sensitive = 'Bearer secret user document';
@@ -121,6 +129,9 @@ describe('display routing browser capture', () => {
     busy = false;
     clock += 1;
     frame();
+    expect(window.__vizlyBrowserBootMilestones).toMatchObject({
+      workerConstructedMs: 0, workerResponseMs: 1,
+    });
     expect(window.__vizlyLayoutVisualEvents.length).toBeLessThanOrEqual(128);
     for (const type of ['layout-busy', 'layout-progress', 'layout-committing']) {
       expect(window.__vizlyLayoutVisualEvents).toContainEqual({ type, value: true, sampledAt: 0 });

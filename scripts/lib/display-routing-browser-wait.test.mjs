@@ -10,6 +10,52 @@ import {
 } from './display-routing-layout-visual-settle.mjs';
 
 describe('display routing browser wait', () => {
+  it.each([null, '10', -1, NaN, Infinity, 600_001])('rejects invalid timeout %s', async value => {
+    const session = { evaluate: vi.fn() };
+    await expect(waitForDisplayRoutingBrowserValue(session, 'ready', value)).rejects.toThrow(/Invalid/);
+    expect(session.evaluate).not.toHaveBeenCalled();
+  });
+
+  it('bounds a stuck renderer and its evidence read, without leaking CDP failures', async () => {
+    vi.useFakeTimers();
+    try {
+      const session = { evaluate: vi.fn(() => new Promise(() => {})) };
+      const result = expect(waitForDisplayRoutingBrowserValue(session, 'ready', 50))
+        .rejects.toThrow(/"evidenceStatus": "evaluation-timeout"/);
+      await vi.advanceTimersByTimeAsync(1_050);
+      await result;
+      expect(vi.getTimerCount()).toBe(0);
+      session.evaluate.mockRejectedValue(new Error('Bearer private-content'));
+      const failure = await waitForDisplayRoutingBrowserValue(session, 'ready', 50).catch(error => error);
+      expect(failure.message).toContain('evaluation-failed');
+      expect(failure.message).not.toMatch(/Bearer|private-content/);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('bounds and sanitizes malformed routing evidence and milestone values', async () => {
+    let evidence;
+    const session = { evaluate: async expression => {
+      evidence = vm.runInNewContext(expression, {
+        window: {
+          __vizlyBaseReactFlowDisplayRouting: { stage: 'secret', workerStartCount: Infinity },
+          __vizlyRoutingRequests: Array.from({ length: 100 }, () => ({ operation: 'secret' })),
+          __vizlyRoutingResponses: 'secret',
+          __vizlyBrowserBootMilestones: { workerRequestMs: 42, rootObservedMs: 'secret', pathObservedMs: Infinity },
+        },
+        document: { querySelector: () => null, querySelectorAll: () => [] },
+      });
+      return evidence;
+    } };
+    await expect(waitForDisplayRoutingBrowserValue(session, 'ready', 0)).rejects.toThrow(/workerRequestMs/);
+    expect(evidence.requests).toHaveLength(16);
+    expect(evidence.responses).toHaveLength(0);
+    expect(evidence.milestones).toMatchObject({ workerRequestMs: 42, rootObservedMs: null, pathObservedMs: null });
+    expect(JSON.stringify(evidence)).not.toMatch(/secret|Infinity/);
+  });
+
   it('returns the first ready browser value', async () => {
     const ready = { stage: 'final-applied' };
     const session = { evaluate: vi.fn().mockResolvedValue(ready) };
