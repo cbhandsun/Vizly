@@ -614,7 +614,9 @@ const worker = new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', impor
     expect(i18nSource).toContain('fallbackLng: false');
     expect(i18nSource).toContain('export const i18nReady: Promise<void>');
     expect(mainSource).toContain("import { i18nReady } from './i18n'");
-    expect(mainSource).toContain('void i18nReady.then(() =>');
+    expect(mainSource).toContain("import { startApplication } from './main/applicationStartup'");
+    expect(mainSource).toContain('void startApplication({');
+    expect(mainSource).toContain('ready: i18nReady,');
   });
 
   it('keeps theme presets behind the asynchronous preset loader', () => {
