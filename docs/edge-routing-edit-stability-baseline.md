@@ -37,6 +37,15 @@ CI 工作流契约 26 项通过，定向 Lint、秘密、规模和测试收录�
 相关拓扑测试 31 项、业务测试 41 项通过；安全扫描和定向 Lint 通过。
 仍需定位需求图首次拖动的全量回退原因，不能将它视作已优化或普遍必要行为。
 
+进一步定位：`tmp/i2-demand-fallback-request.json` 捕获实际 Worker 请求，
+`tmp/i2-demand-fallback-boundary.json` 的定向重放确认基线/当前签名、几何摘要、
+基线路径签名和变化集全部匹配，失败点为 topology projection。
+该请求 reason=container-change，changedNodeIds 仅 start-calc，changedEdgeIds 为空。
+`baseReactFlowDisplayTopologyIncremental.ts` 的 resolveTopologyKind 要求容器变化同时包含
+连线拓扑变化，因此拒绝这种仅恢复 parentId 并移动节点的转换；阶段轨迹立即回退。
+下一步需为无连线拓扑变化的父子关系编辑建立有界关联连线投影，并保留冻结边界、
+实际受影响组及硬质量门禁；不能仅删除类型判定条件后接受旧路径。
+
 本轮只修改浏览器验证工具，不调整生产布局、路由算法或性能预算。
 
 先执行 `npm run build`，使用 `vite preview` 提供当前 `dist`，然后设置
