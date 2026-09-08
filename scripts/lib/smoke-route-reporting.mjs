@@ -268,15 +268,18 @@ export const collectBudgetViolations = (results, { enabled = false, isMobile = f
         });
       }
     }
-    for (const violation of collectRouteStabilityViolations(
-      result.stabilityReport,
-      result.stabilityBudget,
-    )) {
-      violations.push({
-        route: result.name,
-        ...violation,
-        sampleCount: result.sampleCount || 1,
-      });
+    for (const [sampleIndex, sample] of (result.samples || [result]).entries()) {
+      for (const violation of collectRouteStabilityViolations(
+        sample.stabilityReport,
+        sample.stabilityBudget,
+      )) {
+        violations.push({
+          route: result.name,
+          ...violation,
+          sampleCount: result.sampleCount || 1,
+          sampleIndex: sampleIndex + 1,
+        });
+      }
     }
   }
 

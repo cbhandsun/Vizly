@@ -660,6 +660,24 @@ describe('smoke route modules', () => {
     expect(result.worstReport.readyAt).toBe(300);
     expect(collectBudgetViolations([result])).toEqual([]);
   });
+  it('rejects stability violations in non-median samples and identifies their sample index', () => {
+    const samples = [100, 200, 300].map((readyAt, index) => ({
+      name: 'management', assetReport: { readyAt, criticalAssets: 1, criticalDecodedKB: 1,
+        totalAssets: 1, totalDecodedKB: 1 },
+      stabilityBudget: { maxLongTaskCount: 1, maxLongTaskMs: 200 },
+      stabilityReport: { longTaskCount: index === 0 ? 2 : 0, maxLongTaskMs: index === 2 ? 250 : 100 },
+    }));
+    const result = aggregateRouteSamples(samples);
+    expect(result.stabilityReport.longTaskCount).toBe(0);
+    expect(collectBudgetViolations([result], { enabled: true })).toEqual([
+      { route: 'management', metric: 'longTaskCount', actual: 2, max: 1, unit: 'tasks', sampleCount: 3, sampleIndex: 1 },
+      { route: 'management', metric: 'maxLongTaskMs', actual: 250, max: 200, unit: 'ms', sampleCount: 3, sampleIndex: 3 },
+    ]);
+    samples[0].stabilityReport.longTaskCount = 1;
+    samples[2].stabilityReport.maxLongTaskMs = 200;
+    expect(collectBudgetViolations([aggregateRouteSamples(samples)], { enabled: true })).toEqual([]);
+    expect(collectBudgetViolations([aggregateRouteSamples([samples[0]])], { enabled: true })).toEqual([]);
+  });
 
   it('defers only warehouse 3D ready latency while preserving its resource budgets', () => {
     const result = {
