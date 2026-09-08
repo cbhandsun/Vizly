@@ -114,7 +114,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: routing-performance-cold-${{ github.run_attempt }}
-          path: artifacts/routing-performance/cold-routing.txt
+          path: |
+            artifacts/routing-performance/cold-routing.txt
+            artifacts/routing-performance/cold-*/samples.jsonl
           if-no-files-found: error
           retention-days: 30
 
@@ -194,7 +196,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: routing-performance-incremental-${{ github.run_attempt }}
-          path: artifacts/routing-performance/incremental-routing.txt
+          path: |
+            artifacts/routing-performance/incremental-routing.txt
+            artifacts/routing-performance/incremental-*/samples.jsonl
           if-no-files-found: error
           retention-days: 30
 

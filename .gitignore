@@ -15,6 +15,7 @@ dist-ssr
 coverage/
 .coverage/
 test-results/
+artifacts/routing-performance/
 
 # Local environment
 *.local

@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { collectJournaledRoutingSamples } from './lib/display-routing-sample-journal.mjs';
 
 import {
   assertPrecompiledDisplayRoutePerformanceBudget,
@@ -65,11 +66,10 @@ const runOneSample = sampleIndex => new Promise((resolve, reject) => {
 const sampleCount = parsePrecompiledDisplayRouteSampleCount(
   process.env.DISPLAY_ROUTING_COLD_SAMPLE_COUNT,
 );
-const samples = [];
-for (let index = 0; index < sampleCount; index += 1) {
-  samples.push(await runOneSample(index + 1));
-  process.stdout.write(`cold-routing sample ${index + 1}/${sampleCount} complete\n`);
-}
+const samples = await collectJournaledRoutingSamples({ kind: 'cold', sampleCount,
+  runSample: runOneSample, sourceCommit: process.env.GITHUB_SHA ?? null,
+  onSample: index => process.stdout.write(`cold-routing sample ${index}/${sampleCount} complete\n`),
+});
 
 const summary = summarizePrecompiledDisplayRoutePerformance(samples, sampleCount, presetIds);
 process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);

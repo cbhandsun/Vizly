@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { collectJournaledRoutingSamples } from './lib/display-routing-sample-journal.mjs';
 import { summarizeDisplayRoutingEditStability } from './lib/display-routing-edit-stability.mjs';
 
 import {
@@ -61,11 +62,10 @@ const runOneSample = sampleIndex => new Promise((resolve, reject) => {
 });
 
 const sampleCount = parseSampleCount(process.env.DISPLAY_ROUTING_SAMPLE_COUNT);
-const samples = [];
-for (let index = 0; index < sampleCount; index += 1) {
-  samples.push(await runOneSample(index + 1));
-  process.stdout.write(`display-routing sample ${index + 1}/${sampleCount} complete\n`);
-}
+const samples = await collectJournaledRoutingSamples({ kind: 'incremental', sampleCount,
+  runSample: runOneSample, sourceCommit: process.env.GITHUB_SHA ?? null,
+  onSample: index => process.stdout.write(`display-routing sample ${index}/${sampleCount} complete\n`),
+});
 
 const dragNodeIds = [...new Set(samples.flatMap(sample => (
   Array.isArray(sample.dragCases) ? sample.dragCases.map(item => item.nodeId) : []
