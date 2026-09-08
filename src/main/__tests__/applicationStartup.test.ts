@@ -5,6 +5,28 @@ import { showStartupFailure } from '../startupFailureView';
 afterEach(() => { vi.useRealTimers(); document.body.replaceChildren(); });
 
 describe('pre-React startup boundary', () => {
+  it('mounts successfully even if the diagnostic clock fails', async () => {
+    const mount = vi.fn();
+    expect(await startApplication({ ready: Promise.resolve(), initialize: () => {}, mount,
+      now: () => { throw new Error('private clock failure'); }, onFailure: vi.fn() })).toBe(true);
+    expect(mount).toHaveBeenCalledOnce();
+  });
+  it('exports the stages reached before a mount failure without claiming first paint', async () => {
+    let time = 100;
+    await startApplication({ ready: Promise.resolve(), now: () => time,
+      initialize: () => { time = 120; },
+      mount: () => { time = 155; throw new Error('private'); },
+      onFailure: summary => showStartupFailure(summary, document, () => {}),
+    });
+    const summary = JSON.parse(document.querySelector('textarea')?.value ?? '{}');
+    expect(summary.milestones).toEqual([
+      { stage: 'runtime-started', elapsedMs: 0 }, { stage: 'runtime-ready', elapsedMs: 20 },
+      { stage: 'readiness-ready', elapsedMs: 20 }, { stage: 'mount-requested', elapsedMs: 20 },
+      { stage: 'failed', elapsedMs: 55 },
+    ]);
+    expect(summary.elapsedMs).toBe(55);
+    expect(JSON.stringify(summary)).not.toContain('private');
+  });
   it('initializes before waiting and mounts only once ready', async () => {
     vi.useFakeTimers();
     let resolveReady: (() => void) | undefined;
@@ -23,10 +45,12 @@ describe('pre-React startup boundary', () => {
   it.each([null, undefined, 'secret-token', new Error('private URL')])('classifies rejected readiness without exporting its reason', async reason => {
     const onFailure = vi.fn(); const mount = vi.fn();
     expect(await startApplication({ ready: Promise.reject(reason), initialize: () => {}, mount, onFailure,
-      now: vi.fn().mockReturnValueOnce(10).mockReturnValueOnce(22) })).toBe(false);
+      now: vi.fn().mockReturnValue(22).mockReturnValueOnce(10) })).toBe(false);
     expect(mount).not.toHaveBeenCalled();
     expect(onFailure).toHaveBeenCalledExactlyOnceWith({ schema: 'vizly-startup-failure-v1',
-      stage: 'readiness', code: 'application-readiness-failed', elapsedMs: 12 });
+      stage: 'readiness', code: 'application-readiness-failed', elapsedMs: 12,
+      milestones: [{ stage: 'runtime-started', elapsedMs: 0 }, { stage: 'runtime-ready', elapsedMs: 12 },
+        { stage: 'failed', elapsedMs: 12 }] });
   });
 
   it('times out once and ignores eventual readiness instead of mounting over recovery', async () => {

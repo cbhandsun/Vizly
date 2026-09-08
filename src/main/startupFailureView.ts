@@ -1,4 +1,5 @@
 import type { StartupFailureSummary } from './applicationStartup';
+import { projectStartupMilestones } from './applicationStartupTrace';
 import './startupFailureView.css';
 
 /** Pre-React recovery uses text nodes only and never accepts a raw exception. */
@@ -25,7 +26,8 @@ export const showStartupFailure = (
   details.setAttribute('aria-label', 'Startup diagnostic summary');
   // Project explicitly: extra properties on an internal value are never exported.
   details.value = JSON.stringify({ schema: summary.schema, stage: summary.stage,
-    code: summary.code, elapsedMs: summary.elapsedMs }, null, 2);
+    code: summary.code, elapsedMs: summary.elapsedMs,
+    ...(summary.milestones === undefined ? {} : { milestones: projectStartupMilestones(summary.milestones) }) }, null, 2);
   panel.append(title, description, button, details);
   host.replaceChildren(panel);
   button.focus();

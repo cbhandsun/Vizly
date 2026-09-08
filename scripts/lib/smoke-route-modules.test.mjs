@@ -150,9 +150,14 @@ describe('smoke route modules', () => {
   });
 
   it('projects browser recovery and rejects malformed, excessive or private summary fields', () => {
-    const valid = { schema: 'vizly-startup-failure-v1', stage: 'mount', code: 'application-mount-failed', elapsedMs: 1 };
+    const valid = { schema: 'vizly-startup-failure-v1', stage: 'mount', code: 'application-mount-failed', elapsedMs: 1,
+      milestones: ['runtime-started', 'runtime-ready', 'readiness-ready', 'mount-requested', 'failed']
+        .map((stage, index) => ({ stage, elapsedMs: index === 4 ? 1 : 0 })) };
     for (const summary of [valid, { ...valid, secret: 'private-fault-marker' }, null, [],
-      { ...valid, elapsedMs: -1 }, { ...valid, elapsedMs: 600001 }, { ...valid, code: 'private-fault-marker' }]) {
+      { ...valid, elapsedMs: -1 }, { ...valid, elapsedMs: 600001 }, { ...valid, code: 'private-fault-marker' },
+      { ...valid, milestones: undefined }, { ...valid, milestones: [] },
+      { ...valid, milestones: [{ stage: 'runtime-started', elapsedMs: 0, token: 'private-fault-marker' }] },
+      { ...valid, milestones: [...valid.milestones, ...valid.milestones] }]) {
       const textarea = { value: JSON.stringify(summary), readOnly: true,
         getBoundingClientRect: () => ({ x: 0, y: 0, width: 200 }) };
       const panel = { textContent: '', querySelector: selector => selector === 'textarea' ? textarea : null };

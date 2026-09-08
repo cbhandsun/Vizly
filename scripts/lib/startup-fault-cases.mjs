@@ -57,6 +57,32 @@ export const readStartupFaultRecovery = kind => {
   let summary;
   try { summary = JSON.parse(textarea.value); } catch { return { valid: false }; }
   const keys = kind === 'startup' ? ['schema', 'stage', 'code', 'elapsedMs'] : ['schema', 'reason', 'stage', 'code'];
+  let milestonesValid = true;
+  if (kind === 'startup' && summary?.code !== 'entry-resource-failed') {
+    keys.push('milestones');
+    const stages = ['runtime-started', 'runtime-ready', 'readiness-ready', 'mount-requested', 'mount-submitted', 'failed'];
+    const entries = summary?.milestones;
+    let previousStage = -1;
+    let previousTime = 0;
+    milestonesValid = Array.isArray(entries) && entries.length >= 2 && entries.length <= stages.length
+      && entries.every((entry, index) => {
+        if (!entry || typeof entry !== 'object' || Object.keys(entry).length !== 2
+          || !Object.hasOwn(entry, 'stage') || !Object.hasOwn(entry, 'elapsedMs')) return false;
+        const ordinal = stages.indexOf(entry.stage);
+        if (ordinal <= previousStage || (index === 0 && ordinal !== 0)) return false;
+        const time = entry.elapsedMs;
+        if (time !== null && (!Number.isSafeInteger(time) || time < previousTime || time > 600000)) return false;
+        previousStage = ordinal;
+        if (time !== null) previousTime = time;
+        return true;
+      }) && entries.at(-1).stage === 'failed';
+    const expected = summary?.stage === 'mount'
+      ? ['runtime-started', 'runtime-ready', 'readiness-ready', 'mount-requested', 'failed']
+      : ['runtime-started', 'failed'];
+    milestonesValid = milestonesValid && entries.length === expected.length
+      && entries.every((entry, index) => entry.stage === expected[index])
+      && entries.at(-1).elapsedMs === summary.elapsedMs;
+  }
   const safeCodes = ['application-mount-failed', 'runtime-initialization-failed',
     'entry-resource-failed',
     'display-edge-worker-unavailable', 'display-edge-worker-post-failed', 'display-edge-worker-error',
@@ -69,7 +95,7 @@ export const readStartupFaultRecovery = kind => {
     && summary.schema === (kind === 'startup' ? 'vizly-startup-failure-v1' : 'vizly-routing-failure-v1')
     && (kind === 'startup' ? Number.isFinite(summary.elapsedMs) && summary.elapsedMs >= 0 && summary.elapsedMs <= 600000
       : summary.reason === 'worker-failed');
-  if (!valid) return { valid: false };
+  if (!valid || !milestonesValid) return { valid: false };
   const bounds = textarea.getBoundingClientRect();
   return { valid: true, code: summary.code, stage: summary.stage,
     unobscured: bounds.width > 100 && document.elementFromPoint(bounds.x + 20, bounds.y + 16) === textarea,
