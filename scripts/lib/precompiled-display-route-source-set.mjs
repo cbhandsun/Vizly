@@ -19,6 +19,7 @@ const ROUTING_SOURCE_SCOPES = Object.freeze([
 const EXPLICIT_ROUTING_SOURCES = Object.freeze([
   'src/components/diagramViewerFlowchartLoader.tsx',
   'src/core/components/diagrams/designerUtils.ts',
+  'src/core/components/diagrams/hooks/nodeLayerOrdering.ts',
   'src/core/components/shared/useBaseReactFlowDisplayRouting.ts',
 ]);
 

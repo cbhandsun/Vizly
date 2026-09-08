@@ -16,6 +16,29 @@ const node = (id: string, parentId?: string): Node => ({
 const ids = (nodes: readonly Node[]) => nodes.map(item => item.id);
 
 describe('nodeLayerOrdering', () => {
+    it('preserves malformed records and keeps cycles stable on repeated calls', () => {
+        for (const input of [
+            [],
+            [node('orphan', 'missing')],
+            [node('duplicate'), node('duplicate', 'parent'), node('parent')],
+            [node('self', 'self')],
+            [node('a', 'b'), node('b', 'a'), node('child', 'a')],
+            [node('__proto__'), node('constructor', '__proto__')],
+        ]) {
+            const result = ensureParentsPrecedeChildren(input);
+            expect(result).toEqual(input);
+            expect(ensureParentsPrecedeChildren(result)).toEqual(result);
+            result.forEach((entry, index) => expect(entry).toBe(input[index]));
+        }
+    });
+
+    it('orders deeply nested input without recursive stack growth', () => {
+        const input = Array.from({ length: 12000 }, (_, index) => (
+            node(String(index), index < 11999 ? String(index + 1) : undefined)
+        ));
+        expect(ensureParentsPrecedeChildren(input)).toEqual([...input].reverse());
+    });
+
     it('moves every selected node within its own parent scope', () => {
         const input = [
             node('root-a'),

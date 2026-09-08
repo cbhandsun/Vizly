@@ -13,6 +13,19 @@ import {
 import { filterBaseReactFlowRoutableEdges } from '../baseReactFlowRenderableEdges';
 
 describe('baseReactFlowRenderableNodes', () => {
+  it('orders a restored parent before a dragged child without changing local geometry', () => {
+    const child: Node = { id: 'child', parentId: 'parent', position: { x: 136, y: 116 }, data: {} };
+    const parent: Node = { id: 'parent', position: { x: 20, y: 1312 }, data: {} };
+    const input = [child, parent];
+    const result = normalizeBaseReactFlowRenderableNodes(input);
+    expect(result).toEqual([parent, child]);
+    expect(result[0]).toBe(parent);
+    expect(result[1]).toBe(child);
+    expect(child.position).toEqual({ x: 136, y: 116 });
+    expect(input).toEqual([child, parent]);
+    expect(normalizeBaseReactFlowRenderableNodes(result)).toBe(result);
+  });
+
   it('waits for every internal node to publish finite positive routing geometry', () => {
     const ready = {
       id: 'ready',

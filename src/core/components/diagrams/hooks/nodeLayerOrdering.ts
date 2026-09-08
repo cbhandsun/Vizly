@@ -18,27 +18,27 @@ const nodeOrderMatches = (left: readonly Node[], right: readonly Node[]): boolea
  */
 export const ensureParentsPrecedeChildren = (nodes: readonly Node[]): Node[] => {
     const nodeById = new Map(nodes.map(node => [node.id, node]));
+    // Ordering cannot resolve ambiguous IDs. Preserve all input records.
+    if (nodeById.size !== nodes.length) return [...nodes];
     const visited = new Set<string>();
-    const visiting = new Set<string>();
     const ordered: Node[] = [];
 
-    const visit = (node: Node) => {
-        if (visited.has(node.id)) return;
-        if (visiting.has(node.id)) return;
-
-        visiting.add(node.id);
-        if (node.parentId) {
-            const parent = nodeById.get(node.parentId);
-            if (parent) visit(parent);
+    for (const node of nodes) {
+        const chain: Node[] = [];
+        const visiting = new Set<string>();
+        let current: Node | undefined = node;
+        while (current && !visited.has(current.id)) {
+            // A cycle has no parent-first order; keep it stable across renders.
+            if (visiting.has(current.id)) return [...nodes];
+            visiting.add(current.id);
+            chain.push(current);
+            current = current.parentId ? nodeById.get(current.parentId) : undefined;
         }
-        visiting.delete(node.id);
-
-        if (visited.has(node.id)) return;
-        visited.add(node.id);
-        ordered.push(node);
-    };
-
-    nodes.forEach(visit);
+        for (let index = chain.length - 1; index >= 0; index -= 1) {
+            visited.add(chain[index].id);
+            ordered.push(chain[index]);
+        }
+    }
     return nodeOrderMatches(nodes, ordered) ? [...nodes] : ordered;
 };
 

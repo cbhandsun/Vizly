@@ -1,4 +1,5 @@
 import type { Node, XYPosition } from '@xyflow/react';
+import { ensureParentsPrecedeChildren } from '../diagrams/hooks/nodeLayerOrdering';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
   !!value && typeof value === 'object' && !Array.isArray(value)
@@ -17,6 +18,10 @@ export const normalizeBaseReactFlowRenderableNodes = (nodes: Node[]): Node[] => 
     return { ...node, hidden: true };
   });
 
+  // An edit can restore parentId on previously flattened nodes. React Flow
+  // adopts nodes in array order and needs the parent before its first child.
+  const ordered = ensureParentsPrecedeChildren(normalized);
+  if (ordered.some((node, index) => node !== normalized[index])) return ordered;
   return changed ? normalized : nodes;
 };
 
