@@ -7,12 +7,119 @@ import { selectBusinessEditTarget, assertBusinessEditStability, assertBusinessEd
 import { measureDisplayRoutingEditStability } from './display-routing-edit-stability.mjs';
 import { createDisplayRoutingMatrixCaseIds, parseDisplayRoutingMatrixCase } from './display-routing-matrix-cases.mjs';
 import { verifyDisplayRoutingBrowserCases } from './display-routing-matrix-browser-cases.mjs';
+import { createEditProcessSampler, readEditProcessDomPoints, projectEditProcessReport } from './display-routing-edit-process.mjs';
 
 const node = id => ({ id, position: { x: 0, y: 0 } });
 const nodes = [node('a'), node('b'), node('c')];
 const edges = [{ id: 'ab', source: 'a', target: 'b', data: { computedPath: [{ x: 0, y: 0 }, { x: 10, y: 0 }] } },
   { id: 'bc', source: 'b', target: 'c', data: { computedPath: [{ x: 10, y: 0 }, { x: 20, y: 0 }] } }];
 const validMetrics = () => measureDisplayRoutingEditStability({ nodes, edges }, { nodes, edges }, ['a']);
+
+const processProbe = read => {
+  let tick;
+  let expire;
+  let time = 0;
+  const cancelFrame = vi.fn();
+  const clearTimer = vi.fn();
+  const sampler = createEditProcessSampler({ read, now: () => time,
+    requestFrame: callback => { tick = callback; return 1; }, cancelFrame,
+    setTimer: (callback, delay) => { expect(delay).toBe(10000); expire = callback; return 2; }, clearTimer });
+  return { sampler, cancelFrame, clearTimer, tick: () => { time += 16; tick(); }, expire: () => expire() };
+};
+
+describe('bounded edit process sampling', () => {
+  it('separates initial, frame and final observation costs', () => {
+    let time = 0;
+    let tick;
+    const sampler = createEditProcessSampler({
+      read: () => { time += 3; return [{ id: 'node', x: 0, y: 0 }]; }, now: () => time,
+      requestFrame: callback => { tick = callback; }, cancelFrame: () => {},
+      setTimer: () => {}, clearTimer: () => {},
+    });
+    tick();
+    expect(sampler.stop()).toMatchObject({ initialMs: 3, frameMs: 3, finalMs: 3,
+      frameCount: 1, measurementMs: 9, readMs: 9, comparisonMs: 0 });
+  });
+  it('projects only finite process metrics and fixed states from browser output', () => {
+    const report = processProbe(() => [{ id: 'x', x: 0, y: 0 }]).sampler.stop();
+    expect(projectEditProcessReport({ ...report, content: 'secret' })).toEqual(report);
+    for (const bad of [null, [], { ...report, readMs: Infinity }, { ...report, sampleCount: 257 },
+      { ...report, status: 'secret' }, { ...report, maxSampleMs: 'secret' }]) {
+      expect(projectEditProcessReport(bad)).toBeNull();
+    }
+  });
+  const readDom = (style = {}, nested = false) => vm.runInNewContext(
+    `(${readEditProcessDomPoints.toString()})('edited')`, {
+      document: { querySelectorAll: () => ['edited', 'retained'].map(id => ({
+        getAttribute: () => id, parentElement: { closest: () => nested ? {} : null, getAttribute: () => null },
+        getBoundingClientRect: () => { throw new Error('Unexpected layout read'); },
+      })) },
+      getComputedStyle: () => ({ transform: 'rendered-transform', left: '0px', top: '0px', transitionProperty: 'none', transitionDuration: '0s', ...style }),
+      DOMMatrix: class {
+        constructor(transform) {
+          expect(transform).toBe('rendered-transform');
+          Object.assign(this, { is2D: true, a: 1, d: 1, b: 0, c: 0, e: 156, f: 1428 });
+        }
+      },
+    },
+  );
+  it('reads committed DOM transforms without rectangle layout reads or viewport dependence', () => {
+    expect(readDom()).toEqual([{ id: 'retained', x: 156, y: 1428 }]);
+  });
+  it('rejects unsupported DOM offsets or nested node placement', () => {
+    expect(() => readDom({ left: '12px' })).toThrow('unsupported');
+    expect(() => readDom({}, true)).toThrow('unsupported');
+  });
+  it.each(['translate', 'rotate', 'scale', 'offsetPath'])('rejects independent %s instead of reporting zero displacement', key => {
+    expect(() => readDom({ [key]: '20px' })).toThrow('unsupported');
+  });
+  it('reads changing computed transforms even when DOM attributes do not change', () => {
+    const nodeStyle = 'first';
+    const parentClass = 'first';
+    let x = 0;
+    const getComputedStyle = vi.fn(() => ({ transform: 'matrix', left: '0px', top: '0px',
+      animationName: 'none', transitionDuration: '0.25s', transitionProperty: 'opacity' }));
+    const parent = { closest: () => null, getAttribute: () => parentClass };
+    const element = { parentElement: parent, getAttribute: key => key === 'data-id' ? 'retained' : nodeStyle };
+    const context = vm.createContext({ document: { querySelectorAll: () => [element] },
+      getComputedStyle, DOMMatrix: class { constructor() { Object.assign(this, { is2D: true, a: 1, d: 1, b: 0, c: 0, e: x, f: 0 }); } } });
+    const read = () => vm.runInContext(`(${readEditProcessDomPoints.toString()})('edited')`, context);
+    read(); read();
+    expect(getComputedStyle).toHaveBeenCalledTimes(2);
+    x = 20;
+    expect(read()[0].x).toBe(20);
+    x = 30;
+    expect(read()[0].x).toBe(30);
+    expect(getComputedStyle).toHaveBeenCalledTimes(4);
+  });
+  it('retains a transient movement even when the final position returns to baseline', () => {
+    let x = 0;
+    const probe = processProbe(() => [{ id: 'private-node', x, y: 0 }]);
+    x = 20; probe.tick(); x = 0; probe.tick();
+    const report = probe.sampler.stop();
+    expect(report).toMatchObject({ status: 'completed', sampleCount: 4, monitoredNodeCount: 1,
+      maxNodeDisplacement: 20, movedNodeCount: 1, maxSampleGapMs: 16 });
+    expect(JSON.stringify(report)).not.toContain('private-node');
+    expect(probe.cancelFrame).toHaveBeenCalled();
+    expect(probe.clearTimer).toHaveBeenCalled();
+  });
+  it.each([null, [], [{ id: 'x', x: NaN, y: 0 }], Array(257).fill({ id: 'x', x: 0, y: 0 }),
+    [{ id: 'x', x: 0, y: 0 }, { id: 'x', x: 0, y: 0 }]])('marks invalid or oversized observations unavailable', points => {
+    expect(processProbe(() => points).sampler.stop().status).toBe('unavailable');
+  });
+  it('does not report a missing node, read error or exhausted budget as complete', () => {
+    let points = [{ id: 'x', x: 0, y: 0 }];
+    const missing = processProbe(() => points);
+    points = [{ id: 'other', x: 0, y: 0 }]; missing.tick();
+    expect(missing.sampler.stop().status).toBe('unavailable');
+    expect(processProbe(() => { throw new Error('private'); }).sampler.stop().status).toBe('unavailable');
+    const bounded = processProbe(() => points);
+    for (let index = 0; index < 239; index += 1) bounded.tick();
+    expect(bounded.sampler.stop()).toMatchObject({ status: 'sample-limit', sampleCount: 240 });
+    const timed = processProbe(() => points); timed.expire();
+    expect(timed.sampler.stop().status).toBe('time-limit');
+  });
+});
 // Serialize through the real Node entry point once. Vitest rewrites imported
 // names inside function bodies, which would test SSR internals in the browser VM.
 const expressions = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', `

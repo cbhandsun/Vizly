@@ -13,6 +13,7 @@ import { displayRoutingCommittedEdgesMatchWorkerPatches, displayRoutingTopologyR
 import { displayRoutingTopologyRequestMatchesResponse, displayRoutingTopologyResponseIsFinal,
   findDisplayRoutingTopologyFinalResponse } from './display-routing-browser-topology-response.mjs';
 import { waitForStableDisplayRoutingLayoutVisual } from './display-routing-layout-visual-settle.mjs';
+import { startEditProcessSampling, stopEditProcessSampling } from './display-routing-edit-process.mjs';
 
 export const businessEditFinalRouteExpression = (nodeId, previousRequestId) => `(() => {
   const displayRoutingTopologyRequestMatchesResponse = ${displayRoutingTopologyRequestMatchesResponse.toString()};
@@ -113,6 +114,7 @@ const dragBusinessNode = async (session, nodeId, direction) => {
   if (!target || !delta || !Number.isFinite(viewport.zoom) || viewport.zoom <= 0) throw new Error('Business drag target unavailable');
   await captureTopologyStabilityBaseline(session);
   await prepareDisplayRoutingIncrementalCapture(session);
+  await startEditProcessSampling(session, nodeId);
   await session.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...target, button: 'none' });
   await session.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...target, button: 'left', buttons: 1, clickCount: 1 });
   const end = { x: target.x + direction * delta.x * viewport.zoom, y: target.y + direction * delta.y * viewport.zoom };
@@ -154,6 +156,7 @@ export const verifyDisplayRoutingBusinessEdits = async ({ baseUrl, prepareSessio
             : { expectedCommittedRouteSignature: route.response.outputRouteSignature }),
           expectedNodeCount: route.request.nodes.length, expectedEdgeCount: route.response.edges.length });
         const after = await session.evaluate(businessEditPositionExpression(selected.nodeId));
+        const processStability = await stopEditProcessSampling(session);
         const scopeEvidence = await readTopologyEditStability(session, 'business-drag',
           route.request.mutableEdgeIds, route.response, [selected.nodeId]);
         const stability = scopeEvidence.intent;
@@ -162,9 +165,9 @@ export const verifyDisplayRoutingBusinessEdits = async ({ baseUrl, prepareSessio
         operations.push({ id: direction === 1 ? 'drag-away' : 'drag-reverse', editedNodeIndex: selected.nodeIndex,
           routeResolution: route.response.routeResolution, fallbackLevel: route.response.fallbackLevel,
           workerDurationMs: route.response.workerDurationMs, releaseToObservedMs: Date.now() - drag.releasedAt,
-          stability, scopeEvidence, ...(await auditFinalSvg(session, route, `${target.presetId} edited route`)) });
+          stability, scopeEvidence, processStability, ...(await auditFinalSvg(session, route, `${target.presetId} edited route`)) });
         onProgress({ event: 'business-edit-operation-passed', presetId: target.presetId,
-          operation: operations.at(-1).id, stability: projectDisplayRoutingEditStability(stability), scopeEvidence });
+          operation: operations.at(-1).id, stability: projectDisplayRoutingEditStability(stability), scopeEvidence, processStability });
       }
       return { presetId: target.presetId, canonicalMount, initialAudit, operations };
     }));
