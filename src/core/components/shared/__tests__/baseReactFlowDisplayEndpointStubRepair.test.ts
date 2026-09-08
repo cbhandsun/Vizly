@@ -13,6 +13,7 @@ import { createAtomicRouteTransactionEvaluation } from '../baseReactFlowDisplayA
 import { createStrictCrossingRepairDiagnostics } from '../baseReactFlowDisplayStrictResidualRepair';
 import { buildSharedRenderSafeStubCandidate } from '../baseReactFlowDisplaySharedStubCandidate';
 import { buildPerpendicularTerminalStubCandidates } from '../baseReactFlowDisplayPerpendicularStubCandidate';
+import { buildElbowEndpointStubPaths } from '../baseReactFlowDisplayElbowStubCandidate';
 import { getDisplayComputedPath } from '../baseReactFlowDisplayGeometry';
 import { auditFinalSameSideEndpointOrder } from '../../../strategies/shared/edgeFinalSameSideEndpointOrderRepair';
 import { getExactDisplayHardReport } from '../baseReactFlowDisplayWorkerResponse';
@@ -37,6 +38,53 @@ const edgeWithPath = (
 });
 
 describe('baseReactFlowDisplayEndpointStubRepair', () => {
+  it.each([0, 1, 2, 3])('keeps elbow anchors and orthogonal stub lengths after rotation %i', turns => {
+    const rotate = (p: { x: number; y: number }) => {
+      let result = p;
+      for (let i = 0; i < turns; i++) result = { x: -result.y, y: result.x };
+      return result;
+    };
+    const original = [{ x: 0, y: 0 }, { x: 0, y: 240 }, { x: -40, y: 240 }].map(rotate);
+    for (const path of [original, [...original].reverse()]) {
+      const before = structuredClone(path);
+      const candidates = buildElbowEndpointStubPaths(path, 56);
+      expect(candidates).toHaveLength(2);
+      for (const candidate of candidates) {
+      expect(candidate[0]).toEqual(path[0]);
+      expect(candidate.at(-1)).toEqual(path.at(-1));
+      for (let i = 1; i < candidate.length; i++) {
+        const a = candidate[i - 1], b = candidate[i];
+        expect(a.x === b.x || a.y === b.y).toBe(true);
+        expect(Math.abs(a.x - b.x) + Math.abs(a.y - b.y)).toBeGreaterThanOrEqual(56);
+      }
+      }
+      expect(path).toEqual(before);
+    }
+  });
+  it('rejects invalid or unsupported elbow geometry without proposing detached paths', () => {
+    const valid = [{ x: 0, y: 0 }, { x: 0, y: 240 }, { x: -40, y: 240 }];
+    for (const minimum of [NaN, Infinity, -1, 0, 5001]) expect(buildElbowEndpointStubPaths(valid, minimum)).toEqual([]);
+    for (const path of [[], valid.slice(0, 2), [{ x: NaN, y: 0 }, ...valid.slice(1)],
+      [{ x: 0, y: 0 }, { x: 10, y: 240 }, valid[2]],
+      [{ x: 0, y: 0 }, { x: 0, y: 80 }, { x: 40, y: 80 }],
+      [{ x: 1000000, y: 0 }, { x: 1000000, y: 240 }, { x: 999960, y: 240 }],
+    ]) expect(buildElbowEndpointStubPaths(path, 56)).toEqual([]);
+    expect(buildElbowEndpointStubPaths([{ x: 0, y: 0 }, { x: 0, y: 240 }, { x: -56, y: 240 }], 56)).toEqual([]);
+  });
+  it('repairs a short elbow arrival without displacing its opposite endpoint', () => {
+    const nodes: Node[] = [
+      { id: 's', position: { x: -40, y: -80 }, width: 80, height: 80, data: {} },
+      { id: 't', position: { x: -200, y: 200 }, width: 160, height: 80, data: {} },
+    ];
+    const path = [{ x: 0, y: 0 }, { x: 0, y: 240 }, { x: -40, y: 240 }];
+    const edges: Edge[] = [{ id: 'e', source: 's', target: 't', sourceHandle: 'bottom', targetHandle: 'right', data: { computedPath: path } }];
+    const result = repairRenderSafeEndpointStubs(edges, nodes);
+    expect(countRenderUnsafeEndpointStubs(result)).toBe(0);
+    const repaired = getDisplayComputedPath(result[0]);
+    expect(repaired[0]).toEqual(path[0]);
+    expect(repaired.at(-1)).toEqual(path.at(-1));
+    expect(edges[0].data?.computedPath).toEqual(path);
+  });
   afterEach(() => {
     vi.restoreAllMocks();
   });

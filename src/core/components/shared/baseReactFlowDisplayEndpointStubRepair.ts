@@ -1,4 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
+import { buildElbowEndpointStubPaths } from './baseReactFlowDisplayElbowStubCandidate';
 
 import { COMMERCIAL_BUSINESS_NODE_CLEARANCE } from '../../strategies/shared/edgeBusinessNodeClearanceRepair';
 import { createEdgePathQualityEvaluationContext } from '../../strategies/shared/edgeStrictCrossingGuard';
@@ -208,7 +209,7 @@ const buildRenderSafeEndpointStubPaths = (path: DisplayPoint[]): DisplayPoint[][
     return true;
   };
 
-  const candidates: DisplayPoint[][] = [];
+  const candidates: DisplayPoint[][] = buildElbowEndpointStubPaths(path, MIN_RENDER_SAFE_ENDPOINT_STUB);
   if (sourceNeedsRepair) {
     const candidate = path.map(point => ({ ...point }));
     if (extendSource(candidate)) candidates.push(compactOrthogonalPath(candidate));
