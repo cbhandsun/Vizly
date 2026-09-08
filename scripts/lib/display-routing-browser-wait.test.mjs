@@ -3,9 +3,12 @@ import { describe, expect, it, vi } from 'vitest';
 
 // Vitest fakes global timers, but not node:timers/promises. Route the polling
 // delay through that same clock so renderer and evidence deadlines are tested.
-vi.mock('node:timers/promises', () => ({
-  setTimeout: (milliseconds) => new Promise(resolve => setTimeout(resolve, milliseconds)),
-}));
+vi.mock('node:timers/promises', async importOriginal => {
+  const actual = await importOriginal();
+  const setTimeoutMock = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+  return { ...actual, setTimeout: setTimeoutMock,
+    default: { ...actual.default, setTimeout: setTimeoutMock } };
+});
 
 import { waitForDisplayRoutingBrowserValue } from './display-routing-browser-wait.mjs';
 import {

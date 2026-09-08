@@ -7,7 +7,8 @@ import { collectJournaledRoutingSamples, createRoutingSampleJournal,
 
 vi.mock('node:fs/promises', async importOriginal => {
   const actual = await importOriginal();
-  return { ...actual, open: vi.fn(actual.open) };
+  const openMock = vi.fn(actual.open);
+  return { ...actual, open: openMock, default: { ...actual.default, open: openMock } };
 });
 
 const directories = [];
