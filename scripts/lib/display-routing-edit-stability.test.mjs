@@ -80,6 +80,24 @@ describe('incremental edit stability', () => {
     expect(measure(before, after, [])).toMatchObject({ afterPathLength: 10, afterBendCount: 0 });
   });
 
+  it('separates point subdivision from geometry changes without hiding retracing or detours', () => {
+    const before = fixture();
+    const after = fixture();
+    after.edges[0].data.computedPath = [{ x: 0, y: 0 }, { x: 0, y: 0 },
+      { x: 5, y: 0 }, { x: 10, y: 0 }];
+    expect(measure(before, after, [])).toMatchObject({ changedPathCount: 1, changedGeometryCount: 0 });
+    after.edges[0].data.computedPath = [{ x: 0, y: 0 }, { x: 8, y: 0 },
+      { x: 4, y: 0 }, { x: 10, y: 0 }];
+    expect(measure(before, after, [])).toMatchObject({ changedPathCount: 1, changedGeometryCount: 1 });
+    after.edges[0].data.computedPath = [{ x: 0, y: 0 }, { x: 5, y: 1 }, { x: 10, y: 0 }];
+    expect(measure(before, after, [])).toMatchObject({ changedGeometryCount: 1 });
+    before.edges[0].data.computedPath = [{ x: 0, y: 0 }, { x: 10, y: 10 }];
+    after.edges[0].data.computedPath = [{ x: 0, y: 0 }, { x: 5, y: 5 }, { x: 10, y: 10 }];
+    expect(measure(before, after, [])).toMatchObject({ changedPathCount: 1, changedGeometryCount: 0 });
+    after.edges[0].data.computedPath.reverse();
+    expect(measure(before, after, [])).toMatchObject({ changedGeometryCount: 1 });
+  });
+
   it.each([
     snapshot => { snapshot.nodes = null; },
     snapshot => { snapshot.nodes = Array(5_001).fill(node('x')); },
@@ -129,6 +147,8 @@ describe('incremental edit stability', () => {
     const safe = projectDisplayRoutingEditStability({ ...metrics, secret: 'Bearer private content' });
     expect(JSON.stringify(safe)).not.toMatch(/Bearer|private|computedPath|sourceHandle/);
     expect(projectDisplayRoutingEditStability({ ...metrics, changedPathCount: NaN })).toBeNull();
+    expect(projectDisplayRoutingEditStability({ ...metrics, changedGeometryCount: metrics.changedPathCount + 1 })).toBeNull();
+    expect(projectDisplayRoutingEditStability({ ...metrics, changedGeometryCount: undefined })).toBeNull();
     expect(buildDisplayRoutingMachineResult([{ editStability: metrics }]).dragCases[0].editStability).toEqual(safe);
     await captureDisplayRoutingEditBaseline(session);
     window.__vizlyRoutingResponses = [];

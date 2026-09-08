@@ -65,6 +65,27 @@ export const measureDisplayRoutingEditStability = (before, after, editedNodeIds)
   for (const key of edited) if (!first.nodes.has(key) && !last.nodes.has(key)) invalid();
   const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const pathLength = path => path.slice(1).reduce((sum, p, i) => sum + distance(path[i], p), 0);
+  // Remove exact duplicate points and forward collinear subdivisions only.
+  // Preserve reversals: retracing a corridor is a real route change.
+  const canonicalPath = path => {
+    const result = [];
+    for (const p of path) {
+      const previous = result.at(-1);
+      if (previous && previous.x === p.x && previous.y === p.y) continue;
+      while (result.length >= 2) {
+        const a = result.at(-2);
+        const b = result.at(-1);
+        const ab = { x: b.x - a.x, y: b.y - a.y };
+        const bp = { x: p.x - b.x, y: p.y - b.y };
+        if (ab.x * bp.y !== ab.y * bp.x || ab.x * bp.x + ab.y * bp.y < 0) break;
+        result.pop();
+      }
+      result.push(p);
+    }
+    return result;
+  };
+  const pathsDiffer = (a, b) => a.length !== b.length
+    || a.some((p, i) => distance(p, b[i]) > 0.01);
   const bends = path => {
     let count = 0;
     let previous = null;
@@ -82,7 +103,7 @@ export const measureDisplayRoutingEditStability = (before, after, editedNodeIds)
   const added = (a, b) => [...b.keys()].filter(key => !a.has(key)).length;
   const result = {
     comparedNodeCount: 0, movedNodeCount: 0, totalNodeDisplacement: 0, maxNodeDisplacement: 0,
-    comparedEdgeCount: 0, changedPortCount: 0, changedPathCount: 0,
+    comparedEdgeCount: 0, changedPortCount: 0, changedPathCount: 0, changedGeometryCount: 0,
     beforePathLength: 0, afterPathLength: 0, beforeBendCount: 0, afterBendCount: 0,
     addedNodeCount: added(first.nodes, last.nodes), removedNodeCount: added(last.nodes, first.nodes),
     addedEdgeCount: added(first.edges, last.edges), removedEdgeCount: added(last.edges, first.edges),
@@ -108,8 +129,10 @@ export const measureDisplayRoutingEditStability = (before, after, editedNodeIds)
     if (edge.sourceHandle !== next.sourceHandle || edge.targetHandle !== next.targetHandle) {
       result.changedPortCount += 1;
     }
-    if (edge.path.length !== next.path.length
-      || edge.path.some((p, i) => distance(p, next.path[i]) > 0.01)) result.changedPathCount += 1;
+    if (pathsDiffer(edge.path, next.path)) {
+      result.changedPathCount += 1;
+      if (pathsDiffer(canonicalPath(edge.path), canonicalPath(next.path))) result.changedGeometryCount += 1;
+    }
     result.beforePathLength += pathLength(edge.path);
     result.afterPathLength += pathLength(next.path);
     result.beforeBendCount += bends(edge.path);
@@ -154,7 +177,7 @@ export const readDisplayRoutingEditStability = (session, editedNodeIds) => sessi
 
 const METRICS = Object.freeze([
   'comparedNodeCount', 'movedNodeCount', 'totalNodeDisplacement', 'maxNodeDisplacement',
-  'comparedEdgeCount', 'changedPortCount', 'changedPathCount', 'beforePathLength',
+  'comparedEdgeCount', 'changedPortCount', 'changedPathCount', 'changedGeometryCount', 'beforePathLength',
   'afterPathLength', 'beforeBendCount', 'afterBendCount', 'addedNodeCount',
   'removedNodeCount', 'addedEdgeCount', 'removedEdgeCount', 'rewiredEdgeCount',
 ]);
@@ -167,6 +190,7 @@ export const projectDisplayRoutingEditStability = value => {
   if (value.movedNodeCount > value.comparedNodeCount
     || value.changedPortCount > value.comparedEdgeCount
     || value.changedPathCount > value.comparedEdgeCount
+    || value.changedGeometryCount > value.changedPathCount
     || value.maxNodeDisplacement > value.totalNodeDisplacement) return null;
   return Object.fromEntries(METRICS.map(key => [key, value[key]]));
 };
