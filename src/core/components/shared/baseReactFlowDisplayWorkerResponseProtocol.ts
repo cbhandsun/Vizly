@@ -32,6 +32,8 @@ export type DisplayEdgesWorkerResponse = {
   phaseTrace?: DisplayRoutingPhaseTrace[];
   phaseProgress?: DisplayRoutingPhaseTrace;
   affectedEdgeCount?: number;
+  /** Final incremental candidate's allowed repair scope; not inferred from changed paths. */
+  eligibleEdgeIds?: string[];
   fallbackLevel?: DisplayRoutingFallbackLevel;
   nextIdentity?: RoutingIdentity;
   outputRouteSignature?: string;

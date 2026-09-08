@@ -3,6 +3,7 @@ import type { Edge, Node } from '@xyflow/react';
 import { ROUTING_IDENTIFIER_MAX_LENGTH } from '../../routing/routingBoundaryLimits';
 import type { RoutingPatch } from '../../routing/routingPatch';
 import { parseDisplayWorkerTimingMetadata } from './baseReactFlowDisplayWorkerExecutionTiming';
+import { parseDisplayWorkerEligibleScope } from './baseReactFlowDisplayWorkerEligibleScope';
 import { isDisplayWorkerBoundedCandidateReport } from './baseReactFlowDisplayWorkerQualityProtocol';
 import {
   isDisplayRoutingPhaseTrace,
@@ -532,6 +533,8 @@ export const parseDisplayEdgesWorkerResponse = (
   const hasEdges = typeof value.edges !== 'undefined';
   const hasRoutingPatches = typeof value.routingPatches !== 'undefined';
   const hasPhaseProgress = typeof value.phaseProgress !== 'undefined';
+  const eligibleEdgeIds = parseDisplayWorkerEligibleScope(value);
+  if (eligibleEdgeIds === null) return null;
   if (typeof value.workerExecutionTiming !== 'undefined'
     && !(hasEdges || hasRoutingPatches)) return null;
   if (
@@ -637,10 +640,9 @@ export const parseDisplayEdgesWorkerResponse = (
       )
     )
   );
+  const finalEdges = hasEdges ? value.edges : value.routingPatches;
   if (
-    !(hasEdges
-      ? isDisplayEdgesWorkerEdgeList(value.edges)
-      : isDisplayEdgesWorkerEdgeList(value.routingPatches))
+    !isDisplayEdgesWorkerEdgeList(finalEdges)
     || !phaseTrace
     || hardReport === null
     || hardReport === undefined
@@ -666,6 +668,7 @@ export const parseDisplayEdgesWorkerResponse = (
     hardReport,
     routeResolution: value.routeResolution,
     phaseTrace,
+    eligibleEdgeIds,
     affectedEdgeCount: hasIncrementalMetadata
       ? value.affectedEdgeCount as number
       : undefined,

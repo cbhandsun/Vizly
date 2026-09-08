@@ -82,7 +82,7 @@ export const captureTopologyStabilityBaseline = session => session.evaluate(`(()
 // The request closure can expand inside the Worker, or fall back to a full route.
 // This comparison deliberately preserves changes outside the ORIGINAL request;
 // it must not be presented as an audit of the final transaction's eligible set.
-export const readTopologyEditStability = (session, operationId, mutableEdgeIds) => session.evaluate(`(() => {
+export const readTopologyEditStability = (session, operationId, mutableEdgeIds, finalResponse) => session.evaluate(`(() => {
   const read = ${readTopologyStabilitySnapshot.toString()};
   const measure = ${measureDisplayRoutingEditStability.toString()};
   const editedIds = ${topologyEditedNodeIds.toString()};
@@ -96,7 +96,28 @@ export const readTopologyEditStability = (session, operationId, mutableEdgeIds) 
       || mutable.some(id => typeof id !== 'string' || !id || id.length > 512)) throw new Error('Invalid mutable edge scope');
     const observedEdges = new Set([...before.edges, ...after.edges].map(edge => edge.id));
     const observedMutable = [...new Set(mutable)].filter(id => observedEdges.has(id));
+    const finalScope = ${JSON.stringify(finalResponse ? {
+      eligibleEdgeIds: finalResponse.eligibleEdgeIds,
+      routeResolution: finalResponse.routeResolution, fallbackLevel: finalResponse.fallbackLevel,
+    } : null)};
+    let finalRepairScope = { status: 'unavailable' };
+    if (finalScope?.fallbackLevel === 'full') {
+      if (finalScope.eligibleEdgeIds !== undefined) throw new Error('Scope attached to full fallback');
+      finalRepairScope = { status: 'full-route' };
+    } else if (finalScope?.eligibleEdgeIds !== undefined) {
+      const eligible = finalScope.eligibleEdgeIds;
+      if (finalScope.fallbackLevel !== 'none' || finalScope.routeResolution !== 'incremental-route'
+        || !Array.isArray(eligible) || eligible.length > 5_000
+        || eligible.some(id => typeof id !== 'string' || !id || id.length > 512)
+        || new Set(eligible).size !== eligible.length) throw new Error('Invalid final repair scope');
+      const presentIds = new Set(after.edges.map(edge => edge.id));
+      const observedEligible = eligible.filter(id => presentIds.has(id));
+      finalRepairScope = { status: 'available', eligibleEdgeCount: eligible.length,
+        observedEligibleEdgeCount: observedEligible.length,
+        outsideFinalRepairGroup: measure(before, after, selected, observedEligible) };
+    }
     return {
+      finalRepairScope,
       intent, outsideRequestedRoutingGroup: measure(before, after, selected, observedMutable),
       explicitOrDescendantNodeCount: selected.length, observedRequestedMutableEdgeCount: observedMutable.length,
       beforeHiddenNodeCount: before.hiddenNodeCount, afterHiddenNodeCount: after.hiddenNodeCount,

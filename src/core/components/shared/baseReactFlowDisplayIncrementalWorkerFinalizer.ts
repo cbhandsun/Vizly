@@ -50,8 +50,9 @@ export const finalizeDisplayWorkerIncrementalCandidate = ({
     timer.finish('fallback', 0);
     return null;
   }
+  const acceptedResponse = { ...response, eligibleEdgeIds: [...eligibleEdgeIds].sort() };
   if (!displayIncrementalCandidateRequiresTopologyCommitGate(request.changeSet.classification)) {
-    return finishDisplayWorkerFinalization(timer, response, 0);
+    return finishDisplayWorkerFinalization(timer, acceptedResponse, 0);
   }
   const repairNodes = withDisplayAbsolutePositions(
     request.nodes,
@@ -63,7 +64,7 @@ export const finalizeDisplayWorkerIncrementalCandidate = ({
     response,
     nodes: repairNodes,
     eligibleEdgeIds,
-  })) return finishDisplayWorkerFinalization(timer, response, 0);
+  })) return finishDisplayWorkerFinalization(timer, acceptedResponse, 0);
   timer.finish('fallback', 0);
   return null;
 };

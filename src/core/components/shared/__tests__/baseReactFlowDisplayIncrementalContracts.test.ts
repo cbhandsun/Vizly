@@ -40,7 +40,7 @@ describe('base React Flow incremental route contracts', () => {
       smartEdgePadding: 20, isLargeGraph: false, displayEdgeEpoch: 1, qualityMode: 'full',
       baselineInputSignature: 'baseline', baselineInputGeometryDigest: 'baseline-geometry',
       baselineOutputRouteSignature: 'baseline-route', nextInputSignature: 'next',
-      nextInputGeometryDigest: 'next-geometry', mutableEdgeIds: [edge.id], contextEdgeIds: [],
+      nextInputGeometryDigest: 'next-geometry', mutableEdgeIds: [], contextEdgeIds: [edge.id],
       changeSet: { reason: 'node-drag', classification: 'geometry', changedNodeIds: ['source'],
         changedEdgeIds: [], topologyChanged: false, geometryChanged: true },
     };
@@ -52,7 +52,10 @@ describe('base React Flow incremental route contracts', () => {
       finalizeResponse: candidate => ({ ...candidate, hardClean }),
     });
 
-    if (hardClean) expect(response).toMatchObject({ hardClean: true, routeResolution: 'incremental-route' });
+    // The outcome promotes a context edge without changing its path. Neither the
+    // initial mutable request nor a path diff can reconstruct this final scope.
+    if (hardClean) expect(response).toMatchObject({ hardClean: true,
+      routeResolution: 'incremental-route', eligibleEdgeIds: [edge.id] });
     else expect(response).toBeNull();
     expect(onPhaseTrace).toHaveBeenCalledWith(expect.objectContaining({
       phase: 'finalizer', resolution: hardClean ? 'accepted' : 'fallback',

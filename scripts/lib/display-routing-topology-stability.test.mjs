@@ -14,6 +14,37 @@ const setup = () => {
 };
 
 describe('topology edit stability', () => {
+  it('reports expanded final repair scope without hiding changes outside the request', async () => {
+    const { graph, session } = setup();
+    await captureTopologyStabilityBaseline(session);
+    graph.edges[0].data.computedPath[1].x = 20;
+    const evidence = await readTopologyEditStability(session, 'container-expand', [], {
+      eligibleEdgeIds: ['edge'], routeResolution: 'incremental-route', fallbackLevel: 'none',
+    });
+    expect(evidence.outsideRequestedRoutingGroup.changedGeometryCount).toBe(1);
+    expect(evidence.finalRepairScope).toMatchObject({ status: 'available', eligibleEdgeCount: 1,
+      observedEligibleEdgeCount: 1, outsideFinalRepairGroup: { comparedEdgeCount: 0 } });
+    expect(JSON.stringify(evidence)).not.toContain('"eligibleEdgeIds"');
+  });
+
+  it.each([undefined, { fallbackLevel: 'full', routeResolution: 'full-route' },
+    { eligibleEdgeIds: [], fallbackLevel: 'none', routeResolution: 'incremental-route' }])('distinguishes missing, full fallback and empty final scopes: %j', async response => {
+    const { session } = setup();
+    await captureTopologyStabilityBaseline(session);
+    const evidence = await readTopologyEditStability(session, 'container-expand', [], response);
+    expect(evidence.finalRepairScope.status).toBe(!response ? 'unavailable'
+      : response.fallbackLevel === 'full' ? 'full-route' : 'available');
+  });
+
+  it.each([null, ['edge', 'edge'], [null], {}, Array(5_001).fill('edge')])('rejects malformed final scope and cleans the baseline', async eligibleEdgeIds => {
+    const { session, window } = setup();
+    await captureTopologyStabilityBaseline(session);
+    expect(() => readTopologyEditStability(session, 'container-expand', [], {
+      eligibleEdgeIds, fallbackLevel: 'none', routeResolution: 'incremental-route',
+    })).toThrow('Invalid final repair scope');
+    expect(window.__vizlyTopologyStabilityBaseline).toBeUndefined();
+  });
+
   it.each(['node-resize', 'multi-node-move', 'compound-subtree-move', 'edge-add',
     'port-policy', 'edge-remove', 'container-collapse', 'container-expand'])(
     'rejects movement of an unrelated node during %s', async operation => {

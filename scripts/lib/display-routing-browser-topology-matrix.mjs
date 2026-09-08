@@ -670,7 +670,12 @@ const verifyOperationGroup = ({
       counterBaseline,
       baselineEdgeCount,
     });
-    const editStability = await readTopologyEditStability(session, operationCase.id, result.request.mutableEdgeIds);
+    const editStability = await readTopologyEditStability(
+      session, operationCase.id, result.request.mutableEdgeIds, result.response,
+    );
+    if (editStability.finalRepairScope.status === 'unavailable') {
+      throw new Error('Final topology repair scope evidence unavailable');
+    }
     assertTopologyEditStability(operationCase.id, editStability);
     operationResults.push({
       editStability,
