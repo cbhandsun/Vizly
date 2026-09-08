@@ -1,6 +1,8 @@
-import { mkdir, mkdtemp, open } from 'node:fs/promises';
+import { mkdir, mkdtemp, open, readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { projectDisplayRoutingEditStability } from './display-routing-edit-stability.mjs';
+import { projectPrecompiledRouteLongTasks } from './precompiled-display-route-long-tasks.mjs';
 
 const metric = value => Number.isFinite(value) && value >= 0 && value <= 1e15 ? value : null;
 const fields = (value, keys) => Object.fromEntries(keys.map(key => [key, metric(value?.[key])]));
@@ -26,6 +28,10 @@ export const projectRoutingJournalSample = (kind, sample) => {
         ...fields(item, timings),
         workerResolution: resolutions.includes(item?.workerResolution) ? item.workerResolution : null,
         editStability: projectDisplayRoutingEditStability(item?.editStability),
+        mainThreadLongTasks: projectPrecompiledRouteLongTasks(item?.mainThreadLongTasks),
+        workerTimings: item?.workerTimings == null ? null : fields(item.workerTimings,
+          ['prewarmLeadMs', 'requestPreparationMs', 'firstResponseMs', 'workerDeliveryOverheadMs',
+            'workerMonotonicDeliveryOverheadMs', 'responseParseMs', 'responseApplyMs']),
       };
     })];
   }));
@@ -51,6 +57,12 @@ export const createRoutingSampleJournal = async ({ kind, sampleCount,
   if (sourceCommit !== null && (typeof sourceCommit !== 'string' || !/^[0-9a-f]{40}$/.test(sourceCommit))) {
     throw new Error('Invalid journal source commit');
   }
+  let buildEntrySha256 = null;
+  try {
+    buildEntrySha256 = createHash('sha256').update(await readFile('dist/index.html')).digest('hex');
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
   await mkdir(directory, { recursive: true });
   const runDirectory = await mkdtemp(join(directory, `${kind}-`));
   const file = await open(join(runDirectory, 'samples.jsonl'), 'wx');
@@ -59,7 +71,7 @@ export const createRoutingSampleJournal = async ({ kind, sampleCount,
     await file.sync();
   };
   try {
-    await write({ event: 'started', kind, sampleCount, sourceCommit });
+    await write({ event: 'started', kind, sampleCount, sourceCommit, buildEntrySha256 });
   } catch (error) {
     await file.close();
     throw error;

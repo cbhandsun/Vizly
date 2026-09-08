@@ -1,9 +1,11 @@
 import { createPrecompiledDisplayRouteTimingRecorder } from './precompiled-display-route-capture.mjs';
 import { installDisplayRoutingBrowserBootProbe } from './display-routing-browser-lifecycle.mjs';
+import { installPrecompiledRouteLongTaskProbe } from './precompiled-display-route-long-tasks.mjs';
 
 export const PRECOMPILED_DISPLAY_ROUTE_BROWSER_CAPTURE_SCRIPT = `(() => {
   const NativeWorker = window.Worker;
   const markBoot = (${installDisplayRoutingBrowserBootProbe.toString()})(true);
+  window.__vizlyPrecompiledRouteLongTasks = (${installPrecompiledRouteLongTaskProbe.toString()})();
   const createTimingRecorder = ${createPrecompiledDisplayRouteTimingRecorder.toString()};
   window.__vizlyDisplayRoutingDiagnosticsEnabled = true;
   window.__vizlyPrecompiledRouteRequest = null;

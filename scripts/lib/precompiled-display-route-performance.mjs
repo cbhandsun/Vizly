@@ -1,4 +1,5 @@
 import { summarizeDisplayRoutingSamples } from './display-routing-browser-performance.mjs';
+import { projectPrecompiledRouteLongTasks } from './precompiled-display-route-long-tasks.mjs';
 
 export const PRECOMPILED_DISPLAY_ROUTE_RESULT_PREFIX =
   'PRECOMPILED_DISPLAY_ROUTE_RESULT=';
@@ -159,6 +160,7 @@ export const buildPrecompiledDisplayRoutePerformanceResult = captures => {
       workerDurationMs,
       routeOverheadMs: subtractDurations(routeMs, workerDurationMs),
       workerTimings: projectWorkerTimings(measurement.workerTimings),
+      mainThreadLongTasks: projectPrecompiledRouteLongTasks(measurement.mainThreadLongTasks),
       tracedExclusiveMs,
       workerUntracedMs: subtractDurations(
         workerDurationMs,
@@ -251,6 +253,7 @@ export const summarizePrecompiledDisplayRoutePerformance = (
       slowestSamples: cases.map((item, index) => ({
         sampleIndex: index + 1, routeMs: item.routeMs, workerDurationMs: item.workerDurationMs,
         routeOverheadMs: item.routeOverheadMs, workerTimings: item.workerTimings,
+        mainThreadLongTasks: item.mainThreadLongTasks,
       })).sort((left, right) => right.routeMs - left.routeMs).slice(0, 5),
       tracedCompute: summarizeDisplayRoutingSamples(cases.map(item => item.tracedExclusiveMs)),
       untracedCompute: summarizeDisplayRoutingSamples(cases.map(item => item.workerUntracedMs)),

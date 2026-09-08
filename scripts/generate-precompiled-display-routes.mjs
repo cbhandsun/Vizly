@@ -214,6 +214,7 @@ const captureTarget = async (session, target, source, routingVersion) => {
       routeMs: routing.routeMs,
       workerDurationMs,
       workerTimings: captured.workerTimings,
+      mainThreadLongTasks: captured.mainThreadLongTasks,
       phaseTrace: routing.phaseTrace,
     },
   };

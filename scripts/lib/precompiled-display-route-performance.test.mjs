@@ -1,6 +1,72 @@
 // @vitest-environment node
 
 import { describe, expect, it } from 'vitest';
+import vm from 'node:vm';
+import { installPrecompiledRouteLongTaskProbe, projectPrecompiledRouteLongTasks }
+  from './precompiled-display-route-long-tasks.mjs';
+
+describe('cold-route main thread evidence', () => {
+  it('measures only overlapping numeric intervals and drains pending observer records', () => {
+    let deliver;
+    let pending = [{ startTime: 90, duration: 60, name: 'private URL' }];
+    class Observer {
+      static supportedEntryTypes = ['longtask'];
+      constructor(callback) { deliver = callback; }
+      observe() {}
+      takeRecords() { const values = pending; pending = []; return values; }
+    }
+    const probe = vm.runInNewContext(`(${installPrecompiledRouteLongTaskProbe.toString()})()`, {
+      PerformanceObserver: Observer,
+    });
+    deliver({ getEntries: () => [{ startTime: 190, duration: 100, attribution: ['private'] },
+      { startTime: 300, duration: 100 }, { startTime: NaN, duration: 1 }] });
+    const observation = projectPrecompiledRouteLongTasks(probe.measure(100, 200));
+    expect(observation).toEqual({ supported: true, droppedCount: 0, invalidCount: 1,
+      windowMs: 100, count: 2, totalMs: 60, maxMs: 50 });
+    expect(JSON.stringify(observation)).not.toContain('private');
+    expect(probe.measure(100, 200)).toEqual(observation);
+    expect(probe.measure(200, 100)).toBeNull();
+    expect(probe.measure(0, 600_001)).toBeNull();
+  });
+
+  it('marks unsupported and failed observation unavailable, and reports bounded buffer loss', () => {
+    const unsupported = vm.runInNewContext(`(${installPrecompiledRouteLongTaskProbe.toString()})()`);
+    expect(unsupported.measure(0, 100)).toMatchObject({ supported: false, count: null, totalMs: null });
+    let deliver;
+    class Observer {
+      static supportedEntryTypes = ['longtask'];
+      constructor(callback) { deliver = callback; }
+      observe() {}
+      takeRecords() { return []; }
+    }
+    const probe = vm.runInNewContext(`(${installPrecompiledRouteLongTaskProbe.toString()})()`, {
+      PerformanceObserver: Observer,
+    });
+    deliver({ getEntries: () => Array.from({ length: 600 }, (_, index) => ({ startTime: index * 100, duration: 50 })) });
+    expect(probe.measure(0, 60_000)).toMatchObject({ supported: true, count: 512, droppedCount: 88 });
+    Observer.prototype.takeRecords = () => { throw new Error('private'); };
+    expect(probe.measure(0, 60_000)).toMatchObject({ supported: false, count: null, totalMs: null });
+    class FailingObserver extends Observer {
+      observe() { throw new Error('private'); }
+      disconnect() {}
+    }
+    const failed = vm.runInNewContext(`(${installPrecompiledRouteLongTaskProbe.toString()})()`, {
+      PerformanceObserver: FailingObserver,
+    });
+    expect(failed.measure(0, 100)).toMatchObject({ supported: false, count: null });
+  });
+
+  it('rejects malformed host input without copying arbitrary fields', () => {
+    const valid = { supported: true, droppedCount: 0, invalidCount: 0, windowMs: 100,
+      count: 1, totalMs: 60, maxMs: 60 };
+    expect(projectPrecompiledRouteLongTasks({ ...valid, private: 'secret' })).toEqual(valid);
+    for (const change of [{ supported: 'true' }, { count: 513 }, { windowMs: Infinity },
+      { totalMs: 101 }, { maxMs: 61 }, { invalidCount: -1 }, { droppedCount: 0.5 }]) {
+      expect(() => projectPrecompiledRouteLongTasks({ ...valid, ...change })).toThrow('Invalid');
+    }
+    expect(projectPrecompiledRouteLongTasks(null)).toBeNull();
+  });
+});
 
 import {
   assertPrecompiledDisplayRoutePerformanceBudget,

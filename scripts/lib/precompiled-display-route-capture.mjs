@@ -402,5 +402,9 @@ export const renderPrecompiledDisplayRouteCaptureExpression = (
     workerTimings: isLayoutCapture ? null : projectTimings(
       window.__vizlyPrecompiledRouteTiming, routing, response.workerDurationMs,
     ),
+    mainThreadLongTasks: isLayoutCapture ? null : window.__vizlyPrecompiledRouteLongTasks?.measure(
+      window.__vizlyPrecompiledRouteTiming?.postedMonotonicAt,
+      window.__vizlyPrecompiledRouteTiming?.finalResponseMonotonicAt,
+    ) ?? null,
   };
 })()`;
