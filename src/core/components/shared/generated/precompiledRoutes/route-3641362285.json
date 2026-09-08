@@ -1,10 +1,10 @@
 {
   "schema": "vizly-precompiled-display-route-v1",
-  "routingVersion": "18",
+  "routingVersion": "19",
   "sourceHash": "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
-  "inputSignature": "620915351",
-  "inputGeometryDigest": "geometry-v1:b2de4eba34bb92c295bdfe1a2d1b4686",
-  "outputRouteSignature": "route-v2:44:152:82e64a2285963808",
+  "inputSignature": "3641362285",
+  "inputGeometryDigest": "geometry-v1:37e2fac90d5127d12918da5d9c021df5",
+  "outputRouteSignature": "route-v2:44:163:9e3051b64253ed60",
   "hardClean": true,
   "patches": [
     {
@@ -12,27 +12,24 @@
       "source": "allocation",
       "target": "allocation-rollback",
       "type": "stablePath",
-      "sourceHandle": "right",
+      "sourceHandle": "bottom",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 758,
-            "y": 1596
+            "x": 1286,
+            "y": 1514
           },
           {
-            "x": 1778,
-            "y": 1596
+            "x": 1286,
+            "y": 2165
           },
           {
-            "x": 1778,
-            "y": 2175
-          },
-          {
-            "x": 2312,
-            "y": 2175
+            "x": 1624,
+            "y": 2165
           }
-        ]
+        ],
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -40,27 +37,25 @@
       "source": "allocation",
       "target": "atp-check",
       "type": "stablePath",
-      "sourceHandle": "right",
+      "sourceHandle": "top",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 758,
-            "y": 1596
+            "x": 1286,
+            "y": 1418
           },
           {
-            "x": 1778,
-            "y": 1596
+            "x": 1286,
+            "y": 1000
           },
           {
-            "x": 1778,
-            "y": 1210
-          },
-          {
-            "x": 1834,
-            "y": 1210
+            "x": 1625,
+            "y": 1000
           }
-        ]
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -73,22 +68,23 @@
       "data": {
         "computedPath": [
           {
-            "x": 758,
-            "y": 1596
+            "x": 1286,
+            "y": 1466
           },
           {
-            "x": 1778,
-            "y": 1596
+            "x": 1374,
+            "y": 1466
           },
           {
-            "x": 1778,
-            "y": 1789
+            "x": 1374,
+            "y": 1699
           },
           {
-            "x": 2108,
-            "y": 1789
+            "x": 1612,
+            "y": 1699
           }
-        ]
+        ],
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -101,22 +97,24 @@
       "data": {
         "computedPath": [
           {
-            "x": 758,
-            "y": 1596
+            "x": 1286,
+            "y": 1466
           },
           {
-            "x": 1778,
-            "y": 1596
+            "x": 1374,
+            "y": 1466
           },
           {
-            "x": 1778,
-            "y": 1403
+            "x": 1374,
+            "y": 1233
           },
           {
-            "x": 1925,
-            "y": 1403
+            "x": 1621,
+            "y": 1233
           }
-        ]
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -129,12 +127,12 @@
       "data": {
         "computedPath": [
           {
-            "x": 758,
-            "y": 1596
+            "x": 1286,
+            "y": 1442
           },
           {
-            "x": 2014,
-            "y": 1596
+            "x": 1613.8,
+            "y": 1442
           }
         ]
       }
@@ -144,27 +142,37 @@
       "source": "allocation",
       "target": "task-generate",
       "type": "stablePath",
-      "sourceHandle": "left",
+      "sourceHandle": "right",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 552,
-            "y": 1596
+            "x": 1286,
+            "y": 1466
           },
           {
-            "x": 496,
-            "y": 1596
+            "x": 1565.8,
+            "y": 1466
           },
           {
-            "x": 496,
-            "y": 2867
+            "x": 1565.8,
+            "y": 1317
           },
           {
-            "x": 552,
-            "y": 2867
+            "x": 1844.8,
+            "y": 1317
+          },
+          {
+            "x": 1844.8,
+            "y": 1246
+          },
+          {
+            "x": 2067,
+            "y": 1246
           }
-        ]
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -172,27 +180,24 @@
       "source": "allocation",
       "target": "wave-planning",
       "type": "stablePath",
-      "sourceHandle": "right",
+      "sourceHandle": "bottom",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 758,
-            "y": 1596
+            "x": 1286,
+            "y": 1514
           },
           {
-            "x": 1778,
-            "y": 1596
+            "x": 1286,
+            "y": 1932
           },
           {
-            "x": 1778,
-            "y": 1982
-          },
-          {
-            "x": 2198,
-            "y": 1982
+            "x": 1606,
+            "y": 1932
           }
-        ]
+        ],
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -201,24 +206,24 @@
       "target": "labor-kpi",
       "type": "stablePath",
       "sourceHandle": "right",
-      "targetHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 742,
-            "y": 6630
+            "x": 5290,
+            "y": 2035
           },
           {
-            "x": 1109,
-            "y": 6630
+            "x": 5538,
+            "y": 2035
           },
           {
-            "x": 1109,
-            "y": 6257
+            "x": 5538,
+            "y": 1582
           },
           {
-            "x": 1053,
-            "y": 6257
+            "x": 5610,
+            "y": 1582
           }
         ]
       }
@@ -228,25 +233,17 @@
       "source": "labor-kpi",
       "target": "labor-schedule-feedback",
       "type": "stablePath",
-      "sourceHandle": "bottom",
-      "targetHandle": "bottom",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 946,
-            "y": 6305
+            "x": 5825,
+            "y": 1558
           },
           {
-            "x": 946,
-            "y": 6399
-          },
-          {
-            "x": 3778,
-            "y": 6399
-          },
-          {
-            "x": 3778,
-            "y": 6287
+            "x": 6145,
+            "y": 1558
           }
         ]
       }
@@ -256,27 +253,29 @@
       "source": "labor-schedule-feedback",
       "target": "allocation",
       "type": "stablePath",
-      "sourceHandle": "top",
+      "sourceHandle": "bottom",
       "targetHandle": "bottom",
       "data": {
         "computedPath": [
           {
-            "x": 3778,
-            "y": 6227
+            "x": 6246,
+            "y": 1612
           },
           {
-            "x": 3778,
-            "y": 1700
+            "x": 6246,
+            "y": 2385
           },
           {
-            "x": 655,
-            "y": 1700
+            "x": 1183,
+            "y": 2385
           },
           {
-            "x": 655,
-            "y": 1644
+            "x": 1183,
+            "y": 1514
           }
-        ]
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -284,27 +283,32 @@
       "source": "labor-schedule-feedback",
       "target": "task-group",
       "type": "stablePath",
-      "sourceHandle": "top",
+      "sourceHandle": "left",
       "targetHandle": "top",
       "data": {
         "computedPath": [
           {
-            "x": 3778,
-            "y": 6227
+            "x": 6145,
+            "y": 1582
           },
           {
-            "x": 3778,
-            "y": 3842
+            "x": 6089,
+            "y": 1582
           },
           {
-            "x": 655,
-            "y": 3842
+            "x": 6089,
+            "y": 1148.5
           },
           {
-            "x": 655,
-            "y": 3898
+            "x": 3132.1499999999996,
+            "y": 1148.5
+          },
+          {
+            "x": 3132.1499999999996,
+            "y": 1204.5
           }
-        ]
+        ],
+        "sharedTrunkAware": true
       }
     },
     {
@@ -312,27 +316,29 @@
       "source": "operation",
       "target": "exception-alert",
       "type": "stablePath",
-      "sourceHandle": "bottom",
-      "targetHandle": "top",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 712,
-            "y": 5241
+            "x": 4317,
+            "y": 850
           },
           {
-            "x": 712,
-            "y": 6537
+            "x": 4373,
+            "y": 850
           },
           {
-            "x": 647,
-            "y": 6537
+            "x": 4373,
+            "y": 2035
           },
           {
-            "x": 647,
-            "y": 6593
+            "x": 5100,
+            "y": 2035
           }
-        ]
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -341,22 +347,36 @@
       "target": "labor-kpi",
       "type": "stablePath",
       "sourceHandle": "right",
-      "targetHandle": "top",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 871,
-            "y": 5204
+            "x": 4317,
+            "y": 850
           },
           {
-            "x": 946,
-            "y": 5204
+            "x": 4396,
+            "y": 850
           },
           {
-            "x": 946,
-            "y": 6209
+            "x": 4396,
+            "y": 939
+          },
+          {
+            "x": 5468,
+            "y": 939
+          },
+          {
+            "x": 5468,
+            "y": 1582
+          },
+          {
+            "x": 5610,
+            "y": 1582
           }
-        ]
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -364,27 +384,24 @@
       "source": "operation",
       "target": "loading-handover",
       "type": "stablePath",
-      "sourceHandle": "right",
+      "sourceHandle": "bottom",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 871,
-            "y": 5204
+            "x": 4312,
+            "y": 850
           },
           {
-            "x": 2882,
-            "y": 5204
+            "x": 4312,
+            "y": 1253
           },
           {
-            "x": 2882,
-            "y": 5564
-          },
-          {
-            "x": 3414,
-            "y": 5564
+            "x": 4652,
+            "y": 1253
           }
-        ]
+        ],
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -397,14 +414,23 @@
       "data": {
         "computedPath": [
           {
-            "x": 871,
-            "y": 5204
+            "x": 4317,
+            "y": 850
           },
           {
-            "x": 3222,
-            "y": 5204
+            "x": 4596,
+            "y": 850
+          },
+          {
+            "x": 4596,
+            "y": 813
+          },
+          {
+            "x": 4652,
+            "y": 813
           }
-        ]
+        ],
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -412,27 +438,29 @@
       "source": "operation",
       "target": "path-heatmap",
       "type": "stablePath",
-      "sourceHandle": "bottom",
-      "targetHandle": "top",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 712,
-            "y": 5241
+            "x": 4317,
+            "y": 850
           },
           {
-            "x": 712,
-            "y": 6357
+            "x": 4373,
+            "y": 850
           },
           {
-            "x": 551,
-            "y": 6357
+            "x": 4373,
+            "y": 1809
           },
           {
-            "x": 551,
-            "y": 6413
+            "x": 5102,
+            "y": 1809
           }
-        ]
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -440,27 +468,25 @@
       "source": "operation",
       "target": "picking-exec",
       "type": "stablePath",
-      "sourceHandle": "right",
+      "sourceHandle": "top",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 871,
-            "y": 5204
+            "x": 4317,
+            "y": 777
           },
           {
-            "x": 2882,
-            "y": 5204
+            "x": 4317,
+            "y": 121
           },
           {
-            "x": 2882,
-            "y": 4632
-          },
-          {
-            "x": 2938,
-            "y": 4632
+            "x": 4656,
+            "y": 121
           }
-        ]
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -473,22 +499,23 @@
       "data": {
         "computedPath": [
           {
-            "x": 871,
-            "y": 5204
+            "x": 4317,
+            "y": 850
           },
           {
-            "x": 2882,
-            "y": 5204
+            "x": 4396,
+            "y": 850
           },
           {
-            "x": 2882,
-            "y": 5384
+            "x": 4396,
+            "y": 1033
           },
           {
-            "x": 3338,
-            "y": 5384
+            "x": 4672,
+            "y": 1033
           }
-        ]
+        ],
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -496,23 +523,29 @@
       "source": "operation",
       "target": "real-time-board",
       "type": "stablePath",
-      "sourceHandle": "left",
-      "targetHandle": "top",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 552,
-            "y": 5204
+            "x": 4317,
+            "y": 850
           },
           {
-            "x": 359,
-            "y": 5204
+            "x": 4373,
+            "y": 850
           },
           {
-            "x": 359,
-            "y": 6027
+            "x": 4373,
+            "y": 1349
+          },
+          {
+            "x": 5127.849999999999,
+            "y": 1349
           }
-        ]
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -520,27 +553,25 @@
       "source": "operation",
       "target": "replenish-exec",
       "type": "stablePath",
-      "sourceHandle": "right",
+      "sourceHandle": "top",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 871,
-            "y": 5204
+            "x": 4317,
+            "y": 777
           },
           {
-            "x": 2882,
-            "y": 5204
+            "x": 4317,
+            "y": 354
           },
           {
-            "x": 2882,
-            "y": 4825
-          },
-          {
-            "x": 3036,
-            "y": 4825
+            "x": 4657,
+            "y": 354
           }
-        ]
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -553,22 +584,23 @@
       "data": {
         "computedPath": [
           {
-            "x": 871,
-            "y": 5204
+            "x": 4317,
+            "y": 850
           },
           {
-            "x": 2882,
-            "y": 5204
+            "x": 4373,
+            "y": 850
           },
           {
-            "x": 2882,
-            "y": 5018
+            "x": 4373,
+            "y": 587
           },
           {
-            "x": 3132,
-            "y": 5018
+            "x": 4657,
+            "y": 587
           }
-        ]
+        ],
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -576,39 +608,29 @@
       "source": "operation",
       "target": "uph-calc",
       "type": "stablePath",
-      "sourceHandle": "left",
-      "targetHandle": "top",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 552,
-            "y": 5204
+            "x": 4317,
+            "y": 850
           },
           {
-            "x": 455,
-            "y": 5204
+            "x": 4373,
+            "y": 850
           },
           {
-            "x": 455,
-            "y": 5987
+            "x": 4373,
+            "y": 1582
           },
           {
-            "x": 479,
-            "y": 5987
-          },
-          {
-            "x": 479,
-            "y": 6140
-          },
-          {
-            "x": 455,
-            "y": 6140
-          },
-          {
-            "x": 455,
-            "y": 6220
+            "x": 5108,
+            "y": 1582
           }
-        ]
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -621,22 +643,23 @@
       "data": {
         "computedPath": [
           {
-            "x": 871,
-            "y": 5204
+            "x": 4317,
+            "y": 850
           },
           {
-            "x": 2882,
-            "y": 5204
+            "x": 4373,
+            "y": 850
           },
           {
-            "x": 2882,
-            "y": 5751
+            "x": 4373,
+            "y": 1480
           },
           {
-            "x": 3495,
-            "y": 5751
+            "x": 4637,
+            "y": 1480
           }
-        ]
+        ],
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -644,27 +667,28 @@
       "source": "order-input",
       "target": "allocation",
       "type": "stablePath",
-      "sourceHandle": "bottom",
-      "targetHandle": "top",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 682,
-            "y": 559
+            "x": 292,
+            "y": 1582
           },
           {
-            "x": 682,
-            "y": 1492
+            "x": 376,
+            "y": 1582
           },
           {
-            "x": 655,
-            "y": 1492
+            "x": 376,
+            "y": 1466
           },
           {
-            "x": 655,
-            "y": 1548
+            "x": 1080,
+            "y": 1466
           }
-        ]
+        ],
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -672,23 +696,29 @@
       "source": "order-input",
       "target": "order-exception",
       "type": "stablePath",
-      "sourceHandle": "bottom",
+      "sourceHandle": "right",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 682,
-            "y": 559
+            "x": 292,
+            "y": 1582
           },
           {
-            "x": 682,
-            "y": 897
+            "x": 567,
+            "y": 1582
           },
           {
-            "x": 2807,
-            "y": 897
+            "x": 567,
+            "y": 2048
+          },
+          {
+            "x": 623,
+            "y": 2048
           }
-        ]
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -701,18 +731,20 @@
       "data": {
         "computedPath": [
           {
-            "x": 682,
-            "y": 463
+            "x": 280,
+            "y": 1534
           },
           {
-            "x": 682,
-            "y": 125
+            "x": 280,
+            "y": 1116
           },
           {
-            "x": 2413,
-            "y": 125
+            "x": 613,
+            "y": 1116
           }
-        ]
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -725,12 +757,12 @@
       "data": {
         "computedPath": [
           {
-            "x": 812,
-            "y": 511
+            "x": 292,
+            "y": 1582
           },
           {
-            "x": 2615,
-            "y": 511
+            "x": 622.5,
+            "y": 1582
           }
         ]
       }
@@ -740,23 +772,29 @@
       "source": "order-input",
       "target": "order-split-merge",
       "type": "stablePath",
-      "sourceHandle": "bottom",
+      "sourceHandle": "right",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 682,
-            "y": 559
+            "x": 292,
+            "y": 1582
           },
           {
-            "x": 682,
-            "y": 704
+            "x": 574.5,
+            "y": 1582
           },
           {
-            "x": 2731,
-            "y": 704
+            "x": 574.5,
+            "y": 1815
+          },
+          {
+            "x": 643,
+            "y": 1815
           }
-        ]
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -764,23 +802,28 @@
       "source": "order-input",
       "target": "order-validate",
       "type": "stablePath",
-      "sourceHandle": "top",
+      "sourceHandle": "right",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 682,
-            "y": 463
+            "x": 292,
+            "y": 1582
           },
           {
-            "x": 682,
-            "y": 318
+            "x": 364,
+            "y": 1582
           },
           {
-            "x": 2508,
-            "y": 318
+            "x": 364,
+            "y": 1349
+          },
+          {
+            "x": 612,
+            "y": 1349
           }
-        ]
+        ],
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -793,20 +836,20 @@
       "data": {
         "computedPath": [
           {
-            "x": 644,
-            "y": 6443
+            "x": 5288,
+            "y": 1809
           },
           {
-            "x": 782,
-            "y": 6443
+            "x": 5538,
+            "y": 1809
           },
           {
-            "x": 782,
-            "y": 6257
+            "x": 5538,
+            "y": 1582
           },
           {
-            "x": 838,
-            "y": 6257
+            "x": 5610,
+            "y": 1582
           }
         ]
       }
@@ -817,20 +860,24 @@
       "target": "labor-kpi",
       "type": "stablePath",
       "sourceHandle": "right",
-      "targetHandle": "top",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 426,
-            "y": 6064
+            "x": 5262,
+            "y": 1349
           },
           {
-            "x": 946,
-            "y": 6064
+            "x": 5538,
+            "y": 1349
           },
           {
-            "x": 946,
-            "y": 6209
+            "x": 5538,
+            "y": 1582
+          },
+          {
+            "x": 5610,
+            "y": 1582
           }
         ]
       }
@@ -845,18 +892,20 @@
       "data": {
         "computedPath": [
           {
-            "x": 656,
-            "y": 2915
+            "x": 2275,
+            "y": 1294
           },
           {
-            "x": 656,
-            "y": 3247
+            "x": 2275,
+            "y": 1706
           },
           {
-            "x": 1304,
-            "y": 3247
+            "x": 2595,
+            "y": 1706
           }
-        ]
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -864,23 +913,29 @@
       "source": "task-generate",
       "target": "pick-task-gen",
       "type": "stablePath",
-      "sourceHandle": "top",
+      "sourceHandle": "right",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 656,
-            "y": 2819
+            "x": 2275,
+            "y": 1246
           },
           {
-            "x": 656,
-            "y": 2488
+            "x": 2543,
+            "y": 1246
           },
           {
-            "x": 925,
-            "y": 2488
+            "x": 2543,
+            "y": 787
+          },
+          {
+            "x": 2599,
+            "y": 787
           }
-        ]
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -888,23 +943,28 @@
       "source": "task-generate",
       "target": "qc-task-gen",
       "type": "stablePath",
-      "sourceHandle": "bottom",
+      "sourceHandle": "right",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 656,
-            "y": 2915
+            "x": 2275,
+            "y": 1246
           },
           {
-            "x": 656,
-            "y": 3054
+            "x": 2347,
+            "y": 1246
           },
           {
-            "x": 1232,
-            "y": 3054
+            "x": 2347,
+            "y": 1473
+          },
+          {
+            "x": 2619,
+            "y": 1473
           }
-        ]
+        ],
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -912,23 +972,29 @@
       "source": "task-generate",
       "target": "replenish-task-gen",
       "type": "stablePath",
-      "sourceHandle": "top",
+      "sourceHandle": "right",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 656,
-            "y": 2819
+            "x": 2275,
+            "y": 1246
           },
           {
-            "x": 656,
-            "y": 2681
+            "x": 2551,
+            "y": 1246
           },
           {
-            "x": 1032,
-            "y": 2681
+            "x": 2551,
+            "y": 1020
+          },
+          {
+            "x": 2611,
+            "y": 1020
           }
-        ]
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -941,12 +1007,12 @@
       "data": {
         "computedPath": [
           {
-            "x": 760,
-            "y": 2867
+            "x": 2275,
+            "y": 1246
           },
           {
-            "x": 1119,
-            "y": 2867
+            "x": 2601,
+            "y": 1246
           }
         ]
       }
@@ -956,19 +1022,36 @@
       "source": "task-generate",
       "target": "task-group",
       "type": "stablePath",
-      "sourceHandle": "bottom",
-      "targetHandle": "top",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 655,
-            "y": 2915
+            "x": 2275,
+            "y": 1246
           },
           {
-            "x": 655,
-            "y": 3898
+            "x": 2347,
+            "y": 1246
+          },
+          {
+            "x": 2347,
+            "y": 1324
+          },
+          {
+            "x": 2917,
+            "y": 1324
+          },
+          {
+            "x": 2917,
+            "y": 1253
+          },
+          {
+            "x": 3029,
+            "y": 1253
           }
-        ]
+        ],
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -981,12 +1064,12 @@
       "data": {
         "computedPath": [
           {
-            "x": 758,
-            "y": 3946
+            "x": 3235,
+            "y": 1229
           },
           {
-            "x": 1566,
-            "y": 3946
+            "x": 3563.15,
+            "y": 1229
           }
         ]
       }
@@ -1001,18 +1084,19 @@
       "data": {
         "computedPath": [
           {
-            "x": 655,
-            "y": 3994
+            "x": 3235,
+            "y": 1301
           },
           {
-            "x": 655,
-            "y": 4319
+            "x": 3235,
+            "y": 1706
           },
           {
-            "x": 1781,
-            "y": 4319
+            "x": 3586,
+            "y": 1706
           }
-        ]
+        ],
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -1020,27 +1104,37 @@
       "source": "task-group",
       "target": "operation",
       "type": "stablePath",
-      "sourceHandle": "bottom",
-      "targetHandle": "top",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 655,
-            "y": 3994
+            "x": 3235,
+            "y": 1253
           },
           {
-            "x": 655,
-            "y": 5112
+            "x": 3515.1499999999996,
+            "y": 1253
           },
           {
-            "x": 712,
-            "y": 5112
+            "x": 3515.1499999999996,
+            "y": 871
           },
           {
-            "x": 712,
-            "y": 5168
+            "x": 3885,
+            "y": 871
+          },
+          {
+            "x": 3885,
+            "y": 813
+          },
+          {
+            "x": 3998,
+            "y": 813
           }
-        ]
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -1048,23 +1142,29 @@
       "source": "task-group",
       "target": "priority-sequence",
       "type": "stablePath",
-      "sourceHandle": "bottom",
+      "sourceHandle": "right",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 655,
-            "y": 3994
+            "x": 3235,
+            "y": 1253
           },
           {
-            "x": 655,
-            "y": 4132
+            "x": 3307,
+            "y": 1253
           },
           {
-            "x": 1656,
-            "y": 4132
+            "x": 3307,
+            "y": 1479
+          },
+          {
+            "x": 3557,
+            "y": 1479
           }
-        ]
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -1072,27 +1172,24 @@
       "source": "task-group",
       "target": "wave-build",
       "type": "stablePath",
-      "sourceHandle": "right",
+      "sourceHandle": "top",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 758,
-            "y": 3946
+            "x": 3235,
+            "y": 1205
           },
           {
-            "x": 1310,
-            "y": 3946
+            "x": 3235,
+            "y": 787
           },
           {
-            "x": 1310,
-            "y": 3560
-          },
-          {
-            "x": 1366,
-            "y": 3560
+            "x": 3555,
+            "y": 787
           }
-        ]
+        ],
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -1105,22 +1202,23 @@
       "data": {
         "computedPath": [
           {
-            "x": 758,
-            "y": 3946
+            "x": 3235,
+            "y": 1253
           },
           {
-            "x": 1310,
-            "y": 3946
+            "x": 3339,
+            "y": 1253
           },
           {
-            "x": 1310,
-            "y": 3753
+            "x": 3339,
+            "y": 1020
           },
           {
-            "x": 1472,
-            "y": 3753
+            "x": 3565,
+            "y": 1020
           }
-        ]
+        ],
+        "sharedTrunkSynthesized": true
       }
     },
     {
@@ -1133,12 +1231,12 @@
       "data": {
         "computedPath": [
           {
-            "x": 542,
-            "y": 6257
+            "x": 5282,
+            "y": 1582
           },
           {
-            "x": 838,
-            "y": 6257
+            "x": 5609.849999999999,
+            "y": 1582
           }
         ]
       }

@@ -10,6 +10,25 @@ import { computeBaseReactFlowDisplayEdgeEpoch } from '../baseReactFlowDisplayEdg
 import type { BaseDisplayBoundedCandidateReport } from '../baseReactFlowDisplayEvaluation';
 import { createBaseReactFlowFinalEndpointEvaluation } from '../baseReactFlowDisplayFinalEndpointEvaluation';
 import { baseNodes } from './baseReactFlowDisplayEdges.testUtils';
+import rejectedLayoutSeed from './fixtures/rejectedLayoutSeed.json';
+import { computeBaseReactFlowDisplayEdgesWorkerResponse } from '../baseReactFlowDisplayEdges.worker';
+import { computeBaseReactFlowDisplayInputIdentityBundle } from '../baseReactFlowDisplayInputIdentity';
+import { createDisplayRoutingIdentity } from '../baseReactFlowDisplayRoutingSession';
+
+it('fully reroutes a rejected automatic layout seed instead of retaining its locked paths', () => {
+  const fixture = structuredClone(rejectedLayoutSeed);
+  // The producer now explicitly identifies its generated full-layout proposals.
+  const edges: Edge[] = fixture.edges.map(edge => ({ ...edge, data: { ...edge.data, algorithm: 'domain-dagre-full' } }));
+  const input = { ...fixture, edges, enableSmartEdges: true, smartEdgePadding: 20, isLargeGraph: false };
+  const identity = computeBaseReactFlowDisplayInputIdentityBundle(input);
+  const result = computeBaseReactFlowDisplayEdgesWorkerResponse({ ...input,
+    requestId: 'rejected-layout-seed', operation: 'route', displayEdgeEpoch: 0, qualityMode: 'full',
+    inputIdentity: createDisplayRoutingIdentity(identity.cacheSignature, identity.geometryDigest),
+  });
+  expect(result.hardReport).toMatchObject({ hardClean: true, commercialClearanceViolations: 0,
+    quality: { hairpins: 0, strictCrossings: 0, unrelatedOverlap: 0 } });
+  expect(result.edges).toHaveLength(input.edges.length);
+}, 15_000);
 
 const hardCleanReport: BaseDisplayBoundedCandidateReport = {
   candidate: 'polished',

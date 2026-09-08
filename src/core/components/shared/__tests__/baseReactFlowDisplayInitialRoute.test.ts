@@ -125,6 +125,45 @@ describe('initial obstacle-aware display routing', () => {
     expect(seedObstacleAwareDisplayRoutes(safe, nodes.slice(0, 2))).toBe(safe);
   });
 
+  it('reconstructs only unsafe full-layout proposals while preserving authored geometry and fixed ports', () => {
+    const blocker = node('blocker', 240, 0);
+    const nodes = [node('source', 0, 0), node('target', 600, 0), blocker];
+    const proposal: Edge = {
+      ...edge, sourceHandle: 'right', targetHandle: 'left',
+      data: { algorithm: 'domain-dagre-full', layoutPathLocked: true,
+        runtimeHandleLock: { source: true, target: true },
+        computedPath: [{ x: 100, y: 30 }, { x: 600, y: 30 }] },
+    };
+    const input = [proposal];
+    const original = structuredClone(input);
+    const [routed] = seedObstacleAwareDisplayRoutes(input, nodes);
+    expectClearance(routed, blocker);
+    expect(input).toEqual(original);
+    expect(createDisplayTerminalValidationSnapshot(nodes).validateEdge(routed))
+      .toMatchObject({ attached: true, anchored: true });
+    const safe = [proposal];
+    expect(seedObstacleAwareDisplayRoutes(safe, nodes.slice(0, 2))).toBe(safe);
+    for (const waypoints of [[{ x: 200, y: 30 }], null, 'invalid']) {
+      const authored = [{ ...proposal, data: { ...proposal.data, waypoints } }];
+      expect(seedObstacleAwareDisplayRoutes(authored, nodes)).toBe(authored);
+    }
+    for (const data of [
+      { ...proposal.data, manualHandles: true },
+      { ...proposal.data, algorithm: undefined },
+      { ...proposal.data, algorithm: 'elk' },
+      { ...proposal.data, computedPath: Array.from({ length: 129 }, () => ({ x: 100, y: 30 })) },
+    ]) {
+      const preserved = [{ ...proposal, data }];
+      expect(seedObstacleAwareDisplayRoutes(preserved, nodes)).toBe(preserved);
+    }
+    const [emptyWaypoints] = seedObstacleAwareDisplayRoutes([
+      { ...proposal, data: { ...proposal.data, waypoints: [] } },
+    ], nodes);
+    expectClearance(emptyWaypoints, blocker);
+    const cleanPeer = { ...routed, id: 'clean-peer', data: { ...routed.data, algorithm: 'domain-dagre-full' } };
+    expect(seedObstacleAwareDisplayRoutes([proposal, cleanPeer], nodes)[1]).toBe(cleanPeer);
+  });
+
   it('defers incomplete, invalid, extreme and over-budget geometry to the measured routing pipeline', () => {
     const input = [edge];
     const valid = [node('source', 0, 0), node('target', 0, 300)];

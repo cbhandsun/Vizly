@@ -9,6 +9,7 @@ import { MIN_RENDER_SAFE_ENDPOINT_STUB } from './baseReactFlowDisplayEndpointStu
 import { anchorForHandle, compactOrthogonalPath, type NodeRect } from './baseReactFlowDisplayEdgeGeometry';
 import { fastDisplayHardSafetyIsClean } from './baseReactFlowFastEdgeSafety';
 import { getInteractiveGlobalCandidateEdgeBudget } from './baseReactFlowDisplayBoundedSeedPolicy';
+import { scoreNodeClearanceRisk } from '../../strategies/shared/edgeWaypointCandidateRepair';
 
 const SIDES: readonly SharedNodePortSide[] = ['bottom', 'top', 'right', 'left'];
 const MAX_SEED_NODES = 96;
@@ -97,8 +98,19 @@ export const seedObstacleAwareDisplayRoutes = (edges: Edge[], inputNodes: Node[]
   const yLanes = [...new Set([...obstacles.values()].flatMap(r => [r.y - COMMERCIAL_BUSINESS_NODE_CLEARANCE, r.y + r.height + COMMERCIAL_BUSINESS_NODE_CLEARANCE]))];
   let changed = false;
   const seeded = edges.map(edge => {
-    if (getDisplayComputedPath(edge).length >= 2 && (
-      !rebuildRuntimePaths
+    const path = getDisplayComputedPath(edge);
+    const waypoints = edge.data?.waypoints;
+    const preservesAuthoredPath = waypoints !== undefined
+      && (!Array.isArray(waypoints) || waypoints.length > 0);
+    // Full Dagre paths are generated proposals, not accepted display geometry.
+    // Reconstruct only a proposal that violates the display clearance contract;
+    // unknown provenance and authored waypoints retain their existing ownership.
+    const rebuildFullLayoutPath = edge.data?.algorithm === 'domain-dagre-full'
+      && path.length >= 2 && path.length <= 128 && !preservesAuthoredPath
+      && scoreNodeClearanceRisk(path, nodes, edge, COMMERCIAL_BUSINESS_NODE_CLEARANCE) > 0.5;
+    if (preservesAuthoredPath) return edge;
+    if (path.length >= 2 && (
+      (!rebuildRuntimePaths && !rebuildFullLayoutPath)
       || readEdgeTerminalPolicy(edge, 'source').sourceExactFixed
       || readEdgeTerminalPolicy(edge, 'target').sourceExactFixed
     )) return edge;

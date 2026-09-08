@@ -402,7 +402,10 @@ export async function prepareDomainDagreFullEdges({
         obstacleCrossingSafeCandidate,
         clearanceObstacleCrossingSafeCandidate,
     );
-    return finalRoutedEdges;
+    return finalRoutedEdges.map(edge => ({
+        ...edge,
+        data: { ...edge.data, algorithm: 'domain-dagre-full' },
+    }));
 }
 
 /**
@@ -679,5 +682,7 @@ export function applyDomainDagreEdgeRouting(
         nodes,
         24,
     )
-        .forEach((edge, index) => { edges[index] = edge; });
+        .forEach((edge, index) => {
+            edges[index] = { ...edge, data: { ...edge.data, algorithm: 'domain-dagre-full' } };
+        });
 }

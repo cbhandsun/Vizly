@@ -458,6 +458,7 @@ describe('DomainDagreLayoutStrategy', () => {
         expect(visibleNodesParentedToHiddenGroups).toEqual([]);
         expect(new Set(visibleSubGroups.map(node => String(node.data.subDomain || '')))).toEqual(expectedSubDomains);
         expect(canvas.edges).toHaveLength(systemsFixture.edges.length);
+        expect(canvas.edges.every(edge => edge.data?.algorithm === 'domain-dagre-full')).toBe(true);
     }, 15_000);
 
     it('keeps large standard conversions layout-compatible in interactive edge-routing mode', async () => {
