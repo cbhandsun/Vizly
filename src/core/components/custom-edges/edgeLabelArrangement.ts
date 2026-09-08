@@ -127,11 +127,35 @@ const candidatesFor = (input: EdgeLabelArrangementInput, obstacleBoundaries = fa
   return [...new Map(candidates.filter(validPoint).map(p => [`${p.x},${p.y}`, p])).values()];
 };
 
+// Readability scaling can make labels wider than the fixed retreat range.
+// Try the actual content boundaries only after the cheaper search is exhausted.
+const contentBoundaryCandidates = (input: EdgeLabelArrangementInput, content: readonly Rect[]): Point[] => {
+  const rect = estimateEdgeLabelRect(input.anchor, input.text, input.scale, input.size);
+  const reach = Math.max(320, rect.width, rect.height);
+  const nearby = content.map(obstacle => ({ obstacle, center: {
+    x: obstacle.x + obstacle.width / 2, y: obstacle.y + obstacle.height / 2,
+  } })).sort((a, b) => distance(a.center, input.anchor) - distance(b.center, input.anchor)).slice(0, 16);
+  const alongX = new Set([input.preferredCenter.x]);
+  const alongY = new Set([input.preferredCenter.y]);
+  for (const { obstacle } of nearby) {
+    alongX.add(obstacle.x - rect.width / 2 - 10);
+    alongX.add(obstacle.x + obstacle.width + rect.width / 2 + 10);
+    alongY.add(obstacle.y - rect.height / 2 - 10);
+    alongY.add(obstacle.y + obstacle.height + rect.height / 2 + 10);
+  }
+  // At most 33 × 33 centers, including free intervals between two blockers.
+  const candidates = [...alongX].flatMap(x => [...alongY].map(y => ({ x, y })))
+    .filter(point => validPoint(point) && distance(point, nearestAnchor(point, input.labelPath)) <= reach);
+  return [...new Map(candidates.map(point => [`${point.x},${point.y}`, point])).values()];
+};
+
 /** Bounded deterministic greedy packing. It never modifies routes or hides text.
  * Fixed manual labels reserve space first; automatic labels use up to eight nearby
  * semantic segments and a 320px retreat. If fixed anchors fail, each segment
  * also tries eight nearby obstacle-boundary centers within a 320px along-axis
- * retreat. Their leaders stay on the semantic path. Exhaustion is unresolved,
+ * retreat. If content is still covered, a final search combines boundaries of
+ * sixteen nearby content rectangles, within one label dimension (minimum 320).
+ * Their leaders stay on the semantic path. Exhaustion is unresolved,
  * not a claim that an arbitrary dense graph is collision-free. */
 export const arrangeEdgeLabels = (inputs: readonly EdgeLabelArrangementInput[]): ReadonlyMap<string, EdgeLabelPlacement> => {
   const valid = inputs.filter(input => input.id && validPoint(input.anchor) && validPoint(input.preferredCenter)
@@ -162,9 +186,13 @@ export const arrangeEdgeLabels = (inputs: readonly EdgeLabelArrangementInput[]):
     let bestContentConflicts = Infinity;
     // Search obstacle-adjacent intervals only when the cheaper fixed anchors
     // cannot place this label. Keep the same collision checks and manual intent.
-    for (const obstacleBoundaries of [false, true]) {
-      if (obstacleBoundaries && (searchInput.manual || best?.conflicts === 0)) break;
-      for (const center of candidatesFor(searchInput, obstacleBoundaries)) {
+    for (const pass of [0, 1, 2]) {
+      if (pass > 0 && (searchInput.manual || best?.conflicts === 0)) break;
+      if (pass === 2 && bestContentConflicts === 0) break;
+      const candidates = pass === 2
+        ? contentBoundaryCandidates(searchInput, [...nodes, ...occupied.map(other => other.rect)])
+        : candidatesFor(searchInput, pass === 1);
+      for (const center of candidates) {
         const rect = estimateEdgeLabelRect(center, input.text, input.scale, input.size);
         const nodeConflicts = nodes.filter(node => edgeLabelRectsConflict(rect, node, 10)).length;
         const labelConflicts = occupied.filter(other => edgeLabelRectsConflict(rect, other.rect)).length;

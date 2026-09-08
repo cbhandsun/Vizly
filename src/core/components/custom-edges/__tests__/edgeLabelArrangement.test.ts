@@ -1,5 +1,6 @@
 import shortBranchInputs from './shortBranchLabelArrangement.json';
 import overviewInputs from './overviewLabelArrangement.json';
+import smallViewportInputs from './smallViewportLabelArrangement.json';
 import { describe, expect, it } from 'vitest';
 import { arrangeEdgeLabels, edgeLabelRectsConflict, edgeLabelSegmentIntersectsRect,
   type EdgeLabelArrangementInput } from '../edgeLabelArrangement';
@@ -11,6 +12,25 @@ const input = (id: string, y = 0): EdgeLabelArrangementInput => ({
 });
 
 describe('global edge label arrangement regression', () => {
+  it.each([false, true])('clears content when readability scaling exhausts fixed retreat candidates (transpose=%s)', transpose => {
+    const point = (p: { x: number; y: number }) => transpose ? { x: p.y, y: p.x } : p;
+    const obstacles = smallViewportInputs.obstacles.map(rect => transpose
+      ? { x: rect.y, y: rect.x, width: rect.height, height: rect.width } : rect);
+    const entries = smallViewportInputs.labels.map(label => ({ ...label, obstacles,
+      path: label.path.map(point), labelPath: label.labelPath.map(point),
+      anchor: point(label.anchor), preferredCenter: point(label.preferredCenter),
+      size: transpose ? { width: label.size.height, height: label.size.width } : label.size,
+    }));
+    const before = structuredClone(entries);
+    const result = arrangeEdgeLabels(entries);
+    expect(result.size).toBe(entries.length);
+    for (const [id, placement] of result) {
+      expect(entries[0].obstacles.some(node => edgeLabelRectsConflict(placement.rect, node, 0)), id).toBe(false);
+      expect([...result].filter(([otherId, other]) => otherId !== id && edgeLabelRectsConflict(placement.rect, other.rect, 0)).map(([otherId]) => otherId), id).toEqual([]);
+    }
+    expect(entries).toEqual(before);
+    expect(arrangeEdgeLabels([...entries].reverse())).toEqual(result);
+  });
   it('keeps established placements when pruning candidates with worse content conflicts', () => {
     const entries = overviewInputs.labels.map(label => ({ ...label, obstacles: overviewInputs.obstacles }));
     const result = arrangeEdgeLabels(entries);
