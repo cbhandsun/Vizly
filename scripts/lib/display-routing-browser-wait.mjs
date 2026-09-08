@@ -7,17 +7,21 @@ export const waitForDisplayRoutingBrowserValue = async (
   session,
   expression,
   timeoutMs = DEFAULT_WAIT_TIMEOUT_MS,
-  { stopOnQualityRejection = false } = {},
+  { stopOnQualityRejection = false, diagnosticsExpression = displayRoutingBrowserLifecycleExpression } = {},
 ) => {
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 0 || timeoutMs > 600_000) {
     throw new Error('Invalid browser wait timeout');
   }
   if (typeof expression !== 'string' || expression.length === 0 || expression.length > 1_000_000
-    || typeof stopOnQualityRejection !== 'boolean') throw new Error('Invalid browser wait options');
+    || typeof stopOnQualityRejection !== 'boolean'
+    || typeof diagnosticsExpression !== 'string' || diagnosticsExpression.length === 0
+    || diagnosticsExpression.length > 1_000_000) throw new Error('Invalid browser wait options');
+  // A custom expression must be a trusted, content-safe projector, never graph
+  // input. Keep its last result on the host under the same deadline contract.
   // Read evidence alongside an unsuccessful predicate, in the same renderer
   // task. Keep the last safe snapshot on the host if the renderer later hangs.
   const pollExpression = `(async () => {
-    const evidence = () => ${displayRoutingBrowserLifecycleExpression};
+    const evidence = () => ${diagnosticsExpression};
     try {
       const value = await (${expression});
       return { state: value ? 'ready' : 'waiting', value,
@@ -71,7 +75,7 @@ export const waitForDisplayRoutingBrowserValue = async (
     await delay(Math.min(100, Math.max(0, deadline - Date.now())));
   }
   const evidence = await evaluateWithin(
-    displayRoutingBrowserLifecycleExpression, 1_000,
+    diagnosticsExpression, 1_000,
   );
   const diagnostics = evidence.status === 'available' ? evidence.value : null;
   throw new Error(

@@ -19,6 +19,33 @@ import {
 } from './display-routing-layout-visual-settle.mjs';
 
 describe('display routing browser wait', () => {
+  it.each([null, 7, '', 'x'.repeat(1_000_001)])('rejects invalid custom evidence expression', async value => {
+    const session = { evaluate: vi.fn() };
+    await expect(waitForDisplayRoutingBrowserValue(session, 'false', 100,
+      { diagnosticsExpression: value })).rejects.toThrow('Invalid browser wait options');
+    expect(session.evaluate).not.toHaveBeenCalled();
+  });
+
+  it('retains custom safe evidence when subsequent evaluation and evidence collection hang', async () => {
+    vi.useFakeTimers();
+    try {
+      const session = { evaluate: vi.fn()
+        .mockImplementationOnce(source => vm.runInNewContext(source, {}))
+        .mockImplementation(() => new Promise(() => {})) };
+      const pending = waitForDisplayRoutingBrowserValue(session, 'false', 200,
+        { diagnosticsExpression: '({ visibility: { available: true, edges: [{ index: 0, rendered: false }] } })' })
+        .catch(error => error);
+      await vi.advanceTimersByTimeAsync(1_200);
+      const failure = await pending;
+      const diagnostics = JSON.parse(failure.message.split('\n').slice(1).join('\n'));
+      expect(diagnostics).toMatchObject({ waitStatus: 'evaluation-timeout', evidenceStatus: 'evaluation-timeout',
+        diagnostics: null, lastObservedDiagnostics: { visibility: { available: true, edges: [{ index: 0, rendered: false }] } } });
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it.each([null, '10', -1, NaN, Infinity, 600_001])('rejects invalid timeout %s', async value => {
     const session = { evaluate: vi.fn() };
     await expect(waitForDisplayRoutingBrowserValue(session, 'ready', value)).rejects.toThrow(/Invalid/);
