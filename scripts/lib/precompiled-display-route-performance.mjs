@@ -263,6 +263,9 @@ export const summarizePrecompiledDisplayRoutePerformance = (
         routeOverheadMs: item.routeOverheadMs, workerTimings: item.workerTimings,
         workerExecution: projectPrecompiledWorkerExecution(item.workerExecution),
         mainThreadLongTasks: item.mainThreadLongTasks,
+        slowestPhases: projectPhaseTrace(item.phaseTrace)
+          .sort((left, right) => right.exclusiveDurationMs - left.exclusiveDurationMs)
+          .slice(0, 8),
       })).sort((left, right) => right.routeMs - left.routeMs).slice(0, 5),
       tracedCompute: summarizeDisplayRoutingSamples(cases.map(item => item.tracedExclusiveMs)),
       untracedCompute: summarizeDisplayRoutingSamples(cases.map(item => item.workerUntracedMs)),

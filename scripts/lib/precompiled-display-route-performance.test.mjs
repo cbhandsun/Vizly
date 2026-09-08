@@ -109,6 +109,27 @@ const sample = (logisticsMs = 700) => buildPrecompiledDisplayRoutePerformanceRes
 ]);
 
 describe('precompiled display route cold performance', () => {
+  it('correlates bounded exclusive phase costs with the actual slow sample', () => {
+    const phaseTrace = Array.from({ length: 12 }, (_, index) => ({
+      phase: `phase-${index}`, parentPhase: null, durationMs: index + 1,
+      exclusiveDurationMs: index + 1, resolution: 'fallback', changedEdgeCount: 0,
+      evaluationCount: index, candidateCount: 1, workItemCount: 2, privatePayload: 'secret',
+    }));
+    const slow = buildPrecompiledDisplayRoutePerformanceResult([
+      capture('logistics-architecture-v1', 1000, { phaseTrace }),
+    ]);
+    const fast = buildPrecompiledDisplayRoutePerformanceResult([
+      capture('logistics-architecture-v1', 700),
+    ]);
+    const summary = summarizePrecompiledDisplayRoutePerformance([fast, slow], 2, ['logistics-architecture-v1']);
+    const entry = summary.presets['logistics-architecture-v1'].slowestSamples[0];
+    expect(entry.sampleIndex).toBe(2);
+    expect(entry.slowestPhases).toHaveLength(8);
+    expect(entry.slowestPhases.map(phase => phase.exclusiveDurationMs)).toEqual([12, 11, 10, 9, 8, 7, 6, 5]);
+    expect(entry.slowestPhases[0]).toMatchObject({ phase: 'phase-11', evaluationCount: 11, resolution: 'fallback' });
+    expect(JSON.stringify(entry)).not.toContain('secret');
+    expect(slow.presets[0].phaseTrace[0].phase).toBe('phase-0');
+  });
   it('preserves execution evidence through machine parsing and summary without treating missing samples as zero', () => {
     const workerExecution = { status: 'available', handlerReadyAfterPostMs: 20,
       postReadyDispatchMs: 10, executionMs: 50, responseDeliveryMs: 20, readyAt: 'private' };
