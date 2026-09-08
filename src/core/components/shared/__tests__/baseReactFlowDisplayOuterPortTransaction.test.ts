@@ -16,6 +16,8 @@ import {
   buildOuterTerminalCorridorPaths,
 } from '../baseReactFlowDisplayOuterCorridorCandidates';
 import { getDisplayComputedPath } from '../baseReactFlowDisplayGeometry';
+import compactFanFeedbackResidual from './fixtures/compactFanFeedbackResidual.json';
+import { buildDirtySharedTrunkCandidate } from '../baseReactFlowDisplayDirtyTrunkCandidate';
 
 const node = (id: string, x: number, y: number): Node => ({
   id,
@@ -115,6 +117,65 @@ const crossingOnlyEdges = (): Edge[] => [
 ];
 
 describe('outer port transaction', () => {
+  it.each([false, true].flatMap(cached => [false, true].map(transposed => ({ cached, transposed }))))(
+    'repairs feedback ports and dirty trunks atomically (cached $cached, transposed $transposed)', ({ cached, transposed }) => {
+    const swap = (point: { x: number; y: number }) => ({ x: point.y, y: point.x });
+    const sides: Record<string, string> = { right: 'bottom', bottom: 'right', top: 'left', left: 'top' };
+    const nodes: Node[] = structuredClone(compactFanFeedbackResidual.nodes).map(n => transposed ? {
+      ...n, position: swap(n.position), positionAbsolute: swap(n.positionAbsolute),
+      width: n.height, height: n.width, measured: { width: n.height, height: n.width }, style: { width: n.height, height: n.width },
+    } : n);
+    const edges: Edge[] = structuredClone(compactFanFeedbackResidual.edges).map(e => transposed ? {
+      ...e, sourceHandle: sides[e.sourceHandle], targetHandle: sides[e.targetHandle],
+      data: { ...e.data, computedPath: e.data.computedPath.map(swap), waypoints: [] },
+    } : e);
+    const original = structuredClone({ nodes, edges });
+    const baseline = getDisplayHardQualityGateReport(edges, nodes, 'polished');
+    expect(baseline.quality.reverseOverlap).toBeGreaterThan(0);
+    expect(baseline.quality.unexplainedRelatedOverlap).toBeGreaterThan(0);
+    const evaluationBudget = { remaining: 64 };
+    const repaired = repairResidualOuterPortTransactionWithHardGate(edges, nodes, 64, {
+      evaluationBudget,
+      ...(cached ? { evaluation: createBaseReactFlowFinalEndpointEvaluation(nodes) } : {}),
+    });
+    expect(getDisplayHardQualityGateReport(repaired, nodes, 'polished')).toMatchObject({
+      hardClean: true, obstacleHits: 0, terminalsAttached: true, terminalsAnchored: true,
+      quality: { strictCrossings: 0, reverseOverlap: 0, unrelatedOverlap: 0, unexplainedRelatedOverlap: 0 },
+    });
+    expect(evaluationBudget.remaining).toBeGreaterThanOrEqual(0);
+    expect(evaluationBudget.remaining).toBeLessThan(64);
+    // Render-safe branches sharing a hub with the feedback still stay unchanged.
+    // The fixture's e42 has a 48px stub, so existing 56px normalization may move it.
+    for (const index of [37, 38, 40]) {
+      expect(countRenderUnsafeEndpointStubs([edges[index]])).toBe(0);
+      expect(repaired[index]).toEqual(edges[index]);
+    }
+    expect({ nodes, edges }).toEqual(original);
+  }, 30000);
+  it('keeps dirty-trunk synthesis bounded and leaves clean groups by reference', () => {
+    const clean = overlappingEdges().slice(0, 1);
+    expect(buildDirtySharedTrunkCandidate(clean, graphNodes)).toBe(clean);
+    expect(buildDirtySharedTrunkCandidate([], graphNodes)).toEqual([]);
+    const edges: Edge[] = structuredClone(compactFanFeedbackResidual.edges);
+    expect(buildDirtySharedTrunkCandidate(edges, [])).toBe(edges);
+    const large = Array.from({length:257}, (_, index)=>({...edges[0],id:`edge-${index}`}));
+    expect(buildDirtySharedTrunkCandidate(large, graphNodes)).toBe(large);
+    const nodes = Array.from({length:257}, (_, index)=>node(`node-${index}`,index*200,0));
+    expect(buildDirtySharedTrunkCandidate(edges, nodes)).toBe(edges);
+  });
+  it('retains authored feedback terminals when the joint repair has no legal solution', () => {
+    const nodes: Node[] = structuredClone(compactFanFeedbackResidual.nodes);
+    const edges: Edge[] = structuredClone(compactFanFeedbackResidual.edges).map(edge => ({
+      ...edge, data: { ...edge.data, manualHandlePositions: ['source', 'target'] },
+    }));
+    const original = structuredClone(edges);
+    const budget = { remaining: 64 };
+    expect(repairResidualOuterPortTransactionWithHardGate(edges, nodes, 64, {
+      evaluationBudget: budget, evaluation: createBaseReactFlowFinalEndpointEvaluation(nodes),
+    })).toBe(edges);
+    expect(edges).toEqual(original);
+    expect(budget.remaining).toBeGreaterThanOrEqual(0);
+  });
   afterEach(() => {
     vi.restoreAllMocks();
   });

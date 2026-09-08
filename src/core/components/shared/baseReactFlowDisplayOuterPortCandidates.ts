@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 import { createDisplayStrictCrossingCounter } from './baseReactFlowDisplayStrictCrossingCounter';
+import { findDetachedParallelOverlaps, segmentsRunOppositeDirections } from '../../strategies/shared/edgeDetachedOverlapGeometry';
 
 import { normalizeHandle } from '../../routing/utils/handleUtils';
 import { MIN_EDGE_PATH_PENALIZED_OVERLAP } from '../../strategies/shared/edgeStrictCrossingGuard';
@@ -11,6 +12,7 @@ import {
   candidateStrictCrossingsForEdge,
   displayEdgesRelated,
   displaySegmentsForPath,
+  displaySegmentOverlap,
   extractDisplaySegments,
   findDisplayStrictCrossingHits,
   fullDisplayPortSide,
@@ -56,6 +58,7 @@ type PortCandidate = {
   targetSide: OuterPortSide;
   path: DisplayPoint[];
   length: number;
+  reverseOverlap: number;
   profileRank: number;
   sourceStub: number;
   targetStub: number;
@@ -77,6 +80,18 @@ const pathLength = (path: DisplayPoint[]): number => path.reduce((total, point, 
       + Math.abs(point.x - path[index - 1].x)
       + Math.abs(point.y - path[index - 1].y)
 ), 0);
+
+const reverseOverlapForPath = (edgeIndex: number, path: DisplayPoint[], segments: ReturnType<typeof extractDisplaySegments>): number => {
+  let overlap = 0;
+  for (const first of displaySegmentsForPath(path, edgeIndex)) {
+    for (const second of segments) {
+      if (first.edgeIndex !== second.edgeIndex && first.direction !== second.direction) {
+        overlap += displaySegmentOverlap(first, second);
+      }
+    }
+  }
+  return overlap;
+};
 
 export const outerPortCandidateQuickScore = (
   seedQuickScore: number,
@@ -131,6 +146,27 @@ const findPrimaryResidualPair = (
         || (best && best.overlapLength >= overlapLength)
       ) continue;
       best = { firstIndex, secondIndex, overlapLength };
+    }
+  }
+  if (best) return best;
+  const reverseHits = findDetachedParallelOverlaps(edges.map(getDisplayComputedPath), edges, MIN_EDGE_PATH_PENALIZED_OVERLAP)
+    .filter(hit => segmentsRunOppositeDirections(hit.a, hit.b));
+  const weights = new Map<number, number>();
+  const sharedWeights = new Map<string, number>();
+  for (const hit of reverseHits) {
+    const first = hit.a.edgeIndex, second = hit.b.edgeIndex;
+    weights.set(first, (weights.get(first) ?? 0) + hit.overlap);
+    weights.set(second, (weights.get(second) ?? 0) + hit.overlap);
+    const key = `${Math.min(first, second)}:${Math.max(first, second)}`;
+    sharedWeights.set(key, (sharedWeights.get(key) ?? 0) + hit.overlap);
+  }
+  const indexes = [...weights.keys()].sort((a, b) => a - b);
+  for (let first = 0; first < indexes.length; first++) {
+    for (let second = first + 1; second < indexes.length; second++) {
+      const firstIndex = indexes[first], secondIndex = indexes[second];
+      const overlapLength = (weights.get(firstIndex) ?? 0) + (weights.get(secondIndex) ?? 0)
+        - (sharedWeights.get(`${firstIndex}:${secondIndex}`) ?? 0);
+      if (!best || overlapLength > best.overlapLength) best = { firstIndex, secondIndex, overlapLength };
     }
   }
   if (best) return best;
@@ -222,6 +258,7 @@ const buildPortCandidates = (
             targetSide,
             path: compactPath,
             length: pathLength(compactPath),
+            reverseOverlap: reverseOverlapForPath(edgeIndex, compactPath, externalSegments),
             profileRank: rankOffset + profileIndex,
             sourceStub: profile.sourceStub,
             targetStub: profile.targetStub,
@@ -242,7 +279,7 @@ const buildPortCandidates = (
         sideCandidates = buildProfileCandidates(stubPlan.fallback, stubPlan.preferred.length);
       }
       sideCandidates.sort((first, second) => (
-        first.profileRank - second.profileRank || first.length - second.length
+        first.reverseOverlap - second.reverseOverlap || first.profileRank - second.profileRank || first.length - second.length
       ));
       const seenPaths = new Set<string>();
       const topologyBuckets = new Map<string, PortCandidate[]>();
@@ -258,7 +295,7 @@ const buildPortCandidates = (
       const interleavedTopologies = interleaveOuterPortCandidateBuckets(
         Array.from(topologyBuckets.values()).map(bucket => (
           bucket.sort((first, second) => (
-            first.profileRank - second.profileRank || first.length - second.length
+            first.reverseOverlap - second.reverseOverlap || first.profileRank - second.profileRank || first.length - second.length
           ))
         )),
         maxCandidates,
@@ -339,7 +376,9 @@ export const buildBoundedOuterPortTransactionCandidates = <T extends Edge[]>(
         edges,
         secondSegments,
       );
-      const quickScore = pairStrict * 10_000_000 + overlap * 100_000 + first.length + second.length;
+      const reverseOverlap = first.reverseOverlap + second.reverseOverlap
+        + reverseOverlapForPath(pair.firstIndex, first.path, secondSegments);
+      const quickScore = pairStrict * 10_000_000 + (overlap + reverseOverlap) * 100_000 + first.length + second.length;
       return {
         firstIndex,
         secondIndex,
@@ -505,7 +544,8 @@ export const buildBoundedOuterPortTransactionCandidates = <T extends Edge[]>(
           // Preserve the seed's pair-level crossing/overlap rank. Sorting only
           // by the moved path length discarded that expensive signal and made
           // the hard gate evaluate many low-quality port pairs first.
-          quickScore: outerPortCandidateQuickScore(seed.quickScore, path),
+          quickScore: outerPortCandidateQuickScore(seed.quickScore, path)
+            + reverseOverlapForPath(movingEdgeIndex, path, otherSegments) * 100_000,
         });
       }
     }

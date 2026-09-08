@@ -23,13 +23,14 @@ const edges: Edge[] = [
 const membership = new Map([['start', 'sub-1'], ['left', 'sub-1'], ['end', 'sub-2']]);
 
 describe('semantic swimlane process geometry', () => {
-  it.each((['TB', 'BT', 'LR', 'RL'] as const).flatMap(direction => [4, 5, 9]
+  it.each((['TB', 'BT', 'LR', 'RL'] as const).flatMap(direction => [4, 5, 6, 9]
     .map(count => ({ direction, count }))))('reuses space without losing clearance for $count fan-out peers in $direction', ({ direction, count }) => {
     const horizontal = direction === 'LR' || direction === 'RL';
     const cross = horizontal ? 'y' : 'x', flow = horizontal ? 'x' : 'y';
     const children = Array.from({ length: count }, (_, index) => {
-      const size = count === 9 ? 80 + index * 20 : 80;
-      const dimensions = horizontal ? { width: size, height: 80 } : { width: 160, height: size };
+      // Descending mixed sizes must retain clearance after center alignment.
+      const size = count === 6 ? 140 - index * 12 : count === 9 ? 80 + index * 20 : 80;
+      const dimensions = horizontal ? { width: size, height: count === 6 ? 160 : 80 } : { width: 160, height: size };
       return { ...makeNode(`child-${index}`, 'a'), ...dimensions, measured: dimensions, style: dimensions,
         position: horizontal ? { x: 0, y: index * 300 } : { x: index * 300, y: 0 } };
     });

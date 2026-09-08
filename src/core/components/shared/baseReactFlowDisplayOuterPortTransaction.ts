@@ -10,6 +10,7 @@ import {
 } from './baseReactFlowDisplayEndpointStubRepair';
 import { repairSubpixelEndpointStubPrecision } from './baseReactFlowDisplayEndpointStubPrecision';
 import { buildBoundedOuterPortTransactionCandidates } from './baseReactFlowDisplayOuterPortCandidates';
+import { buildDirtySharedTrunkCandidate } from './baseReactFlowDisplayDirtyTrunkCandidate';
 import { getDisplayHardQualityGateReport } from './baseReactFlowDisplayQualityGates';
 import {
   diffBaseReactFlowEvaluationMetrics,
@@ -145,6 +146,7 @@ export const repairResidualOuterPortTransactionWithHardGate = <T extends Edge[]>
   let remainingEvaluations = evaluationLimit;
   let evaluatedCandidateCount = 0;
   let attemptedGroupTransaction = false;
+  let attemptedTrunkTransaction = false;
   const consumeEvaluation = (): boolean => {
     if (remainingEvaluations <= 0) return false;
     remainingEvaluations -= 1;
@@ -201,6 +203,18 @@ export const repairResidualOuterPortTransactionWithHardGate = <T extends Edge[]>
       changedEdgeIndexes,
     ) ?? getDisplayHardQualityGateReport(terminalBase, nodes, 'polished');
     if (report.hardClean) return finish('accepted', terminalBase);
+    if (!attemptedTrunkTransaction && report.quality.unexplainedRelatedOverlap > 0
+      && report.quality.reverseOverlap === 0 && report.quality.unrelatedOverlap === 0
+      && report.quality.strictCrossings === 0 && report.obstacleHits === 0 && report.terminalsAnchored) {
+      attemptedTrunkTransaction = true;
+      const trunkCandidate = buildDirtySharedTrunkCandidate(terminalBase, nodes);
+      if (trunkCandidate !== terminalBase
+        && routingGroupPreservesAuthoredTerminals(edges, trunkCandidate) && consumeEvaluation()) {
+        const trunkReport = options.evaluation?.hardReport(trunkCandidate)
+          ?? getDisplayHardQualityGateReport(trunkCandidate, nodes, 'polished');
+        if (trunkReport.hardClean) return finish('accepted', trunkCandidate);
+      }
+    }
     if (!attemptedGroupTransaction && remainingEvaluations > 2) {
       attemptedGroupTransaction = true;
       const primaryEdgeIndexes = getChangedBaseReactFlowDisplayRoutingIndexes(edges, candidate.edges);

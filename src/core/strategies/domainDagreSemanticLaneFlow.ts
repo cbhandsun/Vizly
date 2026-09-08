@@ -227,14 +227,20 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
         Math.max(0, flowSize(node) + COMMERCIAL_BUSINESS_NODE_CLEARANCE - flowGap) <= crossSize(node)
       ));
       let peerOffset = compactFan ? 64 : 0;
+      let previousFlowEnd: number | undefined;
       return domainPeers
         .toSorted((a, b) => center(replacements.get(a.id) ?? a) - center(replacements.get(b.id) ?? b))
         .map(node => {
           const current = replacements.get(node.id) ?? node;
+          if (reuseSpacing && previousFlowEnd !== undefined) {
+            peerOffset = Math.max(peerOffset, previousFlowEnd + COMMERCIAL_BUSINESS_NODE_CLEARANCE
+              - current.position[flow] - flowOffset);
+          }
           maximumPeerOffset = Math.max(maximumPeerOffset, peerOffset);
           const positioned = moveAlong(current, flow, current.position[flow] + flowOffset + peerOffset);
           // Start-to-start spacing smaller than a node plus clearance prevents
           // cross-axis reuse, turning a staggered branch into a wide staircase.
+          previousFlowEnd = positioned.position[flow] + flowSize(current);
           peerOffset += reuseSpacing ? Math.max(flowGap, flowSize(current) + COMMERCIAL_BUSINESS_NODE_CLEARANCE) : flowGap;
           return positioned;
         });

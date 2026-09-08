@@ -1,0 +1,2809 @@
+{
+  "nodes": [
+    {
+      "id": "n0",
+      "type": "titleGroup",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "positionAbsolute": {
+        "x": 0,
+        "y": 0
+      },
+      "width": 388,
+      "height": 2395,
+      "measured": {
+        "width": 388,
+        "height": 2395
+      },
+      "style": {
+        "width": 388,
+        "height": 2395
+      },
+      "data": {}
+    },
+    {
+      "id": "n1",
+      "type": "titleGroup",
+      "position": {
+        "x": 508,
+        "y": 0
+      },
+      "positionAbsolute": {
+        "x": 508,
+        "y": 0
+      },
+      "width": 334,
+      "height": 2395,
+      "measured": {
+        "width": 334,
+        "height": 2395
+      },
+      "style": {
+        "width": 334,
+        "height": 2395
+      },
+      "data": {}
+    },
+    {
+      "id": "n2",
+      "type": "titleGroup",
+      "position": {
+        "x": 962,
+        "y": 0
+      },
+      "positionAbsolute": {
+        "x": 962,
+        "y": 0
+      },
+      "width": 336,
+      "height": 2395,
+      "measured": {
+        "width": 336,
+        "height": 2395
+      },
+      "style": {
+        "width": 336,
+        "height": 2395
+      },
+      "data": {}
+    },
+    {
+      "id": "n3",
+      "type": "titleGroup",
+      "position": {
+        "x": 1418,
+        "y": 0
+      },
+      "positionAbsolute": {
+        "x": 1418,
+        "y": 0
+      },
+      "width": 334,
+      "height": 2395,
+      "measured": {
+        "width": 334,
+        "height": 2395
+      },
+      "style": {
+        "width": 334,
+        "height": 2395
+      },
+      "data": {}
+    },
+    {
+      "id": "n4",
+      "type": "titleGroup",
+      "position": {
+        "x": 1872,
+        "y": 0
+      },
+      "positionAbsolute": {
+        "x": 1872,
+        "y": 0
+      },
+      "width": 447,
+      "height": 2395,
+      "measured": {
+        "width": 447,
+        "height": 2395
+      },
+      "style": {
+        "width": 447,
+        "height": 2395
+      },
+      "data": {}
+    },
+    {
+      "id": "n5",
+      "type": "titleGroup",
+      "position": {
+        "x": 2439,
+        "y": 0
+      },
+      "positionAbsolute": {
+        "x": 2439,
+        "y": 0
+      },
+      "width": 343,
+      "height": 2395,
+      "measured": {
+        "width": 343,
+        "height": 2395
+      },
+      "style": {
+        "width": 343,
+        "height": 2395
+      },
+      "data": {}
+    },
+    {
+      "id": "n6",
+      "type": "custom",
+      "parentId": "titlegroup-order",
+      "position": {
+        "x": 64,
+        "y": 620.5
+      },
+      "positionAbsolute": {
+        "x": 64,
+        "y": 620.5
+      },
+      "width": 260,
+      "height": 96,
+      "measured": {
+        "width": 260,
+        "height": 96
+      },
+      "style": {
+        "width": 260,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "n7",
+      "type": "custom",
+      "parentId": "titlegroup-allocation",
+      "position": {
+        "x": 64,
+        "y": 620.5
+      },
+      "positionAbsolute": {
+        "x": 572,
+        "y": 620.5
+      },
+      "width": 206,
+      "height": 96,
+      "measured": {
+        "width": 206,
+        "height": 96
+      },
+      "style": {
+        "width": 206,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "n8",
+      "type": "custom",
+      "parentId": "titlegroup-task",
+      "position": {
+        "x": 64,
+        "y": 620.5
+      },
+      "positionAbsolute": {
+        "x": 1026,
+        "y": 620.5
+      },
+      "width": 208,
+      "height": 96,
+      "measured": {
+        "width": 208,
+        "height": 96
+      },
+      "style": {
+        "width": 208,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "n9",
+      "type": "custom",
+      "parentId": "titlegroup-task-group",
+      "position": {
+        "x": 64,
+        "y": 620.5
+      },
+      "positionAbsolute": {
+        "x": 1482,
+        "y": 620.5
+      },
+      "width": 206,
+      "height": 96,
+      "measured": {
+        "width": 206,
+        "height": 96
+      },
+      "style": {
+        "width": 206,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "n10",
+      "type": "custom",
+      "parentId": "titlegroup-operation",
+      "position": {
+        "x": 64,
+        "y": 200
+      },
+      "positionAbsolute": {
+        "x": 1936,
+        "y": 200
+      },
+      "width": 319,
+      "height": 73,
+      "measured": {
+        "width": 319,
+        "height": 73
+      },
+      "style": {
+        "width": 319,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n11",
+      "type": "custom",
+      "parentId": "titlegroup-analytics",
+      "position": {
+        "x": 64,
+        "y": 1474
+      },
+      "positionAbsolute": {
+        "x": 2503,
+        "y": 1474
+      },
+      "width": 215,
+      "height": 96,
+      "measured": {
+        "width": 215,
+        "height": 96
+      },
+      "style": {
+        "width": 215,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "n12",
+      "type": "custom",
+      "parentId": "titlegroup-order",
+      "position": {
+        "x": 89,
+        "y": 1561
+      },
+      "positionAbsolute": {
+        "x": 89,
+        "y": 1561
+      },
+      "width": 210,
+      "height": 73,
+      "measured": {
+        "width": 210,
+        "height": 73
+      },
+      "style": {
+        "width": 210,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n13",
+      "type": "custom",
+      "parentId": "titlegroup-order",
+      "position": {
+        "x": 88,
+        "y": 1682
+      },
+      "positionAbsolute": {
+        "x": 88,
+        "y": 1682
+      },
+      "width": 212,
+      "height": 73,
+      "measured": {
+        "width": 212,
+        "height": 73
+      },
+      "style": {
+        "width": 212,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n14",
+      "type": "custom",
+      "parentId": "titlegroup-order",
+      "position": {
+        "x": 98.5,
+        "y": 1803
+      },
+      "positionAbsolute": {
+        "x": 98.5,
+        "y": 1803
+      },
+      "width": 191,
+      "height": 73,
+      "measured": {
+        "width": 191,
+        "height": 73
+      },
+      "style": {
+        "width": 191,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n15",
+      "type": "custom",
+      "parentId": "titlegroup-order",
+      "position": {
+        "x": 118.5,
+        "y": 1924
+      },
+      "positionAbsolute": {
+        "x": 118.5,
+        "y": 1924
+      },
+      "width": 151,
+      "height": 73,
+      "measured": {
+        "width": 151,
+        "height": 73
+      },
+      "style": {
+        "width": 151,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n16",
+      "type": "custom",
+      "parentId": "titlegroup-order",
+      "position": {
+        "x": 99,
+        "y": 2045
+      },
+      "positionAbsolute": {
+        "x": 99,
+        "y": 2045
+      },
+      "width": 190,
+      "height": 73,
+      "measured": {
+        "width": 190,
+        "height": 73
+      },
+      "style": {
+        "width": 190,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n17",
+      "type": "custom",
+      "parentId": "titlegroup-allocation",
+      "position": {
+        "x": 83.5,
+        "y": 1561
+      },
+      "positionAbsolute": {
+        "x": 591.5,
+        "y": 1561
+      },
+      "width": 167,
+      "height": 73,
+      "measured": {
+        "width": 167,
+        "height": 73
+      },
+      "style": {
+        "width": 167,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n18",
+      "type": "custom",
+      "parentId": "titlegroup-allocation",
+      "position": {
+        "x": 79,
+        "y": 1682
+      },
+      "positionAbsolute": {
+        "x": 587,
+        "y": 1682
+      },
+      "width": 176,
+      "height": 73,
+      "measured": {
+        "width": 176,
+        "height": 73
+      },
+      "style": {
+        "width": 176,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n19",
+      "type": "custom",
+      "parentId": "titlegroup-allocation",
+      "position": {
+        "x": 72,
+        "y": 1803
+      },
+      "positionAbsolute": {
+        "x": 580,
+        "y": 1803
+      },
+      "width": 190,
+      "height": 73,
+      "measured": {
+        "width": 190,
+        "height": 73
+      },
+      "style": {
+        "width": 190,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n20",
+      "type": "custom",
+      "parentId": "titlegroup-allocation",
+      "position": {
+        "x": 70,
+        "y": 1924
+      },
+      "positionAbsolute": {
+        "x": 578,
+        "y": 1924
+      },
+      "width": 194,
+      "height": 73,
+      "measured": {
+        "width": 194,
+        "height": 73
+      },
+      "style": {
+        "width": 194,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n21",
+      "type": "custom",
+      "parentId": "titlegroup-allocation",
+      "position": {
+        "x": 64,
+        "y": 2045
+      },
+      "positionAbsolute": {
+        "x": 572,
+        "y": 2045
+      },
+      "width": 206,
+      "height": 73,
+      "measured": {
+        "width": 206,
+        "height": 73
+      },
+      "style": {
+        "width": 206,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n22",
+      "type": "custom",
+      "parentId": "titlegroup-allocation",
+      "position": {
+        "x": 82,
+        "y": 2166
+      },
+      "positionAbsolute": {
+        "x": 590,
+        "y": 2166
+      },
+      "width": 170,
+      "height": 73,
+      "measured": {
+        "width": 170,
+        "height": 73
+      },
+      "style": {
+        "width": 170,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n23",
+      "type": "custom",
+      "parentId": "titlegroup-task",
+      "position": {
+        "x": 81,
+        "y": 1561
+      },
+      "positionAbsolute": {
+        "x": 1043,
+        "y": 1561
+      },
+      "width": 174,
+      "height": 73,
+      "measured": {
+        "width": 174,
+        "height": 73
+      },
+      "style": {
+        "width": 174,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n24",
+      "type": "custom",
+      "parentId": "titlegroup-task",
+      "position": {
+        "x": 92.5,
+        "y": 1682
+      },
+      "positionAbsolute": {
+        "x": 1054.5,
+        "y": 1682
+      },
+      "width": 151,
+      "height": 73,
+      "measured": {
+        "width": 151,
+        "height": 73
+      },
+      "style": {
+        "width": 151,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n25",
+      "type": "custom",
+      "parentId": "titlegroup-task",
+      "position": {
+        "x": 83,
+        "y": 1809.5
+      },
+      "positionAbsolute": {
+        "x": 1045,
+        "y": 1809.5
+      },
+      "width": 170,
+      "height": 60,
+      "measured": {
+        "width": 170,
+        "height": 60
+      },
+      "style": {
+        "width": 170,
+        "height": 60
+      },
+      "data": {}
+    },
+    {
+      "id": "n26",
+      "type": "custom",
+      "parentId": "titlegroup-task",
+      "position": {
+        "x": 100.5,
+        "y": 1917.5
+      },
+      "positionAbsolute": {
+        "x": 1062.5,
+        "y": 1917.5
+      },
+      "width": 135,
+      "height": 73,
+      "measured": {
+        "width": 135,
+        "height": 73
+      },
+      "style": {
+        "width": 135,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n27",
+      "type": "custom",
+      "parentId": "titlegroup-task",
+      "position": {
+        "x": 76.5,
+        "y": 2038.5
+      },
+      "positionAbsolute": {
+        "x": 1038.5,
+        "y": 2038.5
+      },
+      "width": 183,
+      "height": 73,
+      "measured": {
+        "width": 183,
+        "height": 73
+      },
+      "style": {
+        "width": 183,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n28",
+      "type": "custom",
+      "parentId": "titlegroup-task-group",
+      "position": {
+        "x": 72,
+        "y": 1561
+      },
+      "positionAbsolute": {
+        "x": 1490,
+        "y": 1561
+      },
+      "width": 190,
+      "height": 73,
+      "measured": {
+        "width": 190,
+        "height": 73
+      },
+      "style": {
+        "width": 190,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n29",
+      "type": "custom",
+      "parentId": "titlegroup-task-group",
+      "position": {
+        "x": 82,
+        "y": 1682
+      },
+      "positionAbsolute": {
+        "x": 1500,
+        "y": 1682
+      },
+      "width": 170,
+      "height": 73,
+      "measured": {
+        "width": 170,
+        "height": 73
+      },
+      "style": {
+        "width": 170,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n30",
+      "type": "custom",
+      "parentId": "titlegroup-task-group",
+      "position": {
+        "x": 80,
+        "y": 1803
+      },
+      "positionAbsolute": {
+        "x": 1498,
+        "y": 1803
+      },
+      "width": 174,
+      "height": 73,
+      "measured": {
+        "width": 174,
+        "height": 73
+      },
+      "style": {
+        "width": 174,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n31",
+      "type": "custom",
+      "parentId": "titlegroup-task-group",
+      "position": {
+        "x": 74,
+        "y": 1930.5
+      },
+      "positionAbsolute": {
+        "x": 1492,
+        "y": 1930.5
+      },
+      "width": 186,
+      "height": 60,
+      "measured": {
+        "width": 186,
+        "height": 60
+      },
+      "style": {
+        "width": 186,
+        "height": 60
+      },
+      "data": {}
+    },
+    {
+      "id": "n32",
+      "type": "custom",
+      "parentId": "titlegroup-task-group",
+      "position": {
+        "x": 102.5,
+        "y": 2038.5
+      },
+      "positionAbsolute": {
+        "x": 1520.5,
+        "y": 2038.5
+      },
+      "width": 129,
+      "height": 73,
+      "measured": {
+        "width": 129,
+        "height": 73
+      },
+      "style": {
+        "width": 129,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n33",
+      "type": "custom",
+      "parentId": "titlegroup-operation",
+      "position": {
+        "x": 138.5,
+        "y": 780.5
+      },
+      "positionAbsolute": {
+        "x": 2010.5,
+        "y": 780.5
+      },
+      "width": 170,
+      "height": 73,
+      "measured": {
+        "width": 170,
+        "height": 73
+      },
+      "style": {
+        "width": 170,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n34",
+      "type": "custom",
+      "parentId": "titlegroup-operation",
+      "position": {
+        "x": 140,
+        "y": 901.5
+      },
+      "positionAbsolute": {
+        "x": 2012,
+        "y": 901.5
+      },
+      "width": 167,
+      "height": 73,
+      "measured": {
+        "width": 167,
+        "height": 73
+      },
+      "style": {
+        "width": 167,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n35",
+      "type": "custom",
+      "parentId": "titlegroup-operation",
+      "position": {
+        "x": 140,
+        "y": 1022.5
+      },
+      "positionAbsolute": {
+        "x": 2012,
+        "y": 1022.5
+      },
+      "width": 167,
+      "height": 73,
+      "measured": {
+        "width": 167,
+        "height": 73
+      },
+      "style": {
+        "width": 167,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n36",
+      "type": "custom",
+      "parentId": "titlegroup-operation",
+      "position": {
+        "x": 134.5,
+        "y": 1150
+      },
+      "positionAbsolute": {
+        "x": 2006.5,
+        "y": 1150
+      },
+      "width": 178,
+      "height": 60,
+      "measured": {
+        "width": 178,
+        "height": 60
+      },
+      "style": {
+        "width": 178,
+        "height": 60
+      },
+      "data": {}
+    },
+    {
+      "id": "n37",
+      "type": "custom",
+      "parentId": "titlegroup-operation",
+      "position": {
+        "x": 154.5,
+        "y": 1258
+      },
+      "positionAbsolute": {
+        "x": 2026.5,
+        "y": 1258
+      },
+      "width": 138,
+      "height": 60,
+      "measured": {
+        "width": 138,
+        "height": 60
+      },
+      "style": {
+        "width": 138,
+        "height": 60
+      },
+      "data": {}
+    },
+    {
+      "id": "n38",
+      "type": "custom",
+      "parentId": "titlegroup-operation",
+      "position": {
+        "x": 134.5,
+        "y": 1366
+      },
+      "positionAbsolute": {
+        "x": 2006.5,
+        "y": 1366
+      },
+      "width": 178,
+      "height": 60,
+      "measured": {
+        "width": 178,
+        "height": 60
+      },
+      "style": {
+        "width": 178,
+        "height": 60
+      },
+      "data": {}
+    },
+    {
+      "id": "n39",
+      "type": "custom",
+      "parentId": "titlegroup-operation",
+      "position": {
+        "x": 119.5,
+        "y": 1474
+      },
+      "positionAbsolute": {
+        "x": 1991.5,
+        "y": 1474
+      },
+      "width": 208,
+      "height": 73,
+      "measured": {
+        "width": 208,
+        "height": 73
+      },
+      "style": {
+        "width": 208,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n40",
+      "type": "custom",
+      "parentId": "titlegroup-analytics",
+      "position": {
+        "x": 104.5,
+        "y": 264
+      },
+      "positionAbsolute": {
+        "x": 2543.5,
+        "y": 264
+      },
+      "width": 134,
+      "height": 73,
+      "measured": {
+        "width": 134,
+        "height": 73
+      },
+      "style": {
+        "width": 134,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n41",
+      "type": "custom",
+      "parentId": "titlegroup-analytics",
+      "position": {
+        "x": 84.5,
+        "y": 385
+      },
+      "positionAbsolute": {
+        "x": 2523.5,
+        "y": 385
+      },
+      "width": 174,
+      "height": 73,
+      "measured": {
+        "width": 174,
+        "height": 73
+      },
+      "style": {
+        "width": 174,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n42",
+      "type": "custom",
+      "parentId": "titlegroup-analytics",
+      "position": {
+        "x": 78.5,
+        "y": 512.5
+      },
+      "positionAbsolute": {
+        "x": 2517.5,
+        "y": 512.5
+      },
+      "width": 186,
+      "height": 60,
+      "measured": {
+        "width": 186,
+        "height": 60
+      },
+      "style": {
+        "width": 186,
+        "height": 60
+      },
+      "data": {}
+    },
+    {
+      "id": "n43",
+      "type": "custom",
+      "parentId": "titlegroup-analytics",
+      "position": {
+        "x": 76.5,
+        "y": 620.5
+      },
+      "positionAbsolute": {
+        "x": 2515.5,
+        "y": 620.5
+      },
+      "width": 190,
+      "height": 73,
+      "measured": {
+        "width": 190,
+        "height": 73
+      },
+      "style": {
+        "width": 190,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "n44",
+      "type": "custom",
+      "parentId": "titlegroup-analytics",
+      "position": {
+        "x": 70.5,
+        "y": 2303
+      },
+      "positionAbsolute": {
+        "x": 2509.5,
+        "y": 2303
+      },
+      "width": 202,
+      "height": 60,
+      "measured": {
+        "width": 202,
+        "height": 60
+      },
+      "style": {
+        "width": 202,
+        "height": 60
+      },
+      "data": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "n7",
+      "target": "n22",
+      "sourceHandle": "right",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 778,
+            "y": 668.5
+          },
+          {
+            "x": 858,
+            "y": 668.5
+          },
+          {
+            "x": 858,
+            "y": 2202.5
+          },
+          {
+            "x": 760,
+            "y": 2202.5
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "n7",
+      "target": "n17",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 675,
+            "y": 716.5
+          },
+          {
+            "x": 675,
+            "y": 1561
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "n7",
+      "target": "n20",
+      "sourceHandle": "right",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 778,
+            "y": 668.5
+          },
+          {
+            "x": 858,
+            "y": 668.5
+          },
+          {
+            "x": 858,
+            "y": 1960.5
+          },
+          {
+            "x": 772,
+            "y": 1960.5
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "n7",
+      "target": "n18",
+      "sourceHandle": "right",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 778,
+            "y": 692.5
+          },
+          {
+            "x": 826,
+            "y": 692.5
+          },
+          {
+            "x": 826,
+            "y": 1718.5
+          },
+          {
+            "x": 763,
+            "y": 1718.5
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed",
+        "terminalHandleAxisRepaired": true
+      }
+    },
+    {
+      "id": "e4",
+      "source": "n7",
+      "target": "n19",
+      "sourceHandle": "right",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 778,
+            "y": 668.5
+          },
+          {
+            "x": 826,
+            "y": 668.5
+          },
+          {
+            "x": 826,
+            "y": 1839.5
+          },
+          {
+            "x": 770,
+            "y": 1839.5
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e5",
+      "source": "n7",
+      "target": "n8",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 778,
+            "y": 644.5
+          },
+          {
+            "x": 1026,
+            "y": 644.5
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed",
+        "terminalHandleAxisRepaired": true
+      }
+    },
+    {
+      "id": "e6",
+      "source": "n7",
+      "target": "n21",
+      "sourceHandle": "right",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 778,
+            "y": 668.5
+          },
+          {
+            "x": 858,
+            "y": 668.5
+          },
+          {
+            "x": 858,
+            "y": 2081.5
+          },
+          {
+            "x": 778,
+            "y": 2081.5
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e7",
+      "source": "n43",
+      "target": "n11",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 2610.5,
+            "y": 693.5
+          },
+          {
+            "x": 2610.5,
+            "y": 1474
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e8",
+      "source": "n11",
+      "target": "n44",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 2610.5,
+            "y": 1570
+          },
+          {
+            "x": 2610.5,
+            "y": 2303
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e9",
+      "source": "n44",
+      "target": "n7",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": true,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 2509.5,
+            "y": 2333
+          },
+          {
+            "x": 834,
+            "y": 2333
+          },
+          {
+            "x": 834,
+            "y": 668.5
+          },
+          {
+            "x": 778,
+            "y": 668.5
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e10",
+      "source": "n44",
+      "target": "n9",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": true,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 2509.5,
+            "y": 2333
+          },
+          {
+            "x": 1756,
+            "y": 2333
+          },
+          {
+            "x": 1756,
+            "y": 668.5
+          },
+          {
+            "x": 1688,
+            "y": 668.5
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e11",
+      "source": "n10",
+      "target": "n43",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 2255,
+            "y": 236.5
+          },
+          {
+            "x": 2459.5,
+            "y": 236.5
+          },
+          {
+            "x": 2459.5,
+            "y": 657
+          },
+          {
+            "x": 2515.5,
+            "y": 657
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e12",
+      "source": "n10",
+      "target": "n11",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 2255,
+            "y": 236.5
+          },
+          {
+            "x": 2447,
+            "y": 236.5
+          },
+          {
+            "x": 2447,
+            "y": 1522
+          },
+          {
+            "x": 2503,
+            "y": 1522
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e13",
+      "source": "n10",
+      "target": "n38",
+      "sourceHandle": "right",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 2255,
+            "y": 236.5
+          },
+          {
+            "x": 2311,
+            "y": 236.5
+          },
+          {
+            "x": 2311,
+            "y": 1396
+          },
+          {
+            "x": 2184.5,
+            "y": 1396
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e14",
+      "source": "n10",
+      "target": "n36",
+      "sourceHandle": "right",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 2255,
+            "y": 236.5
+          },
+          {
+            "x": 2311,
+            "y": 236.5
+          },
+          {
+            "x": 2311,
+            "y": 1180
+          },
+          {
+            "x": 2184.5,
+            "y": 1180
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e15",
+      "source": "n10",
+      "target": "n42",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 2255,
+            "y": 236.5
+          },
+          {
+            "x": 2461.5,
+            "y": 236.5
+          },
+          {
+            "x": 2461.5,
+            "y": 542.5
+          },
+          {
+            "x": 2517.5,
+            "y": 542.5
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e16",
+      "source": "n10",
+      "target": "n33",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 2095.5,
+            "y": 273
+          },
+          {
+            "x": 2095.5,
+            "y": 780.5
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e17",
+      "source": "n10",
+      "target": "n37",
+      "sourceHandle": "right",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 2255,
+            "y": 236.5
+          },
+          {
+            "x": 2311,
+            "y": 236.5
+          },
+          {
+            "x": 2311,
+            "y": 1288
+          },
+          {
+            "x": 2164.5,
+            "y": 1288
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e18",
+      "source": "n10",
+      "target": "n40",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 2255,
+            "y": 236.5
+          },
+          {
+            "x": 2487.5,
+            "y": 236.5
+          },
+          {
+            "x": 2487.5,
+            "y": 300.5
+          },
+          {
+            "x": 2543.5,
+            "y": 300.5
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e19",
+      "source": "n10",
+      "target": "n34",
+      "sourceHandle": "right",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 2255,
+            "y": 236.5
+          },
+          {
+            "x": 2311,
+            "y": 236.5
+          },
+          {
+            "x": 2311,
+            "y": 938
+          },
+          {
+            "x": 2179,
+            "y": 938
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e20",
+      "source": "n10",
+      "target": "n35",
+      "sourceHandle": "right",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 2255,
+            "y": 236.5
+          },
+          {
+            "x": 2311,
+            "y": 236.5
+          },
+          {
+            "x": 2311,
+            "y": 1059
+          },
+          {
+            "x": 2179,
+            "y": 1059
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e21",
+      "source": "n10",
+      "target": "n41",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 2255,
+            "y": 236.5
+          },
+          {
+            "x": 2467.5,
+            "y": 236.5
+          },
+          {
+            "x": 2467.5,
+            "y": 421.5
+          },
+          {
+            "x": 2523.5,
+            "y": 421.5
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e22",
+      "source": "n10",
+      "target": "n39",
+      "sourceHandle": "right",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 2255,
+            "y": 236.5
+          },
+          {
+            "x": 2311,
+            "y": 236.5
+          },
+          {
+            "x": 2311,
+            "y": 1510.5
+          },
+          {
+            "x": 2199.5,
+            "y": 1510.5
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e23",
+      "source": "n6",
+      "target": "n7",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 324,
+            "y": 668.5
+          },
+          {
+            "x": 572,
+            "y": 668.5
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e24",
+      "source": "n6",
+      "target": "n16",
+      "sourceHandle": "right",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 324,
+            "y": 668.5
+          },
+          {
+            "x": 380,
+            "y": 668.5
+          },
+          {
+            "x": 380,
+            "y": 2081.5
+          },
+          {
+            "x": 289,
+            "y": 2081.5
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e25",
+      "source": "n6",
+      "target": "n12",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 194,
+            "y": 716.5
+          },
+          {
+            "x": 194,
+            "y": 1561
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e26",
+      "source": "n6",
+      "target": "n14",
+      "sourceHandle": "right",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 324,
+            "y": 668.5
+          },
+          {
+            "x": 380,
+            "y": 668.5
+          },
+          {
+            "x": 380,
+            "y": 1839.5
+          },
+          {
+            "x": 289.5,
+            "y": 1839.5
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e27",
+      "source": "n6",
+      "target": "n15",
+      "sourceHandle": "right",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 324,
+            "y": 668.5
+          },
+          {
+            "x": 380,
+            "y": 668.5
+          },
+          {
+            "x": 380,
+            "y": 1960.5
+          },
+          {
+            "x": 269.5,
+            "y": 1960.5
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e28",
+      "source": "n6",
+      "target": "n13",
+      "sourceHandle": "right",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 324,
+            "y": 668.5
+          },
+          {
+            "x": 380,
+            "y": 668.5
+          },
+          {
+            "x": 380,
+            "y": 1718.5
+          },
+          {
+            "x": 300,
+            "y": 1718.5
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e29",
+      "source": "n42",
+      "target": "n11",
+      "sourceHandle": "right",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 2703.5,
+            "y": 542.5
+          },
+          {
+            "x": 2774,
+            "y": 542.5
+          },
+          {
+            "x": 2774,
+            "y": 1522
+          },
+          {
+            "x": 2718,
+            "y": 1522
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e30",
+      "source": "n40",
+      "target": "n11",
+      "sourceHandle": "right",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 2677.5,
+            "y": 300.5
+          },
+          {
+            "x": 2774,
+            "y": 300.5
+          },
+          {
+            "x": 2774,
+            "y": 1522
+          },
+          {
+            "x": 2718,
+            "y": 1522
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e31",
+      "source": "n8",
+      "target": "n27",
+      "sourceHandle": "right",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 1234,
+            "y": 668.5
+          },
+          {
+            "x": 1290,
+            "y": 668.5
+          },
+          {
+            "x": 1290,
+            "y": 2075
+          },
+          {
+            "x": 1221.5,
+            "y": 2075
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e32",
+      "source": "n8",
+      "target": "n23",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 1130,
+            "y": 716.5
+          },
+          {
+            "x": 1130,
+            "y": 1561
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e33",
+      "source": "n8",
+      "target": "n26",
+      "sourceHandle": "right",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 1234,
+            "y": 668.5
+          },
+          {
+            "x": 1290,
+            "y": 668.5
+          },
+          {
+            "x": 1290,
+            "y": 1954
+          },
+          {
+            "x": 1197.5,
+            "y": 1954
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e34",
+      "source": "n8",
+      "target": "n24",
+      "sourceHandle": "right",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 1234,
+            "y": 668.5
+          },
+          {
+            "x": 1290,
+            "y": 668.5
+          },
+          {
+            "x": 1290,
+            "y": 1718.5
+          },
+          {
+            "x": 1205.5,
+            "y": 1718.5
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e35",
+      "source": "n8",
+      "target": "n25",
+      "sourceHandle": "right",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 1234,
+            "y": 668.5
+          },
+          {
+            "x": 1290,
+            "y": 668.5
+          },
+          {
+            "x": 1290,
+            "y": 1839.5
+          },
+          {
+            "x": 1215,
+            "y": 1839.5
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e36",
+      "source": "n8",
+      "target": "n9",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 1234,
+            "y": 668.5
+          },
+          {
+            "x": 1482,
+            "y": 668.5
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e37",
+      "source": "n9",
+      "target": "n30",
+      "sourceHandle": "right",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 1688,
+            "y": 668.5
+          },
+          {
+            "x": 1744,
+            "y": 668.5
+          },
+          {
+            "x": 1744,
+            "y": 1839.5
+          },
+          {
+            "x": 1672,
+            "y": 1839.5
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e38",
+      "source": "n9",
+      "target": "n32",
+      "sourceHandle": "right",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": true,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 1688,
+            "y": 668.5
+          },
+          {
+            "x": 1744,
+            "y": 668.5
+          },
+          {
+            "x": 1744,
+            "y": 2075
+          },
+          {
+            "x": 1649.5,
+            "y": 2075
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e39",
+      "source": "n9",
+      "target": "n10",
+      "sourceHandle": "top",
+      "targetHandle": "left",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 1585,
+            "y": 620.5
+          },
+          {
+            "x": 1585,
+            "y": 236.5
+          },
+          {
+            "x": 1936,
+            "y": 236.5
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e40",
+      "source": "n9",
+      "target": "n31",
+      "sourceHandle": "right",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 1688,
+            "y": 668.5
+          },
+          {
+            "x": 1744,
+            "y": 668.5
+          },
+          {
+            "x": 1744,
+            "y": 1960.5
+          },
+          {
+            "x": 1678,
+            "y": 1960.5
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e41",
+      "source": "n9",
+      "target": "n28",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 1585,
+            "y": 716.5
+          },
+          {
+            "x": 1585,
+            "y": 1561
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    },
+    {
+      "id": "e42",
+      "source": "n9",
+      "target": "n29",
+      "sourceHandle": "right",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 1688,
+            "y": 668.5
+          },
+          {
+            "x": 1736,
+            "y": 668.5
+          },
+          {
+            "x": 1736,
+            "y": 1718.5
+          },
+          {
+            "x": 1670,
+            "y": 1718.5
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed",
+        "terminalHandleAxisRepaired": true
+      }
+    },
+    {
+      "id": "e43",
+      "source": "n41",
+      "target": "n11",
+      "sourceHandle": "right",
+      "targetHandle": "right",
+      "type": "stablePath",
+      "data": {
+        "trunkPolishVersion": 2,
+        "waypoints": [],
+        "intraContainerNoObstacle": true,
+        "obstacleScope": "corridor",
+        "obstaclePadding": 24,
+        "pathOptions": {
+          "gridRatio": 1.04,
+          "borderRadius": 4
+        },
+        "layoutDirection": "TB",
+        "computedPath": [
+          {
+            "x": 2697.5,
+            "y": 421.5
+          },
+          {
+            "x": 2774,
+            "y": 421.5
+          },
+          {
+            "x": 2774,
+            "y": 1522
+          },
+          {
+            "x": 2718,
+            "y": 1522
+          }
+        ],
+        "layoutPathLocked": true,
+        "_layoutPathLocked": true,
+        "algorithm": "display-obstacle-seed"
+      }
+    }
+  ]
+}
