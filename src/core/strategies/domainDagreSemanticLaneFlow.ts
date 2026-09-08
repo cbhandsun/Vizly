@@ -11,6 +11,7 @@ import { boundedDomainDagreNumber, getDomainDagreSubDomainOrderIndex,
 
 export interface SemanticLaneFlowOptions {
   rankMode?: LaneRankMode;
+  alignGlobalLanePeers?: boolean;
   direction: DomainDagreDirection;
   nodeToSubGroup?: ReadonlyMap<string, string>;
   domainOrder?: readonly string[];
@@ -71,6 +72,7 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
   }
   // Ranking semantics are explicit; adding isolated nodes never changes them.
   const compactLaneRanks = options.rankMode === 'compact';
+  const alignGlobalPeers = options.alignGlobalLanePeers === true && !compactLaneRanks;
   const positionScopes = new Map<string, Node[]>();
   for (const node of leaves) {
     const key = compactLaneRanks ? domainDagreDomainOf(node) : '';
@@ -255,7 +257,10 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
           // Start-to-start spacing smaller than a node plus clearance prevents
           // cross-axis reuse, turning a staggered branch into a wide staircase.
           previousFlowEnd = positioned.position[flow] + flowSize(current);
-          peerOffset += reuseSpacing ? Math.max(flowGap, flowSize(current) + COMMERCIAL_BUSINESS_NODE_CLEARANCE) : flowGap;
+          // Shared phases can remain aligned when a complete routed candidate
+          // validates their channels. Domain-local compact ranks keep corridors.
+          peerOffset += reuseSpacing ? Math.max(flowGap, flowSize(current) + COMMERCIAL_BUSINESS_NODE_CLEARANCE)
+            : alignGlobalPeers ? 0 : flowGap;
           return positioned;
         });
     });

@@ -507,6 +507,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                 horizontalGap: nodeGapH, verticalGap: nodeGapV,
                 laneRankPreference: options.laneRankPreference,
                 previousLaneRankDecision: options.previousLaneRankDecision,
+                alignGlobalLanePeers: options.alignGlobalLanePeers === true,
                 independentNodeArrangement: nodeArrangement === 'dagre' ? undefined : nodeArrangement,
             });
             updatedNodes = selected.nodes;

@@ -8,6 +8,17 @@
 
 ### 当前执行摘要
 
+#### 全局阶段对齐候选（本地验收通过，待远端）
+
+- 行业参照：[yFiles 泳道网格](https://docs.yworks.com/yfiles-html/dguide/layout-table_layout/)用行列单元约束节点归属；[ELK 分层流程](https://eclipse.dev/elk/blog/posts/2025/25-08-21-layered.html)分别处理分层、层内顺序、坐标与路由。本批针对已识别的公共问题：同阶段并行节点无条件沿流程轴错开，使后续阶段被拉长。没有增加业务 ID、名称或固定示例坐标规则。
+- 保留原布局作为基线，只对已选择全局阶段模式的有界泳道输入增加一个对齐候选。使用现有完整路由与事务验收，节点/分组/依赖身份及主流程方向保持，宽高、实际路径长度、拐点、交叉和回绕全部不退化且至少一项改善才选用；硬质量拒绝保留基线，运行时与协议错误继续报告。候选获选后阶段元数据与几何、连线一并提交。
+- 对照实验说明不能强制对齐：需求图 TB 总线长 12095.5→10492.5、交叉 9→0，LR 总线长 13466.5→12052.5、交叉 3→0；WMS 全局对齐候选无法通过硬门禁。域内紧凑候选虽减少面积，也可能增加倒流与绕行，因此未直接推广。以上为固定输入路由实验指标，非生产采样统计。
+- 1440×900 真实工具栏验证：需求图 TB 适配 23.11%→28.09%，LR 20.14%→22.41%；WMS TB 29.79%、LR 10.36% 均保持原合格结果。四项实际 SVG 硬质量与 Worker/DOM 位置尺寸核对通过；两图保存重载保留几何、拓扑、标签数据。仍有明显泳道空白，本批不宣称复杂图整体质量已解决。
+- 四方向匿名阶段回归先失败后通过；相关事务与候选测试 108 项、布局策略测试 337 项通过，新测试已被统一 CI 收录。生产构建通过，四份预编译路径内容未变，仅更新源码指纹。完整 verify:static、TS6 及拆分后的 60 项候选/事务测试通过；1181 个测试文件全部被 CI 收录。最终生产构建重复四项实际布局与两图保存重载通过，证据 `tmp/lane-aligned-browser-final.log`。总 JS 9994.14 KB，原预算通过但已接近上限，未引入新依赖或放宽预算。本地未重复全部五组测试，本批远端完整结果仍待确认。证据：`tmp/lane-aligned-integration-tests.log`、`tmp/lane-aligned-strategies.log`、`tmp/lane-aligned-browser-persistent.log`、`tmp/lane-routed-alternatives.json`、`tmp/lane-wms-alternatives.json`。
+- 下一批研究泳道网格与跨泳道排序，先提出可验证的公共模型并与现有 ELK 能力比较；不扩大偏移规则或参数搜索。本批没有实现全图联合优化，也未覆盖所有规模与嵌套结构。
+
+前两批远端已完成：`3078180a` [完整 CI](https://github.com/cbhandsun/Vizly/actions/runs/34289414627)及[性能验收](https://github.com/cbhandsun/Vizly/actions/runs/34289468645)成功；`1e20032a` [完整 CI](https://github.com/cbhandsun/Vizly/actions/runs/34288588096)成功。下方“待远端”保留为各批本地交付时的历史记录，不作为本批通过证据。
+
 #### 设置面板外壳同步可用（本地验收通过，待远端）
 
 - `4291e63c` 的主题加载失败证据为 requested/loading=true、ready=false。源码和真实资源记录确认：设置内容已随页面加载，但仅拖动外壳仍是独立 6544 字节动态 chunk。受控浏览器暂扣该资源，在原 5 秒门限内复现相同面板状态；释放资源后立即就绪。记录 `tmp/settings-panel-resources.log`、`tmp/settings-shell-blocked.log`。这证明了可消除的等待路径，不能反推历史远端具体资源慢或主线程慢的原因。

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, type MutableRefObject } from 'react';
 import { usePersistedLayoutSelection } from './usePersistedLayoutSelection';
+import { createLayoutAlternativeComparison } from './layoutAlternativeComparison';
 import { Node, Edge, ReactFlowInstance } from '@xyflow/react';
 import { requestLayoutCommitFit } from '../../shared/diagramControlRequest';
 import { applyLayout, forceDirectedLayout, treeLayout } from '../../../utils/LayoutAlgorithms';
@@ -580,21 +581,18 @@ export function useLayoutStrategy({
                                 data: clearBaseReactFlowLayoutEdgeRoutingData(edge.data),
                             }));
                         laneRankDecision = candidate.metadata?.laneRankDecision;
-                        const compactComparison = isCompactGroups
-                            ? await import('./compactGroupedLayout') : undefined;
                         await commitLayoutAttempt({
                             nodes: finalNodes,
                             edges: finalEdges,
                             routingJob,
                             beforePreviewRelease,
-                            alternative: compactComparison && preservedNodes.length === 0 ? {
-                                create: () => compactComparison.createCompactGroupedLayout(
-                                    layoutNodes, layoutEdges, layoutOptions, dir, layoutContext,
-                                ),
-                                prefer: (baseline, alternative) => compactComparison.preferCompactGroupedLayout(
-                                    baseline, alternative, dir,
-                                ),
-                            } : undefined,
+                            alternative: await createLayoutAlternativeComparison({
+                                compactGroups: isCompactGroups, globalLanes: isDomainLane && candidateUsesDomainDagre,
+                                hasPreservedNodes: preservedNodes.length > 0,
+                                nodes: layoutNodes, edges: layoutEdges, options: layoutOptions,
+                                direction: candidateDirection, context: layoutContext, decision: laneRankDecision,
+                                onSelectedDecision: decision => { laneRankDecision = decision; },
+                            }),
                             // Lane seeds are provisional endpoint paths, not a
                             // verdict on whether the requested geometry can route.
                             // Let the Worker repair them before the exact hard gate.

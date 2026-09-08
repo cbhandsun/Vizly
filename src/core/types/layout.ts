@@ -42,6 +42,8 @@ export interface LayoutOptions {
   /** Explicit lane semantics; auto compares geometry rather than graph size. */
   laneRankPreference?: LaneRankPreference;
   previousLaneRankDecision?: LaneRankDecision;
+  /** Optional shared-phase candidate; final routed quality must be compared before use. */
+  alignGlobalLanePeers?: boolean;
   /** 布局类型 */
   type: LayoutType;
   /** 节点布局类型（用于域/子域内节点排布） */

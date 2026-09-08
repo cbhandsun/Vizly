@@ -23,6 +23,34 @@ const edges: Edge[] = [
 const membership = new Map([['start', 'sub-1'], ['left', 'sub-1'], ['end', 'sub-2']]);
 
 describe('semantic swimlane process geometry', () => {
+  it('keeps domain-local compact corridors unchanged when global alignment is requested', () => {
+    const options = { direction: 'TB' as const, rankMode: 'compact' as const, nodeToSubGroup: membership };
+    expect(alignDomainDagreLaneFlow(nodes, edges, { ...options, alignGlobalLanePeers: true }))
+      .toEqual(alignDomainDagreLaneFlow(nodes, edges, options));
+  });
+
+  it.each(['TB', 'BT', 'LR', 'RL'] as const)('keeps unequal parallel branches on their shared global phase in %s', direction => {
+    const input = nodes.map(node => node.id === 'right' ? { ...node, width: 240, height: 120,
+      measured: { width: 240, height: 120 }, style: { width: 240, height: 120 } } : node);
+    const before = structuredClone(input);
+    const arranged = alignDomainDagreLaneFlow(input, edges, {
+      direction, rankMode: 'global', alignGlobalLanePeers: true,
+      nodeToSubGroup: membership, domainOrder: ['a', 'b'],
+    });
+    const horizontal = direction === 'LR' || direction === 'RL';
+    const flow = horizontal ? 'x' : 'y', size = horizontal ? 'width' : 'height';
+    const center = (id: string) => {
+      const node = arranged.find(item => item.id === id);
+      if (!node) throw Error('Expected parallel phase node');
+      return node.position[flow] + getNodeDimensions(node)[size] / 2;
+    };
+    expect(center('left')).toBe(center('right'));
+    const sign = direction === 'BT' || direction === 'RL' ? -1 : 1;
+    expect(sign * (center('left') - center('start'))).toBeGreaterThan(0);
+    expect(sign * (center('end') - center('right'))).toBeGreaterThan(0);
+    expect(input).toEqual(before);
+  });
+
   it.each((['TB', 'BT', 'LR', 'RL'] as const).flatMap(direction => [4, 5, 6, 9]
     .map(count => ({ direction, count }))))('reuses space without losing clearance for $count fan-out peers in $direction', ({ direction, count }) => {
     const horizontal = direction === 'LR' || direction === 'RL';
