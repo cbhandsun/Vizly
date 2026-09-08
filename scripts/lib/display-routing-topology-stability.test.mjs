@@ -14,6 +14,24 @@ const setup = () => {
 };
 
 describe('topology edit stability', () => {
+  it('compares explicit business edit intent separately from expanded routing scopes', async () => {
+    const { graph, session } = setup();
+    await captureTopologyStabilityBaseline(session);
+    graph.edges[0].data.computedPath[1].x = 20;
+    const evidence = await readTopologyEditStability(session, 'business-drag', [], {
+      eligibleEdgeIds: ['edge'], routeResolution: 'incremental-route', fallbackLevel: 'none',
+    }, ['l-oms']);
+    expect(evidence.intent.changedGeometryCount).toBe(1);
+    expect(evidence.outsideRequestedRoutingGroup.changedGeometryCount).toBe(1);
+    expect(evidence.finalRepairScope.outsideFinalRepairGroup.changedGeometryCount).toBe(0);
+  });
+
+  it.each([null, ['missing'], [null], Array(5001).fill('tms')])('rejects invalid explicit intent and clears evidence', async intent => {
+    const { session, window } = setup();
+    await captureTopologyStabilityBaseline(session);
+    expect(() => readTopologyEditStability(session, 'business-drag', [], undefined, intent)).toThrow();
+    expect(window.__vizlyTopologyStabilityBaseline).toBeUndefined();
+  });
   it.each(['container-collapse', 'container-expand'])(
     'rejects external route drift during %s even when the repair scope grows', async operation => {
       const { graph, session } = setup();

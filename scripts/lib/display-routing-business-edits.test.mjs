@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { execFileSync } from 'node:child_process';
 import { describe, expect, it, vi } from 'vitest';
-import { selectBusinessEditTarget, assertBusinessEditStability } from './display-routing-business-edits.mjs';
+import { selectBusinessEditTarget, assertBusinessEditStability, assertBusinessEditRepairScope } from './display-routing-business-edits.mjs';
 import { measureDisplayRoutingEditStability } from './display-routing-edit-stability.mjs';
 import { createDisplayRoutingMatrixCaseIds, parseDisplayRoutingMatrixCase } from './display-routing-matrix-cases.mjs';
 import { verifyDisplayRoutingBrowserCases } from './display-routing-matrix-browser-cases.mjs';
@@ -75,6 +75,20 @@ describe('business edit transaction evidence',()=>{
 });
 
 describe('business diagram edit coverage', () => {
+  it('enforces unchanged routes outside final scope without treating full fallback as zero changes', () => {
+    const evidence = metrics => ({ finalRepairScope: { status: 'available', outsideFinalRepairGroup: metrics } });
+    expect(() => assertBusinessEditRepairScope(evidence(validMetrics()))).not.toThrow();
+    expect(() => assertBusinessEditRepairScope({ finalRepairScope: { status: 'full-route' } })).not.toThrow();
+    for (const change of [{ sourceHandle: 'changed-port' },
+      { data: { computedPath: [{ x: 10, y: 0 }, { x: 30, y: 0 }] } }]) {
+      const afterEdges = [edges[0], { ...edges[1], ...change }];
+      const metrics = measureDisplayRoutingEditStability({ nodes, edges }, { nodes, edges: afterEdges }, ['a']);
+      expect(() => assertBusinessEditRepairScope(evidence(metrics))).toThrow('outside final');
+    }
+    for (const value of [null, {}, { finalRepairScope: { status: 'unavailable' } }, evidence(null)]) {
+      expect(() => assertBusinessEditRepairScope(value)).toThrow('unavailable');
+    }
+  });
   it('selects a deterministic connected leaf with unrelated routes to compare', () => {
     expect(selectBusinessEditTarget(nodes, edges)).toEqual({ nodeId: 'a', nodeIndex: 0, degree: 1 });
     expect(selectBusinessEditTarget(nodes.toReversed(), edges)?.nodeId).toBe('a');

@@ -82,14 +82,15 @@ export const captureTopologyStabilityBaseline = session => session.evaluate(`(()
 // The request closure can expand inside the Worker, or fall back to a full route.
 // This comparison deliberately preserves changes outside the ORIGINAL request;
 // it must not be presented as an audit of the final transaction's eligible set.
-export const readTopologyEditStability = (session, operationId, mutableEdgeIds, finalResponse) => session.evaluate(`(() => {
+export const readTopologyEditStability = (session, operationId, mutableEdgeIds, finalResponse, explicitNodeIds) => session.evaluate(`(() => {
   const read = ${readTopologyStabilitySnapshot.toString()};
   const measure = ${measureDisplayRoutingEditStability.toString()};
   const editedIds = ${topologyEditedNodeIds.toString()};
   try {
     const before = window.__vizlyTopologyStabilityBaseline;
     const after = read();
-    const selected = editedIds(${JSON.stringify(operationId)}, before, after);
+    const selected = ${explicitNodeIds === undefined
+      ? `editedIds(${JSON.stringify(operationId)}, before, after)` : JSON.stringify(explicitNodeIds)};
     const intent = measure(before, after, selected);
     const mutable = ${JSON.stringify(mutableEdgeIds)};
     if (!Array.isArray(mutable) || mutable.length > 5_000

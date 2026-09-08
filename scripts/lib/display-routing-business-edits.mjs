@@ -6,8 +6,8 @@ import { parseCanonicalPresetIdentity, verifyCanonicalPresetMount } from './disp
 import { resolveDisplayRoutingConnectedDragDelta } from './display-routing-matrix-cases.mjs';
 import { waitForStableDisplayRoutingViewport } from './display-routing-browser-viewport.mjs';
 import { prepareDisplayRoutingIncrementalCapture, releaseDisplayRoutingDrag } from './display-routing-browser-diagnostics.mjs';
-import { captureDisplayRoutingEditBaseline, readDisplayRoutingEditStability,
-  projectDisplayRoutingEditStability } from './display-routing-edit-stability.mjs';
+import { projectDisplayRoutingEditStability } from './display-routing-edit-stability.mjs';
+import { captureTopologyStabilityBaseline, readTopologyEditStability } from './display-routing-topology-stability.mjs';
 import { displayRoutingCommittedEdgesMatchWorkerPatches, displayRoutingTopologyRenderIsCommitted,
   displayRoutingTopologyTransactionIsCommitted } from './display-routing-browser-topology-matrix.mjs';
 import { displayRoutingTopologyRequestMatchesResponse, displayRoutingTopologyResponseIsFinal,
@@ -79,6 +79,16 @@ export const businessEditPositionExpression = nodeId => `(() => {
     ? { x: position.x, y: position.y } : null;
 })()`;
 
+export const assertBusinessEditRepairScope = evidence => {
+  const scope = evidence?.finalRepairScope;
+  if (scope?.status === 'full-route') return;
+  const outside = projectDisplayRoutingEditStability(scope?.outsideFinalRepairGroup);
+  if (scope?.status !== 'available' || !outside) throw new Error('Business edit final repair scope unavailable');
+  if (outside.changedPortCount !== 0 || outside.changedGeometryCount !== 0) {
+    throw new Error('Business edit changed routes outside final repair group');
+  }
+};
+
 const dragBusinessNode = async (session, nodeId, direction) => {
   // parentId may be restored during an edit: local coordinates are not
   // comparable across that transition. Measure both endpoints in canvas space.
@@ -97,7 +107,7 @@ const dragBusinessNode = async (session, nodeId, direction) => {
   const delta = await session.evaluate(`(${resolveDisplayRoutingConnectedDragDelta.toString()})(
     window.reactFlowInstance.getNodes(), window.reactFlowInstance.getEdges(), ${JSON.stringify(nodeId)}, 16)`);
   if (!target || !delta || !Number.isFinite(viewport.zoom) || viewport.zoom <= 0) throw new Error('Business drag target unavailable');
-  await captureDisplayRoutingEditBaseline(session);
+  await captureTopologyStabilityBaseline(session);
   await prepareDisplayRoutingIncrementalCapture(session);
   await session.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...target, button: 'none' });
   await session.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...target, button: 'left', buttons: 1, clickCount: 1 });
@@ -140,14 +150,17 @@ export const verifyDisplayRoutingBusinessEdits = async ({ baseUrl, prepareSessio
             : { expectedCommittedRouteSignature: route.response.outputRouteSignature }),
           expectedNodeCount: route.request.nodes.length, expectedEdgeCount: route.response.edges.length });
         const after = await session.evaluate(businessEditPositionExpression(selected.nodeId));
-        const stability = await readDisplayRoutingEditStability(session, [selected.nodeId]);
+        const scopeEvidence = await readTopologyEditStability(session, 'business-drag',
+          route.request.mutableEdgeIds, route.response, [selected.nodeId]);
+        const stability = scopeEvidence.intent;
+        assertBusinessEditRepairScope(scopeEvidence);
         assertBusinessEditStability(stability, after ? Math.hypot(after.x - drag.before.x, after.y - drag.before.y) : NaN);
         operations.push({ id: direction === 1 ? 'drag-away' : 'drag-reverse', editedNodeIndex: selected.nodeIndex,
           routeResolution: route.response.routeResolution, fallbackLevel: route.response.fallbackLevel,
           workerDurationMs: route.response.workerDurationMs, releaseToObservedMs: Date.now() - drag.releasedAt,
-          stability, ...(await auditFinalSvg(session, route, `${target.presetId} edited route`)) });
+          stability, scopeEvidence, ...(await auditFinalSvg(session, route, `${target.presetId} edited route`)) });
         onProgress({ event: 'business-edit-operation-passed', presetId: target.presetId,
-          operation: operations.at(-1).id, stability: projectDisplayRoutingEditStability(stability) });
+          operation: operations.at(-1).id, stability: projectDisplayRoutingEditStability(stability), scopeEvidence });
       }
       return { presetId: target.presetId, canonicalMount, initialAudit, operations };
     }));
