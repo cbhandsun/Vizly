@@ -5,6 +5,7 @@ import { domainDagreDomainOf, isDomainDagreGroupNode, isDomainDagreNodeHidden } 
 import { domainDagrePeerComponentIndex } from './domainDagrePeerComponents';
 import { compactDomainDagreLaneCrossAxis } from './domainDagreLaneCrossCompaction';
 import { assignDomainDagreLaneCoordinates, type DomainDagreLaneCoordinateScope } from './domainDagreLaneCoordinateAssignment';
+import { COMMERCIAL_BUSINESS_NODE_CLEARANCE } from './shared/edgeBusinessNodeClearanceRepair';
 import { boundedDomainDagreNumber, getDomainDagreSubDomainOrderIndex,
   type DomainDagreDirection, type DomainDagreSubDomainOrder } from './domainDagreLayoutBoundary';
 
@@ -218,16 +219,26 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
     }
     const peerGroups = [...peerGroupsByScope.values()];
     let maximumPeerOffset = 0;
-    const positioned = peerGroups.flatMap(domainPeers => (
-      domainPeers
+    const positioned = peerGroups.flatMap(domainPeers => {
+      const compactFan = compactLaneRanks && domainPeers.length > 3;
+      // Reusing cross-axis space must not buy a larger flow-axis expansion.
+      // Wide cards in horizontal flows often cost more than the row they free.
+      const reuseSpacing = compactFan && domainPeers.every(node => (
+        Math.max(0, flowSize(node) + COMMERCIAL_BUSINESS_NODE_CLEARANCE - flowGap) <= crossSize(node)
+      ));
+      let peerOffset = compactFan ? 64 : 0;
+      return domainPeers
         .toSorted((a, b) => center(replacements.get(a.id) ?? a) - center(replacements.get(b.id) ?? b))
-        .map((node, index) => {
+        .map(node => {
           const current = replacements.get(node.id) ?? node;
-          const peerOffset = index * flowGap + (compactLaneRanks && domainPeers.length > 3 ? 64 : 0);
           maximumPeerOffset = Math.max(maximumPeerOffset, peerOffset);
-          return moveAlong(current, flow, current.position[flow] + flowOffset + peerOffset);
-        })
-    ));
+          const positioned = moveAlong(current, flow, current.position[flow] + flowOffset + peerOffset);
+          // Start-to-start spacing smaller than a node plus clearance prevents
+          // cross-axis reuse, turning a staggered branch into a wide staircase.
+          peerOffset += reuseSpacing ? Math.max(flowGap, flowSize(current) + COMMERCIAL_BUSINESS_NODE_CLEARANCE) : flowGap;
+          return positioned;
+        });
+    });
     const bandStart = Math.min(...positioned.map(node => node.position[flow]));
     const bandEnd = Math.max(...positioned.map(node => node.position[flow] + flowSize(node)));
     if (occupiedEnd !== undefined) {

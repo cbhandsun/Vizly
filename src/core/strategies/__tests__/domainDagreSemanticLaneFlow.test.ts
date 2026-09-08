@@ -23,6 +23,37 @@ const edges: Edge[] = [
 const membership = new Map([['start', 'sub-1'], ['left', 'sub-1'], ['end', 'sub-2']]);
 
 describe('semantic swimlane process geometry', () => {
+  it.each((['TB', 'BT', 'LR', 'RL'] as const).flatMap(direction => [4, 5, 9]
+    .map(count => ({ direction, count }))))('reuses space without losing clearance for $count fan-out peers in $direction', ({ direction, count }) => {
+    const horizontal = direction === 'LR' || direction === 'RL';
+    const cross = horizontal ? 'y' : 'x', flow = horizontal ? 'x' : 'y';
+    const children = Array.from({ length: count }, (_, index) => {
+      const size = count === 9 ? 80 + index * 20 : 80;
+      const dimensions = horizontal ? { width: size, height: 80 } : { width: 160, height: size };
+      return { ...makeNode(`child-${index}`, 'a'), ...dimensions, measured: dimensions, style: dimensions,
+        position: horizontal ? { x: 0, y: index * 300 } : { x: index * 300, y: 0 } };
+    });
+    const graph = [makeNode('domain-a', 'a', 0, 'titleGroup'), makeNode('root', 'a'), ...children];
+    const links = children.map(node => ({ id: `root-${node.id}`, source: 'root', target: node.id }));
+    const arranged = alignDomainDagreLaneFlow(graph, links, { direction, rankMode: 'compact', horizontalGap: 96, verticalGap: 96 });
+    const peers = arranged.filter(node => node.id.startsWith('child-')).sort((a, b) => a.position[flow] - b.position[flow]);
+    const columns = new Set(peers.map(node => node.position[cross])).size;
+    expect(columns).toBeLessThanOrEqual(count);
+    if (count !== 9) expect(columns).toBe(1);
+    else expect(columns).toBe(count); // Expensive flow expansion retains the baseline packing.
+    // Unequal peers may retain another column. Clearance is a rectangle
+    // constraint, not a requirement that every branch use one exact column.
+    for (let first = 0; first < peers.length; first++) {
+      for (let second = first + 1; second < peers.length; second++) {
+        const a = peers[first], b = peers[second];
+        const aSize = getNodeDimensions(a), bSize = getNodeDimensions(b);
+        const xGap = Math.max(b.position.x - a.position.x - aSize.width, a.position.x - b.position.x - bSize.width);
+        const yGap = Math.max(b.position.y - a.position.y - aSize.height, a.position.y - b.position.y - bSize.height);
+        expect(Math.max(xGap, yGap)).toBeGreaterThanOrEqual(48);
+      }
+    }
+    expect(graph[2].position).toEqual({ x: 0, y: 0 });
+  });
   it.each((['TB', 'BT', 'LR', 'RL'] as const).flatMap(direction => (['grid', 'flow'] as const)
     .map(independentNodeArrangement => ({ direction, independentNodeArrangement }))))('keeps cross-domain process bands while $independentNodeArrangement packs only globally isolated cards in $direction', ({ direction, independentNodeArrangement }) => {
     const cards = Array.from({ length: 6 }, (_, index) => makeNode(`isolated-${index}`, 'a'));
