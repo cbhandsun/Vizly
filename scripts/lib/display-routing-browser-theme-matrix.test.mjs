@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { runInNewContext } from 'node:vm';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readThemeControlEvidence, projectThemeControlEvidence } from './display-routing-theme-control-evidence.mjs';
 
 import {
   assertDisplayRoutingThemeState,
@@ -20,6 +21,85 @@ const stateFor = themeCase => ({
 });
 
 describe('display routing browser theme matrix', () => {
+  it('retains bounded control evidence without content or input values', () => {
+    vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}]);
+    for (let index = 0; index < 70; index += 1) {
+      const button = document.createElement('button');
+      button.setAttribute('data-theme-selector-trigger', '');
+      button.textContent = 'private-theme-title';
+      button.disabled = index === 0;
+      button.hidden = index === 1;
+      document.body.append(button);
+    }
+    const input = document.createElement('input');
+    input.value = 'Bearer-private-secret';
+    document.body.append(input);
+    input.focus();
+    for (const hidden of [false, true]) {
+      const dialog = document.createElement('div');
+      dialog.setAttribute('role', 'dialog');
+      dialog.setAttribute('aria-modal', 'true');
+      dialog.setAttribute('aria-hidden', String(hidden));
+      document.body.append(dialog);
+    }
+    const evidence = projectThemeControlEvidence(readThemeControlEvidence(document));
+    expect(evidence).toMatchObject({ focus: 'input', editable: true,
+      trigger: { found: 70, scanned: 64, clickable: 62, disabled: 1, hidden: 1 },
+      modal: { found: 2, scanned: 2, hidden: 1 } });
+    expect(JSON.stringify(evidence)).not.toMatch(/private-theme-title|Bearer-private-secret/);
+  });
+
+  it('projects untrusted CDP fields into fixed enums and bounded numbers', () => {
+    expect(projectThemeControlEvidence(null)).toBeNull();
+    expect(projectThemeControlEvidence([])).toBeNull();
+    const evidence = projectThemeControlEvidence({ schema: 'theme-control-evidence-v1',
+      readyState: 'secret', visibility: 'secret', focus: 'secret', editable: 'secret', hasFocus: 1,
+      trigger: { found: Infinity, scanned: 65, clickable: -1, disabled: 'secret', hidden: 0, obscured: 1.2 },
+      settings: null, dialog: {}, content: 'secret' });
+    expect(evidence).toMatchObject({ readyState: 'unknown', visibility: 'unknown', focus: 'unknown',
+      editable: null, hasFocus: null, trigger: { found: null, scanned: null, clickable: null,
+        disabled: null, hidden: 0, obscured: null } });
+    expect(JSON.stringify(evidence)).not.toContain('secret');
+  });
+
+  it('reports disabled controls at the original deadline without additional shortcuts', async () => {
+    vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}]);
+    const button = document.createElement('button');
+    button.setAttribute('data-theme-selector-trigger', '');
+    button.disabled = true;
+    document.body.append(button);
+    let now = 0;
+    const session = { send: vi.fn(), evaluate: async expression => runInNewContext(expression, {
+      document, window, getComputedStyle: window.getComputedStyle.bind(window),
+    }) };
+    const failure = await switchDisplayRoutingTheme(session, DISPLAY_ROUTING_THEME_CASES[1], {
+      now: () => now, wait: async ms => { now += ms; },
+    }).catch(error => error);
+    expect(now).toBe(5000);
+    expect(session.send).toHaveBeenCalledTimes(2);
+    expect(failure.message).toContain('within 5000ms');
+    const controls = JSON.parse(failure.message.split('; controls=')[1]);
+    expect(controls).toMatchObject({ openedSettings: true, lastControlEvidence: { action: 'open',
+      elapsedMs: 4950, snapshot: { trigger: { found: 1, disabled: 1, clickable: 0 } } } });
+  });
+
+  it('keeps the original failure when diagnostic style inspection throws', async () => {
+    const button = document.createElement('button');
+    button.setAttribute('data-theme-selector-trigger', '');
+    button.disabled = true;
+    document.body.append(button);
+    vi.spyOn(window, 'getComputedStyle').mockImplementation(() => { throw new Error('private-probe-error'); });
+    let now = 0;
+    const session = { send: vi.fn(), evaluate: async expression => runInNewContext(expression, { document, window }) };
+    const failure = await switchDisplayRoutingTheme(session, DISPLAY_ROUTING_THEME_CASES[1], {
+      now: () => now, wait: async ms => { now += ms; },
+    }).catch(error => error);
+    expect(now).toBe(5000);
+    expect(failure.message).toContain('within 5000ms');
+    expect(failure.message).toContain('"lastControlEvidence":null');
+    expect(failure.message).not.toContain('private-probe-error');
+  });
+
   it.each([
     { closedAt: 4_980, observedAt: 4_980, succeeds: true },
     { closedAt: 5_001, observedAt: 5_001, succeeds: false },

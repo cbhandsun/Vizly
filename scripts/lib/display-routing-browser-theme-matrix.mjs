@@ -1,4 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises';
+import { readThemeControlEvidence, projectThemeControlEvidence } from './display-routing-theme-control-evidence.mjs';
 
 export const DISPLAY_ROUTING_THEME_CASES = Object.freeze([
   Object.freeze({ id: 'light', mode: 'light', primary: '#007bff' }),
@@ -103,9 +104,22 @@ export const switchDisplayRoutingTheme = async (session, themeCase, { now = Date
   const transitions = [{ step, elapsedMs: 0 }];
   let state = null;
   let openedSettings = false;
-  const click = action => session.evaluate(
-    `(${clickDisplayRoutingThemeControl.toString()})(document, ${JSON.stringify(action)}, ${JSON.stringify(themeCase.id)})`,
-  );
+  let lastControlEvidence = null;
+  const click = async action => {
+    const result = await session.evaluate(`(() => {
+      const clicked = (${clickDisplayRoutingThemeControl.toString()})(document, ${JSON.stringify(action)}, ${JSON.stringify(themeCase.id)});
+      let evidence = null;
+      if (!clicked) {
+        try { evidence = (${readThemeControlEvidence.toString()})(document); } catch { /* Preserve the control failure. */ }
+      }
+      return { clicked, evidence };
+    })()`);
+    const evidence = projectThemeControlEvidence(result?.evidence);
+    if (evidence) lastControlEvidence = {
+      action, elapsedMs: Math.min(60_000, Math.max(0, now() - startedAt)), snapshot: evidence,
+    };
+    return result?.clicked === true;
+  };
   while (now() < deadline) {
     const previousStep = step;
     if (step === 'open') {
@@ -149,7 +163,7 @@ export const switchDisplayRoutingTheme = async (session, themeCase, { now = Date
       await wait(Math.min(50, Math.max(0, deadline - now())));
     }
   }
-  throw new Error(`Theme selector did not complete ${themeCase.id} (${step}) within 5000ms; transitions=${JSON.stringify(transitions)}`);
+  throw new Error(`Theme selector did not complete ${themeCase.id} (${step}) within 5000ms; transitions=${JSON.stringify(transitions)}; controls=${JSON.stringify({ openedSettings, lastControlEvidence })}`);
 };
 
 export const verifyDisplayRoutingThemeMatrix = async ({
