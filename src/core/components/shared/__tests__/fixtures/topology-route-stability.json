@@ -1,0 +1,4299 @@
+{
+  "collapse": {
+    "baselineNodes": [
+      {
+        "id": "node-0",
+        "type": "titleGroup",
+        "position": {
+          "x": 758.1125,
+          "y": 0
+        },
+        "positionAbsolute": {
+          "x": 758.1125,
+          "y": 0
+        },
+        "width": 1377,
+        "height": 290,
+        "measured": {
+          "width": 1377,
+          "height": 290
+        },
+        "style": {
+          "width": 1376.85,
+          "height": 290
+        },
+        "data": {}
+      },
+      {
+        "id": "node-1",
+        "type": "titleGroup",
+        "position": {
+          "x": 0,
+          "y": 450
+        },
+        "positionAbsolute": {
+          "x": 0,
+          "y": 450
+        },
+        "width": 1882,
+        "height": 846,
+        "measured": {
+          "width": 1882,
+          "height": 846
+        },
+        "style": {
+          "width": 1882.05,
+          "height": 846
+        },
+        "data": {}
+      },
+      {
+        "id": "node-2",
+        "type": "titleGroup",
+        "position": {
+          "x": 1254.3374999999999,
+          "y": 1456
+        },
+        "positionAbsolute": {
+          "x": 1254.3374999999999,
+          "y": 1456
+        },
+        "width": 404,
+        "height": 290,
+        "measured": {
+          "width": 404,
+          "height": 290
+        },
+        "style": {
+          "width": 404.4,
+          "height": 290
+        },
+        "data": {}
+      },
+      {
+        "id": "node-3",
+        "type": "custom",
+        "parentId": "node-0",
+        "position": {
+          "x": 32,
+          "y": 106.5
+        },
+        "positionAbsolute": {
+          "x": 790.1125,
+          "y": 106.5
+        },
+        "width": 210,
+        "height": 73,
+        "measured": {
+          "width": 210,
+          "height": 73
+        },
+        "style": {
+          "width": 210,
+          "height": 73
+        },
+        "data": {}
+      },
+      {
+        "id": "node-4",
+        "type": "custom",
+        "parentId": "node-1",
+        "position": {
+          "x": 935.25,
+          "y": 84
+        },
+        "positionAbsolute": {
+          "x": 935.25,
+          "y": 534
+        },
+        "width": 259,
+        "height": 118,
+        "measured": {
+          "width": 259,
+          "height": 118
+        },
+        "style": {
+          "width": 259,
+          "height": 118
+        },
+        "data": {}
+      },
+      {
+        "id": "node-5",
+        "type": "custom",
+        "parentId": "node-1",
+        "position": {
+          "x": 50,
+          "y": 362
+        },
+        "positionAbsolute": {
+          "x": 50,
+          "y": 812
+        },
+        "width": 282,
+        "height": 118,
+        "measured": {
+          "width": 282,
+          "height": 118
+        },
+        "style": {
+          "width": 282,
+          "height": 118
+        },
+        "data": {}
+      },
+      {
+        "id": "node-6",
+        "type": "custom",
+        "parentId": "node-1",
+        "position": {
+          "x": 32,
+          "y": 640
+        },
+        "positionAbsolute": {
+          "x": 32,
+          "y": 1090
+        },
+        "width": 298,
+        "height": 118,
+        "measured": {
+          "width": 298,
+          "height": 118
+        },
+        "style": {
+          "width": 298,
+          "height": 118
+        },
+        "data": {}
+      },
+      {
+        "id": "node-7",
+        "type": "custom",
+        "parentId": "node-1",
+        "position": {
+          "x": 923.75,
+          "y": 362
+        },
+        "positionAbsolute": {
+          "x": 923.75,
+          "y": 812
+        },
+        "width": 282,
+        "height": 118,
+        "measured": {
+          "width": 282,
+          "height": 118
+        },
+        "style": {
+          "width": 282,
+          "height": 118
+        },
+        "data": {}
+      },
+      {
+        "id": "node-8",
+        "type": "custom",
+        "parentId": "node-1",
+        "position": {
+          "x": 1525.75,
+          "y": 373
+        },
+        "positionAbsolute": {
+          "x": 1525.75,
+          "y": 823
+        },
+        "width": 282,
+        "height": 96,
+        "measured": {
+          "width": 282,
+          "height": 96
+        },
+        "style": {
+          "width": 282,
+          "height": 96
+        },
+        "data": {}
+      },
+      {
+        "id": "node-9",
+        "type": "custom",
+        "parentId": "node-1",
+        "position": {
+          "x": 650,
+          "y": 640
+        },
+        "positionAbsolute": {
+          "x": 650,
+          "y": 1090
+        },
+        "width": 243,
+        "height": 118,
+        "measured": {
+          "width": 243,
+          "height": 118
+        },
+        "style": {
+          "width": 243,
+          "height": 118
+        },
+        "data": {}
+      },
+      {
+        "id": "node-10",
+        "type": "custom",
+        "parentId": "node-1",
+        "position": {
+          "x": 1213,
+          "y": 640
+        },
+        "positionAbsolute": {
+          "x": 1213,
+          "y": 1090
+        },
+        "width": 250,
+        "height": 118,
+        "measured": {
+          "width": 250,
+          "height": 118
+        },
+        "style": {
+          "width": 250,
+          "height": 118
+        },
+        "data": {}
+      },
+      {
+        "id": "node-11",
+        "type": "custom",
+        "parentId": "node-0",
+        "position": {
+          "x": 562,
+          "y": 84
+        },
+        "positionAbsolute": {
+          "x": 1320.1125,
+          "y": 84
+        },
+        "width": 211,
+        "height": 118,
+        "measured": {
+          "width": 211,
+          "height": 118
+        },
+        "style": {
+          "width": 211,
+          "height": 118
+        },
+        "data": {}
+      },
+      {
+        "id": "node-12",
+        "type": "custom",
+        "parentId": "node-2",
+        "position": {
+          "x": 32,
+          "y": 84
+        },
+        "positionAbsolute": {
+          "x": 1286.3374999999999,
+          "y": 1540
+        },
+        "width": 296,
+        "height": 118,
+        "measured": {
+          "width": 296,
+          "height": 118
+        },
+        "style": {
+          "width": 296,
+          "height": 118
+        },
+        "data": {}
+      },
+      {
+        "id": "node-13",
+        "type": "custom",
+        "parentId": "node-0",
+        "position": {
+          "x": 1093,
+          "y": 106.5
+        },
+        "positionAbsolute": {
+          "x": 1851.1125,
+          "y": 106.5
+        },
+        "width": 219,
+        "height": 73,
+        "measured": {
+          "width": 219,
+          "height": 73
+        },
+        "style": {
+          "width": 219,
+          "height": 73
+        },
+        "data": {}
+      }
+    ],
+    "baselineSourceEdges": [
+      {
+        "id": "edge-0",
+        "source": "node-4",
+        "target": "node-8",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1142,
+              "y": 653
+            },
+            {
+              "x": 1142,
+              "y": 742
+            },
+            {
+              "x": 1667,
+              "y": 742
+            },
+            {
+              "x": 1667,
+              "y": 822
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true
+        }
+      },
+      {
+        "id": "edge-1",
+        "source": "node-4",
+        "target": "node-7",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1038.85,
+              "y": 653
+            },
+            {
+              "x": 1038.85,
+              "y": 811
+            }
+          ],
+          "layoutPathLocked": true
+        }
+      },
+      {
+        "id": "edge-2",
+        "source": "node-4",
+        "target": "node-12",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1091,
+              "y": 653
+            },
+            {
+              "x": 1091,
+              "y": 788
+            },
+            {
+              "x": 1230,
+              "y": 788
+            },
+            {
+              "x": 1230,
+              "y": 823
+            },
+            {
+              "x": 1438,
+              "y": 823
+            },
+            {
+              "x": 1438,
+              "y": 954
+            },
+            {
+              "x": 1434,
+              "y": 954
+            },
+            {
+              "x": 1434,
+              "y": 1066
+            },
+            {
+              "x": 1487,
+              "y": 1066
+            },
+            {
+              "x": 1487,
+              "y": 1232
+            },
+            {
+              "x": 1434,
+              "y": 1232
+            },
+            {
+              "x": 1434,
+              "y": 1539
+            }
+          ],
+          "layoutPathLocked": true,
+          "hardObstacleRepaired": true,
+          "obstacleClearanceOptimized": false,
+          "sharedTrunkAware": true,
+          "crossingOptimized": true
+        }
+      },
+      {
+        "id": "edge-3",
+        "source": "node-4",
+        "target": "node-5",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 987,
+              "y": 653
+            },
+            {
+              "x": 987,
+              "y": 742
+            },
+            {
+              "x": 191,
+              "y": 742
+            },
+            {
+              "x": 191,
+              "y": 811
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true
+        }
+      },
+      {
+        "id": "edge-4",
+        "source": "node-7",
+        "target": "node-9",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 994,
+              "y": 931
+            },
+            {
+              "x": 994,
+              "y": 1020
+            },
+            {
+              "x": 976,
+              "y": 1020
+            },
+            {
+              "x": 976,
+              "y": 943
+            },
+            {
+              "x": 830,
+              "y": 943
+            },
+            {
+              "x": 830,
+              "y": 931
+            },
+            {
+              "x": 812,
+              "y": 931
+            },
+            {
+              "x": 812,
+              "y": 1089
+            }
+          ],
+          "layoutPathLocked": true,
+          "crossingOptimized": true,
+          "sharedTrunkAware": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true
+        }
+      },
+      {
+        "id": "edge-5",
+        "source": "node-7",
+        "target": "node-11",
+        "type": "advanced-smart-step",
+        "sourceHandle": "top",
+        "targetHandle": "bottom",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1018,
+              "y": 811
+            },
+            {
+              "x": 1018,
+              "y": 690
+            },
+            {
+              "x": 1027,
+              "y": 690
+            },
+            {
+              "x": 1027,
+              "y": 823
+            },
+            {
+              "x": 1045,
+              "y": 823
+            },
+            {
+              "x": 1045,
+              "y": 835
+            },
+            {
+              "x": 1408,
+              "y": 835
+            },
+            {
+              "x": 1408,
+              "y": 823
+            },
+            {
+              "x": 1426,
+              "y": 823
+            },
+            {
+              "x": 1426,
+              "y": 203
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "detachedOverlapSeparated": true,
+          "crossingOptimized": true,
+          "sharedTrunkAware": true
+        }
+      },
+      {
+        "id": "edge-6",
+        "source": "node-7",
+        "target": "node-13",
+        "type": "advanced-smart-step",
+        "sourceHandle": "top",
+        "targetHandle": "bottom",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1065,
+              "y": 812
+            },
+            {
+              "x": 1065,
+              "y": 790
+            },
+            {
+              "x": 1924,
+              "y": 790
+            },
+            {
+              "x": 1924,
+              "y": 181
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": true,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "crossingOptimized": true,
+          "sharedTrunkAware": true
+        }
+      },
+      {
+        "id": "edge-7",
+        "source": "node-7",
+        "target": "node-12",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1135,
+              "y": 931
+            },
+            {
+              "x": 1135,
+              "y": 972
+            },
+            {
+              "x": 1508,
+              "y": 972
+            },
+            {
+              "x": 1508,
+              "y": 1539
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "detachedOverlapSeparated": true
+        }
+      },
+      {
+        "id": "edge-8",
+        "source": "node-7",
+        "target": "node-10",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1065,
+              "y": 931
+            },
+            {
+              "x": 1065,
+              "y": 1020
+            },
+            {
+              "x": 1201,
+              "y": 1020
+            },
+            {
+              "x": 1201,
+              "y": 1000
+            },
+            {
+              "x": 1338,
+              "y": 1000
+            },
+            {
+              "x": 1338,
+              "y": 1089
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true
+        }
+      },
+      {
+        "id": "edge-9",
+        "source": "node-3",
+        "target": "node-4",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": true,
+          "autoTarget": true,
+          "computedPath": [
+            {
+              "x": 895,
+              "y": 181
+            },
+            {
+              "x": 895,
+              "y": 236
+            },
+            {
+              "x": 1065,
+              "y": 236
+            },
+            {
+              "x": 1065,
+              "y": 533
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true
+        }
+      },
+      {
+        "id": "edge-10",
+        "source": "node-12",
+        "target": "node-13",
+        "type": "advanced-smart-step",
+        "sourceHandle": "top",
+        "targetHandle": "bottom",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1530,
+              "y": 1539
+            },
+            {
+              "x": 1530,
+              "y": 1457
+            },
+            {
+              "x": 1997,
+              "y": 1457
+            },
+            {
+              "x": 1997,
+              "y": 181
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "detachedOverlapSeparated": true
+        }
+      },
+      {
+        "id": "edge-11",
+        "source": "node-5",
+        "target": "node-9",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 191,
+              "y": 931
+            },
+            {
+              "x": 191,
+              "y": 1000
+            },
+            {
+              "x": 250,
+              "y": 1000
+            },
+            {
+              "x": 250,
+              "y": 919
+            },
+            {
+              "x": 731,
+              "y": 919
+            },
+            {
+              "x": 731,
+              "y": 1089
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "crossingOptimized": true,
+          "sharedTrunkAware": true
+        }
+      },
+      {
+        "id": "edge-12",
+        "source": "node-5",
+        "target": "node-12",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 262,
+              "y": 931
+            },
+            {
+              "x": 262,
+              "y": 1066
+            },
+            {
+              "x": 354,
+              "y": 1066
+            },
+            {
+              "x": 354,
+              "y": 1232
+            },
+            {
+              "x": 1360,
+              "y": 1232
+            },
+            {
+              "x": 1360,
+              "y": 1539
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "hardObstacleRepaired": true,
+          "obstacleClearanceOptimized": false,
+          "sharedTrunkAware": true
+        }
+      },
+      {
+        "id": "edge-13",
+        "source": "node-5",
+        "target": "node-6",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 121,
+              "y": 931
+            },
+            {
+              "x": 121,
+              "y": 1020
+            },
+            {
+              "x": 181,
+              "y": 1020
+            },
+            {
+              "x": 181,
+              "y": 1089
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true
+        }
+      }
+    ],
+    "baselinePatches": [
+      {
+        "id": "edge-0",
+        "source": "node-4",
+        "target": "node-8",
+        "type": "stablePath",
+        "data": {
+          "computedPath": [
+            {
+              "x": 1065,
+              "y": 652
+            },
+            {
+              "x": 1065,
+              "y": 730
+            },
+            {
+              "x": 1649,
+              "y": 730
+            },
+            {
+              "x": 1649,
+              "y": 823
+            }
+          ],
+          "sharedTrunkAware": true,
+          "sharedTrunkSynthesized": true,
+          "_layoutPathLocked": true
+        }
+      },
+      {
+        "id": "edge-1",
+        "source": "node-4",
+        "target": "node-7",
+        "type": "stablePath",
+        "data": {
+          "computedPath": [
+            {
+              "x": 1065,
+              "y": 652
+            },
+            {
+              "x": 1065,
+              "y": 812
+            }
+          ],
+          "sharedTrunkAware": true,
+          "sharedTrunkSynthesized": true,
+          "_layoutPathLocked": true
+        }
+      },
+      {
+        "id": "edge-2",
+        "source": "node-4",
+        "target": "node-12",
+        "type": "stablePath",
+        "data": {
+          "computedPath": [
+            {
+              "x": 1065,
+              "y": 652
+            },
+            {
+              "x": 1065,
+              "y": 742
+            },
+            {
+              "x": 1477,
+              "y": 742
+            },
+            {
+              "x": 1477,
+              "y": 1042
+            },
+            {
+              "x": 1511,
+              "y": 1042
+            },
+            {
+              "x": 1511,
+              "y": 1256
+            },
+            {
+              "x": 1434,
+              "y": 1256
+            },
+            {
+              "x": 1434,
+              "y": 1540
+            }
+          ],
+          "sharedTrunkSynthesized": true,
+          "_layoutPathLocked": true
+        }
+      },
+      {
+        "id": "edge-3",
+        "source": "node-4",
+        "target": "node-5",
+        "type": "stablePath",
+        "data": {
+          "computedPath": [
+            {
+              "x": 1065,
+              "y": 652
+            },
+            {
+              "x": 1065,
+              "y": 722
+            },
+            {
+              "x": 191,
+              "y": 722
+            },
+            {
+              "x": 191,
+              "y": 812
+            }
+          ],
+          "sharedTrunkAware": true,
+          "sharedTrunkSynthesized": true,
+          "_layoutPathLocked": true
+        }
+      },
+      {
+        "id": "edge-4",
+        "source": "node-7",
+        "target": "node-9",
+        "type": "stablePath",
+        "data": {
+          "computedPath": [
+            {
+              "x": 1054,
+              "y": 930
+            },
+            {
+              "x": 1054,
+              "y": 1020
+            },
+            {
+              "x": 812,
+              "y": 1020
+            },
+            {
+              "x": 812,
+              "y": 1090
+            }
+          ],
+          "sharedTrunkSynthesized": true,
+          "_layoutPathLocked": true
+        }
+      },
+      {
+        "id": "edge-5",
+        "source": "node-7",
+        "target": "node-11",
+        "type": "stablePath",
+        "sourceHandle": "right",
+        "data": {
+          "computedPath": [
+            {
+              "x": 1205.75,
+              "y": 871
+            },
+            {
+              "x": 1425.6125,
+              "y": 871
+            },
+            {
+              "x": 1425.6125,
+              "y": 202
+            }
+          ],
+          "sharedTrunkSynthesized": true,
+          "_layoutPathLocked": true
+        }
+      },
+      {
+        "id": "edge-6",
+        "source": "node-7",
+        "target": "node-13",
+        "type": "stablePath",
+        "sourceHandle": "bottom",
+        "data": {
+          "computedPath": [
+            {
+              "x": 1054,
+              "y": 930
+            },
+            {
+              "x": 1054,
+              "y": 986
+            },
+            {
+              "x": 1961,
+              "y": 986
+            },
+            {
+              "x": 1961,
+              "y": 179.5
+            }
+          ],
+          "sharedTrunkSynthesized": true,
+          "_layoutPathLocked": true
+        }
+      },
+      {
+        "id": "edge-7",
+        "source": "node-7",
+        "target": "node-12",
+        "type": "stablePath",
+        "data": {
+          "computedPath": [
+            {
+              "x": 1054,
+              "y": 930
+            },
+            {
+              "x": 1054,
+              "y": 1256
+            },
+            {
+              "x": 1434,
+              "y": 1256
+            },
+            {
+              "x": 1434,
+              "y": 1540
+            }
+          ],
+          "sharedTrunkAware": true,
+          "sharedTrunkSynthesized": true,
+          "_layoutPathLocked": true
+        }
+      },
+      {
+        "id": "edge-8",
+        "source": "node-7",
+        "target": "node-10",
+        "type": "stablePath",
+        "data": {
+          "computedPath": [
+            {
+              "x": 1054,
+              "y": 930
+            },
+            {
+              "x": 1054,
+              "y": 1033
+            },
+            {
+              "x": 1338,
+              "y": 1033
+            },
+            {
+              "x": 1338,
+              "y": 1090
+            }
+          ],
+          "sharedTrunkAware": true,
+          "sharedTrunkSynthesized": true,
+          "_layoutPathLocked": true
+        }
+      },
+      {
+        "id": "edge-9",
+        "source": "node-3",
+        "target": "node-4",
+        "type": "stablePath",
+        "data": {
+          "computedPath": [
+            {
+              "x": 895,
+              "y": 179.5
+            },
+            {
+              "x": 895,
+              "y": 237
+            },
+            {
+              "x": 1065,
+              "y": 237
+            },
+            {
+              "x": 1065,
+              "y": 534
+            }
+          ],
+          "_layoutPathLocked": true
+        }
+      },
+      {
+        "id": "edge-10",
+        "source": "node-12",
+        "target": "node-13",
+        "type": "stablePath",
+        "data": {
+          "computedPath": [
+            {
+              "x": 1530,
+              "y": 1540
+            },
+            {
+              "x": 1530,
+              "y": 1376
+            },
+            {
+              "x": 1961,
+              "y": 1376
+            },
+            {
+              "x": 1961,
+              "y": 180
+            }
+          ],
+          "sharedTrunkSynthesized": true,
+          "_layoutPathLocked": true
+        }
+      },
+      {
+        "id": "edge-11",
+        "source": "node-5",
+        "target": "node-9",
+        "type": "stablePath",
+        "sourceHandle": "right",
+        "data": {
+          "computedPath": [
+            {
+              "x": 332,
+              "y": 871
+            },
+            {
+              "x": 731,
+              "y": 871
+            },
+            {
+              "x": 731,
+              "y": 1090
+            }
+          ],
+          "_layoutPathLocked": true
+        }
+      },
+      {
+        "id": "edge-12",
+        "source": "node-5",
+        "target": "node-12",
+        "type": "stablePath",
+        "sourceHandle": "right",
+        "data": {
+          "computedPath": [
+            {
+              "x": 332,
+              "y": 871
+            },
+            {
+              "x": 388,
+              "y": 871
+            },
+            {
+              "x": 388,
+              "y": 1256
+            },
+            {
+              "x": 1434,
+              "y": 1256
+            },
+            {
+              "x": 1434,
+              "y": 1540
+            }
+          ],
+          "sharedTrunkSynthesized": true,
+          "_layoutPathLocked": true
+        }
+      },
+      {
+        "id": "edge-13",
+        "source": "node-5",
+        "target": "node-6",
+        "type": "stablePath",
+        "data": {
+          "computedPath": [
+            {
+              "x": 181,
+              "y": 930
+            },
+            {
+              "x": 181,
+              "y": 1090
+            }
+          ],
+          "sharedTrunkSynthesized": true,
+          "_layoutPathLocked": true
+        }
+      }
+    ],
+    "nodes": [
+      {
+        "id": "node-0",
+        "type": "titleGroup",
+        "position": {
+          "x": 758.1125,
+          "y": 0
+        },
+        "positionAbsolute": {
+          "x": 758.1125,
+          "y": 0
+        },
+        "width": 1377,
+        "height": 290,
+        "measured": {
+          "width": 1377,
+          "height": 290
+        },
+        "style": {
+          "width": 1376.85,
+          "height": 290
+        },
+        "data": {}
+      },
+      {
+        "id": "node-1",
+        "type": "titleGroup",
+        "position": {
+          "x": 0,
+          "y": 450
+        },
+        "positionAbsolute": {
+          "x": 0,
+          "y": 450
+        },
+        "width": 1882,
+        "height": 846,
+        "measured": {
+          "width": 1882,
+          "height": 846
+        },
+        "style": {
+          "width": 1882.05,
+          "height": 120
+        },
+        "data": {
+          "collapsed": true
+        }
+      },
+      {
+        "id": "node-2",
+        "type": "titleGroup",
+        "position": {
+          "x": 1254.3374999999999,
+          "y": 1456
+        },
+        "positionAbsolute": {
+          "x": 1254.3374999999999,
+          "y": 1456
+        },
+        "width": 404,
+        "height": 290,
+        "measured": {
+          "width": 404,
+          "height": 290
+        },
+        "style": {
+          "width": 404.4,
+          "height": 290
+        },
+        "data": {}
+      },
+      {
+        "id": "node-3",
+        "type": "custom",
+        "parentId": "node-0",
+        "position": {
+          "x": 32,
+          "y": 106.5
+        },
+        "positionAbsolute": {
+          "x": 790.1125,
+          "y": 106.5
+        },
+        "width": 210,
+        "height": 73,
+        "measured": {
+          "width": 210,
+          "height": 73
+        },
+        "style": {
+          "width": 210,
+          "height": 73
+        },
+        "data": {}
+      },
+      {
+        "id": "node-11",
+        "type": "custom",
+        "parentId": "node-0",
+        "position": {
+          "x": 562,
+          "y": 84
+        },
+        "positionAbsolute": {
+          "x": 1320.1125,
+          "y": 84
+        },
+        "width": 211,
+        "height": 118,
+        "measured": {
+          "width": 211,
+          "height": 118
+        },
+        "style": {
+          "width": 211,
+          "height": 118
+        },
+        "data": {}
+      },
+      {
+        "id": "node-12",
+        "type": "custom",
+        "parentId": "node-2",
+        "position": {
+          "x": 32,
+          "y": 84
+        },
+        "positionAbsolute": {
+          "x": 1286.3374999999999,
+          "y": 1540
+        },
+        "width": 296,
+        "height": 118,
+        "measured": {
+          "width": 296,
+          "height": 118
+        },
+        "style": {
+          "width": 296,
+          "height": 118
+        },
+        "data": {}
+      },
+      {
+        "id": "node-13",
+        "type": "custom",
+        "parentId": "node-0",
+        "position": {
+          "x": 1093,
+          "y": 106.5
+        },
+        "positionAbsolute": {
+          "x": 1851.1125,
+          "y": 106.5
+        },
+        "width": 219,
+        "height": 73,
+        "measured": {
+          "width": 219,
+          "height": 73
+        },
+        "style": {
+          "width": 219,
+          "height": 73
+        },
+        "data": {}
+      }
+    ],
+    "sourceEdges": [
+      {
+        "id": "edge-2",
+        "source": "node-1",
+        "target": "node-12",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1091,
+              "y": 653
+            },
+            {
+              "x": 1091,
+              "y": 788
+            },
+            {
+              "x": 1230,
+              "y": 788
+            },
+            {
+              "x": 1230,
+              "y": 823
+            },
+            {
+              "x": 1438,
+              "y": 823
+            },
+            {
+              "x": 1438,
+              "y": 954
+            },
+            {
+              "x": 1434,
+              "y": 954
+            },
+            {
+              "x": 1434,
+              "y": 1066
+            },
+            {
+              "x": 1487,
+              "y": 1066
+            },
+            {
+              "x": 1487,
+              "y": 1232
+            },
+            {
+              "x": 1434,
+              "y": 1232
+            },
+            {
+              "x": 1434,
+              "y": 1539
+            }
+          ],
+          "layoutPathLocked": true,
+          "hardObstacleRepaired": true,
+          "obstacleClearanceOptimized": false,
+          "sharedTrunkAware": true,
+          "crossingOptimized": true,
+          "isProxied": true,
+          "originalSource": "node-4",
+          "originalTarget": "node-12"
+        }
+      },
+      {
+        "id": "edge-5",
+        "source": "node-1",
+        "target": "node-11",
+        "type": "advanced-smart-step",
+        "sourceHandle": "top",
+        "targetHandle": "bottom",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1018,
+              "y": 811
+            },
+            {
+              "x": 1018,
+              "y": 690
+            },
+            {
+              "x": 1027,
+              "y": 690
+            },
+            {
+              "x": 1027,
+              "y": 823
+            },
+            {
+              "x": 1045,
+              "y": 823
+            },
+            {
+              "x": 1045,
+              "y": 835
+            },
+            {
+              "x": 1408,
+              "y": 835
+            },
+            {
+              "x": 1408,
+              "y": 823
+            },
+            {
+              "x": 1426,
+              "y": 823
+            },
+            {
+              "x": 1426,
+              "y": 203
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "detachedOverlapSeparated": true,
+          "crossingOptimized": true,
+          "sharedTrunkAware": true,
+          "isProxied": true,
+          "originalSource": "node-7",
+          "originalTarget": "node-11"
+        }
+      },
+      {
+        "id": "edge-6",
+        "source": "node-1",
+        "target": "node-13",
+        "type": "advanced-smart-step",
+        "sourceHandle": "top",
+        "targetHandle": "bottom",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1065,
+              "y": 812
+            },
+            {
+              "x": 1065,
+              "y": 790
+            },
+            {
+              "x": 1924,
+              "y": 790
+            },
+            {
+              "x": 1924,
+              "y": 181
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": true,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "crossingOptimized": true,
+          "sharedTrunkAware": true,
+          "isProxied": true,
+          "originalSource": "node-7",
+          "originalTarget": "node-13"
+        }
+      },
+      {
+        "id": "edge-7",
+        "source": "node-1",
+        "target": "node-12",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1135,
+              "y": 931
+            },
+            {
+              "x": 1135,
+              "y": 972
+            },
+            {
+              "x": 1508,
+              "y": 972
+            },
+            {
+              "x": 1508,
+              "y": 1539
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "detachedOverlapSeparated": true,
+          "isProxied": true,
+          "originalSource": "node-7",
+          "originalTarget": "node-12"
+        }
+      },
+      {
+        "id": "edge-9",
+        "source": "node-3",
+        "target": "node-1",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": true,
+          "autoTarget": true,
+          "computedPath": [
+            {
+              "x": 895,
+              "y": 181
+            },
+            {
+              "x": 895,
+              "y": 236
+            },
+            {
+              "x": 1065,
+              "y": 236
+            },
+            {
+              "x": 1065,
+              "y": 533
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "isProxied": true,
+          "originalSource": "node-3",
+          "originalTarget": "node-4"
+        }
+      },
+      {
+        "id": "edge-10",
+        "source": "node-12",
+        "target": "node-13",
+        "type": "advanced-smart-step",
+        "sourceHandle": "top",
+        "targetHandle": "bottom",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1530,
+              "y": 1539
+            },
+            {
+              "x": 1530,
+              "y": 1457
+            },
+            {
+              "x": 1997,
+              "y": 1457
+            },
+            {
+              "x": 1997,
+              "y": 181
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "detachedOverlapSeparated": true
+        }
+      },
+      {
+        "id": "edge-12",
+        "source": "node-1",
+        "target": "node-12",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 262,
+              "y": 931
+            },
+            {
+              "x": 262,
+              "y": 1066
+            },
+            {
+              "x": 354,
+              "y": 1066
+            },
+            {
+              "x": 354,
+              "y": 1232
+            },
+            {
+              "x": 1360,
+              "y": 1232
+            },
+            {
+              "x": 1360,
+              "y": 1539
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "hardObstacleRepaired": true,
+          "obstacleClearanceOptimized": false,
+          "sharedTrunkAware": true,
+          "isProxied": true,
+          "originalSource": "node-5",
+          "originalTarget": "node-12"
+        }
+      }
+    ],
+    "finalEdges": [
+      {
+        "id": "edge-2",
+        "source": "node-1",
+        "target": "node-12",
+        "type": "stablePath",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1091,
+              "y": 1296
+            },
+            {
+              "x": 1091,
+              "y": 1392
+            },
+            {
+              "x": 1434,
+              "y": 1392
+            },
+            {
+              "x": 1434,
+              "y": 1539
+            }
+          ],
+          "layoutPathLocked": true,
+          "hardObstacleRepaired": true,
+          "obstacleClearanceOptimized": false,
+          "sharedTrunkAware": true,
+          "crossingOptimized": true,
+          "isProxied": true,
+          "originalSource": "node-4",
+          "originalTarget": "node-12",
+          "sharedTrunkSynthesized": true
+        }
+      },
+      {
+        "id": "edge-5",
+        "source": "node-1",
+        "target": "node-11",
+        "type": "stablePath",
+        "sourceHandle": "top",
+        "targetHandle": "bottom",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1091,
+              "y": 450
+            },
+            {
+              "x": 1091,
+              "y": 342
+            },
+            {
+              "x": 1426,
+              "y": 342
+            },
+            {
+              "x": 1426,
+              "y": 203
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "detachedOverlapSeparated": true,
+          "crossingOptimized": true,
+          "sharedTrunkAware": true,
+          "isProxied": true,
+          "originalSource": "node-7",
+          "originalTarget": "node-11",
+          "sharedTrunkSynthesized": true
+        }
+      },
+      {
+        "id": "edge-6",
+        "source": "node-1",
+        "target": "node-13",
+        "type": "stablePath",
+        "sourceHandle": "top",
+        "targetHandle": "bottom",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1091,
+              "y": 450
+            },
+            {
+              "x": 1091,
+              "y": 386
+            },
+            {
+              "x": 1924,
+              "y": 386
+            },
+            {
+              "x": 1924,
+              "y": 181
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": true,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "crossingOptimized": true,
+          "sharedTrunkAware": true,
+          "isProxied": true,
+          "originalSource": "node-7",
+          "originalTarget": "node-13",
+          "sharedTrunkSynthesized": true
+        }
+      },
+      {
+        "id": "edge-7",
+        "source": "node-1",
+        "target": "node-12",
+        "type": "stablePath",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1091,
+              "y": 1296
+            },
+            {
+              "x": 1091,
+              "y": 1392
+            },
+            {
+              "x": 1434,
+              "y": 1392
+            },
+            {
+              "x": 1434,
+              "y": 1539
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "detachedOverlapSeparated": true,
+          "isProxied": true,
+          "originalSource": "node-7",
+          "originalTarget": "node-12",
+          "sharedTrunkAware": true,
+          "sharedTrunkSynthesized": true
+        }
+      },
+      {
+        "id": "edge-9",
+        "source": "node-3",
+        "target": "node-1",
+        "type": "stablePath",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": true,
+          "autoTarget": true,
+          "computedPath": [
+            {
+              "x": 941,
+              "y": 179.5
+            },
+            {
+              "x": 941,
+              "y": 450
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "isProxied": true,
+          "originalSource": "node-3",
+          "originalTarget": "node-4"
+        }
+      },
+      {
+        "id": "edge-10",
+        "source": "node-12",
+        "target": "node-13",
+        "type": "stablePath",
+        "sourceHandle": "top",
+        "targetHandle": "bottom",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1530,
+              "y": 1539
+            },
+            {
+              "x": 1530,
+              "y": 1376
+            },
+            {
+              "x": 1997,
+              "y": 1376
+            },
+            {
+              "x": 1997,
+              "y": 181
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "detachedOverlapSeparated": true
+        }
+      },
+      {
+        "id": "edge-12",
+        "source": "node-1",
+        "target": "node-12",
+        "type": "stablePath",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1091,
+              "y": 1296
+            },
+            {
+              "x": 1091,
+              "y": 1392
+            },
+            {
+              "x": 1434,
+              "y": 1392
+            },
+            {
+              "x": 1434,
+              "y": 1539
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "hardObstacleRepaired": true,
+          "obstacleClearanceOptimized": false,
+          "sharedTrunkAware": true,
+          "isProxied": true,
+          "originalSource": "node-5",
+          "originalTarget": "node-12",
+          "sharedTrunkSynthesized": true
+        }
+      }
+    ],
+    "mutableEdgeIds": [
+      "edge-0",
+      "edge-1",
+      "edge-2",
+      "edge-3",
+      "edge-4",
+      "edge-5",
+      "edge-6",
+      "edge-7",
+      "edge-8",
+      "edge-9",
+      "edge-11",
+      "edge-12",
+      "edge-13"
+    ],
+    "changeSet": {
+      "reason": "container-change",
+      "classification": "topology",
+      "changedNodeIds": [
+        "node-9",
+        "node-8",
+        "node-4",
+        "node-1",
+        "node-7",
+        "node-6",
+        "node-5",
+        "node-10"
+      ],
+      "changedEdgeIds": [
+        "edge-0",
+        "edge-1",
+        "edge-2",
+        "edge-3",
+        "edge-4",
+        "edge-5",
+        "edge-6",
+        "edge-7",
+        "edge-8",
+        "edge-9",
+        "edge-11",
+        "edge-12",
+        "edge-13"
+      ],
+      "topologyChanged": true,
+      "geometryChanged": true
+    }
+  },
+  "expand": {
+    "baselineNodes": [
+      {
+        "id": "node-0",
+        "type": "titleGroup",
+        "position": {
+          "x": 758.1125,
+          "y": 0
+        },
+        "positionAbsolute": {
+          "x": 758.1125,
+          "y": 0
+        },
+        "width": 1377,
+        "height": 290,
+        "measured": {
+          "width": 1377,
+          "height": 290
+        },
+        "style": {
+          "width": 1376.85,
+          "height": 290
+        },
+        "data": {}
+      },
+      {
+        "id": "node-1",
+        "type": "titleGroup",
+        "position": {
+          "x": 0,
+          "y": 450
+        },
+        "positionAbsolute": {
+          "x": 0,
+          "y": 450
+        },
+        "width": 1882,
+        "height": 846,
+        "measured": {
+          "width": 1882,
+          "height": 846
+        },
+        "style": {
+          "width": 1882.05,
+          "height": 120
+        },
+        "data": {
+          "collapsed": true
+        }
+      },
+      {
+        "id": "node-2",
+        "type": "titleGroup",
+        "position": {
+          "x": 1254.3374999999999,
+          "y": 1456
+        },
+        "positionAbsolute": {
+          "x": 1254.3374999999999,
+          "y": 1456
+        },
+        "width": 404,
+        "height": 290,
+        "measured": {
+          "width": 404,
+          "height": 290
+        },
+        "style": {
+          "width": 404.4,
+          "height": 290
+        },
+        "data": {}
+      },
+      {
+        "id": "node-3",
+        "type": "custom",
+        "parentId": "node-0",
+        "position": {
+          "x": 32,
+          "y": 106.5
+        },
+        "positionAbsolute": {
+          "x": 790.1125,
+          "y": 106.5
+        },
+        "width": 210,
+        "height": 73,
+        "measured": {
+          "width": 210,
+          "height": 73
+        },
+        "style": {
+          "width": 210,
+          "height": 73
+        },
+        "data": {}
+      },
+      {
+        "id": "node-4",
+        "type": "custom",
+        "parentId": "node-0",
+        "position": {
+          "x": 562,
+          "y": 84
+        },
+        "positionAbsolute": {
+          "x": 1320.1125,
+          "y": 84
+        },
+        "width": 211,
+        "height": 118,
+        "measured": {
+          "width": 211,
+          "height": 118
+        },
+        "style": {
+          "width": 211,
+          "height": 118
+        },
+        "data": {}
+      },
+      {
+        "id": "node-5",
+        "type": "custom",
+        "parentId": "node-2",
+        "position": {
+          "x": 32,
+          "y": 84
+        },
+        "positionAbsolute": {
+          "x": 1286.3374999999999,
+          "y": 1540
+        },
+        "width": 296,
+        "height": 118,
+        "measured": {
+          "width": 296,
+          "height": 118
+        },
+        "style": {
+          "width": 296,
+          "height": 118
+        },
+        "data": {}
+      },
+      {
+        "id": "node-6",
+        "type": "custom",
+        "parentId": "node-0",
+        "position": {
+          "x": 1093,
+          "y": 106.5
+        },
+        "positionAbsolute": {
+          "x": 1851.1125,
+          "y": 106.5
+        },
+        "width": 219,
+        "height": 73,
+        "measured": {
+          "width": 219,
+          "height": 73
+        },
+        "style": {
+          "width": 219,
+          "height": 73
+        },
+        "data": {}
+      }
+    ],
+    "baselineSourceEdges": [
+      {
+        "id": "edge-0",
+        "source": "node-1",
+        "target": "node-5",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1091,
+              "y": 653
+            },
+            {
+              "x": 1091,
+              "y": 788
+            },
+            {
+              "x": 1230,
+              "y": 788
+            },
+            {
+              "x": 1230,
+              "y": 823
+            },
+            {
+              "x": 1438,
+              "y": 823
+            },
+            {
+              "x": 1438,
+              "y": 954
+            },
+            {
+              "x": 1434,
+              "y": 954
+            },
+            {
+              "x": 1434,
+              "y": 1066
+            },
+            {
+              "x": 1487,
+              "y": 1066
+            },
+            {
+              "x": 1487,
+              "y": 1232
+            },
+            {
+              "x": 1434,
+              "y": 1232
+            },
+            {
+              "x": 1434,
+              "y": 1539
+            }
+          ],
+          "layoutPathLocked": true,
+          "hardObstacleRepaired": true,
+          "obstacleClearanceOptimized": false,
+          "sharedTrunkAware": true,
+          "crossingOptimized": true,
+          "isProxied": true,
+          "originalSource": "node-7",
+          "originalTarget": "node-5"
+        }
+      },
+      {
+        "id": "edge-1",
+        "source": "node-1",
+        "target": "node-4",
+        "type": "advanced-smart-step",
+        "sourceHandle": "top",
+        "targetHandle": "bottom",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1018,
+              "y": 811
+            },
+            {
+              "x": 1018,
+              "y": 690
+            },
+            {
+              "x": 1027,
+              "y": 690
+            },
+            {
+              "x": 1027,
+              "y": 823
+            },
+            {
+              "x": 1045,
+              "y": 823
+            },
+            {
+              "x": 1045,
+              "y": 835
+            },
+            {
+              "x": 1408,
+              "y": 835
+            },
+            {
+              "x": 1408,
+              "y": 823
+            },
+            {
+              "x": 1426,
+              "y": 823
+            },
+            {
+              "x": 1426,
+              "y": 203
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "detachedOverlapSeparated": true,
+          "crossingOptimized": true,
+          "sharedTrunkAware": true,
+          "isProxied": true,
+          "originalSource": "node-10",
+          "originalTarget": "node-4"
+        }
+      },
+      {
+        "id": "edge-2",
+        "source": "node-1",
+        "target": "node-6",
+        "type": "advanced-smart-step",
+        "sourceHandle": "top",
+        "targetHandle": "bottom",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1065,
+              "y": 812
+            },
+            {
+              "x": 1065,
+              "y": 790
+            },
+            {
+              "x": 1924,
+              "y": 790
+            },
+            {
+              "x": 1924,
+              "y": 181
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": true,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "crossingOptimized": true,
+          "sharedTrunkAware": true,
+          "isProxied": true,
+          "originalSource": "node-10",
+          "originalTarget": "node-6"
+        }
+      },
+      {
+        "id": "edge-3",
+        "source": "node-1",
+        "target": "node-5",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1135,
+              "y": 931
+            },
+            {
+              "x": 1135,
+              "y": 972
+            },
+            {
+              "x": 1508,
+              "y": 972
+            },
+            {
+              "x": 1508,
+              "y": 1539
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "detachedOverlapSeparated": true,
+          "isProxied": true,
+          "originalSource": "node-10",
+          "originalTarget": "node-5"
+        }
+      },
+      {
+        "id": "edge-4",
+        "source": "node-3",
+        "target": "node-1",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": true,
+          "autoTarget": true,
+          "computedPath": [
+            {
+              "x": 895,
+              "y": 181
+            },
+            {
+              "x": 895,
+              "y": 236
+            },
+            {
+              "x": 1065,
+              "y": 236
+            },
+            {
+              "x": 1065,
+              "y": 533
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "isProxied": true,
+          "originalSource": "node-3",
+          "originalTarget": "node-7"
+        }
+      },
+      {
+        "id": "edge-5",
+        "source": "node-5",
+        "target": "node-6",
+        "type": "advanced-smart-step",
+        "sourceHandle": "top",
+        "targetHandle": "bottom",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1530,
+              "y": 1539
+            },
+            {
+              "x": 1530,
+              "y": 1457
+            },
+            {
+              "x": 1997,
+              "y": 1457
+            },
+            {
+              "x": 1997,
+              "y": 181
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "detachedOverlapSeparated": true
+        }
+      },
+      {
+        "id": "edge-6",
+        "source": "node-1",
+        "target": "node-5",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 262,
+              "y": 931
+            },
+            {
+              "x": 262,
+              "y": 1066
+            },
+            {
+              "x": 354,
+              "y": 1066
+            },
+            {
+              "x": 354,
+              "y": 1232
+            },
+            {
+              "x": 1360,
+              "y": 1232
+            },
+            {
+              "x": 1360,
+              "y": 1539
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "hardObstacleRepaired": true,
+          "obstacleClearanceOptimized": false,
+          "sharedTrunkAware": true,
+          "isProxied": true,
+          "originalSource": "node-8",
+          "originalTarget": "node-5"
+        }
+      }
+    ],
+    "baselinePatches": [
+      {
+        "id": "edge-0",
+        "source": "node-1",
+        "target": "node-5",
+        "type": "stablePath",
+        "data": {
+          "computedPath": [
+            {
+              "x": 1091,
+              "y": 1296
+            },
+            {
+              "x": 1091,
+              "y": 1392
+            },
+            {
+              "x": 1434,
+              "y": 1392
+            },
+            {
+              "x": 1434,
+              "y": 1539
+            }
+          ],
+          "detachedSourceEndpointReanchored": true,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "localDoglegRepaired": true,
+          "sharedTrunkSynthesized": true,
+          "hairpinBridgeWidened": true,
+          "_layoutPathLocked": true
+        }
+      },
+      {
+        "id": "edge-1",
+        "source": "node-1",
+        "target": "node-4",
+        "type": "stablePath",
+        "data": {
+          "computedPath": [
+            {
+              "x": 1091,
+              "y": 450
+            },
+            {
+              "x": 1091,
+              "y": 342
+            },
+            {
+              "x": 1426,
+              "y": 342
+            },
+            {
+              "x": 1426,
+              "y": 203
+            }
+          ],
+          "detachedSourceEndpointReanchored": true,
+          "sharedTrunkSynthesized": true,
+          "localDoglegRepaired": true,
+          "_layoutPathLocked": true
+        }
+      },
+      {
+        "id": "edge-2",
+        "source": "node-1",
+        "target": "node-6",
+        "type": "stablePath",
+        "data": {
+          "computedPath": [
+            {
+              "x": 1091,
+              "y": 450
+            },
+            {
+              "x": 1091,
+              "y": 386
+            },
+            {
+              "x": 1924,
+              "y": 386
+            },
+            {
+              "x": 1924,
+              "y": 181
+            }
+          ],
+          "sharedTrunkSynthesized": true,
+          "detachedOverlapSeparated": true,
+          "_layoutPathLocked": true,
+          "displaySoftQualityRepaired": true
+        }
+      },
+      {
+        "id": "edge-3",
+        "source": "node-1",
+        "target": "node-5",
+        "type": "stablePath",
+        "data": {
+          "computedPath": [
+            {
+              "x": 1091,
+              "y": 1296
+            },
+            {
+              "x": 1091,
+              "y": 1392
+            },
+            {
+              "x": 1434,
+              "y": 1392
+            },
+            {
+              "x": 1434,
+              "y": 1539
+            }
+          ],
+          "detachedSourceEndpointReanchored": true,
+          "crossingOptimized": true,
+          "sharedTrunkAware": true,
+          "sharedTrunkSynthesized": true,
+          "_layoutPathLocked": true
+        }
+      },
+      {
+        "id": "edge-4",
+        "source": "node-3",
+        "target": "node-1",
+        "type": "stablePath",
+        "data": {
+          "computedPath": [
+            {
+              "x": 941,
+              "y": 179.5
+            },
+            {
+              "x": 941,
+              "y": 450
+            }
+          ],
+          "terminalPortBridgeRepaired": true,
+          "terminalBoundaryStairRepaired": true,
+          "_layoutPathLocked": true
+        }
+      },
+      {
+        "id": "edge-5",
+        "source": "node-5",
+        "target": "node-6",
+        "type": "stablePath",
+        "data": {
+          "computedPath": [
+            {
+              "x": 1530,
+              "y": 1539
+            },
+            {
+              "x": 1530,
+              "y": 1376
+            },
+            {
+              "x": 1997,
+              "y": 1376
+            },
+            {
+              "x": 1997,
+              "y": 181
+            }
+          ],
+          "_layoutPathLocked": true,
+          "displaySoftQualityRepaired": true
+        }
+      },
+      {
+        "id": "edge-6",
+        "source": "node-1",
+        "target": "node-5",
+        "type": "stablePath",
+        "data": {
+          "computedPath": [
+            {
+              "x": 1091,
+              "y": 1296
+            },
+            {
+              "x": 1091,
+              "y": 1392
+            },
+            {
+              "x": 1434,
+              "y": 1392
+            },
+            {
+              "x": 1434,
+              "y": 1539
+            }
+          ],
+          "detachedSourceEndpointReanchored": true,
+          "sharedTrunkSynthesized": true,
+          "_layoutPathLocked": true
+        }
+      }
+    ],
+    "nodes": [
+      {
+        "id": "node-0",
+        "type": "titleGroup",
+        "position": {
+          "x": 758.1125,
+          "y": 0
+        },
+        "positionAbsolute": {
+          "x": 758.1125,
+          "y": 0
+        },
+        "width": 1377,
+        "height": 290,
+        "measured": {
+          "width": 1377,
+          "height": 290
+        },
+        "style": {
+          "width": 1376.85,
+          "height": 290
+        },
+        "data": {}
+      },
+      {
+        "id": "node-1",
+        "type": "titleGroup",
+        "position": {
+          "x": 0,
+          "y": 450
+        },
+        "positionAbsolute": {
+          "x": 0,
+          "y": 450
+        },
+        "width": 1882,
+        "height": 846,
+        "measured": {
+          "width": 1882,
+          "height": 846
+        },
+        "style": {
+          "width": 1882.05,
+          "height": 846
+        },
+        "data": {}
+      },
+      {
+        "id": "node-2",
+        "type": "titleGroup",
+        "position": {
+          "x": 1254.3374999999999,
+          "y": 1456
+        },
+        "positionAbsolute": {
+          "x": 1254.3374999999999,
+          "y": 1456
+        },
+        "width": 404,
+        "height": 290,
+        "measured": {
+          "width": 404,
+          "height": 290
+        },
+        "style": {
+          "width": 404.4,
+          "height": 290
+        },
+        "data": {}
+      },
+      {
+        "id": "node-3",
+        "type": "custom",
+        "parentId": "node-0",
+        "position": {
+          "x": 32,
+          "y": 106.5
+        },
+        "positionAbsolute": {
+          "x": 790.1125,
+          "y": 106.5
+        },
+        "width": 210,
+        "height": 73,
+        "measured": {
+          "width": 210,
+          "height": 73
+        },
+        "style": {
+          "width": 210,
+          "height": 73
+        },
+        "data": {}
+      },
+      {
+        "id": "node-7",
+        "type": "custom",
+        "parentId": "node-1",
+        "position": {
+          "x": 935.25,
+          "y": 84
+        },
+        "positionAbsolute": {
+          "x": 935.25,
+          "y": 534
+        },
+        "width": 259,
+        "height": 118,
+        "measured": {
+          "width": 259,
+          "height": 118
+        },
+        "style": {
+          "width": 259,
+          "height": 118
+        },
+        "data": {}
+      },
+      {
+        "id": "node-8",
+        "type": "custom",
+        "parentId": "node-1",
+        "position": {
+          "x": 50,
+          "y": 362
+        },
+        "positionAbsolute": {
+          "x": 50,
+          "y": 812
+        },
+        "width": 282,
+        "height": 118,
+        "measured": {
+          "width": 282,
+          "height": 118
+        },
+        "style": {
+          "width": 282,
+          "height": 118
+        },
+        "data": {}
+      },
+      {
+        "id": "node-9",
+        "type": "custom",
+        "parentId": "node-1",
+        "position": {
+          "x": 32,
+          "y": 640
+        },
+        "positionAbsolute": {
+          "x": 32,
+          "y": 1090
+        },
+        "width": 298,
+        "height": 118,
+        "measured": {
+          "width": 298,
+          "height": 118
+        },
+        "style": {
+          "width": 298,
+          "height": 118
+        },
+        "data": {}
+      },
+      {
+        "id": "node-10",
+        "type": "custom",
+        "parentId": "node-1",
+        "position": {
+          "x": 923.75,
+          "y": 362
+        },
+        "positionAbsolute": {
+          "x": 923.75,
+          "y": 812
+        },
+        "width": 282,
+        "height": 118,
+        "measured": {
+          "width": 282,
+          "height": 118
+        },
+        "style": {
+          "width": 282,
+          "height": 118
+        },
+        "data": {}
+      },
+      {
+        "id": "node-11",
+        "type": "custom",
+        "parentId": "node-1",
+        "position": {
+          "x": 1525.75,
+          "y": 373
+        },
+        "positionAbsolute": {
+          "x": 1525.75,
+          "y": 823
+        },
+        "width": 282,
+        "height": 96,
+        "measured": {
+          "width": 282,
+          "height": 96
+        },
+        "style": {
+          "width": 282,
+          "height": 96
+        },
+        "data": {}
+      },
+      {
+        "id": "node-12",
+        "type": "custom",
+        "parentId": "node-1",
+        "position": {
+          "x": 650,
+          "y": 640
+        },
+        "positionAbsolute": {
+          "x": 650,
+          "y": 1090
+        },
+        "width": 243,
+        "height": 118,
+        "measured": {
+          "width": 243,
+          "height": 118
+        },
+        "style": {
+          "width": 243,
+          "height": 118
+        },
+        "data": {}
+      },
+      {
+        "id": "node-13",
+        "type": "custom",
+        "parentId": "node-1",
+        "position": {
+          "x": 1213,
+          "y": 640
+        },
+        "positionAbsolute": {
+          "x": 1213,
+          "y": 1090
+        },
+        "width": 250,
+        "height": 118,
+        "measured": {
+          "width": 250,
+          "height": 118
+        },
+        "style": {
+          "width": 250,
+          "height": 118
+        },
+        "data": {}
+      },
+      {
+        "id": "node-4",
+        "type": "custom",
+        "parentId": "node-0",
+        "position": {
+          "x": 562,
+          "y": 84
+        },
+        "positionAbsolute": {
+          "x": 1320.1125,
+          "y": 84
+        },
+        "width": 211,
+        "height": 118,
+        "measured": {
+          "width": 211,
+          "height": 118
+        },
+        "style": {
+          "width": 211,
+          "height": 118
+        },
+        "data": {}
+      },
+      {
+        "id": "node-5",
+        "type": "custom",
+        "parentId": "node-2",
+        "position": {
+          "x": 32,
+          "y": 84
+        },
+        "positionAbsolute": {
+          "x": 1286.3374999999999,
+          "y": 1540
+        },
+        "width": 296,
+        "height": 118,
+        "measured": {
+          "width": 296,
+          "height": 118
+        },
+        "style": {
+          "width": 296,
+          "height": 118
+        },
+        "data": {}
+      },
+      {
+        "id": "node-6",
+        "type": "custom",
+        "parentId": "node-0",
+        "position": {
+          "x": 1093,
+          "y": 106.5
+        },
+        "positionAbsolute": {
+          "x": 1851.1125,
+          "y": 106.5
+        },
+        "width": 219,
+        "height": 73,
+        "measured": {
+          "width": 219,
+          "height": 73
+        },
+        "style": {
+          "width": 219,
+          "height": 73
+        },
+        "data": {}
+      }
+    ],
+    "sourceEdges": [
+      {
+        "id": "edge-7",
+        "source": "node-7",
+        "target": "node-11",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1142,
+              "y": 653
+            },
+            {
+              "x": 1142,
+              "y": 742
+            },
+            {
+              "x": 1667,
+              "y": 742
+            },
+            {
+              "x": 1667,
+              "y": 822
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true
+        }
+      },
+      {
+        "id": "edge-8",
+        "source": "node-7",
+        "target": "node-10",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1038.85,
+              "y": 653
+            },
+            {
+              "x": 1038.85,
+              "y": 811
+            }
+          ],
+          "layoutPathLocked": true
+        }
+      },
+      {
+        "id": "edge-0",
+        "source": "node-7",
+        "target": "node-5",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1091,
+              "y": 653
+            },
+            {
+              "x": 1091,
+              "y": 788
+            },
+            {
+              "x": 1230,
+              "y": 788
+            },
+            {
+              "x": 1230,
+              "y": 823
+            },
+            {
+              "x": 1438,
+              "y": 823
+            },
+            {
+              "x": 1438,
+              "y": 954
+            },
+            {
+              "x": 1434,
+              "y": 954
+            },
+            {
+              "x": 1434,
+              "y": 1066
+            },
+            {
+              "x": 1487,
+              "y": 1066
+            },
+            {
+              "x": 1487,
+              "y": 1232
+            },
+            {
+              "x": 1434,
+              "y": 1232
+            },
+            {
+              "x": 1434,
+              "y": 1539
+            }
+          ],
+          "layoutPathLocked": true,
+          "hardObstacleRepaired": true,
+          "obstacleClearanceOptimized": false,
+          "sharedTrunkAware": true,
+          "crossingOptimized": true
+        }
+      },
+      {
+        "id": "edge-9",
+        "source": "node-7",
+        "target": "node-8",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 987,
+              "y": 653
+            },
+            {
+              "x": 987,
+              "y": 742
+            },
+            {
+              "x": 191,
+              "y": 742
+            },
+            {
+              "x": 191,
+              "y": 811
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true
+        }
+      },
+      {
+        "id": "edge-10",
+        "source": "node-10",
+        "target": "node-12",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 994,
+              "y": 931
+            },
+            {
+              "x": 994,
+              "y": 1020
+            },
+            {
+              "x": 976,
+              "y": 1020
+            },
+            {
+              "x": 976,
+              "y": 943
+            },
+            {
+              "x": 830,
+              "y": 943
+            },
+            {
+              "x": 830,
+              "y": 931
+            },
+            {
+              "x": 812,
+              "y": 931
+            },
+            {
+              "x": 812,
+              "y": 1089
+            }
+          ],
+          "layoutPathLocked": true,
+          "crossingOptimized": true,
+          "sharedTrunkAware": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true
+        }
+      },
+      {
+        "id": "edge-1",
+        "source": "node-10",
+        "target": "node-4",
+        "type": "advanced-smart-step",
+        "sourceHandle": "top",
+        "targetHandle": "bottom",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1018,
+              "y": 811
+            },
+            {
+              "x": 1018,
+              "y": 690
+            },
+            {
+              "x": 1027,
+              "y": 690
+            },
+            {
+              "x": 1027,
+              "y": 823
+            },
+            {
+              "x": 1045,
+              "y": 823
+            },
+            {
+              "x": 1045,
+              "y": 835
+            },
+            {
+              "x": 1408,
+              "y": 835
+            },
+            {
+              "x": 1408,
+              "y": 823
+            },
+            {
+              "x": 1426,
+              "y": 823
+            },
+            {
+              "x": 1426,
+              "y": 203
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "detachedOverlapSeparated": true,
+          "crossingOptimized": true,
+          "sharedTrunkAware": true
+        }
+      },
+      {
+        "id": "edge-2",
+        "source": "node-10",
+        "target": "node-6",
+        "type": "advanced-smart-step",
+        "sourceHandle": "top",
+        "targetHandle": "bottom",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1065,
+              "y": 812
+            },
+            {
+              "x": 1065,
+              "y": 790
+            },
+            {
+              "x": 1924,
+              "y": 790
+            },
+            {
+              "x": 1924,
+              "y": 181
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": true,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "crossingOptimized": true,
+          "sharedTrunkAware": true
+        }
+      },
+      {
+        "id": "edge-3",
+        "source": "node-10",
+        "target": "node-5",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1135,
+              "y": 931
+            },
+            {
+              "x": 1135,
+              "y": 972
+            },
+            {
+              "x": 1508,
+              "y": 972
+            },
+            {
+              "x": 1508,
+              "y": 1539
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "detachedOverlapSeparated": true
+        }
+      },
+      {
+        "id": "edge-11",
+        "source": "node-10",
+        "target": "node-13",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1065,
+              "y": 931
+            },
+            {
+              "x": 1065,
+              "y": 1020
+            },
+            {
+              "x": 1201,
+              "y": 1020
+            },
+            {
+              "x": 1201,
+              "y": 1000
+            },
+            {
+              "x": 1338,
+              "y": 1000
+            },
+            {
+              "x": 1338,
+              "y": 1089
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true
+        }
+      },
+      {
+        "id": "edge-4",
+        "source": "node-3",
+        "target": "node-7",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": true,
+          "autoTarget": true,
+          "computedPath": [
+            {
+              "x": 895,
+              "y": 181
+            },
+            {
+              "x": 895,
+              "y": 236
+            },
+            {
+              "x": 1065,
+              "y": 236
+            },
+            {
+              "x": 1065,
+              "y": 533
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true
+        }
+      },
+      {
+        "id": "edge-5",
+        "source": "node-5",
+        "target": "node-6",
+        "type": "advanced-smart-step",
+        "sourceHandle": "top",
+        "targetHandle": "bottom",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1530,
+              "y": 1539
+            },
+            {
+              "x": 1530,
+              "y": 1457
+            },
+            {
+              "x": 1997,
+              "y": 1457
+            },
+            {
+              "x": 1997,
+              "y": 181
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "detachedOverlapSeparated": true
+        }
+      },
+      {
+        "id": "edge-12",
+        "source": "node-8",
+        "target": "node-12",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 191,
+              "y": 931
+            },
+            {
+              "x": 191,
+              "y": 1000
+            },
+            {
+              "x": 250,
+              "y": 1000
+            },
+            {
+              "x": 250,
+              "y": 919
+            },
+            {
+              "x": 731,
+              "y": 919
+            },
+            {
+              "x": 731,
+              "y": 1089
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "crossingOptimized": true,
+          "sharedTrunkAware": true
+        }
+      },
+      {
+        "id": "edge-6",
+        "source": "node-8",
+        "target": "node-5",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 262,
+              "y": 931
+            },
+            {
+              "x": 262,
+              "y": 1066
+            },
+            {
+              "x": 354,
+              "y": 1066
+            },
+            {
+              "x": 354,
+              "y": 1232
+            },
+            {
+              "x": 1360,
+              "y": 1232
+            },
+            {
+              "x": 1360,
+              "y": 1539
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "hardObstacleRepaired": true,
+          "obstacleClearanceOptimized": false,
+          "sharedTrunkAware": true
+        }
+      },
+      {
+        "id": "edge-13",
+        "source": "node-8",
+        "target": "node-9",
+        "type": "advanced-smart-step",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 121,
+              "y": 931
+            },
+            {
+              "x": 121,
+              "y": 1020
+            },
+            {
+              "x": 181,
+              "y": 1020
+            },
+            {
+              "x": 181,
+              "y": 1089
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true
+        }
+      }
+    ],
+    "finalEdges": [
+      {
+        "id": "edge-7",
+        "source": "node-7",
+        "target": "node-11",
+        "type": "stablePath",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1065,
+              "y": 652
+            },
+            {
+              "x": 1065,
+              "y": 730
+            },
+            {
+              "x": 1649,
+              "y": 730
+            },
+            {
+              "x": 1649,
+              "y": 823
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "sharedTrunkAware": true,
+          "sharedTrunkSynthesized": true
+        }
+      },
+      {
+        "id": "edge-8",
+        "source": "node-7",
+        "target": "node-10",
+        "type": "stablePath",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1065,
+              "y": 652
+            },
+            {
+              "x": 1065,
+              "y": 812
+            }
+          ],
+          "layoutPathLocked": true,
+          "sharedTrunkAware": true,
+          "sharedTrunkSynthesized": true
+        }
+      },
+      {
+        "id": "edge-0",
+        "source": "node-7",
+        "target": "node-5",
+        "type": "stablePath",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1065,
+              "y": 652
+            },
+            {
+              "x": 1065,
+              "y": 742
+            },
+            {
+              "x": 1477,
+              "y": 742
+            },
+            {
+              "x": 1477,
+              "y": 1042
+            },
+            {
+              "x": 1511,
+              "y": 1042
+            },
+            {
+              "x": 1511,
+              "y": 1256
+            },
+            {
+              "x": 1434,
+              "y": 1256
+            },
+            {
+              "x": 1434,
+              "y": 1540
+            }
+          ],
+          "layoutPathLocked": true,
+          "hardObstacleRepaired": true,
+          "obstacleClearanceOptimized": false,
+          "sharedTrunkAware": true,
+          "crossingOptimized": true,
+          "sharedTrunkSynthesized": true
+        }
+      },
+      {
+        "id": "edge-9",
+        "source": "node-7",
+        "target": "node-8",
+        "type": "stablePath",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1065,
+              "y": 652
+            },
+            {
+              "x": 1065,
+              "y": 722
+            },
+            {
+              "x": 191,
+              "y": 722
+            },
+            {
+              "x": 191,
+              "y": 812
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "sharedTrunkAware": true,
+          "sharedTrunkSynthesized": true
+        }
+      },
+      {
+        "id": "edge-10",
+        "source": "node-10",
+        "target": "node-12",
+        "type": "stablePath",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1054,
+              "y": 930
+            },
+            {
+              "x": 1054,
+              "y": 1020
+            },
+            {
+              "x": 812,
+              "y": 1020
+            },
+            {
+              "x": 812,
+              "y": 1090
+            }
+          ],
+          "layoutPathLocked": true,
+          "crossingOptimized": true,
+          "sharedTrunkAware": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "sharedTrunkSynthesized": true
+        }
+      },
+      {
+        "id": "edge-1",
+        "source": "node-10",
+        "target": "node-4",
+        "type": "stablePath",
+        "sourceHandle": "right",
+        "targetHandle": "bottom",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1205.75,
+              "y": 871
+            },
+            {
+              "x": 1425.6125,
+              "y": 871
+            },
+            {
+              "x": 1425.6125,
+              "y": 202
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "detachedOverlapSeparated": true,
+          "crossingOptimized": true,
+          "sharedTrunkAware": true,
+          "sharedTrunkSynthesized": true
+        }
+      },
+      {
+        "id": "edge-2",
+        "source": "node-10",
+        "target": "node-6",
+        "type": "stablePath",
+        "sourceHandle": "bottom",
+        "targetHandle": "bottom",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1054,
+              "y": 930
+            },
+            {
+              "x": 1054,
+              "y": 986
+            },
+            {
+              "x": 1961,
+              "y": 986
+            },
+            {
+              "x": 1961,
+              "y": 179.5
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": true,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "crossingOptimized": true,
+          "sharedTrunkAware": true,
+          "sharedTrunkSynthesized": true
+        }
+      },
+      {
+        "id": "edge-3",
+        "source": "node-10",
+        "target": "node-5",
+        "type": "stablePath",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1054,
+              "y": 930
+            },
+            {
+              "x": 1054,
+              "y": 1256
+            },
+            {
+              "x": 1434,
+              "y": 1256
+            },
+            {
+              "x": 1434,
+              "y": 1540
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "detachedOverlapSeparated": true,
+          "sharedTrunkAware": true,
+          "sharedTrunkSynthesized": true
+        }
+      },
+      {
+        "id": "edge-11",
+        "source": "node-10",
+        "target": "node-13",
+        "type": "stablePath",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1054,
+              "y": 930
+            },
+            {
+              "x": 1054,
+              "y": 1033
+            },
+            {
+              "x": 1338,
+              "y": 1033
+            },
+            {
+              "x": 1338,
+              "y": 1090
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "sharedTrunkAware": true,
+          "sharedTrunkSynthesized": true
+        }
+      },
+      {
+        "id": "edge-4",
+        "source": "node-3",
+        "target": "node-7",
+        "type": "stablePath",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": true,
+          "autoTarget": true,
+          "computedPath": [
+            {
+              "x": 895,
+              "y": 179.5
+            },
+            {
+              "x": 895,
+              "y": 237
+            },
+            {
+              "x": 1065,
+              "y": 237
+            },
+            {
+              "x": 1065,
+              "y": 534
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true
+        }
+      },
+      {
+        "id": "edge-5",
+        "source": "node-5",
+        "target": "node-6",
+        "type": "stablePath",
+        "sourceHandle": "top",
+        "targetHandle": "bottom",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 1530,
+              "y": 1540
+            },
+            {
+              "x": 1530,
+              "y": 1392
+            },
+            {
+              "x": 1961,
+              "y": 1392
+            },
+            {
+              "x": 1961,
+              "y": 180
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "detachedOverlapSeparated": true,
+          "sharedTrunkSynthesized": true
+        }
+      },
+      {
+        "id": "edge-12",
+        "source": "node-8",
+        "target": "node-12",
+        "type": "stablePath",
+        "sourceHandle": "right",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 332,
+              "y": 871
+            },
+            {
+              "x": 731,
+              "y": 871
+            },
+            {
+              "x": 731,
+              "y": 1090
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "crossingOptimized": true,
+          "sharedTrunkAware": true
+        }
+      },
+      {
+        "id": "edge-6",
+        "source": "node-8",
+        "target": "node-5",
+        "type": "stablePath",
+        "sourceHandle": "right",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 332,
+              "y": 871
+            },
+            {
+              "x": 388,
+              "y": 871
+            },
+            {
+              "x": 388,
+              "y": 1256
+            },
+            {
+              "x": 1434,
+              "y": 1256
+            },
+            {
+              "x": 1434,
+              "y": 1540
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "hardObstacleRepaired": true,
+          "obstacleClearanceOptimized": false,
+          "sharedTrunkAware": true,
+          "sharedTrunkSynthesized": true
+        }
+      },
+      {
+        "id": "edge-13",
+        "source": "node-8",
+        "target": "node-9",
+        "type": "stablePath",
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "data": {
+          "autoSource": false,
+          "autoTarget": false,
+          "computedPath": [
+            {
+              "x": 181,
+              "y": 930
+            },
+            {
+              "x": 181,
+              "y": 1090
+            }
+          ],
+          "layoutPathLocked": true,
+          "detachedSourceEndpointReanchored": false,
+          "detachedTargetEndpointReanchored": false,
+          "endpointOrthogonalRepaired": true,
+          "sharedTrunkSynthesized": true
+        }
+      }
+    ],
+    "mutableEdgeIds": [
+      "edge-7",
+      "edge-8",
+      "edge-0",
+      "edge-9",
+      "edge-10",
+      "edge-1",
+      "edge-2",
+      "edge-3",
+      "edge-11",
+      "edge-4",
+      "edge-12",
+      "edge-6",
+      "edge-13"
+    ],
+    "changeSet": {
+      "reason": "container-change",
+      "classification": "topology",
+      "changedNodeIds": [
+        "node-12",
+        "node-11",
+        "node-7",
+        "node-1",
+        "node-10",
+        "node-9",
+        "node-8",
+        "node-13"
+      ],
+      "changedEdgeIds": [
+        "edge-7",
+        "edge-8",
+        "edge-0",
+        "edge-9",
+        "edge-10",
+        "edge-1",
+        "edge-2",
+        "edge-3",
+        "edge-11",
+        "edge-4",
+        "edge-12",
+        "edge-6",
+        "edge-13"
+      ],
+      "topologyChanged": true,
+      "geometryChanged": true
+    }
+  }
+}

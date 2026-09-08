@@ -134,6 +134,15 @@ export const assertTopologyEditStability = (operationId, evidence) => {
   // not the positions of retained nodes outside that scope. Router-selected
   // mutable edge groups must not exempt unrelated node movement.
   if (intent.movedNodeCount !== 0) throw new Error('Topology edit changed retained diagram positions');
+  // This canonical logistics fixture has a retained route outside the folded
+  // subtree. Its old geometry passes the production commit gate; expanding the
+  // requested or final repair group must not hide a regression of that route.
+  if (['container-collapse', 'container-expand'].includes(operationId)
+    && (intent.changedPortCount !== 0 || intent.changedGeometryCount !== 0
+      || Math.abs(intent.afterPathLength - intent.beforePathLength) > 0.01
+      || intent.afterBendCount !== intent.beforeBendCount)) {
+    throw new Error('Container edit changed retained external routes');
+  }
   // The audit node is deliberately isolated and outside the existing diagram.
   // Adding/removing it has no legitimate effect on retained positions or routes.
   if (['node-add', 'node-remove'].includes(operationId)

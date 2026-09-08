@@ -26,6 +26,7 @@ import type {
 import type { DisplayRoutingWorkerSpatialSnapshot } from './baseReactFlowDisplayWorkerSpatialSnapshot';
 import { createDisplayRoutingWorkerCommitReceipt } from './baseReactFlowDisplayWorkerCommitReceipt';
 import { isDisplayWorkerBoundedCandidateReport } from './baseReactFlowDisplayWorkerQualityProtocol';
+import { preserveDisplayTopologyFallbackRoutes } from './baseReactFlowDisplayTopologyFallbackStability';
 
 type ResolvedDisplayWorkerIncrementalRequest = Readonly<{
   request: DisplayEdgesWorkerResolvedIncrementalRouteRequest;
@@ -174,5 +175,13 @@ export const createDisplayWorkerResponseCompleter = (
   request: DisplayEdgesWorkerRequest,
   phaseTrace: DisplayRoutingPhaseTrace[],
 ): ((response: DisplayEdgesWorkerResponse) => DisplayEdgesWorkerResponse) => (
-  response => completeDisplayWorkerResponse({ request, response, phaseTrace })
+  response => {
+    const baseline = request.operation === 'incremental-route'
+      && request.changeSet.classification === 'topology' && response.fallbackLevel === 'full'
+      ? resolveDisplayWorkerIncrementalRequest(request) : null;
+    const candidate = baseline ? preserveDisplayTopologyFallbackRoutes(
+      baseline.request, response, trace => appendDisplayRoutingPhaseTrace(phaseTrace, trace),
+    ) : response;
+    return completeDisplayWorkerResponse({ request, response: candidate, phaseTrace });
+  }
 );

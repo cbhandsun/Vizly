@@ -14,6 +14,19 @@ const setup = () => {
 };
 
 describe('topology edit stability', () => {
+  it.each(['container-collapse', 'container-expand'])(
+    'rejects external route drift during %s even when the repair scope grows', async operation => {
+      const { graph, session } = setup();
+      await captureTopologyStabilityBaseline(session);
+      graph.edges[0].data.computedPath[1].x = 20;
+      const evidence = await readTopologyEditStability(session, operation, ['edge'], {
+        eligibleEdgeIds: ['edge'], routeResolution: 'incremental-route', fallbackLevel: 'none',
+      });
+      expect(evidence.outsideRequestedRoutingGroup.comparedEdgeCount).toBe(0);
+      expect(evidence.finalRepairScope.outsideFinalRepairGroup.comparedEdgeCount).toBe(0);
+      expect(() => assertTopologyEditStability(operation, evidence)).toThrow('retained external routes');
+    },
+  );
   it('reports expanded final repair scope without hiding changes outside the request', async () => {
     const { graph, session } = setup();
     await captureTopologyStabilityBaseline(session);
@@ -121,7 +134,8 @@ describe('topology edit stability', () => {
     expect(result.outsideRequestedRoutingGroup).toMatchObject({ comparedEdgeCount: 1, changedGeometryCount: 1 });
     expect(result.observedRequestedMutableEdgeCount).toBe(0);
     expect(result).not.toHaveProperty('outsideRoutingGroup');
-    expect(() => assertTopologyEditStability('container-expand', result)).not.toThrow();
+    expect(result.finalRepairScope.status).toBe('unavailable');
+    expect(() => assertTopologyEditStability('container-expand', result)).toThrow('retained external routes');
   });
 
   it('includes descendants in explicit movement and reports hidden route-set changes', async () => {
