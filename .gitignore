@@ -41,6 +41,7 @@ docs/*
 !docs/edge-routing-normal-entry-fix.md
 !docs/layout-space-optimization.md
 !docs/edge-routing-edit-stability-baseline.md
+!docs/edge-routing-next-iteration-plan.md
 scratch/
 .tmp-vizly-smoke-profile-*/
 thumbnails/
