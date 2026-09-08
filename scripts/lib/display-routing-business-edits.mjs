@@ -68,7 +68,11 @@ export const assertBusinessEditStability = (value, displacement) => {
     || metrics.addedEdgeCount !== 0 || metrics.removedEdgeCount !== 0 || metrics.rewiredEdgeCount !== 0) {
     throw new Error('Business drag changed unrelated positions or topology');
   }
-  // Route changes remain visible until each scenario has a justified contract.
+  // All four canonical leaf-drag fixtures retain feasible nonincident routes.
+  // Keep this independent of any enlargement of the router's eligible scope.
+  if (metrics.changedPortCount !== 0 || metrics.changedGeometryCount !== 0) {
+    throw new Error('Business drag changed retained nonincident routes');
+  }
   return metrics;
 };
 

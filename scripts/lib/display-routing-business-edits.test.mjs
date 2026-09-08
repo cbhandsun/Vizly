@@ -117,9 +117,9 @@ describe('business diagram edit coverage', () => {
     expect(selectBusinessEditTarget([...nodes, ...Array.from({ length: 4_997 }, (_, i) => node(`extra-${i}`))], edges)?.nodeId).toBe('a');
   });
 
-  it('records route changes without fabricating a zero-change contract', () => {
+  it('rejects nonincident route drift in the canonical leaf-drag fixtures', () => {
     const metrics = { ...validMetrics(), changedPathCount: 1, changedGeometryCount: 1, afterPathLength: 30 };
-    expect(assertBusinessEditStability(metrics, 16)).toEqual(metrics);
+    expect(() => assertBusinessEditStability(metrics, 16)).toThrow('nonincident');
   });
 
   it.each([NaN, Infinity, 0, -1, undefined])('rejects missing or ineffective gestures', displacement => {
