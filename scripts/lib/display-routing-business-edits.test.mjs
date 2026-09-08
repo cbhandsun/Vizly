@@ -8,12 +8,65 @@ import { measureDisplayRoutingEditStability } from './display-routing-edit-stabi
 import { createDisplayRoutingMatrixCaseIds, parseDisplayRoutingMatrixCase } from './display-routing-matrix-cases.mjs';
 import { verifyDisplayRoutingBrowserCases } from './display-routing-matrix-browser-cases.mjs';
 import { createEditProcessSampler, readEditProcessDomPoints, projectEditProcessReport } from './display-routing-edit-process.mjs';
+import { assertHistoryRestored, assertHistoryRetainedRoutes, captureBusinessHistoryState, verifyBusinessHistoryRoundtrip } from './display-routing-history-edits.mjs';
 
 const node = id => ({ id, position: { x: 0, y: 0 } });
 const nodes = [node('a'), node('b'), node('c')];
 const edges = [{ id: 'ab', source: 'a', target: 'b', data: { computedPath: [{ x: 0, y: 0 }, { x: 10, y: 0 }] } },
   { id: 'bc', source: 'b', target: 'c', data: { computedPath: [{ x: 10, y: 0 }, { x: 20, y: 0 }] } }];
 const validMetrics = () => measureDisplayRoutingEditStability({ nodes, edges }, { nodes, edges }, ['a']);
+
+describe('business history restoration contract', () => {
+  it.each([null, { ...validMetrics(), comparedEdgeCount: 0 }, { ...validMetrics(), changedPortCount: 1 },
+    { ...validMetrics(), changedPathCount: 1, changedGeometryCount: 1 }])('rejects missing or changed nonincident routes', value => {
+    expect(() => assertHistoryRetainedRoutes(value)).toThrow('retained');
+  });
+  it('accepts restored positions and topology while reporting route changes separately', () => {
+    expect(assertHistoryRestored({ ...validMetrics(), changedPathCount: 1, changedGeometryCount: 1 }).changedGeometryCount).toBe(1);
+  });
+  it.each(['movedNodeCount', 'addedNodeCount', 'removedNodeCount', 'addedEdgeCount', 'removedEdgeCount', 'rewiredEdgeCount'])('rejects a history mismatch: %s', key => {
+    expect(() => assertHistoryRestored({ ...validMetrics(), [key]: 1 })).toThrow('did not restore');
+  });
+  it.each([null, {}, { comparedNodeCount: 0 }, { ...validMetrics(), comparedEdgeCount: 0 },
+    { ...validMetrics(), movedNodeCount: NaN }])('rejects incomplete evidence', value => {
+    expect(() => assertHistoryRestored(value)).toThrow('Incomplete');
+  });
+  it('keeps independent before/after snapshots in the page and returns no graph data', async () => {
+    const state = structuredClone({ nodes, edges });
+    const window = { reactFlowInstance: { getNodes: () => state.nodes, getEdges: () => state.edges } };
+    const session = { evaluate: expression => vm.runInNewContext(expression, { window }) };
+    expect(await captureBusinessHistoryState(session, 'before')).toBeUndefined();
+    state.nodes[0].position.x = 20;
+    await captureBusinessHistoryState(session, 'after');
+    expect(window.__vizlyBusinessHistory.before.nodes[0].position.x).toBe(0);
+    expect(window.__vizlyBusinessHistory.after.nodes[0].position.x).toBe(20);
+  });
+  it.each(['', 'secret', null, {}])('rejects unsupported snapshot slots before browser evaluation', async phase => {
+    const session = { evaluate: vi.fn() };
+    await expect(captureBusinessHistoryState(session, phase)).rejects.toThrow('Invalid history capture');
+    expect(session.evaluate).not.toHaveBeenCalled();
+  });
+  it.each([false, true])('rechecks positions after routing and clears the capture (late drift=%s)', async drift => {
+    const session = { send: vi.fn(async () => {}), evaluate: vi.fn(async expression =>
+      expression.startsWith('delete ') ? true : drift ? null : { stability: validMetrics(), retained: validMetrics() }) };
+    const route = { routing: { requestId: 'current' }, request: { nodes }, response: { edges } };
+    const waitForValue = vi.fn(async (_session, _expression, label) => label.endsWith(' route') ? route : validMetrics());
+    const waitForVisual = vi.fn(async () => {});
+    const auditFinalSvg = vi.fn(async () => ({ checked: true }));
+    const result = verifyBusinessHistoryRoundtrip({ session, editedNodeId: 'a', waitForValue, waitForVisual, auditFinalSvg,
+      readFinalRouteExpression: () => 'route expression' });
+    if (drift) {
+      await expect(result).rejects.toThrow('Incomplete history');
+      expect(auditFinalSvg).not.toHaveBeenCalled();
+    } else {
+      expect((await result).map(item => item.operation)).toEqual(['undo', 'redo']);
+      expect(session.send.mock.calls.map(([, event]) => event.modifiers)).toEqual([2, 2, 10, 10]);
+      expect(auditFinalSvg).toHaveBeenCalledTimes(2);
+    }
+    expect(waitForVisual).toHaveBeenCalled();
+    expect(session.evaluate).toHaveBeenLastCalledWith('delete window.__vizlyBusinessHistory');
+  });
+});
 
 const processProbe = read => {
   let tick;

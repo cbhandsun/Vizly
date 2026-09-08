@@ -14,6 +14,7 @@ import { displayRoutingTopologyRequestMatchesResponse, displayRoutingTopologyRes
   findDisplayRoutingTopologyFinalResponse } from './display-routing-browser-topology-response.mjs';
 import { waitForStableDisplayRoutingLayoutVisual } from './display-routing-layout-visual-settle.mjs';
 import { startEditProcessSampling, stopEditProcessSampling } from './display-routing-edit-process.mjs';
+import { captureBusinessHistoryState, verifyBusinessHistoryRoundtrip } from './display-routing-history-edits.mjs';
 
 export const businessEditFinalRouteExpression = (nodeId, previousRequestId) => `(() => {
   const displayRoutingTopologyRequestMatchesResponse = ${displayRoutingTopologyRequestMatchesResponse.toString()};
@@ -147,6 +148,7 @@ export const verifyDisplayRoutingBusinessEdits = async ({ baseUrl, prepareSessio
       if (!selected) throw new Error('Business fixture has no eligible connected leaf');
       const operations = [];
       for (const direction of [1, -1]) {
+        await captureBusinessHistoryState(session, 'before');
         const priorRequestId = route.request.requestId;
         const drag = await dragBusinessNode(session, selected.nodeId, direction);
         route = await waitForValue(session, businessEditFinalRouteExpression(selected.nodeId, priorRequestId),
@@ -169,7 +171,11 @@ export const verifyDisplayRoutingBusinessEdits = async ({ baseUrl, prepareSessio
         onProgress({ event: 'business-edit-operation-passed', presetId: target.presetId,
           operation: operations.at(-1).id, stability: projectDisplayRoutingEditStability(stability), scopeEvidence, processStability });
       }
-      return { presetId: target.presetId, canonicalMount, initialAudit, operations };
+      await captureBusinessHistoryState(session, 'after');
+      const history = await verifyBusinessHistoryRoundtrip({ session, editedNodeId: selected.nodeId,
+        waitForValue, readFinalRouteExpression, auditFinalSvg });
+      onProgress({ event: 'business-edit-history-passed', presetId: target.presetId, operations: history.map(item => item.operation) });
+      return { presetId: target.presetId, canonicalMount, initialAudit, operations, history };
     }));
   }
   return results;
