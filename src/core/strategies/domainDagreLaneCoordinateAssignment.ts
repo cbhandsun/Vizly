@@ -84,7 +84,9 @@ export function assignDomainDagreLaneCoordinates(
       const compacted = compactDomainDagreLaneCrossAxis(process,
         new Map(process.map(node => [node.id, node.position])), cross, crossGap);
       const origin = process.length ? Math.min(...process.map(node => compacted.get(node.id) ?? node.position[cross])) : 0;
-      const inset = horizontal ? 64 : 32;
+      // Direct content already receives the domain's outer inset. Only a
+      // real nested container needs another border around its own content.
+      const inset = bucket.id === scope.domainId ? 0 : horizontal ? 64 : 32;
       let occupiedWidth = 0;
       for (const node of process) {
         const c = (compacted.get(node.id) ?? node.position[cross]) - origin;
@@ -147,7 +149,7 @@ export function assignDomainDagreLaneCoordinates(
         occupiedWidth = Math.max(occupiedWidth, column + crossSize(node));
         cursor += flowSize(node) + flowGap;
       }
-      const width = occupiedWidth + inset + 32;
+      const width = occupiedWidth + inset + (bucket.id === scope.domainId ? 0 : 32);
       const group = replacements.get(bucket.id);
       if (group && bucket.id !== scope.domainId) replacements.set(bucket.id, resize(group, bucketCross, width));
       bucketCross += width + crossGap;

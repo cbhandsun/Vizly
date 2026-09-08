@@ -7,6 +7,28 @@ const node = (id: string, x: number, y: number, width = 240, height = 80): Node 
   id, position: { x, y }, width, height, measured: { width, height }, data: {},
 });
 describe('final swimlane coordinate assignment', () => {
+  it.each([false, true])('applies one inset per actual container, horizontal=%s', horizontal => {
+    const cross = horizontal ? 'y' : 'x', size = horizontal ? 'height' : 'width';
+    const outerInset = horizontal ? 88 : 32, innerInset = horizontal ? 64 : 32;
+    const measure = (nested: boolean) => {
+      const input = [node('domain', 0, 0, 1000, 1000), node('group', 0, 0, 900, 900), node('leaf', 0, 200)];
+      const values = new Map(input.map(value => [value.id, value]));
+      assignDomainDagreLaneCoordinates(values, [{ domainId: 'domain', buckets: [{
+        id: nested ? 'group' : 'domain', nodeIds: ['leaf'],
+      }] }], [], horizontal, 120, 96);
+      const domain = values.get('domain'), group = values.get('group'), leaf = values.get('leaf');
+      if (!domain || !group || !leaf) throw new Error('Missing container geometry');
+      expect(leaf.position[cross] - domain.position[cross]).toBe(outerInset + (nested ? innerInset : 0));
+      expect(domain.position[cross] + Number(domain[size]) - leaf.position[cross] - Number(leaf[size]))
+        .toBe(nested ? 64 : 32);
+      if (nested) {
+        expect(leaf.position[cross] - group.position[cross]).toBe(innerInset);
+        expect(group.position[cross] + Number(group[size]) - leaf.position[cross] - Number(leaf[size])).toBe(32);
+      }
+      return Number(domain[size]);
+    };
+    expect(measure(true) - measure(false)).toBe(innerInset + 32);
+  });
   it('leaves common-channel refinement bounded on oversized edge input', () => {
     const input = [{ ...node('domain', 0, 0, 1000, 1600), type: 'titleGroup' },
       node('hub', 205, 200, 260), node('a', 64, 800, 210), node('b', 394, 800, 212),
@@ -70,7 +92,7 @@ describe('final swimlane coordinate assignment', () => {
     const flowSize = horizontal ? 'width' : 'height';
     expect(replacements.get('domain')?.[flowSize]).toBe(1032);
     // Horizontal lanes retain their larger title insets.
-    expect(replacements.get('domain')?.[crossSize]).toBe(horizontal ? 1536 : 1448);
+    expect(replacements.get('domain')?.[crossSize]).toBe(horizontal ? 1440 : 1384);
     for (const value of chain) expect(replacements.get(value.id)?.position[flow]).toBe(value.position.y);
     expect(new Set(isolated.map(value => replacements.get(value.id)?.position[flow])).size).toBe(4);
     expect(new Set(isolated.map(value => replacements.get(value.id)?.position[cross])).size).toBe(3);
@@ -82,7 +104,7 @@ describe('final swimlane coordinate assignment', () => {
     const values = new Map([node('domain', 0, 0, 1448, 900), ...leaves].map(value => [value.id, value]));
     assignDomainDagreLaneCoordinates(values, [{ domainId: 'domain', buckets: [{ id: 'domain', nodeIds: leaves.map(value => value.id) }] }],
       leaves.slice(1).map((value, index) => ({ id: `e${index}`, source: leaves[index].id, target: value.id })), false, 120, 120);
-    expect(values.get('domain')?.width).toBe(368);
+    expect(values.get('domain')?.width).toBe(304);
     expect(new Set(leaves.map(value => values.get(value.id)?.position.x)).size).toBe(1);
     expect(leaves.map(value => values.get(value.id)?.position.y)).toEqual(leaves.map(value => value.position.y));
   });
@@ -92,7 +114,7 @@ describe('final swimlane coordinate assignment', () => {
       .map(value => [value.id, value]));
     assignDomainDagreLaneCoordinates(values, [], [], false, 120, 120);
     assignDomainDagreLaneCoordinates(values, [{ domainId: '__proto__', buckets: [{ id: '__proto__', nodeIds: ['<svg onload=alert(1)>'] }] }], [], false, 120, 120);
-    expect(values.get('<svg onload=alert(1)>')?.position).toEqual({ x: 64, y: 200 });
+    expect(values.get('<svg onload=alert(1)>')?.position).toEqual({ x: 32, y: 200 });
   });
 
   it.each([false, true])('keeps truly independent cards in a uniform grid and grows the common lane envelope, horizontal=%s', horizontal => {
