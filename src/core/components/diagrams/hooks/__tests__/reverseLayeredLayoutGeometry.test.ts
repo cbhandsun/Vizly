@@ -9,6 +9,19 @@ import {
 } from '../reverseLayeredLayoutGeometry';
 
 describe('reverseLayeredLayoutGeometry', () => {
+  it.each(['LR', 'RL', 'TB', 'BT'] as const)('preserves an independent child axis for %s', async direction => {
+    const inner = direction === 'LR' || direction === 'RL' ? 'TB' : 'LR';
+    const nodes: Node[] = [{ id: 'n', position: { x: 0, y: 0 }, width: 60, height: 40, data: {} }];
+    const calculateLayout = vi.fn(async () => ({ nodes, edges: [] }));
+    await calculateLayeredLayoutWithReverse({ calculateLayout }, nodes, [], {
+      type: LayoutType.DAGRE, direction, domainSubGroupDirection: direction, subDomainNodeDirection: inner,
+    }, direction, true);
+    expect(calculateLayout).toHaveBeenCalledWith(nodes, [], expect.objectContaining({
+      direction: direction === 'RL' ? 'LR' : direction === 'BT' ? 'TB' : direction,
+      subDomainNodeDirection: inner,
+    }), undefined);
+  });
+
   it('mirrors BT nodes and every supported absolute route path without mutating the source', () => {
     const invalidPath = [{ x: 0, y: Number.NaN }];
     const nodes = [

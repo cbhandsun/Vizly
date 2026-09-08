@@ -12,6 +12,36 @@ const request = {
 };
 const committedShape = { nodeCount: 2, edgeCount: 1 };
 
+it('retains a committed cache baseline after an unselected alternative Worker response', () => {
+  const alternative = { ...request, requestId: 'layout:9:alternative' };
+  const options = {
+    routing: { ...committedShape, stage: 'final-applied', requestId: 'layout:9',
+      renderAuthorityStatus: 'accepted', layoutTransactionJobId: 9, layoutTransactionStatus: 'committed',
+      cacheTrustLevel: 'runtime-committed', outputRouteSignature: 'baseline-output' },
+    requests: [alternative], responses: [{ requestId: alternative.requestId, edges: alternative.edges,
+      hardClean: true, hardReport: { hardClean: true }, outputRouteSignature: 'alternative-output' }],
+    currentNodes: request.nodes, currentEdges: request.edges, renderedEdgeCount: 1,
+    expectedRequestPrefix: 'layout:', minimumExclusiveLayoutJobId: 8,
+  };
+  const result = resolveDisplayRoutingFinalRouteSnapshot(options);
+  expect(result?.response.source).toBe('runtime-committed-cache');
+  expect(result?.request.requestId).toBe('layout:9');
+  expect(resolveDisplayRoutingFinalRouteSnapshot({ ...options,
+    requests: [{ ...request, requestId: 'layout:9' }, alternative],
+  })).toBeNull();
+});
+
+it('does not accept the last candidate merely because its request ID matches stale diagnostics', () => {
+  const options = {
+    routing: { ...committedShape, stage: 'final-applied', requestId: 'layout:7',
+      renderAuthorityStatus: 'accepted', outputRouteSignature: 'baseline-output' },
+    requests: [request], responses: [{ requestId: request.requestId, edges: request.edges,
+      hardClean: true, hardReport: { hardClean: true }, outputRouteSignature: 'other-output' }],
+    currentEdges: request.edges, renderedEdgeCount: 1, expectedRequestPrefix: 'layout:',
+  };
+  expect(resolveDisplayRoutingFinalRouteSnapshot(options)).toBeNull();
+});
+
 describe('new layout completion requires the whole transaction', () => {
   const options = (status, jobId = 7, responses = []) => ({
     routing: { ...committedShape, stage: 'final-applied', requestId: 'layout:7',

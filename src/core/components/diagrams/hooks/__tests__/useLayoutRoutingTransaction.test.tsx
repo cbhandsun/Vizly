@@ -122,6 +122,70 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
       .__vizlyBaseReactFlowDisplayRouting;
   });
 
+  it.each([true, false])('commits only the selected complete layout when alternative wins=%s', async wins => {
+    const options = createOptions();
+    const candidateNodes = nodes.map(node => ({ ...node, position: { ...node.position, y: 200 } }));
+    const candidateEdges = edges.map(edge => ({ ...edge, data: { candidate: true } }));
+    const baselineReceipt = vi.fn(() => true);
+    const candidateReceipt = vi.fn(() => true);
+    mocks.stageLayoutRouting.mockResolvedValueOnce({ committedSourceEdges: edges, routedEdges, commitSnapshot: baselineReceipt });
+    mocks.stageLayoutRouting.mockImplementationOnce(async () => {
+      expect(options.setNodes).not.toHaveBeenCalled();
+      expect(options.setEdges).not.toHaveBeenCalled();
+      expect(options.takeSnapshot).not.toHaveBeenCalled();
+      return { committedSourceEdges: candidateEdges, routedEdges: candidateEdges, commitSnapshot: candidateReceipt };
+    });
+    const selection = vi.fn();
+    const { result } = renderHook(() => useLayoutRoutingTransaction(options));
+    await act(async () => result.current({
+      nodes, edges, routingJob: options.routingSessionRuntime.beginJob('layout'), commitSelection: selection,
+      alternative: { create: async () => ({ nodes: candidateNodes, edges: candidateEdges }), prefer: () => wins },
+    }));
+    expect(options.setNodes).toHaveBeenCalledExactlyOnceWith(wins ? candidateNodes : nodes);
+    expect(options.setEdges).toHaveBeenCalledExactlyOnceWith(wins ? candidateEdges : edges);
+    expect(options.takeSnapshot).toHaveBeenCalledExactlyOnceWith(nodes, edges);
+    expect(selection).toHaveBeenCalledOnce();
+    expect(baselineReceipt).toHaveBeenCalledTimes(wins ? 0 : 1);
+    expect(candidateReceipt).toHaveBeenCalledTimes(wins ? 1 : 0);
+    expect(mocks.stageLayoutRouting.mock.calls.map(([request]) => request.requestId)).toEqual(['layout:1', 'layout:1:alternative']);
+    expect(readDisplayRoutingDebugState()?.requestId).toBe(wins ? 'layout:1:alternative' : 'layout:1');
+  });
+
+  it('retains the baseline when optional geometry violates the original constraints', async () => {
+    const options = createOptions();
+    const selection = vi.fn();
+    const prefer = vi.fn(() => true);
+    const { result } = renderHook(() => useLayoutRoutingTransaction(options));
+    await act(async () => result.current({
+      nodes, edges, routingJob: options.routingSessionRuntime.beginJob('layout'), commitSelection: selection,
+      alternative: { create: async () => ({ nodes: nodes.map(node => ({ ...node, position: { x: 0, y: 0 } })), edges }), prefer },
+    }));
+    expect(mocks.stageLayoutRouting).toHaveBeenCalledOnce();
+    expect(prefer).not.toHaveBeenCalled();
+    expect(options.setNodes).toHaveBeenCalledExactlyOnceWith(nodes);
+    expect(selection).toHaveBeenCalledOnce();
+  });
+
+  it('does not commit either candidate when a new job supersedes optional routing', async () => {
+    const options = createOptions();
+    const selection = vi.fn();
+    mocks.stageLayoutRouting.mockResolvedValueOnce({ committedSourceEdges: edges, routedEdges, commitSnapshot: () => true });
+    mocks.stageLayoutRouting.mockImplementationOnce(async () => {
+      options.routingSessionRuntime.beginJob('layout');
+      return { committedSourceEdges: edges, routedEdges, commitSnapshot: () => true };
+    });
+    const { result } = renderHook(() => useLayoutRoutingTransaction(options));
+    await act(async () => {
+      await expect(result.current({
+        nodes, edges, routingJob: options.routingSessionRuntime.beginJob('layout'), commitSelection: selection,
+        alternative: { create: async () => ({ nodes: structuredClone(nodes), edges }), prefer: () => true },
+      })).rejects.toThrow('layout-routing-cancelled');
+    });
+    expect(options.setNodes).not.toHaveBeenCalled();
+    expect(options.takeSnapshot).not.toHaveBeenCalled();
+    expect(selection).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['layout-routing-hard-quality-rejected', 'hard-quality-rejected'],
     ['display-edge-worker-timeout', 'worker-timeout'],

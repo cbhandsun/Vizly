@@ -45,6 +45,26 @@ const contextFor = (nodes: Node[], edges: Edge[]) => ({
 describe('runDomainDagreSimplifiedPath', () => {
   beforeEach(() => routeEdges.mockClear());
 
+  it.each([[false, false], [false, true], [true, false], [true, true]])(
+    'rebuilds child coordinates independently of the previous group origin (inner=%s, outer=%s)',
+    (innerHorizontal, outerHorizontal) => {
+      const calculate = (x: number, y: number) => {
+        const group: Node = { id: 'g', type: 'subGroup', position: { x, y }, data: { children: ['a', 'b'] } };
+        const context = contextFor([group, makeLeaf('a'), makeLeaf('b'), makeLeaf('free')], [
+          { id: 'ab', source: 'a', target: 'b' }, { id: 'bf', source: 'b', target: 'free' },
+        ]);
+        context.subGroups = [group];
+        context.subDomainNodeIsHorizontal = innerHorizontal;
+        context.domainSubGroupIsHorizontal = outerHorizontal;
+        return runDomainDagreSimplifiedPath(context)?.nodes;
+      };
+      const fresh = calculate(0, 0);
+      expect(calculate(900, 600)).toEqual(fresh);
+      expect(calculate(-900, -600)).toEqual(fresh);
+      expect(fresh?.filter(node => node.parentId).every(node => node.position.x >= 24 && node.position.y >= 52)).toBe(true);
+    },
+  );
+
   it('lays out ungrouped leaves and removes dangling edges', () => {
     const nodes = [makeLeaf('a'), makeLeaf('b')];
     const edges: Edge[] = [

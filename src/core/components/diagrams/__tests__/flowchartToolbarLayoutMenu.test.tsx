@@ -19,6 +19,7 @@ import {
 } from '../flowchartLayoutStrategyMode';
 import { resolveFlowchartCustomDomainLayoutCapability } from '../flowchartLayoutCapabilities';
 import { getFlowchartLayoutMenuPlacements } from '../flowchartLayoutMenuPlacement';
+import { parsePersistedLayoutSelection } from '../layoutSelectionPersistence';
 
 const asRecord = (value: unknown): Record<string, unknown> => (
   value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -38,6 +39,23 @@ const collectItems = (value: unknown): Record<string, unknown>[] => {
 };
 
 describe('flowchartToolbarLayoutMenu', () => {
+  it('exposes the guarded compact command without enabling legacy cyclic layouts and restores its label', () => {
+    const onStrategyLayout = vi.fn();
+    const model = buildFlowchartLayoutMenuModel({ customDomainLayoutAvailable: false,
+      lastDomainStrategy: 'compact-groups', lastDomainDirection: 'LR', onStrategyLayout,
+      translate: (_key, fallback) => fallback });
+    const items = collectItems(model.items);
+    const item = items.find(entry => entry.key === 'compact-groups-lr');
+    expect(item?.label).toBe('紧凑分组');
+    if (typeof item?.onClick !== 'function') throw new Error('Compact command missing');
+    item.onClick();
+    expect(onStrategyLayout).toHaveBeenCalledExactlyOnceWith('compact-groups', undefined, 'LR');
+    expect(items.some(entry => entry.key === 'domain-dagre-sub-horizontal-tb')).toBe(false);
+    expect(model.selectedKeys).toContain('compact-groups-lr');
+    expect(parsePersistedLayoutSelection({ layoutSelection: { version: 2, strategy: 'compact-groups',
+      direction: 'LR', nodeLayout: 'dagre', laneRankPreference: 'auto' } })?.strategy).toBe('compact-groups');
+  });
+
   it('shifts every advanced popup inside the viewport while retaining directional flips', () => {
     const ltr = getFlowchartLayoutMenuPlacements('ltr');
     const rtl = getFlowchartLayoutMenuPlacements('rtl');

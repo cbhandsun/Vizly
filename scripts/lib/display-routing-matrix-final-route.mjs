@@ -142,6 +142,8 @@ export const resolveDisplayRoutingFinalRouteSnapshot = ({
     && (Array.isArray(item.edges) || Array.isArray(item.routingPatches))
     && isRecord(item.hardReport)
     && item.hardReport.hardClean === true
+    && (typeof item.outputRouteSignature !== 'string' || typeof routing.outputRouteSignature !== 'string'
+      || responseMatchesCommittedOutput(item))
     && (
       item.requestId === routing.requestId
         && (
@@ -192,7 +194,9 @@ export const resolveDisplayRoutingFinalRouteSnapshot = ({
     && routing.nodeCount === currentNodes.length
     && routing.edgeCount === currentEdges.length
     && renderedEdgeCount === currentEdges.length;
-  if (trustedRuntimeCommit && safeRequests.length === 0 && safeResponses.length === 0) {
+  const selectedRequestWasCaptured = safeRequests.some(item => item?.requestId === routing.requestId)
+    || safeResponses.some(item => item?.requestId === routing.requestId);
+  if (trustedRuntimeCommit && !selectedRequestWasCaptured) {
     return {
       routing,
       request: {

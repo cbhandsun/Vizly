@@ -18,6 +18,11 @@ import type {
 import { resolveBaseReactFlowPrecompiledLayoutRegenerationFromWindow } from '../../shared/baseReactFlowPrecompiledCaptureMode';
 import { PRECOMPILED_CAPTURE_WORKER_TIMEOUT_MS } from '../../shared/baseReactFlowDisplayWorkerTimeout';
 import type { LayoutRoutingTransactionDiagnostics } from './layoutRoutingTransactionDiagnostics';
+import {
+  stagePreferredLayoutCandidate,
+  type LayoutCandidate,
+  type RoutedLayoutCandidate,
+} from './layoutCandidateSelection';
 
 type LayoutRoutingTransactionRequest = Readonly<{
   nodes: Node[];
@@ -31,6 +36,10 @@ type LayoutRoutingTransactionRequest = Readonly<{
   candidateRepairPolicy?: 'default' | 'skip-exact-clean';
   retainLayoutPreviewOnFailure?: boolean;
   diagnostics?: LayoutRoutingTransactionDiagnostics;
+  alternative?: Readonly<{
+    create: () => Promise<LayoutCandidate | null>;
+    prefer: (baseline: RoutedLayoutCandidate, candidate: RoutedLayoutCandidate) => boolean;
+  }>;
 }>;
 
 export type LayoutPresentationPreviewRequest = Readonly<{
@@ -79,6 +88,7 @@ export const useLayoutRoutingTransaction = ({
     candidateRepairPolicy,
     retainLayoutPreviewOnFailure = false,
     diagnostics,
+    alternative,
   }: LayoutRoutingTransactionRequest): Promise<void> => {
     if (routingJob.owner !== 'layout' || !routingSessionRuntime.isCurrentJob(routingJob)) {
       throw new Error('layout-routing-cancelled');
@@ -110,14 +120,15 @@ export const useLayoutRoutingTransaction = ({
         throw new Error('layout-routing-cancelled');
       }
 
-      const targetNodes = clearBaseReactFlowLayoutNodeRuntimeGeometry(normalizeBaseReactFlowLayoutVisibility(nodes));
-      const geometryAcceptance = createLayoutCandidateAcceptance(targetNodes, layoutConstraints, null);
+      let targetNodes = clearBaseReactFlowLayoutNodeRuntimeGeometry(normalizeBaseReactFlowLayoutVisibility(nodes));
+      let geometryAcceptance = createLayoutCandidateAcceptance(targetNodes, layoutConstraints, null);
       updateDisplayRoutingDebugState({ layoutGeometryReport: geometryAcceptance?.geometry
         ?? evaluateLayoutGeometry(targetNodes, layoutConstraints) });
       if (!geometryAcceptance) throw new Error('layout-routing-hard-quality-rejected');
       setLayoutStable?.(false);
       publishLayoutPreview?.({ nodes: targetNodes, routingJob });
       let committedEdges = edges;
+      let committedRequestId: string | undefined;
       let commitLayoutSnapshot = (_runtime: BaseReactFlowRoutingSessionRuntime): boolean => true;
       if (edges.length > 0) {
         const performanceConfig = readBaseReactFlowPerformanceConfig({
@@ -130,31 +141,68 @@ export const useLayoutRoutingTransaction = ({
         });
         const precompiledLayoutRegeneration =
           resolveBaseReactFlowPrecompiledLayoutRegenerationFromWindow();
-        const stageRouting = () => stageBaseReactFlowLayoutRouting({
-          workerRef: routingSessionRuntime.workerRef,
-          requestId: `layout:${routingJob.id}`,
-          sourceEdges: edges,
-          sourceNodes: targetNodes,
-          layoutConstraints: layoutConstraints === undefined ? undefined : geometryAcceptance.constraints,
-          isLargeGraph,
+        const candidateAcceptances = new Map<Node[], NonNullable<typeof geometryAcceptance>>();
+        const candidateRequestIds = new Map<Node[], string>();
+        let candidateOrdinal = 0;
+        const stageRouting = async (candidate: LayoutCandidate) => {
+          const acceptance = createLayoutCandidateAcceptance(candidate.nodes, layoutConstraints, null);
+          if (!acceptance) throw new Error('layout-routing-hard-quality-rejected');
+          candidateAcceptances.set(candidate.nodes, acceptance);
+          const requestId = `layout:${routingJob.id}${candidateOrdinal++ === 0 ? '' : ':alternative'}`;
+          candidateRequestIds.set(candidate.nodes, requestId);
+          const route = () => stageBaseReactFlowLayoutRouting({
+            workerRef: routingSessionRuntime.workerRef,
+            requestId,
+            sourceEdges: candidate.edges,
+            sourceNodes: candidate.nodes,
+            layoutConstraints: layoutConstraints === undefined ? undefined : acceptance.constraints,
+            isLargeGraph,
+            signal: routingJob.signal,
+            forceFreshFullRoute: precompiledLayoutRegeneration !== null,
+            fullRouteTimeoutMs: precompiledLayoutRegeneration
+              ? PRECOMPILED_CAPTURE_WORKER_TIMEOUT_MS
+              : undefined,
+            precompiledLayoutRegeneration,
+            rejectObstacleDirtyBoundedCandidate,
+            rejectUnanchoredFlatElkCandidate,
+            candidateRepairPolicy,
+          });
+          const staged = diagnostics ? await diagnostics.measurePhase('worker-routing', route) : await route();
+          if (!layoutCandidateAcceptanceMatches(acceptance, candidate.nodes, null)) {
+            throw new Error('layout-routing-hard-quality-rejected');
+          }
+          return staged;
+        };
+        const select = () => stagePreferredLayoutCandidate({
+          baseline: { nodes: targetNodes, edges },
+          createAlternative: alternative ? async () => {
+            const candidate = diagnostics
+              ? await diagnostics.measurePhase('layout-calculation', alternative.create)
+              : await alternative.create();
+            return candidate && { ...candidate, nodes: clearBaseReactFlowLayoutNodeRuntimeGeometry(
+              normalizeBaseReactFlowLayoutVisibility(candidate.nodes),
+            ) };
+          } : undefined,
+          stage: stageRouting,
+          preferAlternative: alternative?.prefer ?? (() => false),
           signal: routingJob.signal,
-          forceFreshFullRoute: precompiledLayoutRegeneration !== null,
-          fullRouteTimeoutMs: precompiledLayoutRegeneration
-            ? PRECOMPILED_CAPTURE_WORKER_TIMEOUT_MS
-            : undefined,
-          precompiledLayoutRegeneration,
-          rejectObstacleDirtyBoundedCandidate,
-          rejectUnanchoredFlatElkCandidate,
-          candidateRepairPolicy,
         });
-        const staged = diagnostics
-          ? await diagnostics.measurePhase('worker-routing', stageRouting)
-          : await stageRouting();
+        const selected = await select();
         if (!routingSessionRuntime.isCurrentJob(routingJob)) {
           throw new Error('layout-routing-cancelled');
         }
-        committedEdges = staged.committedSourceEdges;
-        commitLayoutSnapshot = staged.commitSnapshot;
+        // Keep candidate evaluation off the state writers. Only the selected
+        // geometry, route receipt, and saved selection enter the same commit.
+        if (selected.geometry.nodes !== targetNodes) {
+          targetNodes = selected.geometry.nodes;
+          geometryAcceptance = candidateAcceptances.get(targetNodes) ?? null;
+          if (!geometryAcceptance) throw new Error('layout-routing-hard-quality-rejected');
+          publishLayoutPreview?.({ nodes: targetNodes, routingJob });
+          updateDisplayRoutingDebugState({ layoutGeometryReport: geometryAcceptance.geometry });
+        }
+        committedEdges = selected.staged.committedSourceEdges;
+        commitLayoutSnapshot = selected.staged.commitSnapshot;
+        committedRequestId = candidateRequestIds.get(selected.geometry.nodes);
       }
       const commit = () => routingSessionRuntime.commitJob(routingJob, () => {
         if (!layoutCandidateAcceptanceMatches(geometryAcceptance, targetNodes, null)) {
@@ -164,6 +212,7 @@ export const useLayoutRoutingTransaction = ({
         if (!commitLayoutSnapshot(routingSessionRuntime)) {
           throw new Error('layout-routing-hard-quality-rejected');
         }
+        if (committedRequestId) updateDisplayRoutingDebugState({ requestId: committedRequestId });
         if (edges.length === 0 && !routingSessionRuntime.commitLayoutAcceptance(geometryAcceptance, targetNodes, null)) {
           throw new Error('layout-routing-hard-quality-rejected');
         }

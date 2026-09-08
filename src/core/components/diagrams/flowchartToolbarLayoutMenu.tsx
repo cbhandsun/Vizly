@@ -249,6 +249,7 @@ export const buildFlowchartLayoutMenuModel = ({
         : <FaObjectGroup />);
 
     const labelByKey: Record<string, string> = {
+        'compact-groups-lr': translate('flowchart.layout.compactGroups', '紧凑分组'),
         'tree-tb': labels.treeTb,
         'tree-bt': labels.treeBt,
         'tree-lr': labels.treeLr,
@@ -338,6 +339,12 @@ export const buildFlowchartLayoutMenuModel = ({
             label: labels.domainGroup,
             type: 'group' as const,
             children: [
+                domainItem(
+                    'compact-groups-lr',
+                    translate('flowchart.layout.compactGroups', '紧凑分组'),
+                    () => onStrategyLayout('compact-groups', undefined, 'LR'),
+                    <FaObjectGroup />,
+                ),
                 ...(customDomainLayoutAvailable ? [
                     domainItem(
                         'domain-dagre-sub-horizontal-tb',

@@ -197,8 +197,12 @@ export const calculateLayeredLayoutWithReverse = async (
     const calculationOptions: LayeredLayoutOptions = {
         ...options,
         direction: calculationDirection,
-        domainSubGroupDirection: calculationDirection,
-        subDomainNodeDirection: calculationDirection,
+        domainSubGroupDirection: options.domainSubGroupDirection === undefined
+            || options.domainSubGroupDirection === requestedDirection
+            ? calculationDirection : options.domainSubGroupDirection,
+        subDomainNodeDirection: options.subDomainNodeDirection === undefined
+            || options.subDomainNodeDirection === requestedDirection
+            ? calculationDirection : options.subDomainNodeDirection,
         directionOverrides: reverseDirection ? undefined : options.directionOverrides,
     };
     const calculated = await strategy.calculateLayout(nodes, edges, calculationOptions, context);

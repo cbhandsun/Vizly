@@ -177,16 +177,16 @@ const layoutWithSubGroupsOnly = (
     if (!item) continue;
     const absolutePosition = offsetPosition(position);
     if (String(item.type || '') === 'subGroup') {
-      const deltaX = absolutePosition.x - item.position.x;
-      const deltaY = absolutePosition.y - item.position.y;
       item.position = absolutePosition;
       item.positionAbsolute = absolutePosition;
       for (const childId of childrenBySubGroup.get(item.id) ?? []) {
         const child = idMap.get(childId) as NodeWithAbsolutePosition | undefined;
         if (!child) continue;
         child.position = {
-          x: child.position.x + deltaX,
-          y: child.position.y + deltaY,
+          // Child ranking above has already produced fresh local coordinates.
+          // Add the new origin once; the previous group position is irrelevant.
+          x: child.position.x + absolutePosition.x,
+          y: child.position.y + absolutePosition.y,
         };
         child.positionAbsolute = { ...child.position };
       }

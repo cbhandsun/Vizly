@@ -17,6 +17,7 @@ const STRATEGIES = new Set([
   'domain-elk',
   'elk',
   'domain-compound-elk',
+  'compact-groups',
   'tree',
   'force',
 ]);
