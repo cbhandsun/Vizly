@@ -6,6 +6,14 @@
 
 ## 1. 目标与已知边界
 
+### 当前执行摘要
+
+本次整合时本地主分支为 `70f6f9ba`；下文 `cb68c9da` 是计划起始基准，实施记录中的状态按各自提交理解。工作区仍有未提交的 Worker 计时实现及其他已有修改，不计为已发布能力。
+
+下一批先确认当前目标提交的 CI 阻塞并闭环，再收口 Worker 计时观测链路；随后扩展增量稳定性场景与门禁。I0 历史问题已闭环不代表后续提交自动通过发布验收。I1/I2 为部分落地，I3–I6 仍按下列退出条件推进。
+
+每个实现批次只选择一个可独立验收的职责，完成定向验证即小提交；同一验收批次验证完成后推送 main。研究任务先交付反例、对照结果与取舍，再决定实现，不把未验证优化累计进主工作区。
+
 目标是在现有布局、端口、连线、标签、视图联合验收基础上，交付：
 
 1. 异常启动能定位阶段、保留安全证据，并能在原预算内明确失败。
@@ -246,6 +254,8 @@ I5（加载与成本余量）可在 I2 后作为独立批次插入；只读调�
 
 ## 10. 行业依据与适用限制
 
+- [Anthropic：Building effective agents](https://www.anthropic.com/engineering/building-effective-agents) 建议从满足需求的简单方案开始，仅在证据支持时增加复杂度。这里落实为先采用主代理与确定性工具；低成本侦察是一种工作方式，不要求额外启动一个侦察代理。
+
 - [Google：Towards a science of scaling agent systems](https://research.google/blog/towards-a-science-of-scaling-agent-systems-when-and-why-agent-systems-work/) 的受控研究表明，多代理效果依赖任务可拆分性，强顺序依赖可能受到协调开销影响。该结果支持按依赖选择架构，不提供 Vizly 的具体收益比例。
 - [Anthropic：How we built our multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system) 强调明确任务边界、工具选择及产物引用；编码任务通常比广度研究更难并行。文中约 15 倍 token 是其多代理系统相对普通聊天的观测，不是多代理相对单代理的固定成本系数。
 - [Google：Architecting efficient context-aware multi-agent framework](https://developers.googleblog.com/architecting-efficient-context-aware-multi-agent-framework-for-production/) 支持将持久记录与工作上下文分离，按需提供任务相关信息。
@@ -342,8 +352,18 @@ I5（加载与成本余量）可在 I2 后作为独立批次插入；只读调�
 - 连接手势提取为独立脚本模块，避免拓扑矩阵超过 800 行；回归覆盖中心被内容层遮挡、没有可点击点以及非法/极端矩形。原视口、单次事务、质量与性能断言保持。
 - 清理后的最终小视口矩阵十项全部通过（`tmp/i2-topology-small-final.log`）；完整 Node 分片 51 文件 / 596 项、拓扑默认环境 18 项通过，定向 Lint、规模与秘密扫描通过。该 CI 修复不修改产品源码，浏览器复用 `32bbe1cd` 已验证产物；Worker 计时扩展仍未进入此构建，不将此次浏览器成功当作计时扩展的验证。
 
-### I1d：Worker 执行时点（实施中，尚未提交）
+### I1d：Worker 执行时点（本地已提交，性能问题未闭环）
+
+- 后续完成正规预编译生成、完整静态门禁与 TS6 兼容检查；生成器的显式测量投影补齐 workerExecution，冷启动样本缺少有效计时即失败。物流十样本全部获得有效四段计时，但 p95 2757ms 超过原 1100ms 预算。最慢样本执行 2727.4ms、就绪后调度约 0.5ms、回复交付约 0.9ms；此次异常集中在 Worker 执行区间，不能归为 Worker 加载等待，也不能据此认定纯 CPU 算法根因。日志 `tmp/i1-worker-execution-logistics-valid.log`，性能问题仍未闭环。
+- 计时实现独立本地提交 `69b55d9c`，最终四个脚本文件 44 项测试通过；等待上一修复提交的远端 CI，不立即重启流水线。`87274fa5` 将每个慢样本的八个最慢独占阶段及候选/评估计数纳入报告，15 项相关测试通过，避免不同样本的阶段 p95 被误当作同一次尖峰。
+- 为取得单样本完整阶段证据执行一次无写入测量：route 933ms、Worker 904.4ms；早期交叉闭环 208.3ms 且 accepted。该结果没有复现前次尖峰，不撤销十样本失败结论，也不作为新的性能通过声明。证据 `tmp/i1-logistics-phase-evidence.log`。
 
 - Worker 最终响应增加处理器就绪、收到请求、完成序列化准备三个单调时间时点；协议独立校验、剔除额外字段，执行区间与原 workerDurationMs 需在 1ms 精度内一致。复用 Worker 的就绪时间不按单次请求超时限制。
 - 浏览器内依照 [W3C 跨上下文计时模型](https://www.w3.org/TR/hr-time-2/) 换算为等待处理器就绪、就绪后调度、执行与回复交付四项时长；日志仅保存时长和 available/unavailable/invalid/clock-inconsistent 状态，不输出绝对时间戳或用户内容。加载与模块初始化仍未分开测量。
 - Worker 相关 5 文件 / 84 项、后续协议严格校验 2 文件 / 17 项、脚本投影/汇总/记录 4 文件 / 43 项通过；新增测试已进入统一入口。静态验证停在预编译路由来源校验，因为生产 Worker 源码变化使 manifest 失效；需先构建新产物并正规重新生成预编译路由，再完成静态、兼容性与真实冷启动验证，不直接改来源哈希或放宽门禁。
+
+### 当前 CI smoke 资源释放缺口（本地验证中）
+
+- `70f6f9ba` 完整 CI 的五组测试及覆盖率通过，但 route smoke 在企业图遇到 `ERR_NO_BUFFER_SPACE` 和数据注册初始化错误；失败早于拓扑矩阵。性能流水线成功不能抵消该失败。
+- 代码确认每个样本新建 target，但 finally 只断开 CDP socket，旧页面仍保留。修复在断开前有界等待 browser-level `Target.closeTarget` 成功；关闭拒绝/超时继续报告失败，不新增重试或忽略网络错误。此为确定的资源生命周期缺口，尚未证明它是远端错误的唯一根因。
+- 48 项模块测试、定向 Lint、测试收录、规模和秘密扫描通过。真实浏览器九条路由各三次，共 27 次 smoke 全部通过，期间确认只保留当前业务页与初始空白页。修复独立提交 `9437d0ee`；浏览器使用工作区 I1 计时构建，远端仍需验证该提交自身产物。日志 `tmp/i1-smoke-target-cleanup.log`。
