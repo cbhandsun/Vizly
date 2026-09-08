@@ -321,9 +321,15 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
                       <span>{diagramSwitcherTitle}</span>
                     </div>
                     <div className="max-h-[50vh] overflow-y-auto">
-                      {typeof leftChildren === 'function'
-                        ? leftChildren(isDiagramSwitcherOpen)
-                        : leftChildren}
+                      <React.Suspense fallback={
+                        <div role="status" aria-live="polite" className="px-3 py-4 text-sm text-slate-500">
+                          {t('common.loading')}
+                        </div>
+                      }>
+                        {typeof leftChildren === 'function'
+                          ? leftChildren(isDiagramSwitcherOpen)
+                          : leftChildren}
+                      </React.Suspense>
                     </div>
                   </div>
                 }
@@ -338,8 +344,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
                   <button
                     ref={diagramSwitcherTriggerRef}
                     type="button"
-                    onClick={() => setIsDiagramSwitcherOpen((open) => !open)}
-                    className={`flex items-center gap-1.5 px-2.5 appearance-none border-0 bg-transparent rounded-[6px] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] cursor-pointer transition-colors active:scale-[0.97] min-w-0 group ${isMobile ? 'h-[44px] min-h-[44px]' : 'h-[32px]'}`}
+                    className={`flex items-center gap-1.5 px-2.5 appearance-none border-0 bg-transparent rounded-[6px] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] cursor-pointer transition-colors min-w-0 group ${isMobile ? 'h-[44px] min-h-[44px]' : 'h-[32px]'}`}
                     style={isMobile ? { minHeight: 'var(--commercial-touch-target, 44px)' } : undefined}
                     aria-label={diagramSwitcherLabel}
                     aria-haspopup="dialog"

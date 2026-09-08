@@ -3,7 +3,7 @@
 import React from 'react';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const breakpointState = vi.hoisted(() => ({ md: false }));
@@ -230,6 +230,43 @@ describe('ModernTopToolbar responsive layout', () => {
       expect(screen.getByRole('heading', { level: 1, name: 'Second flowchart' })).toBeTruthy();
       expect(document.activeElement).toBe(commandSearch);
     });
+  });
+
+  it('keeps the editor visible while the diagram menu loads and can close and reopen during loading', async () => {
+    breakpointState.md = true;
+    let resolveMenu: (module: { default: React.ComponentType }) => void = () => undefined;
+    const menuModule = new Promise<{ default: React.ComponentType }>((resolveModule) => {
+      resolveMenu = resolveModule;
+    });
+    const LazyMenu = React.lazy(() => menuModule);
+    render(
+      <React.Suspense fallback={<div>Loading entire editor</div>}>
+        <div>Existing canvas</div>
+        <ModernTopToolbar
+          diagramId="diagram-1"
+          title="Untitled flowchart"
+          edgeMode="native"
+          onEdgeModeChange={() => undefined}
+          leftChildren={() => <LazyMenu />}
+        />
+      </React.Suspense>,
+    );
+    const trigger = screen.getByRole('button', { name: 'Open diagrams and templates：Untitled flowchart' });
+    fireEvent.click(trigger);
+    expect(screen.queryByText('Loading entire editor')).toBeNull();
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    expect(screen.getByText('Existing canvas').style.display).not.toBe('none');
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(trigger);
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    await act(async () => {
+      resolveMenu({ default: () => <input aria-label="Loaded menu" /> });
+      await menuModule;
+    });
+    expect(screen.getByRole('textbox', { name: 'Loaded menu' })).toBeTruthy();
+    expect(screen.queryByText('Loading entire editor')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Open diagrams and templates：Untitled flowchart' })).toBe(trigger);
   });
 
   it('exposes diagram switching and command search as keyboard-operable controls', async () => {
