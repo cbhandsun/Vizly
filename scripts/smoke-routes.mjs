@@ -10,6 +10,7 @@ import WebSocket from 'ws';
 import { createSmokeRouteCatalog } from './lib/smoke-route-catalog.mjs';
 import { CdpSession } from './lib/smoke-route-cdp-session.mjs';
 import { waitForRouteReadiness } from './lib/smoke-route-readiness.mjs';
+import { installSmokeLongTaskProbe, projectSmokeLongTaskEvidence } from './lib/smoke-route-long-tasks.mjs';
 import {
   runBrowserDevToolsStartupWithSingleRetry,
   waitForBrowserDevTools,
@@ -398,20 +399,8 @@ const collectRouteStabilityReport = async (session, budget) => {
     window.__smokeStability = {
       startedAt: performance.now(),
       heapStart: Number(performance.memory?.usedJSHeapSize) || 0,
-      longTasks: [],
+      longTaskProbe: (${installSmokeLongTaskProbe.toString()})(),
     };
-    if ('PerformanceObserver' in window) {
-      const observer = new PerformanceObserver((list) => {
-        for (const entry of list.getEntries()) {
-          window.__smokeStability.longTasks.push({
-            startTime: entry.startTime,
-            duration: entry.duration,
-          });
-        }
-      });
-      observer.observe({ entryTypes: ['longtask'] });
-      window.__smokeStability.observer = observer;
-    }
   })()`);
   await delay(budget.durationMs);
   // Stop observing before the harness forces a final GC for heap accounting.
@@ -421,20 +410,20 @@ const collectRouteStabilityReport = async (session, budget) => {
     const state = window.__smokeStability;
     if (!state) return;
     state.endedAt = performance.now();
-    state.observer?.disconnect();
-    delete state.observer;
+    state.longTaskEvidence = state.longTaskProbe.stop();
+    delete state.longTaskProbe;
   })()`);
   await session.send('HeapProfiler.collectGarbage').catch(() => {});
-  return session.evaluate(`(() => {
-    const state = window.__smokeStability || { longTasks: [] };
-    const durations = state.longTasks.map((entry) => entry.duration).filter(Number.isFinite);
+  const report = await session.evaluate(`(() => {
+    const state = window.__smokeStability;
     const heapEnd = Number(performance.memory?.usedJSHeapSize) || 0;
     const parallel = window.__vizly_coordinator__?.getOptimizationStats?.()?.parallel || null;
     const report = {
       durationMs: Math.round((state.endedAt || performance.now())
         - (state.startedAt || performance.now())),
-      longTaskCount: durations.length,
-      maxLongTaskMs: durations.length ? Math.round(Math.max(...durations)) : 0,
+      longTaskCount: state.longTaskEvidence.longTaskCount,
+      maxLongTaskMs: state.longTaskEvidence.maxLongTaskMs,
+      longTaskEvidence: state.longTaskEvidence,
       heapGrowthKB: state.heapStart && heapEnd
         ? Math.round((heapEnd - state.heapStart) / 1024)
         : 0,
@@ -444,6 +433,9 @@ const collectRouteStabilityReport = async (session, budget) => {
     delete window.__smokeStability;
     return report;
   })()`);
+  const evidence = projectSmokeLongTaskEvidence(report.longTaskEvidence);
+  if (!evidence.supported || evidence.invalidCount > 0) throw new Error('Smoke long task observation unavailable');
+  return { ...report, longTaskEvidence: evidence };
 };
 
 const isWorkspaceChildPath = (candidatePath) => {

@@ -13,11 +13,92 @@ import {
   dedupeRouteAssets,
   getUnexpectedLogs,
   partitionRouteAssetsByReadyTime,
+  printBudgetSummary,
 } from './smoke-route-reporting.mjs';
 import { isEnterpriseDisplayRoutingSettled } from '../smokeRouteBudgetUtils.mjs';
+import { installSmokeLongTaskProbe, projectSmokeLongTaskEvidence } from './smoke-route-long-tasks.mjs';
 import { startupFaultCases, readStartupFaultRecovery, assertStartupFaultRecovery, parseStartupFaultBaseUrl } from './startup-fault-cases.mjs';
 
 describe('smoke route modules', () => {
+  it('prints safe evidence for every sample instead of only the ready-time median', () => {
+    const evidence = { supported: true, durationMs: 15000, longTaskCount: 1,
+      maxLongTaskMs: 162, droppedCount: 0, invalidCount: 0,
+      entries: [{ offsetMs: 200, durationMs: 162, name: 'private' }] };
+    const samples = [100, 200, 300].map(readyAt => ({ name: 'management',
+      assetReport: { readyAt, criticalAssets: 1, criticalDecodedKB: 1, totalAssets: 1, totalDecodedKB: 1 },
+      stabilityReport: { longTaskEvidence: evidence },
+    }));
+    const log = vi.fn();
+    printBudgetSummary([aggregateRouteSamples(samples)], { enabled: true, log });
+    const output = log.mock.calls.flat().join('\n');
+    for (const index of [1, 2, 3]) expect(output).toContain(`stability sample ${index}:`);
+    expect(output).toContain('"offsetMs":200');
+    expect(output).not.toContain('private');
+  });
+  it('drains pending long tasks, preserves relative timing and stops before later harness work', () => {
+    let deliver;
+    let now = 100;
+    const disconnect = vi.fn();
+    class Observer {
+      constructor(callback) { deliver = callback; }
+      observe() {}
+      takeRecords() { return [{ startTime: 120, duration: 162, name: 'private' }]; }
+      disconnect = disconnect;
+    }
+    const probe = runInNewContext(`(${installSmokeLongTaskProbe.toString()})()`, {
+      PerformanceObserver: Observer, performance: { now: () => now },
+    });
+    deliver({ getEntries: () => [{ startTime: 90, duration: 50, attribution: 'private' }] });
+    now = 15100;
+    const result = projectSmokeLongTaskEvidence(probe.stop());
+    expect(result).toEqual({ supported: true, durationMs: 15000, longTaskCount: 2, maxLongTaskMs: 162,
+      droppedCount: 0, invalidCount: 0, entries: [{ offsetMs: -10, durationMs: 50 }, { offsetMs: 20, durationMs: 162 }] });
+    deliver({ getEntries: () => [{ startTime: 15200, duration: 500 }] });
+    expect(projectSmokeLongTaskEvidence(probe.stop())).toEqual(result);
+    expect(disconnect).toHaveBeenCalledOnce();
+    expect(JSON.stringify(result)).not.toMatch(/private|attribution|startTime/);
+  });
+  it('bounds stored detail without dropping counts or maximums and flags invalid observation', () => {
+    let deliver;
+    class Observer {
+      constructor(callback) { deliver = callback; }
+      observe() {}
+      takeRecords() { return []; }
+      disconnect() {}
+    }
+    const probe = runInNewContext(`(${installSmokeLongTaskProbe.toString()})()`, {
+      PerformanceObserver: Observer, performance: { now: () => 0 },
+    });
+    deliver({ getEntries: () => [...Array.from({ length: 300 }, (_, index) => ({ startTime: index, duration: index + 50 })),
+      { startTime: NaN, duration: 50 }, { startTime: 0, duration: Infinity }] });
+    const result = projectSmokeLongTaskEvidence(probe.stop());
+    expect(result).toMatchObject({ longTaskCount: 300, maxLongTaskMs: 349, droppedCount: 44, invalidCount: 2 });
+    expect(result.entries).toHaveLength(256);
+    expect(projectSmokeLongTaskEvidence(runInNewContext(`(${installSmokeLongTaskProbe.toString()})()`, {
+      performance: { now: () => 0 },
+    }).stop())).toMatchObject({ supported: false });
+    for (const value of [null, {}, { ...result, entries: Array(257).fill({}) },
+      { ...result, durationMs: Infinity }, { ...result, longTaskCount: 0 },
+      { ...result, entries: [{ offsetMs: 'private', durationMs: 50 }] }]) {
+      expect(() => projectSmokeLongTaskEvidence(value)).toThrow('Invalid smoke long task evidence');
+    }
+  });
+  it('marks unsupported, failed registration and failed record reads unavailable', () => {
+    for (const mode of ['unsupported', 'observe', 'read']) {
+      class Observer {
+        static supportedEntryTypes = mode === 'unsupported' ? [] : ['longtask'];
+        observe() { if (mode === 'observe') throw new Error('private'); }
+        takeRecords() { throw new Error('private'); }
+        disconnect() {}
+      }
+      const probe = runInNewContext(`(${installSmokeLongTaskProbe.toString()})()`, {
+        PerformanceObserver: Observer, performance: { now: () => 0 },
+      });
+      const result = projectSmokeLongTaskEvidence(probe.stop());
+      expect(result.supported).toBe(false);
+      expect(JSON.stringify(result)).not.toContain('private');
+    }
+  });
   it('accepts only bounded local preview origins and never echoes invalid URL input', () => {
     expect(parseStartupFaultBaseUrl('http://127.0.0.1:4176/')).toBe('http://127.0.0.1:4176');
     expect(parseStartupFaultBaseUrl('https://localhost')).toBe('https://localhost');
@@ -169,7 +250,7 @@ describe('smoke route modules', () => {
 
   it('disconnects long-task observation before forcing heap-accounting GC', () => {
     const smokeSource = readFileSync(new URL('../smoke-routes.mjs', import.meta.url), 'utf8');
-    const endObservation = smokeSource.indexOf('state.observer?.disconnect();');
+    const endObservation = smokeSource.indexOf('state.longTaskEvidence = state.longTaskProbe.stop();');
     const finalGarbageCollection = smokeSource.lastIndexOf(
       "session.send('HeapProfiler.collectGarbage')",
     );

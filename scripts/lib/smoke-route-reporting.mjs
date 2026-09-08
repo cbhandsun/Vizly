@@ -2,6 +2,7 @@ import {
   collectRouteStabilityViolations,
   resolveRouteBudget,
 } from '../smokeRouteBudgetUtils.mjs';
+import { projectSmokeLongTaskEvidence } from './smoke-route-long-tasks.mjs';
 
 export const getUnexpectedLogs = (logs, allowedWarningPatterns) => logs.filter((entry) => {
   if (entry.level === 'error') return true;
@@ -305,6 +306,10 @@ export const printBudgetSummary = (
     if (result.stabilityReport) {
       const stability = result.stabilityReport;
       log(`  stability ${stability.durationMs} ms: long tasks ${stability.longTaskCount}, max ${stability.maxLongTaskMs} ms, heap ${stability.heapGrowthKB} KB, workers ${stability.activeWorkers}/${stability.queuedTasks}`);
+    }
+    for (const [index, sample] of (result.samples || [result]).entries()) {
+      if (!sample.stabilityReport?.longTaskEvidence) continue;
+      log(`  stability sample ${index + 1}: ${JSON.stringify(projectSmokeLongTaskEvidence(sample.stabilityReport.longTaskEvidence))}`);
     }
   }
 };
