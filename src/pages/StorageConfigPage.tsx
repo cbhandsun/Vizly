@@ -21,6 +21,7 @@ import {
 } from './storageConfigPageModel';
 import { StorageSecretInput } from './StorageSecretInput';
 import { useUnsavedNavigationGuard } from './useUnsavedNavigationGuard';
+import { useUnsavedFormState } from './useUnsavedFormState';
 import './StorageConfigPage.css';
 
 const { Title, Paragraph } = Typography;
@@ -32,7 +33,7 @@ const StorageConfigPage: React.FC = () => {
     const [form] = Form.useForm<StorageConfig>();
     const [loading, setLoading] = useState(false);
     const [testing, setTesting] = useState(false);
-    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useUnsavedFormState();
     const [hasStoredConfiguration, setHasStoredConfiguration] = useState(() => (
         !!(storageService.getConfig() ?? storageService.getPersistedConfigDraft())
     ));
@@ -94,18 +95,6 @@ const StorageConfigPage: React.FC = () => {
             connectionStateBeforeTestRef.current = null;
         };
     }, [form]);
-
-    useEffect(() => {
-        if (!hasUnsavedChanges) return;
-
-        const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-            event.preventDefault();
-            event.returnValue = '';
-        };
-        window.addEventListener('beforeunload', handleBeforeUnload);
-
-        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-    }, [hasUnsavedChanges]);
 
     const onFinish = (values: StorageConfig) => {
         setLoading(true);

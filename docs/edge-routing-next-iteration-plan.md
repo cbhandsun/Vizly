@@ -251,3 +251,14 @@ I5（加载与成本余量）可在 I2 后作为独立批次插入；只读调�
 - [Google：Architecting efficient context-aware multi-agent framework](https://developers.googleblog.com/architecting-efficient-context-aware-multi-agent-framework-for-production/) 支持将持久记录与工作上下文分离，按需提供任务相关信息。
 
 本文的代理数量、模型档位、批次排序与验证安排是结合 Vizly 的项目决策，需由后续真实交付记录校准；不为采用这些经验额外引入代理框架。
+
+## 11. 实施记录（持续更新，不代替完整验收）
+
+### I0：保存成功与卸载保护的同步边界
+
+- 基准：`07915570`；原远端失败见第 2 节。
+- 原用例本地单跑通过。补充在保存成功通知回调内触发 `beforeunload` 的确定性回归后，旧实现返回 false，证明成功保存与 effect 清理之间存在仍阻止离开的窗口。
+- 修复将未保存状态与卸载监听封装为 `useUnsavedFormState`；状态更新同步刷新监听器读取的值，成功持久化后立即允许离开。监听器仍只在 dirty 渲染状态下注册，并在干净状态及卸载时清理。
+- 集成用例保留原 savedVerified、存储调用次数及卸载断言，增加成功通知边界断言；独立 Hook 回归覆盖提交前清除、同一批次再次编辑和 StrictMode 清理。保存失败仍由现有集成回归验证不得解除保护。
+- TS7、strict-core、TS6、1118 测试文件收录检查通过。所属 UI 分片 14 文件 / 98 项测试通过；架构、显式 any、文件规模、DOM sink、秘密扫描、产物与预编译检查、依赖安全审计及全仓 Lint 通过。生产构建与 bundle 门禁通过（9960.87 KiB，启动 JS 516.38 KiB）。远端完整 CI 与覆盖率尚待完成，I0 未完成；本地未重复全量 test:ci，完整测试交由远端执行。
+- 执行方式：主代理直接实现，无子代理交接或重复实现。使用已存在的 npm 12.0.1 缓存运行时，未升级依赖或修改 lockfile。

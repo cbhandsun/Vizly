@@ -539,6 +539,15 @@ describe('StorageConfigPage validation recovery', () => {
     });
 
     it('preserves successful verification when the tested configuration is saved', async () => {
+        // A successful persistence notification must not observe a stale unload
+        // guard while React is still scheduling its render/effect cleanup.
+        const saveNotificationEvent = new Event('beforeunload', { cancelable: true });
+        let canLeaveAtSaveNotification: boolean | undefined;
+        bridgeMocks.messageSuccess.mockImplementation((message: string) => {
+            if (message === 'storageConfig.saveSuccess') {
+                canLeaveAtSaveNotification = window.dispatchEvent(saveNotificationEvent);
+            }
+        });
         storageMocks.testConnection.mockResolvedValueOnce(undefined);
         renderStorageConfig();
         fireEvent.change(screen.getByPlaceholderText('https://...'), { target: { value: 'https://storage.example.com' } });
@@ -555,6 +564,8 @@ describe('StorageConfigPage validation recovery', () => {
         fireEvent.click(screen.getByRole('button', { name: 'storageConfig.form.saveBtn' }));
         await waitFor(() => expect(screen.getByText('storageConfig.status.savedVerified')).toBeInTheDocument());
         expect(storageMocks.saveConfig).toHaveBeenCalledTimes(1);
+        expect(canLeaveAtSaveNotification).toBe(true);
+        expect(saveNotificationEvent.defaultPrevented).toBe(false);
         const savedVerifiedEvent = new Event('beforeunload', { cancelable: true });
         expect(window.dispatchEvent(savedVerifiedEvent)).toBe(true);
         expect(savedVerifiedEvent.defaultPrevented).toBe(false);
