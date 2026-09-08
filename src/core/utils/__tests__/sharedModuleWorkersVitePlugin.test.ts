@@ -552,6 +552,28 @@ const worker = new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', impor
     )).toBe(false);
   });
 
+  it('co-loads measured visibility and paint helpers without broadening to optional engines', () => {
+    for (const suffix of [
+      'components/shared/baseReactFlowRenderableNodes.ts',
+      'components/shared/baseReactFlowLayoutVisibility.ts',
+      'utils/interactionMetrics.ts',
+      'rendering/styleTokens.ts',
+    ]) {
+      expect(matchesFlowchartDesignerMicroModule(`C:/repo/src/core/${suffix}`)).toBe(true);
+      expect(matchesFlowchartDesignerMicroModule(`C:\\repo\\src\\core\\${suffix.replaceAll('/', '\\')}?import`)).toBe(true);
+      expect(matchesDisplayRoutingNeutralModule(`C:/repo/src/core/${suffix}`)).toBe(false);
+    }
+    for (const suffix of [
+      'rendering/reactFlowScene.ts',
+      'utils/scenePdfExport.ts',
+      'components/shared/baseReactFlowDisplayEdges.worker.ts',
+      'components/diagrams/hooks/useKeyboardAccessibleDropdown.ts',
+      'components/shared/baseReactFlowRenderableNodes.test.ts',
+    ]) {
+      expect(matchesFlowchartDesignerMicroModule(`C:/repo/src/core/${suffix}`)).toBe(false);
+    }
+  });
+
   it('minifies emitted locale JSON without touching unrelated assets', () => {
     expect(minifyLocaleJsonAsset('assets/zh-hash.json', '{\n  "a": 1\n}'))
       .toBe('{"a":1}');

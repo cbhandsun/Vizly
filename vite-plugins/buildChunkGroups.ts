@@ -59,6 +59,12 @@ const FLOWCHART_DESIGNER_STARTUP_MODULES = new Set([
 ]);
 
 const FLOWCHART_DESIGNER_MICRO_MODULES = new Set([
+  // Measured standalone requests on the diagram startup path; these pure
+  // visibility/paint helpers add no optional engine or Worker dependency.
+  '/src/core/components/shared/baseReactFlowRenderableNodes.ts',
+  '/src/core/components/shared/baseReactFlowLayoutVisibility.ts',
+  '/src/core/utils/interactionMetrics.ts',
+  '/src/core/rendering/styleTokens.ts',
   '/src/core/components/shared/generated/baseReactFlowPrecompiledRouteLoaders.ts',
   // This bounded fetcher has only the generated loaders as a runtime consumer.
   '/src/core/components/shared/baseReactFlowPrecompiledRouteAsset.ts',
