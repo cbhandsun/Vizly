@@ -1,5 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises';
-import { readThemeControlEvidence, projectThemeControlEvidence } from './display-routing-theme-control-evidence.mjs';
+import { readThemeControlEvidence, projectThemeControlEvidence, readThemeShortcutEvidence,
+  projectThemeShortcutEvidence } from './display-routing-theme-control-evidence.mjs';
 
 export const DISPLAY_ROUTING_THEME_CASES = Object.freeze([
   Object.freeze({ id: 'light', mode: 'light', primary: '#007bff' }),
@@ -105,16 +106,21 @@ export const switchDisplayRoutingTheme = async (session, themeCase, { now = Date
   let state = null;
   let openedSettings = false;
   let lastControlEvidence = null;
+  let shortcutEvidence = null;
+  let beforeShortcutEvidence = null;
   const click = async action => {
     const result = await session.evaluate(`(() => {
       const clicked = (${clickDisplayRoutingThemeControl.toString()})(document, ${JSON.stringify(action)}, ${JSON.stringify(themeCase.id)});
       let evidence = null;
+      let shortcut = null;
+      try { shortcut = (${readThemeShortcutEvidence.toString()})(document, ${action === 'open' && !openedSettings} && !clicked); } catch { /* Optional bounded observation. */ }
       if (!clicked) {
         try { evidence = (${readThemeControlEvidence.toString()})(document); } catch { /* Preserve the control failure. */ }
       }
-      return { clicked, evidence };
+      return { clicked, evidence, shortcut };
     })()`);
     const evidence = projectThemeControlEvidence(result?.evidence);
+    shortcutEvidence = projectThemeShortcutEvidence(result?.shortcut) ?? shortcutEvidence;
     if (evidence) lastControlEvidence = {
       action, elapsedMs: Math.min(60_000, Math.max(0, now() - startedAt)), snapshot: evidence,
     };
@@ -128,6 +134,7 @@ export const switchDisplayRoutingTheme = async (session, themeCase, { now = Date
         // The viewer exposes this selector inside settings. Use its public
         // shortcut once, then wait for the lazy panel within the same deadline.
         openedSettings = true;
+        beforeShortcutEvidence = lastControlEvidence?.snapshot ?? null;
         for (const type of ['keyDown', 'keyUp']) {
           await session.send('Input.dispatchKeyEvent', {
             type, key: ',', code: 'Comma', modifiers: 2, windowsVirtualKeyCode: 188,
@@ -163,7 +170,7 @@ export const switchDisplayRoutingTheme = async (session, themeCase, { now = Date
       await wait(Math.min(50, Math.max(0, deadline - now())));
     }
   }
-  throw new Error(`Theme selector did not complete ${themeCase.id} (${step}) within 5000ms; transitions=${JSON.stringify(transitions)}; controls=${JSON.stringify({ openedSettings, lastControlEvidence })}`);
+  throw new Error(`Theme selector did not complete ${themeCase.id} (${step}) within 5000ms; transitions=${JSON.stringify(transitions)}; controls=${JSON.stringify({ openedSettings, beforeShortcutEvidence, shortcutEvidence, lastControlEvidence })}`);
 };
 
 export const verifyDisplayRoutingThemeMatrix = async ({

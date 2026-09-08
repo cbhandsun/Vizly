@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { runInNewContext } from 'node:vm';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { readThemeControlEvidence, projectThemeControlEvidence } from './display-routing-theme-control-evidence.mjs';
+import { readThemeControlEvidence, projectThemeControlEvidence, readThemeShortcutEvidence,
+  projectThemeShortcutEvidence } from './display-routing-theme-control-evidence.mjs';
 
 import {
   assertDisplayRoutingThemeState,
@@ -21,6 +22,39 @@ const stateFor = themeCase => ({
 });
 
 describe('display routing browser theme matrix', () => {
+  it('records shortcut arrival and later cancellation without retaining other keys', async () => {
+    const stop = event => { event.preventDefault(); event.stopImmediatePropagation(); };
+    expect(readThemeShortcutEvidence(document, true)).toEqual({ received: false, defaultPrevented: null });
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'private-user-content' }));
+    expect(readThemeShortcutEvidence(document).received).toBe(false);
+    window.addEventListener('keydown', stop);
+    try {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: ',', ctrlKey: true, cancelable: true }));
+      await new Promise(resolve => window.queueMicrotask(resolve));
+      expect(readThemeShortcutEvidence(document)).toEqual({ received: true, defaultPrevented: true });
+      expect(window.__vizlyThemeShortcutCleanup).toBeUndefined();
+      expect(JSON.stringify(readThemeShortcutEvidence(document))).not.toContain('private');
+    } finally { window.removeEventListener('keydown', stop); }
+  });
+
+  it('bounds an undelivered shortcut observer to the original timeout', () => {
+    vi.useFakeTimers();
+    try {
+      readThemeShortcutEvidence(document, true);
+      vi.advanceTimersByTime(5000);
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: ',', ctrlKey: true }));
+      expect(readThemeShortcutEvidence(document)).toEqual({ received: false, defaultPrevented: null });
+      expect(window.__vizlyThemeShortcutCleanup).toBeUndefined();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('projects only shortcut booleans from untrusted evidence', () => {
+    for (const value of [null, [], {}, { received: 'secret', defaultPrevented: false }]) {
+      expect(projectThemeShortcutEvidence(value)).toBeNull();
+    }
+    expect(projectThemeShortcutEvidence({ received: true, defaultPrevented: false, key: 'secret' }))
+      .toEqual({ received: true, defaultPrevented: false });
+  });
   it('retains bounded control evidence without content or input values', () => {
     vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}]);
     for (let index = 0; index < 70; index += 1) {
@@ -153,6 +187,8 @@ describe('display routing browser theme matrix', () => {
   });
 
   afterEach(() => {
+    window.__vizlyThemeShortcutCleanup?.();
+    delete window.__vizlyThemeShortcutEvidence;
     vi.restoreAllMocks();
     document.body.replaceChildren();
     document.documentElement.removeAttribute('data-theme');

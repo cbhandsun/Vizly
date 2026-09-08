@@ -1,3 +1,39 @@
+// Observe only the single public settings shortcut used by this browser audit.
+// The microtask sees preventDefault even when a later handler stops propagation.
+export const readThemeShortcutEvidence = (doc, start = false) => {
+  const win = doc.defaultView;
+  if (!win) return null;
+  if (start) {
+    win.__vizlyThemeShortcutCleanup?.();
+    const state = { received: false, defaultPrevented: null };
+    win.__vizlyThemeShortcutEvidence = state;
+    let timer;
+    const cleanup = () => {
+      win.removeEventListener('keydown', observe, true);
+      win.clearTimeout(timer);
+      delete win.__vizlyThemeShortcutCleanup;
+    };
+    const observe = event => {
+      if (event.key !== ',' || !(event.ctrlKey || event.metaKey)) return;
+      state.received = true;
+      win.queueMicrotask(() => { state.defaultPrevented = event.defaultPrevented === true; });
+      cleanup();
+    };
+    win.__vizlyThemeShortcutCleanup = cleanup;
+    win.addEventListener('keydown', observe, true);
+    timer = win.setTimeout(cleanup, 5000);
+  }
+  const state = win.__vizlyThemeShortcutEvidence;
+  return state ? { received: state.received, defaultPrevented: state.defaultPrevented } : null;
+};
+
+export const projectThemeShortcutEvidence = value => (
+  value && typeof value === 'object' && !Array.isArray(value)
+    && typeof value.received === 'boolean'
+    && (value.defaultPrevented === null || typeof value.defaultPrevented === 'boolean')
+    ? { received: value.received, defaultPrevented: value.defaultPrevented } : null
+);
+
 // Self-contained because the browser runner serializes this function.
 export const readThemeControlEvidence = doc => {
   const scan = selector => {
