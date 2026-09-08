@@ -409,8 +409,7 @@ describe('business diagram edit coverage', () => {
     }
   });
 
-  it('registers the matrix case and invokes only its verifier', async () => {
-    const id = 'business-edit-stability';
+  it.each(['business-edit-stability', 'swimlane-edit-stability'])('registers %s and invokes only its verifier', async id => {
     expect(parseDisplayRoutingMatrixCase(id, createDisplayRoutingMatrixCaseIds([]))).toBe(id);
     const verifyBusinessEdits = vi.fn(async () => [{ presetId: 'fixture' }]);
     const verifyTopology = vi.fn();
@@ -419,9 +418,12 @@ describe('business diagram edit coverage', () => {
       verifyBusinessEdits, verifyTopology, verifyMultiPage });
     expect(result.businessEditResults).toEqual([{ presetId: 'fixture' }]);
     expect(verifyBusinessEdits).toHaveBeenCalledOnce();
+    expect(verifyBusinessEdits.mock.calls[0][0].layoutCase?.id)
+      .toBe(id === 'swimlane-edit-stability' ? 'domain-lanes-tb' : undefined);
     expect(verifyTopology).not.toHaveBeenCalled();
     expect(verifyMultiPage).not.toHaveBeenCalled();
     const workflow = readFileSync(new URL('../../.github/workflows/ci.yml', import.meta.url), 'utf8');
     expect(workflow).toMatch(/DISPLAY_ROUTING_MATRIX_CASE = 'business-edit-stability'\s+npm run verify:display-routing-matrix/);
+    expect(workflow).toMatch(/DISPLAY_ROUTING_MATRIX_CASE = 'swimlane-edit-stability'\s+npm run verify:display-routing-matrix/);
   });
 });

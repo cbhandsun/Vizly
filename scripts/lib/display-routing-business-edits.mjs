@@ -16,6 +16,7 @@ import { waitForStableDisplayRoutingLayoutVisual } from './display-routing-layou
 import { startEditProcessSampling, stopEditProcessSampling } from './display-routing-edit-process.mjs';
 import { captureBusinessHistoryState, verifyBusinessHistoryRoundtrip } from './display-routing-history-edits.mjs';
 import { installHeldRoutingResponse } from './display-routing-held-response.mjs';
+import { clickLayout, assertRequestedLayoutSelected } from './display-routing-matrix-layout-command.mjs';
 
 export const businessEditFinalRouteExpression = (nodeId, previousRequestId) => `(() => {
   const displayRoutingTopologyRequestMatchesResponse = ${displayRoutingTopologyRequestMatchesResponse.toString()};
@@ -129,7 +130,7 @@ const dragBusinessNode = async (session, nodeId, direction) => {
 };
 
 export const verifyDisplayRoutingBusinessEdits = async ({ baseUrl, prepareSession,
-  waitForValue, readFinalRouteExpression, auditFinalSvg, onProgress = () => {} }) => {
+  waitForValue, readFinalRouteExpression, auditFinalSvg, layoutCase, onProgress = () => {} }) => {
   const results = [];
   for (const target of DISPLAY_ROUTING_MATRIX_PRESET_TARGETS) {
     results.push(await withPrecompiledRouteBrowser(async session => {
@@ -138,11 +139,21 @@ export const verifyDisplayRoutingBusinessEdits = async ({ baseUrl, prepareSessio
       await session.send('Page.navigate', { url: `${baseUrl}/?canonicalPreset=${encodeURIComponent(target.presetId)}`
         + `&businessEdit=${Date.now()}#/?diagram=${encodeURIComponent(target.presetId)}` });
       let route = await waitForValue(session, readFinalRouteExpression(''), `${target.presetId} initial route`);
-      const mounted = await session.evaluate('({nodes:window.reactFlowInstance.getNodes(),edges:window.reactFlowInstance.getEdges()})');
+      let mounted = await session.evaluate('({nodes:window.reactFlowInstance.getNodes(),edges:window.reactFlowInstance.getEdges()})');
       const canonicalMount = verifyCanonicalPresetMount({ identity, requestNodes: route.request.nodes,
         requestEdges: route.request.edges, mountedNodes: mounted.nodes, mountedEdges: mounted.edges });
       await waitForStableDisplayRoutingLayoutVisual({ session, expectedRequestId: route.routing.requestId,
         expectedNodeCount: route.request.nodes.length, expectedEdgeCount: route.response.edges.length });
+      if (layoutCase) {
+        const previousJobId = await session.evaluate('window.__vizlyBaseReactFlowDisplayRouting?.layoutTransactionJobId ?? 0');
+        await clickLayout(session, layoutCase);
+        route = await waitForValue(session, readFinalRouteExpression('layout:', previousJobId),
+          `${target.presetId} ${layoutCase.id} before editing`);
+        await waitForStableDisplayRoutingLayoutVisual({ session, expectedRequestId: route.routing.requestId,
+          expectedNodeCount: route.request.nodes.length, expectedEdgeCount: route.response.edges.length });
+        await assertRequestedLayoutSelected(session, layoutCase.id);
+        mounted = await session.evaluate('({nodes:window.reactFlowInstance.getNodes(),edges:window.reactFlowInstance.getEdges()})');
+      }
       const initialAudit = await auditFinalSvg(session, route, `${target.presetId} before editing`);
       onProgress({ event: 'business-edit-initial-passed', presetId: target.presetId });
       const selected = selectBusinessEditTarget(mounted.nodes, mounted.edges);
@@ -199,7 +210,7 @@ export const verifyDisplayRoutingBusinessEdits = async ({ baseUrl, prepareSessio
           await session.evaluate('window.__vizlyHeldRoutingResponse?.dispose(); delete window.__vizlyHeldRoutingResponse; delete window.__vizlyBusinessHistory; delete window.__vizlyTopologyStabilityBaseline');
         }
       }
-      return { presetId: target.presetId, canonicalMount, initialAudit, operations, history, pendingHistory };
+      return { presetId: target.presetId, layoutId: layoutCase?.id ?? 'canonical', canonicalMount, initialAudit, operations, history, pendingHistory };
     }));
   }
   return results;

@@ -5,6 +5,8 @@ import {
   DISPLAY_ROUTING_MULTI_PAGE_CASE_ID,
   DISPLAY_ROUTING_TOPOLOGY_CASE_ID,
   DISPLAY_ROUTING_BUSINESS_EDIT_CASE_ID,
+  DISPLAY_ROUTING_SWIMLANE_EDIT_CASE_ID,
+  DISPLAY_ROUTING_LAYOUT_CASES,
 } from './display-routing-matrix-cases.mjs';
 
 export const verifyDisplayRoutingBrowserCases = async ({
@@ -41,7 +43,14 @@ export const verifyDisplayRoutingBrowserCases = async ({
       auditFinalSvg,
     })]
     : [];
-  const businessEditResults = !requestedCase || requestedCase === DISPLAY_ROUTING_BUSINESS_EDIT_CASE_ID
-    ? await verifyBusinessEdits({ baseUrl, prepareSession, waitForValue, readFinalRouteExpression, auditFinalSvg, onProgress }) : [];
+  const businessEditResults = [];
+  for (const editCase of [DISPLAY_ROUTING_BUSINESS_EDIT_CASE_ID, DISPLAY_ROUTING_SWIMLANE_EDIT_CASE_ID]) {
+    if (requestedCase && requestedCase !== editCase) continue;
+    businessEditResults.push(...await verifyBusinessEdits({ baseUrl, prepareSession, waitForValue,
+      readFinalRouteExpression, auditFinalSvg, onProgress,
+      ...(editCase === DISPLAY_ROUTING_SWIMLANE_EDIT_CASE_ID
+        ? { layoutCase: DISPLAY_ROUTING_LAYOUT_CASES.find(item => item.id === 'domain-lanes-tb') } : {}),
+    }));
+  }
   return { topologyResults, multiPageResults, businessEditResults };
 };
