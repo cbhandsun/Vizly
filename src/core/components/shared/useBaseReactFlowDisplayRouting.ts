@@ -201,12 +201,7 @@ export const useBaseReactFlowDisplayRouting = ({
       edgeCount,
     });
     if (!routingInput || nodeCount === 0 || edgeCount === 0) {
-      updateDisplayRoutingDebugState({
-        stage: 'skip-empty',
-        signature: displayEdgeCacheSignature,
-        nodeCount,
-        edgeCount,
-      });
+      updateDisplayRoutingLifecycleState('skip-empty', displayEdgeCacheSignature, nodeCount, edgeCount);
       return undefined;
     }
 
@@ -225,6 +220,13 @@ export const useBaseReactFlowDisplayRouting = ({
       return undefined;
     }
     const displayWorkerQualityMode = displayQualityPolicy.mode;
+
+    // Dragging freezes input identity at the last committed layout. A cache
+    // hit here belongs to that layout, not to the gesture still in progress.
+    if (isNodeDragging) {
+      updateDisplayRoutingLifecycleState('paused-node-drag', displayEdgeCacheSignature, nodeCount, edgeCount);
+      return undefined;
+    }
 
     const {
       retainedEntry: retainedCommittedEntry,
@@ -288,11 +290,6 @@ export const useBaseReactFlowDisplayRouting = ({
       updateDisplayRoutingLifecycleState('wait-container', displayEdgeCacheSignature, nodeCount, edgeCount);
       return undefined;
     }
-    if (isNodeDragging) {
-      updateDisplayRoutingLifecycleState('paused-node-drag', displayEdgeCacheSignature, nodeCount, edgeCount);
-      return undefined;
-    }
-
     // Re-prewarm after cancellation so the replacement compiles during geometry settle.
     prewarmBaseReactFlowDisplayWorker(displayEdgeWorkerRef);
 

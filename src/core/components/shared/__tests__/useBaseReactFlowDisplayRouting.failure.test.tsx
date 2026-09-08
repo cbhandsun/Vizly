@@ -7,7 +7,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useBaseReactFlowDisplayRouting } from '../useBaseReactFlowDisplayRouting';
 import { computeBaseReactFlowDisplayEdgesInWorker, type BaseReactFlowDisplayWorkerResult } from '../baseReactFlowDisplayWorkerClient';
 import { createBaseReactFlowRoutingSessionRuntime } from '../baseReactFlowRoutingSessionRuntime';
-import { clearBaseReactFlowDisplayCommittedSnapshots } from '../baseReactFlowDisplayCommittedSnapshot';
+import { clearBaseReactFlowDisplayCommittedSnapshots, commitBaseReactFlowDisplaySnapshot } from '../baseReactFlowDisplayCommittedSnapshot';
+import * as committedReuse from '../baseReactFlowDisplayCommittedReuse';
+import { computeBaseReactFlowDisplayInputIdentityBundle } from '../baseReactFlowDisplayInputIdentity';
+import { computeBaseReactFlowDisplayOutputRouteSignature } from '../baseReactFlowDisplayCache';
+import { createTestDisplayHardReport } from './baseReactFlowDisplayWorkerTestFixtures';
 import { resolveBaseReactFlowDisplayCandidate } from '../baseReactFlowDisplayCandidateResolver';
 import { readDisplayRoutingDebugState } from '../baseReactFlowDisplayRoutingDebug';
 import type { UseBaseReactFlowDisplayRoutingOptions } from '../baseReactFlowDisplayRoutingTypes';
@@ -39,7 +43,7 @@ const rejected: BaseReactFlowDisplayWorkerResult = {
   hardClean: false, routeResolution: 'full-route', phaseTrace: [],
 };
 
-const setup = () => {
+const setup = (overrides: Partial<UseBaseReactFlowDisplayRoutingOptions> = {}) => {
   const runtime = createBaseReactFlowRoutingSessionRuntime();
   const onNodeDragFallbackResolved = vi.fn();
   const options: UseBaseReactFlowDisplayRoutingOptions = {
@@ -47,6 +51,7 @@ const setup = () => {
     enableSmartEdges: true, smartEdgePadding: 24, isLargeGraph: false,
     isNodeDragging: false, isNodeDragFallbackPending: true, nodeDragFallbackIds: ['b'],
     onNodeDragFallbackResolved, routingSessionRuntime: runtime,
+    ...overrides,
   };
   const hook = renderHook((props: UseBaseReactFlowDisplayRoutingOptions) => useBaseReactFlowDisplayRouting(props), { initialProps: options });
   return { hook, runtime, options, onNodeDragFallbackResolved };
@@ -59,6 +64,38 @@ beforeEach(() => {
 afterEach(() => vi.clearAllMocks());
 
 describe('display routing rejection lifecycle', () => {
+  it('does not resolve an active drag from its frozen committed cache identity', async () => {
+    const routedEdges: Edge[] = [{ ...edges[0], data: { computedPath: [{ x: 100, y: 30 }, { x: 200, y: 30 }] } }];
+    const identity = computeBaseReactFlowDisplayInputIdentityBundle({ nodes, edges,
+      enableSmartEdges: true, smartEdgePadding: 24, isLargeGraph: false });
+    const signature = computeBaseReactFlowDisplayOutputRouteSignature(routedEdges);
+    if (!signature) throw new Error('Missing test route signature');
+    const baseline = commitBaseReactFlowDisplaySnapshot({ inputSignature: identity.cacheSignature,
+      inputGeometryDigest: identity.geometryDigest, sourceEdges: edges, sourceNodes: nodes,
+      displayPatches: routedEdges, outputRouteSignature: signature, hardReport: createTestDisplayHardReport(true, 100) });
+    if (!baseline) throw new Error('Missing test committed snapshot');
+    const reuse = vi.spyOn(committedReuse, 'resolveBaseReactFlowDisplayCommittedReuse').mockReturnValue({
+      retainedEntry: baseline, reusableEntry: null, authorityBaseline: null,
+      authorityEdges: [], outputRouteSignature: signature,
+    });
+    const finalApplied = vi.fn();
+    const { hook, options, onNodeDragFallbackResolved } = setup({ isNodeDragging: true, onDisplayRoutingFinalApplied: finalApplied });
+    try {
+      await act(async () => { await Promise.resolve(); });
+      expect(onNodeDragFallbackResolved).not.toHaveBeenCalled();
+      expect(finalApplied).not.toHaveBeenCalled();
+      expect(readDisplayRoutingDebugState()?.stage).toBe('paused-node-drag');
+      expect(computeBaseReactFlowDisplayEdgesInWorker).not.toHaveBeenCalled();
+      // Releasing an unchanged gesture can still reuse its committed result.
+      hook.rerender({ ...options, isNodeDragging: false });
+      await waitFor(() => expect(onNodeDragFallbackResolved).toHaveBeenCalledOnce());
+      expect(finalApplied).toHaveBeenCalledOnce();
+      expect(computeBaseReactFlowDisplayEdgesInWorker).not.toHaveBeenCalled();
+    } finally {
+      hook.unmount();
+      reuse.mockRestore();
+    }
+  });
   it('drops a display intent rejected during a synchronous layout commit before candidate loading', async () => {
     const { hook, runtime } = setup();
     const beginJob = runtime.beginJob;
