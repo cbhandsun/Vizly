@@ -15,8 +15,85 @@ import {
   partitionRouteAssetsByReadyTime,
 } from './smoke-route-reporting.mjs';
 import { isEnterpriseDisplayRoutingSettled } from '../smokeRouteBudgetUtils.mjs';
+import { startupFaultCases, readStartupFaultRecovery, assertStartupFaultRecovery, parseStartupFaultBaseUrl } from './startup-fault-cases.mjs';
 
 describe('smoke route modules', () => {
+  it('accepts only bounded local preview origins and never echoes invalid URL input', () => {
+    expect(parseStartupFaultBaseUrl('http://127.0.0.1:4176/')).toBe('http://127.0.0.1:4176');
+    expect(parseStartupFaultBaseUrl('https://localhost')).toBe('https://localhost');
+    expect(parseStartupFaultBaseUrl('http://[::1]:4176')).toBe('http://[::1]:4176');
+    for (const value of [null, undefined, '', [], 1, 'x'.repeat(2049), 'http://localhost:0',
+      'http://user:private@localhost', 'http://localhost?token=private', 'http://localhost/#private',
+      'http://localhost/path', 'https://example.com', 'file:///private', 'private-not-url']) {
+      expect(() => parseStartupFaultBaseUrl(value)).toThrow('Startup fault verification requires a local preview origin');
+    }
+  });
+  it('gates startup failure recovery in the existing required preview lifecycle', () => {
+    const ci = readFileSync(new URL('../../.github/workflows/ci.yml', import.meta.url), 'utf8');
+    expect(ci).toMatch(/node scripts\/verify-startup-failures.mjs\s+if \(\$LASTEXITCODE -ne 0\)/);
+    const position = ci.indexOf('node scripts/verify-startup-failures.mjs');
+    expect(position).toBeGreaterThan(ci.indexOf("if (-not $ready)"));
+    expect(position).toBeLessThan(ci.indexOf('Stop-Process -Id $savedPreview.Id'));
+  });
+
+  it.each(['worker-creation', 'worker-post'])('injects %s only into display Workers', id => {
+    class WorkerStub { postMessage() { return 'sent'; } }
+    const context = { window: { Worker: WorkerStub } };
+    const fault = startupFaultCases.find(candidate => candidate.id === id);
+    runInNewContext(fault.source, context);
+    expect(new context.window.Worker('elk-engine-worker.js').postMessage()).toBe('sent');
+    if (id === 'worker-creation') {
+      expect(() => new context.window.Worker('baseReactFlowDisplayEdges.worker.js')).toThrow('private-fault-marker');
+    } else {
+      expect(() => new context.window.Worker('baseReactFlowDisplayEdges.worker.js').postMessage()).toThrow('private-fault-marker');
+    }
+  });
+
+  it.each([['worker-runtime', 'error'], ['worker-decode', 'messageerror'],
+    ['worker-invalid-response', 'message']])('injects %s after the request is posted', (id, type) => {
+    const events = []; const queued = [];
+    class WorkerStub {
+      postMessage() { throw new Error('The request must be intercepted'); }
+      dispatchEvent(event) { events.push(event); }
+    }
+    class EventStub { constructor(eventType, options) { this.type = eventType; Object.assign(this, options); } }
+    const context = { window: { Worker: WorkerStub }, queueMicrotask: callback => queued.push(callback),
+      ErrorEvent: EventStub, MessageEvent: EventStub };
+    runInNewContext(startupFaultCases.find(candidate => candidate.id === id).source, context);
+    new context.window.Worker('baseReactFlowDisplayEdges.worker.js').postMessage({ requestId: 'request' });
+    expect(events).toHaveLength(0);
+    expect(queued).toHaveLength(1);
+    queued[0]();
+    expect(events[0].type).toBe(type);
+    if (type === 'message') expect(events[0].data).toEqual({ requestId: 'request', edges: 'invalid' });
+  });
+
+  it('projects browser recovery and rejects malformed, excessive or private summary fields', () => {
+    const valid = { schema: 'vizly-startup-failure-v1', stage: 'mount', code: 'application-mount-failed', elapsedMs: 1 };
+    for (const summary of [valid, { ...valid, secret: 'private-fault-marker' }, null, [],
+      { ...valid, elapsedMs: -1 }, { ...valid, elapsedMs: 600001 }, { ...valid, code: 'private-fault-marker' }]) {
+      const textarea = { value: JSON.stringify(summary), readOnly: true,
+        getBoundingClientRect: () => ({ x: 0, y: 0, width: 200 }) };
+      const panel = { textContent: '', querySelector: selector => selector === 'textarea' ? textarea : null };
+      const result = runInNewContext(`(${readStartupFaultRecovery.toString()})('startup')`, {
+        document: { querySelector: () => panel, elementFromPoint: () => textarea },
+      });
+      expect(result.valid).toBe(summary === valid);
+      expect(JSON.stringify(result)).not.toContain('private-fault-marker');
+    }
+  });
+
+  it('rejects every missing recovery invariant without echoing the observation', () => {
+    const fault = startupFaultCases[0];
+    const valid = { valid: true, code: fault.code, stage: fault.stage, unobscured: true,
+      readOnly: true, nodesPreserved: true, privateContentAbsent: true };
+    expect(() => assertStartupFaultRecovery(valid, fault)).not.toThrow();
+    for (const key of Object.keys(valid)) {
+      expect(() => assertStartupFaultRecovery({ ...valid, [key]: 'private-fault-marker' }, fault))
+        .toThrow('Startup fault recovery contract failed');
+    }
+    expect(() => assertStartupFaultRecovery(null, fault)).toThrow('Startup fault recovery contract failed');
+  });
   it('closes the page target before disconnecting after each sample', async () => {
     const session = new CdpSession('ws://browser', 'sample-target');
     const calls = [];

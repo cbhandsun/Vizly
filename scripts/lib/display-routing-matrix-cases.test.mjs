@@ -31,7 +31,8 @@ describe('display routing matrix cases', () => {
     expect(savedStep).toContain("DISPLAY_ROUTING_MATRIX_CASE = 'multi-page-roundtrip'");
     expect(savedStep).toContain("DISPLAY_ROUTING_MATRIX_CASE = 'topology-edit-cycle'");
     expect(savedStep.match(/npm run verify:display-routing-matrix/g)).toHaveLength(4);
-    expect(savedStep.match(/if \(\$LASTEXITCODE -ne 0\)/g)).toHaveLength(4);
+    expect(savedStep).toContain('node scripts/verify-startup-failures.mjs');
+    expect(savedStep.match(/if \(\$LASTEXITCODE -ne 0\)/g)).toHaveLength(5);
     expect(savedStep).toContain('finally {');
     expect(savedStep).toContain('Stop-Process -Id $savedPreview.Id');
     expect(savedStep).not.toContain('continue-on-error');
