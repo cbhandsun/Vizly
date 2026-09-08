@@ -1,13 +1,14 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { TEST_CI_SHARDS } from './lib/test-ci-shards.mjs';
+import { ciShardCoversTest, extractCiTestPaths, normalizeCiTestPath } from './lib/test-ci-coverage-paths.mjs';
 
 const projectRoot = process.cwd();
 const packageJson = JSON.parse(readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
-const testFilePattern = /\.test\.(ts|tsx)$/;
-const searchRoots = ['src', 'supabase'];
+const testFilePattern = /\.test\.(ts|tsx|mjs)$/;
+const searchRoots = ['src', 'supabase', 'scripts/lib'];
 
-const normalizePath = (value) => value.replace(/\\/g, '/').replace(/\/+$/, '');
+const normalizePath = normalizeCiTestPath;
 
 const walk = (dir) => {
   if (!existsSync(dir)) {
@@ -44,32 +45,10 @@ const ciShardScripts = runnerShardNames
   .map((name) => packageScripts[name])
   .filter((command) => typeof command === 'string');
 
-const extractVitestPaths = (command) => {
-  const tokens = command.split(/\s+/).filter(Boolean);
-  const paths = [];
-
-  for (let index = 0; index < tokens.length; index += 1) {
-    const token = tokens[index];
-    if (token === '--environment') {
-      index += 1;
-      continue;
-    }
-    if (token.startsWith('--')) {
-      continue;
-    }
-    if (['vitest', 'run', 'node'].includes(token)) {
-      continue;
-    }
-    if (token.startsWith('src/') || token.startsWith('supabase/')) {
-      paths.push(normalizePath(token));
-    }
-  }
-
-  return paths;
-};
-
-const ciPaths = ciShardScripts.flatMap(extractVitestPaths);
-const uncovered = allTests.filter((file) => !ciPaths.some((ciPath) => file === ciPath || file.startsWith(`${ciPath}/`)));
+const ciFilters = ciShardScripts.map(extractCiTestPaths);
+const ciPaths = ciFilters.flatMap(shard => shard.paths);
+const invalidPaths = ciFilters.flatMap(shard => shard.invalidPaths);
+const uncovered = allTests.filter(file => !ciFilters.some(shard => ciShardCoversTest(shard, file)));
 const missingDeclaredPaths = ciPaths.filter((ciPath) => !existsSync(path.join(projectRoot, ciPath)));
 
 if (
@@ -77,7 +56,11 @@ if (
   || missingDeclaredPaths.length > 0
   || missingRunnerScripts.length > 0
   || vitestShardsMissingFromRunner.length > 0
+  || invalidPaths.length > 0
 ) {
+  if (invalidPaths.length > 0) {
+    console.error('Invalid test:ci repository paths:', JSON.stringify(invalidPaths));
+  }
   if (uncovered.length > 0) {
     console.error('Test files missing from test:ci shards:');
     for (const file of uncovered) {
