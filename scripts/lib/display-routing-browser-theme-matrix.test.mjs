@@ -22,6 +22,19 @@ const stateFor = themeCase => ({
 });
 
 describe('display routing browser theme matrix', () => {
+  it('reports panel lifecycle markers without retaining their content', () => {
+    for (const phase of ['requested', 'loading']) {
+      const marker = document.createElement('span');
+      marker.hidden = true;
+      marker.dataset.settingsPanelPhase = phase;
+      marker.textContent = 'private-panel-content';
+      document.body.append(marker);
+    }
+    const evidence = projectThemeControlEvidence(readThemeControlEvidence(document));
+    expect(evidence).toMatchObject({ panelRequested: true, panelLoading: true, panelReady: false });
+    expect(JSON.stringify(evidence)).not.toContain('private-panel-content');
+    expect(projectThemeControlEvidence({ ...evidence, panelReady: 'private' }).panelReady).toBeNull();
+  });
   it('records shortcut arrival and later cancellation without retaining other keys', async () => {
     const stop = event => { event.preventDefault(); event.stopImmediatePropagation(); };
     expect(readThemeShortcutEvidence(document, true)).toEqual({ received: false, defaultPrevented: null });
@@ -31,6 +44,8 @@ describe('display routing browser theme matrix', () => {
     try {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: ',', ctrlKey: true, cancelable: true }));
       await new Promise(resolve => window.queueMicrotask(resolve));
+      expect(readThemeShortcutEvidence(document).defaultPrevented).toBeNull();
+      await new Promise(resolve => window.setTimeout(resolve, 0));
       expect(readThemeShortcutEvidence(document)).toEqual({ received: true, defaultPrevented: true });
       expect(window.__vizlyThemeShortcutCleanup).toBeUndefined();
       expect(JSON.stringify(readThemeShortcutEvidence(document))).not.toContain('private');

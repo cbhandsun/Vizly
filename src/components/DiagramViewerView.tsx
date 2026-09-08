@@ -19,6 +19,7 @@ import { subscribeMindMapAIConfigRequest } from '@/core/components/mindmap-v2/mi
 import { CloudSaveAuthRecovery } from './diagrams/CloudSaveAuthRecovery';
 import { loadLayoutPresetMapForDiagram } from '@/data/standardized/layoutPresetMapLoader';
 import { shouldHideDiagramViewerCenterIsland } from './diagramViewerChrome';
+import { SettingsPanelBoundary } from './ui/SettingsPanelBoundary';
 
 const RoutingDebugPanel = import.meta.env.DEV
     ? lazy(() => import('./debug/RoutingDebugPanel').then(module => ({ default: module.RoutingDebugPanel })))
@@ -383,7 +384,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                                 </Suspense>
 
                                 {isSettingsOpen && (
-                                    <Suspense fallback={null}>
+                                    <SettingsPanelBoundary>
                                         <DraggableSettingsPanel
                                             title={settingsPanelTitle}
                                             closeLabel={t('designer.settings.closePanel', { title: settingsPanelTitle })}
@@ -391,7 +392,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                                         >
                                             {settingsPanel}
                                         </DraggableSettingsPanel>
-                                    </Suspense>
+                                    </SettingsPanelBoundary>
                                 )}
 
                                 {/* 演示模式退出提示层 */}

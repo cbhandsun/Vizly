@@ -1,5 +1,6 @@
 // Observe only the single public settings shortcut used by this browser audit.
-// The microtask sees preventDefault even when a later handler stops propagation.
+// Native dispatch may run microtasks between listeners. A following task sees
+// preventDefault after propagation, even if a later handler stops propagation.
 export const readThemeShortcutEvidence = (doc, start = false) => {
   const win = doc.defaultView;
   if (!win) return null;
@@ -16,7 +17,7 @@ export const readThemeShortcutEvidence = (doc, start = false) => {
     const observe = event => {
       if (event.key !== ',' || !(event.ctrlKey || event.metaKey)) return;
       state.received = true;
-      win.queueMicrotask(() => { state.defaultPrevented = event.defaultPrevented === true; });
+      win.setTimeout(() => { state.defaultPrevented = event.defaultPrevented === true; }, 0);
       cleanup();
     };
     win.__vizlyThemeShortcutCleanup = cleanup;
@@ -71,6 +72,9 @@ export const readThemeControlEvidence = doc => {
     hasFocus: typeof doc.hasFocus === 'function' ? doc.hasFocus() : null,
     focus,
     editable: Boolean(active?.isContentEditable || ['input', 'textarea', 'select'].includes(tag)),
+    panelRequested: Boolean(doc.querySelector('[data-settings-panel-phase="requested"]')),
+    panelLoading: Boolean(doc.querySelector('[data-settings-panel-phase="loading"]')),
+    panelReady: Boolean(doc.querySelector('[data-settings-panel-phase="ready"]')),
     trigger: scan('[data-theme-selector-trigger]'),
     settings: scan('[data-settings-close]'),
     dialog: scan('[data-theme-selector-dialog]'),
@@ -98,6 +102,9 @@ export const projectThemeControlEvidence = value => {
     hasFocus: boolean(value.hasFocus),
     focus: enumeration(value.focus, ['body', 'button', 'input', 'textarea', 'select', 'other', 'none']),
     editable: boolean(value.editable),
+    panelRequested: boolean(value.panelRequested),
+    panelLoading: boolean(value.panelLoading),
+    panelReady: boolean(value.panelReady),
     trigger: controls(value.trigger), settings: controls(value.settings), dialog: controls(value.dialog), modal: controls(value.modal),
   };
 };
