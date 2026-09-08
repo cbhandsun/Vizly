@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { collectJournaledRoutingSamples, createRoutingSampleJournal,
-  projectRoutingJournalFailure, projectRoutingJournalSample } from './display-routing-sample-journal.mjs';
+  createRoutingSampleFailure, projectRoutingJournalFailure, projectRoutingJournalSample } from './display-routing-sample-journal.mjs';
 
 vi.mock('node:fs/promises', async importOriginal => {
   const actual = await importOriginal();
@@ -30,6 +30,19 @@ const records = async directory => {
 };
 
 describe('routing sample journal', () => {
+  it('persists the precise safe sample category in both journal and terminal failure', async () => {
+    const directory = await createDirectory();
+    const error = createRoutingSampleFailure('child-exit-failed', {
+      message: 'Bearer private {"waitStatus":"not-ready","stage":"worker-phase"}',
+    });
+    await expect(collectJournaledRoutingSamples({ kind: 'cold', sampleCount: 1, directory,
+      runSample: async () => { throw error; },
+    })).rejects.toThrow('child-exit-failed');
+    const [entries] = await records(directory);
+    expect(entries.at(-1).failure).toEqual({ code: 'sample-failed', sampleFailureCode: 'child-exit-failed',
+      observedWaitStatus: 'not-ready', observedRoutingStage: 'worker-phase' });
+    expect(JSON.stringify(entries)).not.toMatch(/Bearer|private/);
+  });
   it('keeps numeric execution evidence and unavailable states without exporting raw timestamps', () => {
     const workerExecution = { status: 'available', handlerReadyAfterPostMs: 1,
       postReadyDispatchMs: 2, executionMs: 3, responseDeliveryMs: 4, readyAt: 'private' };

@@ -13,6 +13,17 @@ const resolutions = ['full-route', 'full-route-repaired', 'incremental-route',
   'validated-candidate', 'repaired-candidate'];
 const caseIds = ['logistics-architecture-v1', 'wms-demand-allocation-strategy-v2',
   'wms-process-flow-v1', 'l-oms', 'tms', 'wms'];
+const sampleFailureCodes = ['child-spawn-failed', 'child-exit-failed',
+  'machine-result-missing', 'machine-result-invalid', 'worker-evidence-invalid'];
+
+export const createRoutingSampleFailure = (sampleFailureCode, diagnostic = null) => {
+  if (!sampleFailureCodes.includes(sampleFailureCode)) throw new Error('Invalid sample failure code');
+  const safe = projectRoutingJournalFailure(diagnostic);
+  const error = new Error(JSON.stringify({ waitStatus: safe.observedWaitStatus,
+    stage: safe.observedRoutingStage }));
+  error.sampleFailureCode = sampleFailureCode;
+  return error;
+};
 
 export const projectRoutingJournalSample = (kind, sample) => {
   if (!['cold', 'incremental'].includes(kind)) throw new Error('Invalid journal kind');
@@ -48,7 +59,10 @@ export const projectRoutingJournalFailure = (error, code = 'sample-failed') => {
   const message = typeof error?.message === 'string' ? error.message.slice(0, 65_536) : '';
   const wait = message.match(/"waitStatus":\s*"(not-ready|evaluation-failed|evaluation-timeout|invalid-evaluation|predicate-failed|quality-rejected)"/);
   const stage = message.match(/"stage":\s*"(scheduled|routing|worker-post|worker-phase|worker-response|worker-error|worker-message-error|worker-cancelled|worker-timeout|final-quality-rejected|final-safety-rejected|final-applied)"/);
-  return { code, observedWaitStatus: wait?.[1] ?? null,
+  return { code,
+    ...(code === 'sample-failed' && sampleFailureCodes.includes(error?.sampleFailureCode)
+      ? { sampleFailureCode: error.sampleFailureCode } : {}),
+    observedWaitStatus: wait?.[1] ?? null,
     observedRoutingStage: stage?.[1] ?? null };
 };
 

@@ -2,6 +2,9 @@
 
 import { describe, expect, it } from 'vitest';
 import vm from 'node:vm';
+import { EventEmitter } from 'node:events';
+import { runColdRoutingSample } from './precompiled-display-route-cold-sample.mjs';
+import { createRoutingSampleFailure, projectRoutingJournalFailure } from './display-routing-sample-journal.mjs';
 import { installPrecompiledRouteLongTaskProbe, projectPrecompiledRouteLongTasks }
   from './precompiled-display-route-long-tasks.mjs';
 
@@ -109,6 +112,71 @@ const sample = (logisticsMs = 700) => buildPrecompiledDisplayRoutePerformanceRes
 ]);
 
 describe('precompiled display route cold performance', () => {
+  const fakeChild = () => Object.assign(new EventEmitter(), {
+    stdout: new EventEmitter(), stderr: new EventEmitter(),
+  });
+  it('waits for drained stdio after exit before accepting the final machine result', async () => {
+    const child = fakeChild();
+    const pending = runColdRoutingSample(1, () => child);
+    child.emit('exit', 0);
+    const result = buildPrecompiledDisplayRoutePerformanceResult([
+      capture('logistics-architecture-v1', 700, { workerExecution: { status: 'available',
+        handlerReadyAfterPostMs: 1, postReadyDispatchMs: 2, executionMs: 500, responseDeliveryMs: 3 } }),
+    ]);
+    child.stdout.emit('data', `PRECOMPILED_DISPLAY_ROUTE_RESULT=${JSON.stringify(result)}\n`);
+    child.emit('close', 0);
+    await expect(pending).resolves.toEqual(result);
+  });
+  it.each([
+    [1, '', 'child-exit-failed'], [null, '', 'child-exit-failed'],
+    [0, '', 'machine-result-missing'], [0, 'private', 'machine-result-missing'],
+    [0, 'PRECOMPILED_DISPLAY_ROUTE_RESULT={private', 'machine-result-invalid'],
+    [0, 'PRECOMPILED_DISPLAY_ROUTE_RESULT=null', 'machine-result-invalid'],
+  ])('classifies child completion safely: %s / %s', async (exitCode, output, expected) => {
+    const child = fakeChild();
+    const pending = runColdRoutingSample(1, () => child);
+    child.stdout.emit('data', output);
+    child.stderr.emit('data', 'Bearer private {"waitStatus":"evaluation-timeout","stage":"worker-post"}');
+    child.emit('close', exitCode);
+    const error = await pending.catch(value => value);
+    expect(projectRoutingJournalFailure(error)).toMatchObject({ sampleFailureCode: expected });
+    expect(error.message).not.toMatch(/Bearer|private/);
+    if (exitCode !== 0) expect(projectRoutingJournalFailure(error)).toMatchObject({
+      observedWaitStatus: 'evaluation-timeout', observedRoutingStage: 'worker-post' });
+  });
+  it('distinguishes missing Worker evidence from malformed machine results', async () => {
+    const child = fakeChild();
+    const pending = runColdRoutingSample(1, () => child);
+    child.stdout.emit('data', `PRECOMPILED_DISPLAY_ROUTE_RESULT=${JSON.stringify(sample())}`);
+    child.emit('close', 0);
+    await expect(pending).rejects.toMatchObject({ sampleFailureCode: 'worker-evidence-invalid' });
+  });
+  it('keeps bounded output tails and recognizes a result after oversized logging', async () => {
+    const child = fakeChild();
+    const pending = runColdRoutingSample(1, () => child);
+    child.stdout.emit('data', 'x'.repeat(4 * 1024 * 1024 + 100));
+    child.stdout.emit('data', `\nPRECOMPILED_DISPLAY_ROUTE_RESULT=${JSON.stringify(sample())}`);
+    child.emit('close', 0);
+    await expect(pending).rejects.toMatchObject({ sampleFailureCode: 'worker-evidence-invalid' });
+  });
+  it('handles synchronous and asynchronous spawn failures without retaining raw errors', async () => {
+    await expect(runColdRoutingSample(1, () => { throw new Error('private'); }))
+      .rejects.toMatchObject({ sampleFailureCode: 'child-spawn-failed', message: '{"waitStatus":null,"stage":null}' });
+    const child = fakeChild();
+    const pending = runColdRoutingSample(1, () => child);
+    child.emit('error', new Error('private'));
+    child.emit('close', -1);
+    await expect(pending).rejects.toMatchObject({ sampleFailureCode: 'child-spawn-failed' });
+  });
+  it('bounds sample inputs and failure codes, excluding forged fields and unrelated failures', async () => {
+    for (const index of [null, '1', 0, -1, 101, Infinity, NaN]) {
+      await expect(runColdRoutingSample(index)).rejects.toThrow('Invalid cold sample index');
+    }
+    expect(() => createRoutingSampleFailure('private')).toThrow('Invalid sample failure code');
+    expect(projectRoutingJournalFailure({ sampleFailureCode: 'private' })).not.toHaveProperty('sampleFailureCode');
+    expect(projectRoutingJournalFailure(createRoutingSampleFailure('child-exit-failed'), 'journal-write-failed'))
+      .not.toHaveProperty('sampleFailureCode');
+  });
   it('correlates bounded exclusive phase costs with the actual slow sample', () => {
     const phaseTrace = Array.from({ length: 12 }, (_, index) => ({
       phase: `phase-${index}`, parentPhase: null, durationMs: index + 1,
