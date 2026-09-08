@@ -109,6 +109,20 @@ const sample = (logisticsMs = 700) => buildPrecompiledDisplayRoutePerformanceRes
 ]);
 
 describe('precompiled display route cold performance', () => {
+  it('preserves execution evidence through machine parsing and summary without treating missing samples as zero', () => {
+    const workerExecution = { status: 'available', handlerReadyAfterPostMs: 20,
+      postReadyDispatchMs: 10, executionMs: 50, responseDeliveryMs: 20, readyAt: 'private' };
+    const result = buildPrecompiledDisplayRoutePerformanceResult([
+      capture('logistics-architecture-v1', 700, { workerExecution }),
+    ]);
+    expect(parsePrecompiledDisplayRoutePerformanceResult(result)).toEqual(result);
+    const missing = buildPrecompiledDisplayRoutePerformanceResult([capture('logistics-architecture-v1', 700)]);
+    const summary = summarizePrecompiledDisplayRoutePerformance([result, missing], 2, ['logistics-architecture-v1']);
+    expect(summary.presets['logistics-architecture-v1'].workerExecutionSampleCount).toBe(1);
+    expect(summary.presets['logistics-architecture-v1'].workerExecution.handlerReadyAfterPostMs.p95Ms).toBe(20);
+    expect(summary.presets['logistics-architecture-v1'].slowestSamples[0].workerExecution.status).toBe('available');
+    expect(JSON.stringify(summary)).not.toContain('private');
+  });
   it('retains bounded timing aggregates and correlates slow samples without private fields', () => {
     const workerTimings = { prewarmLeadMs: 100, requestPreparationMs: 10, firstResponseMs: 30,
       workerDeliveryOverheadMs: 100, workerMonotonicDeliveryOverheadMs: 99.5,

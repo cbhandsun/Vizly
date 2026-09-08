@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { collectJournaledRoutingSamples } from './lib/display-routing-sample-journal.mjs';
+import { assertPrecompiledWorkerExecutionCoverage } from './lib/precompiled-display-route-worker-execution.mjs';
 
 import {
   assertPrecompiledDisplayRoutePerformanceBudget,
@@ -53,13 +54,22 @@ const runOneSample = sampleIndex => new Promise((resolve, reject) => {
       reject(new Error(`Cold-routing sample ${sampleIndex} did not emit a machine result`));
       return;
     }
+    let sample;
     try {
-      resolve(parsePrecompiledDisplayRoutePerformanceResult(
+      sample = parsePrecompiledDisplayRoutePerformanceResult(
         JSON.parse(line.slice(PRECOMPILED_DISPLAY_ROUTE_RESULT_PREFIX.length)),
-      ));
+      );
     } catch {
       reject(new Error(`Cold-routing sample ${sampleIndex} emitted malformed JSON`));
+      return;
     }
+    try {
+      assertPrecompiledWorkerExecutionCoverage(sample);
+    } catch {
+      reject(new Error(`Cold-routing sample ${sampleIndex} is missing valid Worker execution evidence`));
+      return;
+    }
+    resolve(sample);
   });
 });
 

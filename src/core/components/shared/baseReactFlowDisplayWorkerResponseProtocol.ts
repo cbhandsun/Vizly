@@ -1,5 +1,6 @@
 import type { Edge } from '@xyflow/react';
 import type { RoutingPatch } from '../../routing/routingPatch';
+import type { DisplayWorkerExecutionTiming } from './baseReactFlowDisplayWorkerExecutionTiming';
 
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
 import type { DisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
@@ -37,4 +38,5 @@ export type DisplayEdgesWorkerResponse = {
   sessionRef?: RoutingWorkerSessionRef;
   commitReceipt?: DisplayRoutingWorkerCommitReceipt;
   workerDurationMs?: number;
+  workerExecutionTiming?: DisplayWorkerExecutionTiming;
 };

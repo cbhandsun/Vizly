@@ -30,6 +30,14 @@ const records = async directory => {
 };
 
 describe('routing sample journal', () => {
+  it('keeps numeric execution evidence and unavailable states without exporting raw timestamps', () => {
+    const workerExecution = { status: 'available', handlerReadyAfterPostMs: 1,
+      postReadyDispatchMs: 2, executionMs: 3, responseDeliveryMs: 4, readyAt: 'private' };
+    const projected = projectRoutingJournalSample('cold', { presets: [{ ...sample.presets[0], workerExecution }] });
+    expect(projected.presets[0].workerExecution).toMatchObject({ status: 'available', postReadyDispatchMs: 2 });
+    expect(JSON.stringify(projected)).not.toMatch(/private|readyAt/);
+    expect(projectRoutingJournalSample('cold', sample).presets[0].workerExecution).toEqual({ status: 'unavailable' });
+  });
   it('persists each sample before advancing and preserves it on a later failure', async () => {
     const directory = await createDirectory();
     let calls = 0;

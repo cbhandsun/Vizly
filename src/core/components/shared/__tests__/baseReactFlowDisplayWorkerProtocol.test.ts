@@ -754,6 +754,18 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       routeResolution: 'repair',
       workerDurationMs: 12.5,
     }, 'repair-1')).toMatchObject({ hardReport, workerDurationMs: 12.5 });
+    const timedResponse = { requestId: 'repair-1', edges: validEdges, hardClean: true,
+      hardReport, routeResolution: 'repair', workerDurationMs: 12.5 };
+    expect(parseDisplayEdgesWorkerResponse({ ...timedResponse,
+      workerExecutionTiming: { readyAt: 1, receivedAt: 20, finishedAt: 32.5, token: 'private' },
+    }, 'repair-1')?.workerExecutionTiming).toEqual({ readyAt: 1, receivedAt: 20, finishedAt: 32.5 });
+    for (const workerExecutionTiming of [null, {}, [], { readyAt: 1, receivedAt: 20, finishedAt: 2 },
+      { readyAt: 1, receivedAt: 20, finishedAt: 40 }]) {
+      expect(parseDisplayEdgesWorkerResponse({ ...timedResponse, workerExecutionTiming }, 'repair-1')).toBeNull();
+    }
+    expect(parseDisplayEdgesWorkerResponse({ requestId: 'repair-1', error: 'failed',
+      workerExecutionTiming: { readyAt: 1, receivedAt: 2, finishedAt: 3 },
+    }, 'repair-1')).toBeNull();
     expect(parseDisplayEdgesWorkerResponse({
       requestId: 'repair-missing-report',
       edges: validEdges,

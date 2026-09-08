@@ -44,6 +44,9 @@ export const installBaseReactFlowDisplayWorkerTransport = (
   handleMessage: DisplayWorkerMessageHandler,
 ): void => {
   if (!displayEdgesWorkerScope) return;
+  // Static imports have evaluated by this point. This is handler readiness,
+  // not a measurement of network transfer or module evaluation in isolation.
+  const readyAt = performance.timeOrigin + performance.now();
   displayEdgesWorkerScope.onmessage = (event: MessageEvent<unknown>) => {
     const workerStartedAt = performance.now();
     const requestId = readDisplayEdgesWorkerRequestId(event.data) ?? 'invalid-request';
@@ -65,6 +68,7 @@ export const installBaseReactFlowDisplayWorkerTransport = (
         transportRequest?.operation === 'incremental-route'
           ? transportRequest.edges
           : undefined,
+        readyAt,
       );
     } catch {
       postDisplayEdgesResponse({

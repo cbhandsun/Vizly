@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { projectDisplayRoutingEditStability } from './display-routing-edit-stability.mjs';
 import { projectPrecompiledRouteLongTasks } from './precompiled-display-route-long-tasks.mjs';
+import { projectPrecompiledWorkerExecution } from './precompiled-display-route-worker-execution.mjs';
 
 const metric = value => Number.isFinite(value) && value >= 0 && value <= 1e15 ? value : null;
 const fields = (value, keys) => Object.fromEntries(keys.map(key => [key, metric(value?.[key])]));
@@ -29,6 +30,7 @@ export const projectRoutingJournalSample = (kind, sample) => {
         workerResolution: resolutions.includes(item?.workerResolution) ? item.workerResolution : null,
         editStability: projectDisplayRoutingEditStability(item?.editStability),
         mainThreadLongTasks: projectPrecompiledRouteLongTasks(item?.mainThreadLongTasks),
+        workerExecution: projectPrecompiledWorkerExecution(item?.workerExecution),
         workerTimings: item?.workerTimings == null ? null : fields(item.workerTimings,
           ['prewarmLeadMs', 'requestPreparationMs', 'firstResponseMs', 'workerDeliveryOverheadMs',
             'workerMonotonicDeliveryOverheadMs', 'responseParseMs', 'responseApplyMs']),

@@ -1,3 +1,5 @@
+import { measurePrecompiledWorkerExecution } from './precompiled-display-route-worker-execution.mjs';
+
 /**
  * Generation accepts one final hard-clean route/validate response. A standalone
  * later `:repair` response remains invalid because it has a different request
@@ -336,6 +338,7 @@ export const renderPrecompiledDisplayRouteCaptureExpression = (
   const replayTrustedPatches = ${replayTrustedDisplayRoutePatches.toString()};
   const routeContractsMatch = ${precompiledDisplayRouteContractsMatch.toString()};
   const projectTimings = ${projectPrecompiledDisplayRouteTimings.toString()};
+  const measureWorkerExecution = ${measurePrecompiledWorkerExecution.toString()};
   const hashQueryIndex = window.location.hash.indexOf('?');
   const activeTargetId = hashQueryIndex >= 0
     ? new URLSearchParams(window.location.hash.slice(hashQueryIndex + 1)).get('diagram')
@@ -399,6 +402,9 @@ export const renderPrecompiledDisplayRouteCaptureExpression = (
     provenance: committed.provenance ?? 'fresh-full-route',
     workerResolution: isLayoutCapture ? routing.workerResolution : response.routeResolution,
     workerDurationMs: isLayoutCapture ? routing.routeMs : response.workerDurationMs,
+    workerExecution: isLayoutCapture ? { status: 'unavailable' } : measureWorkerExecution(
+      window.__vizlyPrecompiledRouteTiming, response.workerExecutionTiming, performance.timeOrigin,
+    ),
     workerTimings: isLayoutCapture ? null : projectTimings(
       window.__vizlyPrecompiledRouteTiming, routing, response.workerDurationMs,
     ),

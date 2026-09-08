@@ -2,6 +2,7 @@ import type { Edge, Node } from '@xyflow/react';
 
 import { ROUTING_IDENTIFIER_MAX_LENGTH } from '../../routing/routingBoundaryLimits';
 import type { RoutingPatch } from '../../routing/routingPatch';
+import { parseDisplayWorkerTimingMetadata } from './baseReactFlowDisplayWorkerExecutionTiming';
 import { isDisplayWorkerBoundedCandidateReport } from './baseReactFlowDisplayWorkerQualityProtocol';
 import {
   isDisplayRoutingPhaseTrace,
@@ -531,6 +532,8 @@ export const parseDisplayEdgesWorkerResponse = (
   const hasEdges = typeof value.edges !== 'undefined';
   const hasRoutingPatches = typeof value.routingPatches !== 'undefined';
   const hasPhaseProgress = typeof value.phaseProgress !== 'undefined';
+  if (typeof value.workerExecutionTiming !== 'undefined'
+    && !(hasEdges || hasRoutingPatches)) return null;
   if (
     Number(hasError)
     + Number(hasBoundedCandidate)
@@ -600,9 +603,7 @@ export const parseDisplayEdgesWorkerResponse = (
   const hardReport = typeof value.hardReport === 'undefined'
     ? undefined
     : (isDisplayWorkerBoundedCandidateReport(value.hardReport) ? value.hardReport : null);
-  const workerDurationMs = typeof value.workerDurationMs === 'undefined'
-    ? undefined
-    : value.workerDurationMs;
+  const workerTiming = parseDisplayWorkerTimingMetadata(value);
   const hasIncrementalMetadata = typeof value.affectedEdgeCount !== 'undefined'
     || typeof value.fallbackLevel !== 'undefined';
   const incrementalMetadataIsValid = !hasIncrementalMetadata || (
@@ -643,11 +644,7 @@ export const parseDisplayEdgesWorkerResponse = (
     || !phaseTrace
     || hardReport === null
     || hardReport === undefined
-    || (workerDurationMs !== undefined && (
-      !isFiniteNumber(workerDurationMs)
-      || workerDurationMs < 0
-      || workerDurationMs > 600_000
-    ))
+    || workerTiming === null
     || !incrementalMetadataIsValid
     || !sessionMetadataIsValid
     || typeof value.hardClean !== 'boolean'
@@ -679,7 +676,7 @@ export const parseDisplayEdgesWorkerResponse = (
     outputRouteSignature: hasSessionMetadata ? value.outputRouteSignature as string : undefined,
     sessionRef: hasSessionMetadata ? value.sessionRef as RoutingWorkerSessionRef : undefined,
     commitReceipt: commitReceipt ?? undefined,
-    workerDurationMs,
+    ...workerTiming,
   };
 };
 

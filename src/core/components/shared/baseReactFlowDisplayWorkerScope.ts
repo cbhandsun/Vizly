@@ -1,5 +1,6 @@
 import type { DisplayEdgesWorkerResponse } from './baseReactFlowDisplayWorkerProtocol';
 import { createBaseReactFlowDisplayEdgePatches } from './baseReactFlowDisplayRoutingTransaction';
+import { parseDisplayWorkerExecutionTiming } from './baseReactFlowDisplayWorkerExecutionTiming';
 
 interface DisplayEdgesWorkerScope {
   postMessage: (response: DisplayEdgesWorkerResponse) => void;
@@ -31,12 +32,19 @@ export const postTimedDisplayEdgesResponse = (
   response: DisplayEdgesWorkerResponse,
   startedAt: number,
   incrementalSourceEdges?: import('@xyflow/react').Edge[],
+  readyAt?: number,
 ): void => {
   const transportResponse = createDisplayEdgesTransportResponse(response, incrementalSourceEdges);
+  const finishedAt = performance.now();
+  const workerExecutionTiming = parseDisplayWorkerExecutionTiming({
+    readyAt, receivedAt: performance.timeOrigin + startedAt,
+    finishedAt: performance.timeOrigin + finishedAt,
+  });
   postDisplayEdgesResponse({
     ...transportResponse,
     ...((response.edges || response.routingPatches)
-      ? { workerDurationMs: Math.max(0, performance.now() - startedAt) }
+      ? { workerDurationMs: Math.max(0, finishedAt - startedAt),
+        ...(workerExecutionTiming ? { workerExecutionTiming } : {}) }
       : {}),
   });
 };

@@ -1,5 +1,6 @@
 import { summarizeDisplayRoutingSamples } from './display-routing-browser-performance.mjs';
 import { projectPrecompiledRouteLongTasks } from './precompiled-display-route-long-tasks.mjs';
+import { projectPrecompiledWorkerExecution, WORKER_EXECUTION_FIELDS } from './precompiled-display-route-worker-execution.mjs';
 
 export const PRECOMPILED_DISPLAY_ROUTE_RESULT_PREFIX =
   'PRECOMPILED_DISPLAY_ROUTE_RESULT=';
@@ -160,6 +161,7 @@ export const buildPrecompiledDisplayRoutePerformanceResult = captures => {
       workerDurationMs,
       routeOverheadMs: subtractDurations(routeMs, workerDurationMs),
       workerTimings: projectWorkerTimings(measurement.workerTimings),
+      workerExecution: projectPrecompiledWorkerExecution(measurement.workerExecution),
       mainThreadLongTasks: projectPrecompiledRouteLongTasks(measurement.mainThreadLongTasks),
       tracedExclusiveMs,
       workerUntracedMs: subtractDurations(
@@ -245,6 +247,12 @@ export const summarizePrecompiledDisplayRoutePerformance = (
       workerCompute: summarizeDisplayRoutingSamples(cases.map(item => item.workerDurationMs)),
       routeOverhead: summarizeDisplayRoutingSamples(cases.map(item => item.routeOverheadMs)),
       workerTimingSampleCount: cases.filter(item => item.workerTimings).length,
+      workerExecutionSampleCount: cases.filter(item => item.workerExecution?.status === 'available').length,
+      workerExecution: Object.fromEntries(WORKER_EXECUTION_FIELDS.map(field => [field,
+        summarizeDisplayRoutingSamples(cases.flatMap(item => (
+          item.workerExecution?.status === 'available' ? [item.workerExecution[field]] : []
+        ))),
+      ])),
       workerTimings: Object.fromEntries(WORKER_TIMING_FIELDS.map(field => [field,
         summarizeDisplayRoutingSamples(cases.flatMap(item => (
           item.workerTimings ? [item.workerTimings[field]] : []
@@ -253,6 +261,7 @@ export const summarizePrecompiledDisplayRoutePerformance = (
       slowestSamples: cases.map((item, index) => ({
         sampleIndex: index + 1, routeMs: item.routeMs, workerDurationMs: item.workerDurationMs,
         routeOverheadMs: item.routeOverheadMs, workerTimings: item.workerTimings,
+        workerExecution: projectPrecompiledWorkerExecution(item.workerExecution),
         mainThreadLongTasks: item.mainThreadLongTasks,
       })).sort((left, right) => right.routeMs - left.routeMs).slice(0, 5),
       tracedCompute: summarizeDisplayRoutingSamples(cases.map(item => item.tracedExclusiveMs)),
