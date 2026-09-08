@@ -1,5 +1,7 @@
 import type { Edge } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
+import { collectLineJumpIntersections, injectLineJumps } from '../../../services/LineJumpEngine';
+import { separateSharedTrunkCrossingJunctions } from '../../../rendering/sharedTrunkJunctionSeparation';
 
 import {
   applySharedTrunkPaintPlan,
@@ -8,6 +10,7 @@ import {
   createSharedTrunkJunctionFragments,
   createSharedTrunkPaintFragments,
   MIXED_SEMANTIC_SHARED_TRUNK_PAINT,
+  normalizeSharedTrunkPaintPoints,
   readSharedTrunkPaintPlan,
 } from '../../../rendering/sharedTrunkPaint';
 
@@ -39,6 +42,86 @@ const planFor = (edges: readonly Edge[], edgeId: string) => {
   const planned = applySharedTrunkPaintPlan(edges);
   return readSharedTrunkPaintPlan(planned.find(item => item.id === edgeId)?.data);
 };
+
+describe('coincident source and target paint junctions', () => {
+  const fixture = (transform: (point: { x: number; y: number }) => { x: number; y: number }) => [
+    edge({ id: 'a', source: 's', target: 'u', points: [[1012, 0], [1012, 1016], [0, 1016], [0, 1088]].map(([x, y]) => transform({ x, y })) }),
+    edge({ id: 'b', source: 't', target: 'v', points: [[525, 513], [525, 992], [454, 992], [454, 1088]].map(([x, y]) => transform({ x, y })) }),
+    edge({ id: 'c', source: 's', target: 'v', points: [[1012, 0], [1012, 1016], [454, 1016], [454, 1088]].map(([x, y]) => transform({ x, y })) }),
+  ];
+
+  it.each([0, 1, 2, 3])('retains a visible bridge and connection after rotation %s', rotation => {
+    const input = fixture(point => {
+      let result = point;
+      for (let index = 0; index < rotation; index += 1) result = { x: -result.y, y: result.x };
+      return result;
+    });
+    const planned = applySharedTrunkPaintPlan(input);
+    const paths = input.map(item => ({ edgeId: item.id,
+      points: normalizeSharedTrunkPaintPoints(item.data?.computedPath) ?? [],
+      endpointInfo: { source: item.source, target: item.target } }));
+    const jumps = collectLineJumpIntersections(paths);
+    const owner = planned.find(item => item.id === (rotation % 2 ? 'b' : 'a'));
+    const fragments = [
+      ...createSharedTrunkPaintFragments(owner?.data?.computedPath, readSharedTrunkPaintPlan(owner?.data)),
+      ...createSharedTrunkBackboneFragments(owner?.data?.computedPath, readSharedTrunkPaintPlan(owner?.data)),
+    ];
+    expect(fragments.some(fragment => injectLineJumps([...fragment.points],
+      jumps.filter(jump => jump.horizontalEdgeId === owner?.id), 6, 0).includes('A 6 6'))).toBe(true);
+    const connection = planned.find(item => item.id === 'c');
+    expect(createSharedTrunkPaintFragments(connection?.data?.computedPath,
+      readSharedTrunkPaintPlan(connection?.data))).toHaveLength(1);
+    expect(planned.map(item => item.data?.computedPath)).toEqual(input.map(item => item.data?.computedPath));
+    expect(applySharedTrunkPaintPlan(planned)).toEqual(planned);
+    expect(applySharedTrunkPaintPlan([...input].reverse()).reverse()).toEqual(planned);
+  });
+
+  it('keeps an existing private interval instead of moving its junction', () => {
+    const input = fixture(point => point);
+    input[0] = edge({ id: 'a', source: 's', target: 'u', points: [
+      { x: 1012, y: 0 }, { x: 1012, y: 992 }, { x: 0, y: 992 }, { x: 0, y: 1088 },
+    ] });
+    const plan = planFor(input, 'a');
+    expect(plan?.memberships[0].commonLength).toBe(992);
+  });
+
+  it('does not shorten a shared stem below its paint minimum', () => {
+    // Rotated: the target owner needs the bridge, but 64 - 24 is below 48.
+    const input = fixture(point => ({ x: point.y === 1088 ? 1080 : point.y, y: point.x }));
+    const planned = applySharedTrunkPaintPlan(input);
+    const connection = planned.find(item => item.id === 'c');
+    const plan = readSharedTrunkPaintPlan(connection?.data);
+    expect(plan?.memberships.find(m => m.role === 'target')?.commonLength).toBe(64);
+    expect(createSharedTrunkPaintFragments(connection?.data?.computedPath, plan)).toHaveLength(0);
+  });
+
+  it('leaves empty path input and an invalid minimum unchanged', () => {
+    const planned = applySharedTrunkPaintPlan(fixture(point => point));
+    const before = new Map(planned.flatMap(item => {
+      const plan = readSharedTrunkPaintPlan(item.data);
+      return plan ? [[item.id, plan] as const] : [];
+    }));
+    expect(separateSharedTrunkCrossingJunctions(before, [], 48)).toBe(before);
+    expect(separateSharedTrunkCrossingJunctions(before, [], Number.NaN)).toBe(before);
+  });
+
+  it('bounds releases and keeps the next complete group unchanged', () => {
+    const input = Array.from({ length: 129 }, (_, index) => (
+      fixture(point => ({ x: point.x + index * 2000, y: point.y })).map(item => ({
+        ...item, id: `${index}-${item.id}`, source: `${index}-${item.source}`, target: `${index}-${item.target}`,
+      }))
+    )).flat();
+    const planned = applySharedTrunkPaintPlan(input);
+    const connections = planned.filter(item => item.id.endsWith('-c'));
+    const visible = connections.map(item => createSharedTrunkPaintFragments(
+      item.data?.computedPath, readSharedTrunkPaintPlan(item.data),
+    ).length);
+    expect(visible.slice(0, 128)).toEqual(Array.from({ length: 128 }, () => 1));
+    expect(visible[128]).toBe(0);
+    expect(planned.map(item => item.data?.computedPath)).toEqual(input.map(item => item.data?.computedPath));
+    expect(applySharedTrunkPaintPlan(planned)).toEqual(planned);
+  });
+});
 
 describe('shared trunk paint planning', () => {
   it('paints a compatible target trunk once and keeps each incoming branch visible', () => {

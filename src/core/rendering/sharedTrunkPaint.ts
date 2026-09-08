@@ -1,5 +1,6 @@
 /** Render-only ownership and fragmentation for eligible source/target trunks. */
 import type { Edge } from '@xyflow/react';
+import { separateSharedTrunkCrossingJunctions } from './sharedTrunkJunctionSeparation';
 import {
   readSharedTrunkCanonicalOwnerPriority,
   resolveSharedTrunkCanonicalPaint,
@@ -407,8 +408,9 @@ export const applySharedTrunkPaintPlan = (edges: readonly Edge[]): Edge[] => {
   }
 
   if (plans.size === 0) return hadStalePlan ? cleanEdges : edges as Edge[];
+  const separatedPlans = separateSharedTrunkCrossingJunctions(plans, plannedEdges, MIN_SHARED_TRUNK_PAINT_LENGTH);
   return cleanEdges.map(edge => {
-    const plan = plans.get(edge.id);
+    const plan = separatedPlans.get(edge.id);
     if (!plan) return edge;
     return {
       ...edge,
