@@ -188,6 +188,61 @@ describe('useBaseReactFlowFitController', () => {
     unmount();
   });
 
+  it('fits around its portaled minimap using canvas-relative screen coordinates', async () => {
+    const nodes: Node[] = [{ ...node, position: { x: 0, y: 0 }, width: 3000, height: 1200 }];
+    const instance = createInstance(nodes);
+    const container = document.createElement('div');
+    container.className = 'react-flow';
+    Object.defineProperties(container, { clientWidth: { value: 1200 }, clientHeight: { value: 800 } });
+    container.getBoundingClientRect = () => new DOMRect(100, 50, 1200, 800);
+    const anchor = document.createElement('div');
+    anchor.dataset.diagramFitOccluder = 'own-minimap';
+    container.append(anchor);
+    const overlay = document.createElement('div');
+    overlay.id = 'own-minimap';
+    overlay.getBoundingClientRect = () => new DOMRect(124, 550, 240, 180);
+    document.body.append(container, overlay);
+    const { unmount } = renderHook(() => useBaseReactFlowFitController({
+      ...createParams(instance), renderNodes: nodes, containerRef: { current: container },
+      containerSize: { width: 1200, height: 800 }, pinFit: false,
+    }));
+    try {
+      await act(async () => vi.advanceTimersByTimeAsync(200));
+      const view = instance.getViewport();
+      const overlaps = view.x < 264 && view.x + 3000 * view.zoom > 24
+        && view.y < 680 && view.y + 1200 * view.zoom > 500;
+      expect(overlaps).toBe(false);
+      expect(instance.fitView).not.toHaveBeenCalled();
+    } finally {
+      unmount(); container.remove(); overlay.remove();
+    }
+  });
+
+  it('ignores an unrelated, hidden, detached or empty overlay when reading fit input', () => {
+    const container = document.createElement('div');
+    Object.defineProperties(container, { clientWidth: { value: 1200 }, clientHeight: { value: 800 } });
+    const overlay = document.createElement('div');
+    overlay.id = 'other-minimap';
+    overlay.getBoundingClientRect = () => new DOMRect(20, 500, 240, 180);
+    document.body.append(overlay);
+    const read = () => readDiagramOverviewFitInput({ container, nodes: [node], edges: [],
+      viewport: { x: 0, y: 0, zoom: 1 } });
+    try {
+      expect(read()?.occlusion).toBeUndefined();
+      const anchor = document.createElement('div');
+      anchor.dataset.diagramFitOccluder = overlay.id;
+      container.append(anchor);
+      expect(read()?.occlusion).toEqual({ x: 20, y: 500, width: 240, height: 180 });
+      overlay.style.display = 'none';
+      expect(read()?.occlusion).toBeUndefined();
+      overlay.style.display = '';
+      overlay.getBoundingClientRect = () => new DOMRect(20, 500, 0, 0);
+      expect(read()?.occlusion).toBeUndefined();
+      overlay.remove();
+      expect(read()?.occlusion).toBeUndefined();
+    } finally { overlay.remove(); }
+  });
+
   it('leaves a saved viewport authoritative when restoreOrFitAll resolves to none', async () => {
     const instance = createInstance();
     const saved = { x: 210, y: 130, zoom: 0.06 };

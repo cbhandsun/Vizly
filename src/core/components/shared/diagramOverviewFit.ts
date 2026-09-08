@@ -1,7 +1,9 @@
 import type { Edge, Node } from '@xyflow/react';
-import { resolveDiagramFitLayout, type DiagramFitViewport, type DiagramFitViewportInput } from './diagramControlFit';
+import { resolveDiagramFitLayout, type DiagramFitViewport } from './diagramControlFit';
 import { computeDiagramContentBounds, readDiagramRenderedLabels } from './diagramContentBounds';
-import { computeDiagramLabelAwareFit, diagramBoundsAtLabelZoom } from './diagramLabelAwareFit';
+import { diagramBoundsAtLabelZoom } from './diagramLabelAwareFit';
+import { computeDiagramOcclusionAwareFit, diagramViewportAvoidsOcclusion,
+  readDiagramFitOcclusion, type DiagramOverviewFitInput } from './diagramOcclusionAwareFit';
 import { resolveEdgeLabelScale } from '../../rendering/edgeLabelScale';
 
 export const sameDiagramViewport = (first: DiagramFitViewport, second: DiagramFitViewport): boolean => (
@@ -17,7 +19,7 @@ export const readDiagramOverviewFitInput = ({ container, nodes, edges, viewport,
   edges: readonly Edge[];
   viewport: DiagramFitViewport;
   fallbackSize?: Readonly<{ width: number; height: number }>;
-}): DiagramFitViewportInput | null => {
+}): DiagramOverviewFitInput | null => {
   const canvas = container?.querySelector<HTMLElement>('.react-flow') ?? container;
   const viewportElement = canvas?.querySelector<HTMLElement>('.react-flow__renderer') ?? canvas;
   const bounds = computeDiagramContentBounds(nodes, edges);
@@ -31,19 +33,21 @@ export const readDiagramOverviewFitInput = ({ container, nodes, edges, viewport,
   if (!bounds || width === undefined || height === undefined || width <= 0 || height <= 0) return null;
   const root = container?.ownerDocument.documentElement ?? document.documentElement;
   const style = getComputedStyle(root);
-  return { bounds, labelMeasurements, viewportWidth: width, viewportHeight: height, ...resolveDiagramFitLayout({
+  return { bounds, labelMeasurements, viewportWidth: width, viewportHeight: height,
+    occlusion: canvas && viewportElement ? readDiagramFitOcclusion(canvas, viewportElement) : undefined,
+    ...resolveDiagramFitLayout({
     viewportWidth: width, leftSidebarOffset: style.getPropertyValue('--left-sidebar-offset'),
     rightSidebarOffset: style.getPropertyValue('--right-sidebar-offset'),
   }) };
 };
 
 export const diagramOverviewContainsContent = (
-  input: DiagramFitViewportInput,
+  input: DiagramOverviewFitInput,
   viewport: DiagramFitViewport,
 ): boolean => {
   const { safeArea } = input;
   const bounds = diagramBoundsAtLabelZoom(input, viewport.zoom);
-  if (!bounds) return false;
+  if (!bounds || !diagramViewportAvoidsOcclusion(input, viewport)) return false;
   const padding = input.padding ?? 16;
   return bounds.minX * viewport.zoom + viewport.x >= safeArea.left + padding - 0.5
     && bounds.minY * viewport.zoom + viewport.y >= safeArea.top + padding - 0.5
@@ -57,7 +61,7 @@ export const applyDiagramOverviewFit = async ({
   readFitInput, getViewport, setViewport, fallbackFit, syncSemanticViewport,
   waitForPaint, isCancelled, duration,
 }: {
-  readFitInput: () => DiagramFitViewportInput | null;
+  readFitInput: () => DiagramOverviewFitInput | null;
   getViewport: () => DiagramFitViewport;
   setViewport: (viewport: DiagramFitViewport, duration?: number) => Promise<boolean>;
   fallbackFit: () => Promise<boolean>;
@@ -68,7 +72,8 @@ export const applyDiagramOverviewFit = async ({
 }): Promise<boolean> => {
   if (isCancelled()) return false;
   const input = readFitInput();
-  const target = input ? computeDiagramLabelAwareFit(input) : null;
+  const target = input ? computeDiagramOcclusionAwareFit(input) : null;
+  if (input?.occlusion !== undefined && !target) return false;
   if (target) syncSemanticViewport?.(target);
   const applied = target ? await setViewport(target, duration) : await fallbackFit();
   if (!applied || isCancelled()) return false;
@@ -84,7 +89,7 @@ export const applyDiagramOverviewFit = async ({
   if (!sameDiagramViewport(appliedViewport, current)) return true;
   const measuredInput = readFitInput();
   if (!measuredInput || diagramOverviewContainsContent(measuredInput, current)) return true;
-  const correction = computeDiagramLabelAwareFit(measuredInput);
+  const correction = computeDiagramOcclusionAwareFit(measuredInput);
   if (!correction || isCancelled()) return false;
   syncSemanticViewport?.(correction);
   if (!await setViewport(correction) || isCancelled()) return false;

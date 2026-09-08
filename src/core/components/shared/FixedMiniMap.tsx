@@ -92,6 +92,7 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
 }) => {
   const { t } = useTranslation();
   const navigationInstructionsId = useId();
+  const fitOccluderId = `${navigationInstructionsId}-fit-occluder`;
   // 接入主题系统
   const [cfgState, cfgActions] = useConfigIntegration({ autoInitialize: true });
   const [currentTheme, setCurrentTheme] = useState<Theme | null>(() => cfgActions.getCurrentTheme() ?? null);
@@ -342,10 +343,11 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
 
   return (
     <>
-      <div ref={anchorRef} style={{ display: 'none' }} />
+      <div ref={anchorRef} data-diagram-fit-occluder={fitOccluderId} style={{ display: 'none' }} />
       {createPortal(
         <div
           ref={containerRef}
+          id={fitOccluderId}
           className={`fixed-minimap-container ${overlay.isMinimized ? 'minimized' : ''} ${overlay.isDragging ? 'dragging' : ''} ${isNodeDragging ? 'drag-frozen' : ''}`}
           style={containerStyle}
           onMouseDown={!overlay.isMinimized ? (e) => {
