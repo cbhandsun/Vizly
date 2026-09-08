@@ -34,9 +34,29 @@ import {
   collectStaticJsAssetPaths,
   parseViteModuleEntry,
   readStaticJsImports,
+  parseClassicScriptEntries,
+  collectStartupJsAssetPaths,
 } from './bundle-static-import-graph.mjs';
 
 describe('bundle static import graph', () => {
+  it('accounts for the guard and module imports together and rejects a missing guard artifact', () => {
+    const html = '<script src="/assets/guard.js"></script><script type="module" src="/assets/main.js"></script>';
+    const sources = new Map([['assets/guard.js', ''], ['assets/main.js', 'import "./shared.js";'],
+      ['assets/shared.js', ''], ['assets/lazy.js', '']]);
+    expect(new Set(collectStartupJsAssetPaths(html, sources)))
+      .toEqual(new Set(['assets/guard.js', 'assets/main.js', 'assets/shared.js']));
+    sources.delete('assets/guard.js');
+    expect(() => collectStartupJsAssetPaths(html, sources)).toThrow('Missing static bundle asset');
+  });
+  it('includes classic startup scripts without counting modules or JSON data twice', () => {
+    expect(parseClassicScriptEntries(`<script src="/assets/guard.js"></script>
+      <script type="text/javascript" src="/assets/guard.js?v=1"></script>
+      <script type="module" src="/assets/index.js"></script>
+      <script type="application/json" src="/data.json"></script>`)).toEqual(['assets/guard.js']);
+    for (const value of [null, '', 'x'.repeat(4 * 1024 * 1024 + 1), '<script src="https://private.invalid/a.js"></script>']) {
+      expect(() => parseClassicScriptEntries(value)).toThrow();
+    }
+  });
   it('reads the Vite module entry regardless of attribute order', () => {
     expect(parseViteModuleEntry('<script crossorigin src="/assets/index-a.js" type="module"></script>'))
       .toBe('assets/index-a.js');

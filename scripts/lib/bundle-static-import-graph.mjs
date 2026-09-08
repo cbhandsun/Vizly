@@ -32,6 +32,21 @@ export const parseViteModuleEntry = html => {
   throw new Error('Vite module entry was not found');
 };
 
+/** Classic startup scripts must count toward startup and total JS budgets too. */
+export const parseClassicScriptEntries = html => {
+  if (typeof html !== 'string' || html.length === 0 || html.length > MAX_MANIFEST_SOURCE_LENGTH) {
+    throw new Error('Invalid Vite entry HTML');
+  }
+  const entries = [];
+  for (const script of html.match(/<script\b[^>]*>/gi) ?? []) {
+    const type = /\btype\s*=\s*["']([^"']*)["']/i.exec(script)?.[1].toLowerCase();
+    if (type && !['text/javascript', 'application/javascript'].includes(type)) continue;
+    const source = /\bsrc\s*=\s*["']([^"']+)["']/i.exec(script)?.[1];
+    if (source) entries.push(normalizeAssetPath(source));
+  }
+  return [...new Set(entries)];
+};
+
 export const readStaticJsImports = source => {
   if (typeof source !== 'string' || source.length > MAX_MANIFEST_SOURCE_LENGTH) {
     throw new Error('Invalid JavaScript asset source');
@@ -69,3 +84,7 @@ export const collectStaticJsAssetPaths = (entry, sourceByPath) => {
   }
   return [...visited];
 };
+
+export const collectStartupJsAssetPaths = (html, sourceByPath) => [...new Set([
+  parseViteModuleEntry(html), ...parseClassicScriptEntries(html),
+].flatMap(entry => collectStaticJsAssetPaths(entry, sourceByPath)))];

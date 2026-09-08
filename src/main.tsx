@@ -14,6 +14,7 @@ import './index.css'; // Tailwind CSS
 import './main.css'; // 保留您项目全局的基础CSS
 import { startApplication } from './main/applicationStartup';
 import { showStartupFailure } from './main/startupFailureView';
+window.dispatchEvent(new Event('vizly:entry-ready'));
 /**
  * 函数级注释：应用入口渲染
  * - 使用 ESM 命名导入（createRoot），避免默认导出在生产包中出现空对象的兼容问题

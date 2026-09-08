@@ -3,10 +3,7 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { evaluateTotalJsBudget, TOTAL_JS_HARD_LIMIT_KIB } from './lib/bundle-total-budget.mjs';
-import {
-  collectStaticJsAssetPaths,
-  parseViteModuleEntry,
-} from './lib/bundle-static-import-graph.mjs';
+import { collectStartupJsAssetPaths } from './lib/bundle-static-import-graph.mjs';
 
 const projectRoot = resolve(process.cwd());
 const assetsDir = resolve(projectRoot, 'dist/assets');
@@ -63,10 +60,10 @@ for (const entry of entries) {
 const jsAssets = assets.filter((asset) => asset.type === 'js');
 const cssAssets = assets.filter((asset) => asset.type === 'css');
 const totalJsBytes = jsAssets.reduce((total, asset) => total + asset.bytes, 0);
-const moduleEntry = parseViteModuleEntry(await readFile(resolve(projectRoot, 'dist/index.html'), 'utf8'));
+const entryHtml = await readFile(resolve(projectRoot, 'dist/index.html'), 'utf8');
 const jsAssetByPath = new Map(jsAssets.map(asset => [`assets/${asset.name}`, asset]));
-const startupJsPaths = collectStaticJsAssetPaths(
-  moduleEntry,
+const startupJsPaths = collectStartupJsAssetPaths(
+  entryHtml,
   new Map(jsAssets.map(asset => [`assets/${asset.name}`, asset.source])),
 );
 const startupJsAssets = startupJsPaths.map(path => jsAssetByPath.get(path));

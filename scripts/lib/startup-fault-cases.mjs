@@ -12,6 +12,8 @@ export const parseStartupFaultBaseUrl = value => {
 };
 
 export const startupFaultCases = [
+  { id: 'entry-resource', kind: 'startup', code: 'entry-resource-failed', stage: 'resources',
+    blockEntry: true, source: '' },
   { id: 'missing-root', kind: 'startup', code: 'application-mount-failed', stage: 'mount',
     source: `new MutationObserver((_, observer) => {
       const root = document.getElementById('root');
@@ -56,9 +58,10 @@ export const readStartupFaultRecovery = kind => {
   try { summary = JSON.parse(textarea.value); } catch { return { valid: false }; }
   const keys = kind === 'startup' ? ['schema', 'stage', 'code', 'elapsedMs'] : ['schema', 'reason', 'stage', 'code'];
   const safeCodes = ['application-mount-failed', 'runtime-initialization-failed',
+    'entry-resource-failed',
     'display-edge-worker-unavailable', 'display-edge-worker-post-failed', 'display-edge-worker-error',
     'display-edge-worker-message-error', 'display-edge-worker-invalid-response'];
-  const safeStages = ['mount', 'runtime', 'worker-creation', 'request-post',
+  const safeStages = ['resources', 'mount', 'runtime', 'worker-creation', 'request-post',
     'worker-runtime', 'response-decode', 'response-validation'];
   const valid = summary && typeof summary === 'object' && !Array.isArray(summary)
     && Object.keys(summary).length === keys.length && keys.every(key => Object.hasOwn(summary, key))
