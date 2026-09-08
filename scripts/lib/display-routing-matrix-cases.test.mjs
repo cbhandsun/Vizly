@@ -29,8 +29,9 @@ describe('display routing matrix cases', () => {
     expect(savedStep).toContain("DISPLAY_ROUTING_MATRIX_PRESET = 'wms-process-flow-v1'");
     expect(savedStep).toContain("DISPLAY_ROUTING_MATRIX_PRESET = 'logistics-architecture-v1'");
     expect(savedStep).toContain("DISPLAY_ROUTING_MATRIX_CASE = 'multi-page-roundtrip'");
-    expect(savedStep.match(/npm run verify:display-routing-matrix/g)).toHaveLength(3);
-    expect(savedStep.match(/if \(\$LASTEXITCODE -ne 0\)/g)).toHaveLength(3);
+    expect(savedStep).toContain("DISPLAY_ROUTING_MATRIX_CASE = 'topology-edit-cycle'");
+    expect(savedStep.match(/npm run verify:display-routing-matrix/g)).toHaveLength(4);
+    expect(savedStep.match(/if \(\$LASTEXITCODE -ne 0\)/g)).toHaveLength(4);
     expect(savedStep).toContain('finally {');
     expect(savedStep).toContain('Stop-Process -Id $savedPreview.Id');
     expect(savedStep).not.toContain('continue-on-error');

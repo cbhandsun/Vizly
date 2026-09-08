@@ -1,3 +1,4 @@
+import { applyTopologyEdgeAdd as applyEdgeAdd } from './display-routing-topology-edge-gesture.mjs';
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { DISPLAY_ROUTING_TOPOLOGY_CASE_ID } from './display-routing-matrix-cases.mjs';
@@ -439,93 +440,6 @@ const applyNodeRemove = session => session.evaluate(`(() => {
   instance.setNodes(nodes => nodes.filter(node => node.id !== id));
   return Number.isFinite(before) && before > 0;
 })()`);
-
-const applyEdgeAdd = async session => {
-  await session.evaluate(`(() => {
-    const instance = window.reactFlowInstance;
-    const nodes = instance?.getNodes?.().filter(node => node.id === 'wcs' || node.id === 'bms');
-    if (nodes?.length === 2) instance.fitView?.({ nodes, padding: 0.25, duration: 0 });
-    return nodes?.length === 2;
-  })()`);
-  await delay(200);
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const gesture = await session.evaluate(`(() => {
-      const source = document.querySelector(
-        '.react-flow__node[data-id="wcs"] .react-flow__handle.source.react-flow__handle-right',
-      );
-      const target = document.querySelector(
-        '.react-flow__node[data-id="bms"] .react-flow__handle.target.react-flow__handle-left',
-      );
-      const instance = window.reactFlowInstance;
-      if (!source || !target || !instance?.getEdges) return null;
-      const sourceRect = source.getBoundingClientRect();
-      const targetRect = target.getBoundingClientRect();
-      const inViewport = rect => (
-        rect.width > 0
-        && rect.height > 0
-        && rect.left >= 0
-        && rect.top >= 0
-        && rect.right <= window.innerWidth
-        && rect.bottom <= window.innerHeight
-      );
-      if (!inViewport(sourceRect) || !inViewport(targetRect)) return null;
-      return {
-        source: { x: sourceRect.left + sourceRect.width / 2, y: sourceRect.top + sourceRect.height / 2 },
-        target: { x: targetRect.left + targetRect.width / 2, y: targetRect.top + targetRect.height / 2 },
-        previousEdgeIds: instance.getEdges().map(edge => edge.id),
-      };
-    })()`);
-    if (!gesture) {
-      await delay(100);
-      continue;
-    }
-    await session.send('Input.dispatchMouseEvent', {
-      type: 'mouseMoved',
-      ...gesture.source,
-      button: 'none',
-    });
-    await delay(80);
-    await session.send('Input.dispatchMouseEvent', {
-      type: 'mousePressed',
-      ...gesture.source,
-      button: 'left',
-      buttons: 1,
-      clickCount: 1,
-    });
-    for (let step = 1; step <= 10; step += 1) {
-      await session.send('Input.dispatchMouseEvent', {
-        type: 'mouseMoved',
-        x: gesture.source.x + ((gesture.target.x - gesture.source.x) * step) / 10,
-        y: gesture.source.y + ((gesture.target.y - gesture.source.y) * step) / 10,
-        button: 'left',
-        buttons: 1,
-      });
-      await delay(20);
-    }
-    await session.send('Input.dispatchMouseEvent', {
-      type: 'mouseReleased',
-      ...gesture.target,
-      button: 'left',
-      buttons: 0,
-      clickCount: 1,
-    });
-    const previousIds = JSON.stringify(gesture.previousEdgeIds);
-    const deadline = Date.now() + 1_500;
-    while (Date.now() < deadline) {
-      const edgeId = await session.evaluate(`(() => {
-        const previousIds = new Set(${previousIds});
-        const edge = window.reactFlowInstance?.getEdges?.()
-          .find(candidate => !previousIds.has(candidate.id));
-        if (!edge) return null;
-        window.__vizlyTopologyAuditEdgeId = edge.id;
-        return edge.id;
-      })()`);
-      if (edgeId) return true;
-      await delay(50);
-    }
-  }
-  return false;
-};
 
 const applyPortPolicyChange = session => session.evaluate(`(() => {
   const instance = window.reactFlowInstance;

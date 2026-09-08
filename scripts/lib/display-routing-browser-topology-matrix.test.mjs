@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { resolveTopologyHandleHitPoint } from './display-routing-topology-edge-gesture.mjs';
 
 import {
   assertDisplayRoutingTopologyOperationGroupResult,
@@ -16,6 +17,19 @@ import {
 } from './display-routing-browser-topology-matrix.mjs';
 
 describe('topology DOM commit boundary', () => {
+  it('chooses an actual integer handle hit when its center is covered by node content', () => {
+    const hitTest = vi.fn((x, y) => x === 1 && y === 5);
+    expect(resolveTopologyHandleHitPoint({ left: .25, top: 2, width: 6, height: 6 }, hitTest))
+      .toEqual({ x: 1, y: 5 });
+    expect(hitTest.mock.calls).toEqual([[3, 5], [5, 5], [1, 5]]);
+    expect(resolveTopologyHandleHitPoint({ left: .25, top: 2, width: 6, height: 6 }, () => false)).toBeNull();
+    for (const rect of [null, {}, { left: NaN, top: 2, width: 6, height: 6 },
+      { left: 0, top: 0, width: 0, height: 6 }, { left: 0, top: 0, width: 6, height: -1 },
+      { left: 1e9, top: 0, width: 6, height: 6 }]) {
+      expect(resolveTopologyHandleHitPoint(rect, () => true)).toBeNull();
+    }
+  });
+
   it('bounds a hung topology evaluation and diagnostic read without leaking CDP errors', async () => {
     vi.useFakeTimers();
     try {
