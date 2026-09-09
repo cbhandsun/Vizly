@@ -100,6 +100,31 @@ describe('routing sample journal', () => {
       observedWaitStatus: 'not-ready', observedRoutingStage: 'worker-phase' });
     expect(JSON.stringify(entries)).not.toMatch(/Bearer|private/);
   });
+  it('persists a bounded child process failure summary without raw output', async () => {
+    const directory = await createDirectory();
+    const error = createRoutingSampleFailure('child-exit-failed', {
+      message: 'Display-routing sample 3 failed',
+      childFailure: {
+        sampleIndex: 3,
+        stdout: 'DISPLAY_ROUTING_BROWSER_RESULT={"private":true}\nBearer private body',
+        stderr: 'Error: Routing performance or lifecycle budget exceeded:\n at file:///D:/a/Vizly/Vizly/scripts/lib/display-routing-browser-performance.mjs:477:9\nurl=https://private.invalid/?token=secret',
+      },
+    });
+    await expect(collectJournaledRoutingSamples({ kind: 'cold', sampleCount: 1, directory,
+      runSample: async () => { throw error; },
+    })).rejects.toThrow('routing-performance-budget-exceeded');
+    const [entries] = await records(directory);
+    expect(entries.at(-1).failure.childFailureSummary).toEqual({
+      code: 'routing-performance-budget-exceeded',
+      sampleIndex: 3,
+      stdoutLineCount: 2,
+      stderrLineCount: 3,
+      emittedMachineResult: true,
+      firstRepoStackFile: 'scripts/lib/display-routing-browser-performance.mjs',
+    });
+    expect(JSON.stringify(entries)).not.toMatch(/Bearer|private|token|body|invalid/);
+  });
+
   it('keeps numeric execution evidence and unavailable states without exporting raw timestamps', () => {
     const workerExecution = { status: 'available', handlerReadyAfterPostMs: 1,
       postReadyDispatchMs: 2, executionMs: 3, responseDeliveryMs: 4, readyAt: 'private' };

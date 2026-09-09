@@ -45,8 +45,10 @@ const runOneSample = sampleIndex => new Promise((resolve, reject) => {
   child.once('error', error => reject(createRoutingSampleFailure('child-spawn-failed', error)));
   child.once('exit', (code) => {
     if (code !== 0) {
-      reject(createRoutingSampleFailure('child-exit-failed',
-        new Error(`Display-routing sample ${sampleIndex} failed:\n${stderr || stdout}`)));
+      reject(createRoutingSampleFailure('child-exit-failed', {
+        message: `Display-routing sample ${sampleIndex} failed:\n${stderr || stdout}`,
+        childFailure: { sampleIndex, stdout, stderr },
+      }));
       return;
     }
     const line = stdout.split(/\r?\n/).find(candidate => candidate.startsWith(RESULT_PREFIX));

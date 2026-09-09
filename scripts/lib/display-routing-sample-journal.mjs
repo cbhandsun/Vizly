@@ -6,7 +6,9 @@ import { projectPrecompiledRouteLongTasks } from './precompiled-display-route-lo
 import { projectPrecompiledWorkerExecution } from './precompiled-display-route-worker-execution.mjs';
 import { projectRoutingWaitFailureEvidence } from './display-routing-wait-failure-evidence.mjs';
 
+const record = value => value !== null && typeof value === 'object' && !Array.isArray(value) ? value : {};
 const metric = value => Number.isFinite(value) && value >= 0 && value <= 1e15 ? value : null;
+const safeCount = value => Number.isSafeInteger(value) && value >= 0 && value <= 100_000 ? value : null;
 const fields = (value, keys) => Object.fromEntries(keys.map(key => [key, metric(value?.[key])]));
 const timings = ['routeMs', 'workerDurationMs', 'workerStartCount', 'workerAbortCount',
   'releaseToFinalMs', 'workerToFinalMs', 'workerRoundTripMs', 'workerDeliveryWaitMs'];
@@ -17,6 +19,89 @@ const caseIds = ['logistics-architecture-v1', 'wms-demand-allocation-strategy-v2
 const sampleFailureCodes = ['child-spawn-failed', 'child-exit-failed',
   'machine-result-missing', 'machine-result-invalid', 'worker-evidence-invalid'];
 
+const childFailureCodes = [
+  'browser-state-wait-failed',
+  'routing-performance-budget-exceeded',
+  'unexpected-mutable-closure',
+  'incremental-route-not-clean',
+  'incremental-route-not-single-transaction',
+  'unexpected-affected-edge-count',
+  'final-render-mismatch',
+  'incomplete-incremental-phase-trace',
+  'viewport-changed-during-drag',
+  'rendered-obstacle-audit-failed',
+  'normal-route-changed-after-paint',
+  'fixed-zoom-unavailable',
+  'assertion-error',
+  'type-error',
+  'syntax-error',
+  'generic-error',
+];
+
+const boundedText = value => (typeof value === 'string' ? value.slice(-65_536) : '');
+const lineCount = value => {
+  const text = boundedText(value).trim();
+  if (!text) return 0;
+  return Math.min(10_000, text.split(/\r?\n/).length);
+};
+const classifyChildFailure = text => {
+  if (/Browser state wait failed/.test(text)) return 'browser-state-wait-failed';
+  if (/Routing performance(?: or lifecycle)? budget exceeded/.test(text)) return 'routing-performance-budget-exceeded';
+  if (/Unexpected mutable closure/.test(text)) return 'unexpected-mutable-closure';
+  if (/Incremental route did not commit cleanly/.test(text)) return 'incremental-route-not-clean';
+  if (/Incremental route was not a single Worker transaction/.test(text)) return 'incremental-route-not-single-transaction';
+  if (/Unexpected affected edge count/.test(text)) return 'unexpected-affected-edge-count';
+  if (/Final render did not match the committed route/.test(text)) return 'final-render-mismatch';
+  if (/Incremental phase trace was incomplete/.test(text)) return 'incomplete-incremental-phase-trace';
+  if (/Display routing viewport changed during the drag gesture/.test(text)) return 'viewport-changed-during-drag';
+  if (/Rendered SVG obstacle audit failed/.test(text)) return 'rendered-obstacle-audit-failed';
+  if (/Normal preset route changed after first visible paint/.test(text)) return 'normal-route-changed-after-paint';
+  if (/Could not set fixed visual zoom/.test(text)) return 'fixed-zoom-unavailable';
+  if (/AssertionError/.test(text)) return 'assertion-error';
+  if (/TypeError/.test(text)) return 'type-error';
+  if (/SyntaxError/.test(text)) return 'syntax-error';
+  if (/\bError:/.test(text)) return 'generic-error';
+  return null;
+};
+const firstRepoStackFile = text => {
+  const match = boundedText(text).match(/(?:file:\/\/\/[A-Za-z]:\/[^\s)]*\/)?((?:scripts|src)[\\/][A-Za-z0-9_.\\/-]+):\d+:\d+/);
+  if (!match) return null;
+  const normalized = match[1].replace(/\\/g, '/');
+  return normalized.length <= 240 ? normalized : null;
+};
+const childFailureSummaryFromRecord = value => {
+  const source = record(value);
+  if (!Object.hasOwn(source, 'stdoutLineCount')) return null;
+  const code = source.code === null || childFailureCodes.includes(source.code) ? source.code : null;
+  return {
+    code,
+    sampleIndex: metric(source.sampleIndex),
+    stdoutLineCount: safeCount(source.stdoutLineCount),
+    stderrLineCount: safeCount(source.stderrLineCount),
+    emittedMachineResult: typeof source.emittedMachineResult === 'boolean' ? source.emittedMachineResult : null,
+    firstRepoStackFile: typeof source.firstRepoStackFile === 'string'
+      && /^(?:scripts|src)\/[A-Za-z0-9_.\/-]{1,232}$/.test(source.firstRepoStackFile)
+      ? source.firstRepoStackFile : null,
+  };
+};
+const projectChildFailureSummary = error => {
+  const existing = childFailureSummaryFromRecord(error?.childFailureSummary);
+  if (existing) return existing;
+  const source = record(error?.childFailure);
+  const stdout = boundedText(source.stdout), stderr = boundedText(source.stderr);
+  if (!stdout && !stderr) return null;
+  const combined = `${stderr}\n${stdout}`;
+  const failureCode = classifyChildFailure(combined);
+  return {
+    code: childFailureCodes.includes(failureCode) ? failureCode : null,
+    sampleIndex: metric(source.sampleIndex),
+    stdoutLineCount: lineCount(stdout),
+    stderrLineCount: lineCount(stderr),
+    emittedMachineResult: stdout.includes('DISPLAY_ROUTING_BROWSER_RESULT='),
+    firstRepoStackFile: firstRepoStackFile(combined),
+  };
+};
+
 export const createRoutingSampleFailure = (sampleFailureCode, diagnostic = null) => {
   if (!sampleFailureCodes.includes(sampleFailureCode)) throw new Error('Invalid sample failure code');
   const safe = projectRoutingJournalFailure(diagnostic);
@@ -24,6 +109,7 @@ export const createRoutingSampleFailure = (sampleFailureCode, diagnostic = null)
     stage: safe.observedRoutingStage }));
   error.sampleFailureCode = sampleFailureCode;
   if (safe.waitEvidence) error.waitEvidence = safe.waitEvidence;
+  if (safe.childFailureSummary) error.childFailureSummary = safe.childFailureSummary;
   return error;
 };
 
@@ -62,11 +148,13 @@ export const projectRoutingJournalFailure = (error, code = 'sample-failed') => {
   const wait = message.match(/"waitStatus":\s*"(not-ready|evaluation-failed|evaluation-timeout|invalid-evaluation|predicate-failed|quality-rejected)"/);
   const stage = message.match(/"stage":\s*"(scheduled|routing|worker-post|worker-phase|worker-response|worker-error|worker-message-error|worker-cancelled|worker-timeout|final-quality-rejected|final-safety-rejected|final-applied)"/);
   const waitEvidence = projectRoutingWaitFailureEvidence(error);
+  const childFailureSummary = projectChildFailureSummary(error);
   const observedStage = waitEvidence
     ? (waitEvidence.diagnostics ?? waitEvidence.lastObservedDiagnostics)?.routing.stage
     : stage?.[1];
   return { code,
     ...(waitEvidence ? { waitEvidence } : {}),
+    ...(childFailureSummary ? { childFailureSummary } : {}),
     ...(code === 'sample-failed' && sampleFailureCodes.includes(error?.sampleFailureCode)
       ? { sampleFailureCode: error.sampleFailureCode } : {}),
     observedWaitStatus: waitEvidence?.waitStatus ?? wait?.[1] ?? null,
