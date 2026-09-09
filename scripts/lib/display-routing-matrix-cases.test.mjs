@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { assertRequestedLayoutSelected, clickLayout } from './display-routing-matrix-layout-command.mjs';
-import { parseSavedDisplayRoutingMode, readSavedDisplayRoutingState } from './display-routing-saved-roundtrip.mjs';
+import {
+  parseSavedDisplayRoutingMode,
+  readSavedDisplayRoutingState,
+  verifySavedDisplayRoutingRoundtrip,
+} from './display-routing-saved-roundtrip.mjs';
 
 import {
   createDisplayRoutingMatrixCaseIds,
@@ -105,6 +109,86 @@ describe('display routing matrix cases', () => {
     const generatedRaw = JSON.stringify({ nodes, edges: [generated], routingSnapshot: { candidate: { hardClean: true } } });
     expect(readSavedDisplayRoutingState(generatedRaw, nodes, [{ ...generated,
       data: { labelPosition: { x: 500, y: 600, adjusted: true } } }])).not.toBeNull();
+  });
+
+  it('waits for restored route visuals to settle before auditing saved reload labels', async () => {
+    const events = [];
+    let visualSample = 0;
+    const state = {
+      geometry: 'same-geometry',
+      topology: 'same-topology',
+      annotations: 'same-annotations',
+      nodeCount: 2,
+      edgeCount: 1,
+    };
+    const restoredRoute = {
+      routing: { requestId: 'saved-request-1' },
+      request: { nodes: [{ id: 'source' }, { id: 'target' }] },
+      response: { edges: [{ id: 'edge' }] },
+    };
+    const session = {
+      evaluate: vi.fn(async expression => {
+        if (expression === 'window.__vizlyRequestedLayoutLabel ?? null') return null;
+        if (expression === 'window.__vizlySavedReloadSentinel = true') return true;
+        if (String(expression).includes('const readSnapshot =')) {
+          events.push('visual-settle');
+          visualSample += 1;
+          return {
+            ready: true,
+            requestId: 'saved-request-1',
+            committedRouteSignature: null,
+            nodeCount: 2,
+            edgeCount: 1,
+            renderedNodeCount: 2,
+            renderedEdgeCount: 1,
+            renderedPathCount: 1,
+            nodeGeometryFingerprint: 'nodes',
+            pathFingerprint: 'paths',
+            viewport: { x: 0, y: 0, zoom: 1 },
+            sampledAt: visualSample * 150,
+          };
+        }
+        if (String(expression).includes('flowchart-autosave-v2-saved-preset')) return state;
+        return null;
+      }),
+      send: vi.fn(async () => undefined),
+    };
+    const waitForValue = vi.fn(async (_session, _expression, label) => {
+      events.push(label);
+      if (label === 'durable routing snapshot') return state;
+      if (label === 'new saved document') return true;
+      if (label === 'saved final route') return restoredRoute;
+      return null;
+    });
+    const auditFinalSvg = vi.fn(async () => {
+      events.push('audit');
+      return { visualAudit: { labelLabelOverlapCount: 0 } };
+    });
+
+    await expect(verifySavedDisplayRoutingRoundtrip({
+      session,
+      presetId: 'saved-preset',
+      semanticChains: [],
+      waitForValue,
+      readFinalRouteExpression: () => 'final-route-expression',
+      auditFinalSvg,
+      visualSettleTimeoutMs: 1_000,
+    })).resolves.toMatchObject({ status: 'passed' });
+
+    expect(events).toEqual([
+      'durable routing snapshot',
+      'new saved document',
+      'saved final route',
+      'visual-settle',
+      'visual-settle',
+      'visual-settle',
+      'audit',
+    ]);
+    expect(session.evaluate.mock.calls.some(([expression]) => (
+      String(expression).includes('"expectedRequestId":"saved-request-1"')
+      && String(expression).includes('"expectedNodeCount":2')
+      && String(expression).includes('"expectedEdgeCount":1')
+    ))).toBe(true);
   });
 
   it('accepts bounded desktop and narrow viewport configurations', () => {

@@ -105,6 +105,13 @@ export const verifySavedDisplayRoutingRoundtrip = async ({
   await session.send('Page.reload', {});
   await waitForValue(session, '!window.__vizlySavedReloadSentinel', 'new saved document');
   const restoredRoute = await waitForValue(session, readFinalRouteExpression(''), 'saved final route');
+  await waitForStableDisplayRoutingLayoutVisual({
+    session,
+    expectedRequestId: restoredRoute.routing.requestId,
+    expectedNodeCount: restoredRoute.request?.nodes?.length,
+    expectedEdgeCount: restoredRoute.response?.edges?.length,
+    timeoutMs: visualSettleTimeoutMs,
+  });
   const restoredAudit = await auditFinalSvg(session, restoredRoute, 'saved final route');
   const after = await session.evaluate(stateExpression);
   if (!after || before.geometry !== after.geometry || before.topology !== after.topology
