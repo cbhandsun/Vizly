@@ -159,10 +159,13 @@ export const readDisplayRoutingMultiPageState = (raw, tabs, currentNodes, curren
     if (!isRecord(page) || !safeToken(page.id) || pageIds.has(page.id) || !safeToken(page.name)
       || !isRecord(tab) || tab.name !== page.name || typeof tab.selected !== 'boolean') return null;
     const nodeIds = readSafeIds(page.nodes, 5000);
+    const contentNodeIds = readSafeIds(page.nodes.filter(node => (
+      !['titleGroup', 'subGroup'].includes(node?.type)
+    )), 5000);
     const edgeIds = readSafeIds(page.edges, 300);
     const layout = readSafeLayout(page.layoutSelection);
     const labelOffsets = readSafeLabelOffsets(page.edges);
-    if (!nodeIds || !edgeIds || !layout || !labelOffsets) return null;
+    if (!nodeIds || !contentNodeIds || !edgeIds || !layout || !labelOffsets) return null;
     const nodeIdSet = new Set(nodeIds);
     if (page.edges.some(edge => !isRecord(edge) || !safeToken(edge.source) || !safeToken(edge.target)
       || !nodeIdSet.has(edge.source) || !nodeIdSet.has(edge.target))) return null;
@@ -172,6 +175,7 @@ export const readDisplayRoutingMultiPageState = (raw, tabs, currentNodes, curren
       name: page.name,
       selected: tab.selected,
       nodeIds,
+      contentNodeIds,
       edgeIds,
       labelOffsets,
       layout,
@@ -214,7 +218,7 @@ export const displayRoutingMultiPageStateIsExpected = state => Boolean(
   && state.pages[1]?.labelOffsets[0]?.x === -8
   && state.pages[1]?.labelOffsets[0]?.y === 6
   && !state.pages[1]?.markers?.includes('multi-page-first')
-  && state.pages[1]?.nodeIds?.length === state.pages[0]?.nodeIds?.length
+  && state.pages[1]?.contentNodeIds?.length === state.pages[0]?.contentNodeIds?.length
   && state.pages[1]?.edgeIds?.length === state.pages[0]?.edgeIds?.length
   && state.pages[2]?.layout?.strategy === 'domain-dagre'
   && state.pages[2]?.layout?.direction === 'TB'
@@ -375,19 +379,28 @@ export const verifyDisplayRoutingMultiPageMatrix = async ({
   const firstLayout = DISPLAY_ROUTING_LAYOUT_CASES.find(item => item.id === FIRST_LAYOUT_ID);
   const copyLayout = DISPLAY_ROUTING_LAYOUT_CASES.find(item => item.id === COPY_LAYOUT_ID);
   if (!firstLayout || !copyLayout) throw new Error('Multi-page layout case is unavailable');
-  await selectLayout({ session, layoutCase: firstLayout, waitForLayoutRoute, auditFinalSvg });
+  const firstRoute = await selectLayout({
+    session, layoutCase: firstLayout, waitForLayoutRoute, auditFinalSvg,
+  });
+  const firstNodeCount = firstRoute.request.nodes.length;
+  const firstEdgeCount = firstRoute.response.edges.length;
   await setFirstEdgeLabelOffset(session, MARKERS.first, { x: 12, y: -4 });
 
   await clickPageElement(session, '.page-tabs__duplicate');
   await waitForPageCanvas(waitForValue, session, {
-    pageCount: 2, activeIndex: 1, nodeCount, edgeCount, label: 'duplicated page canvas',
+    pageCount: 2, activeIndex: 1, nodeCount: firstNodeCount, edgeCount: firstEdgeCount,
+    label: 'duplicated page canvas',
   });
   await waitForCurrentRenderAuthority(waitForValue, session, 'duplicated page route authority');
   await auditCurrentCanvas(session, auditFinalSvg, 'duplicated page route');
   await assertCurrentEdgeLabelOffset(waitForValue, session, MARKERS.first, { x: 12, y: -4 }, 'duplicated page inherited');
   await setFirstEdgeLabelOffset(session, MARKERS.copy, { x: -8, y: 6 });
   await assertCurrentEdgeLabelOffset(waitForValue, session, MARKERS.copy, { x: -8, y: 6 }, 'duplicated page edited');
-  await selectLayout({ session, layoutCase: copyLayout, waitForLayoutRoute, auditFinalSvg });
+  const copyRoute = await selectLayout({
+    session, layoutCase: copyLayout, waitForLayoutRoute, auditFinalSvg,
+  });
+  const copyNodeCount = copyRoute.request.nodes.length;
+  const copyEdgeCount = copyRoute.response.edges.length;
 
   await clickPageElement(session, '.page-tabs__add');
   await waitForPageCanvas(waitForValue, session, {
@@ -395,7 +408,8 @@ export const verifyDisplayRoutingMultiPageMatrix = async ({
   });
   await clickPageElement(session, '.page-tabs__tab', 1);
   await waitForPageCanvas(waitForValue, session, {
-    pageCount: 3, activeIndex: 1, nodeCount, edgeCount, label: 'copy page before reload',
+    pageCount: 3, activeIndex: 1, nodeCount: copyNodeCount, edgeCount: copyEdgeCount,
+    label: 'copy page before reload',
   });
   await waitForCurrentRenderAuthority(waitForValue, session, 'copy page before reload authority');
   await auditCurrentCanvas(session, auditFinalSvg, 'copy page before reload');
@@ -404,7 +418,8 @@ export const verifyDisplayRoutingMultiPageMatrix = async ({
   await session.send('Page.reload', {});
   await waitForValue(session, '!window.__vizlyMultiPageReloadSentinel', 'new multi-page document');
   await waitForPageCanvas(waitForValue, session, {
-    pageCount: 3, activeIndex: 1, nodeCount, edgeCount, label: 'restored copy page canvas',
+    pageCount: 3, activeIndex: 1, nodeCount: copyNodeCount, edgeCount: copyEdgeCount,
+    label: 'restored copy page canvas',
   });
   await waitForCurrentRenderAuthority(waitForValue, session, 'restored copy page authority');
   const restored = await waitForValue(
@@ -420,7 +435,8 @@ export const verifyDisplayRoutingMultiPageMatrix = async ({
   await session.evaluate(`window.__vizlyRequestedLayoutLabel = ${JSON.stringify(firstLayout.label)}`);
   await clickPageElement(session, '.page-tabs__tab', 0);
   await waitForPageCanvas(waitForValue, session, {
-    pageCount: 3, activeIndex: 0, nodeCount, edgeCount, label: 'restored first page canvas',
+    pageCount: 3, activeIndex: 0, nodeCount: firstNodeCount, edgeCount: firstEdgeCount,
+    label: 'restored first page canvas',
   });
   await waitForCurrentRenderAuthority(waitForValue, session, 'restored first page authority');
   await assertRequestedLayoutSelected(session, FIRST_LAYOUT_ID);
@@ -430,7 +446,8 @@ export const verifyDisplayRoutingMultiPageMatrix = async ({
   await session.evaluate(`window.__vizlyRequestedLayoutLabel = ${JSON.stringify(copyLayout.label)}`);
   await clickPageElement(session, '.page-tabs__tab', 1);
   await waitForPageCanvas(waitForValue, session, {
-    pageCount: 3, activeIndex: 1, nodeCount, edgeCount, label: 'restored copy page revisit',
+    pageCount: 3, activeIndex: 1, nodeCount: copyNodeCount, edgeCount: copyEdgeCount,
+    label: 'restored copy page revisit',
   });
   await waitForCurrentRenderAuthority(waitForValue, session, 'restored copy page revisit authority');
   await assertRequestedLayoutSelected(session, COPY_LAYOUT_ID);

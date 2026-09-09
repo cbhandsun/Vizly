@@ -163,6 +163,23 @@ describe('display routing browser multi-page matrix', () => {
     ]);
   });
 
+  it('allows layout-generated container counts to differ while preserving business nodes', () => {
+    const fixture = createFixture();
+    fixture.pages[0].nodes.push({ id: 'generated-domain', type: 'titleGroup' });
+    fixture.raw = JSON.stringify({ metadata: { multiPage: {
+      version: 1, activePageId: 'page-2', pages: fixture.pages,
+    } } });
+    const state = readDisplayRoutingMultiPageState(
+      fixture.raw, fixture.tabs, fixture.pages[1].nodes, fixture.pages[1].edges,
+    );
+    expect(state?.pages.map(page => page.nodeIds.length)).toEqual([3, 2, 0]);
+    expect(state?.pages.slice(0, 2).map(page => page.contentNodeIds)).toEqual([
+      ['first-a', 'first-b'],
+      ['copy-a', 'copy-b'],
+    ]);
+    expect(displayRoutingMultiPageStateIsExpected(state)).toBe(true);
+  });
+
   it('rejects stale tabs, active canvas drift, dangling edges and duplicated ids', () => {
     const fixture = createFixture();
     const read = (raw = fixture.raw, tabs = fixture.tabs, nodes = fixture.pages[1].nodes,
