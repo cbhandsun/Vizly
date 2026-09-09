@@ -289,14 +289,43 @@ export const summarizePrecompiledDisplayRoutePerformance = (
   return { sampleCount: expectedSampleCount, presets };
 };
 
+const p95Of = value => (Number.isFinite(value?.p95Ms) ? value.p95Ms : null);
+const maxOf = value => (Number.isFinite(value?.maxMs) ? value.maxMs : null);
+
+const coldRouteStageDiagnostics = preset => {
+  const stages = [
+    ['worker-compute', p95Of(preset?.workerCompute)],
+    ['route-overhead', p95Of(preset?.routeOverhead)],
+    ['handler-ready-after-post', p95Of(preset?.workerExecution?.handlerReadyAfterPostMs)],
+    ['post-ready-dispatch', p95Of(preset?.workerExecution?.postReadyDispatchMs)],
+    ['response-delivery', p95Of(preset?.workerExecution?.responseDeliveryMs)],
+    ['response-apply', p95Of(preset?.workerTimings?.responseApplyMs)],
+    ['main-thread-long-task', maxOf(preset?.slowestSamples?.[0]?.mainThreadLongTasks)],
+  ].filter(([, durationMs]) => Number.isFinite(durationMs));
+  const dominant = stages
+    .sort((first, second) => second[1] - first[1])[0]
+    ?? null;
+  return {
+    dominantStage: dominant?.[0] ?? null,
+    dominantStageMs: dominant?.[1] ?? null,
+    routeOverheadP95Ms: p95Of(preset?.routeOverhead),
+    workerComputeP95Ms: p95Of(preset?.workerCompute),
+    handlerReadyAfterPostP95Ms: p95Of(preset?.workerExecution?.handlerReadyAfterPostMs),
+    firstResponseP95Ms: p95Of(preset?.workerTimings?.firstResponseMs),
+    workerDeliveryOverheadP95Ms: p95Of(preset?.workerTimings?.workerDeliveryOverheadMs),
+    mainThreadLongTaskMaxMs: maxOf(preset?.slowestSamples?.[0]?.mainThreadLongTasks),
+  };
+};
+
 export const assertPrecompiledDisplayRoutePerformanceBudget = summary => {
   const presetEntries = Object.entries(summary?.presets ?? {});
   if (presetEntries.length === 0) throw new Error('Cold routing performance summary is empty');
   const exceeded = presetEntries
-    .map(([presetId]) => ({
+    .map(([presetId, preset]) => ({
       presetId,
       budgetMs: PRECOMPILED_DISPLAY_ROUTE_P95_BUDGET_MS[presetId],
-      p95Ms: summary?.presets?.[presetId]?.route?.p95Ms,
+      p95Ms: preset?.route?.p95Ms,
+      diagnostics: coldRouteStageDiagnostics(preset),
     }))
     .filter(item => (
       !Number.isFinite(item.budgetMs)

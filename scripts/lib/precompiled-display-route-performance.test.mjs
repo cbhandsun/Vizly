@@ -456,10 +456,25 @@ describe('precompiled display route cold performance', () => {
     expect(Object.keys(focused.presets)).toEqual(['logistics-architecture-v1']);
     expect(assertPrecompiledDisplayRoutePerformanceBudget(focused)).toBe(true);
     const overBudget = summarizePrecompiledDisplayRoutePerformance(
-      Array.from({ length: 30 }, () => sample(1_101)),
+      Array.from({ length: 30 }, () => buildPrecompiledDisplayRoutePerformanceResult([
+        capture('wms-process-flow-v1', 20_000),
+        capture('logistics-architecture-v1', 2_800, {
+          workerDurationMs: 600,
+          workerExecution: { status: 'available', handlerReadyAfterPostMs: 2_000,
+            postReadyDispatchMs: 1, executionMs: 600, responseDeliveryMs: 2 },
+          workerTimings: { prewarmLeadMs: 100, requestPreparationMs: 1, firstResponseMs: 2_004,
+            workerDeliveryOverheadMs: 2_000, workerMonotonicDeliveryOverheadMs: 2_000,
+            responseParseMs: 2, responseApplyMs: 3, privatePath: 'secret' },
+          phaseTrace: [{ phase: 'quality', durationMs: 300, exclusiveDurationMs: 300,
+            candidateCount: 14, changedEdgeCount: 3, workItemCount: 5, resolution: 'accepted' }],
+        }),
+        capture('wms-demand-allocation-strategy-v2', 2_000),
+      ])),
       30,
     );
-    expect(() => assertPrecompiledDisplayRoutePerformanceBudget(overBudget)).toThrow(/logistics/);
+    expect(() => assertPrecompiledDisplayRoutePerformanceBudget(overBudget)).toThrow(/handlerReadyAfterPostP95Ms/);
+    expect(() => assertPrecompiledDisplayRoutePerformanceBudget(overBudget)).toThrow(/workerDeliveryOverheadP95Ms/);
+    expect(() => assertPrecompiledDisplayRoutePerformanceBudget(overBudget)).not.toThrow(/secret/);
     expect(() => summarizePrecompiledDisplayRoutePerformance(samples.slice(1), 30)).toThrow(/missing/);
   });
 });
