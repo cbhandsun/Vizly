@@ -461,7 +461,7 @@ describe('display routing browser topology matrix', () => {
     const operationCase = {
       id: 'compound-subtree-move',
       classification: 'geometry',
-      reason: 'unknown',
+      reason: 'node-drag',
       edgeDelta: 0,
       expectedChangedNodeIds: ['container', 'descendant'],
       maximumMutableEdgeCount: 2,
@@ -470,7 +470,7 @@ describe('display routing browser topology matrix', () => {
     const result = validResult({
       changeSet: {
         classification: 'geometry',
-        reason: 'unknown',
+        reason: 'node-drag',
         changedNodeIds: ['container', 'descendant'],
       },
       request: { mutableEdgeIds: ['internal', 'boundary'] },

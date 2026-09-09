@@ -103,7 +103,7 @@ const OPERATION_CASES = Object.freeze([
   Object.freeze({
     id: 'compound-subtree-move',
     classification: 'geometry',
-    reason: 'unknown',
+    reason: 'node-drag',
     edgeDelta: 0,
     expectedChangedNodeIds: Object.freeze([
       'bms',
