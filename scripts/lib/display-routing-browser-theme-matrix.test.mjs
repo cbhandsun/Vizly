@@ -22,6 +22,29 @@ const stateFor = themeCase => ({
 });
 
 describe('display routing browser theme matrix', () => {
+  it.each([12, undefined, NaN, Infinity, -1, 60001, 'private-token', { secret: 'private-token' }])(
+    'bounds command timings and separates browser execution from host elapsed time: %j', async browserMs => {
+      let now = 0;
+      const session = {
+        evaluate: async () => { now += 100; return { clicked: false, browserMs }; },
+        send: async () => { now += 700; },
+      };
+      const failure = await switchDisplayRoutingTheme(session, DISPLAY_ROUTING_THEME_CASES[1], {
+        now: () => now, wait: async ms => { now += ms; },
+      }).catch(error => error);
+      expect(failure.message).toContain('within 5000ms');
+      const controls = JSON.parse(failure.message.split('controls=')[1]);
+      expect(controls.commandTimings).toHaveLength(8);
+      expect(controls.commandTimings.slice(0, 2)).toMatchObject([
+        { action: 'keyDown', durationMs: 700, browserMs: null },
+        { action: 'keyUp', durationMs: 700, browserMs: null },
+      ]);
+      expect(controls.commandTimings[2]).toMatchObject({ action: 'open', durationMs: 100,
+        browserMs: browserMs === 12 ? 12 : null });
+      expect(failure.message).not.toContain('private-token');
+      expect(now).toBeLessThanOrEqual(5100);
+    },
+  );
   it('reports panel lifecycle markers without retaining their content', () => {
     for (const phase of ['requested', 'loading']) {
       const marker = document.createElement('span');

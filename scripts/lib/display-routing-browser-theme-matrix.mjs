@@ -108,8 +108,30 @@ export const switchDisplayRoutingTheme = async (session, themeCase, { now = Date
   let lastControlEvidence = null;
   let shortcutEvidence = null;
   let beforeShortcutEvidence = null;
+  const commandTimings = [];
+  const timedCommand = async (action, run) => {
+    const start = now();
+    const result = await run();
+    const browserMs = result?.browserMs;
+    const entry = { action, elapsedMs: Math.min(60_000, Math.max(0, now() - startedAt)),
+      durationMs: Math.min(60_000, Math.max(0, now() - start)),
+      browserMs: typeof browserMs === 'number' && Number.isFinite(browserMs)
+        && browserMs >= 0 && browserMs <= 60_000 ? browserMs : null };
+    // Keep the slowest commands, not an unbounded history of pending controls.
+    commandTimings.push(entry);
+    commandTimings.sort((a, b) => b.durationMs - a.durationMs);
+    commandTimings.length = Math.min(commandTimings.length, 8);
+    return result;
+  };
   const click = async action => {
-    const result = await session.evaluate(`(() => {
+    const result = await timedCommand(action, () => session.evaluate(`(() => {
+      const readTime = () => {
+        try {
+          const value = document.defaultView.performance.now();
+          return typeof value === 'number' && Number.isFinite(value) ? value : null;
+        } catch { return null; }
+      };
+      const started = readTime();
       const clicked = (${clickDisplayRoutingThemeControl.toString()})(document, ${JSON.stringify(action)}, ${JSON.stringify(themeCase.id)});
       let evidence = null;
       let shortcut = null;
@@ -117,8 +139,10 @@ export const switchDisplayRoutingTheme = async (session, themeCase, { now = Date
       if (!clicked) {
         try { evidence = (${readThemeControlEvidence.toString()})(document); } catch { /* Preserve the control failure. */ }
       }
-      return { clicked, evidence, shortcut };
-    })()`);
+      const ended = readTime();
+      return { clicked, evidence, shortcut,
+        browserMs: started !== null && ended !== null ? ended - started : null };
+    })()`));
     const evidence = projectThemeControlEvidence(result?.evidence);
     shortcutEvidence = projectThemeShortcutEvidence(result?.shortcut) ?? shortcutEvidence;
     if (evidence) lastControlEvidence = {
@@ -136,29 +160,29 @@ export const switchDisplayRoutingTheme = async (session, themeCase, { now = Date
         openedSettings = true;
         beforeShortcutEvidence = lastControlEvidence?.snapshot ?? null;
         for (const type of ['keyDown', 'keyUp']) {
-          await session.send('Input.dispatchKeyEvent', {
+          await timedCommand(type, () => session.send('Input.dispatchKeyEvent', {
             type, key: ',', code: 'Comma', modifiers: 2, windowsVirtualKeyCode: 188,
-          });
+          }));
         }
       }
     } else if (step === 'select' && await click('select')) step = 'applied';
     else if (step === 'applied') {
-      state = await readThemeState(session);
+      state = await timedCommand('read-theme', () => readThemeState(session));
       if (state?.dataTheme === themeCase.mode
         && normalizeColor(state.primary) === normalizeColor(themeCase.primary)) {
         if (await click('close')) step = 'closed';
       }
-    } else if (step === 'closed' && await session.evaluate(
+    } else if (step === 'closed' && await timedCommand('confirm-dialog-close', () => session.evaluate(
       `!document.querySelector('[data-theme-selector-dialog]')`,
-    )) {
+    ))) {
       if (!openedSettings) {
         if (now() < deadline) return state;
         break;
       }
       if (await click('close-settings')) step = 'settings-closed';
-    } else if (step === 'settings-closed' && await session.evaluate(
+    } else if (step === 'settings-closed' && await timedCommand('confirm-settings-close', () => session.evaluate(
       `!document.querySelector('[data-settings-close]')`,
-    )) {
+    ))) {
       if (now() < deadline) return state;
       break;
     }
@@ -170,7 +194,7 @@ export const switchDisplayRoutingTheme = async (session, themeCase, { now = Date
       await wait(Math.min(50, Math.max(0, deadline - now())));
     }
   }
-  throw new Error(`Theme selector did not complete ${themeCase.id} (${step}) within 5000ms; transitions=${JSON.stringify(transitions)}; controls=${JSON.stringify({ openedSettings, beforeShortcutEvidence, shortcutEvidence, lastControlEvidence })}`);
+  throw new Error(`Theme selector did not complete ${themeCase.id} (${step}) within 5000ms; transitions=${JSON.stringify(transitions)}; controls=${JSON.stringify({ openedSettings, beforeShortcutEvidence, shortcutEvidence, lastControlEvidence, commandTimings })}`);
 };
 
 export const verifyDisplayRoutingThemeMatrix = async ({

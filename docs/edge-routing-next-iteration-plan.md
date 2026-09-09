@@ -8,6 +8,14 @@
 
 ### 当前执行摘要
 
+#### 6e8bae1f 远端失败与下一步（未完成验收）
+
+- [完整 CI](https://github.com/cbhandsun/Vizly/actions/runs/34292148756)失败于默认图首开资源数：94，预算 92；解码体积 3659.9/3900 KB、就绪 1174/4500ms 均未超限。应检查候选模块引入后的共享 chunk 分拆与加载边界，不能提高资产数量预算。日志 `tmp/lane-aligned-remote-ci-failure.log`。
+- [性能验收](https://github.com/cbhandsun/Vizly/actions/runs/34292148767)交互首个样本失败：主题选择器 open→select 4683ms，主题应用 4698ms，关闭操作 5403ms，超过原 5 秒门限。此次已成功打开面板，不能直接归因为此前外壳动态资源未就绪。日志 `tmp/lane-aligned-remote-perf-failure.log`。
+- 本批仅为现有主题操作增加命令耗时证据：分别记录快捷键投递、点击、状态读取及关闭确认的宿主耗时；点击同时记录页面内执行耗时。复用原请求，仅保留最慢 8 条固定动作及有限数值，不记录页面内容，不增加等待、重试或往返，不放宽截止时间。
+- 25 项测试、Lint、安全、文件规模和测试收录通过。真实页面普通主题切换通过；受控页面点击阻塞约 5102ms，记录 open 宿主耗时 5134ms，原门限仍失败。该实验验证证据可区分页面阻塞，不证明远端同一根因。本地普通 CPU 采样约 0.85 秒，未复现历史尾延迟。
+- 证据 `tmp/theme-command-timing-tests-final.log`、`tmp/theme-command-timing-blocked.json`、`tmp/theme-command-timing-browser.log`。只修改验证脚本，复用已验证生产构建；首开资源数回归和真实主题尾延迟仍需处理，优先于继续新增布局候选。
+
 #### 泳道引擎能力对照（研究完成，未新增生产策略）
 
 已用本地 elkjs 0.12.0 验证 partitioning、层内分组排序及半交互排序的边界，并固定需求图比较 ELK 与当前阶段排名。替换后高度仅减少 3 单位，横向宽度增加 2 单位，不足以支持新增生产候选，停止该路线。下一项先明确主流程、数据关联和反馈边的阶段约束，再做有界对照。完整配置、反例、指标和限制见 [能力研究](swimlane-engine-capability-study.md)；不把这些实验记为复杂图整体质量已完成。
