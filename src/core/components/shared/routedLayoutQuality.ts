@@ -11,6 +11,7 @@ export type RoutedLayoutQuality = Readonly<{
   pathLength: number;
   bends: number;
   crossings: number;
+  sharedLaneOverlap: number;
   backwardTravel: number;
 }>;
 
@@ -63,6 +64,7 @@ export function measureRoutedLayoutQuality(
   return {
     width: maxX - minX, height: maxY - minY,
     pathLength, backwardTravel, bends: scored.bends, crossings: scored.hardCrossings + scored.buddyCrossings,
+    sharedLaneOverlap: scored.parallelOverlaps,
   };
 }
 
@@ -70,7 +72,7 @@ export function measureRoutedLayoutQuality(
  * Keep the baseline on ties, incomplete evidence, or conflicting objectives. */
 export function routedLayoutDominates(baseline: RoutedLayoutQuality | null, candidate: RoutedLayoutQuality | null): boolean {
   if (!baseline || !candidate) return false;
-  const fields = ['width', 'height', 'pathLength', 'bends', 'crossings', 'backwardTravel'] as const;
+  const fields = ['width', 'height', 'pathLength', 'bends', 'crossings', 'sharedLaneOverlap', 'backwardTravel'] as const;
   if (fields.some(key => !Number.isFinite(baseline[key]) || !Number.isFinite(candidate[key])
     || baseline[key] < 0 || candidate[key] < 0)) return false;
   return fields.every(key => candidate[key] <= baseline[key] + 0.01)

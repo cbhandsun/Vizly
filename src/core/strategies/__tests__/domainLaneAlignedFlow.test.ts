@@ -222,9 +222,9 @@ describe('shared process ranks with local branch separation', () => {
       expect(quality).not.toBeNull();
       if (!quality) throw new Error('Missing complete routed layout measurement');
       const baseline = horizontal
-        ? { width: 3911, height: 6698, pathLength: 76314, bends: 64, crossings: 12, backwardTravel: 6925 }
-        : { width: 4191, height: 1517, pathLength: 34046, bends: 43, crossings: 4, backwardTravel: 2080.5 };
-      for (const key of ['width', 'height', 'pathLength', 'bends', 'crossings', 'backwardTravel'] as const) {
+        ? { width: 3911, height: 6698, pathLength: 76314, bends: 64, crossings: 12, sharedLaneOverlap: 1428, backwardTravel: 6925 }
+        : { width: 4191, height: 1517, pathLength: 34046, bends: 43, crossings: 4, sharedLaneOverlap: 663, backwardTravel: 2080.5 };
+      for (const key of ['width', 'height', 'pathLength', 'bends', 'crossings', 'sharedLaneOverlap', 'backwardTravel'] as const) {
         expect(quality[key], `Routed readability regressed: ${key}`).toBeLessThanOrEqual(baseline[key] + 0.01);
       }
     }

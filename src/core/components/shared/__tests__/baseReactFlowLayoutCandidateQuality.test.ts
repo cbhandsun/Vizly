@@ -18,18 +18,36 @@ describe('routed layout candidate quality', () => {
     const crossed = measureRoutedLayoutQuality(nodes, [straight, vertical]);
     const detour = edge('two', [{ x: 100, y: 0 }, { x: 220, y: 0 }, { x: 220, y: 160 }, { x: 100, y: 160 }]);
     const routed = measureRoutedLayoutQuality(nodes, [straight, detour]);
-    expect(crossed).toMatchObject({ width: 200, height: 160, crossings: 1, pathLength: 360, bends: 0 });
-    expect(routed).toMatchObject({ width: 220, crossings: 0, pathLength: 600, bends: 2 });
+    expect(crossed).toMatchObject({ width: 200, height: 160, crossings: 1, sharedLaneOverlap: 0, pathLength: 360, bends: 0 });
+    expect(routed).toMatchObject({ width: 220, crossings: 0, sharedLaneOverlap: 0, pathLength: 600, bends: 2 });
     expect(routedLayoutDominates(crossed, routed)).toBe(false);
   });
   it('accepts shorter routed paths without widening the graph or adding crossings', () => {
-    const baseline = { width: 200, height: 160, crossings: 1, pathLength: 600, bends: 2, backwardTravel: 0 };
+    const baseline = { width: 200, height: 160, crossings: 1, sharedLaneOverlap: 0, pathLength: 600, bends: 2, backwardTravel: 0 };
     const candidate = { ...baseline, height: 120, pathLength: 400, crossings: 0 };
     expect(routedLayoutDominates(baseline, candidate)).toBe(true);
     expect(routedLayoutDominates(candidate, candidate)).toBe(false);
-    for (const key of ['width', 'height', 'crossings', 'pathLength', 'bends', 'backwardTravel'] as const) {
+    for (const key of ['width', 'height', 'crossings', 'sharedLaneOverlap', 'pathLength', 'bends', 'backwardTravel'] as const) {
       expect(routedLayoutDominates(baseline, { ...candidate, [key]: baseline[key] + 1 })).toBe(false);
     }
+  });
+  it('prefers fewer non-protected shared lanes when other route dimensions tie', () => {
+    const overlapped = [
+      edge('one', [{ x: 0, y: 40 }, { x: 160, y: 40 }]),
+      edge('two', [{ x: 40, y: 40 }, { x: 200, y: 40 }]),
+    ];
+    const separated = [
+      edge('one', [{ x: 0, y: 40 }, { x: 160, y: 40 }]),
+      edge('two', [{ x: 40, y: 80 }, { x: 200, y: 80 }]),
+    ];
+
+    const baseline = measureRoutedLayoutQuality(nodes, overlapped);
+    const candidate = measureRoutedLayoutQuality(nodes, separated);
+
+    expect(baseline).toMatchObject({ sharedLaneOverlap: 3, pathLength: 320, bends: 0, crossings: 0 });
+    expect(candidate).toMatchObject({ sharedLaneOverlap: 0, pathLength: 320, bends: 0, crossings: 0 });
+    expect(routedLayoutDominates(baseline, candidate)).toBe(true);
+    expect(routedLayoutDominates(candidate, baseline)).toBe(false);
   });
   it.each(['TB', 'BT', 'LR', 'RL'] as const)('measures backward travel consistently in %s', direction => {
     const path = [{ x: 60, y: 0 }, { x: 60, y: 100 }, { x: 100, y: 100 },
@@ -42,7 +60,7 @@ describe('routed layout candidate quality', () => {
   });
   it('ignores hidden routes but refuses to score missing visible routes', () => {
     expect(measureRoutedLayoutQuality(nodes, [straight, { ...vertical, hidden: true }]))
-      .toMatchObject({ pathLength: 200, crossings: 0 });
+      .toMatchObject({ pathLength: 200, crossings: 0, sharedLaneOverlap: 0 });
     expect(measureRoutedLayoutQuality(nodes, [{ ...straight, hidden: true }])).toBeNull();
     expect(measureRoutedLayoutQuality(nodes, [straight, { id: 'missing', source: 'a', target: 'b' }])).toBeNull();
   });
