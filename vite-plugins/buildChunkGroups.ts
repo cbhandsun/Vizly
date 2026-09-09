@@ -60,8 +60,8 @@ const FLOWCHART_DESIGNER_STARTUP_MODULES = new Set([
   '/src/core/utils/customPresetStorage.ts',
   '/src/components/diagrams/hooks/diagramStorageLogging.ts',
   '/src/core/components/diagrams/hooks/treeLayoutTopology.ts',
-  // These editor helpers are already requested on every measured diagram mount.
-  '/src/core/components/diagrams/hooks/useKeyboardAccessibleDropdown.ts',
+  // Editor-only helpers. The keyboard dropdown is also used by management
+  // cards and LanguageSwitcher, so co-locating it here eagerly loads the editor.
   '/src/core/components/diagrams/hooks/nodeLayerOrdering.ts',
   '/src/core/components/diagrams/hooks/useCollapsibleGroups.ts',
 ]);

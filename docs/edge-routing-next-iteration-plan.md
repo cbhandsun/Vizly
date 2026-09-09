@@ -8,6 +8,14 @@
 
 ### 当前执行摘要
 
+#### 管理页加载边界回归修复（本地验证完成）
+
+- `fae910ae` 完整 CI 最终失败：管理页及模板管理页均请求 85 个资源、3458.3 KB，超过各自原预算；五组测试与覆盖率通过。静态资源失败导致后续移动端和普通保存恢复未执行。WMS 首个样本另记录 166ms 长任务，复杂架构图最慢 ready 10589ms；本次通过不能证明这些历史尾延迟根因已关闭。
+- 根因是把 `useKeyboardAccessibleDropdown` 合入编辑器 startup chunk，而管理卡片菜单及语言切换也静态使用它。移除此项定向分组，保留两个编辑器专用辅助模块。没有放宽资源预算，也没有修改组件功能或增加懒加载重试。
+- 新回归在旧配置失败（1 失败、52 通过），修复后 53 项全部通过；完整 verify:static、TS6、构建及 bundle 通过。总 JS 9995.25 KB，仍接近上限；默认图资源数 92/92，尚无数量余量。
+- 同一本机生产预览，管理页修复前单样本 84 个资源、3467 KB；修复后全部九条路由各三样本通过。管理页及模板页均为 37 个资源、1814.1 KB；WMS 104/108、复杂架构图 106/108，两个大图各三次稳定窗口均无长任务。性能采样期间没有并行构建、类型检查或其他浏览器回归。
+- 证据：`tmp/fae910ae-ci-failure.log`、`tmp/management-chunk-boundary-before.log`、`tmp/management-chunk-before-browser.log`、`tmp/management-chunk-tests.log`、`tmp/management-chunk-static.log`、`tmp/management-chunk-ts6.log`、`tmp/management-chunk-all-routes.log`。本批远端完整门禁仍需验证。
+
 #### fae910ae 性能验收与排序方案取舍
 
 - [性能采样 34295602525](https://github.com/cbhandsun/Vizly/actions/runs/34295602525)已完成且成功，冷启动、增量和交互绘制均通过。本轮检查时[完整 CI 34295567744](https://github.com/cbhandsun/Vizly/actions/runs/34295567744)仍在运行，不能将性能通过写成整批验收完成，也不关闭历史偶发超时的根因研究。

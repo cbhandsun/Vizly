@@ -524,12 +524,22 @@ const worker = new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', impor
   });
 
   it('co-loads measured editor controls without pulling optional layout engines into startup', () => {
-    for (const name of ['useKeyboardAccessibleDropdown', 'nodeLayerOrdering', 'useCollapsibleGroups']) {
+    for (const name of ['nodeLayerOrdering', 'useCollapsibleGroups']) {
       expect(matchesFlowchartDesignerStartupModule(`C:/repo/src/core/components/diagrams/hooks/${name}.ts`)).toBe(true);
       expect(matchesFlowchartDesignerStartupModule(`C:\\repo\\src\\core\\components\\diagrams\\hooks\\${name}.ts?import`)).toBe(true);
     }
     expect(matchesFlowchartDesignerStartupModule('C:/repo/src/core/components/diagrams/hooks/alignedLaneLayout.ts')).toBe(false);
     expect(matchesFlowchartDesignerStartupModule('C:/repo/src/core/strategies/DomainElkLayoutStrategy.ts')).toBe(false);
+  });
+
+  it('keeps the management and language dropdown dependency outside the editor startup chunk', () => {
+    for (const id of [
+      'C:/repo/src/core/components/diagrams/hooks/useKeyboardAccessibleDropdown.ts',
+      'C:\\repo\\src\\core\\components\\diagrams\\hooks\\useKeyboardAccessibleDropdown.ts?import',
+    ]) {
+      expect(matchesFlowchartDesignerStartupModule(id)).toBe(false);
+      expect(matchesFlowchartDesignerMicroModule(id)).toBe(false);
+    }
   });
 
   it('co-loads the node style subscription with its startup style manager', () => {
