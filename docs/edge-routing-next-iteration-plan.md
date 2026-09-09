@@ -8,6 +8,15 @@
 
 ### 当前执行摘要
 
+#### 显式泳道命令与隐藏域容器的冲突（本地生产验证完成）
+
+- `76b15af9` 的远端完整 CI 34301581619 与路由性能 34301581758 均成功。本轮重新检查系统交互图，发现其首开长横带约 24% 适配缩放；点击 TB 泳道失败，旧图保留。失败发生在 Worker 路由之前：几何报告零重叠、零越界，但 laneViolations=1。
+- 根因是显式泳道命令继承模板 `generateDomainGroups: false`，与必须保留域归属的泳道验收矛盾。同输入仅启用域容器后几何验收通过。命令配置边界现在为显式泳道生成所有业务域的容器；普通布局和子域可见性仍按原配置。未特判图 ID、未改算法间距、未降低验收。
+- 匿名两域夹具覆盖四方向 × 关闭域容器/部分域白名单，共八项回归；关联 76 项测试、verify:static、TS6 通过。测试复用现有 CI 文件。最终总 JS 9996.50 KB，启动静态 JS 523.04 KB，原预算通过。
+- 最终生产浏览器系统交互图 TB/LR 均 committed，适配缩放为 0.423038/0.359094，16/16 标签可见。需求图保持 0.280872/0.224116、19/19，WMS 保持 0.297919/0.103599、44/44。六场景最终 SVG、节点模型/DOM 一致性、标签无互叠/无遮挡节点通过；三图保存重载的几何、拓扑及注释一致。此对比包含布局模式变化，不把缩放差异当作相同布局模式的性能改善；首开默认几何未改。
+- 证据：`tmp/whole-layout-inspection.log`、`tmp/whole-layout-domain-lanes-tb-worker.json`、`tmp/whole-layout-lane-options.log`、`tmp/explicit-lane-container-regression.log`、`tmp/explicit-lane-container-static.log`、`tmp/explicit-lane-container-ts6.log`、`tmp/explicit-lane-representative-browser.log`。可见对比为工作区外 `systems-swimlane-comparison.html`。本批完整远端门禁仍需对应提交验收。
+- 计划审计未结束：实际 `display-routing-edit-process.mjs` 当前采集的是组外节点位移，不能据此声称已经完成 I3 的过程端口/路径切换和标签运动采样。I1–I6 仍需逐项按当前版本收口；10% WMS 标签残留和 bundle 余量不足继续保留，不能用本批泳道收益替代这些要求。
+
 #### 小缩放自动标签避让（限定修复，仍有未解决场景）
 
 - 上批 `8f1cad63` 的完整 CI 34298804914 与路由性能 34298804926 均成功。较早 `9eb6d814` 的 WMS 标签失败已在 1024×600、缩放 0.0986183243718159 下独立复现；普通自动适配缩放 0.10458797188394718 通过不能替代该复现。

@@ -6,6 +6,9 @@ import wmsProcess from '../../../data/standardized/WmsProcessFlowStandardData.js
 import demandAllocation from '../../../data/standardized/DeamndAllocation.json';
 import enterpriseArchitecture from '../../../data/standardized/ArchitectureStandardData.json';
 import { DomainDagreLayoutStrategy } from '../DomainDagreLayoutStrategy';
+import { resolveLayoutCommandGroupOptions, resolveLayoutStrategyGeneratedGroupOptions } from '../../components/diagrams/hooks/layoutStrategyInputBoundary';
+import { resolveLayoutStrategyGeometryConstraints } from '../../components/diagrams/hooks/layoutStrategyGeometryConstraints';
+import { evaluateLayoutGeometry } from '../../algorithms/layoutGeometryConstraints';
 import { measureRoutedLayoutQuality } from '../../components/shared/__tests__/routedLayoutQuality';
 import { LayoutType } from '../../types/layout';
 import { withDisplayAbsolutePositions } from '../../components/shared/baseReactFlowDisplayEdgeCore';
@@ -30,6 +33,35 @@ import { getDisplayComputedPath } from '../../components/shared/baseReactFlowDis
 vi.hoisted(() => {
   Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
     writable: true, value: () => ({ font: '', measureText: (text: string) => ({ width: text.length * 8 }) }),
+  });
+});
+
+describe('explicit swimlanes from a canvas with suppressed domain containers', () => {
+  it.each((['TB', 'BT', 'LR', 'RL'] as const).flatMap(direction => [false, true]
+    .map(whitelist => ({ direction, whitelist }))))('preserves every domain in $direction (whitelist: $whitelist)', async ({ direction, whitelist }) => {
+    const nodes: Node[] = ['alpha', 'beta'].map((domain, index) => ({
+      id: `node-${index}`, type: 'custom', data: { domain }, position: { x: index * 400, y: 0 },
+      measured: { width: 180, height: 80 }, width: 180, height: 80,
+    }));
+    const original = structuredClone(nodes);
+    const preset = { layout: { generateDomainGroups: whitelist,
+      ...(whitelist ? { domainWhitelist: ['alpha'] } : {}), generateSubDomainGroups: false } };
+    const groupOptions = resolveLayoutStrategyGeneratedGroupOptions(preset, nodes);
+    const preserved = structuredClone(groupOptions);
+    const result = await new DomainDagreLayoutStrategy().calculateLayout(nodes, [
+      { id: 'link', source: 'node-0', target: 'node-1' },
+    ], {
+      type: LayoutType.DAGRE, direction, nodeLayout: LayoutType.DAGRE, domainPlacement: 'ordered-lanes',
+      ...resolveLayoutCommandGroupOptions('domain-lanes', groupOptions),
+      spacing: resolveDomainLaneSpacing(direction), fitDomainContent: true,
+    });
+    const constraints = resolveLayoutStrategyGeometryConstraints('domain-lanes', direction, result.nodes, undefined, nodes);
+    expect(evaluateLayoutGeometry(result.nodes, constraints).clean).toBe(true);
+    expect(result.nodes.filter(node => node.type === 'titleGroup').map(node => node.data.domain).sort())
+      .toEqual(['alpha', 'beta']);
+    expect(nodes).toEqual(original);
+    expect(groupOptions).toEqual(preserved);
+    expect(resolveLayoutCommandGroupOptions('domain-dagre', groupOptions)).toEqual(preserved);
   });
 });
 

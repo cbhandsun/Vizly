@@ -113,6 +113,15 @@ export const resolveLayoutStrategyGeneratedGroupOptions = (preset: unknown, curr
     };
 };
 
+/** An explicit swimlane command needs a lane for every business domain.
+ * Preset container visibility still applies to other layouts and subgroups. */
+export const resolveLayoutCommandGroupOptions = (
+    strategy: string,
+    options: ReturnType<typeof resolveLayoutStrategyGeneratedGroupOptions>,
+) => strategy === 'domain-lanes'
+    ? { ...options, generateDomainGroups: true, domainWhitelist: undefined }
+    : options;
+
 export const stripHiddenGeneratedLayoutNodes = (
     nodes: Node[],
     groupOptions?: ReturnType<typeof resolveLayoutStrategyGeneratedGroupOptions>,

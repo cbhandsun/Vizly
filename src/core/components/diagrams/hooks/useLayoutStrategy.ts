@@ -58,6 +58,7 @@ import {
     coerceLayoutStrategyStringArray as coerceStringArray,
     coerceLayoutStrategyStringArrayRecord as coerceStringArrayRecord,
     loadLayoutStrategyPresetFromCandidates,
+    resolveLayoutCommandGroupOptions,
     resolveLayoutStrategyGeneratedGroupOptions,
     stripHiddenGeneratedLayoutNodes,
 } from './layoutStrategyInputBoundary';
@@ -391,6 +392,7 @@ export function useLayoutStrategy({
                     }
                 } catch { /* ignore */ }
 
+                generatedGroupOptions = resolveLayoutCommandGroupOptions(strategyName, generatedGroupOptions);
                 appliedLaneDomainOrder = domainOrder;
                 let strategy: ILayoutStrategy;
                 // [FIX] domain-dagre 始终走 DomainDagreLayoutStrategy（唯一支持 domainOrder 的策略）
