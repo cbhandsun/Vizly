@@ -11,6 +11,7 @@ import {
   replayDisplayRoutingResponseEdges,
   readVisibleDisplayRoutingNodeRect,
   selectDisplayRoutingAuditRoute,
+  summarizeDisplayRoutingGeometryFailure,
 } from './display-routing-browser-geometry.mjs';
 import {
   displayRoutingViewportSamplesAreStable,
@@ -109,6 +110,100 @@ describe('display routing browser geometry', () => {
       hardAudit: { ...cleanHardAudit, hairpinEdgeIds: ['edge'] },
       expectedPathCount: 2,
     })).toBe(false);
+  });
+
+  it('summarizes bounded clearance evidence for failed final SVG geometry', () => {
+    const route = {
+      response: {
+        edges: [
+          {
+            id: 'edge-a',
+            source: 'source-a',
+            target: 'target-a',
+            sourceHandle: 'right',
+            targetHandle: 'left',
+          },
+        ],
+        routeResolution: 'repaired-candidate',
+        phaseTrace: [
+          { phase: 'final-commercial-clearance', resolution: 'skip' },
+          { phase: 'other-phase', resolution: 'accepted' },
+        ],
+      },
+    };
+    const audit = {
+      auditedPathCount: 1,
+      invalidEdgeIds: [],
+      intersections: [],
+      clearanceRisks: Array.from({ length: 14 }, (_, index) => ({
+        edgeId: 'edge-a',
+        nodeId: `node-${index}`,
+        clearance: 15.04 + index,
+        requiredClearance: 16,
+      })),
+    };
+    const commercialAudit = {
+      ...audit,
+      clearanceRisks: [
+        { edgeId: 'edge-a', nodeId: 'business-node', clearance: 47.96, requiredClearance: 48 },
+      ],
+    };
+    const hardAudit = {
+      auditedPathCount: 1,
+      invalidEdgeIds: [],
+      nonOrthogonalEdgeIds: [],
+      detachedTerminalEdgeIds: [],
+      detachedTerminalFindings: [],
+      shortEndpointStubEdgeIds: [],
+      tinyInteriorDoglegEdgeIds: [],
+      excessiveBendEdgeIds: [],
+      excessiveBendFindings: [],
+      hairpinEdgeIds: [],
+      strictCrossings: [],
+      illegalOverlaps: [],
+    };
+
+    const summary = summarizeDisplayRoutingGeometryFailure({
+      route,
+      audit,
+      commercialAudit,
+      hardAudit,
+      visualAudit: { computedRenderPathCount: 1 },
+      renderAuthorityStatus: 'accepted',
+    });
+
+    expect(summary).toMatchObject({
+      expectedPathCount: 1,
+      minimumClearanceRiskCount: 14,
+      commercialClearanceRiskCount: 1,
+      commercialClearanceRiskSamples: [
+        {
+          edgeId: 'edge-a',
+          edgeIndex: 0,
+          nodeId: 'business-node',
+          clearance: 48,
+          requiredClearance: 48,
+        },
+      ],
+      computedRenderPathCount: 1,
+      renderAuthorityStatus: 'accepted',
+      routeResolution: 'repaired-candidate',
+      commercialPhaseTrace: [
+        { phase: 'final-commercial-clearance', resolution: 'skip' },
+      ],
+    });
+    expect(summary.minimumClearanceRiskSamples).toHaveLength(12);
+    expect(summary.minimumClearanceRiskSamples[0]).toEqual({
+      edgeId: 'edge-a',
+      edgeIndex: 0,
+      source: 'source-a',
+      target: 'target-a',
+      sourceHandle: 'right',
+      targetHandle: 'left',
+      nodeId: 'node-0',
+      clearance: 15,
+      requiredClearance: 16,
+    });
   });
 
   it('audits complete final SVG paths for orthogonal terminals and bounded defects', () => {

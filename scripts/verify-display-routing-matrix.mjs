@@ -12,6 +12,7 @@ import {
   readDisplayRoutingNodeGeometryParity,
   readDisplayRoutingVisualScaleAudit,
   readRenderedDisplayEdgeNodeIntersections,
+  summarizeDisplayRoutingGeometryFailure,
 } from './lib/display-routing-browser-geometry.mjs';
 import { readRenderedDisplayEdgeHardGeometryAudit } from './lib/display-routing-browser-hard-geometry.mjs';
 import { withPrecompiledRouteBrowser } from './lib/precompiled-display-route-cdp.mjs';
@@ -208,40 +209,16 @@ const auditFinalSvg = async (session, route, label) => {
     const renderAuthorityStatus = await session.evaluate(
       'window.__vizlyBaseReactFlowDisplayRouting?.renderAuthorityStatus ?? null',
     );
-    throw new Error(`Final SVG geometry failed for ${label}: ${JSON.stringify({
-      expectedPathCount: route.response.edges.length,
-      auditedPathCount: audit?.auditedPathCount,
-      invalidPathCount: audit?.invalidEdgeIds?.length,
-      obstacleHitCount: audit?.intersections?.length,
-      minimumClearanceRiskCount: audit?.clearanceRisks?.length,
-      commercialClearanceRiskCount: commercialAudit?.clearanceRisks?.length,
-      nonOrthogonalPathCount: hardAudit?.nonOrthogonalEdgeIds?.length,
-      detachedTerminalPathCount: hardAudit?.detachedTerminalEdgeIds?.length,
-      detachedTerminalPathIndexes: hardAudit?.detachedTerminalEdgeIds?.map(edgeId => (
-        route.response.edges.findIndex(edge => edge?.id === edgeId)
-      )),
-      detachedTerminalFindings: hardAudit?.detachedTerminalFindings,
-      computedRenderPathCount: visualAudit?.computedRenderPathCount,
-      fallbackRenderPathCount: visualAudit?.fallbackRenderPathCount,
-      missingRenderPathSourceCount: visualAudit?.missingRenderPathSourceCount,
-      acceptedRenderAuthorityCount: visualAudit?.acceptedRenderAuthorityCount,
-      rejectedRenderAuthorityCount: visualAudit?.rejectedRenderAuthorityCount,
-      acceptedRenderAttachmentCount: visualAudit?.acceptedRenderAttachmentCount,
-      rejectedRenderAttachmentCount: visualAudit?.rejectedRenderAttachmentCount,
-      renderAuthorityStatus,
-      shortEndpointStubPathCount: hardAudit?.shortEndpointStubEdgeIds?.length,
-      tinyInteriorDoglegPathCount: hardAudit?.tinyInteriorDoglegEdgeIds?.length,
-      excessiveBendPathCount: hardAudit?.excessiveBendEdgeIds?.length,
-      excessiveBendEdgeIds: hardAudit?.excessiveBendEdgeIds,
-      excessiveBendFindings: hardAudit?.excessiveBendFindings,
-      routeResolution: route.response.routeResolution ?? route.response.resolution,
-      commercialPhaseTrace: route.response.phaseTrace?.filter(trace => (
-        typeof trace?.phase === 'string' && trace.phase.startsWith('final-commercial')
-      )),
-      hairpinPathCount: hardAudit?.hairpinEdgeIds?.length,
-      strictCrossingCount: hardAudit?.strictCrossings?.length,
-      illegalOverlapCount: hardAudit?.illegalOverlaps?.length,
-    })}`);
+    throw new Error(`Final SVG geometry failed for ${label}: ${JSON.stringify(
+      summarizeDisplayRoutingGeometryFailure({
+        route,
+        audit,
+        commercialAudit,
+        hardAudit,
+        visualAudit,
+        renderAuthorityStatus,
+      }),
+    )}`);
   }
   assertDisplayRoutingVisualScaleAudit({
     name: label,

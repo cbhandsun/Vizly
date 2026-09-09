@@ -117,6 +117,79 @@ export const displayRoutingFinalSvgGeometryIsClean = ({
   && hardAudit.illegalOverlaps.length === 0
 );
 
+const summarizeClearanceRisk = (risk, edgeById) => {
+  const edgeId = typeof risk?.edgeId === 'string' ? risk.edgeId : null;
+  const edge = edgeId ? edgeById.get(edgeId) : null;
+  return {
+    edgeId,
+    edgeIndex: edge?.edgeIndex,
+    source: typeof edge?.source === 'string' ? edge.source : undefined,
+    target: typeof edge?.target === 'string' ? edge.target : undefined,
+    sourceHandle: typeof edge?.sourceHandle === 'string' ? edge.sourceHandle : undefined,
+    targetHandle: typeof edge?.targetHandle === 'string' ? edge.targetHandle : undefined,
+    nodeId: typeof risk?.nodeId === 'string' ? risk.nodeId : null,
+    clearance: Number.isFinite(risk?.clearance) ? Math.round(risk.clearance * 10) / 10 : null,
+    requiredClearance: Number.isFinite(risk?.requiredClearance) ? risk.requiredClearance : null,
+  };
+};
+
+const summarizeClearanceRisks = (risks, edgeById, limit = 12) => (
+  Array.isArray(risks)
+    ? risks.slice(0, limit).map(risk => summarizeClearanceRisk(risk, edgeById))
+    : []
+);
+
+export const summarizeDisplayRoutingGeometryFailure = ({
+  route,
+  audit,
+  commercialAudit,
+  hardAudit,
+  visualAudit,
+  renderAuthorityStatus,
+}) => {
+  const responseEdges = Array.isArray(route?.response?.edges) ? route.response.edges : [];
+  const edgeById = new Map(responseEdges.map((edge, edgeIndex) => [
+    typeof edge?.id === 'string' ? edge.id : '',
+    { ...edge, edgeIndex },
+  ]).filter(([edgeId]) => edgeId.length > 0));
+  return {
+    expectedPathCount: responseEdges.length,
+    auditedPathCount: audit?.auditedPathCount,
+    invalidPathCount: audit?.invalidEdgeIds?.length,
+    obstacleHitCount: audit?.intersections?.length,
+    minimumClearanceRiskCount: audit?.clearanceRisks?.length,
+    minimumClearanceRiskSamples: summarizeClearanceRisks(audit?.clearanceRisks, edgeById),
+    commercialClearanceRiskCount: commercialAudit?.clearanceRisks?.length,
+    commercialClearanceRiskSamples: summarizeClearanceRisks(commercialAudit?.clearanceRisks, edgeById),
+    nonOrthogonalPathCount: hardAudit?.nonOrthogonalEdgeIds?.length,
+    detachedTerminalPathCount: hardAudit?.detachedTerminalEdgeIds?.length,
+    detachedTerminalPathIndexes: hardAudit?.detachedTerminalEdgeIds?.map(edgeId => (
+      responseEdges.findIndex(edge => edge?.id === edgeId)
+    )),
+    detachedTerminalFindings: hardAudit?.detachedTerminalFindings,
+    computedRenderPathCount: visualAudit?.computedRenderPathCount,
+    fallbackRenderPathCount: visualAudit?.fallbackRenderPathCount,
+    missingRenderPathSourceCount: visualAudit?.missingRenderPathSourceCount,
+    acceptedRenderAuthorityCount: visualAudit?.acceptedRenderAuthorityCount,
+    rejectedRenderAuthorityCount: visualAudit?.rejectedRenderAuthorityCount,
+    acceptedRenderAttachmentCount: visualAudit?.acceptedRenderAttachmentCount,
+    rejectedRenderAttachmentCount: visualAudit?.rejectedRenderAttachmentCount,
+    renderAuthorityStatus,
+    shortEndpointStubPathCount: hardAudit?.shortEndpointStubEdgeIds?.length,
+    tinyInteriorDoglegPathCount: hardAudit?.tinyInteriorDoglegEdgeIds?.length,
+    excessiveBendPathCount: hardAudit?.excessiveBendEdgeIds?.length,
+    excessiveBendEdgeIds: hardAudit?.excessiveBendEdgeIds,
+    excessiveBendFindings: hardAudit?.excessiveBendFindings,
+    routeResolution: route?.response?.routeResolution ?? route?.response?.resolution,
+    commercialPhaseTrace: route?.response?.phaseTrace?.filter(trace => (
+      typeof trace?.phase === 'string' && trace.phase.startsWith('final-commercial')
+    )),
+    hairpinPathCount: hardAudit?.hairpinEdgeIds?.length,
+    strictCrossingCount: hardAudit?.strictCrossings?.length,
+    illegalOverlapCount: hardAudit?.illegalOverlaps?.length,
+  };
+};
+
 export const readVisibleDisplayRoutingNodeRect = (nodeId) => {
   if (typeof nodeId !== 'string' || nodeId.length === 0 || nodeId.length > 500) return null;
   const element = [...document.querySelectorAll('.react-flow__node[data-id]')]
