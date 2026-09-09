@@ -85,6 +85,26 @@ describe('browser startup lifecycle and safe diagnostics', () => {
     expect(isRetryableBrowserDevToolsStartupFailure(new Error('unclassified'))).toBe(false);
   });
 
+  it('includes the bounded startup attempt in deadline diagnostics', async () => {
+    vi.useFakeTimers();
+    try {
+      const result = waitForBrowserDevTools(startupChild(), 9333, {
+        startupAttempt: 1,
+        fetchEndpoint: async () => {
+          throw new Error('not listening', { cause: { code: 'ECONNREFUSED' } });
+        },
+      }).catch(startupDiagnostic);
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(await result).toMatchObject({
+        reason: 'deadline',
+        probeErrorCode: 'ECONNREFUSED',
+        startupAttempt: 1,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('performs one fresh startup only after the classified infrastructure failure', async () => {
     const diagnostic = {
       reason: 'deadline', lastProbe: 'request-failed', probeErrorCode: 'ECONNREFUSED',
@@ -111,6 +131,31 @@ describe('browser startup lifecycle and safe diagnostics', () => {
       .rejects.toBe(productFailure);
     expect(start).toHaveBeenCalledOnce();
     expect(prepareRetry).not.toHaveBeenCalled();
+  });
+
+  it('marks the final diagnostic when the retry startup also fails', async () => {
+    const diagnostic = {
+      reason: 'deadline', lastProbe: 'request-failed', probeErrorCode: 'ECONNREFUSED',
+      processSpawned: true, exitCode: null, signal: null, stdoutBytes: 0, stderrBytes: 0,
+      outputMarkers: [],
+    };
+    const firstFailure = Object.assign(new Error('safe startup failure'), {
+      browserStartupDiagnostic: diagnostic,
+    });
+    const secondFailure = Object.assign(new Error('safe retry failure'), {
+      browserStartupDiagnostic: { ...diagnostic, startupAttempt: 0 },
+    });
+    const start = vi.fn()
+      .mockRejectedValueOnce(firstFailure)
+      .mockRejectedValueOnce(secondFailure);
+
+    const finalFailure = await runBrowserDevToolsStartupWithSingleRetry(
+      start,
+      vi.fn().mockResolvedValue(undefined),
+    ).catch(error => error);
+
+    expect(start.mock.calls).toEqual([[0], [1]]);
+    expect(finalFailure.browserStartupDiagnostic).toMatchObject({ startupAttempt: 1 });
   });
 
   it.each([0, -1, 65536, NaN, Infinity, '9333', null, [], {}])(
@@ -295,7 +340,7 @@ describe('browser startup lifecycle and safe diagnostics', () => {
   it('wires both real harnesses to the lifecycle-aware startup boundary', () => {
     const cdpSource = readFileSync(new URL('./precompiled-display-route-cdp.mjs', import.meta.url), 'utf8');
     const smokeSource = readFileSync(new URL('../smoke-routes.mjs', import.meta.url), 'utf8');
-    expect(cdpSource).toContain('await waitForBrowserDevTools(browser, port)');
+    expect(cdpSource).toContain('await waitForBrowserDevTools(browser, port, { startupAttempt })');
     expect(cdpSource).toContain('runBrowserDevToolsStartupWithSingleRetry(');
     expect(cdpSource).toContain("stdio: ['ignore', 'pipe', 'pipe']");
     expect(smokeSource).toContain('version = await waitForBrowserDevTools(child, DEBUG_PORT)');

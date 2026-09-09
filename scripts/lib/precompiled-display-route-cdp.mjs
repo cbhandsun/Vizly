@@ -266,7 +266,7 @@ export const withPrecompiledRouteBrowser = async (run) => {
   let browser = null;
   let session = null;
   try {
-    await runBrowserDevToolsStartupWithSingleRetry(async () => {
+    await runBrowserDevToolsStartupWithSingleRetry(async (startupAttempt) => {
       port = await findAvailablePort();
       profile = await mkdtemp(join(tmpdir(), 'vizly-precompiled-routes-'));
       browser = spawn(browserPath, [
@@ -288,7 +288,7 @@ export const withPrecompiledRouteBrowser = async (run) => {
         'about:blank',
       ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
       try {
-        await waitForBrowserDevTools(browser, port);
+        await waitForBrowserDevTools(browser, port, { startupAttempt });
       } catch (error) {
         await closePrecompiledRouteBrowser(null, browser);
         await retryPrecompiledRouteBrowserProfileCleanup(() => (

@@ -35,7 +35,20 @@ export const runBrowserDevToolsStartupWithSingleRetry = async (
   } catch (error) {
     if (!isRetryableBrowserDevToolsStartupFailure(error)) throw error;
     await prepareRetry();
-    return start(1);
+    try {
+      return await start(1);
+    } catch (retryError) {
+      const diagnostic = retryError?.browserStartupDiagnostic;
+      if (diagnostic && typeof diagnostic === 'object') {
+        const descriptor = Object.getOwnPropertyDescriptor(retryError, 'browserStartupDiagnostic');
+        if (descriptor?.configurable !== false) {
+          Object.defineProperty(retryError, 'browserStartupDiagnostic', {
+            value: { ...diagnostic, startupAttempt: 1 },
+          });
+        }
+      }
+      throw retryError;
+    }
   }
 };
 
@@ -83,7 +96,7 @@ const parseBrowserVersion = (value, port) => {
 export const waitForBrowserDevTools = async (
   browser,
   port,
-  { timeoutMs = 15_000, fetchEndpoint = fetch } = {},
+  { timeoutMs = 15_000, fetchEndpoint = fetch, startupAttempt = 0 } = {},
 ) => {
   if (!Number.isSafeInteger(port) || port < 1 || port > 65535) {
     throw new Error('Invalid browser DevTools port');
@@ -128,6 +141,9 @@ export const waitForBrowserDevTools = async (
       stdoutBytes,
       stderrBytes,
       outputMarkers: [...markers].sort(),
+      startupAttempt: Number.isSafeInteger(startupAttempt) && startupAttempt >= 0
+        ? startupAttempt
+        : 0,
     };
     const error = new Error(`Browser DevTools startup failed: ${JSON.stringify(diagnostic)}`);
     Object.defineProperty(error, 'browserStartupDiagnostic', { value: diagnostic });
