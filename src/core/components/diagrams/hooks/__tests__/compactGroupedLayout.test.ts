@@ -56,6 +56,13 @@ describe('bounded compact group comparison', () => {
   it('rejects a shorter layout that reverses an explicit main dependency', () => {
     expect(preferCompactGroupedLayout(candidate(500), candidate(-100), 'LR')).toBe(false);
   });
+  it('rejects compact candidates that increase cross-flow drift', () => {
+    const before = candidate(500);
+    const after = candidate(200);
+    after.geometry.nodes[1] = { ...after.geometry.nodes[1], position: { x: 200, y: 120 } };
+    after.staged.routedEdges[0] = { ...edges[0], data: { computedPath: [{ x: 60, y: 20 }, { x: 200, y: 20 }] } };
+    expect(preferCompactGroupedLayout(before, after, 'LR')).toBe(false);
+  });
   it('rejects lost dependencies or changed semantic membership', () => {
     const missingEdge = candidate(200);
     expect(preferCompactGroupedLayout(candidate(500), {
