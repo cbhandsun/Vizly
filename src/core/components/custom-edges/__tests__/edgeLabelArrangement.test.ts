@@ -1,6 +1,8 @@
+// @vitest-environment node
 import shortBranchInputs from './shortBranchLabelArrangement.json';
 import overviewInputs from './overviewLabelArrangement.json';
 import smallViewportInputs from './smallViewportLabelArrangement.json';
+import constrainedPairInputs from './constrainedPairLabelArrangement.json';
 import { describe, expect, it } from 'vitest';
 import { arrangeEdgeLabels, edgeLabelRectsConflict, edgeLabelSegmentIntersectsRect,
   type EdgeLabelArrangementInput } from '../edgeLabelArrangement';
@@ -12,6 +14,37 @@ const input = (id: string, y = 0): EdgeLabelArrangementInput => ({
 });
 
 describe('global edge label arrangement regression', () => {
+  it('leaves explicitly pinned overlapping labels fixed during automatic pair repair', () => {
+    const pinned = { x: 5000, y: 5000 };
+    const entries = constrainedPairInputs.labels.map((label, index) => ({ ...label,
+      obstacles: constrainedPairInputs.obstacles,
+      ...(index < 2 ? { manual: true, allowManualReflow: false, preferredCenter: pinned } : {}),
+    }));
+    const placements = arrangeEdgeLabels(entries);
+    for (const entry of entries.slice(0, 2)) expect(placements.get(entry.id)?.center).toEqual(pinned);
+  });
+
+  it.each([false, true])('repairs a constrained automatic pair without covering content (transpose=%s)', transpose => {
+    const point = (p: { x: number; y: number }) => transpose ? { x: p.y, y: p.x } : p;
+    const obstacles = constrainedPairInputs.obstacles.map(rect => transpose
+      ? { x: rect.y, y: rect.x, width: rect.height, height: rect.width } : rect);
+    const entries = constrainedPairInputs.labels.map(label => ({ ...label, obstacles,
+      path: label.path.map(point), labelPath: label.labelPath.map(point),
+      anchor: point(label.anchor), preferredCenter: point(label.preferredCenter),
+      size: transpose ? { width: label.size.height, height: label.size.width } : label.size,
+    }));
+    const before = structuredClone(entries);
+    const placements = arrangeEdgeLabels(entries);
+    expect(placements.size).toBe(entries.length);
+    for (const [id, placement] of placements) {
+      expect(obstacles.some(obstacle => edgeLabelRectsConflict(placement.rect, obstacle, 0)), id).toBe(false);
+      expect([...placements].some(([otherId, other]) => otherId !== id
+        && edgeLabelRectsConflict(placement.rect, other.rect, 0)), id).toBe(false);
+    }
+    expect(arrangeEdgeLabels([...entries].reverse())).toEqual(placements);
+    expect(entries).toEqual(before);
+  });
+
   it.each([false, true])('clears content when readability scaling exhausts fixed retreat candidates (transpose=%s)', transpose => {
     const point = (p: { x: number; y: number }) => transpose ? { x: p.y, y: p.x } : p;
     const obstacles = smallViewportInputs.obstacles.map(rect => transpose

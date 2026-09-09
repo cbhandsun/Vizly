@@ -172,7 +172,7 @@ export const arrangeEdgeLabels = (inputs: readonly EdgeLabelArrangementInput[]):
     Number(b.manual && !b.allowManualReflow) - Number(a.manual && !a.allowManualReflow)
   ) || Number(b.manual) - Number(a.manual)
     || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  for (const input of labels) {
+  const place = (input: EdgeLabelArrangementInput, occupied: readonly EdgeLabelPlacement[]): EdgeLabelPlacement | undefined => {
     const preferredRect = estimateEdgeLabelRect(input.preferredCenter, input.text, input.scale, input.size);
     // Only a readability-scaled relative offset may leave its saved position,
     // and only when that position would cover content. Its input stays intact.
@@ -225,7 +225,45 @@ export const arrangeEdgeLabels = (inputs: readonly EdgeLabelArrangementInput[]):
         if (conflicts === 0 && distance(center, input.preferredCenter) < 0.01) break;
       }
     }
-    if (best) { result.set(input.id, best); occupied.push(best); }
+    return best;
+  };
+  for (const input of labels) {
+    const placement = place(input, occupied);
+    if (placement) { result.set(input.id, placement); occupied.push(placement); }
+  }
+  // One bounded two-label repair: a short semantic segment may have fewer
+  // available positions than an earlier label. Reconsider only the first
+  // conflicting automatic pair, preferring one move before reversing its order.
+  // Keep every other placement and the original search bounds. Manual labels
+  // are never displaced by this repair.
+  for (let first = 0; first < labels.length; first++) {
+    const a = labels[first], beforeA = result.get(a.id);
+    if (a.manual || !beforeA) continue;
+    for (let second = first + 1; second < labels.length; second++) {
+      const b = labels[second], beforeB = result.get(b.id);
+      if (b.manual || !beforeB || !edgeLabelRectsConflict(beforeA.rect, beforeB.rect)) continue;
+      const fixed = [...result].filter(([id]) => id !== a.id && id !== b.id).map(([,placement]) => placement);
+      const contentClear = (placement: EdgeLabelPlacement) => (
+        nodes.every(node => !edgeLabelRectsConflict(placement.rect, node, 10))
+        && fixed.every(other => !edgeLabelRectsConflict(placement.rect, other.rect))
+      );
+      // First keep the later label fixed and give its earlier neighbor the
+      // blocker that did not exist during the original greedy placement.
+      const movedA = place(a, [...fixed, beforeB]);
+      if (movedA && contentClear(movedA) && contentClear(beforeB)
+        && !edgeLabelRectsConflict(movedA.rect, beforeB.rect)) {
+        result.set(a.id, movedA);
+        return result;
+      }
+      const afterB = place(b, fixed);
+      const afterA = afterB ? place(a, [...fixed, afterB]) : undefined;
+      if (afterA && afterB && contentClear(afterA) && contentClear(afterB)
+        && !edgeLabelRectsConflict(afterA.rect, afterB.rect)) {
+        result.set(a.id, afterA);
+        result.set(b.id, afterB);
+      }
+      return result;
+    }
   }
   return result;
 };
