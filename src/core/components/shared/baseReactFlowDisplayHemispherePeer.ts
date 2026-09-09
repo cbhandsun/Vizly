@@ -4,6 +4,7 @@ import {
   classifyRectPeerHemisphere,
   geometryHemispheresAreOpposite,
   type GeometryHemisphere,
+  type PeerHemisphereOptions,
 } from '../../strategies/shared/edgeSharedTrunkSynthesisUtils';
 import { getDisplayNodeRect, type DisplayRect } from './baseReactFlowDisplayGeometry';
 
@@ -20,7 +21,8 @@ const finitePositiveRect = (rect: DisplayRect | null): rect is DisplayRect => (
 export const classifyDisplayPeerHemisphere = (
   hub: DisplayRect,
   peer: DisplayRect,
-): GeometryHemisphere => classifyRectPeerHemisphere(hub, peer);
+  options?: PeerHemisphereOptions,
+): GeometryHemisphere => classifyRectPeerHemisphere(hub, peer, options);
 
 export const displayPeerHemispheresAreOpposite = (
   first: GeometryHemisphere,

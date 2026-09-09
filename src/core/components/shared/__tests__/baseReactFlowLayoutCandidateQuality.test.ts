@@ -112,6 +112,27 @@ describe('routed layout candidate quality', () => {
     expect(measureRoutedLayoutQuality(hemisphereNodes, sharedSame))
       .toMatchObject({ hemisphereSharedLaneOverlap: 0 });
   });
+
+  it('classifies hemisphere shared lanes relative to the layout flow axis', () => {
+    const directionalNodes: Node[] = [
+      { id: 'hub', data: {}, position: { x: 100, y: 100 }, width: 40, height: 40 },
+      { id: 'upper-right', data: {}, position: { x: 160, y: 30 }, width: 40, height: 40 },
+      { id: 'lower-right', data: {}, position: { x: 160, y: 170 }, width: 40, height: 40 },
+    ];
+    const shared: Edge[] = [
+      { id: 'upper-right', source: 'hub', target: 'upper-right', data: { computedPath: [
+        { x: 120, y: 120 }, { x: 120, y: 180 }, { x: 180, y: 180 }, { x: 180, y: 50 },
+      ] } },
+      { id: 'lower-right', source: 'hub', target: 'lower-right', data: { computedPath: [
+        { x: 120, y: 120 }, { x: 120, y: 180 }, { x: 180, y: 180 }, { x: 180, y: 190 },
+      ] } },
+    ];
+
+    expect(measureRoutedLayoutQuality(directionalNodes, shared, 'TB'))
+      .toMatchObject({ hemisphereSharedLaneOverlap: 120 });
+    expect(measureRoutedLayoutQuality(directionalNodes, shared, 'LR'))
+      .toMatchObject({ hemisphereSharedLaneOverlap: 0 });
+  });
   it.each(['TB', 'BT', 'LR', 'RL'] as const)('measures backward travel consistently in %s', direction => {
     const path = [{ x: 60, y: 0 }, { x: 60, y: 100 }, { x: 100, y: 100 },
       { x: 100, y: 70 }, { x: 140, y: 70 }, { x: 140, y: 160 }];

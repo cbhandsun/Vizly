@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 import type { Point } from '../../types/routing';
 import type { LaneRankDirection } from '../../types/domainLaneRank';
+import type { PeerHemisphereFlowAxis } from '../../strategies/shared/edgeSharedTrunkSynthesisUtils';
 import { RoutingCrossingScorer } from '../../algorithms/routingCrossingScorer';
 import { evaluateLayoutGeometry } from '../../algorithms/layoutGeometryConstraints';
 import { projectBaseReactFlowDisplayWorkerInput } from './baseReactFlowDisplayWorkerProjection';
@@ -91,6 +92,7 @@ function measureHemisphereSharedLaneOverlap(
   nodes: readonly Node[],
   edges: readonly Edge[],
   paths: ReadonlyMap<string, readonly Point[]>,
+  flowAxis: PeerHemisphereFlowAxis,
 ): number {
   const rectByNodeId = new Map<string, QualityRect>();
   for (const node of nodes) {
@@ -127,8 +129,8 @@ function measureHemisphereSharedLaneOverlap(
       const secondPeerRect = rectByNodeId.get(secondPeerId);
       if (!hubRect || !firstPeerRect || !secondPeerRect) continue;
       if (!displayPeerHemispheresAreOpposite(
-        classifyDisplayPeerHemisphere(hubRect, firstPeerRect),
-        classifyDisplayPeerHemisphere(hubRect, secondPeerRect),
+        classifyDisplayPeerHemisphere(hubRect, firstPeerRect, { flowAxis }),
+        classifyDisplayPeerHemisphere(hubRect, secondPeerRect, { flowAxis }),
       )) continue;
       const firstSegments = segmentsByEdgeId.get(first.id) ?? [];
       const secondSegments = segmentsByEdgeId.get(second.id) ?? [];
@@ -188,7 +190,12 @@ export function measureRoutedLayoutQuality(
   }
   if (!paths.size) return null;
   const scored = new RoutingCrossingScorer().score(paths);
-  const hemisphereSharedLaneOverlap = measureHemisphereSharedLaneOverlap(projected.nodes, edges, paths);
+  const hemisphereSharedLaneOverlap = measureHemisphereSharedLaneOverlap(
+    projected.nodes,
+    edges,
+    paths,
+    horizontal ? 'horizontal' : 'vertical',
+  );
   const flowOrthogonalDrift = measureFlowOrthogonalDrift(projected.nodes, edges, horizontal);
   if (flowOrthogonalDrift === null) return null;
   return {
