@@ -2,6 +2,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { displayRoutingBrowserLifecycleExpression } from './display-routing-browser-lifecycle.mjs';
 
 const DEFAULT_WAIT_TIMEOUT_MS = 60_000;
+const PREDICATE_FAILURE_RETRY_MS = 1_000;
 
 export const waitForDisplayRoutingBrowserValue = async (
   session,
@@ -51,6 +52,7 @@ export const waitForDisplayRoutingBrowserValue = async (
   const deadline = Date.now() + timeoutMs;
   let waitStatus = 'not-ready';
   let lastObservedDiagnostics = null;
+  let predicateFailureStartedAt = null;
   while (Date.now() < deadline) {
     const result = await evaluateWithin(pollExpression, Math.max(0, deadline - Date.now()));
     if (result.status !== 'available') {
@@ -66,8 +68,12 @@ export const waitForDisplayRoutingBrowserValue = async (
     lastObservedDiagnostics = observation.diagnostics;
     if (observation.state === 'predicate-failed') {
       waitStatus = 'predicate-failed';
-      break;
+      predicateFailureStartedAt ??= Date.now();
+      if (Date.now() - predicateFailureStartedAt >= PREDICATE_FAILURE_RETRY_MS) break;
+      await delay(Math.min(100, Math.max(0, deadline - Date.now())));
+      continue;
     }
+    predicateFailureStartedAt = null;
     if (stopOnQualityRejection && observation.diagnostics?.routing?.stage === 'final-quality-rejected') {
       waitStatus = 'quality-rejected';
       break;

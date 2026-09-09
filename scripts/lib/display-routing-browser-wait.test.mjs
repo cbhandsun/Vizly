@@ -124,6 +124,24 @@ describe('display routing browser wait', () => {
     expect(error.message).not.toContain('private-content');
   });
 
+  it('retries transient predicate failures before returning a ready browser value', async () => {
+    let calls = 0;
+    const context = {
+      next: () => {
+        calls += 1;
+        if (calls === 1) throw new Error('private-transient-shape');
+        return { ready: true };
+      },
+      window: {},
+      document: { querySelector: () => null, querySelectorAll: () => [] },
+    };
+    const session = { evaluate: source => vm.runInNewContext(source, context) };
+
+    await expect(waitForDisplayRoutingBrowserValue(session, 'next()', 1_000))
+      .resolves.toEqual({ ready: true });
+    expect(calls).toBe(2);
+  });
+
   it('retains the last host-side evidence when the renderer and final evidence read stop responding', async () => {
     vi.useFakeTimers();
     try {
