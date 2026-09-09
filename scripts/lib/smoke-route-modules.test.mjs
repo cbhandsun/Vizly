@@ -695,7 +695,7 @@ describe('smoke route modules', () => {
     expect(result.worstReport.readyAt).toBe(300);
     expect(collectBudgetViolations([result])).toEqual([]);
   });
-  it('rejects stability violations in non-median samples and identifies their sample index', () => {
+  it('uses representative samples for long task count while keeping hard stability spikes visible', () => {
     const samples = [100, 200, 300].map((readyAt, index) => ({
       name: 'management', assetReport: { readyAt, criticalAssets: 1, criticalDecodedKB: 1,
         totalAssets: 1, totalDecodedKB: 1 },
@@ -704,14 +704,22 @@ describe('smoke route modules', () => {
     }));
     const result = aggregateRouteSamples(samples);
     expect(result.stabilityReport.longTaskCount).toBe(0);
+    expect(result.representativeSampleIndex).toBe(1);
     expect(collectBudgetViolations([result], { enabled: true })).toEqual([
-      { route: 'management', metric: 'longTaskCount', actual: 2, max: 1, unit: 'tasks', sampleCount: 3, sampleIndex: 1 },
       { route: 'management', metric: 'maxLongTaskMs', actual: 250, max: 200, unit: 'ms', sampleCount: 3, sampleIndex: 3 },
     ]);
+    samples[1].stabilityReport.longTaskCount = 2;
+    expect(collectBudgetViolations([aggregateRouteSamples(samples)], { enabled: true })).toContainEqual(
+      { route: 'management', metric: 'longTaskCount', actual: 2, max: 1, unit: 'tasks', sampleCount: 3, sampleIndex: 2 },
+    );
     samples[0].stabilityReport.longTaskCount = 1;
+    samples[1].stabilityReport.longTaskCount = 0;
     samples[2].stabilityReport.maxLongTaskMs = 200;
     expect(collectBudgetViolations([aggregateRouteSamples(samples)], { enabled: true })).toEqual([]);
-    expect(collectBudgetViolations([aggregateRouteSamples([samples[0]])], { enabled: true })).toEqual([]);
+    samples[0].stabilityReport.longTaskCount = 2;
+    expect(collectBudgetViolations([aggregateRouteSamples([samples[0]])], { enabled: true })).toEqual([
+      { route: 'management', metric: 'longTaskCount', actual: 2, max: 1, unit: 'tasks', sampleCount: 1, sampleIndex: 1 },
+    ]);
   });
 
   it('defers only warehouse 3D ready latency while preserving its resource budgets', () => {

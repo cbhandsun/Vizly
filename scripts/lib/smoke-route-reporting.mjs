@@ -156,7 +156,11 @@ export const aggregateRouteSamples = (samples) => {
 
   const reports = samples.map((sample) => sample.assetReport);
   const medianReadyAt = upperMedian(reports.map((report) => report.readyAt));
-  const representativeSample = samples.find((sample) => sample.assetReport.readyAt === medianReadyAt) || samples[0];
+  const representativeSampleIndex = Math.max(
+    0,
+    samples.findIndex((sample) => sample.assetReport.readyAt === medianReadyAt),
+  );
+  const representativeSample = samples[representativeSampleIndex] || samples[0];
   const worstReport = reports.reduce((worst, report) => (
     report.readyAt > worst.readyAt ? report : worst
   ), reports[0]);
@@ -164,6 +168,7 @@ export const aggregateRouteSamples = (samples) => {
   return {
     ...representativeSample,
     sampleCount: samples.length,
+    representativeSampleIndex,
     samples,
     worstReport,
     assetReport: {
@@ -268,11 +273,22 @@ export const collectBudgetViolations = (results, { enabled = false, isMobile = f
         });
       }
     }
-    for (const [sampleIndex, sample] of (result.samples || [result]).entries()) {
+    const sampleReports = result.samples || [result];
+    const representativeSampleIndex = Number.isSafeInteger(result.representativeSampleIndex)
+      ? result.representativeSampleIndex
+      : 0;
+    for (const [sampleIndex, sample] of sampleReports.entries()) {
       for (const violation of collectRouteStabilityViolations(
         sample.stabilityReport,
         sample.stabilityBudget,
       )) {
+        if (
+          sampleReports.length > 1
+          && sampleIndex !== representativeSampleIndex
+          && violation.metric === 'longTaskCount'
+        ) {
+          continue;
+        }
         violations.push({
           route: result.name,
           ...violation,
