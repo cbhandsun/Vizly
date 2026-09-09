@@ -87,12 +87,11 @@ describe('loadStandardPresetById', () => {
   });
 
   it('rejects an oversized declared asset before reading its body', async () => {
-    const readBody = vi.fn(async () => logisticsPresetSource);
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-      ok: true,
-      headers: new Headers({ 'content-length': String(1024 * 1024 + 1) }),
-      text: readBody,
-    } as Response);
+    const response = new Response(logisticsPresetSource, {
+      headers: { 'content-length': String(1024 * 1024 + 1) },
+    });
+    const readBody = vi.spyOn(response, 'text');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(response);
     await expect(loadStandardPresetAsset('/preset.json', 'BlankCanvasStandardData'))
       .rejects.toThrow('Invalid standard preset asset: BlankCanvasStandardData');
     expect(readBody).not.toHaveBeenCalled();
