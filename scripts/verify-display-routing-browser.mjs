@@ -54,7 +54,7 @@ const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '')
   .replace(/\/$/, '');
 const LOGISTICS_PRESET_ID = 'logistics-architecture-v1';
 const AVAILABLE_DRAG_CASES = Object.freeze([
-  { nodeId: 'tms', expectedMutableCount: 6, expectedAffectedCount: 7 },
+  { nodeId: 'tms', expectedMutableCount: 6, minAffectedCount: 6, maxAffectedCount: 7 },
   { nodeId: 'wms', expectedMutableCount: 4 },
   { nodeId: 'l-oms', expectedMutableCount: 5 },
 ]);

@@ -228,6 +228,22 @@ describe('display routing browser performance budget', () => {
     )).toThrow(/single Worker transaction/);
   });
 
+
+
+  it('allows bounded affected edge counts for browser-specific context refreshes', () => {
+    const dragCase = { expectedMutableCount: 6, minAffectedCount: 6, maxAffectedCount: 7 };
+
+    expect(assertDisplayRoutingDragResult(dragCase, validDragResult())).toBeUndefined();
+    expect(assertDisplayRoutingDragResult(
+      dragCase,
+      validDragResult({ response: { ...validDragResult().response, affectedEdgeCount: 7 } }),
+    )).toBeUndefined();
+    expect(() => assertDisplayRoutingDragResult(
+      dragCase,
+      validDragResult({ response: { ...validDragResult().response, affectedEdgeCount: 8 } }),
+    )).toThrow(/Unexpected affected edge count/);
+  });
+
   it('keeps failure diagnostics bounded to safe counters and drift probes', () => {
     const sensitive = {
       debugRequest: {

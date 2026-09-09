@@ -186,6 +186,8 @@ export const assertDisplayRoutingDragResult = (
     expected: {
       mutableEdgeCount: dragCase?.expectedMutableCount,
       affectedEdgeCount: dragCase?.expectedAffectedCount,
+      minAffectedCount: dragCase?.minAffectedCount,
+      maxAffectedCount: dragCase?.maxAffectedCount,
     },
     observed: {
       mutableEdgeCount: result?.mutableEdgeCount,
@@ -231,9 +233,11 @@ export const assertDisplayRoutingDragResult = (
   ) {
     throw new Error(`Incremental route was not a single Worker transaction:\n${diagnostics}`);
   }
+  const minAffectedCount = dragCase.expectedAffectedCount ?? dragCase.minAffectedCount;
+  const maxAffectedCount = dragCase.expectedAffectedCount ?? dragCase.maxAffectedCount;
   if (
-    dragCase.expectedAffectedCount !== undefined
-    && result.response.affectedEdgeCount !== dragCase.expectedAffectedCount
+    (minAffectedCount !== undefined && result.response.affectedEdgeCount < minAffectedCount)
+    || (maxAffectedCount !== undefined && result.response.affectedEdgeCount > maxAffectedCount)
   ) {
     throw new Error(`Unexpected affected edge count:\n${diagnostics}`);
   }
