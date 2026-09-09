@@ -51,14 +51,4 @@ describe('balanced crossing quality', () => {
     expect(compareEdgePathQualityScores(direct, { ...direct, bridgedCrossings: 2 })).toBeLessThan(0);
     expect(compareEdgePathQualityScores({ ...direct, unrelatedOverlap: 50 }, detour)).toBeGreaterThan(0);
   });
-
-  it('uses related lane sharing only after primary readability ties', () => {
-    const bundled = { ...emptyScore(), relatedOverlap: 360, totalLength: 200 };
-    const longerSeparated = { ...emptyScore(), bends: 1, relatedOverlap: 0, totalLength: 260 };
-    const tiedSeparated = { ...emptyScore(), relatedOverlap: 0, totalLength: 200 };
-
-    expect(compareEdgePathQualityScores(bundled, longerSeparated)).toBeLessThan(0);
-    expect(compareEdgePathQualityScores(bundled, tiedSeparated)).toBeGreaterThan(0);
-    expect(compareEdgePathQualityScores({ ...bundled, unrelatedOverlap: 1 }, tiedSeparated)).toBeGreaterThan(0);
-  });
 });

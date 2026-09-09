@@ -18,6 +18,7 @@ import { repairBaseReactFlowResidualOverlapAxisClosure } from './baseReactFlowDi
 import { findBaseReactFlowStrictContextEdgePromotions } from './baseReactFlowDisplayIncrementalPromotion';
 import { repairFinalResidualStrictCrossings } from './baseReactFlowDisplayStrictResidualRepair';
 import { buildBaseReactFlowTopologyStrictTransactionCandidates } from './baseReactFlowDisplayTopologyStrictTransaction';
+import { recommitBaseReactFlowTopologyEligibleTerminals } from './baseReactFlowDisplayTopologyTerminalCommit';
 import {
   baseReactFlowIncrementalEdgesHaveNodeClearance as topologyEdgesHaveClearance,
   baseReactFlowReportHasOnlyStrictDefects as reportHasOnlyStrictDefects,
@@ -109,6 +110,8 @@ const lockTopologyEligibleEdges = <T extends Edge[]>(
   return edges.map(edge => lockedById.get(edge.id) ?? edge) as T;
 };
 
+
+
 const ROUTING_DATA_KEYS = new Set([
   'computedPath',
   'elkPath',
@@ -162,6 +165,28 @@ const sameIdentifiers = (first: readonly string[], second: readonly string[]): b
   first.length === second.length
   && first.every((identifier, index) => identifier === second[index])
 );
+
+
+const addUniqueRole = (
+  roles: string[],
+  role: 'source' | 'target',
+): string[] => roles.includes(role) ? roles : [...roles, role];
+
+const materializeTopologyPortPolicySideLocks = (edge: Edge): Edge => {
+  const data = asRecord(edge.data);
+  let manualHandleSides = Array.isArray(data.manualHandleSides)
+    ? data.manualHandleSides.filter((item): item is string => item === 'source' || item === 'target')
+    : [];
+  if (data.autoSource === false && typeof edge.sourceHandle === 'string' && edge.sourceHandle.length > 0) {
+    manualHandleSides = addUniqueRole(manualHandleSides, 'source');
+  }
+  if (data.autoTarget === false && typeof edge.targetHandle === 'string' && edge.targetHandle.length > 0) {
+    manualHandleSides = addUniqueRole(manualHandleSides, 'target');
+  }
+  return manualHandleSides.length === 0
+    ? edge
+    : { ...edge, data: { ...data, manualHandleSides } };
+};
 
 const clearTopologyMutableRoutingState = (edge: Edge): Edge => {
   const sourceData = asRecord(edge.data);
@@ -414,7 +439,10 @@ export const createBaseReactFlowTopologyIncrementalProjection = ({
   const projectedEdges: Edge[] = [];
   for (const nextEdge of nextEdges) {
     if (changedPresentIds.has(nextEdge.id)) {
-      projectedEdges.push(clearTopologyMutableRoutingState(nextEdge));
+      const cleaned = clearTopologyMutableRoutingState(nextEdge);
+      projectedEdges.push(kind === 'port-policy'
+        ? materializeTopologyPortPolicySideLocks(cleaned)
+        : cleaned);
       continue;
     }
     const baselineSourceEdge = baselineSourceById.get(nextEdge.id);
@@ -618,6 +646,24 @@ export const createBaseReactFlowTopologyIncrementalDisplayEdges = ({
       );
     }
     hardReport = evaluation.hardReport(candidateEdges);
+  }
+  if (!hardReport.terminalsAnchored && eligibleIds.size > 0) {
+    const terminalCommitted = recommitBaseReactFlowTopologyEligibleTerminals({
+      edges: candidateEdges,
+      baselineEdges: projection.edges,
+      nodes,
+      eligibleEdgeIds: eligibleIds,
+    });
+    if (terminalCommitted) {
+      const terminalCommittedReport = evaluation.hardReport(terminalCommitted);
+      if (
+        terminalCommittedReport.hardClean
+        || (terminalCommittedReport.terminalsAnchored && !hardReport.terminalsAnchored)
+      ) {
+        candidateEdges = terminalCommitted;
+        hardReport = terminalCommittedReport;
+      }
+    }
   }
   const accepted = hardReport.hardClean
     && topologyEdgesHaveClearance(candidateEdges, nodes, eligibleIds)

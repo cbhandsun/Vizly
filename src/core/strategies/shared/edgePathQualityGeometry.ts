@@ -57,9 +57,7 @@ export const compareEdgePathQualityScores = (
     const delta = first[key] - second[key];
     if (delta !== 0) return delta;
   }
-  const readabilityDelta = edgePathReadabilityCost(first) - edgePathReadabilityCost(second);
-  if (readabilityDelta !== 0) return readabilityDelta;
-  return first.relatedOverlap - second.relatedOverlap;
+  return edgePathReadabilityCost(first) - edgePathReadabilityCost(second);
 };
 
 /** Crossing and bend costs are relative weights, not pass/fail thresholds. */

@@ -717,7 +717,7 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
         deltaX: 48.25,
         deltaY: 16,
         expectedMutableCount: 6,
-        expectedAffectedCount: 6,
+        expectedAffectedCount: 7,
       },
       { nodeId: 'wms', deltaX: 48.25, deltaY: 16, expectedMutableCount: 4 },
       { nodeId: 'wms', deltaX: 40, deltaY: 12, expectedMutableCount: 4 },
@@ -898,13 +898,25 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
         })
         .map(edge => edge.id)
         .sort();
-      const expectedChangedPathIds = [
-        ...affectedClosure.mutableEdgeIds,
-        ...(incrementalResponse.affectedEdgeCount === affectedClosure.mutableEdgeIds.length
-          ? []
-          : ['edge-tms-carrier']),
-      ].sort();
-      expect(changedPathIds, diagnostics).toEqual(expectedChangedPathIds);
+      const mutableChangedPathIds = changedPathIds
+        .filter(edgeId => affectedClosure.mutableEdgeIds.includes(edgeId))
+        .sort();
+      const contextChangedPathIds = changedPathIds
+        .filter(edgeId => !affectedClosure.mutableEdgeIds.includes(edgeId))
+        .sort();
+      expect(mutableChangedPathIds, diagnostics)
+        .toEqual([...affectedClosure.mutableEdgeIds].sort());
+      expect(contextChangedPathIds.every(
+        edgeId => affectedClosure.contextEdgeIds.includes(edgeId),
+      ), diagnostics).toBe(true);
+      if (typeof incrementalResponse.affectedEdgeCount !== 'number') {
+        throw new Error('expected incremental response to report affected edge count');
+      }
+      expect(changedPathIds, diagnostics)
+        .toHaveLength(incrementalResponse.affectedEdgeCount);
+      expect(contextChangedPathIds, diagnostics).toHaveLength(
+        incrementalResponse.affectedEdgeCount - affectedClosure.mutableEdgeIds.length,
+      );
     }
   }, 60_000);
 

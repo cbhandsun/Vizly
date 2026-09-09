@@ -174,17 +174,42 @@ describe('Logistics incremental display routing', () => {
     expect(response.routeResolution, diagnostics).toBe('incremental-route');
     expect(response.fallbackLevel, diagnostics).toBe('none');
     expect(affectedClosure.mutableEdgeIds, diagnostics).toHaveLength(mutableCount);
-    expect(response.affectedEdgeCount, diagnostics).toBe(
-      affectedClosure.mutableEdgeIds.length,
+    if (!response.edges) throw new Error('expected the incremental route edges');
+    const responseById = new Map(response.edges.map(edge => [edge.id, edge]));
+    const changedPathIds = baselineEdges
+      .filter(baselineEdge => {
+        const responseEdge = responseById.get(baselineEdge.id);
+        return responseEdge
+          ? !doBaseReactFlowDisplayRoutesMatchExactly([baselineEdge], [responseEdge])
+          : true;
+      })
+      .map(edge => edge.id)
+      .sort();
+    const mutableChangedPathIds = changedPathIds
+      .filter(edgeId => affectedClosure.mutableEdgeIds.includes(edgeId))
+      .sort();
+    const contextChangedPathIds = changedPathIds
+      .filter(edgeId => !affectedClosure.mutableEdgeIds.includes(edgeId))
+      .sort();
+    expect(mutableChangedPathIds, diagnostics)
+      .toEqual([...affectedClosure.mutableEdgeIds].sort());
+    expect(contextChangedPathIds.every(
+      edgeId => affectedClosure.contextEdgeIds.includes(edgeId),
+    ), diagnostics).toBe(true);
+    if (typeof response.affectedEdgeCount !== 'number') {
+      throw new Error('expected incremental response to report affected edge count');
+    }
+    expect(changedPathIds, diagnostics).toHaveLength(response.affectedEdgeCount);
+    expect(contextChangedPathIds, diagnostics).toHaveLength(
+      response.affectedEdgeCount - affectedClosure.mutableEdgeIds.length,
     );
     expect(report?.hardClean, diagnostics).toBe(true);
     expect(response.hardReport, diagnostics).toEqual(report);
-    if (!response.edges) throw new Error('expected the incremental route edges');
-    const responseById = new Map(response.edges.map(edge => [edge.id, edge]));
+    const changedPathIdSet = new Set(changedPathIds);
     for (const baselineEdge of baselineEdges) {
       const responseEdge = responseById.get(baselineEdge.id);
       if (!responseEdge) throw new Error('expected every baseline edge to remain present');
-      if (affectedClosure.mutableEdgeIds.includes(baselineEdge.id)) {
+      if (changedPathIdSet.has(baselineEdge.id)) {
         expect(createNodeClearanceEvaluationContext(nextNodes, responseEdge).score(
           getDisplayComputedPath(responseEdge), COMMERCIAL_BUSINESS_NODE_CLEARANCE,
         ), diagnostics).toBeLessThanOrEqual(0.5);
