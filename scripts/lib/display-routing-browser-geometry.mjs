@@ -130,6 +130,12 @@ const summarizeClearanceRisk = (risk, edgeById) => {
     nodeId: typeof risk?.nodeId === 'string' ? risk.nodeId : null,
     clearance: Number.isFinite(risk?.clearance) ? Math.round(risk.clearance * 10) / 10 : null,
     requiredClearance: Number.isFinite(risk?.requiredClearance) ? risk.requiredClearance : null,
+    screenClearance: Number.isFinite(risk?.screenClearance)
+      ? Math.round(risk.screenClearance * 10) / 10
+      : undefined,
+    requiredScreenClearance: Number.isFinite(risk?.requiredScreenClearance)
+      ? risk.requiredScreenClearance
+      : undefined,
   };
 };
 
@@ -159,8 +165,12 @@ export const summarizeDisplayRoutingGeometryFailure = ({
     obstacleHitCount: audit?.intersections?.length,
     minimumClearanceRiskCount: audit?.clearanceRisks?.length,
     minimumClearanceRiskSamples: summarizeClearanceRisks(audit?.clearanceRisks, edgeById),
+    minimumVisualClearanceRiskCount: audit?.visualClearanceRisks?.length,
+    minimumVisualClearanceRiskSamples: summarizeClearanceRisks(audit?.visualClearanceRisks, edgeById),
     commercialClearanceRiskCount: commercialAudit?.clearanceRisks?.length,
     commercialClearanceRiskSamples: summarizeClearanceRisks(commercialAudit?.clearanceRisks, edgeById),
+    commercialVisualClearanceRiskCount: commercialAudit?.visualClearanceRisks?.length,
+    commercialVisualClearanceRiskSamples: summarizeClearanceRisks(commercialAudit?.visualClearanceRisks, edgeById),
     nonOrthogonalPathCount: hardAudit?.nonOrthogonalEdgeIds?.length,
     detachedTerminalPathCount: hardAudit?.detachedTerminalEdgeIds?.length,
     detachedTerminalPathIndexes: hardAudit?.detachedTerminalEdgeIds?.map(edgeId => (
@@ -374,6 +384,7 @@ export const readRenderedDisplayEdgeNodeIntersections = (
   const nodes = scannedNodes;
   const intersections = [];
   const clearanceRisks = [];
+  const visualClearanceRisks = [];
   const invalidEdgeIds = [];
   let auditedPathCount = 0;
 
@@ -413,8 +424,10 @@ export const readRenderedDisplayEdgeNodeIntersections = (
     const step = Math.max(0.25, Math.min(4, 2 / scale));
     const sampleCount = Math.min(20_000, Math.max(1, Math.ceil(length / step)));
     const candidateNodes = nodes.filter(node => node.id !== source && node.id !== target);
-    const minimumScreenClearance = Math.max(4, boundedRequiredClearance * scale - 1);
+    const minimumGraphClearance = Math.max(0, boundedRequiredClearance - (1 / scale));
+    const minimumVisualScreenClearance = 4;
     const nearestNodeClearance = new Map();
+    const nearestVisualClearance = new Map();
     auditedPathCount += 1;
 
     for (let sampleIndex = 0; sampleIndex <= sampleCount; sampleIndex += 1) {
@@ -446,19 +459,44 @@ export const readRenderedDisplayEdgeNodeIntersections = (
           0,
         );
         const distance = Math.hypot(deltaX, deltaY);
-        if (distance >= minimumScreenClearance) continue;
-        const previous = nearestNodeClearance.get(node.id);
-        if (previous === undefined || distance < previous) {
-          nearestNodeClearance.set(node.id, distance);
+        const graphClearance = distance / scale;
+        if (graphClearance < minimumGraphClearance) {
+          const previous = nearestNodeClearance.get(node.id);
+          if (previous === undefined || graphClearance < previous.clearance) {
+            nearestNodeClearance.set(node.id, {
+              clearance: graphClearance,
+              screenClearance: distance,
+            });
+          }
+        }
+        if (distance < minimumVisualScreenClearance) {
+          const previous = nearestVisualClearance.get(node.id);
+          if (previous === undefined || distance < previous.screenClearance) {
+            nearestVisualClearance.set(node.id, {
+              clearance: graphClearance,
+              screenClearance: distance,
+            });
+          }
         }
       }
     }
-    for (const [nodeId, distance] of nearestNodeClearance) {
+    for (const [nodeId, evidence] of nearestNodeClearance) {
       clearanceRisks.push({
         edgeId,
         nodeId,
-        clearance: distance / scale,
+        clearance: evidence.clearance,
         requiredClearance: boundedRequiredClearance,
+        screenClearance: evidence.screenClearance,
+      });
+    }
+    for (const [nodeId, evidence] of nearestVisualClearance) {
+      visualClearanceRisks.push({
+        edgeId,
+        nodeId,
+        clearance: evidence.clearance,
+        requiredClearance: boundedRequiredClearance,
+        screenClearance: evidence.screenClearance,
+        requiredScreenClearance: minimumVisualScreenClearance,
       });
     }
   }
@@ -470,6 +508,7 @@ export const readRenderedDisplayEdgeNodeIntersections = (
     invalidEdgeIds,
     intersections,
     clearanceRisks,
+    visualClearanceRisks,
   };
 };
 
