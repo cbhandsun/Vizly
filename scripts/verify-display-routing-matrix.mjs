@@ -38,6 +38,7 @@ import {
 import { verifyDisplayRoutingBrowserCases } from './lib/display-routing-matrix-browser-cases.mjs';
 import {
   assertDisplayRoutingCommittedReuse,
+  displayRoutingCommittedReuseIsExpected,
   readDisplayRoutingCommittedReuseSnapshot,
 } from './lib/display-routing-browser-diagnostics.mjs';
 import {
@@ -330,14 +331,33 @@ const verifyPreset = target => withPrecompiledRouteBrowser(async session => {
       window.location.hash = ${JSON.stringify(`#/?diagram=${target.presetId}`)};
       return true;
     })()`);
-    const after = await waitForValue(session, `(() => {
-      const readSnapshot = ${readDisplayRoutingCommittedReuseSnapshot.toString()};
-      const snapshot = readSnapshot();
-      return snapshot.stage === 'final-applied'
-        && snapshot.renderedEdgeCount === ${route.response.edges.length}
-        ? snapshot
-        : null;
-    })()`, `${target.presetId} committed snapshot reuse`);
+    let after;
+    try {
+      after = await waitForValue(session, `(() => {
+        const readSnapshot = ${readDisplayRoutingCommittedReuseSnapshot.toString()};
+        const matches = ${displayRoutingCommittedReuseIsExpected.toString()};
+        const snapshot = readSnapshot();
+        return matches({
+          before: ${JSON.stringify(before)},
+          after: snapshot,
+          expectedEdgeCount: ${route.response.edges.length},
+        }) ? snapshot : null;
+      })()`, `${target.presetId} committed snapshot reuse`);
+    } catch (error) {
+      const current = await session.evaluate(readSnapshotExpression);
+      try {
+        assertDisplayRoutingCommittedReuse({
+          before,
+          after: current,
+          expectedEdgeCount: route.response.edges.length,
+        });
+      } catch (snapshotError) {
+        throw new Error(`${error.message}\n${snapshotError.message}\nCommitted snapshot: ${JSON.stringify(current)}`, {
+          cause: error,
+        });
+      }
+      throw error;
+    }
     assertDisplayRoutingCommittedReuse({
       before,
       after,

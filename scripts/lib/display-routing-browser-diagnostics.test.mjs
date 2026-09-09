@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   assertDisplayRoutingCommittedReuse,
+  displayRoutingCommittedReuseIsExpected,
   prepareDisplayRoutingIncrementalCapture,
   readDisplayRoutingCommittedReuseSnapshot,
   readDisplayRoutingRequestDriftProbe,
@@ -225,6 +226,12 @@ describe('display routing browser diagnostics', () => {
 
     expect(() => assertDisplayRoutingCommittedReuse({ before, after, expectedEdgeCount: 2 }))
       .not.toThrow();
+    expect(displayRoutingCommittedReuseIsExpected({ before, after, expectedEdgeCount: 2 })).toBe(true);
+    expect(displayRoutingCommittedReuseIsExpected({
+      before,
+      after: { ...after, renderedPathCount: 3, renderedPathDigest: 'abcdef12' },
+      expectedEdgeCount: 2,
+    })).toBe(false);
     expect(() => assertDisplayRoutingCommittedReuse({
       before,
       after: { ...after, workerStartCount: 1 },

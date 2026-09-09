@@ -262,6 +262,31 @@ export const readDisplayRoutingCommittedReuseSnapshot = () => {
   };
 };
 
+/** True only after every layer of the committed SVG route has been restored. */
+export const displayRoutingCommittedReuseIsExpected = ({ before, after, expectedEdgeCount }) => {
+  const exactFields = [
+    'inputSignature',
+    'inputGeometryDigest',
+    'outputRouteSignature',
+    'renderedPathDigest',
+  ];
+  return before?.stage === 'final-applied'
+    && after?.stage === 'final-applied'
+    && after?.cacheTrustLevel === 'runtime-committed'
+    && after?.workerStartCount === 0
+    && after?.workerAbortCount === 0
+    && after?.requestCount === 0
+    && after?.responseCount === 0
+    && after?.renderedEdgeCount === expectedEdgeCount
+    && after?.renderedEdgesWithPathCount === expectedEdgeCount
+    && Number.isInteger(after?.renderedPathCount)
+    && after.renderedPathCount >= expectedEdgeCount
+    && after.renderedPathCount === before?.renderedPathCount
+    && exactFields.every(field => (
+      typeof before?.[field] === 'string' && before[field] === after?.[field]
+    ));
+};
+
 export const assertDisplayRoutingCommittedReuse = ({ before, after, expectedEdgeCount }) => {
   const issues = [];
   const exactFields = [
