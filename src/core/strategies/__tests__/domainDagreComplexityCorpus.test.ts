@@ -2,7 +2,9 @@
 import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it, vi } from 'vitest';
 import { evaluateLayoutGeometry } from '../../algorithms/layoutGeometryConstraints';
+import { auditBaseReactFlowDisplayCommercialQuality } from '../../components/shared/baseReactFlowDisplayCommercialQuality';
 import { projectBaseReactFlowDisplayWorkerInput } from '../../components/shared/baseReactFlowDisplayWorkerProjection';
+import { measureRoutedLayoutQuality, type RoutedLayoutQuality } from '../../components/shared/routedLayoutQuality';
 import { LayoutType } from '../../types/layout';
 import { DomainDagreLayoutStrategy } from '../DomainDagreLayoutStrategy';
 
@@ -91,6 +93,47 @@ const corpus: readonly CorpusCase[] = [
 ];
 
 const directions = ['TB', 'BT', 'LR', 'RL'] as const;
+type Direction = typeof directions[number];
+type DirectionalQualityLimits = Readonly<{
+  vertical: RoutedLayoutQuality;
+  horizontal: RoutedLayoutQuality;
+  reverseHorizontal?: RoutedLayoutQuality;
+}>;
+
+const qualityLimits: Readonly<Record<string, DirectionalQualityLimits>> = {
+  'sparse-chain': {
+    vertical: { width: 1075, height: 416, pathLength: 1208, backwardTravel: 248, bends: 4, crossings: 0 },
+    horizontal: { width: 1198, height: 860, pathLength: 1180, backwardTravel: 0, bends: 2, crossings: 0 },
+  },
+  'dense-fan': {
+    vertical: { width: 1123, height: 1340, pathLength: 11146, backwardTravel: 0, bends: 12, crossings: 0 },
+    horizontal: { width: 2315, height: 860, pathLength: 14952, backwardTravel: 0, bends: 12, crossings: 0 },
+  },
+  'nested-subgroups': {
+    vertical: { width: 1668, height: 1160, pathLength: 3692, backwardTravel: 0, bends: 7, crossings: 0 },
+    horizontal: { width: 1552, height: 1344, pathLength: 3074, backwardTravel: 0, bends: 7, crossings: 0 },
+  },
+  'feedback-cycle': {
+    vertical: { width: 634, height: 912, pathLength: 1847, backwardTravel: 496, bends: 3, crossings: 0 },
+    horizontal: { width: 1198, height: 520, pathLength: 1990, backwardTravel: 708, bends: 3, crossings: 0 },
+  },
+  'fixed-ports': {
+    vertical: { width: 634, height: 912, pathLength: 1776, backwardTravel: 0, bends: 10, crossings: 0 },
+    horizontal: { width: 1198, height: 520, pathLength: 820, backwardTravel: 0, bends: 2, crossings: 0 },
+    reverseHorizontal: { width: 1198, height: 520, pathLength: 1742, backwardTravel: 56, bends: 2, crossings: 0 },
+  },
+  'unbalanced-components': {
+    vertical: { width: 1075, height: 1160, pathLength: 966, backwardTravel: 0, bends: 1, crossings: 0 },
+    horizontal: { width: 1552, height: 860, pathLength: 1118, backwardTravel: 0, bends: 1, crossings: 0 },
+  },
+};
+
+const qualityLimitFor = (id: string, direction: Direction): RoutedLayoutQuality => {
+  const limits = qualityLimits[id];
+  if (!limits) throw new Error(`Missing quality limits for ${id}`);
+  if (direction === 'RL' && limits.reverseHorizontal) return limits.reverseHorizontal;
+  return direction === 'LR' || direction === 'RL' ? limits.horizontal : limits.vertical;
+};
 
 describe('domain Dagre generic complexity corpus', () => {
   it.each(corpus.flatMap(value => directions.map(direction => ({ value, direction }))))(
@@ -113,6 +156,15 @@ describe('domain Dagre generic complexity corpus', () => {
       expect(evaluateLayoutGeometry(result.nodes).clean).toBe(true);
       expect(result.edges).toHaveLength(value.edges.length);
       expect(result.nodes.filter(node => node.type === 'custom')).toHaveLength(value.nodes.length);
+      expect(auditBaseReactFlowDisplayCommercialQuality(result.edges)).toEqual([]);
+      const quality = measureRoutedLayoutQuality(result.nodes, result.edges, direction);
+      expect(quality).not.toBeNull();
+      if (!quality) throw new Error('Missing complete routed quality vector');
+      const limit = qualityLimitFor(value.id, direction);
+      for (const key of ['width', 'height', 'pathLength', 'backwardTravel', 'bends', 'crossings'] as const) {
+        expect(quality[key], `Routed quality regressed: ${value.id} ${direction} ${key}`)
+          .toBeLessThanOrEqual(limit[key] + 0.01);
+      }
       expect(value.nodes).toEqual(beforeNodes);
       expect(value.edges).toEqual(beforeEdges);
       if (value.id === 'fixed-ports') {
