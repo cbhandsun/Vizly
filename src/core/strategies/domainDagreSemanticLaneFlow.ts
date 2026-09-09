@@ -128,7 +128,19 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
     coordinateScopes.push({ domainId: domain.id,
       buckets: orderedBuckets.map(([id, bucket]) => ({ id, nodeIds: bucket.map(node => node.id) })) });
     for (const [id, bucket] of orderedBuckets) {
-      const compactCross = compactDomainDagreLaneCrossAxis(bucket, globalPositions, cross, crossGap);
+      // Global phase alignment removes the old staggered corridors. Seed the
+      // cross axis from the same ranking, whose peers have separate slots;
+      // old lane coordinates may deliberately reuse a slot at different phases.
+      const reusedPeerSlots = alignGlobalPeers && bucket.some((a, index) => bucket.slice(index + 1).some(b => {
+        const aFlow = globalPositions.get(a.id)?.[flow] ?? a.position[flow];
+        const bFlow = globalPositions.get(b.id)?.[flow] ?? b.position[flow];
+        return Math.max(bFlow - aFlow - flowSize(a), aFlow - bFlow - flowSize(b)) < COMMERCIAL_BUSINESS_NODE_CLEARANCE
+          && Math.max(b.position[cross] - a.position[cross] - crossSize(a),
+            a.position[cross] - b.position[cross] - crossSize(b)) < 0;
+      }));
+      const crossSeeds = reusedPeerSlots ? bucket.map(node => moveAlong(node, cross,
+        globalPositions.get(node.id)?.[cross] ?? node.position[cross])) : bucket;
+      const compactCross = compactDomainDagreLaneCrossAxis(crossSeeds, globalPositions, cross, crossGap);
       const crossPosition = (node: Node) => compactCross.get(node.id) ?? node.position[cross];
       const minCross = Math.min(...bucket.map(crossPosition));
       const maxCross = Math.max(...bucket.map(node => crossPosition(node) + crossSize(node)));

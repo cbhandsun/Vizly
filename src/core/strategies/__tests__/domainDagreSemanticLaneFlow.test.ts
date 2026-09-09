@@ -23,6 +23,32 @@ const edges: Edge[] = [
 const membership = new Map([['start', 'sub-1'], ['left', 'sub-1'], ['end', 'sub-2']]);
 
 describe('semantic swimlane process geometry', () => {
+  it.each((['TB', 'BT', 'LR', 'RL'] as const).flatMap(direction => [false, true]
+    .map(unequal => ({ direction, unequal }))))('separates aligned siblings that previously shared a corridor in $direction (unequal: $unequal)', ({ direction, unequal }) => {
+    const horizontal = direction === 'LR' || direction === 'RL';
+    const flow = horizontal ? 'x' : 'y', size = horizontal ? 'width' : 'height';
+    const siblings = ['a', 'b', 'c'].map((id, index) => {
+      const dimensions = { width: unequal ? 160 + index * 40 : 160, height: unequal ? 80 + index * 20 : 80 };
+      return { ...makeNode(id, 'a'), ...dimensions, measured: dimensions,
+        style: dimensions, position: { x: 0, y: 0 } };
+    });
+    const input = [makeNode('lane', 'a', 0, 'titleGroup'), makeNode('root', 'a'), ...siblings];
+    const original = structuredClone(input);
+    const links = siblings.map(node => ({ id: `root-${node.id}`, source: 'root', target: node.id }));
+    const arranged = alignDomainDagreLaneFlow(input, links, { direction, rankMode: 'global', alignGlobalLanePeers: true });
+    const peers = arranged.filter(node => siblings.some(sibling => sibling.id === node.id));
+    expect(peers).toHaveLength(3);
+    const phase = peers[0].position[flow] + getNodeDimensions(peers[0])[size] / 2;
+    for (const peer of peers) expect(peer.position[flow] + getNodeDimensions(peer)[size] / 2).toBeCloseTo(phase);
+    for (let first = 0; first < peers.length; first++) for (let second = first + 1; second < peers.length; second++) {
+      const a = peers[first], b = peers[second];
+      const aSize = getNodeDimensions(a), bSize = getNodeDimensions(b);
+      expect(Math.max(b.position.x - a.position.x - aSize.width, a.position.x - b.position.x - bSize.width,
+        b.position.y - a.position.y - aSize.height, a.position.y - b.position.y - bSize.height)).toBeGreaterThanOrEqual(48);
+    }
+    expect(input).toEqual(original);
+  });
+
   it('keeps domain-local compact corridors unchanged when global alignment is requested', () => {
     const options = { direction: 'TB' as const, rankMode: 'compact' as const, nodeToSubGroup: membership };
     expect(alignDomainDagreLaneFlow(nodes, edges, { ...options, alignGlobalLanePeers: true }))

@@ -2,9 +2,22 @@ import type { Edge, Node } from '@xyflow/react';
 import { getNodeDimensions } from './DomainDagreLayoutHelpers';
 import { compactDomainDagreLaneCrossAxis } from './domainDagreLaneCrossCompaction';
 import { arrangeDomainDagreChildren } from './domainDagreChildArrangement';
+import { COMMERCIAL_BUSINESS_NODE_CLEARANCE } from './shared/edgeBusinessNodeClearanceRepair';
 
 export type DomainDagreLaneBucket = Readonly<{ id: string; nodeIds: readonly string[] }>;
 export type DomainDagreLaneCoordinateScope = Readonly<{ domainId: string; buckets: readonly DomainDagreLaneBucket[] }>;
+
+const channelPreservesClearance = (nodes: Node[], proposed: ReadonlyMap<string, Node>): boolean => {
+  const boxes = nodes.map(node => ({ id: node.id, ...(proposed.get(node.id) ?? node).position,
+    ...getNodeDimensions(proposed.get(node.id) ?? node) }));
+  for (let first = 0; first < boxes.length; first++) for (let second = first + 1; second < boxes.length; second++) {
+    const a = boxes[first], b = boxes[second];
+    if (!proposed.has(a.id) && !proposed.has(b.id)) continue;
+    if (Math.max(b.x - a.x - a.width, a.x - b.x - b.width,
+      b.y - a.y - a.height, a.y - b.y - b.height) < COMMERCIAL_BUSINESS_NODE_CLEARANCE) return false;
+  }
+  return true;
+};
 
 /** Final coordinate assignment consumes final process bands, never provisional ranks.
  * Unconnected cards have no process phase. They use a separate content block,
@@ -113,15 +126,23 @@ export function assignDomainDagreLaneCoordinates(
         // Reserve a render-safe terminal plus one parallel routing track.
         const channelMargin = 56 + 24;
         channel = Math.max(channel, bucketCross + inset + Math.max(...left.map(crossSize)) + channelMargin);
-        replacements.set(hub.id, { ...hub, position: at(channel - crossSize(hub) / 2, hub.position[flow]) });
-        occupiedWidth = Math.max(occupiedWidth, channel + crossSize(hub) / 2 - bucketCross - inset);
+        const proposed = new Map<string, Node>([[hub.id,
+          { ...hub, position: at(channel - crossSize(hub) / 2, hub.position[flow]) }]]);
         for (const node of [...left, ...right]) {
           const next = left.includes(node)
             ? channel - channelMargin - crossSize(node)
             : channel + channelMargin;
           if (next < bucketCross + inset) continue;
-          replacements.set(node.id, { ...node, position: at(next, node.position[flow]) });
-          occupiedWidth = Math.max(occupiedWidth, next - bucketCross - inset + crossSize(node));
+          proposed.set(node.id, { ...node, position: at(next, node.position[flow]) });
+        }
+        // A shared channel may reuse a column only across separate flow bands.
+        // Validate the hub and all moved peers against current bucket geometry
+        // before applying any of them, including peers of earlier hubs.
+        const current = process.map(node => replacements.get(node.id) ?? node);
+        if (!channelPreservesClearance(current, proposed)) continue;
+        for (const node of proposed.values()) {
+          replacements.set(node.id, node);
+          occupiedWidth = Math.max(occupiedWidth, node.position[cross] - bucketCross - inset + crossSize(node));
         }
       }
       // Explicit Grid/Flow uses the bounded card packer; automatic keeps its

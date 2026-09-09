@@ -8,6 +8,15 @@
 
 ### 当前执行摘要
 
+#### 同阶段分支与共用通道的节点净距修复（本地验收完成）
+
+- 已将 WMS 强制对齐候选中的重叠缩成匿名一对多反例，四方向均能复现。第一处根因是取消错开通道后继续复用旧横向槽位；仅在新阶段下旧槽位重叠时改用本次分层槽位。第二处是共用通道调整无条件把同侧节点压到同一列；现在先检查整组位移的矩形净距，再一起应用，保持原规模边界。
+- 最终 WMS 强制对齐候选 TB/LR 的 39 个业务节点均零重叠，Worker 硬质量均通过。选中布局仍不变，不把候选修复写成 WMS 已有新的可见改善。需求图也保留已上线的 0.2809/0.2241 适配缩放；两图两个方向真实 SVG、模型/DOM 一致性及保存重载均通过。
+- 过程中无条件替换所有横向槽位曾导致需求图 LR 变宽、保存恢复几何不同，浏览器验收阻止了提交。条件替换后两项复验通过，失败记录保留于 `tmp/lane-clearance-browser.log`，最终记录为 `tmp/lane-clearance-retain-browser.log`。
+- 完整策略回归 31 文件 / 347 项通过；最后收紧条件后，两个直接相关文件 73 项复验通过。新增十项测试进入既有 CI 文件；移除通道净距检查的对照出现 2 失败 / 12 通过。最终 verify:static、TS6、测试收录及生产构建通过；重新生成四份预编译路由，只有清单源码指纹改变，路径内容未变。未提高任何预算。
+- 证据：`tmp/aligned-clearance-strategies.log`、`tmp/aligned-clearance-retain-slots.log`、`tmp/lane-channel-mutation.log`、`tmp/aligned-clearance-retain-static.log`、`tmp/aligned-clearance-retain-ts6.log`、`tmp/aligned-clearance-retain-precompile.log`。本批全量远端门禁待对应提交验收。
+- 上一提交 `9eb6d814` 的[完整 CI 34297080937](https://github.com/cbhandsun/Vizly/actions/runs/34297080937)测试与覆盖率通过，失败位于普通 WMS 保存恢复：缩放约 0.09862 时 44 个标签可见，但有一处标签互叠。该问题未由本批关闭，下一批优先复现该缩放与保存恢复边界；不降低标签验收标准。日志 `tmp/9eb6d814-ci-failure.log`。
+
 #### 管理页加载边界回归修复（本地验证完成）
 
 - `fae910ae` 完整 CI 最终失败：管理页及模板管理页均请求 85 个资源、3458.3 KB，超过各自原预算；五组测试与覆盖率通过。静态资源失败导致后续移动端和普通保存恢复未执行。WMS 首个样本另记录 166ms 长任务，复杂架构图最慢 ready 10589ms；本次通过不能证明这些历史尾延迟根因已关闭。

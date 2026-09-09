@@ -7,6 +7,32 @@ const node = (id: string, x: number, y: number, width = 240, height = 80): Node 
   id, position: { x, y }, width, height, measured: { width, height }, data: {},
 });
 describe('final swimlane coordinate assignment', () => {
+  it.each([false, true])('keeps same-phase fan-out peers separated when considering a shared channel, horizontal=%s', horizontal => {
+    const input = [node('domain', 0, 0, 2000, 1600), node('hub', 500, 200),
+      node('a', 0, 800, 200), node('b', 320, 800, 220),
+      node('c', 760, 800, 180), node('d', 1100, 800, 240)].map(value => horizontal ? {
+      ...value, position: { x: value.position.y, y: value.position.x },
+      width: value.height, height: value.width, measured: { width: value.height, height: value.width },
+    } : value);
+    const before = structuredClone(input);
+    const replacements = new Map(input.map(value => [value.id, value]));
+    assignDomainDagreLaneCoordinates(replacements, [{ domainId: 'domain', buckets: [{ id: 'domain',
+      nodeIds: input.slice(1).map(value => value.id) }] }],
+    input.slice(2).map(value => ({ id: `hub-${value.id}`, source: 'hub', target: value.id })), horizontal, 120, 96);
+    const peers = input.slice(1).map(value => {
+      const result = replacements.get(value.id);
+      if (!result) throw Error('Missing fan-out node');
+      expect(result.position[horizontal ? 'x' : 'y']).toBe(value.position[horizontal ? 'x' : 'y']);
+      return result;
+    });
+    for (let first = 0; first < peers.length; first++) for (let second = first + 1; second < peers.length; second++) {
+      const a = peers[first], b = peers[second];
+      expect(Math.max(b.position.x - a.position.x - Number(a.width), a.position.x - b.position.x - Number(b.width),
+        b.position.y - a.position.y - Number(a.height), a.position.y - b.position.y - Number(b.height))).toBeGreaterThanOrEqual(48);
+    }
+    expect(input).toEqual(before);
+  });
+
   it.each([false, true])('applies one inset per actual container, horizontal=%s', horizontal => {
     const cross = horizontal ? 'y' : 'x', size = horizontal ? 'height' : 'width';
     const outerInset = horizontal ? 88 : 32, innerInset = horizontal ? 64 : 32;
