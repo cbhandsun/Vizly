@@ -182,6 +182,7 @@ export const useBaseReactFlowDisplayRouting = ({
   const [deferredDisplayEdges, setDeferredDisplayEdges] = useState<DeferredDisplayEdges | null>(null);
   const {
     committedRenderAuthority,
+    committedRenderEdges,
     rememberCommittedRenderAuthority,
   } = useBaseReactFlowCommittedRenderAuthority();
   useEffect(() => {
@@ -691,6 +692,7 @@ export const useBaseReactFlowDisplayRouting = ({
     dragFallbackPending: isNodeDragFallbackPending,
     nodeDragFallbackIds,
     committedRenderAuthority,
+    committedRenderEdges,
     failure,
   });
 };

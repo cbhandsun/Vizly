@@ -182,6 +182,21 @@ describe('BaseReactFlow committed render authority', () => {
     });
 
     expect(resolve()).toEqual({ authority: committedRenderAuthority, status: 'accepted' });
+    const dragFallbackEdge = { ...routedEdges[0], type: 'smoothstep' };
+    expect(resolve({
+      inputSignature: 'node-drag-paused',
+      inputGeometryDigest: 'node-drag-paused',
+      displayedEdges: [dragFallbackEdge],
+      dragFallbackActive: true,
+      dragFallbackNodeIds: ['source'],
+    })).toEqual({ authority: committedRenderAuthority, status: 'accepted' });
+    expect(resolve({
+      inputSignature: 'node-drag-paused',
+      inputGeometryDigest: 'node-drag-paused',
+      displayedEdges: [{ ...dragFallbackEdge, target: 'other' }],
+      dragFallbackActive: true,
+      dragFallbackNodeIds: ['source'],
+    }).status).toBe('input-signature-mismatch');
     expect(resolve({ committedRenderAuthority: null }).status).toBe('missing-commit');
     expect(resolve({ inputSignature: '9999' }).status).toBe('input-signature-mismatch');
     expect(resolve({

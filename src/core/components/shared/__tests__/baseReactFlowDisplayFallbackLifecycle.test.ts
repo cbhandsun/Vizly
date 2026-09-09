@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createBaseReactFlowInteractiveFallbackEdges,
   createBaseReactFlowNodeDragFallbackEdges,
+  resolveBaseReactFlowNodeDragFallbackBase,
   resolveBaseReactFlowNodeDragFallbackIds,
   shouldUseBaseReactFlowNodeDragFallback,
 } from '../baseReactFlowDisplayFallback';
@@ -137,12 +138,37 @@ describe('baseReactFlow display fallback lifecycle', () => {
     expect(fallback[1]).toBe(unrelated);
   });
 
+  it('keeps accepted unrelated paths as the drag fallback base when topology matches', () => {
+    const source = [
+      { id: 'incident', source: 'dragged', target: 'target', type: 'advanced-smart-step' },
+      { id: 'unrelated', source: 'other-source', target: 'other-target', type: 'advanced-smart-step' },
+    ];
+    const resolved = source.map(edge => ({ ...edge, type: 'stablePath', data: { computedPath: [] } }));
+
+    const base = resolveBaseReactFlowNodeDragFallbackBase(source, resolved);
+    const fallback = createBaseReactFlowNodeDragFallbackEdges([...base], ['dragged']);
+
+    expect(fallback[0]).toEqual({ ...resolved[0], type: 'smoothstep' });
+    expect(fallback[1]).toBe(resolved[1]);
+  });
+
+  it('rejects stale fallback geometry after an edge is removed or rewired', () => {
+    const source = [{ id: 'edge', source: 'a', target: 'b', type: 'advanced-smart-step' }];
+    const resolved = [{ ...source[0], type: 'stablePath' }];
+
+    expect(resolveBaseReactFlowNodeDragFallbackBase(source, [])).toBe(source);
+    expect(resolveBaseReactFlowNodeDragFallbackBase(source, [{ ...resolved[0], target: 'c' }])).toBe(source);
+    expect(resolveBaseReactFlowNodeDragFallbackBase(source, [{ ...resolved[0], id: 'other' }])).toBe(source);
+    expect(resolveBaseReactFlowNodeDragFallbackBase([...source, source[0]], [...resolved, resolved[0]])).not.toBe(resolved);
+  });
+
   it('ignores unselected descendants when resolving drag fallback nodes', () => {
     expect(resolveBaseReactFlowNodeDragFallbackIds('primary', [
       { id: 'primary', selected: true },
       { id: 'selected-peer', selected: true },
       { id: 'unselected-descendant', selected: false },
     ])).toEqual(['primary', 'selected-peer']);
+    expect(resolveBaseReactFlowNodeDragFallbackIds('primary', undefined)).toEqual(['primary']);
   });
 
   it('keeps drag fallback visible throughout dragging and pending rerouting', () => {

@@ -76,4 +76,11 @@ describe('edge contrast paint CSS states', () => {
     expect(stableSource).toContain('resolveEdgeContrastPaint({');
     expect(advancedSource).not.toContain('<BaseEdge');
   });
+
+  it('keeps advanced fallback labels addressable by the process stability sampler', () => {
+    const advancedSource = readSource('../renderers/AdvancedSmartEdgeGraphics.tsx');
+
+    expect(advancedSource).toContain('data-edge-id={id}');
+    expect(advancedSource).toContain('data-edge-label-placement="interactive-fallback"');
+  });
 });

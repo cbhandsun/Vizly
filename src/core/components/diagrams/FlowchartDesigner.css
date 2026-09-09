@@ -1824,13 +1824,6 @@ html[data-theme='dark'] body.performance-mode .modern-sidebar-container {
     animation-play-state: paused !important;
 }
 
-/* 鎷栧姩涓細鍋滅敤杈规爣绛撅紙閬垮厤浣嶇疆鎶栧姩锛?*/
-.diagram-dragging .react-flow__edge-textbg,
-.diagram-dragging .react-flow__edge-text {
-    opacity: 0 !important;
-    transition: none !important;
-}
-
 /* 鎷栧姩缁撴潫鍚庯細骞虫粦鎭㈠ */
 .react-flow__edge-path {
     transition: opacity 0.25s ease, stroke-width 0.15s ease;

@@ -28,6 +28,7 @@ export const useBaseReactFlowDisplayRoutingResult = ({
   dragFallbackPending,
   nodeDragFallbackIds,
   committedRenderAuthority,
+  committedRenderEdges = [],
   failure = null,
 }: {
   sourceEdges: Edge[];
@@ -41,6 +42,7 @@ export const useBaseReactFlowDisplayRoutingResult = ({
   dragFallbackPending: boolean;
   nodeDragFallbackIds: readonly string[];
   committedRenderAuthority: DisplayRoutingRenderAuthority | null;
+  committedRenderEdges?: readonly Edge[];
   failure?: BaseReactFlowDisplayFailure | null;
 }): UseBaseReactFlowDisplayRoutingResult => {
   const resolvedEdges = useBaseReactFlowResolvedDisplayEdges({
@@ -58,6 +60,7 @@ export const useBaseReactFlowDisplayRoutingResult = ({
     isNodeDragging,
     dragFallbackPending,
     nodeDragFallbackIds,
+    settledEdges: committedRenderEdges,
   });
   const activeFailure = !isNodeDragging && displayFailureMatchesInput(failure, { inputSignature, inputGeometryDigest })
     ? failure : null;
@@ -67,6 +70,8 @@ export const useBaseReactFlowDisplayRoutingResult = ({
       inputSignature,
       inputGeometryDigest,
       displayedEdges: finalEdges,
+      dragFallbackNodeIds: nodeDragFallbackIds,
+      dragFallbackActive: isNodeDragging || dragFallbackPending,
     });
   return {
     edges: finalEdges,

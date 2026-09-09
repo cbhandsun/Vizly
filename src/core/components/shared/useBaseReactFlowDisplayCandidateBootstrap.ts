@@ -5,6 +5,7 @@ import { readBaseReactFlowDisplayEdgesCacheEntry } from './baseReactFlowDisplayE
 import {
   createBaseReactFlowInteractiveFallbackEdges,
   createBaseReactFlowNodeDragFallbackEdges,
+  resolveBaseReactFlowNodeDragFallbackBase,
   shouldUseBaseReactFlowNodeDragFallback,
 } from './baseReactFlowDisplayFallback';
 import {
@@ -171,21 +172,24 @@ export const useBaseReactFlowResolvedOrDragFallbackEdges = ({
   isNodeDragging,
   dragFallbackPending,
   nodeDragFallbackIds,
+  settledEdges,
 }: {
   sourceEdges: Edge[];
   resolvedEdges: Edge[];
   isNodeDragging: boolean;
   dragFallbackPending: boolean;
   nodeDragFallbackIds: readonly string[];
+  settledEdges: readonly Edge[];
 }): Edge[] => {
-  const fallbackEdges = useMemo(
-    () => createBaseReactFlowNodeDragFallbackEdges(sourceEdges, nodeDragFallbackIds),
-    [sourceEdges, nodeDragFallbackIds],
-  );
-  return shouldUseBaseReactFlowNodeDragFallback({
+  const fallbackActive = shouldUseBaseReactFlowNodeDragFallback({
     isNodeDragging,
     dragFallbackPending,
     hasResolvedEdges: sourceEdges.length === 0 || resolvedEdges.length > 0,
     sourceEdgeCount: sourceEdges.length,
-  }) ? fallbackEdges : resolvedEdges;
+  });
+  if (!fallbackActive) return resolvedEdges;
+  return createBaseReactFlowNodeDragFallbackEdges(
+    [...resolveBaseReactFlowNodeDragFallbackBase(sourceEdges, settledEdges)],
+    nodeDragFallbackIds,
+  );
 };

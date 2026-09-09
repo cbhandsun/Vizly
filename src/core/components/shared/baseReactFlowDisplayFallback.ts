@@ -19,10 +19,10 @@ const STALE_DURING_NODE_DRAG_EDGE_TYPES = new Set([
 
 export const resolveBaseReactFlowNodeDragFallbackIds = (
   primaryNodeId: string,
-  draggedNodes: readonly { id: string; selected?: boolean }[],
+  draggedNodes: readonly { id: string; selected?: boolean }[] | undefined,
 ): string[] => Array.from(new Set([
   primaryNodeId,
-  ...draggedNodes
+  ...(draggedNodes ?? [])
     .filter(node => node.selected)
     .map(node => node.id),
 ]));
@@ -78,6 +78,25 @@ export const createBaseReactFlowNodeDragFallbackEdges = (
   });
 
   return fallbackEdges ?? edges;
+};
+
+/**
+ * Reuses the last accepted render geometry only while it still describes the
+ * same edge topology. This keeps unrelated paths and labels stable during a
+ * node drag without carrying removed or rewired edges into the fallback view.
+ */
+export const resolveBaseReactFlowNodeDragFallbackBase = (
+  sourceEdges: readonly Edge[],
+  resolvedEdges: readonly Edge[],
+): readonly Edge[] => {
+  if (sourceEdges.length === 0 || sourceEdges.length !== resolvedEdges.length) return sourceEdges;
+  const sourceById = new Map(sourceEdges.map(edge => [edge.id, edge]));
+  if (sourceById.size !== sourceEdges.length) return sourceEdges;
+  for (const edge of resolvedEdges) {
+    const source = sourceById.get(edge.id);
+    if (!source || source.source !== edge.source || source.target !== edge.target) return sourceEdges;
+  }
+  return resolvedEdges;
 };
 
 export const shouldUseBaseReactFlowNodeDragFallback = ({

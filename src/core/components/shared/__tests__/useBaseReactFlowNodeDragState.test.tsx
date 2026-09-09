@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { BaseReactFlowProps } from '../baseReactFlowTypes';
 import { useBaseReactFlowNodeDragState } from '../useBaseReactFlowNodeDragState';
+import { useBaseReactFlowResolvedOrDragFallbackEdges } from '../useBaseReactFlowDisplayCandidateBootstrap';
 
 const primaryNode: Node = {
   id: 'primary',
@@ -51,6 +52,37 @@ describe('useBaseReactFlowNodeDragState', () => {
 
     act(() => hook.result.current.handleNodeDragFallbackResolved());
     expect(hook.result.current.isNodeDragFallbackPending).toBe(false);
-    expect(hook.result.current.nodeDragFallbackIds).toEqual([]);
+    expect(hook.result.current.nodeDragFallbackIds).toEqual(['primary', 'selected']);
+
+    act(() => hook.result.current.handleNodeDragStart(event, selectedNode, [selectedNode]));
+    expect(hook.result.current.nodeDragFallbackIds).toEqual(['selected']);
   });
+
+  it('narrows an already active fallback when the dragged node identity arrives', () => {
+    const sourceEdges = [
+      { id: 'incident', source: 'primary', target: 'target', type: 'advanced-smart-step' },
+      { id: 'unrelated', source: 'other-source', target: 'other-target', type: 'advanced-smart-step' },
+    ];
+    const resolvedEdges = sourceEdges.map(edge => ({ ...edge, type: 'stablePath' }));
+    const immediateEdges = sourceEdges.map(edge => ({ ...edge, type: 'smoothstep' }));
+    const hook = renderHook(({ ids, dragging, resolved }: {
+      ids: readonly string[];
+      dragging: boolean;
+      resolved: typeof resolvedEdges;
+    }) => (
+      useBaseReactFlowResolvedOrDragFallbackEdges({
+        sourceEdges,
+        resolvedEdges: resolved,
+        isNodeDragging: dragging,
+        dragFallbackPending: dragging,
+        nodeDragFallbackIds: ids,
+        settledEdges: resolvedEdges,
+      })
+    ), { initialProps: { ids: [] as readonly string[], dragging: false, resolved: resolvedEdges } });
+
+    expect(hook.result.current.map(edge => edge.type)).toEqual(['stablePath', 'stablePath']);
+    hook.rerender({ ids: ['primary'], dragging: true, resolved: immediateEdges });
+    expect(hook.result.current.map(edge => edge.type)).toEqual(['smoothstep', 'stablePath']);
+  });
+
 });

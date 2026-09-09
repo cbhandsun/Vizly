@@ -7,7 +7,8 @@ import { selectBusinessEditTarget, assertBusinessEditStability, assertBusinessEd
 import { measureDisplayRoutingEditStability } from './display-routing-edit-stability.mjs';
 import { createDisplayRoutingMatrixCaseIds, parseDisplayRoutingMatrixCase } from './display-routing-matrix-cases.mjs';
 import { verifyDisplayRoutingBrowserCases } from './display-routing-matrix-browser-cases.mjs';
-import { createEditProcessSampler, parseEditProcessLabelTransform, readEditProcessDomPoints, projectEditProcessReport } from './display-routing-edit-process.mjs';
+import { createEditProcessSampler, parseEditProcessLabelTransform, parseEditProcessSvgLabelTransform,
+  readEditProcessDomPoints, readEditProcessDomSnapshot, projectEditProcessReport } from './display-routing-edit-process.mjs';
 import { assertHistoryRestored, assertHistoryRetainedRoutes, captureBusinessHistoryState, verifyBusinessHistoryRoundtrip } from './display-routing-history-edits.mjs';
 import { installHeldRoutingResponse } from './display-routing-held-response.mjs';
 
@@ -361,6 +362,49 @@ describe('bounded edit process sampling', () => {
       `translate(-50%,-50%) translate(${'1'.repeat(513)}px,0px)`]) {
       expect(parseEditProcessLabelTransform(value)).toBeNull();
     }
+  });
+  it('normalizes built-in fallback label bounds to the route label center', () => {
+    expect(parseEditProcessSvgLabelTransform('translate(96 42)', { x: -2, y: -4, width: 8, height: 16 }))
+      .toEqual({ x: 98, y: 46 });
+    expect(parseEditProcessSvgLabelTransform('translate(1e2, .5)', { x: 0, y: 0, width: 20, height: 10 }))
+      .toEqual({ x: 110, y: 5.5 });
+    for (const value of [null, '', 'matrix(1,0,0,1,2,3)', 'translate(NaN 0)', `translate(${'1'.repeat(513)} 0)`]) {
+      expect(parseEditProcessSvgLabelTransform(value, { x: 0, y: 0, width: 10, height: 10 })).toBeNull();
+    }
+    expect(parseEditProcessSvgLabelTransform('translate(0 0)', { x: 0, y: 0, width: -1, height: 10 })).toBeNull();
+  });
+  it('keeps a built-in drag fallback label in the same sampled edge identity', () => {
+    const edgeWrapper = { getAttribute: key => key === 'data-id' ? 'edge' : null };
+    const background = { getAttribute: key => ({ x: '-2', y: '-4', width: '24', height: '18' })[key] ?? null };
+    const text = {};
+    const fallbackLabel = {
+      closest: () => edgeWrapper,
+      getAttribute: key => ({ transform: 'translate(90 40)', visibility: 'visible' })[key] ?? null,
+      querySelector: selector => selector.endsWith('textbg') ? background : selector.endsWith('text') ? text : null,
+    };
+    const routePath = { getAttribute: key => key === 'd' ? 'M0 0L10 0' : null };
+    const routeWrapper = { getAttribute: key => key === 'data-id' ? 'edge' : null,
+      querySelector: selector => selector === '.react-flow__edge-path' ? routePath : null };
+    const context = {
+      window: { reactFlowInstance: { getEdges: () => [{ id: 'edge' }] } },
+      document: { querySelectorAll: selector => selector.startsWith('.react-flow__node') ? [{
+        style: { transform: 'matrix(1,0,0,1,0,0)', left: '0px', top: '0px' },
+        getAttribute: key => key === 'data-id' ? 'retained' : null, parentElement: { closest: () => null },
+      }] : selector.startsWith('.react-flow__edge[data-id]') ? [routeWrapper]
+        : selector.startsWith('[data-edge-id]') ? [] : [fallbackLabel] },
+      getComputedStyle: () => ({ display: 'inline', visibility: 'visible', opacity: '1' }),
+      DOMMatrix: class { constructor() { Object.assign(this, { is2D: true, a: 1, d: 1, b: 0, c: 0, e: 0, f: 0 }); } },
+    };
+    expect(vm.runInNewContext(`(() => {
+      const readEditProcessDomPoints = ${readEditProcessDomPoints.toString()};
+      const parseEditProcessLabelTransform = ${parseEditProcessLabelTransform.toString()};
+      const parseEditProcessSvgLabelTransform = ${parseEditProcessSvgLabelTransform.toString()};
+      return (${readEditProcessDomSnapshot.toString()})('edited');
+    })()`, context)).toEqual({
+      points: [{ id: 'retained', x: 0, y: 0 }],
+      routes: [{ id: 'edge', path: 'M0 0L10 0', sourceHandle: null, targetHandle: null }],
+      labels: [{ id: 'edge', x: 100, y: 45, visible: true, conflicts: 0 }],
+    });
   });
   it.each([null, [], [{ id: 'x', x: NaN, y: 0 }], Array(257).fill({ id: 'x', x: 0, y: 0 }),
     [{ id: 'x', x: 0, y: 0 }, { id: 'x', x: 0, y: 0 }]])('marks invalid or oversized observations unavailable', points => {

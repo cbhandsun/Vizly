@@ -226,6 +226,8 @@ const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: Advance
                             ...labelStyle,
                         }}
                         className="vizly-edge-label nodrag nopan"
+                        data-edge-id={id}
+                        data-edge-label-placement="interactive-fallback"
                     >
                         {isEditing ? (
                             <textarea

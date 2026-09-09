@@ -78,14 +78,16 @@ export const createBaseReactFlowCommittedRenderAuthority = (
 
 export const useBaseReactFlowCommittedRenderAuthority = (): Readonly<{
   committedRenderAuthority: DisplayRoutingRenderAuthority | null;
+  committedRenderEdges: readonly Edge[];
   rememberCommittedRenderAuthority: (
     baseline: BaseReactFlowDisplayCommittedSnapshotBaseline,
     edges: readonly Edge[],
   ) => void;
 }> => {
-  const [committedRenderAuthority, setCommittedRenderAuthority] = useState<
-    DisplayRoutingRenderAuthority | null
-  >(null);
+  const [committedRenderState, setCommittedRenderState] = useState<Readonly<{
+    authority: DisplayRoutingRenderAuthority | null;
+    edges: readonly Edge[];
+  }>>({ authority: null, edges: [] });
   const rememberCommittedRenderAuthority = useCallback((
     baseline: BaseReactFlowDisplayCommittedSnapshotBaseline,
     edges: readonly Edge[],
@@ -93,9 +95,16 @@ export const useBaseReactFlowCommittedRenderAuthority = (): Readonly<{
     const resolution = resolveBaseReactFlowCommittedRenderAuthority(baseline, edges);
     if (resolution.authority) bindRoutingObservation(baseline, resolution.authority);
     updateDisplayRoutingDebugState({ renderAuthorityIssue: resolution.issue });
-    setCommittedRenderAuthority(resolution.authority);
+    setCommittedRenderState({
+      authority: resolution.authority,
+      edges: resolution.authority ? [...edges] : [],
+    });
   }, []);
-  return { committedRenderAuthority, rememberCommittedRenderAuthority };
+  return {
+    committedRenderAuthority: committedRenderState.authority,
+    committedRenderEdges: committedRenderState.edges,
+    rememberCommittedRenderAuthority,
+  };
 };
 
 export const resolveBaseReactFlowActiveRenderAuthority = ({
@@ -103,16 +112,47 @@ export const resolveBaseReactFlowActiveRenderAuthority = ({
   inputSignature,
   inputGeometryDigest,
   displayedEdges,
+  dragFallbackNodeIds = [],
+  dragFallbackActive = false,
 }: {
   committedRenderAuthority: DisplayRoutingRenderAuthority | null;
   inputSignature: string;
   inputGeometryDigest: string;
   displayedEdges: Edge[];
+  dragFallbackNodeIds?: readonly string[];
+  dragFallbackActive?: boolean;
 }): Readonly<{
   authority: DisplayRoutingRenderAuthority | null;
   status: BaseReactFlowRenderAuthorityStatus;
 }> => {
   if (!committedRenderAuthority) return { authority: null, status: 'missing-commit' };
+  if (dragFallbackActive && dragFallbackNodeIds.length > 0) {
+    const fallbackNodeIds = new Set(dragFallbackNodeIds);
+    const edgeIds = new Set(displayedEdges.map(edge => edge.id));
+    const authorized = edgeIds.size === displayedEdges.length
+      && edgeIds.size === committedRenderAuthority.authorizedEdgeIds.size
+      && displayedEdges.every(edge => {
+        if (!committedRenderAuthority.authorizedEdgeIds.has(edge.id)) return false;
+        const incident = fallbackNodeIds.has(edge.source) || fallbackNodeIds.has(edge.target);
+        if (incident && edge.type !== 'smoothstep') return false;
+        const data = edge.data && typeof edge.data === 'object'
+          ? edge.data as Record<string, unknown>
+          : null;
+        return displayRoutingRenderAuthorityAllowsEdge(
+          committedRenderAuthority,
+          createDisplayRoutingRenderEdgeClaim({
+            edgeId: edge.id,
+            source: edge.source,
+            target: edge.target,
+            sourceHandle: edge.sourceHandle ?? null,
+            targetHandle: edge.targetHandle ?? null,
+            rendererType: incident ? 'stablePath' : edge.type ?? null,
+            data,
+          }),
+        );
+      });
+    if (authorized) return { authority: committedRenderAuthority, status: 'accepted' };
+  }
   if (committedRenderAuthority.inputSignature !== inputSignature) {
     return { authority: null, status: 'input-signature-mismatch' };
   }
@@ -149,11 +189,15 @@ export const useBaseReactFlowActiveRenderAuthority = ({
   inputSignature,
   inputGeometryDigest,
   displayedEdges,
+  dragFallbackNodeIds,
+  dragFallbackActive,
 }: {
   committedRenderAuthority: DisplayRoutingRenderAuthority | null;
   inputSignature: string;
   inputGeometryDigest: string;
   displayedEdges: Edge[];
+  dragFallbackNodeIds: readonly string[];
+  dragFallbackActive: boolean;
 }): DisplayRoutingRenderAuthority | null => {
   const resolution = useMemo(
     () => resolveBaseReactFlowActiveRenderAuthority({
@@ -161,10 +205,14 @@ export const useBaseReactFlowActiveRenderAuthority = ({
       inputSignature,
       inputGeometryDigest,
       displayedEdges,
+      dragFallbackNodeIds,
+      dragFallbackActive,
     }),
     [
       committedRenderAuthority,
       displayedEdges,
+      dragFallbackActive,
+      dragFallbackNodeIds,
       inputGeometryDigest,
       inputSignature,
     ],

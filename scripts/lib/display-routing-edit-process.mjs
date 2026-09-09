@@ -185,13 +185,24 @@ export const parseEditProcessLabelTransform = value => {
     ? { x, y } : null;
 };
 
+export const parseEditProcessSvgLabelTransform = (value, bounds) => {
+  if (typeof value !== 'string' || value.length > 512 || !bounds || typeof bounds !== 'object') return null;
+  const number = '([+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:e[+-]?\\d+)?)';
+  const match = new RegExp(`^translate\\(\\s*${number}(?:\\s*,\\s*|\\s+)${number}\\s*\\)$`, 'i').exec(value);
+  const values = [match?.[1], match?.[2], bounds.x, bounds.y, bounds.width, bounds.height].map(Number);
+  if (!match || !values.every(Number.isFinite) || values.some(numberValue => Math.abs(numberValue) > 10_000_000)
+    || values[4] < 0 || values[5] < 0) return null;
+  return { x: values[0] + values[2] + values[4] / 2, y: values[1] + values[3] + values[5] / 2 };
+};
+
 export const readEditProcessDomSnapshot = (editedNodeId, animatedTransforms = new Set()) => {
   const points = readEditProcessDomPoints(editedNodeId, animatedTransforms);
   const instanceEdges = window.reactFlowInstance?.getEdges?.();
   const wrappers = [...document.querySelectorAll('.react-flow__edge[data-id]')];
-  const labelElements = [...document.querySelectorAll('[data-edge-id][data-edge-label-placement]')];
+  const customLabelElements = [...document.querySelectorAll('[data-edge-id][data-edge-label-placement]')];
+  const fallbackLabelElements = [...document.querySelectorAll('.react-flow__edge-textwrapper')];
   if (!Array.isArray(points) || !Array.isArray(instanceEdges) || instanceEdges.length > 512
-    || wrappers.length > 512 || labelElements.length > 512) return null;
+    || wrappers.length > 512 || customLabelElements.length + fallbackLabelElements.length > 512) return null;
   const edgeById = new Map(instanceEdges.map(edge => [edge.id, edge]));
   const routes = wrappers.map(wrapper => {
     const id = wrapper.getAttribute('data-id');
@@ -202,22 +213,41 @@ export const readEditProcessDomSnapshot = (editedNodeId, animatedTransforms = ne
     return { id, path: path?.getAttribute('d'),
       sourceHandle: edge?.sourceHandle ?? null, targetHandle: edge?.targetHandle ?? null };
   });
-  const labels = labelElements.map(element => {
+  const labelsById = new Map();
+  for (const element of customLabelElements) {
     const position = parseEditProcessLabelTransform(element.style?.transform);
     const conflicts = Number(element.getAttribute('data-edge-label-conflicts') ?? 0);
-    return { id: element.getAttribute('data-edge-id'), x: position?.x, y: position?.y,
+    const label = { id: element.getAttribute('data-edge-id'), x: position?.x, y: position?.y,
       visible: !element.hidden && element.getAttribute('aria-hidden') !== 'true'
         && element.style?.display !== 'none' && element.style?.visibility !== 'hidden'
         && Number(element.style?.opacity || 1) > 0,
       conflicts };
-  });
-  return { points, routes, labels };
+    labelsById.set(label.id, label);
+  }
+  for (const element of fallbackLabelElements) {
+    const wrapper = element.closest?.('.react-flow__edge[data-id]');
+    const id = wrapper?.getAttribute('data-id');
+    if (labelsById.has(id)) continue;
+    const background = element.querySelector('.react-flow__edge-textbg');
+    const text = element.querySelector('.react-flow__edge-text');
+    const position = parseEditProcessSvgLabelTransform(element.getAttribute('transform'), {
+      x: background?.getAttribute('x'), y: background?.getAttribute('y'),
+      width: background?.getAttribute('width'), height: background?.getAttribute('height'),
+    });
+    const style = text ? getComputedStyle(text) : null;
+    labelsById.set(id, { id, x: position?.x, y: position?.y,
+      visible: element.getAttribute('visibility') !== 'hidden' && Boolean(text)
+        && style?.display !== 'none' && style?.visibility !== 'hidden' && Number(style?.opacity || 1) > 0,
+      conflicts: 0 });
+  }
+  return { points, routes, labels: [...labelsById.values()] };
 };
 
 export const startEditProcessSampling = (session, editedNodeId) => session.evaluate(`(() => {
   window.__vizlyEditProcessSampler?.stop();
   const readEditProcessDomPoints = ${readEditProcessDomPoints.toString()};
   const parseEditProcessLabelTransform = ${parseEditProcessLabelTransform.toString()};
+  const parseEditProcessSvgLabelTransform = ${parseEditProcessSvgLabelTransform.toString()};
   const read = ${readEditProcessDomSnapshot.toString()};
   const animatedTransforms = new Set();
   const nodeTarget = event => event.target?.closest?.('.react-flow__node[data-id]') ?? null;

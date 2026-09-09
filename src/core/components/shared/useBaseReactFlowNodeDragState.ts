@@ -28,7 +28,6 @@ export const useBaseReactFlowNodeDragState = ({
   );
   const handleNodeDragFallbackResolved = useCallback(() => {
     setIsNodeDragFallbackPending(false);
-    setNodeDragFallbackIds(current => current.length === 0 ? current : []);
   }, []);
 
   return {

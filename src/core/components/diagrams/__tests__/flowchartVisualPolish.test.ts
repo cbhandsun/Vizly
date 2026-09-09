@@ -104,6 +104,14 @@ describe('flowchart visual polish stylesheet', () => {
         }
     });
 
+    it('keeps endpoint-driven fallback labels visible while a node is dragged', () => {
+        const legacyStylesheet = readRelativeFile('../FlowchartDesigner.css');
+
+        expect(legacyStylesheet).not.toMatch(
+            /\.diagram-dragging[^{}]*\.react-flow__edge-text(?:bg)?[^{}]*\{[^}]*opacity:\s*0\s*!important/s,
+        );
+    });
+
     it('gives hover, selection, and focus a non-color trace hierarchy', () => {
         const stylesheet = readRelativeFile('../FlowchartVisualPolish.css');
         const legacyStylesheet = readRelativeFile('../FlowchartDesigner.css');
