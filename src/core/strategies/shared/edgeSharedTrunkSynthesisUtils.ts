@@ -3,6 +3,13 @@ import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 export type Point = { x: number; y: number };
 export type Rect = { x: number; y: number; width: number; height: number };
 export type Side = 'top' | 'bottom' | 'left' | 'right';
+export type GeometryHemisphere = Side;
+export type PeerHemisphereFlowAxis = 'horizontal' | 'vertical';
+export type PeerHemisphereOptions = Readonly<{
+  dominantRatio?: number;
+  minOffset?: number;
+  flowAxis?: PeerHemisphereFlowAxis;
+}>;
 type PositionedNode = ReactFlowNode & {
   positionAbsolute?: Point;
   computed?: { positionAbsolute?: Point };
@@ -11,6 +18,8 @@ type PositionedNode = ReactFlowNode & {
 export const EPS = 0.5;
 export const MIN_BRANCH_SPAN = 24;
 export const MIN_ENDPOINT_TAIL = 48;
+export const DEFAULT_PEER_HEMISPHERE_RATIO = 1.35;
+export const DEFAULT_PEER_HEMISPHERE_MIN_OFFSET = 24;
 
 export function compactPath(path: Point[]): Point[] {
   const deduped: Point[] = [];
@@ -98,6 +107,51 @@ export function rectCenter(rect: Rect): Point {
   return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
 }
 
+export function classifyRectPeerHemisphere(
+  hubRect: Rect,
+  peerRect: Rect,
+  options: PeerHemisphereOptions = {},
+): GeometryHemisphere {
+  const hubCenter = rectCenter(hubRect);
+  const peerCenter = rectCenter(peerRect);
+  const dx = peerCenter.x - hubCenter.x;
+  const dy = peerCenter.y - hubCenter.y;
+  const dominantRatio = options.dominantRatio ?? DEFAULT_PEER_HEMISPHERE_RATIO;
+  const minOffset = options.minOffset ?? DEFAULT_PEER_HEMISPHERE_MIN_OFFSET;
+
+  if (options.flowAxis === 'vertical') {
+    if (Math.abs(dx) > Math.abs(dy) * dominantRatio && Math.abs(dx) > minOffset) {
+      return dx < 0 ? 'left' : 'right';
+    }
+    return dy < 0 ? 'top' : 'bottom';
+  }
+
+  if (options.flowAxis === 'horizontal') {
+    if (Math.abs(dy) > Math.abs(dx) * dominantRatio && Math.abs(dy) > minOffset) {
+      return dy < 0 ? 'top' : 'bottom';
+    }
+    return dx < 0 ? 'left' : 'right';
+  }
+
+  if (Math.abs(dx) > Math.abs(dy) * dominantRatio && Math.abs(dx) > minOffset) {
+    return dx < 0 ? 'left' : 'right';
+  }
+  if (Math.abs(dy) > minOffset) return dy < 0 ? 'top' : 'bottom';
+  return Math.abs(dx) >= Math.abs(dy)
+    ? (dx < 0 ? 'left' : 'right')
+    : (dy < 0 ? 'top' : 'bottom');
+}
+
+export function geometryHemispheresAreOpposite(
+  first: GeometryHemisphere,
+  second: GeometryHemisphere,
+): boolean {
+  return (first === 'top' && second === 'bottom')
+    || (first === 'bottom' && second === 'top')
+    || (first === 'left' && second === 'right')
+    || (first === 'right' && second === 'left');
+}
+
 function clamp(value: number, minValue: number, maxValue: number): number {
   return Math.max(minValue, Math.min(maxValue, value));
 }
@@ -130,12 +184,11 @@ export function oppositeSide(side: Side): Side {
 }
 
 export function expectedTargetSideFromGeometry(sourceRect: Rect, targetRect: Rect): Side {
-  const sourceCenter = rectCenter(sourceRect);
-  const targetCenter = rectCenter(targetRect);
-  const dx = sourceCenter.x - targetCenter.x;
-  const dy = sourceCenter.y - targetCenter.y;
-  if (Math.abs(dx) > Math.abs(dy) * 1.35) return dx < 0 ? 'left' : 'right';
-  return dy < 0 ? 'top' : 'bottom';
+  return classifyRectPeerHemisphere(targetRect, sourceRect, {
+    dominantRatio: DEFAULT_PEER_HEMISPHERE_RATIO,
+    minOffset: 0,
+    flowAxis: 'vertical',
+  });
 }
 
 export function firstStepBacktracksFromTarget(path: Point[], sourceRect: Rect, targetRect: Rect): boolean {

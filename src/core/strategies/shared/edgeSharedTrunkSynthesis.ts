@@ -5,6 +5,7 @@ import {
 } from '../../routing/utils/edgeTerminalPolicy';
 import {
   buildHemisphereTargetCandidatePaths,
+  classifyRectPeerHemisphere,
   compactPath,
   EPS,
   expectedTargetSideFromGeometry,
@@ -14,6 +15,7 @@ import {
   oppositeSide,
   pathHitsUnrelatedNode,
   rectCenter,
+  type PeerHemisphereFlowAxis,
   type Point,
   type Side,
 } from './edgeSharedTrunkSynthesisUtils';
@@ -63,7 +65,7 @@ function splitNodeGeometryHemisphereGroups(
   if (!hubRect) return null;
   const hubCenter = rectCenter(hubRect);
 
-  const entries: Array<{ index: number; peerCenter: Point; dx: number; dy: number }> = [];
+  const entries: Array<{ index: number; peerRect: ReturnType<typeof nodeRect>; peerCenter: Point; dx: number; dy: number }> = [];
   for (const index of indices) {
     const edge = edges[index];
     const peerId = endpoint === 'source' ? edge?.target : edge?.source;
@@ -72,6 +74,7 @@ function splitNodeGeometryHemisphereGroups(
     const peerCenter = rectCenter(peerRect);
     entries.push({
       index,
+      peerRect,
       peerCenter,
       dx: peerCenter.x - hubCenter.x,
       dy: peerCenter.y - hubCenter.y,
@@ -89,20 +92,15 @@ function splitNodeGeometryHemisphereGroups(
   const flowDy = centroid.y - hubCenter.y;
   const isVerticalFlow = Math.abs(flowDy) >= Math.abs(flowDx);
 
+  const flowAxis: PeerHemisphereFlowAxis = isVerticalFlow ? 'vertical' : 'horizontal';
   const sideGroups = new Map<string, number[]>();
   for (const entry of entries) {
-    let side: string;
-    if (isVerticalFlow) {
-      side = Math.abs(entry.dx) > Math.abs(entry.dy) * HEMISPHERE_ESCAPE_RATIO
-        && Math.abs(entry.dx) > HEMISPHERE_ESCAPE_MIN
-        ? (entry.dx < 0 ? 'left' : 'right')
-        : (entry.dy < 0 ? 'top' : 'bottom');
-    } else {
-      side = Math.abs(entry.dy) > Math.abs(entry.dx) * HEMISPHERE_ESCAPE_RATIO
-        && Math.abs(entry.dy) > HEMISPHERE_ESCAPE_MIN
-        ? (entry.dy < 0 ? 'top' : 'bottom')
-        : (entry.dx < 0 ? 'left' : 'right');
-    }
+    if (!entry.peerRect) continue;
+    const side = classifyRectPeerHemisphere(hubRect, entry.peerRect, {
+      dominantRatio: HEMISPHERE_ESCAPE_RATIO,
+      minOffset: HEMISPHERE_ESCAPE_MIN,
+      flowAxis,
+    });
     if (!sideGroups.has(side)) sideGroups.set(side, []);
     sideGroups.get(side)?.push(entry.index);
   }
