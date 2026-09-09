@@ -1,9 +1,27 @@
-import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { loadStandardPresetById, parseStandardPresetModule } from '../presetLoader';
+import {
+  loadStandardPresetAsset,
+  loadStandardPresetById,
+  parseStandardPresetModule,
+  parseStandardPresetText,
+} from '../presetLoader';
+
+const logisticsPresetSource = readFileSync(
+  'src/data/standardized/LogisticsStandardData.json',
+  'utf8',
+);
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('loadStandardPresetById', () => {
   it('single-flights the canonical key and persisted diagram id', async () => {
+    const fetchPreset = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(logisticsPresetSource, { status: 200 }),
+    );
     const byId = loadStandardPresetById('logistics-architecture-v1');
     const byKey = loadStandardPresetById('LogisticsStandardData');
 
@@ -12,6 +30,7 @@ describe('loadStandardPresetById', () => {
       id: 'logistics-architecture-v1',
       type: 'logistics',
     });
+    expect(fetchPreset).toHaveBeenCalledTimes(1);
   });
 
   it('returns null for unknown ids without importing a fallback preset', async () => {
@@ -48,5 +67,34 @@ describe('loadStandardPresetById', () => {
       nodes: 'not-an-array',
       edges: [],
     }, 'BlankCanvasStandardData')).toThrow('Invalid standard preset');
+  });
+
+  it('bounds and validates emitted JSON assets before coercion', () => {
+    expect(() => parseStandardPresetText('', 'BlankCanvasStandardData'))
+      .toThrow('Invalid standard preset asset');
+    expect(() => parseStandardPresetText('{', 'BlankCanvasStandardData'))
+      .toThrow('Invalid standard preset asset');
+    expect(() => parseStandardPresetText(' '.repeat(1024 * 1024 + 1), 'BlankCanvasStandardData'))
+      .toThrow('Invalid standard preset asset');
+    expect(parseStandardPresetText(logisticsPresetSource, 'LogisticsStandardData'))
+      .toMatchObject({ id: 'logistics-architecture-v1' });
+  });
+
+  it('fails closed when an emitted asset cannot be fetched', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 503 }));
+    await expect(loadStandardPresetAsset('/preset.json', 'BlankCanvasStandardData'))
+      .rejects.toThrow('Standard preset asset unavailable: BlankCanvasStandardData');
+  });
+
+  it('rejects an oversized declared asset before reading its body', async () => {
+    const readBody = vi.fn(async () => logisticsPresetSource);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      headers: new Headers({ 'content-length': String(1024 * 1024 + 1) }),
+      text: readBody,
+    } as Response);
+    await expect(loadStandardPresetAsset('/preset.json', 'BlankCanvasStandardData'))
+      .rejects.toThrow('Invalid standard preset asset: BlankCanvasStandardData');
+    expect(readBody).not.toHaveBeenCalled();
   });
 });

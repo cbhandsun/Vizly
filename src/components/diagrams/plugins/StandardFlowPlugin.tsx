@@ -8,7 +8,7 @@ import { JsonEditorModal } from '@/core/components/diagrams/JsonEditorModal';
 import { FlowchartShapesPanel } from '@/core/components/diagrams/FlowchartShapesPanel';
 import { TemplateCascaderMenu } from '../ui/TemplateCascaderMenu';
 import { parseRemoteDiagramContent } from '@/services/remoteDiagramContent';
-import { PRESET_MAP } from '@/data/standardized';
+import { loadStandardPresetById } from '@/data/standardized/presetLoader';
 import { getCustomPreset } from '@/core/utils/customPresetStorage';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import type { StandardDiagramData } from '@/core/models/DiagramModels';
@@ -21,7 +21,6 @@ import {
 import { logStandardFlowTemplateLoadFailure } from './standardFlowPluginLogging';
 import {
   applyStandardFlowTemplateSelection,
-  resolveStandardFlowPreset,
 } from './standardFlowTemplateSelection';
 
 export class StandardFlowPlugin implements DiagramTypePlugin {
@@ -152,7 +151,7 @@ const StandardTemplateToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
         return coerceRemoteDiagramSelection(data, id);
       },
       loadStandardPreset: async (id) => (
-        resolveStandardFlowPreset(PRESET_MAP, id) as unknown as DiagramViewerTemplateData | null
+        await loadStandardPresetById(id) as unknown as DiagramViewerTemplateData | null
       ),
       getLocalPreset: (id) => getCustomPreset(id) as unknown as DiagramViewerTemplateData | null,
       parseRemoteContent: (content, fallback) => parseRemoteDiagramContent(content, {

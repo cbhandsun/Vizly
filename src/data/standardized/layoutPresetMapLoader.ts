@@ -1,6 +1,6 @@
 import type { StandardDiagramData } from '@/core/models/DiagramModels';
 
-import { loadStandardPresetById } from './presetLoader';
+import { loadAllStandardPresets, loadStandardPresetById } from './presetLoader';
 
 type StandardPresetLoader = (id?: string) => Promise<StandardDiagramData | null>;
 type FallbackPresetMapLoader = () => Promise<Record<string, unknown>>;
@@ -12,7 +12,7 @@ export type LayoutPresetMapLoaderDependencies = Readonly<{
 
 const defaultDependencies: LayoutPresetMapLoaderDependencies = {
   loadStandardPreset: loadStandardPresetById,
-  loadFallbackPresetMap: () => import('./index').then(({ PRESET_MAP }) => PRESET_MAP),
+  loadFallbackPresetMap: loadAllStandardPresets,
 };
 
 /**

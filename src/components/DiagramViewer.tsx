@@ -565,8 +565,8 @@ const DiagramViewer: React.FC = () => {
                 return coerceRemoteDiagramSelection(data, id);
             },
             loadStandardPreset: async (id) => {
-                const { PRESET_MAP } = await import('@/data/standardized');
-                return (PRESET_MAP[id] ?? null) as unknown as DiagramViewerTemplateData | null;
+                const { loadStandardPresetById } = await import('@/data/standardized/presetLoader');
+                return await loadStandardPresetById(id) as unknown as DiagramViewerTemplateData | null;
             },
             getLocalPreset: (id) => getCustomPreset(id) as unknown as DiagramViewerTemplateData | null,
             parseRemoteContent: (content, fallback) => parseRemoteDiagramContent(
