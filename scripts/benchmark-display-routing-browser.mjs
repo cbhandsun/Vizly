@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { collectJournaledRoutingSamples } from './lib/display-routing-sample-journal.mjs';
+import { collectJournaledRoutingSamples, createRoutingSampleFailure } from './lib/display-routing-sample-journal.mjs';
 import { summarizeDisplayRoutingEditStability } from './lib/display-routing-edit-stability.mjs';
 
 import {
@@ -42,21 +42,24 @@ const runOneSample = sampleIndex => new Promise((resolve, reject) => {
   };
   child.stdout.on('data', chunk => { stdout = appendBounded(stdout, chunk); });
   child.stderr.on('data', chunk => { stderr = appendBounded(stderr, chunk); });
-  child.once('error', reject);
+  child.once('error', error => reject(createRoutingSampleFailure('child-spawn-failed', error)));
   child.once('exit', (code) => {
     if (code !== 0) {
-      reject(new Error(`Display-routing sample ${sampleIndex} failed:\n${stderr || stdout}`));
+      reject(createRoutingSampleFailure('child-exit-failed',
+        new Error(`Display-routing sample ${sampleIndex} failed:\n${stderr || stdout}`)));
       return;
     }
     const line = stdout.split(/\r?\n/).find(candidate => candidate.startsWith(RESULT_PREFIX));
     if (!line) {
-      reject(new Error(`Display-routing sample ${sampleIndex} did not emit a machine result`));
+      reject(createRoutingSampleFailure('machine-result-missing',
+        new Error(`Display-routing sample ${sampleIndex} did not emit a machine result`)));
       return;
     }
     try {
       resolve(JSON.parse(line.slice(RESULT_PREFIX.length)));
     } catch {
-      reject(new Error(`Display-routing sample ${sampleIndex} emitted malformed JSON`));
+      reject(createRoutingSampleFailure('machine-result-invalid',
+        new Error(`Display-routing sample ${sampleIndex} emitted malformed JSON`)));
     }
   });
 });
