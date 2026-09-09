@@ -3,7 +3,7 @@
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
 import { readFileSync } from 'node:fs';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('react-i18next', () => ({
@@ -24,8 +24,14 @@ vi.mock('../EnhancedThemeSelector', () => ({
     EnhancedThemeSelector: ({ ariaLabel }: { ariaLabel?: string }) => <button aria-label={ariaLabel}>theme</button>,
 }));
 
+const configurationRender = vi.hoisted(() => vi.fn());
 vi.mock('../ConfigurationPanel', () => ({
-    ConfigurationPanel: () => null,
+    ConfigurationPanel: (props: { isOpen: boolean; onClose: () => void }) => {
+        configurationRender(props);
+        return props.isOpen ? <div role="dialog" aria-label="advanced configuration">
+            <button onClick={props.onClose}>close configuration</button>
+        </div> : null;
+    },
 }));
 
 const strategy = {
@@ -47,6 +53,23 @@ vi.mock('@/core/strategies/LayoutStrategyManager', () => ({
 import { DiagramSettingsPanel } from '../DiagramSettingsPanel';
 
 describe('DiagramSettingsPanel accessibility', () => {
+    it('mounts advanced configuration only when requested and supports reopening', async () => {
+        configurationRender.mockClear();
+        render(<DiagramSettingsPanel selectedDiagramId="diagram-1" edgeMode="advanced-smart"
+            onEdgeModeChange={vi.fn()} layoutStrategy="DomainVerticalLayout"
+            onLayoutStrategyChange={vi.fn()} nodeLayoutStrategy="VerticalLayout"
+            onNodeLayoutStrategyChange={vi.fn()} elkAlgorithm="layered" onElkAlgorithmChange={vi.fn()}
+            linkOrientationEnabled={false} showOnlyMainFlow={false}
+            onShowOnlyMainFlowChange={vi.fn()} onRefreshRequest={vi.fn()} />);
+        expect(configurationRender).not.toHaveBeenCalled();
+        const open = screen.getByRole('button', { name: /designer.settings.advancedConfig/ });
+        fireEvent.click(open);
+        expect(await screen.findByRole('dialog', { name: 'advanced configuration' })).toBeVisible();
+        fireEvent.click(screen.getByRole('button', { name: 'close configuration' }));
+        expect(screen.queryByRole('dialog', { name: 'advanced configuration' })).not.toBeInTheDocument();
+        fireEvent.click(open);
+        expect(await screen.findByRole('dialog', { name: 'advanced configuration' })).toBeVisible();
+    });
     it('keeps narrow-screen controls full-width with commercial touch heights', () => {
         const css = readFileSync('src/components/ui/DiagramSettingsPanel.css', 'utf8');
 

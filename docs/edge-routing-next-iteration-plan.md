@@ -8,6 +8,16 @@
 
 ### 当前执行摘要
 
+#### 首开请求合并与高级配置按需加载（本地验收通过，待远端）
+
+- 已复现默认图 94/92 请求数超限。实际资源清单与构建模块表确认，`geometryUtils.ts`（1244 字节）和 `orthogonalCrossingPolicy.ts`（429 字节）均为首开已请求的纯几何模块；新增布局候选的共享使用使这些代码独立成块。不是额外加载了完整布局引擎。
+- 两模块归入已有 neutral 路由公共包，保持 Worker/UI 边界；三个已在首开请求的编辑器小模块归入现有 startup 包。分组使用明确路径，不扩大通配规则，不提前加载候选或引擎。Linux/Windows 路径及可选引擎排除回归保留在统一 CI。
+- 高级配置由静态导入改为点击后加载，关闭时不挂载。真实浏览器确认首开与普通设置不请求该实现，打开后只请求一次；关闭、再次打开以及路由保持通过。冷加载同时暴露焦点陷阱在配置未就绪时提前启动的问题，现改为控件就绪后激活。测试等待旧焦点微任务执行后再切换 ready；恢复旧激活行为的对照测试会失败，生产路径测试通过。
+- 相关 74 项测试、完整 verify:static、TS6、生产构建和原 bundle 预算通过。最终 JS 文件 243，总 JS 9995.13 KB；启动静态代码 523.05 KB，比原先增加约 1.65 KB。按需配置减少页面关键路径代码，但全站总 bundle 仍接近上限，I5 体积余量问题未关闭。
+- 三次首开采样：默认图 91/92 资源、3640.5/3900 KB；WMS 103/108、4863.6/4900 KB；复杂架构图 105/108、4874/4900 KB。资源与就绪时间均通过。WMS 首个稳定性样本出现 68ms、53ms 两个长任务，超过计数预算；该轮仍与 TS6 运行重叠，记录保留。确认构建、类型检查和其他浏览器任务结束后，WMS 单独三次采样全部通过、长任务均为零，日志 `tmp/lane-startup-wms-serial.log`；这限定了本地通过的执行条件，不能反推已证明历史远端环境根因。
+- 最新证据：`tmp/lane-startup-complete-tests.log`、`tmp/lane-startup-complete-static.log`、`tmp/lane-startup-complete-ts6.log`、`tmp/lane-startup-complete-browser.log`、`tmp/advanced-settings-lazy-browser-final.log`、`tmp/configuration-cold-focus-mutation.log`。本地未重复全部五组测试，远端完整验收仍需本批提交完成。
+- 证据：`tmp/lane-default-assets-report.log`、`tmp/lane-default-critical-assets.json`、`tmp/lane-chunk-map.json`、`tmp/lane-neutral-chunks-before.log`、`tmp/lane-neutral-chunks-tests.log`、`tmp/lane-neutral-chunks-static.log`、`tmp/lane-neutral-chunks-ts6.log`。上一诊断提交 `51349032` 的[性能采样](https://github.com/cbhandsun/Vizly/actions/runs/34293180215)通过，但不证明历史主题尾延迟根因已关闭。
+
 #### 6e8bae1f 远端失败与下一步（未完成验收）
 
 - [完整 CI](https://github.com/cbhandsun/Vizly/actions/runs/34292148756)失败于默认图首开资源数：94，预算 92；解码体积 3659.9/3900 KB、就绪 1174/4500ms 均未超限。应检查候选模块引入后的共享 chunk 分拆与加载边界，不能提高资产数量预算。日志 `tmp/lane-aligned-remote-ci-failure.log`。

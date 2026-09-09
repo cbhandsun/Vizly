@@ -386,6 +386,8 @@ describe('sharedModuleWorkers Vite plugin', () => {
       'C:/repo/src/core/routing/persistedRoutingCandidate.ts',
       'C:/repo/src/core/routing/routingLineHops.ts',
       'C:/repo/src/core/routing/routingBoundaryLimits.ts',
+      'C:/repo/src/core/algorithms/geometryUtils.ts',
+      'C:\\repo\\src\\core\\routing\\orthogonalCrossingPolicy.ts?worker_file',
       'C:/repo/src/core/routing/utils/handleUtils.ts',
       'C:/repo/src/core/types/flow.ts',
       'C:/repo/src/core/utils/boundedResponse.ts',
@@ -519,6 +521,15 @@ const worker = new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', impor
     expect(matchesFlowchartDesignerStartupModule(
       'C:/repo/src/pages/DiagramManagementPage.tsx',
     )).toBe(false);
+  });
+
+  it('co-loads measured editor controls without pulling optional layout engines into startup', () => {
+    for (const name of ['useKeyboardAccessibleDropdown', 'nodeLayerOrdering', 'useCollapsibleGroups']) {
+      expect(matchesFlowchartDesignerStartupModule(`C:/repo/src/core/components/diagrams/hooks/${name}.ts`)).toBe(true);
+      expect(matchesFlowchartDesignerStartupModule(`C:\\repo\\src\\core\\components\\diagrams\\hooks\\${name}.ts?import`)).toBe(true);
+    }
+    expect(matchesFlowchartDesignerStartupModule('C:/repo/src/core/components/diagrams/hooks/alignedLaneLayout.ts')).toBe(false);
+    expect(matchesFlowchartDesignerStartupModule('C:/repo/src/core/strategies/DomainElkLayoutStrategy.ts')).toBe(false);
   });
 
   it('co-loads the node style subscription with its startup style manager', () => {

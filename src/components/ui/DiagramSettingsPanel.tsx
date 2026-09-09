@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Select, Switch } from 'antd';
 import { 
@@ -19,7 +19,6 @@ import { EnhancedThemeSelector } from './EnhancedThemeSelector';
 import { LayoutStrategyManager, type ILayoutStrategy } from '@/core/strategies/LayoutStrategyManager';
 import { LayeredConfigManager, ConfigLayer } from '@/core/config/LayeredConfigManager';
 import type { DiagramDefinition } from '@/core/types/diagram-components';
-import { ConfigurationPanel } from './ConfigurationPanel';
 import type { ToolbarEdgeMode } from './topToolbarGuards';
 import {
     getEngineNodeLayout,
@@ -33,6 +32,10 @@ import {
 } from './diagramSettingsGuards';
 import { logDiagramSettingsLayoutSyncFailure } from '@/components/diagramSettingsLogging';
 import './DiagramSettingsPanel.css';
+
+const ConfigurationPanel = lazy(() => import('./ConfigurationPanel').then(module => ({
+    default: module.ConfigurationPanel,
+})));
 
 interface DiagramSettingsPanelProps {
     selectedDiagram?: DiagramDefinition;
@@ -517,10 +520,11 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
             </div>
         </div>
             
-        <ConfigurationPanel
-                isOpen={editingEnabled && isPanelOpen}
-                onClose={() => setIsPanelOpen(false)}
-            />
+        {editingEnabled && isPanelOpen && (
+            <Suspense fallback={<div role="status">{t('common.loading', '加载中…')}</div>}>
+                <ConfigurationPanel isOpen onClose={() => setIsPanelOpen(false)} />
+            </Suspense>
+        )}
         </div>
     );
 };

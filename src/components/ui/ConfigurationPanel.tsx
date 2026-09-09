@@ -66,7 +66,7 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
     onClose();
   }, [onClose]);
   const { containerRef: dialogRef, handleKeyDown: handleDialogKeyDown } = useModalFocusTrap<HTMLDivElement>({
-    active: isOpen,
+    active: isOpen && state.isReady,
     initialFocusRef: closeButtonRef,
     onClose: handleCancel,
   });

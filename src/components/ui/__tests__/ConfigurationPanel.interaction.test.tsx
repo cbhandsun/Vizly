@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const getConfig = vi.fn(async (key: string) => key === 'diagram.node.minWidth' ? 80 : undefined);
@@ -37,9 +37,24 @@ import { ConfigurationPanel } from '../ConfigurationPanel';
 
 describe('ConfigurationPanel interactions', () => {
   beforeEach(() => {
+    configState.isReady = true;
     getConfig.mockClear();
     setConfig.mockReset();
     setConfig.mockResolvedValue(undefined);
+  });
+
+  it('takes focus after cold initialization and handles Escape inside the ready dialog', async () => {
+    configState.isReady = false;
+    const onClose = vi.fn();
+    const view = render(<ConfigurationPanel isOpen onClose={onClose} />);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await act(async () => { await Promise.resolve(); });
+    configState.isReady = true;
+    view.rerender(<ConfigurationPanel isOpen onClose={onClose} />);
+    const close = await screen.findByRole('button', { name: 'config.actions.close' });
+    await waitFor(() => expect(document.activeElement).toBe(close));
+    fireEvent.keyDown(close, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledOnce();
   });
 
   it('uses responsive modal semantics and accessible commercial-size controls', async () => {

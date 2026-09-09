@@ -29,6 +29,10 @@ const DISPLAY_ROUTING_NEUTRAL_MODULES = new Set([
   '/src/core/routing/persistedRoutingCandidate.ts',
   '/src/core/routing/routingLineHops.ts',
   '/src/core/routing/routingBoundaryLimits.ts',
+  // Measured first-view requests shared by routing and lazy layout comparisons.
+  // Pure geometry belongs with the neutral runtime, never with a UI/engine chunk.
+  '/src/core/algorithms/geometryUtils.ts',
+  '/src/core/routing/orthogonalCrossingPolicy.ts',
   '/src/core/routing/utils/handleUtils.ts',
   '/src/core/types/flow.ts',
   '/src/core/utils/boundedResponse.ts',
@@ -56,6 +60,10 @@ const FLOWCHART_DESIGNER_STARTUP_MODULES = new Set([
   '/src/core/utils/customPresetStorage.ts',
   '/src/components/diagrams/hooks/diagramStorageLogging.ts',
   '/src/core/components/diagrams/hooks/treeLayoutTopology.ts',
+  // These editor helpers are already requested on every measured diagram mount.
+  '/src/core/components/diagrams/hooks/useKeyboardAccessibleDropdown.ts',
+  '/src/core/components/diagrams/hooks/nodeLayerOrdering.ts',
+  '/src/core/components/diagrams/hooks/useCollapsibleGroups.ts',
 ]);
 
 const FLOWCHART_DESIGNER_MICRO_MODULES = new Set([
