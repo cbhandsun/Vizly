@@ -5,6 +5,10 @@ import { RoutingCrossingScorer } from '../../algorithms/routingCrossingScorer';
 import { evaluateLayoutGeometry } from '../../algorithms/layoutGeometryConstraints';
 import { projectBaseReactFlowDisplayWorkerInput } from './baseReactFlowDisplayWorkerProjection';
 import { getDisplayComputedPath } from './baseReactFlowDisplayGeometry';
+import {
+  classifyDisplayPeerHemisphere,
+  displayPeerHemispheresAreOpposite,
+} from './baseReactFlowDisplayHemispherePeer';
 
 export type RoutedLayoutQuality = Readonly<{
   width: number;
@@ -25,33 +29,7 @@ type ProjectedQualityNode = Node & {
   computed?: { positionAbsolute?: Point };
 };
 
-const HEMISPHERE_RATIO = 1.35;
-const HEMISPHERE_MIN_OFFSET = 24;
 const PARALLEL_LANE_TOLERANCE = 4;
-
-const rectCenter = (rect: QualityRect): Point => ({
-  x: rect.x + rect.width / 2,
-  y: rect.y + rect.height / 2,
-});
-
-function oppositeHemisphere(first: string, second: string): boolean {
-  return (first === 'top' && second === 'bottom')
-    || (first === 'bottom' && second === 'top')
-    || (first === 'left' && second === 'right')
-    || (first === 'right' && second === 'left');
-}
-
-function peerHemisphere(hub: QualityRect, peer: QualityRect): string {
-  const hubCenter = rectCenter(hub);
-  const peerCenter = rectCenter(peer);
-  const dx = peerCenter.x - hubCenter.x;
-  const dy = peerCenter.y - hubCenter.y;
-  if (Math.abs(dx) > Math.abs(dy) * HEMISPHERE_RATIO && Math.abs(dx) > HEMISPHERE_MIN_OFFSET) {
-    return dx < 0 ? 'left' : 'right';
-  }
-  if (Math.abs(dy) > HEMISPHERE_MIN_OFFSET) return dy < 0 ? 'top' : 'bottom';
-  return Math.abs(dx) >= Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'top' : 'bottom');
-}
 
 function qualitySegments(path: readonly Point[]): QualitySegment[] {
   const segments: QualitySegment[] = [];
@@ -148,7 +126,10 @@ function measureHemisphereSharedLaneOverlap(
       const firstPeerRect = rectByNodeId.get(firstPeerId);
       const secondPeerRect = rectByNodeId.get(secondPeerId);
       if (!hubRect || !firstPeerRect || !secondPeerRect) continue;
-      if (!oppositeHemisphere(peerHemisphere(hubRect, firstPeerRect), peerHemisphere(hubRect, secondPeerRect))) continue;
+      if (!displayPeerHemispheresAreOpposite(
+        classifyDisplayPeerHemisphere(hubRect, firstPeerRect),
+        classifyDisplayPeerHemisphere(hubRect, secondPeerRect),
+      )) continue;
       const firstSegments = segmentsByEdgeId.get(first.id) ?? [];
       const secondSegments = segmentsByEdgeId.get(second.id) ?? [];
       for (const firstSegment of firstSegments) {
