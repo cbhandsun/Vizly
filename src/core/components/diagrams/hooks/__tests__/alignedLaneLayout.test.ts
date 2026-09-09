@@ -96,6 +96,12 @@ describe('bounded global lane alignment comparison', () => {
     expect(preferAlignedLaneLayout(candidate(500), changed, 'LR')).toBe(false);
     expect(preferAlignedLaneLayout(candidate(500), { ...candidate(200), geometry: { nodes, edges: [] } }, 'LR')).toBe(false);
   });
+  it('rejects aligned candidates that increase cross-flow drift', () => {
+    const after = candidate(200);
+    after.geometry.nodes[1] = { ...after.geometry.nodes[1], position: { x: 200, y: 120 } };
+    after.staged.routedEdges[0] = { ...edges[0], data: { computedPath: [{ x: 60, y: 20 }, { x: 200, y: 20 }] } };
+    expect(preferAlignedLaneLayout(candidate(500), after, 'LR')).toBe(false);
+  });
   it('does not count malformed geometry or absent paths as a better layout', () => {
     expect(preferAlignedLaneLayout(candidate(500), candidate(NaN), 'LR')).toBe(false);
     const incomplete = candidate(200);
