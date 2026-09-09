@@ -7,8 +7,8 @@ const nodes: Node[] = [
   { id: 'a', data: {}, position: { x: 0, y: 0 }, width: 40, height: 40 },
   { id: 'b', data: {}, position: { x: 160, y: 120 }, width: 40, height: 40 },
 ];
-const edge = (id: string, path: { x: number; y: number }[]): Edge => ({
-  id, source: 'a', target: 'b', data: { computedPath: path },
+const edge = (id: string, path: { x: number; y: number }[], source = 'a', target = 'b'): Edge => ({
+  id, source, target, data: { computedPath: path },
 });
 const straight = edge('one', [{ x: 0, y: 60 }, { x: 200, y: 60 }]);
 const vertical = edge('two', [{ x: 100, y: 0 }, { x: 100, y: 160 }]);
@@ -18,8 +18,8 @@ describe('routed layout candidate quality', () => {
     const crossed = measureRoutedLayoutQuality(nodes, [straight, vertical]);
     const detour = edge('two', [{ x: 100, y: 0 }, { x: 220, y: 0 }, { x: 220, y: 160 }, { x: 100, y: 160 }]);
     const routed = measureRoutedLayoutQuality(nodes, [straight, detour]);
-    expect(crossed).toMatchObject({ width: 200, height: 160, crossings: 1, sharedLaneOverlap: 0, pathLength: 360, bends: 0 });
-    expect(routed).toMatchObject({ width: 220, crossings: 0, sharedLaneOverlap: 0, pathLength: 600, bends: 2 });
+    expect(crossed).toMatchObject({ width: 200, height: 160, crossings: 1, sharedLaneOverlap: 0, flowOrthogonalDrift: 320, pathLength: 360, bends: 0 });
+    expect(routed).toMatchObject({ width: 220, crossings: 0, sharedLaneOverlap: 0, flowOrthogonalDrift: 320, pathLength: 600, bends: 2 });
     expect(routedLayoutDominates(crossed, routed)).toBe(false);
   });
   it('accepts shorter routed paths without widening the graph or adding crossings', () => {
@@ -29,6 +29,7 @@ describe('routed layout candidate quality', () => {
       crossings: 1,
       sharedLaneOverlap: 0,
       hemisphereSharedLaneOverlap: 0,
+      flowOrthogonalDrift: 0,
       pathLength: 600,
       bends: 2,
       backwardTravel: 0,
@@ -42,6 +43,7 @@ describe('routed layout candidate quality', () => {
       'crossings',
       'sharedLaneOverlap',
       'hemisphereSharedLaneOverlap',
+      'flowOrthogonalDrift',
       'pathLength',
       'bends',
       'backwardTravel',
@@ -62,11 +64,27 @@ describe('routed layout candidate quality', () => {
     const baseline = measureRoutedLayoutQuality(nodes, overlapped);
     const candidate = measureRoutedLayoutQuality(nodes, separated);
 
-    expect(baseline).toMatchObject({ sharedLaneOverlap: 3, pathLength: 320, bends: 0, crossings: 0 });
+    expect(baseline).toMatchObject({ sharedLaneOverlap: 3, flowOrthogonalDrift: 320, pathLength: 320, bends: 0, crossings: 0 });
     expect(candidate).toMatchObject({ sharedLaneOverlap: 0, pathLength: 320, bends: 0, crossings: 0 });
     expect(routedLayoutDominates(baseline, candidate)).toBe(true);
     expect(routedLayoutDominates(candidate, baseline)).toBe(false);
   });
+  it('measures cross-flow drift independently from route length', () => {
+    const driftNodes: Node[] = [
+      { id: 'a', data: {}, position: { x: 0, y: 0 }, width: 40, height: 40 },
+      { id: 'b', data: {}, position: { x: 120, y: 80 }, width: 40, height: 40 },
+      { id: 'c', data: {}, position: { x: 120, y: 0 }, width: 40, height: 40 },
+    ];
+    const sameLength = [
+      edge('drift', [{ x: 20, y: 20 }, { x: 140, y: 20 }], 'a', 'b'),
+      edge('aligned', [{ x: 20, y: 20 }, { x: 140, y: 20 }], 'a', 'c'),
+    ];
+    expect(measureRoutedLayoutQuality(driftNodes.slice(0, 2), [sameLength[0]], 'LR'))
+      .toMatchObject({ flowOrthogonalDrift: 80, pathLength: 120 });
+    expect(measureRoutedLayoutQuality([driftNodes[0], driftNodes[2]], [sameLength[1]], 'LR'))
+      .toMatchObject({ flowOrthogonalDrift: 0, pathLength: 120 });
+  });
+
   it('measures same-endpoint shared lanes across opposite node hemispheres', () => {
     const hemisphereNodes: Node[] = [
       { id: 'hub', data: {}, position: { x: 100, y: 100 }, width: 40, height: 40 },

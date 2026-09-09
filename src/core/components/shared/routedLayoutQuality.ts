@@ -14,6 +14,7 @@ export type RoutedLayoutQuality = Readonly<{
   crossings: number;
   sharedLaneOverlap: number;
   hemisphereSharedLaneOverlap: number;
+  flowOrthogonalDrift: number;
   backwardTravel: number;
 }>;
 
@@ -79,6 +80,33 @@ function parallelOverlap(first: QualitySegment, second: QualitySegment): number 
   }
   if (Math.abs(first.a.x - second.a.x) > PARALLEL_LANE_TOLERANCE) return 0;
   return rangeOverlap(first.a.y, first.b.y, second.a.y, second.b.y);
+}
+
+function measureFlowOrthogonalDrift(
+  nodes: readonly Node[],
+  edges: readonly Edge[],
+  horizontal: boolean,
+): number | null {
+  const centers = new Map<string, Point>();
+  for (const node of nodes) {
+    if (node.hidden) continue;
+    const projectedNode = node as ProjectedQualityNode;
+    const positionAbsolute = projectedNode.positionAbsolute ?? projectedNode.computed?.positionAbsolute;
+    const width = node.measured?.width ?? node.width;
+    const height = node.measured?.height ?? node.height;
+    if (!positionAbsolute || typeof width !== 'number' || typeof height !== 'number') return null;
+    if (!Number.isFinite(positionAbsolute.x) || !Number.isFinite(positionAbsolute.y)
+      || !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
+    centers.set(node.id, { x: positionAbsolute.x + width / 2, y: positionAbsolute.y + height / 2 });
+  }
+  let drift = 0;
+  for (const edge of edges) {
+    if (edge.hidden) continue;
+    const source = centers.get(edge.source), target = centers.get(edge.target);
+    if (!source || !target) return null;
+    drift += Math.abs(horizontal ? target.y - source.y : target.x - source.x);
+  }
+  return Math.round(drift);
 }
 
 function measureHemisphereSharedLaneOverlap(
@@ -180,10 +208,12 @@ export function measureRoutedLayoutQuality(
   if (!paths.size) return null;
   const scored = new RoutingCrossingScorer().score(paths);
   const hemisphereSharedLaneOverlap = measureHemisphereSharedLaneOverlap(projected.nodes, edges, paths);
+  const flowOrthogonalDrift = measureFlowOrthogonalDrift(projected.nodes, edges, horizontal);
+  if (flowOrthogonalDrift === null) return null;
   return {
     width: maxX - minX, height: maxY - minY,
     pathLength, backwardTravel, bends: scored.bends, crossings: scored.hardCrossings + scored.buddyCrossings,
-    sharedLaneOverlap: scored.parallelOverlaps, hemisphereSharedLaneOverlap,
+    sharedLaneOverlap: scored.parallelOverlaps, hemisphereSharedLaneOverlap, flowOrthogonalDrift,
   };
 }
 
@@ -191,7 +221,7 @@ export function measureRoutedLayoutQuality(
  * Keep the baseline on ties, incomplete evidence, or conflicting objectives. */
 export function routedLayoutDominates(baseline: RoutedLayoutQuality | null, candidate: RoutedLayoutQuality | null): boolean {
   if (!baseline || !candidate) return false;
-  const fields = ['width', 'height', 'pathLength', 'bends', 'crossings', 'sharedLaneOverlap', 'hemisphereSharedLaneOverlap', 'backwardTravel'] as const;
+  const fields = ['width', 'height', 'pathLength', 'bends', 'crossings', 'sharedLaneOverlap', 'hemisphereSharedLaneOverlap', 'flowOrthogonalDrift', 'backwardTravel'] as const;
   if (fields.some(key => !Number.isFinite(baseline[key]) || !Number.isFinite(candidate[key])
     || baseline[key] < 0 || candidate[key] < 0)) return false;
   return fields.every(key => candidate[key] <= baseline[key] + 0.01)
