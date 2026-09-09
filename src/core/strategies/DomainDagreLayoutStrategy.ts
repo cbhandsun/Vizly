@@ -42,6 +42,7 @@ import { runDomainDagreNestedLayout } from './domainDagreNestedLayout';
 import { arrangeDomainDagreChildren } from './domainDagreChildArrangement';
 import { centerDomainDagreSubGroups } from './domainDagreDirectContent';
 import { domainDagrePeerComponentIndex } from './domainDagrePeerComponents';
+import { tightenDomainDagreSubGroupFlowBounds } from './domainDagreLaneCoordinateAssignment';
 import {
     unifyContainerHeightsByMaximum,
     unifyContainerWidthsByMaximum,
@@ -513,6 +514,17 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                 independentNodeArrangement: nodeArrangement === 'dagre' ? undefined : nodeArrangement,
             });
             updatedNodes = selected.nodes;
+            updatedNodes = tightenDomainDagreSubGroupFlowBounds(
+                updatedNodes,
+                nodeToSubGroup,
+                isHorizontal,
+                isHorizontal
+                    ? { leading: sdPadHEffective, trailing: sdPadHEffective }
+                    : {
+                        leading: sdTitleH + titleSafe + sdPadV,
+                        trailing: sdPadV + bottomSafe,
+                    },
+            );
             laneRankDecision = selected.decision;
         }
 

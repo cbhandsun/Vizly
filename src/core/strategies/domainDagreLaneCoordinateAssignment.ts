@@ -2,6 +2,7 @@ import type { Edge, Node } from '@xyflow/react';
 import { getNodeDimensions } from './DomainDagreLayoutHelpers';
 import { compactDomainDagreLaneCrossAxis } from './domainDagreLaneCrossCompaction';
 import { arrangeDomainDagreChildren } from './domainDagreChildArrangement';
+import { isDomainDagreNodeHidden } from './domainDagreHierarchy';
 import { COMMERCIAL_BUSINESS_NODE_CLEARANCE } from './shared/edgeBusinessNodeClearanceRepair';
 
 export type DomainDagreLaneBucket = Readonly<{ id: string; nodeIds: readonly string[] }>;
@@ -179,4 +180,48 @@ export function assignDomainDagreLaneCoordinates(
     replacements.set(scope.domainId, resize(domain, domainCross, width));
     domainCross += width + crossGap;
   }
+}
+
+type DomainDagreFlowInsets = Readonly<{ leading: number; trailing: number }>;
+
+/** Tighten nested presentation containers after global lane ranks are final.
+ * Leaf coordinates and outer lane envelopes stay unchanged. */
+export function tightenDomainDagreSubGroupFlowBounds(
+  nodes: readonly Node[], nodeToSubGroup: ReadonlyMap<string, string>,
+  horizontal: boolean, insets: DomainDagreFlowInsets,
+): Node[] {
+  if (![insets.leading, insets.trailing].every(value => Number.isFinite(value)
+    && value >= 0 && value <= 10_000)) return nodes.slice();
+  const flow = horizontal ? 'x' : 'y';
+  const flowDimension = horizontal ? 'width' : 'height';
+  const memberBounds = new Map<string, { start: number; end: number }>();
+  for (const node of nodes) {
+    if (isDomainDagreNodeHidden(node)) continue;
+    const groupId = nodeToSubGroup.get(node.id);
+    if (!groupId) continue;
+    const start = node.position[flow], end = start + getNodeDimensions(node)[flowDimension];
+    if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
+    const previous = memberBounds.get(groupId);
+    memberBounds.set(groupId, {
+      start: Math.min(previous?.start ?? start, start),
+      end: Math.max(previous?.end ?? end, end),
+    });
+  }
+  return nodes.map(node => {
+    if (node.type !== 'subGroup' || isDomainDagreNodeHidden(node)) return node;
+    const members = memberBounds.get(node.id);
+    if (!members) return node;
+    const currentStart = node.position[flow], currentSize = getNodeDimensions(node)[flowDimension];
+    const currentEnd = currentStart + currentSize;
+    if (!Number.isFinite(currentStart) || !Number.isFinite(currentSize)
+      || members.start < currentStart - 0.5 || members.end > currentEnd + 0.5) return node;
+    // Retain every available inset without enlarging the old boundary.
+    const start = Math.max(currentStart, members.start - insets.leading);
+    const end = Math.min(currentEnd, members.end + insets.trailing);
+    const size = end - start;
+    if (size <= 0 || size >= currentSize - 0.5) return node;
+    const dimensions = { ...getNodeDimensions(node), [flowDimension]: size };
+    return { ...node, position: { ...node.position, [flow]: start }, ...dimensions,
+      measured: dimensions, style: { ...node.style, ...dimensions } };
+  });
 }

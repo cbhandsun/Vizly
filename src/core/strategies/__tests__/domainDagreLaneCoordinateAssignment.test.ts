@@ -1,12 +1,61 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import type { Node } from '@xyflow/react';
-import { assignDomainDagreLaneCoordinates } from '../domainDagreLaneCoordinateAssignment';
+import {
+  assignDomainDagreLaneCoordinates,
+  tightenDomainDagreSubGroupFlowBounds,
+} from '../domainDagreLaneCoordinateAssignment';
 
 const node = (id: string, x: number, y: number, width = 240, height = 80): Node => ({
   id, position: { x, y }, width, height, measured: { width, height }, data: {},
 });
 describe('final swimlane coordinate assignment', () => {
+  it.each([false, true])('tightens subgroup presentation bounds around final members, horizontal=%s', horizontal => {
+    const flow = horizontal ? 'x' : 'y', flowSize = horizontal ? 'width' : 'height';
+    const cross = horizontal ? 'y' : 'x', crossSize = horizontal ? 'height' : 'width';
+    const transpose = (value: Node): Node => horizontal ? {
+      ...value,
+      position: { x: value.position.y, y: value.position.x },
+      width: value.height,
+      height: value.width,
+      measured: { width: Number(value.height), height: Number(value.width) },
+    } : value;
+    const input = [
+      { ...node('domain', 0, 0, 800, 1200), type: 'titleGroup' },
+      { ...node('group', 100, 100, 500, 1000), type: 'subGroup' },
+      node('first', 180, 300, 180, 80),
+      node('second', 180, 600, 180, 100),
+      { ...node('empty', 620, 100, 120, 1000), type: 'subGroup' },
+    ].map(transpose);
+    const before = structuredClone(input);
+    const result = tightenDomainDagreSubGroupFlowBounds(
+      input,
+      new Map([['first', 'group'], ['second', 'group']]),
+      horizontal,
+      { leading: 80, trailing: 40 },
+    );
+    const byId = new Map(result.map(value => [value.id, value]));
+    expect(byId.get('group')?.position[flow]).toBe(220);
+    expect(byId.get('group')?.[flowSize]).toBe(520);
+    expect(byId.get('group')?.position[cross]).toBe(before[1].position[cross]);
+    expect(byId.get('group')?.[crossSize]).toBe(before[1][crossSize]);
+    expect(byId.get('empty')).toEqual(before[4]);
+    expect(['first', 'second'].map(id => byId.get(id)?.position)).toEqual([
+      before[2].position, before[3].position,
+    ]);
+    expect(input).toEqual(before);
+  });
+
+  it('fails closed for invalid insets and never expands an invalid container', () => {
+    const group = { ...node('group', 0, 0, 200, 200), type: 'subGroup' };
+    const child = node('child', 0, 300, 100, 80);
+    const membership = new Map([['child', 'group']]);
+    expect(tightenDomainDagreSubGroupFlowBounds([group, child], membership, false,
+      { leading: Number.NaN, trailing: 20 })).toEqual([group, child]);
+    expect(tightenDomainDagreSubGroupFlowBounds([group, child], membership, false,
+      { leading: 20, trailing: 20 })).toEqual([group, child]);
+  });
+
   it.each([false, true])('keeps same-phase fan-out peers separated when considering a shared channel, horizontal=%s', horizontal => {
     const input = [node('domain', 0, 0, 2000, 1600), node('hub', 500, 200),
       node('a', 0, 800, 200), node('b', 320, 800, 220),
