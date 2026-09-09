@@ -3,11 +3,11 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { execFileSync } from 'node:child_process';
 import { describe, expect, it, vi } from 'vitest';
-import { selectBusinessEditTarget, assertBusinessEditStability, assertBusinessEditRepairScope } from './display-routing-business-edits.mjs';
+import { selectBusinessEditTarget, assertBusinessEditStability, assertBusinessEditRepairScope, assertBusinessEditProcessEvidence } from './display-routing-business-edits.mjs';
 import { measureDisplayRoutingEditStability } from './display-routing-edit-stability.mjs';
 import { createDisplayRoutingMatrixCaseIds, parseDisplayRoutingMatrixCase } from './display-routing-matrix-cases.mjs';
 import { verifyDisplayRoutingBrowserCases } from './display-routing-matrix-browser-cases.mjs';
-import { createEditProcessSampler, readEditProcessDomPoints, projectEditProcessReport } from './display-routing-edit-process.mjs';
+import { createEditProcessSampler, parseEditProcessLabelTransform, readEditProcessDomPoints, projectEditProcessReport } from './display-routing-edit-process.mjs';
 import { assertHistoryRestored, assertHistoryRetainedRoutes, captureBusinessHistoryState, verifyBusinessHistoryRoundtrip } from './display-routing-history-edits.mjs';
 import { installHeldRoutingResponse } from './display-routing-held-response.mjs';
 
@@ -226,6 +226,17 @@ const processProbe = read => {
 };
 
 describe('bounded edit process sampling', () => {
+  it('requires non-vacuous completed browser process evidence', () => {
+    const report = processProbe(() => ({ points: [{ id: 'node', x: 0, y: 0 }],
+      routes: [{ id: 'edge', path: 'M0 0L1 0', sourceHandle: null, targetHandle: null }],
+      labels: [{ id: 'edge', x: 0, y: 0, visible: true, conflicts: 0 }] })).sampler;
+    const probe = report.stop();
+    expect(assertBusinessEditProcessEvidence({ ...probe, sampleCount: 2 })).toMatchObject({ status: 'completed' });
+    for (const value of [null, { ...probe, status: 'unavailable' }, { ...probe, sampleCount: 1 },
+      { ...probe, monitoredNodeCount: 0 }, { ...probe, monitoredRouteCount: 0 }, { ...probe, monitoredLabelCount: 0 }]) {
+      expect(() => assertBusinessEditProcessEvidence(value)).toThrow('incomplete');
+    }
+  });
   it('separates initial, frame and final observation costs', () => {
     let time = 0;
     let tick;
@@ -264,6 +275,18 @@ describe('bounded edit process sampling', () => {
   it('reads committed DOM transforms without rectangle layout reads or viewport dependence', () => {
     expect(readDom()).toEqual([{ id: 'retained', x: 156, y: 1428 }]);
   });
+  it('uses React Flow inline transforms without a synchronous computed-style read', () => {
+    const getComputedStyle = vi.fn(() => { throw new Error('Unexpected computed style'); });
+    const element = { style: { transform: 'inline-transform', left: '0px', top: '0px' },
+      getAnimations: () => [], getAttribute: () => 'retained', parentElement: { closest: () => null } };
+    const points = vm.runInNewContext(`(${readEditProcessDomPoints.toString()})('edited')`, {
+      document: { querySelectorAll: () => [element] }, getComputedStyle,
+      DOMMatrix: class { constructor(value) { expect(value).toBe('inline-transform');
+        Object.assign(this, { is2D: true, a: 1, d: 1, b: 0, c: 0, e: 20, f: 30 }); } },
+    });
+    expect(points).toEqual([{ id: 'retained', x: 20, y: 30 }]);
+    expect(getComputedStyle).not.toHaveBeenCalled();
+  });
   it('rejects unsupported DOM offsets or nested node placement', () => {
     expect(() => readDom({ left: '12px' })).toThrow('unsupported');
     expect(() => readDom({}, true)).toThrow('unsupported');
@@ -281,7 +304,8 @@ describe('bounded edit process sampling', () => {
     const element = { parentElement: parent, getAttribute: key => key === 'data-id' ? 'retained' : nodeStyle };
     const context = vm.createContext({ document: { querySelectorAll: () => [element] },
       getComputedStyle, DOMMatrix: class { constructor() { Object.assign(this, { is2D: true, a: 1, d: 1, b: 0, c: 0, e: x, f: 0 }); } } });
-    const read = () => vm.runInContext(`(${readEditProcessDomPoints.toString()})('edited')`, context);
+    context.animated = new Set([element]);
+    const read = () => vm.runInContext(`(${readEditProcessDomPoints.toString()})('edited', animated)`, context);
     read(); read();
     expect(getComputedStyle).toHaveBeenCalledTimes(2);
     x = 20;
@@ -300,6 +324,43 @@ describe('bounded edit process sampling', () => {
     expect(JSON.stringify(report)).not.toContain('private-node');
     expect(probe.cancelFrame).toHaveBeenCalled();
     expect(probe.clearTimer).toHaveBeenCalled();
+  });
+  it('retains transient route, port and label changes after the final frame returns to baseline', () => {
+    let path = 'M0 0L10 0', sourceHandle = 'right', labelX = 0, visible = true, conflicts = 0;
+    const read = () => ({
+      points: [{ id: 'retained-node', x: 0, y: 0 }],
+      routes: [{ id: 'edge', path, sourceHandle, targetHandle: 'left' }],
+      labels: [{ id: 'edge', x: labelX, y: 0, visible, conflicts }],
+    });
+    const probe = processProbe(read);
+    path = 'M0 0L0 10L10 10'; sourceHandle = 'bottom'; labelX = 20; visible = false; conflicts = 2;
+    probe.tick();
+    path = 'M0 0L10 0'; sourceHandle = 'right'; labelX = 0; visible = true; conflicts = 0;
+    probe.tick();
+    const report = probe.sampler.stop();
+    expect(report).toMatchObject({ monitoredRouteCount: 1, monitoredLabelCount: 1,
+      routePathSwitchCount: 2, portSwitchCount: 2, maxMissingRouteCount: 0, routeMissingSampleCount: 0,
+      maxLabelDisplacement: 20, movedLabelCount: 1, maxMissingLabelCount: 0,
+      labelMissingSampleCount: 0, maxHiddenLabelCount: 1, maxLabelConflictCount: 2,
+      finalQuietMs: 0 });
+    expect(JSON.stringify(report)).not.toMatch(/retained-node|M0|right|edge/);
+  });
+  it('reports bounded missing rendered routes and labels without returning their identities', () => {
+    let routes = [{ id: 'edge', path: 'M0 0L10 0', sourceHandle: null, targetHandle: null }];
+    let labels = [{ id: 'edge', x: 0, y: 0, visible: true, conflicts: 0 }];
+    const probe = processProbe(() => ({ points: [{ id: 'node', x: 0, y: 0 }], routes, labels }));
+    routes = []; labels = []; probe.tick();
+    expect(probe.sampler.stop()).toMatchObject({ maxMissingRouteCount: 1, routeMissingSampleCount: 2,
+      maxMissingLabelCount: 1, labelMissingSampleCount: 2 });
+  });
+  it('parses only bounded label transforms emitted by the edge renderer', () => {
+    expect(parseEditProcessLabelTransform('translate(-50%, -50%) translate(123.5px,-42px) scale(var(--scale, 1))'))
+      .toEqual({ x: 123.5, y: -42 });
+    expect(parseEditProcessLabelTransform('translate(-50%,-50%) translate(1e2px, .5px)')).toEqual({ x: 100, y: 0.5 });
+    for (const value of [null, '', 'matrix(1,0,0,1,2,3)', 'translate(-50%,-50%) translate(NaNpx,0px)',
+      `translate(-50%,-50%) translate(${'1'.repeat(513)}px,0px)`]) {
+      expect(parseEditProcessLabelTransform(value)).toBeNull();
+    }
   });
   it.each([null, [], [{ id: 'x', x: NaN, y: 0 }], Array(257).fill({ id: 'x', x: 0, y: 0 }),
     [{ id: 'x', x: 0, y: 0 }, { id: 'x', x: 0, y: 0 }]])('marks invalid or oversized observations unavailable', points => {

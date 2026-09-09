@@ -129,6 +129,14 @@ const dragBusinessNode = async (session, nodeId, direction) => {
   return { before, releasedAt: await releaseDisplayRoutingDrag(session, end.x, end.y) };
 };
 
+export const assertBusinessEditProcessEvidence = value => {
+  if (!value || value.status !== 'completed' || value.sampleCount < 2
+    || value.monitoredNodeCount < 1 || value.monitoredRouteCount < 1 || value.monitoredLabelCount < 1) {
+    throw new Error('Business edit process evidence incomplete');
+  }
+  return value;
+};
+
 export const verifyDisplayRoutingBusinessEdits = async ({ baseUrl, prepareSession,
   waitForValue, readFinalRouteExpression, auditFinalSvg, layoutCase, onProgress = () => {} }) => {
   const results = [];
@@ -170,7 +178,7 @@ export const verifyDisplayRoutingBusinessEdits = async ({ baseUrl, prepareSessio
             : { expectedCommittedRouteSignature: route.response.outputRouteSignature }),
           expectedNodeCount: route.request.nodes.length, expectedEdgeCount: route.response.edges.length });
         const after = await session.evaluate(businessEditPositionExpression(selected.nodeId));
-        const processStability = await stopEditProcessSampling(session);
+        const processStability = assertBusinessEditProcessEvidence(await stopEditProcessSampling(session));
         const scopeEvidence = await readTopologyEditStability(session, 'business-drag',
           route.request.mutableEdgeIds, route.response, [selected.nodeId]);
         const stability = scopeEvidence.intent;
