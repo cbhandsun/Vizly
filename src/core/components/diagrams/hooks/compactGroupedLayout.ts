@@ -99,6 +99,8 @@ export function preferCompactGroupedLayout(baseline: RoutedLayoutCandidate, cand
   const mainAfter = reversedMainEdges(candidate, direction, compactGroupInnerDirection(direction));
   return Number.isFinite(mainBefore) && Number.isFinite(mainAfter) && mainAfter <= mainBefore
     && after.crossings <= before.crossings && after.pathLength <= before.pathLength + 0.01
+    && after.sharedLaneOverlap <= before.sharedLaneOverlap + 0.01
+    && after.hemisphereSharedLaneOverlap <= before.hemisphereSharedLaneOverlap + 0.01
     && after.flowOrthogonalDrift <= before.flowOrthogonalDrift + 0.01
     && Math.max(after.width, after.height) < Math.max(before.width, before.height) - 0.01;
 }

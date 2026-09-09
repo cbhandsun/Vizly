@@ -56,6 +56,36 @@ describe('bounded compact group comparison', () => {
   it('rejects a shorter layout that reverses an explicit main dependency', () => {
     expect(preferCompactGroupedLayout(candidate(500), candidate(-100), 'LR')).toBe(false);
   });
+  it('rejects compact candidates that increase opposite-hemisphere shared lanes', () => {
+    const hub: Node = { id: 'hub', position: { x: 300, y: 100 }, width: 40, height: 40, data: { subDomain: 'Group' } };
+    const left: Node = { id: 'left', position: { x: 0, y: 100 }, width: 40, height: 40, data: { subDomain: 'Group' } };
+    const right: Node = { id: 'right', position: { x: 660, y: 100 }, width: 40, height: 40, data: { subDomain: 'Group' } };
+    const fanoutEdges: Edge[] = [
+      { id: 'hub-left', source: 'hub', target: 'left' },
+      { id: 'hub-right', source: 'hub', target: 'right' },
+    ];
+    const before: RoutedLayoutCandidate = {
+      geometry: { nodes: [hub, left, right], edges: fanoutEdges },
+      staged: { committedSourceEdges: fanoutEdges, commitSnapshot: () => true, routedEdges: [
+        { ...fanoutEdges[0], data: { computedPath: [{ x: 320, y: 120 }, { x: 320, y: 60 }, { x: 20, y: 60 }] } },
+        { ...fanoutEdges[1], data: { computedPath: [{ x: 320, y: 120 }, { x: 320, y: 180 }, { x: 680, y: 180 }] } },
+      ] },
+    };
+    const afterNodes = [
+      { ...hub, position: { x: 100, y: 100 } },
+      left,
+      { ...right, position: { x: 220, y: 100 } },
+    ];
+    const after: RoutedLayoutCandidate = {
+      geometry: { nodes: afterNodes, edges: fanoutEdges },
+      staged: { committedSourceEdges: fanoutEdges, commitSnapshot: () => true, routedEdges: [
+        { ...fanoutEdges[0], data: { computedPath: [{ x: 120, y: 120 }, { x: 120, y: 180 }, { x: 20, y: 180 }] } },
+        { ...fanoutEdges[1], data: { computedPath: [{ x: 120, y: 120 }, { x: 120, y: 180 }, { x: 240, y: 180 }] } },
+      ] },
+    };
+
+    expect(preferCompactGroupedLayout(before, after, 'LR')).toBe(false);
+  });
   it('rejects compact candidates that increase cross-flow drift', () => {
     const before = candidate(500);
     const after = candidate(200);
