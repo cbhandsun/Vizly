@@ -6,6 +6,7 @@ import { diagramConfigManager } from '../../config/DiagramConfig';
 import {
   applyDomainGrouping,
   applySubGrouping,
+  collapseGeneratedDomainAliasSubGroups,
   ensureMeasuredForNodes,
   normalizeMissingNodeSubDomainByDomain,
   normalizeSubGroupDomainByChildren,
@@ -166,6 +167,7 @@ export function prepareDomainVerticalLayout(
     generateDomainGroups: Boolean(options.generateDomainGroups),
     generateSubDomainGroups: Boolean(options.generateSubDomainGroups),
   });
+  updatedNodes = collapseGeneratedDomainAliasSubGroups(updatedNodes);
 
   const effectiveTopPad = (): number => {
     const raw = subTitleH + subTitleV + subPadTop;

@@ -32,6 +32,7 @@ import { createBaseReactFlowDisplayEdgePatches } from '../../components/shared/b
 import { computeBaseReactFlowDisplayEdgesWorkerResponse } from '../../components/shared/baseReactFlowDisplayEdges.worker';
 import { computeBaseReactFlowDisplayInputIdentityBundle } from '../../components/shared/baseReactFlowDisplayInputIdentity';
 import { createDisplayRoutingIdentity } from '../../routing/routingSessionIdentity';
+import { isDomainAliasSubDomain } from '../../utils/layout/domainSemanticKey';
 
 type PathPoint = { x: number; y: number };
 
@@ -459,6 +460,28 @@ describe('DomainDagreLayoutStrategy', () => {
         expect(new Set(visibleSubGroups.map(node => String(node.data.subDomain || '')))).toEqual(expectedSubDomains);
         expect(canvas.edges).toHaveLength(systemsFixture.edges.length);
         expect(canvas.edges.every(edge => edge.data?.algorithm === 'domain-dagre-simplified')).toBe(true);
+    }, 15_000);
+
+    it('does not repeat an auto-generated subgroup inside its visible domain lane', async () => {
+        const systemsFixture = fixtureData(systemsInteractionStandardData);
+        const canvas = await standardDataToCanvas(systemsFixture);
+        const result = await new DomainDagreLayoutStrategy().calculateLayout(canvas.nodes, canvas.edges, {
+            type: LayoutType.DAGRE,
+            direction: 'TB',
+            nodeLayout: LayoutType.DAGRE,
+            domainPlacement: 'ordered-lanes',
+            domainSubGroupDirection: 'TB',
+            subDomainNodeDirection: 'TB',
+            generateDomainGroups: true,
+            generateSubDomainGroups: true,
+        });
+        const visibleDomains = result.nodes.filter(node => node.type === 'titleGroup' && node.data.hidden !== true);
+        const visibleSubGroups = result.nodes.filter(node => node.type === 'subGroup' && node.data.hidden !== true);
+
+        expect(visibleDomains).toHaveLength(new Set(systemsFixture.nodes.map(node => node.domain)).size);
+        expect(visibleSubGroups.some(node => isDomainAliasSubDomain(node.data.domain, node.data.subDomain))).toBe(false);
+        expect(visibleSubGroups.map(node => node.data.subDomain).sort()).toEqual(['客户管理', '数据管理', '物流执行层']);
+        expect(result.edges).toHaveLength(systemsFixture.edges.length);
     }, 15_000);
 
     it('keeps large standard conversions layout-compatible in interactive edge-routing mode', async () => {

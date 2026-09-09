@@ -84,7 +84,7 @@ export const injectSemanticSubGroupsForMissingKeys = (list: ReactFlowNode[]): Re
         id: sgId,
         type: 'subGroup',
         position: { x: 0, y: 0 },
-        data: { domain: d, subDomain: k, description: k, children: [] },
+        data: { domain: d, subDomain: k, description: k, children: [], layoutGenerated: 'subdomain' },
         style: { width: 0, height: 0 },
         measured: { width: 0, height: 0 },
         draggable: false,

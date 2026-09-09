@@ -7,6 +7,7 @@ import { diagramConfigManager } from '../config/DiagramConfig';
 import {
     applyDomainGrouping,
     applySubGrouping,
+    collapseGeneratedDomainAliasSubGroups,
     assignChildrenToSubGroupsBySemantic,
     normalizeSubGroupDomainByChildren,
     ensureMeasuredForNodes,
@@ -159,6 +160,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             }
             return clone as ReactFlowNode;
         });
+        processedNodes = collapseGeneratedDomainAliasSubGroups(processedNodes);
 
         let updatedNodes = normalizeDomainDagreNodes(processedNodes, defaultNodeW, defaultNodeH);
 

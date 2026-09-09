@@ -134,7 +134,7 @@ export const injectSemanticSubGroupsForMissingKeys = (nodes: Node[]): Node[] => 
         id,
         type: 'subGroup',
         position: { x: 0, y: 0 },
-        data: { domain, subDomain: key, description: key, children: [] },
+        data: { domain, subDomain: key, description: key, children: [], layoutGenerated: 'subdomain' },
         style: { width: 0, height: 0 },
         measured: { width: 0, height: 0 },
         draggable: false,

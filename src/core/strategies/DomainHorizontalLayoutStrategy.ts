@@ -7,6 +7,7 @@ import { ILayoutStrategy } from './LayoutStrategyManager';
 import {
   applyDomainGrouping,
   applySubGrouping,
+  collapseGeneratedDomainAliasSubGroups,
   assignChildrenToSubGroupsBySemantic,
   normalizeSubGroupDomainByChildren,
   purgeSubGroupChildrenBySemantic,
@@ -157,6 +158,7 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
       showDomainGroups: showDomain,
       showSubDomainGroups: showSub,
     });
+    updatedNodes = collapseGeneratedDomainAliasSubGroups(updatedNodes);
     updatedNodes = purgeSubGroupChildrenBySemantic(updatedNodes);
     updatedNodes = assignChildrenToSubGroupsBySemantic(updatedNodes);
     updatedNodes = normalizeSubGroupDomainByChildren(updatedNodes);

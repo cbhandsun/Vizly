@@ -5,6 +5,7 @@
 export * from './layout/basicLayouts';
 export * from './layout/hierarchicalLayout';
 export * from './layout/subGrouping';
+export * from './layout/domainSemanticKey';
 export * from './layout/domainContainers';
 export * from './layout/subGroupLayout';
 export * from './layout/geometryUtils';

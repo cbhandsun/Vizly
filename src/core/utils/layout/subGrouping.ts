@@ -122,6 +122,7 @@ export const applySubGrouping = (
         children: children.map(c => c.id),
         domain,
         domainClass,
+        layoutGenerated: 'subdomain',
         hidden: Array.isArray(whitelist) && whitelist.length > 0 ? !whitelist.includes(subDomain) : false,
       },
       measured: { width, height },

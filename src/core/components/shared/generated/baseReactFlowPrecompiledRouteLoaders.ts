@@ -48,7 +48,7 @@ const generatedPrecompiledRouteDescriptor2: GeneratedBaseReactFlowPrecompiledRou
 };
 
 const generatedPrecompiledRouteAsset3 = new URL(
-  './precompiledRoutes/route-752702193.json',
+  './precompiledRoutes/route-785374153.json',
   import.meta.url,
 );
 
@@ -56,7 +56,7 @@ const generatedPrecompiledRouteDescriptor3: GeneratedBaseReactFlowPrecompiledRou
   presetId: "wms-demand-allocation-strategy-v2",
   variantId: "initial",
   sourceHash: "source-v1:ea82c502ab6535b5c8f8367c591861e540396a41955a15c6b5f94f922264b7de",
-  geometryDigest: "geometry-v1:12b6ae5c7ff902f8aa9b3b86594eb13c",
+  geometryDigest: "geometry-v1:f1da3ff9c1216f31bb65068134ef7f9d",
   load: () => loadBaseReactFlowPrecompiledRouteAsset(generatedPrecompiledRouteAsset3),
 };
 
@@ -68,7 +68,7 @@ export const GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_LOADERS: Record<
   "1902262462": generatedPrecompiledRouteDescriptor0,
   "3179279980": generatedPrecompiledRouteDescriptor1,
   "3604171991": generatedPrecompiledRouteDescriptor2,
-  "752702193": generatedPrecompiledRouteDescriptor3,
+  "785374153": generatedPrecompiledRouteDescriptor3,
 };
 
 /**
