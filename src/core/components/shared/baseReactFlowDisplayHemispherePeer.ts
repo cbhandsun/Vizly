@@ -4,6 +4,7 @@ import {
   classifyRectPeerHemisphere,
   geometryHemispheresAreOpposite,
   type GeometryHemisphere,
+  type PeerHemisphereFlowAxis,
   type PeerHemisphereOptions,
 } from '../../strategies/shared/edgeSharedTrunkSynthesisUtils';
 import { getDisplayNodeRect, type DisplayRect } from './baseReactFlowDisplayGeometry';
@@ -29,11 +30,16 @@ export const displayPeerHemispheresAreOpposite = (
   second: GeometryHemisphere,
 ): boolean => geometryHemispheresAreOpposite(first, second);
 
+export const displayPortSideFlowAxis = (side: GeometryHemisphere): PeerHemisphereFlowAxis => (
+  side === 'left' || side === 'right' ? 'horizontal' : 'vertical'
+);
+
 export const shouldSkipSharedSourceTrunkAcrossOppositeHemisphere = (
   nodesById: ReadonlyMap<string, Node>,
   sourceId: string,
   targetId: string,
   peerTargetId: string,
+  options?: PeerHemisphereOptions,
 ): boolean => {
   const hubNode = nodesById.get(sourceId);
   const targetNode = nodesById.get(targetId);
@@ -46,7 +52,20 @@ export const shouldSkipSharedSourceTrunkAcrossOppositeHemisphere = (
     return false;
   }
   return displayPeerHemispheresAreOpposite(
-    classifyDisplayPeerHemisphere(hubRect, targetRect),
-    classifyDisplayPeerHemisphere(hubRect, peerTargetRect),
+    classifyDisplayPeerHemisphere(hubRect, targetRect, options),
+    classifyDisplayPeerHemisphere(hubRect, peerTargetRect, options),
   );
 };
+export const shouldSkipSharedSourceTrunkForPortSide = (
+  nodesById: ReadonlyMap<string, Node>,
+  sourceId: string,
+  targetId: string,
+  peerTargetId: string,
+  portSide: GeometryHemisphere,
+): boolean => shouldSkipSharedSourceTrunkAcrossOppositeHemisphere(
+  nodesById,
+  sourceId,
+  targetId,
+  peerTargetId,
+  { flowAxis: displayPortSideFlowAxis(portSide) },
+);

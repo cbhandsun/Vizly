@@ -6,6 +6,7 @@ import type { Node } from '@xyflow/react';
 import {
   classifyDisplayPeerHemisphere,
   displayPeerHemispheresAreOpposite,
+  displayPortSideFlowAxis,
   shouldSkipSharedSourceTrunkAcrossOppositeHemisphere,
 } from '../baseReactFlowDisplayHemispherePeer';
 
@@ -48,4 +49,33 @@ describe('base React Flow display hemisphere peers', () => {
     expect(shouldSkipSharedSourceTrunkAcrossOppositeHemisphere(nodes, 'hub', 'right', 'right-neighbor')).toBe(false);
     expect(shouldSkipSharedSourceTrunkAcrossOppositeHemisphere(nodes, 'missing', 'left', 'right')).toBe(false);
   });
-});
+
+  it('uses the caller flow axis when deciding whether same-source trunks compete', () => {
+    const nodes = new Map([
+      node('hub', 100, 100),
+      node('upper-right', 160, 30),
+      node('lower-right', 160, 170),
+    ].map(item => [item.id, item] as const));
+
+    expect(shouldSkipSharedSourceTrunkAcrossOppositeHemisphere(
+      nodes,
+      'hub',
+      'upper-right',
+      'lower-right',
+    )).toBe(true);
+    expect(shouldSkipSharedSourceTrunkAcrossOppositeHemisphere(
+      nodes,
+      'hub',
+      'upper-right',
+      'lower-right',
+      { flowAxis: 'vertical' },
+    )).toBe(true);
+    expect(shouldSkipSharedSourceTrunkAcrossOppositeHemisphere(
+      nodes,
+      'hub',
+      'upper-right',
+      'lower-right',
+      { flowAxis: displayPortSideFlowAxis('right') },
+    )).toBe(false);
+    expect(displayPortSideFlowAxis('top')).toBe('vertical');
+  });});
