@@ -46,6 +46,7 @@ import { verifyDisplayRoutingThemeMatrix } from './lib/display-routing-browser-t
 import { verifyDisplayRoutingInteractionStates } from './lib/display-routing-browser-interaction-audit.mjs';
 import { DISPLAY_ROUTING_EXPORT_CAPTURE_SCRIPT, formatDisplayRoutingExportMatrix, verifyDisplayRoutingExportMatrix } from './lib/display-routing-browser-export-audit.mjs';
 import { waitForDisplayRoutingBrowserValue as waitForValue } from './lib/display-routing-browser-wait.mjs';
+import { displayRoutingBrowserLifecycleExpression } from './lib/display-routing-browser-lifecycle.mjs';
 import { captureDisplayRoutingEditBaseline, readDisplayRoutingEditStability } from './lib/display-routing-edit-stability.mjs';
 
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '')
@@ -80,6 +81,35 @@ const RUN_STARTED_AT = performance.now();
 if (INTERACTION_ONLY && COLLECT_PERFORMANCE_SAMPLES) {
   throw new Error('--interaction-only cannot collect incremental-route performance samples');
 }
+
+
+const readDisplayRoutingFailureEnvelope = async (session, error) => {
+  const message = error instanceof Error ? error.message : 'Display routing browser verification failed';
+  let diagnostics = null;
+  let evidenceStatus = 'evaluation-failed';
+  try {
+    diagnostics = await session.evaluate(displayRoutingBrowserLifecycleExpression);
+    evidenceStatus = 'available';
+  } catch {
+    diagnostics = null;
+  }
+  return new Error(`${message}
+Browser state wait failed
+${JSON.stringify({
+    waitStatus: 'predicate-failed',
+    evidenceStatus,
+    diagnostics,
+    lastObservedDiagnostics: null,
+  }, null, 2)}`);
+};
+
+const withDisplayRoutingFailureEvidence = async (session, run) => {
+  try {
+    return await run();
+  } catch (error) {
+    throw await readDisplayRoutingFailureEnvelope(session, error);
+  }
+};
 
 const initialReadyExpression = `(() => {
   const replayResponseEdges = ${replayDisplayRoutingResponseEdges.toString()};
@@ -541,7 +571,7 @@ const verifyFixedVisualScales = async (session, expectedSignature) => {
 };
 
 const verifyNormalRenderedObstacleAudit = async () => withPrecompiledRouteBrowser(
-  async session => {
+  async session => withDisplayRoutingFailureEvidence(session, async () => {
     await session.send('Emulation.setDeviceMetricsOverride', {
       width: 1_600,
       height: 1_200,
@@ -619,7 +649,7 @@ const verifyNormalRenderedObstacleAudit = async () => withPrecompiledRouteBrowse
         requireLicensedExports: process.env.DISPLAY_ROUTING_REQUIRE_LICENSED_EXPORTS === '1',
       });
     return { route, audit, stability, visualScales, themeMatrix, exportMatrix };
-  },
+  }),
 );
 
 const main = async () => {
@@ -632,7 +662,7 @@ const main = async () => {
     : await verifyNormalRenderedObstacleAudit();
   const results = [];
   for (const dragCase of INTERACTION_ONLY ? [] : DRAG_CASES) {
-    const captured = await withPrecompiledRouteBrowser(async session => {
+    const captured = await withPrecompiledRouteBrowser(async session => withDisplayRoutingFailureEvidence(session, async () => {
       await session.send('Emulation.setDeviceMetricsOverride', {
         width: 1_600,
         height: 1_200,
@@ -740,7 +770,7 @@ const main = async () => {
         incrementalRenderedObstacleAudit,
         cpuProfile,
       };
-    });
+    }));
     results.push(captured);
   }
   for (const result of results) {
