@@ -11,6 +11,7 @@ import { fullDisplayPortSide, getDisplayComputedPath } from './baseReactFlowDisp
 import { buildSharedSourceTrunkAdoptionCandidates } from './baseReactFlowSharedNodePortRoleRepair';
 import { withDisplayPortBridge } from './baseReactFlowDisplayTerminalPortCandidates';
 import { createDisplayTerminalValidationSnapshot } from './baseReactFlowTerminalAxisRepair';
+import { shouldSkipSharedSourceTrunkAcrossOppositeHemisphere } from './baseReactFlowDisplayHemispherePeer';
 
 const hardQualityDoesNotRegress = (
   baseline: EdgePathQualityScore,
@@ -39,6 +40,7 @@ export const repairResidualSharedSourceTrunkAxisMismatches = <T extends Edge[]>(
   const terminalValidation = createDisplayTerminalValidationSnapshot(nodes);
   const countAxisMismatches = createDisplayDeclaredAxisMismatchCounter(nodes);
   const skippedEdgeIds = new Set<string>();
+  const nodeById = new Map(nodes.map(node => [node.id, node] as const));
   let current = edges;
   let evaluations = 0;
 
@@ -57,6 +59,12 @@ export const repairResidualSharedSourceTrunkAxisMismatches = <T extends Edge[]>(
       const baselineObstacleHits = obstacleContext.evaluate(current);
       for (const peer of current) {
         if (peer.id === edge.id || peer.source !== edge.source) continue;
+        if (shouldSkipSharedSourceTrunkAcrossOppositeHemisphere(
+          nodeById,
+          edge.source,
+          edge.target,
+          peer.target,
+        )) continue;
         const peerSide = fullDisplayPortSide(normalizeHandle(peer.sourceHandle));
         if (!peerSide || !terminalValidation.validateEdge(peer).sourceAnchored) continue;
         for (const path of buildSharedSourceTrunkAdoptionCandidates(

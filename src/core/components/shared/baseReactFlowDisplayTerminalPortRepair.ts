@@ -56,6 +56,7 @@ import {
   buildApproachSideTerminalCandidate,
   detachedTerminalQualityDoesNotRegress,
 } from './baseReactFlowDisplayTerminalPortQuality';
+import { shouldSkipSharedSourceTrunkAcrossOppositeHemisphere } from './baseReactFlowDisplayHemispherePeer';
 
 export { repairTerminalHandleHemisphereHairpins } from './baseReactFlowDisplayHemisphereHairpinRepair';
 
@@ -214,6 +215,7 @@ export const repairDetachedTerminalsWithBoundedPortRoles = <T extends Edge[]>(
     if (declaredTargetSide) {
       for (const peer of current) {
         if (peer.id === edge.id || peer.source !== edge.source) continue;
+        if (shouldSkipSharedSourceTrunkAcrossOppositeHemisphere(nodeById, edge.source, edge.target, peer.target)) continue;
         const peerValidation = terminalValidation.validateEdge(peer);
         const peerSourceSide = fullDisplayPortSide(normalizeHandle(peer.sourceHandle));
         if (
