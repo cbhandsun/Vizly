@@ -4,7 +4,7 @@ import type { Edge, Node } from '@xyflow/react';
 
 import { createBaseReactFlowRoutingSessionRuntime } from '../baseReactFlowRoutingSessionRuntime';
 import { beginRoutingRequestObservation, bindRoutingObservation, observeRoutingRenderFrame, readRoutingObservation,
-  recordRoutingObservation, startRoutingObservation } from '../baseReactFlowRoutingObservation';
+  recordRoutingObservation, startRoutingObservation, summarizeRoutingObservationCheckpoint } from '../baseReactFlowRoutingObservation';
 import { addFlowchartAccessibilityLabels } from '../../diagrams/flowchartCanvasAccessibility';
 import { clearBaseReactFlowDisplayCommittedSnapshots } from '../baseReactFlowDisplayCommittedSnapshot';
 import { createBaseReactFlowDocumentSnapshotSource } from '../baseReactFlowDocumentSnapshotSource';
@@ -71,6 +71,25 @@ describe('content-free routing observations', () => {
     expect(JSON.stringify(report)).not.toContain('secret');
     report?.entries.pop(); expect(readRoutingObservation(authority)?.entries).toHaveLength(4);
     expect(readRoutingObservation({ ...baseline })).toBeNull();
+  });
+  it('summarizes the latest routing checkpoint without exporting the full event list', () => {
+    const signal = new AbortController().signal; startRoutingObservation(signal, 'display', () => 0);
+    const request = beginRoutingRequestObservation(signal);
+    request('worker-available');
+    request('worker-post-requested');
+    recordRoutingObservation(signal, 'failed');
+
+    expect(summarizeRoutingObservationCheckpoint(signal)).toEqual({
+      schema: 'vizly-routing-observation-checkpoint-v1',
+      owner: 'display',
+      lastStage: 'failed',
+      previousStage: 'worker-post-requested',
+      lastRequestOrdinal: null,
+      elapsedMs: 0,
+      eventCount: 5,
+      truncated: false,
+    });
+    expect(summarizeRoutingObservationCheckpoint({})).toBeNull();
   });
   it('bounds request and event retention and explicitly reports truncation', () => {
     const signal = new AbortController().signal; startRoutingObservation(signal, 'display', () => 0);

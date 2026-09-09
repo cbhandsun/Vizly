@@ -183,7 +183,11 @@ describe('smoke route modules', () => {
   });
   it('requires bounded content-free request observations for Worker recovery', () => {
     const valid = { schema: 'vizly-routing-failure-v1', reason: 'worker-failed', stage: 'worker-creation',
-      code: 'display-edge-worker-unavailable', observation: { schema: 'vizly-routing-observation-v1',
+      code: 'display-edge-worker-unavailable',
+      checkpoint: { schema: 'vizly-routing-observation-checkpoint-v1',
+        owner: 'display', lastStage: 'failed', previousStage: 'worker-requested',
+        lastRequestOrdinal: null, elapsedMs: 2, eventCount: 3, truncated: false },
+      observation: { schema: 'vizly-routing-observation-v1',
         owner: 'display', truncated: false, entries: [
           { stage: 'job-started', requestOrdinal: null, elapsedMs: 0 },
           { stage: 'worker-requested', requestOrdinal: 1, elapsedMs: 1 },
@@ -193,7 +197,9 @@ describe('smoke route modules', () => {
       { ...valid, observation: { ...valid.observation, token: 'private-fault-marker' } },
       { ...valid, observation: { ...valid.observation, truncated: true } },
       { ...valid, observation: { ...valid.observation, entries: Array(33).fill(valid.observation.entries[0]) } },
-      { ...valid, observation: { ...valid.observation, entries: [{ stage: 'private-fault-marker' }] } }]) {
+      { ...valid, observation: { ...valid.observation, entries: [{ stage: 'private-fault-marker' }] } },
+      { ...valid, checkpoint: undefined },
+      { ...valid, checkpoint: { ...valid.checkpoint, previousStage: 'private-fault-marker' } }]) {
       const textarea = { value: JSON.stringify(summary), readOnly: true,
         getBoundingClientRect: () => ({ x: 0, y: 0, width: 200 }) };
       const panel = { textContent: '', querySelector: selector => selector === 'textarea' ? textarea : null };

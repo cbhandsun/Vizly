@@ -32,6 +32,12 @@ describe('display routing failure terminal', () => {
     const summary = summarizeDisplayRoutingFailure(failure);
     expect(summary?.observation?.entries.map(entry => entry.stage)).toEqual([
       'job-started', 'worker-requested', 'worker-post-requested', 'failed']);
+    expect(summary?.checkpoint).toMatchObject({
+      schema: 'vizly-routing-observation-checkpoint-v1',
+      lastStage: 'failed',
+      previousStage: 'worker-post-requested',
+      eventCount: 4,
+    });
     expect(JSON.stringify(summary)).not.toContain('private');
     expect(summarizeDisplayRoutingFailure({ ...failure, observation: { secret: 'private' } })).not.toHaveProperty('observation');
     runtime.beginJob('display');

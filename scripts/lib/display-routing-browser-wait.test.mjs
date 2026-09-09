@@ -79,6 +79,7 @@ describe('display routing browser wait', () => {
           __vizlyBaseReactFlowDisplayRouting: { stage: 'secret', workerStartCount: Infinity },
           __vizlyRoutingRequests: Array.from({ length: 100 }, () => ({ operation: 'secret' })),
           __vizlyRoutingResponses: 'secret',
+          __vizlyWorkerHeartbeats: [{ elapsedMs: 123.4, requestId: 'private-content' }],
           __vizlyBrowserBootMilestones: { workerRequestMs: 42, rootObservedMs: 'secret', pathObservedMs: Infinity },
         },
         document: { querySelector: () => null, querySelectorAll: () => [] },
@@ -88,6 +89,11 @@ describe('display routing browser wait', () => {
     await expect(waitForDisplayRoutingBrowserValue(session, 'ready', 0)).rejects.toThrow(/workerRequestMs/);
     expect(evidence.requests).toHaveLength(16);
     expect(evidence.responses).toHaveLength(0);
+    expect(evidence.startup).toEqual({
+      phase: 'worker-executing',
+      lastMilestone: 'workerRequestMs',
+      heartbeatElapsedMs: 123,
+    });
     expect(evidence.milestones).toMatchObject({ workerRequestMs: 42, rootObservedMs: null, pathObservedMs: null });
     expect(JSON.stringify(evidence)).not.toMatch(/secret|Infinity/);
   });

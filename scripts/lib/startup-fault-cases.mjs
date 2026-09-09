@@ -59,7 +59,7 @@ export const readStartupFaultRecovery = kind => {
   const keys = kind === 'startup' ? ['schema', 'stage', 'code', 'elapsedMs'] : ['schema', 'reason', 'stage', 'code'];
   let milestonesValid = true;
   if (kind !== 'startup') {
-    keys.push('observation');
+    keys.push('checkpoint', 'observation');
     const trace = summary?.observation;
     const stages = ['job-started', 'job-cancelled', 'job-finished', 'failed', 'commit-accepted',
       'render-committed', 'render-frame-observed', 'worker-requested', 'worker-available',
@@ -83,6 +83,25 @@ export const readStartupFaultRecovery = kind => {
       && trace.entries.some(entry => entry.stage === 'worker-requested' && entry.requestOrdinal === 1)
       && (summary?.code === 'display-edge-worker-unavailable'
         || trace.entries.some(entry => entry.stage === 'worker-post-requested' && entry.requestOrdinal === 1));
+    const checkpoint = summary?.checkpoint;
+    milestonesValid = milestonesValid && checkpoint && typeof checkpoint === 'object'
+      && Object.keys(checkpoint).length === 8
+      && checkpoint.schema === 'vizly-routing-observation-checkpoint-v1'
+      && checkpoint.owner === 'display'
+      && stages.includes(checkpoint.lastStage)
+      && (checkpoint.previousStage === null || stages.includes(checkpoint.previousStage))
+      && (checkpoint.lastRequestOrdinal === null || (Number.isSafeInteger(checkpoint.lastRequestOrdinal)
+        && checkpoint.lastRequestOrdinal >= 1 && checkpoint.lastRequestOrdinal <= 8))
+      && (checkpoint.elapsedMs === null || (Number.isSafeInteger(checkpoint.elapsedMs)
+        && checkpoint.elapsedMs >= 0 && checkpoint.elapsedMs <= 600000))
+      && Number.isSafeInteger(checkpoint.eventCount)
+      && checkpoint.eventCount >= 1 && checkpoint.eventCount <= 32
+      && checkpoint.truncated === false
+      && checkpoint.lastStage === trace.entries.at(-1).stage
+      && checkpoint.previousStage === (trace.entries.length > 1
+        ? trace.entries.at(-2).stage
+        : null)
+      && checkpoint.eventCount === trace.entries.length;
   }
   if (kind === 'startup' && summary?.code !== 'entry-resource-failed') {
     keys.push('milestones');

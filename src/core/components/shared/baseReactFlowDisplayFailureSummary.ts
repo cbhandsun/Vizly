@@ -1,4 +1,7 @@
-import { readRoutingObservation } from './baseReactFlowRoutingObservation';
+import {
+  readRoutingObservation,
+  summarizeRoutingObservationCheckpoint,
+} from './baseReactFlowRoutingObservation';
 
 const workerCodes = {
   'display-edge-worker-unavailable': 'worker-creation',
@@ -36,6 +39,7 @@ export const summarizeDisplayRoutingFailure = (value: unknown) => {
   const code = value.reason === 'worker-timeout' && candidate === 'display-edge-worker-timeout'
     ? candidate : value.reason === 'worker-failed' && candidate !== 'display-edge-worker-timeout' ? candidate : null;
   const observation = readRoutingObservation(value);
+  const checkpoint = summarizeRoutingObservationCheckpoint(value);
   return {
     schema: 'vizly-routing-failure-v1',
     reason: value.reason,
@@ -43,6 +47,7 @@ export const summarizeDisplayRoutingFailure = (value: unknown) => {
       : value.reason === 'worker-failed' ? 'unknown'
         : value.reason === 'quality-rejected' ? 'quality-acceptance' : 'transaction-acceptance',
     code,
+    ...(checkpoint ? { checkpoint } : {}),
     ...(observation ? { observation } : {}),
   };
 };

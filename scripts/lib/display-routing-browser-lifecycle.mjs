@@ -13,7 +13,17 @@ export const readDisplayRoutingBrowserLifecycle = () => {
     : window.__vizlyPrecompiledRouteRequest ? [window.__vizlyPrecompiledRouteRequest] : [];
   const responses = Array.isArray(window.__vizlyRoutingResponses) ? window.__vizlyRoutingResponses
     : window.__vizlyPrecompiledRouteResponse ? [window.__vizlyPrecompiledRouteResponse] : [];
+  const heartbeats = Array.isArray(window.__vizlyWorkerHeartbeats) ? window.__vizlyWorkerHeartbeats : [];
   const milestones = window.__vizlyBrowserBootMilestones || {};
+  const milestoneNames = [
+    'domReadyMs', 'pageLoadedMs', 'rootObservedMs', 'workerConstructedMs',
+    'workerRequestMs', 'workerResponseMs', 'pathObservedMs',
+  ];
+  const safeMilestones = Object.fromEntries(milestoneNames.map(name => [
+    name,
+    Number.isFinite(milestones[name]) && milestones[name] >= 0
+      && milestones[name] <= 600_000 ? milestones[name] : null,
+  ]));
   const rootChildren = count(document.querySelector('#root')?.childElementCount);
   const renderedNodes = count(document.querySelectorAll('.react-flow__node').length);
   const renderedPaths = count(document.querySelectorAll('.react-flow__edge .react-flow__edge-path').length);
@@ -23,6 +33,18 @@ export const readDisplayRoutingBrowserLifecycle = () => {
     'final-quality-rejected', 'final-safety-rejected']);
   const failureStage = ['worker-response-error', 'worker-error', 'worker-message-error',
     'worker-cancelled', 'worker-timeout', 'final-quality-rejected', 'final-safety-rejected'].includes(stage);
+  const lastMilestone = [...milestoneNames].reverse().find(name => safeMilestones[name] !== null) || null;
+  const latestHeartbeat = heartbeats.slice(-1)[0];
+  const heartbeatElapsedMs = Number.isFinite(latestHeartbeat?.elapsedMs) && latestHeartbeat.elapsedMs >= 0
+    && latestHeartbeat.elapsedMs <= 600_000 ? Math.round(latestHeartbeat.elapsedMs) : null;
+  const startupPhase = failureStage ? 'failed'
+    : renderedPaths > 0 ? 'path-rendered'
+      : responses.length > 0 ? 'worker-response-waiting-for-render'
+        : requests.length > 0 ? 'worker-executing'
+          : safeMilestones.workerConstructedMs !== null ? 'worker-ready-waiting-for-request'
+            : renderedNodes > 0 ? 'nodes-rendered-waiting-for-worker'
+              : rootChildren > 0 ? 'root-mounted'
+                : document.readyState === 'loading' ? 'document-loading' : 'application-not-mounted';
   return {
     schema: 'browser-lifecycle-v1',
     // These describe observed boundaries, not inferred causes or Worker readiness.
@@ -30,11 +52,12 @@ export const readDisplayRoutingBrowserLifecycle = () => {
       ? (renderedPaths > 0 ? 'committed-path-observed' : 'committed-no-path-observed')
       : responses.length ? 'worker-response-observed' : requests.length ? 'worker-request-observed'
       : renderedNodes > 0 ? 'nodes-observed' : rootChildren > 0 ? 'root-observed' : 'page-loading',
-    milestones: Object.fromEntries([
-      'domReadyMs', 'pageLoadedMs', 'rootObservedMs', 'workerConstructedMs',
-      'workerRequestMs', 'workerResponseMs', 'pathObservedMs',
-    ].map(name => [name, Number.isFinite(milestones[name]) && milestones[name] >= 0
-      && milestones[name] <= 600_000 ? milestones[name] : null])),
+    startup: {
+      phase: startupPhase,
+      lastMilestone,
+      heartbeatElapsedMs,
+    },
+    milestones: safeMilestones,
     page: {
       readyState: token(document.readyState, ['loading', 'interactive', 'complete']),
       protocol: ['http:', 'https:', 'about:', 'chrome-error:'].includes(window.location?.protocol)

@@ -75,3 +75,35 @@ export const readRoutingObservation = (key: object) => {
   return observation ? { schema: 'vizly-routing-observation-v1' as const, owner: observation.owner,
     truncated: observation.truncated, entries: observation.entries.map(entry => ({ ...entry })) } : null;
 };
+
+export type RoutingObservationCheckpoint = Readonly<{
+  schema: 'vizly-routing-observation-checkpoint-v1';
+  owner: 'display' | 'layout';
+  lastStage: Entry['stage'];
+  previousStage: Entry['stage'] | null;
+  lastRequestOrdinal: number | null;
+  elapsedMs: number | null;
+  eventCount: number;
+  truncated: boolean;
+}>;
+
+export const summarizeRoutingObservationCheckpoint = (
+  key: object,
+): RoutingObservationCheckpoint | null => {
+  const observation = observations.get(key);
+  const last = observation?.entries.at(-1);
+  if (!observation || !last) return null;
+  const previous = observation.entries.length > 1
+    ? observation.entries.at(-2)
+    : undefined;
+  return {
+    schema: 'vizly-routing-observation-checkpoint-v1',
+    owner: observation.owner,
+    lastStage: last.stage,
+    previousStage: previous?.stage ?? null,
+    lastRequestOrdinal: last.requestOrdinal,
+    elapsedMs: last.elapsedMs,
+    eventCount: observation.entries.length,
+    truncated: observation.truncated,
+  };
+};
