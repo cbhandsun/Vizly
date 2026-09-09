@@ -43,6 +43,26 @@ describe('display routing browser interaction audit', () => {
     })).toThrow(/paint failed/);
   });
 
+  it('can report over-budget paints without weakening interaction state validation', () => {
+    expect(assertDisplayRoutingInteractionPaint({
+      kind: 'hover',
+      state: { ...state, hovered: true },
+      durationMs: 140.5,
+      enforceBudget: false,
+    })).toEqual({
+      kind: 'hover',
+      durationMs: 140.5,
+      budgetMs: 100,
+      overBudget: true,
+    });
+    expect(() => assertDisplayRoutingInteractionPaint({
+      kind: 'hover',
+      state: { ...state, hovered: true, traceVisible: false },
+      durationMs: 10,
+      enforceBudget: false,
+    })).toThrow(/paint failed/);
+  });
+
   it.each([0.995, 1.2])('accepts the bounded complete-coverage boundary %s', (traceCoverage) => {
     expect(assertDisplayRoutingInteractionPaint({
       kind: 'hover',

@@ -41,6 +41,9 @@ describe('routing performance workflow', () => {
     expect(workflow).toContain(
       'node scripts/verify-display-routing-browser.mjs --interaction-only',
     );
+    expect(workflow).toContain('DISPLAY_ROUTING_INTERACTION_RESULT=');
+    expect(workflow).toContain('interaction-paint summary: count=');
+    expect(workflow).toContain('$p95Ms -gt 100');
   });
 
   it('always stops its own preview process and retains every isolated report', () => {

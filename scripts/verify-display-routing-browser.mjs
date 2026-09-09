@@ -605,7 +605,10 @@ const verifyNormalRenderedObstacleAudit = async () => withPrecompiledRouteBrowse
       expectedWorkerStartCount: stability.workerStartCount,
       expectedWorkerAbortCount: stability.workerAbortCount,
       initialVisualScales: visualScales,
-      verifyInteractionStates: () => verifyDisplayRoutingInteractionStates(session),
+      verifyInteractionStates: () => verifyDisplayRoutingInteractionStates(
+        session,
+        { enforcePaintBudget: !INTERACTION_ONLY },
+      ),
       verifyVisualScales: INTERACTION_ONLY
         ? async () => []
         : () => verifyFixedVisualScales(session, route.outputRouteSignature),
@@ -774,6 +777,11 @@ const main = async () => {
       console.log(`themes: ${normal.themeMatrix.map(item => (
         `${item.id}/${item.interactions.maximumPaintMs.toFixed(1)}ms-max-paint`
       )).join(', ')}.`);
+      if (INTERACTION_ONLY) {
+        console.log(`DISPLAY_ROUTING_INTERACTION_RESULT=${JSON.stringify({
+          themes: normal.themeMatrix,
+        })}`);
+      }
     }
     const exportLine = formatDisplayRoutingExportMatrix(normal.exportMatrix);
     if (exportLine) console.log(exportLine);

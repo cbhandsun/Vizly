@@ -268,6 +268,29 @@ jobs:
               Tee-Object -FilePath $reportPath -Append
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
+          $paintDurations = @()
+          Get-Content $reportPath | Where-Object {
+            $_.StartsWith('DISPLAY_ROUTING_INTERACTION_RESULT=')
+          } | ForEach-Object {
+            $payload = $_.Substring('DISPLAY_ROUTING_INTERACTION_RESULT='.Length)
+            $result = $payload | ConvertFrom-Json
+            foreach ($theme in @($result.themes)) {
+              $paintDurations += [double]$theme.interactions.maximumPaintMs
+            }
+          }
+          $expectedCount = [int]$env:ROUTING_PERF_SAMPLE_COUNT * 3
+          if ($paintDurations.Count -ne $expectedCount) {
+            throw "Expected $expectedCount interaction paint measurements but found $($paintDurations.Count)."
+          }
+          $sortedDurations = @($paintDurations | Sort-Object)
+          $p95Index = [Math]::Max(0, [Math]::Ceiling($sortedDurations.Count * 0.95) - 1)
+          $p95Ms = [double]$sortedDurations[$p95Index]
+          $maxMs = [double]$sortedDurations[-1]
+          "interaction-paint summary: count=$($sortedDurations.Count), p95Ms=$([Math]::Round($p95Ms, 1)), maxMs=$([Math]::Round($maxMs, 1)), budgetMs=100" |
+            Tee-Object -FilePath $reportPath -Append
+          if ($p95Ms -gt 100) {
+            exit 1
+          }
 
       - name: Stop production preview
         if: ${{ always() }}

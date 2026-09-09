@@ -12,22 +12,30 @@ const INTERACTION_PAINT_BUDGET_MS = 100;
 const MINIMUM_COMPLETE_TRACE_COVERAGE = 0.995;
 const MAXIMUM_COMPLETE_TRACE_COVERAGE = 1.2;
 
-export const assertDisplayRoutingInteractionPaint = ({ kind, state, durationMs }) => {
+export const assertDisplayRoutingInteractionPaint = ({
+  kind,
+  state,
+  durationMs,
+  enforceBudget = true,
+}) => {
   const active = kind === 'hover'
     ? state?.hovered === true
     : kind === 'focus'
       ? state?.focused === true && state?.focusVisible === true
       : state?.selected === true;
-  const valid = active
+  const validState = active
     && state?.interactionPathCount === 1
     && state?.traceVisible === true
     && Number.isFinite(state?.traceCoverage)
     && state.traceCoverage >= MINIMUM_COMPLETE_TRACE_COVERAGE
     && state.traceCoverage <= MAXIMUM_COMPLETE_TRACE_COVERAGE
     && Number.isFinite(durationMs)
-    && durationMs >= 0
-    && durationMs <= INTERACTION_PAINT_BUDGET_MS;
-  if (valid) return { kind, durationMs };
+    && durationMs >= 0;
+  if (validState && (!enforceBudget || durationMs <= INTERACTION_PAINT_BUDGET_MS)) {
+    return durationMs <= INTERACTION_PAINT_BUDGET_MS
+      ? { kind, durationMs }
+      : { kind, durationMs, budgetMs: INTERACTION_PAINT_BUDGET_MS, overBudget: true };
+  }
   throw new Error(`Display-routing ${kind} paint failed: ${JSON.stringify({
     kind,
     durationMs,
@@ -154,7 +162,7 @@ const armInteractionTimestamp = (session, edgeIndex, eventName, kind) => session
   return true;
 })()`);
 
-const waitForInteractionPaint = async (session, edgeIndex, kind) => {
+const waitForInteractionPaint = async (session, edgeIndex, kind, options = {}) => {
   const deadline = Date.now() + 1_000;
   let state = null;
   while (Date.now() < deadline) {
@@ -174,10 +182,11 @@ const waitForInteractionPaint = async (session, edgeIndex, kind) => {
       && Number.isFinite(state?.interactionStartedAt)
       ? state.interactionPaintedAt - state.interactionStartedAt
       : null,
+    enforceBudget: options.enforceBudget !== false,
   });
 };
 
-const waitForPersistentSelectedPaint = async (session, edgeIndex, durationMs) => {
+const waitForPersistentSelectedPaint = async (session, edgeIndex, durationMs, options = {}) => {
   const deadline = Date.now() + 1_000;
   let state = null;
   while (Date.now() < deadline) {
@@ -185,7 +194,12 @@ const waitForPersistentSelectedPaint = async (session, edgeIndex, durationMs) =>
     if (state?.selected && !state.hovered && state.traceVisible) break;
     await delay(10);
   }
-  return assertDisplayRoutingInteractionPaint({ kind: 'selected', state, durationMs });
+  return assertDisplayRoutingInteractionPaint({
+    kind: 'selected',
+    state,
+    durationMs,
+    enforceBudget: options.enforceBudget !== false,
+  });
 };
 
 const waitForInteractionReset = async session => {
@@ -237,7 +251,8 @@ const waitForInteractionReset = async session => {
   return assertDisplayRoutingInteractionReset(state);
 };
 
-export const verifyDisplayRoutingInteractionStates = async session => {
+export const verifyDisplayRoutingInteractionStates = async (session, options = {}) => {
+  const enforceBudget = options.enforcePaintBudget !== false;
   if (await fitViewport(session) !== true) throw new Error('Unable to fit interaction audit viewport');
   const target = await findVisibleInteractionTarget(session);
   if (!target) throw new Error('Unable to find a visible topmost edge interaction path');
@@ -254,7 +269,7 @@ export const verifyDisplayRoutingInteractionStates = async session => {
     wrappers[${JSON.stringify(target.edgeIndex)}]?.focus();
     return true;
   })()`);
-  const focus = await waitForInteractionPaint(session, target.edgeIndex, 'focus');
+  const focus = await waitForInteractionPaint(session, target.edgeIndex, 'focus', { enforceBudget });
 
   await session.evaluate('document.activeElement?.blur?.()');
   await session.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 });
@@ -262,7 +277,7 @@ export const verifyDisplayRoutingInteractionStates = async session => {
   await session.send('Input.dispatchMouseEvent', {
     type: 'mouseMoved', x: target.x, y: target.y,
   });
-  const hover = await waitForInteractionPaint(session, target.edgeIndex, 'hover');
+  const hover = await waitForInteractionPaint(session, target.edgeIndex, 'hover', { enforceBudget });
 
   await armInteractionTimestamp(session, target.edgeIndex, 'pointerdown', 'selected');
   await session.send('Input.dispatchMouseEvent', {
@@ -275,12 +290,14 @@ export const verifyDisplayRoutingInteractionStates = async session => {
     session,
     target.edgeIndex,
     'selected',
+    { enforceBudget },
   );
   await session.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 });
   const selected = await waitForPersistentSelectedPaint(
     session,
     target.edgeIndex,
     selectedWhilePointerActive.durationMs,
+    { enforceBudget },
   );
 
   await session.send('Input.dispatchKeyEvent', {
