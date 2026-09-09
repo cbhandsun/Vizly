@@ -4,7 +4,7 @@
   "sourceHash": "source-v1:da286fbefa1a0d0a3ba3bf5a6589d2edba849af0f477ddb910ecad4d91649986",
   "inputSignature": "3179279980",
   "inputGeometryDigest": "geometry-v1:9748639c3654c11860e6a7da9649bfc4",
-  "outputRouteSignature": "route-v2:14:55:d0019013b866bbd1",
+  "outputRouteSignature": "route-v2:14:57:be16d0f3792c0de1",
   "hardClean": true,
   "patches": [
     {
@@ -77,19 +77,19 @@
             "y": 742
           },
           {
-            "x": 1477,
+            "x": 1314,
             "y": 742
           },
           {
-            "x": 1477,
-            "y": 1042
+            "x": 1314,
+            "y": 978
           },
           {
-            "x": 1511,
-            "y": 1042
+            "x": 1164,
+            "y": 978
           },
           {
-            "x": 1511,
+            "x": 1164,
             "y": 1256
           },
           {
@@ -206,11 +206,11 @@
           },
           {
             "x": 1054,
-            "y": 986
+            "y": 1019
           },
           {
             "x": 1961,
-            "y": 986
+            "y": 1019
           },
           {
             "x": 1961,
@@ -343,17 +343,21 @@
       "source": "wms",
       "target": "bms",
       "type": "stablePath",
-      "sourceHandle": "right",
+      "sourceHandle": "bottom",
       "targetHandle": "top",
       "data": {
         "computedPath": [
           {
-            "x": 332,
-            "y": 871
+            "x": 193,
+            "y": 930
+          },
+          {
+            "x": 193,
+            "y": 1000
           },
           {
             "x": 731,
-            "y": 871
+            "y": 1000
           },
           {
             "x": 731,
@@ -368,20 +372,24 @@
       "source": "wms",
       "target": "visibility",
       "type": "stablePath",
-      "sourceHandle": "right",
+      "sourceHandle": "bottom",
       "targetHandle": "top",
       "data": {
         "computedPath": [
           {
-            "x": 332,
-            "y": 871
+            "x": 193,
+            "y": 930
           },
           {
-            "x": 388,
-            "y": 871
+            "x": 193,
+            "y": 1020
           },
           {
-            "x": 388,
+            "x": 602,
+            "y": 1020
+          },
+          {
+            "x": 602,
             "y": 1256
           },
           {

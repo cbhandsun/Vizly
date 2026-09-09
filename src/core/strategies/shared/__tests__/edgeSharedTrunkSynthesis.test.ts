@@ -637,6 +637,49 @@ describe('synthesizeSharedEndpointTrunks', () => {
     expect(result.every(edge => (edge.data as any).sharedTrunkSynthesized !== true)).toBe(true);
   });
 
+  it('uses node hemispheres to avoid merging same-source branches toward opposite sides', () => {
+    const edges: Edge[] = [
+      {
+        id: 'hub-to-left',
+        source: 'hub',
+        target: 'left',
+        data: {
+          computedPath: [
+            { x: 320, y: 380 },
+            { x: 320, y: 440 },
+            { x: 80, y: 440 },
+            { x: 80, y: 640 },
+          ],
+        },
+      },
+      {
+        id: 'hub-to-right',
+        source: 'hub',
+        target: 'right',
+        data: {
+          computedPath: [
+            { x: 400, y: 380 },
+            { x: 400, y: 460 },
+            { x: 780, y: 460 },
+            { x: 780, y: 640 },
+          ],
+        },
+      },
+    ];
+    const nodes = [
+      node('left', 0, 600),
+      node('hub', 300, 300),
+      node('right', 720, 600),
+    ];
+
+    const result = synthesizeSharedSourceTrunks(edges, { nodes });
+
+    expect(result.map(edge => (edge.data as any).computedPath)).toEqual(
+      edges.map(edge => (edge.data as any).computedPath),
+    );
+    expect(result.every(edge => (edge.data as any).sharedTrunkSynthesized !== true)).toBe(true);
+  });
+
   it('detaches a reverse feedback edge that was already merged into the forward target trunk', () => {
     const edges: Edge[] = [
       {

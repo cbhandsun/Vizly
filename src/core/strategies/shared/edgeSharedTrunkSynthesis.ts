@@ -322,9 +322,12 @@ function applySharedEndpointTrunks(
     if (indices.length < MIN_GROUP_SIZE) continue;
     const side = endpoint === 'source' ? sourceSide(paths[indices[0]]) : targetSide(paths[indices[0]]);
     if (!side) continue;
-    const nodeGeometryGroups = endpoint === 'target'
-      ? splitNodeGeometryHemisphereGroups(edges, indices, endpoint, options.nodes)
-      : null;
+    const nodeGeometryGroups = splitNodeGeometryHemisphereGroups(
+      edges,
+      indices,
+      endpoint,
+      options.nodes,
+    );
     const subgroupList = nodeGeometryGroups
       ?? (endpoint === 'target' ? splitTargetDirectionGroups(paths, indices, side) : [indices]);
 
