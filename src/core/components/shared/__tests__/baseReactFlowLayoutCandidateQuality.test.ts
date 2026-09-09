@@ -23,11 +23,29 @@ describe('routed layout candidate quality', () => {
     expect(routedLayoutDominates(crossed, routed)).toBe(false);
   });
   it('accepts shorter routed paths without widening the graph or adding crossings', () => {
-    const baseline = { width: 200, height: 160, crossings: 1, sharedLaneOverlap: 0, pathLength: 600, bends: 2, backwardTravel: 0 };
+    const baseline = {
+      width: 200,
+      height: 160,
+      crossings: 1,
+      sharedLaneOverlap: 0,
+      hemisphereSharedLaneOverlap: 0,
+      pathLength: 600,
+      bends: 2,
+      backwardTravel: 0,
+    };
     const candidate = { ...baseline, height: 120, pathLength: 400, crossings: 0 };
     expect(routedLayoutDominates(baseline, candidate)).toBe(true);
     expect(routedLayoutDominates(candidate, candidate)).toBe(false);
-    for (const key of ['width', 'height', 'crossings', 'sharedLaneOverlap', 'pathLength', 'bends', 'backwardTravel'] as const) {
+    for (const key of [
+      'width',
+      'height',
+      'crossings',
+      'sharedLaneOverlap',
+      'hemisphereSharedLaneOverlap',
+      'pathLength',
+      'bends',
+      'backwardTravel',
+    ] as const) {
       expect(routedLayoutDominates(baseline, { ...candidate, [key]: baseline[key] + 1 })).toBe(false);
     }
   });
@@ -48,6 +66,33 @@ describe('routed layout candidate quality', () => {
     expect(candidate).toMatchObject({ sharedLaneOverlap: 0, pathLength: 320, bends: 0, crossings: 0 });
     expect(routedLayoutDominates(baseline, candidate)).toBe(true);
     expect(routedLayoutDominates(candidate, baseline)).toBe(false);
+  });
+  it('measures same-endpoint shared lanes across opposite node hemispheres', () => {
+    const hemisphereNodes: Node[] = [
+      { id: 'hub', data: {}, position: { x: 100, y: 100 }, width: 40, height: 40 },
+      { id: 'left', data: {}, position: { x: 0, y: 100 }, width: 40, height: 40 },
+      { id: 'right', data: {}, position: { x: 220, y: 100 }, width: 40, height: 40 },
+      { id: 'right-2', data: {}, position: { x: 220, y: 180 }, width: 40, height: 40 },
+    ];
+    const sharedOpposite: Edge[] = [
+      { id: 'left', source: 'hub', target: 'left', data: { computedPath: [
+        { x: 120, y: 120 }, { x: 120, y: 180 }, { x: 20, y: 180 },
+      ] } },
+      { id: 'right', source: 'hub', target: 'right', data: { computedPath: [
+        { x: 120, y: 120 }, { x: 120, y: 180 }, { x: 240, y: 180 },
+      ] } },
+    ];
+    const sharedSame: Edge[] = [
+      sharedOpposite[1],
+      { id: 'right-2', source: 'hub', target: 'right-2', data: { computedPath: [
+        { x: 120, y: 120 }, { x: 120, y: 180 }, { x: 240, y: 180 }, { x: 240, y: 200 },
+      ] } },
+    ];
+
+    expect(measureRoutedLayoutQuality(hemisphereNodes, sharedOpposite))
+      .toMatchObject({ hemisphereSharedLaneOverlap: 60 });
+    expect(measureRoutedLayoutQuality(hemisphereNodes, sharedSame))
+      .toMatchObject({ hemisphereSharedLaneOverlap: 0 });
   });
   it.each(['TB', 'BT', 'LR', 'RL'] as const)('measures backward travel consistently in %s', direction => {
     const path = [{ x: 60, y: 0 }, { x: 60, y: 100 }, { x: 100, y: 100 },

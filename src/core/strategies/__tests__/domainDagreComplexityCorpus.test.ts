@@ -123,33 +123,33 @@ type DirectionalQualityLimits = Readonly<{
 
 const qualityLimits: Readonly<Record<string, DirectionalQualityLimits>> = {
   'sparse-chain': {
-    vertical: { width: 1075, height: 416, pathLength: 1208, backwardTravel: 248, bends: 4, crossings: 0, sharedLaneOverlap: 0 },
-    horizontal: { width: 1198, height: 860, pathLength: 1180, backwardTravel: 0, bends: 2, crossings: 0, sharedLaneOverlap: 0 },
+    vertical: { width: 1075, height: 416, pathLength: 1208, backwardTravel: 248, bends: 4, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0 },
+    horizontal: { width: 1198, height: 860, pathLength: 1180, backwardTravel: 0, bends: 2, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0 },
   },
   'dense-fan': {
-    vertical: { width: 1123, height: 1340, pathLength: 11146, backwardTravel: 0, bends: 12, crossings: 0, sharedLaneOverlap: 172 },
-    horizontal: { width: 2315, height: 860, pathLength: 14952, backwardTravel: 0, bends: 12, crossings: 0, sharedLaneOverlap: 358 },
+    vertical: { width: 1123, height: 1340, pathLength: 11146, backwardTravel: 0, bends: 12, crossings: 0, sharedLaneOverlap: 172, hemisphereSharedLaneOverlap: 0 },
+    horizontal: { width: 2315, height: 860, pathLength: 14952, backwardTravel: 0, bends: 12, crossings: 0, sharedLaneOverlap: 358, hemisphereSharedLaneOverlap: 0 },
   },
   'nested-subgroups': {
-    vertical: { width: 1668, height: 1160, pathLength: 3692, backwardTravel: 0, bends: 7, crossings: 0, sharedLaneOverlap: 0 },
-    horizontal: { width: 1552, height: 1344, pathLength: 3074, backwardTravel: 0, bends: 7, crossings: 0, sharedLaneOverlap: 0 },
+    vertical: { width: 1668, height: 1160, pathLength: 3692, backwardTravel: 0, bends: 7, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0 },
+    horizontal: { width: 1552, height: 1344, pathLength: 3074, backwardTravel: 0, bends: 7, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0 },
   },
   'feedback-cycle': {
-    vertical: { width: 634, height: 912, pathLength: 1847, backwardTravel: 496, bends: 3, crossings: 0, sharedLaneOverlap: 0 },
-    horizontal: { width: 1198, height: 520, pathLength: 1990, backwardTravel: 708, bends: 3, crossings: 0, sharedLaneOverlap: 0 },
+    vertical: { width: 634, height: 912, pathLength: 1847, backwardTravel: 496, bends: 3, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0 },
+    horizontal: { width: 1198, height: 520, pathLength: 1990, backwardTravel: 708, bends: 3, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0 },
   },
   'fixed-ports': {
-    vertical: { width: 634, height: 912, pathLength: 1776, backwardTravel: 0, bends: 10, crossings: 0, sharedLaneOverlap: 3 },
-    horizontal: { width: 1198, height: 520, pathLength: 820, backwardTravel: 0, bends: 2, crossings: 0, sharedLaneOverlap: 0 },
-    reverseHorizontal: { width: 1198, height: 520, pathLength: 1742, backwardTravel: 56, bends: 2, crossings: 0, sharedLaneOverlap: 7 },
+    vertical: { width: 634, height: 912, pathLength: 1776, backwardTravel: 0, bends: 10, crossings: 0, sharedLaneOverlap: 3, hemisphereSharedLaneOverlap: 0 },
+    horizontal: { width: 1198, height: 520, pathLength: 820, backwardTravel: 0, bends: 2, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0 },
+    reverseHorizontal: { width: 1198, height: 520, pathLength: 1742, backwardTravel: 56, bends: 2, crossings: 0, sharedLaneOverlap: 7, hemisphereSharedLaneOverlap: 0 },
   },
   'unbalanced-components': {
-    vertical: { width: 1075, height: 1160, pathLength: 966, backwardTravel: 0, bends: 1, crossings: 0, sharedLaneOverlap: 0 },
-    horizontal: { width: 1552, height: 860, pathLength: 1118, backwardTravel: 0, bends: 1, crossings: 0, sharedLaneOverlap: 0 },
+    vertical: { width: 1075, height: 1160, pathLength: 966, backwardTravel: 0, bends: 1, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0 },
+    horizontal: { width: 1552, height: 860, pathLength: 1118, backwardTravel: 0, bends: 1, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0 },
   },
   'multi-lane-handoff-fan': {
-    vertical: { width: 2400, height: 1800, pathLength: 22000, backwardTravel: 580, bends: 32, crossings: 0, sharedLaneOverlap: 128 },
-    horizontal: { width: 3600, height: 1540, pathLength: 28000, backwardTravel: 580, bends: 32, crossings: 2, sharedLaneOverlap: 256 },
+    vertical: { width: 2400, height: 1800, pathLength: 22000, backwardTravel: 580, bends: 32, crossings: 0, sharedLaneOverlap: 128, hemisphereSharedLaneOverlap: 0 },
+    horizontal: { width: 3600, height: 1540, pathLength: 28000, backwardTravel: 580, bends: 32, crossings: 2, sharedLaneOverlap: 256, hemisphereSharedLaneOverlap: 0 },
   },
 };
 
@@ -186,7 +186,7 @@ describe('domain Dagre generic complexity corpus', () => {
       expect(quality).not.toBeNull();
       if (!quality) throw new Error('Missing complete routed quality vector');
       const limit = qualityLimitFor(value.id, direction);
-      for (const key of ['width', 'height', 'pathLength', 'backwardTravel', 'bends', 'crossings', 'sharedLaneOverlap'] as const) {
+      for (const key of ['width', 'height', 'pathLength', 'backwardTravel', 'bends', 'crossings', 'sharedLaneOverlap', 'hemisphereSharedLaneOverlap'] as const) {
         expect(quality[key], `Routed quality regressed: ${value.id} ${direction} ${key}`)
           .toBeLessThanOrEqual(limit[key] + 0.01);
       }
