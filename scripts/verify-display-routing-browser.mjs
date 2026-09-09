@@ -46,7 +46,7 @@ import { verifyDisplayRoutingThemeMatrix } from './lib/display-routing-browser-t
 import { verifyDisplayRoutingInteractionStates } from './lib/display-routing-browser-interaction-audit.mjs';
 import { DISPLAY_ROUTING_EXPORT_CAPTURE_SCRIPT, formatDisplayRoutingExportMatrix, verifyDisplayRoutingExportMatrix } from './lib/display-routing-browser-export-audit.mjs';
 import { waitForDisplayRoutingBrowserValue as waitForValue } from './lib/display-routing-browser-wait.mjs';
-import { displayRoutingBrowserLifecycleExpression } from './lib/display-routing-browser-lifecycle.mjs';
+import { withDisplayRoutingFailureEvidence } from './lib/display-routing-browser-failure-evidence.mjs';
 import { captureDisplayRoutingEditBaseline, readDisplayRoutingEditStability } from './lib/display-routing-edit-stability.mjs';
 
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '')
@@ -82,34 +82,6 @@ if (INTERACTION_ONLY && COLLECT_PERFORMANCE_SAMPLES) {
   throw new Error('--interaction-only cannot collect incremental-route performance samples');
 }
 
-
-const readDisplayRoutingFailureEnvelope = async (session, error) => {
-  const message = error instanceof Error ? error.message : 'Display routing browser verification failed';
-  let diagnostics = null;
-  let evidenceStatus = 'evaluation-failed';
-  try {
-    diagnostics = await session.evaluate(displayRoutingBrowserLifecycleExpression);
-    evidenceStatus = 'available';
-  } catch {
-    diagnostics = null;
-  }
-  return new Error(`${message}
-Browser state wait failed
-${JSON.stringify({
-    waitStatus: 'predicate-failed',
-    evidenceStatus,
-    diagnostics,
-    lastObservedDiagnostics: null,
-  }, null, 2)}`);
-};
-
-const withDisplayRoutingFailureEvidence = async (session, run) => {
-  try {
-    return await run();
-  } catch (error) {
-    throw await readDisplayRoutingFailureEnvelope(session, error);
-  }
-};
 
 const initialReadyExpression = `(() => {
   const replayResponseEdges = ${replayDisplayRoutingResponseEdges.toString()};
