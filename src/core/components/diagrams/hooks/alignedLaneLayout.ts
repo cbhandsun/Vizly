@@ -45,6 +45,15 @@ export const preferAlignedLaneLayout = (baseline: RoutedLayoutCandidate, candida
   );
 };
 
+const tiedLaneRankMetrics = (decision: LaneRankDecision): boolean => {
+  if (decision.requested !== 'auto' || decision.applied !== 'global') return false;
+  const global = decision.metrics.global, compact = decision.metrics.compact;
+  if (!global || !compact) return false;
+  const fields = ['flowLength', 'whitespaceRatio', 'backwardTravel', 'backwardEdgeCount'] as const;
+  return fields.every(key => Number.isFinite(global[key]) && Number.isFinite(compact[key])
+    && Math.abs(global[key] - compact[key]) <= 0.01);
+};
+
 /** One optional candidate for an already-selected global phase model. Failed
  * geometry/routing stays with the existing transaction's validated baseline. */
 export function createAlignedLaneComparison({ nodes, edges, options, direction, context, decision, onSelectedDecision }: {
@@ -58,14 +67,24 @@ export function createAlignedLaneComparison({ nodes, edges, options, direction, 
     || edges.some(edge => edge.data?.waypoints !== undefined
       && (!Array.isArray(edge.data.waypoints) || edge.data.waypoints.length > 0))) return undefined;
   let alternativeDecision: LaneRankDecision | undefined;
+  const compareCompactRank = tiedLaneRankMetrics(decision);
   return {
     create: async (): Promise<LayoutCandidate | null> => {
       const { DomainDagreLayoutStrategy } = await import('../../../strategies/DomainDagreLayoutStrategy');
       const result = await calculateLayeredLayoutWithReverse(new DomainDagreLayoutStrategy(), nodes, edges, {
-        ...options, alignGlobalLanePeers: true, previousLaneRankDecision: decision,
+        ...options,
+        ...(compareCompactRank ? { laneRankPreference: 'compact' as const } : { alignGlobalLanePeers: true }),
+        previousLaneRankDecision: decision,
       }, direction, true, context);
-      alternativeDecision = result.metadata?.laneRankDecision;
-      if (alternativeDecision?.applied !== 'global') { alternativeDecision = undefined; return null; }
+      const generatedDecision = result.metadata?.laneRankDecision;
+      const expectedMode = compareCompactRank ? 'compact' : 'global';
+      if (generatedDecision?.applied !== expectedMode) { alternativeDecision = undefined; return null; }
+      alternativeDecision = compareCompactRank ? {
+        ...decision,
+        applied: 'compact',
+        reason: 'routed-quality',
+        previousApplied: decision.applied,
+      } : generatedDecision;
       const finalNodes = stripHiddenGeneratedLayoutNodes(result.nodes, {
         generateDomainGroups: true, generateSubDomainGroups: options.generateSubDomainGroups !== false,
         domainWhitelist: options.domainWhitelist, subDomainWhitelist: options.subDomainWhitelist,

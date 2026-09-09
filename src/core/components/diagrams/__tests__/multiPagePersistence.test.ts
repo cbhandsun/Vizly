@@ -119,6 +119,24 @@ describe('multiPagePersistence', () => {
         });
     });
 
+    it('accepts a bounded routed-quality lane decision', () => {
+        const metric = { flowLength: 500, whitespaceRatio: 0.5, backwardTravel: 0, backwardEdgeCount: 0 };
+        expect(parseLayoutSelection({
+            version: 2,
+            strategy: 'domain-dagre',
+            direction: 'TB',
+            nodeLayout: 'dagre',
+            laneRankPreference: 'auto',
+            laneRankDecision: {
+                version: 1, policyVersion: 1, requested: 'auto', applied: 'compact',
+                reason: 'routed-quality', direction: 'TB', connectedInputFingerprint: 'safe',
+                metrics: { global: metric, compact: metric }, previousApplied: 'global',
+            },
+        })?.laneRankDecision).toMatchObject({
+            requested: 'auto', applied: 'compact', reason: 'routed-quality', previousApplied: 'global',
+        });
+    });
+
     it.each([
         { laneRankPreference: 'diagonal' },
         { laneRankDecision: { version: 2 } },

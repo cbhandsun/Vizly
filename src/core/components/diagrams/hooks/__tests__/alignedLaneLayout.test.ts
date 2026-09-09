@@ -44,6 +44,26 @@ describe('bounded global lane alignment comparison', () => {
     expect(comparison.prefer(candidate(500), after)).toBe(true);
     expect(args.onSelectedDecision).toHaveBeenCalledWith(decision);
   });
+  it('uses routed quality to break an exact semantic-rank tie', async () => {
+    const metrics = { flowLength: 500, whitespaceRatio: 0.5, backwardTravel: 0, backwardEdgeCount: 0 };
+    const tiedDecision: LaneRankDecision = { ...decision, metrics: { global: metrics, compact: metrics } };
+    const args = { ...settings(), decision: tiedDecision };
+    const comparison = createAlignedLaneComparison(args);
+    if (!comparison) throw Error('Expected comparison');
+    calculate.mockResolvedValue({
+      ...candidate(200).geometry,
+      metadata: { laneRankDecision: { ...tiedDecision, requested: 'compact', applied: 'compact' } },
+    });
+
+    await comparison.create();
+    expect(calculate.mock.calls[0]?.[2]).toMatchObject({
+      laneRankPreference: 'compact', previousLaneRankDecision: tiedDecision,
+    });
+    expect(comparison.prefer(candidate(500), candidate(200))).toBe(true);
+    expect(args.onSelectedDecision).toHaveBeenCalledWith(expect.objectContaining({
+      requested: 'auto', applied: 'compact', reason: 'routed-quality', previousApplied: 'global',
+    }));
+  });
   it('rejects candidates that change the selected rank mode or lose its decision', async () => {
     const args = settings(), comparison = createAlignedLaneComparison(args);
     if (!comparison) throw Error('Expected comparison');

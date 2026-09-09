@@ -27,7 +27,7 @@ const PREFERENCES = new Set<LaneRankPreference>(['auto', 'global', 'compact']);
 const MODES = new Set<LaneRankMode>(['global', 'compact']);
 const REASONS = new Set<LaneRankDecisionReason>([
   'manual-global', 'manual-compact', 'compact-benefit', 'global-preserved',
-  'hysteresis', 'unchanged-connected-flow', 'alternative-invalid',
+  'hysteresis', 'unchanged-connected-flow', 'alternative-invalid', 'routed-quality',
 ]);
 const MAX_FINGERPRINT_LENGTH = 256;
 const MAX_METRIC_VALUE = 1_000_000_000;

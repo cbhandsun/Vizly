@@ -12,7 +12,7 @@ export type LaneRankMetrics = Readonly<{
 export type LaneRankDecisionReason =
   | 'manual-global' | 'manual-compact'
   | 'compact-benefit' | 'global-preserved' | 'hysteresis'
-  | 'unchanged-connected-flow' | 'alternative-invalid';
+  | 'unchanged-connected-flow' | 'alternative-invalid' | 'routed-quality';
 
 /** Small, content-free explanation of a successfully committed lane layout. */
 export type LaneRankDecision = Readonly<{

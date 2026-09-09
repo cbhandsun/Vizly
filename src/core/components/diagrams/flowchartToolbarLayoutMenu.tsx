@@ -201,6 +201,7 @@ export const buildFlowchartLayoutMenuModel = ({
         hysteresis: '保留上次成功模式以避免临界输入切换',
         'unchanged-connected-flow': '连接流程未变化，保留上次成功模式',
         'alternative-invalid': '另一候选未通过布局约束，保留可用模式',
+        'routed-quality': '最终连线质量更好，采用域内紧凑模式',
     };
 
     const domainItem = (

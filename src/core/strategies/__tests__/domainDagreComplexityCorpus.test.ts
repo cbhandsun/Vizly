@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { evaluateLayoutGeometry } from '../../algorithms/layoutGeometryConstraints';
 import { auditBaseReactFlowDisplayCommercialQuality } from '../../components/shared/baseReactFlowDisplayCommercialQuality';
 import { projectBaseReactFlowDisplayWorkerInput } from '../../components/shared/baseReactFlowDisplayWorkerProjection';
-import { measureRoutedLayoutQuality, type RoutedLayoutQuality } from '../../components/shared/routedLayoutQuality';
+import { measureRoutedLayoutQuality, routedLayoutDominates, type RoutedLayoutQuality } from '../../components/shared/routedLayoutQuality';
 import { LayoutType } from '../../types/layout';
 import { DomainDagreLayoutStrategy } from '../DomainDagreLayoutStrategy';
 
@@ -209,5 +209,39 @@ describe('domain Dagre generic complexity corpus', () => {
       expect(groupEnd - contentEnd).toBeGreaterThanOrEqual(0);
       expect((contentStart - groupStart) + (groupEnd - contentEnd)).toBeLessThanOrEqual(horizontal ? 56 : 114);
     }
+  });
+
+  it.each(directions)('exposes the compact routed winner for an unbalanced rank tie in %s', async direction => {
+    const value = corpus.find(entry => entry.id === 'unbalanced-components');
+    if (!value) throw new Error('Missing unbalanced corpus case');
+    const options = {
+      type: LayoutType.DAGRE,
+      nodeLayout: LayoutType.DAGRE,
+      direction,
+      domainPlacement: 'ordered-lanes' as const,
+      domainSubGroupDirection: direction,
+      subDomainNodeDirection: direction,
+      generateDomainGroups: true,
+      generateSubDomainGroups: true,
+      fitDomainContent: true,
+      edgeRoutingQuality: 'interactive' as const,
+      laneRankPreference: 'auto' as const,
+    };
+    const strategy = new DomainDagreLayoutStrategy();
+    const [baseline, alternative] = await Promise.all([
+      strategy.calculateLayout(value.nodes, value.edges, options),
+      strategy.calculateLayout(value.nodes, value.edges, { ...options, laneRankPreference: 'compact' }),
+    ]);
+    const decision = baseline.metadata?.laneRankDecision;
+    if (!decision) throw new Error('Missing baseline lane-rank decision');
+    const before = measureRoutedLayoutQuality(baseline.nodes, baseline.edges, direction);
+    const after = measureRoutedLayoutQuality(alternative.nodes, alternative.edges, direction);
+    expect(decision).toMatchObject({
+      requested: 'auto', applied: 'global', reason: 'global-preserved',
+    });
+    expect(decision.metrics.global).toEqual(decision.metrics.compact);
+    expect(routedLayoutDominates(before, after)).toBe(true);
+    expect(after?.pathLength).toBeLessThan(before?.pathLength ?? 0);
+    expect(after?.bends).toBeLessThan(before?.bends ?? 0);
   });
 });
