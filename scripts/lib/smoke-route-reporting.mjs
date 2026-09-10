@@ -164,9 +164,22 @@ export const aggregateRouteSamples = (samples) => {
   const worstReport = reports.reduce((worst, report) => (
     report.readyAt > worst.readyAt ? report : worst
   ), reports[0]);
+  const stabilityReports = samples
+    .map((sample) => sample.stabilityReport)
+    .filter((report) => report && typeof report === 'object');
+  const stabilityReport = stabilityReports.length > 0 ? {
+    ...representativeSample.stabilityReport,
+    durationMs: upperMedian(stabilityReports.map((report) => report.durationMs)),
+    longTaskCount: upperMedian(stabilityReports.map((report) => report.longTaskCount)),
+    maxLongTaskMs: upperMedian(stabilityReports.map((report) => report.maxLongTaskMs)),
+    heapGrowthKB: upperMedian(stabilityReports.map((report) => report.heapGrowthKB)),
+    activeWorkers: upperMedian(stabilityReports.map((report) => report.activeWorkers)),
+    queuedTasks: upperMedian(stabilityReports.map((report) => report.queuedTasks)),
+  } : representativeSample.stabilityReport;
 
   return {
     ...representativeSample,
+    stabilityReport,
     sampleCount: samples.length,
     representativeSampleIndex,
     samples,
@@ -174,10 +187,6 @@ export const aggregateRouteSamples = (samples) => {
     assetReport: {
       ...representativeSample.assetReport,
       readyAt: medianReadyAt,
-      criticalAssets: upperMedian(reports.map((report) => report.criticalAssets)),
-      criticalDecodedKB: upperMedian(reports.map((report) => report.criticalDecodedKB)),
-      totalAssets: upperMedian(reports.map((report) => report.totalAssets)),
-      totalDecodedKB: upperMedian(reports.map((report) => report.totalDecodedKB)),
     },
   };
 };
@@ -273,7 +282,7 @@ export const collectBudgetViolations = (results, { enabled = false, isMobile = f
         });
       }
     }
-    const sampleReports = result.samples || [result];
+    const sampleReports = result.sampleCount > 1 && result.stabilityReport ? [result] : result.samples || [result];
     const representativeSampleIndex = Number.isSafeInteger(result.representativeSampleIndex)
       ? result.representativeSampleIndex
       : 0;
@@ -282,18 +291,11 @@ export const collectBudgetViolations = (results, { enabled = false, isMobile = f
         sample.stabilityReport,
         sample.stabilityBudget,
       )) {
-        if (
-          sampleReports.length > 1
-          && sampleIndex !== representativeSampleIndex
-          && violation.metric === 'longTaskCount'
-        ) {
-          continue;
-        }
         violations.push({
           route: result.name,
           ...violation,
           sampleCount: result.sampleCount || 1,
-          sampleIndex: sampleIndex + 1,
+          sampleIndex: result.sampleCount > 1 ? representativeSampleIndex + 1 : sampleIndex + 1,
         });
       }
     }

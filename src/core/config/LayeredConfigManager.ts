@@ -229,7 +229,7 @@ export class LayeredConfigManager {
     }
     registeredSchema.defaultValue = cloneConfigValue(validatedDefaultValue);
     this.invalidateCache();
-    this.configLogger.debug(`注册配置模式: ${schema.key}`);
+    safeLog.debug(`LayeredConfigManager: registered schema ${schema.key}`);
   }
 
   /**

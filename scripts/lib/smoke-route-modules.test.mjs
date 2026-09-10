@@ -706,7 +706,7 @@ describe('smoke route modules', () => {
     expect(result.worstReport.readyAt).toBe(300);
     expect(collectBudgetViolations([result])).toEqual([]);
   });
-  it('uses representative samples for long task count while keeping hard stability spikes visible', () => {
+  it('uses representative repeated samples for stability while preserving per-sample evidence', () => {
     const samples = [100, 200, 300].map((readyAt, index) => ({
       name: 'management', assetReport: { readyAt, criticalAssets: 1, criticalDecodedKB: 1,
         totalAssets: 1, totalDecodedKB: 1 },
@@ -715,16 +715,23 @@ describe('smoke route modules', () => {
     }));
     const result = aggregateRouteSamples(samples);
     expect(result.stabilityReport.longTaskCount).toBe(0);
+    expect(result.stabilityReport.maxLongTaskMs).toBe(100);
     expect(result.representativeSampleIndex).toBe(1);
-    expect(collectBudgetViolations([result], { enabled: true })).toEqual([
-      { route: 'management', metric: 'maxLongTaskMs', actual: 250, max: 200, unit: 'ms', sampleCount: 3, sampleIndex: 3 },
-    ]);
+    expect(result.samples[2].stabilityReport.maxLongTaskMs).toBe(250);
+    expect(collectBudgetViolations([result], { enabled: true })).toEqual([]);
     samples[1].stabilityReport.longTaskCount = 2;
     expect(collectBudgetViolations([aggregateRouteSamples(samples)], { enabled: true })).toContainEqual(
       { route: 'management', metric: 'longTaskCount', actual: 2, max: 1, unit: 'tasks', sampleCount: 3, sampleIndex: 2 },
     );
     samples[0].stabilityReport.longTaskCount = 1;
     samples[1].stabilityReport.longTaskCount = 0;
+    samples[0].stabilityReport.maxLongTaskMs = 280;
+    samples[1].stabilityReport.maxLongTaskMs = 260;
+    expect(collectBudgetViolations([aggregateRouteSamples(samples)], { enabled: true })).toContainEqual(
+      { route: 'management', metric: 'maxLongTaskMs', actual: 260, max: 200, unit: 'ms', sampleCount: 3, sampleIndex: 2 },
+    );
+    samples[0].stabilityReport.maxLongTaskMs = 100;
+    samples[1].stabilityReport.maxLongTaskMs = 100;
     samples[2].stabilityReport.maxLongTaskMs = 200;
     expect(collectBudgetViolations([aggregateRouteSamples(samples)], { enabled: true })).toEqual([]);
     samples[0].stabilityReport.longTaskCount = 2;
