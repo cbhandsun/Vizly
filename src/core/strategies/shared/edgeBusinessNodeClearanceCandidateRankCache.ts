@@ -40,6 +40,18 @@ export const measureBusinessNodeClearanceTerminalBacktrack = (
   return backtrack;
 };
 
+const lazyTerminalBacktrack = (candidate: readonly Point[]): Readonly<{
+  terminalBacktrack: number;
+}> => {
+  let value: number | null = null;
+  return {
+    get terminalBacktrack() {
+      value ??= measureBusinessNodeClearanceTerminalBacktrack(candidate);
+      return value;
+    },
+  };
+};
+
 /**
  * Reuses only absolute clearance ranks for an exact request-local candidate
  * collection. The cache lifetime is one repair transaction and collection
@@ -77,7 +89,7 @@ export const createBusinessNodeClearanceCandidateRankCache = () => {
           length,
           minimumClearanceViolation,
           bendCount: Math.max(0, candidate.length - 2),
-          terminalBacktrack: measureBusinessNodeClearanceTerminalBacktrack(candidate),
+          ...lazyTerminalBacktrack(candidate),
         };
       });
       ranksByCollection.set(collection, value);

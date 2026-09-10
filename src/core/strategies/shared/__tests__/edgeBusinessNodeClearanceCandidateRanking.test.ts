@@ -144,6 +144,23 @@ describe('rankBusinessNodeClearanceCandidates', () => {
     ]);
   });
 
+  it('does not read terminal backtracking when risk already decides the winner', () => {
+    let terminalBacktrackReads = 0;
+    const ranked = rankBusinessNodeClearanceCandidates([
+      candidate('lower-risk', { risk: 1 }),
+      candidate('higher-risk', { risk: 2 }),
+    ].map(entry => ({
+      ...entry,
+      get terminalBacktrack() {
+        terminalBacktrackReads += 1;
+        return entry.terminalBacktrack;
+      },
+    })), { hits: 1, commercialRisk: 10, risk: 10 });
+
+    expect(ranked.map(entry => entry.candidate)).toEqual(['lower-risk', 'higher-risk']);
+    expect(terminalBacktrackReads).toBe(0);
+  });
+
   it('does not rank unused alternatives after an accepted first winner', () => {
     let candidateReads = 0;
     const candidates = [
