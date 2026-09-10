@@ -6,6 +6,7 @@ export type BusinessNodeClearanceCandidateRank<T> = Readonly<{
   length: number;
   minimumClearanceViolation: boolean;
   risk: number;
+  terminalBacktrack: number;
 }>;
 
 export type BusinessNodeClearanceBaselineRank = Readonly<{
@@ -47,10 +48,26 @@ const canReplace = <T>(
 ): boolean => {
   if (candidate.hits > best.hits) return false;
   if (candidate.commercialRisk > best.commercialRisk + RISK_TOLERANCE) return false;
+  const sameLocalRiskBand = candidate.hits === best.hits
+    && Math.abs(candidate.commercialRisk - best.commercialRisk) <= RISK_TOLERANCE
+    && Math.abs(candidate.risk - best.risk) <= RISK_TOLERANCE;
+  const improvesStableGeometry = sameLocalRiskBand && (
+    candidate.terminalBacktrack < best.terminalBacktrack
+    || (
+      candidate.terminalBacktrack === best.terminalBacktrack
+      && candidate.bendCount < best.bendCount
+    )
+    || (
+      candidate.terminalBacktrack === best.terminalBacktrack
+      && candidate.bendCount === best.bendCount
+      && candidate.length < best.length
+    )
+  );
   if (
     candidate.hits === best.hits
     && Math.abs(candidate.commercialRisk - best.commercialRisk) <= RISK_TOLERANCE
     && candidate.risk >= best.risk - RISK_TOLERANCE
+    && !improvesStableGeometry
   ) return false;
   return candidate.hits < best.hits
     || candidate.commercialRisk < best.commercialRisk - RISK_TOLERANCE
@@ -58,18 +75,7 @@ const canReplace = <T>(
       Math.abs(candidate.commercialRisk - best.commercialRisk) <= RISK_TOLERANCE
       && candidate.risk < best.risk - RISK_TOLERANCE
     )
-    || (
-      candidate.hits === best.hits
-      && Math.abs(candidate.commercialRisk - best.commercialRisk) <= RISK_TOLERANCE
-      && Math.abs(candidate.risk - best.risk) <= RISK_TOLERANCE
-      && (
-        candidate.bendCount < best.bendCount
-        || (
-          candidate.bendCount === best.bendCount
-          && candidate.length < best.length
-        )
-      )
-    );
+    || improvesStableGeometry;
 };
 
 /**
@@ -103,6 +109,7 @@ export function* iterateBusinessNodeClearanceCandidates<T>(
       length: Number.POSITIVE_INFINITY,
       minimumClearanceViolation: false,
       risk: baseline.risk,
+      terminalBacktrack: Number.POSITIVE_INFINITY,
     };
     let bestIndex = -1;
     for (let index = 0; index < remaining.length; index += 1) {

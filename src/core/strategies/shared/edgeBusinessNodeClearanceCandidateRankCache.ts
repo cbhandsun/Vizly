@@ -7,6 +7,39 @@ type CandidateWithHits = Readonly<{
   hits: number;
 }>;
 
+const axisProgress = (point: Point, origin: Point, vector: Point): number => (
+  (point.x - origin.x) * vector.x + (point.y - origin.y) * vector.y
+);
+
+const terminalDirection = (from: Point, to: Point): Point | null => {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const length = Math.abs(dx) + Math.abs(dy);
+  if (length <= 0) return null;
+  return { x: dx / length, y: dy / length };
+};
+
+export const measureBusinessNodeClearanceTerminalBacktrack = (
+  candidate: readonly Point[],
+): number => {
+  if (candidate.length < 2) return 0;
+  const sourceDirection = terminalDirection(candidate[0], candidate[1]);
+  const targetDirection = terminalDirection(candidate[candidate.length - 2], candidate[candidate.length - 1]);
+  let backtrack = 0;
+  if (sourceDirection) {
+    for (const point of candidate) {
+      backtrack += Math.max(0, -axisProgress(point, candidate[0], sourceDirection));
+    }
+  }
+  if (targetDirection) {
+    const target = candidate[candidate.length - 1];
+    for (const point of candidate) {
+      backtrack += Math.max(0, axisProgress(point, target, targetDirection));
+    }
+  }
+  return backtrack;
+};
+
 /**
  * Reuses only absolute clearance ranks for an exact request-local candidate
  * collection. The cache lifetime is one repair transaction and collection
@@ -44,6 +77,7 @@ export const createBusinessNodeClearanceCandidateRankCache = () => {
           length,
           minimumClearanceViolation,
           bendCount: Math.max(0, candidate.length - 2),
+          terminalBacktrack: measureBusinessNodeClearanceTerminalBacktrack(candidate),
         };
       });
       ranksByCollection.set(collection, value);

@@ -6,7 +6,10 @@ import {
   selectBusinessNodeClearanceCandidatesWithinHitBudget,
   type BusinessNodeClearanceCandidateRank,
 } from '../edgeBusinessNodeClearanceCandidateRanking';
-import { createBusinessNodeClearanceCandidateRankCache } from '../edgeBusinessNodeClearanceCandidateRankCache';
+import {
+  createBusinessNodeClearanceCandidateRankCache,
+  measureBusinessNodeClearanceTerminalBacktrack,
+} from '../edgeBusinessNodeClearanceCandidateRankCache';
 
 const candidate = (
   id: string,
@@ -19,6 +22,7 @@ const candidate = (
   length: 200,
   minimumClearanceViolation: false,
   risk: 8,
+  terminalBacktrack: 0,
   ...values,
 });
 
@@ -50,16 +54,37 @@ describe('rankBusinessNodeClearanceCandidates', () => {
       length: rank.length,
       minimumClearanceViolation: rank.minimumClearanceViolation,
       risk: rank.risk,
+      terminalBacktrack: rank.terminalBacktrack,
     }))).toEqual([
       {
         bends: 0, commercialRisk: 4, hits: 1, length: 10,
-        minimumClearanceViolation: false, risk: 2,
+        minimumClearanceViolation: false, risk: 2, terminalBacktrack: 0,
       },
       {
         bends: 1, commercialRisk: 6, hits: 0, length: 13,
-        minimumClearanceViolation: true, risk: 3,
+        minimumClearanceViolation: true, risk: 3, terminalBacktrack: 0,
       },
     ]);
+  });
+
+  it('measures terminal half-plane backtracking without using diagram-specific ids', () => {
+    expect(measureBusinessNodeClearanceTerminalBacktrack([
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 20, y: 0 },
+    ])).toBe(0);
+    expect(measureBusinessNodeClearanceTerminalBacktrack([
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: -5, y: 0 },
+      { x: 20, y: 0 },
+    ])).toBe(5);
+    expect(measureBusinessNodeClearanceTerminalBacktrack([
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 25, y: 0 },
+      { x: 20, y: 0 },
+    ])).toBe(30);
   });
 
   it('prunes candidates above the baseline hit budget before expensive scoring', () => {
@@ -103,6 +128,20 @@ describe('rankBusinessNodeClearanceCandidates', () => {
     ], { hits: 1, commercialRisk: 10, risk: 10 });
 
     expect(ranked.map(entry => entry.candidate)).toEqual(['first', 'second']);
+  });
+
+  it('prefers candidates that stay in the terminal half-planes before bends and length', () => {
+    const ranked = rankBusinessNodeClearanceCandidates([
+      candidate('short-backtracking', { length: 100, terminalBacktrack: 20 }),
+      candidate('long-clean', { length: 140, terminalBacktrack: 0 }),
+      candidate('bendy-clean', { bendCount: 6, length: 80, terminalBacktrack: 0 }),
+    ], { hits: 1, commercialRisk: 10, risk: 10 });
+
+    expect(ranked.map(entry => entry.candidate)).toEqual([
+      'long-clean',
+      'bendy-clean',
+      'short-backtracking',
+    ]);
   });
 
   it('does not rank unused alternatives after an accepted first winner', () => {
