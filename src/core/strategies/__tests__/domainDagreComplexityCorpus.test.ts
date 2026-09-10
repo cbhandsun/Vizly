@@ -31,11 +31,12 @@ const edges = (pairs: readonly (readonly [string, string])[], fixed = false): Ed
     id: `edge-${index}`,
     source,
     target,
-    ...(fixed ? {
-      sourceHandle: 'right',
-      targetHandle: 'left',
-      data: { sourceHandleLocked: true, targetHandleLocked: true },
-    } : {}),
+    label: `${source} to ${target}`,
+    data: {
+      label: `${source} to ${target}`,
+      ...(fixed ? { sourceHandleLocked: true, targetHandleLocked: true } : {}),
+    },
+    ...(fixed ? { sourceHandle: 'right', targetHandle: 'left' } : {}),
   }));
 
 const corpus: readonly CorpusCase[] = [
@@ -123,33 +124,33 @@ type DirectionalQualityLimits = Readonly<{
 
 const qualityLimits: Readonly<Record<string, DirectionalQualityLimits>> = {
   'sparse-chain': {
-    vertical: { width: 1075, height: 416, pathLength: 1208, backwardTravel: 248, bends: 4, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 930, orthogonalRouteTravel: 768, labelLabelOverlap: 4, labelNodeOverlap: 4 },
-    horizontal: { width: 1198, height: 860, pathLength: 1180, backwardTravel: 0, bends: 2, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 680, orthogonalRouteTravel: 620, labelLabelOverlap: 4, labelNodeOverlap: 4 },
+    vertical: { width: 1075, height: 416, pathLength: 1208, backwardTravel: 248, bends: 4, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 930, orthogonalRouteTravel: 768, labelLabelOverlap: 0, labelNodeOverlap: 3 },
+    horizontal: { width: 1198, height: 860, pathLength: 1180, backwardTravel: 0, bends: 2, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 680, orthogonalRouteTravel: 620, labelLabelOverlap: 0, labelNodeOverlap: 11 },
   },
   'dense-fan': {
-    vertical: { width: 1123, height: 1340, pathLength: 11146, backwardTravel: 0, bends: 12, crossings: 0, sharedLaneOverlap: 172, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 5721, orthogonalRouteTravel: 5218, labelLabelOverlap: 16, labelNodeOverlap: 16 },
-    horizontal: { width: 2315, height: 860, pathLength: 14952, backwardTravel: 0, bends: 12, crossings: 0, sharedLaneOverlap: 358, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 4080, orthogonalRouteTravel: 3720, labelLabelOverlap: 16, labelNodeOverlap: 16 },
+    vertical: { width: 1123, height: 1340, pathLength: 11146, backwardTravel: 0, bends: 12, crossings: 0, sharedLaneOverlap: 172, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 5721, orthogonalRouteTravel: 5218, labelLabelOverlap: 0, labelNodeOverlap: 10 },
+    horizontal: { width: 2315, height: 860, pathLength: 14952, backwardTravel: 0, bends: 12, crossings: 0, sharedLaneOverlap: 358, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 4080, orthogonalRouteTravel: 3720, labelLabelOverlap: 0, labelNodeOverlap: 11 },
   },
   'nested-subgroups': {
-    vertical: { width: 1668, height: 1160, pathLength: 3692, backwardTravel: 0, bends: 7, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 3319, orthogonalRouteTravel: 3034, labelLabelOverlap: 8, labelNodeOverlap: 8 },
-    horizontal: { width: 1552, height: 1344, pathLength: 3074, backwardTravel: 0, bends: 7, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 2332, orthogonalRouteTravel: 2122, labelLabelOverlap: 8, labelNodeOverlap: 8 },
+    vertical: { width: 1668, height: 1160, pathLength: 3692, backwardTravel: 0, bends: 7, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 3319, orthogonalRouteTravel: 3034, labelLabelOverlap: 0, labelNodeOverlap: 6 },
+    horizontal: { width: 1552, height: 1344, pathLength: 3074, backwardTravel: 0, bends: 7, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 2332, orthogonalRouteTravel: 2122, labelLabelOverlap: 0, labelNodeOverlap: 11 },
   },
   'feedback-cycle': {
-    vertical: { width: 634, height: 912, pathLength: 1847, backwardTravel: 496, bends: 3, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 930, orthogonalRouteTravel: 1001, labelLabelOverlap: 4, labelNodeOverlap: 4 },
-    horizontal: { width: 1198, height: 520, pathLength: 1990, backwardTravel: 708, bends: 3, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 680, orthogonalRouteTravel: 762, labelLabelOverlap: 4, labelNodeOverlap: 4 },
+    vertical: { width: 634, height: 912, pathLength: 1847, backwardTravel: 496, bends: 3, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 930, orthogonalRouteTravel: 1001, labelLabelOverlap: 0, labelNodeOverlap: 5 },
+    horizontal: { width: 1198, height: 520, pathLength: 1990, backwardTravel: 708, bends: 3, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 680, orthogonalRouteTravel: 762, labelLabelOverlap: 0, labelNodeOverlap: 14 },
   },
   'fixed-ports': {
-    vertical: { width: 634, height: 912, pathLength: 1776, backwardTravel: 0, bends: 10, crossings: 0, sharedLaneOverlap: 3, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 465, orthogonalRouteTravel: 1156, labelLabelOverlap: 4, labelNodeOverlap: 4 },
-    horizontal: { width: 1198, height: 520, pathLength: 820, backwardTravel: 0, bends: 2, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 340, orthogonalRouteTravel: 340, labelLabelOverlap: 4, labelNodeOverlap: 4 },
-    reverseHorizontal: { width: 1198, height: 520, pathLength: 1742, backwardTravel: 56, bends: 2, crossings: 0, sharedLaneOverlap: 7, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 340, orthogonalRouteTravel: 340, labelLabelOverlap: 4, labelNodeOverlap: 4 },
+    vertical: { width: 634, height: 912, pathLength: 1776, backwardTravel: 0, bends: 10, crossings: 0, sharedLaneOverlap: 3, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 465, orthogonalRouteTravel: 1156, labelLabelOverlap: 0, labelNodeOverlap: 4 },
+    horizontal: { width: 1198, height: 520, pathLength: 820, backwardTravel: 0, bends: 2, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 340, orthogonalRouteTravel: 340, labelLabelOverlap: 0, labelNodeOverlap: 13 },
+    reverseHorizontal: { width: 1198, height: 520, pathLength: 1742, backwardTravel: 56, bends: 2, crossings: 0, sharedLaneOverlap: 7, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 340, orthogonalRouteTravel: 340, labelLabelOverlap: 0, labelNodeOverlap: 13 },
   },
   'unbalanced-components': {
-    vertical: { width: 1075, height: 1160, pathLength: 966, backwardTravel: 0, bends: 1, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 465, orthogonalRouteTravel: 424, labelLabelOverlap: 4, labelNodeOverlap: 4 },
-    horizontal: { width: 1552, height: 860, pathLength: 1118, backwardTravel: 0, bends: 1, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 340, orthogonalRouteTravel: 310, labelLabelOverlap: 4, labelNodeOverlap: 4 },
+    vertical: { width: 1075, height: 1160, pathLength: 966, backwardTravel: 0, bends: 1, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 465, orthogonalRouteTravel: 424, labelLabelOverlap: 0, labelNodeOverlap: 7 },
+    horizontal: { width: 1552, height: 860, pathLength: 1118, backwardTravel: 0, bends: 1, crossings: 0, sharedLaneOverlap: 0, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 340, orthogonalRouteTravel: 310, labelLabelOverlap: 0, labelNodeOverlap: 22 },
   },
   'multi-lane-handoff-fan': {
-    vertical: { width: 2400, height: 1800, pathLength: 22000, backwardTravel: 580, bends: 32, crossings: 0, sharedLaneOverlap: 128, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 6577, orthogonalRouteTravel: 5171, labelLabelOverlap: 32, labelNodeOverlap: 32 },
-    horizontal: { width: 3600, height: 1540, pathLength: 28000, backwardTravel: 580, bends: 32, crossings: 2, sharedLaneOverlap: 256, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 4420, orthogonalRouteTravel: 4112, labelLabelOverlap: 32, labelNodeOverlap: 32 },
+    vertical: { width: 2400, height: 1800, pathLength: 22000, backwardTravel: 580, bends: 32, crossings: 0, sharedLaneOverlap: 128, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 6577, orthogonalRouteTravel: 5171, labelLabelOverlap: 3, labelNodeOverlap: 8 },
+    horizontal: { width: 3600, height: 1540, pathLength: 28000, backwardTravel: 580, bends: 32, crossings: 2, sharedLaneOverlap: 256, hemisphereSharedLaneOverlap: 0, flowOrthogonalDrift: 4420, orthogonalRouteTravel: 4112, labelLabelOverlap: 2, labelNodeOverlap: 16 },
   },
 };
 
