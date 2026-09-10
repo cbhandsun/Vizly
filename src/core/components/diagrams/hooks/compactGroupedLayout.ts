@@ -50,6 +50,16 @@ export async function createCompactGroupedLayout(
   return { nodes: finalNodes, edges: prepareLayeredLayoutEdges(finalNodes, prepared, direction) };
 }
 
+const READABILITY_ONLY_COMPACT_GROUP_NODE_LIMIT = 32;
+const READABILITY_ONLY_COMPACT_GROUP_EDGE_LIMIT = 32;
+
+const visibleCount = <T extends { hidden?: boolean }>(items: T[]): number =>
+  items.filter(item => item.hidden !== true).length;
+
+const canUseReadabilityOnlyCompactGroupTieBreak = (candidate: RoutedLayoutCandidate): boolean =>
+  visibleCount(candidate.geometry.nodes) <= READABILITY_ONLY_COMPACT_GROUP_NODE_LIMIT
+  && visibleCount(candidate.geometry.edges) <= READABILITY_ONLY_COMPACT_GROUP_EDGE_LIMIT;
+
 const reversedMainEdges = (candidate: RoutedLayoutCandidate, direction: FlowchartLayoutDirection,
   inner: FlowchartLayoutDirection): number => {
   const { nodes } = projectBaseReactFlowDisplayWorkerInput({ nodes: candidate.geometry.nodes, edges: [] });
@@ -103,6 +113,7 @@ export function preferCompactGroupedLayout(baseline: RoutedLayoutCandidate, cand
     && after.hemisphereSharedLaneOverlap <= before.hemisphereSharedLaneOverlap + 0.01
     && after.flowOrthogonalDrift <= before.flowOrthogonalDrift + 0.01
     && after.orthogonalRouteTravel <= before.orthogonalRouteTravel + 0.01;
-  return qualitySafe && (Math.max(after.width, after.height) < Math.max(before.width, before.height) - 0.01
-    || routedLayoutImprovesReadableFlow(before, after));
+  const compactnessImproves = Math.max(after.width, after.height) < Math.max(before.width, before.height) - 0.01;
+  return qualitySafe && (compactnessImproves
+    || (canUseReadabilityOnlyCompactGroupTieBreak(candidate) && routedLayoutImprovesReadableFlow(before, after)));
 }
