@@ -93,6 +93,22 @@ describe('bounded compact group comparison', () => {
     after.staged.routedEdges[0] = { ...edges[0], data: { computedPath: [{ x: 60, y: 20 }, { x: 200, y: 20 }] } };
     expect(preferCompactGroupedLayout(before, after, 'LR')).toBe(false);
   });
+  it('rejects compact candidates that move route travel away from the flow axis', () => {
+    const before = candidate(500);
+    before.staged.routedEdges[0] = { ...edges[0], data: { computedPath: [
+      { x: 60, y: 20 },
+      { x: 500, y: 20 },
+      { x: 500, y: 80 },
+    ] } };
+    const after = candidate(200);
+    after.staged.routedEdges[0] = { ...edges[0], data: { computedPath: [
+      { x: 60, y: 20 },
+      { x: 60, y: 160 },
+      { x: 200, y: 160 },
+      { x: 200, y: 20 },
+    ] } };
+    expect(preferCompactGroupedLayout(before, after, 'LR')).toBe(false);
+  });
   it('rejects lost dependencies or changed semantic membership', () => {
     const missingEdge = candidate(200);
     expect(preferCompactGroupedLayout(candidate(500), {

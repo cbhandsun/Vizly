@@ -102,5 +102,6 @@ export function preferCompactGroupedLayout(baseline: RoutedLayoutCandidate, cand
     && after.sharedLaneOverlap <= before.sharedLaneOverlap + 0.01
     && after.hemisphereSharedLaneOverlap <= before.hemisphereSharedLaneOverlap + 0.01
     && after.flowOrthogonalDrift <= before.flowOrthogonalDrift + 0.01
+    && after.orthogonalRouteTravel <= before.orthogonalRouteTravel + 0.01
     && Math.max(after.width, after.height) < Math.max(before.width, before.height) - 0.01;
 }
