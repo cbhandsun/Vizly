@@ -22,6 +22,8 @@ export type RoutedLayoutQuality = Readonly<{
   flowOrthogonalDrift: number;
   orthogonalRouteTravel: number;
   backwardTravel: number;
+  labelLabelOverlap: number;
+  labelNodeOverlap: number;
 }>;
 
 type QualityRect = Readonly<{ x: number; y: number; width: number; height: number }>;
@@ -32,6 +34,9 @@ type ProjectedQualityNode = Node & {
 };
 
 const PARALLEL_LANE_TOLERANCE = 4;
+const EDGE_LABEL_MAX_WIDTH = 220;
+const EDGE_LABEL_GAP = 8;
+const EDGE_LABEL_NODE_GAP = 10;
 
 function qualitySegments(path: readonly Point[]): QualitySegment[] {
   const segments: QualitySegment[] = [];
@@ -60,6 +65,84 @@ function parallelOverlap(first: QualitySegment, second: QualitySegment): number 
   }
   if (Math.abs(first.a.x - second.a.x) > PARALLEL_LANE_TOLERANCE) return 0;
   return rangeOverlap(first.a.y, first.b.y, second.a.y, second.b.y);
+}
+
+const readEdgeLabelText = (edge: Edge): string => {
+  const data = edge.data;
+  if (data && typeof data === 'object' && 'label' in data && typeof data.label === 'string') {
+    return data.label.trim();
+  }
+  return typeof edge.label === 'string' ? edge.label.trim() : '';
+};
+
+const estimateLabelSize = (text: string): Readonly<{ width: number; height: number }> => {
+  const lines = text.split(/\r\n|\r|\n/);
+  let rows = 0;
+  let width = 42;
+  for (const line of lines) {
+    let textWidth = 0;
+    for (const glyph of line) textWidth += glyph.charCodeAt(0) < 128 ? 8 : 22;
+    width = Math.max(width, Math.min(EDGE_LABEL_MAX_WIDTH, textWidth + 22));
+    rows += Math.max(1, Math.ceil(textWidth / (EDGE_LABEL_MAX_WIDTH - 22)));
+  }
+  return { width, height: 26 + (rows - 1) * 22 };
+};
+
+const pointAtHalfLength = (path: readonly Point[]): Point | null => {
+  let total = 0;
+  for (let index = 1; index < path.length; index += 1) {
+    total += Math.hypot(path[index].x - path[index - 1].x, path[index].y - path[index - 1].y);
+  }
+  if (!Number.isFinite(total) || total <= 0) return null;
+  let travelled = 0;
+  const target = total / 2;
+  for (let index = 1; index < path.length; index += 1) {
+    const a = path[index - 1], b = path[index];
+    const length = Math.hypot(b.x - a.x, b.y - a.y);
+    if (travelled + length >= target) {
+      const ratio = length <= 0 ? 0 : (target - travelled) / length;
+      return { x: a.x + (b.x - a.x) * ratio, y: a.y + (b.y - a.y) * ratio };
+    }
+    travelled += length;
+  }
+  return path[path.length - 1] ?? null;
+};
+
+const rectsConflict = (a: QualityRect, b: QualityRect, gap: number): boolean => (
+  a.x < b.x + b.width + gap && a.x + a.width + gap > b.x
+  && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y
+);
+
+const labelRectForPath = (edge: Edge, path: readonly Point[]): QualityRect | null => {
+  const text = readEdgeLabelText(edge);
+  if (!text) return null;
+  const center = pointAtHalfLength(path);
+  if (!center) return null;
+  const size = estimateLabelSize(text);
+  return { x: center.x - size.width / 2, y: center.y - size.height / 2, width: size.width, height: size.height };
+};
+
+function measureLabelOverlap(
+  edges: readonly Edge[],
+  paths: ReadonlyMap<string, readonly Point[]>,
+  rectangles: readonly QualityRect[],
+): Pick<RoutedLayoutQuality, 'labelLabelOverlap' | 'labelNodeOverlap'> {
+  const labels = edges.flatMap(edge => {
+    if (edge.hidden) return [];
+    const path = paths.get(edge.id);
+    const rect = path ? labelRectForPath(edge, path) : null;
+    return rect ? [rect] : [];
+  });
+  let labelLabelOverlap = 0;
+  for (let firstIndex = 0; firstIndex < labels.length; firstIndex += 1) {
+    for (let secondIndex = firstIndex + 1; secondIndex < labels.length; secondIndex += 1) {
+      if (rectsConflict(labels[firstIndex], labels[secondIndex], EDGE_LABEL_GAP)) labelLabelOverlap += 1;
+    }
+  }
+  const labelNodeOverlap = labels.reduce((total, label) => (
+    total + rectangles.filter(rectangle => rectsConflict(label, rectangle, EDGE_LABEL_NODE_GAP)).length
+  ), 0);
+  return { labelLabelOverlap, labelNodeOverlap };
 }
 
 function measureFlowOrthogonalDrift(
@@ -155,11 +238,15 @@ export function measureRoutedLayoutQuality(
   const projected = projectBaseReactFlowDisplayWorkerInput({ nodes, edges });
   const visible = projected.nodes.filter(node => !node.hidden);
   if (!visible.length) return null;
-  const rectangles = visible.map(node => ({ x: node.positionAbsolute.x, y: node.positionAbsolute.y,
-    width: node.measured?.width ?? node.width, height: node.measured?.height ?? node.height }));
-  if (rectangles.some(rect => !Number.isFinite(rect.x) || !Number.isFinite(rect.y)
-    || typeof rect.width !== 'number' || !Number.isFinite(rect.width) || rect.width <= 0
-    || typeof rect.height !== 'number' || !Number.isFinite(rect.height) || rect.height <= 0)) return null;
+  const rectangles: QualityRect[] = [];
+  for (const node of visible) {
+    const width = node.measured?.width ?? node.width;
+    const height = node.measured?.height ?? node.height;
+    if (!Number.isFinite(node.positionAbsolute.x) || !Number.isFinite(node.positionAbsolute.y)
+      || typeof width !== 'number' || !Number.isFinite(width) || width <= 0
+      || typeof height !== 'number' || !Number.isFinite(height) || height <= 0) return null;
+    rectangles.push({ x: node.positionAbsolute.x, y: node.positionAbsolute.y, width, height });
+  }
   const paths = new Map<string, ReturnType<typeof getDisplayComputedPath>>();
   let minX = Math.min(...rectangles.map(rect => rect.x)), minY = Math.min(...rectangles.map(rect => rect.y));
   let maxX = Math.max(...rectangles.map(rect => rect.x + (rect.width ?? 0)));
@@ -201,17 +288,19 @@ export function measureRoutedLayoutQuality(
   );
   const flowOrthogonalDrift = measureFlowOrthogonalDrift(projected.nodes, edges, horizontal);
   if (flowOrthogonalDrift === null) return null;
+  const labelOverlap = measureLabelOverlap(edges, paths, rectangles);
   return {
     width: maxX - minX, height: maxY - minY,
     pathLength, backwardTravel, bends: scored.bends, crossings: scored.hardCrossings + scored.buddyCrossings,
     sharedLaneOverlap: scored.parallelOverlaps, hemisphereSharedLaneOverlap, flowOrthogonalDrift,
     orthogonalRouteTravel: Math.round(orthogonalRouteTravel),
+    ...labelOverlap,
   };
 }
 
 const routedLayoutQualityFields = ['width', 'height', 'pathLength', 'bends', 'crossings',
   'sharedLaneOverlap', 'hemisphereSharedLaneOverlap', 'flowOrthogonalDrift',
-  'orthogonalRouteTravel', 'backwardTravel'] as const;
+  'orthogonalRouteTravel', 'backwardTravel', 'labelLabelOverlap', 'labelNodeOverlap'] as const;
 
 function routedLayoutEvidenceIsFinite(
   baseline: RoutedLayoutQuality | null,
@@ -242,10 +331,12 @@ export function routedLayoutImprovesReadableFlow(
 ): boolean {
   if (!baseline || !candidate || !routedLayoutEvidenceIsFinite(baseline, candidate)) return false;
   const protectedFields = ['width', 'height', 'pathLength', 'bends', 'crossings',
-    'sharedLaneOverlap', 'flowOrthogonalDrift', 'orthogonalRouteTravel', 'backwardTravel'] as const;
+    'sharedLaneOverlap', 'flowOrthogonalDrift', 'orthogonalRouteTravel', 'backwardTravel',
+    'labelLabelOverlap', 'labelNodeOverlap'] as const;
   const readabilityFields = ['hemisphereSharedLaneOverlap', 'sharedLaneOverlap',
     'flowOrthogonalDrift', 'orthogonalRouteTravel', 'backwardTravel'] as const;
   return protectedFields.every(key => candidate[key] <= baseline[key] + 0.01)
     && readabilityFields.some(key => candidate[key] < baseline[key] - 0.01);
 }
+
 

@@ -35,6 +35,8 @@ describe('routed layout candidate quality', () => {
       pathLength: 600,
       bends: 2,
       backwardTravel: 0,
+      labelLabelOverlap: 0,
+      labelNodeOverlap: 0,
     };
     const candidate = { ...baseline, height: 120, pathLength: 400, crossings: 0 };
     expect(routedLayoutDominates(baseline, candidate)).toBe(true);
@@ -50,6 +52,8 @@ describe('routed layout candidate quality', () => {
       'pathLength',
       'bends',
       'backwardTravel',
+      'labelLabelOverlap',
+      'labelNodeOverlap',
     ] as const) {
       expect(routedLayoutDominates(baseline, { ...candidate, [key]: baseline[key] + 1 })).toBe(false);
     }
@@ -72,6 +76,38 @@ describe('routed layout candidate quality', () => {
     expect(routedLayoutDominates(baseline, candidate)).toBe(true);
     expect(routedLayoutDominates(candidate, baseline)).toBe(false);
   });
+
+  it('measures estimated edge label collisions before choosing a routed candidate', () => {
+    const labelNodes: Node[] = [
+      { id: 'a', data: {}, position: { x: 0, y: 220 }, width: 40, height: 40 },
+      { id: 'b', data: {}, position: { x: 260, y: 220 }, width: 40, height: 40 },
+    ];
+    const labelledOverlap = [
+      edge('alpha', [{ x: 60, y: 40 }, { x: 220, y: 40 }]),
+      edge('beta', [{ x: 64, y: 42 }, { x: 224, y: 42 }]),
+    ].map(route => ({ ...route, data: { ...route.data, label: `Label ${route.id}` } }));
+    const labelledSeparated = [
+      edge('alpha', [{ x: 60, y: 40 }, { x: 220, y: 40 }]),
+      edge('beta', [{ x: 64, y: 100 }, { x: 224, y: 100 }]),
+    ].map(route => ({ ...route, data: { ...route.data, label: `Label ${route.id}` } }));
+
+    const crowded = measureRoutedLayoutQuality(labelNodes, labelledOverlap);
+    const separated = measureRoutedLayoutQuality(labelNodes, labelledSeparated);
+
+    expect(crowded).toMatchObject({ labelLabelOverlap: 1, labelNodeOverlap: 0 });
+    expect(separated).toMatchObject({ labelLabelOverlap: 0, labelNodeOverlap: 0 });
+    expect(routedLayoutDominates(crowded, separated)).toBe(true);
+    expect(routedLayoutImprovesReadableFlow(crowded, { ...separated!,
+      hemisphereSharedLaneOverlap: crowded!.hemisphereSharedLaneOverlap - 1, labelLabelOverlap: 1,
+    })).toBe(false);
+  });
+
+  it('measures estimated edge label collisions with business nodes', () => {
+    const labelled = edge('labelled', [{ x: 0, y: 20 }, { x: 160, y: 20 }]);
+    const quality = measureRoutedLayoutQuality(nodes, [{ ...labelled, data: { ...labelled.data, label: 'Covers source node' } }]);
+
+    expect(quality).toMatchObject({ labelNodeOverlap: 1 });
+  });
   it('prefers clearer readable flow only without route or geometry regressions', () => {
     const baseline = {
       width: 200,
@@ -84,6 +120,8 @@ describe('routed layout candidate quality', () => {
       pathLength: 400,
       bends: 2,
       backwardTravel: 0,
+      labelLabelOverlap: 0,
+      labelNodeOverlap: 0,
     };
     const clearer = { ...baseline, hemisphereSharedLaneOverlap: 0 };
     expect(routedLayoutImprovesReadableFlow(baseline, clearer)).toBe(true);
@@ -201,3 +239,5 @@ describe('routed layout candidate quality', () => {
     expect(routedLayoutDominates(null, null)).toBe(false);
   });
 });
+
+
