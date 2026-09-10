@@ -66,6 +66,16 @@ const FLOWCHART_DESIGNER_STARTUP_MODULES = new Set([
   '/src/core/components/diagrams/hooks/useCollapsibleGroups.ts',
 ]);
 
+const FLOWCHART_LAYOUT_ALTERNATIVE_MODULES = new Set([
+  // Enterprise and swimlane diagrams evaluate compact/aligned alternatives
+  // before the display-routing ready signal. Keep these pure comparison gates
+  // in one lazy chunk so the cold path does not request one helper per
+  // alternative while still leaving layout engines lazy.
+  '/src/core/components/shared/routedLayoutQuality.ts',
+  '/src/core/components/diagrams/hooks/compactGroupedLayout.ts',
+  '/src/core/components/diagrams/hooks/alignedLaneLayout.ts',
+]);
+
 const FLOWCHART_DESIGNER_MICRO_MODULES = new Set([
   // Measured standalone requests on the diagram startup path; these pure
   // visibility/paint helpers add no optional engine or Worker dependency.
@@ -164,6 +174,11 @@ export const matchesDisplayRoutingNeutralModule = (id: string): boolean => {
 export const matchesFlowchartDesignerStartupModule = (id: string): boolean => {
   const normalized = normalizeModuleId(id).split('?', 1)[0];
   return [...FLOWCHART_DESIGNER_STARTUP_MODULES].some(suffix => normalized.endsWith(suffix));
+};
+
+export const matchesFlowchartLayoutAlternativeModule = (id: string): boolean => {
+  const normalized = normalizeModuleId(id).split('?', 1)[0];
+  return [...FLOWCHART_LAYOUT_ALTERNATIVE_MODULES].some(suffix => normalized.endsWith(suffix));
 };
 
 export const matchesFlowchartDesignerMicroModule = (id: string): boolean => {

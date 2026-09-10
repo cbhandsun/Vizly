@@ -16,6 +16,7 @@ import {
   matchesDisplayRoutingNeutralModule,
   matchesFlowchartDesignerStartupModule,
   matchesFlowchartDesignerMicroModule,
+  matchesFlowchartLayoutAlternativeModule,
   matchesFlowchartRuntimeModule,
   productionChunkFileNames,
 } from './vite-plugins/buildChunkGroups'
@@ -432,6 +433,14 @@ export default defineConfig({
               name: 'flowchart-designer-micro',
               test: matchesFlowchartDesignerMicroModule,
               priority: 77,
+              minSize: 0,
+              entriesAware: false,
+              includeDependenciesRecursively: false,
+            },
+            {
+              name: 'flowchart-layout-alternatives',
+              test: matchesFlowchartLayoutAlternativeModule,
+              priority: 76,
               minSize: 0,
               entriesAware: false,
               includeDependenciesRecursively: false,

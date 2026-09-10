@@ -12,6 +12,7 @@ import {
   matchesDisplayRoutingNeutralModule,
   matchesFlowchartDesignerStartupModule,
   matchesFlowchartDesignerMicroModule,
+  matchesFlowchartLayoutAlternativeModule,
   matchesFlowchartRuntimeModule,
   productionChunkFileNames,
 } from '../../../../vite-plugins/buildChunkGroups';
@@ -355,6 +356,25 @@ describe('sharedModuleWorkers Vite plugin', () => {
     )).toBe(true);
     expect(matchesFlowchartDesignerMicroModule(
       'C:/repo/src/core/components/shared/baseReactFlowDisplayEdges.worker.ts',
+    )).toBe(false);
+  });
+
+  it('co-loads route-aware layout alternatives in one lazy comparison chunk', () => {
+    for (const id of [
+      'C:/repo/src/core/components/shared/routedLayoutQuality.ts',
+      'C:\\repo\\src\\core\\components\\shared\\routedLayoutQuality.ts?import',
+      'C:/repo/src/core/components/diagrams/hooks/compactGroupedLayout.ts',
+      'C:\\repo\\src\\core\\components\\diagrams\\hooks\\compactGroupedLayout.ts?import',
+      'C:/repo/src/core/components/diagrams/hooks/alignedLaneLayout.ts',
+    ]) {
+      expect(matchesFlowchartLayoutAlternativeModule(id)).toBe(true);
+      expect(matchesFlowchartDesignerMicroModule(id)).toBe(false);
+      expect(matchesFlowchartDesignerStartupModule(id)).toBe(false);
+      expect(matchesDisplayRoutingNeutralModule(id)).toBe(false);
+    }
+
+    expect(matchesFlowchartLayoutAlternativeModule(
+      'C:/repo/src/core/strategies/DomainDagreLayoutStrategy.ts',
     )).toBe(false);
   });
 
@@ -702,3 +722,4 @@ const worker = new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', impor
     expect(plugin.enforce).toBe('pre');
   });
 });
+
