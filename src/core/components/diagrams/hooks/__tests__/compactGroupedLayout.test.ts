@@ -156,13 +156,13 @@ describe('bounded compact group comparison', () => {
     const before: RoutedLayoutCandidate = {
       geometry: beforeGeometry,
       staged: { committedSourceEdges: [labelledEdge], commitSnapshot: () => true, routedEdges: [
-        { ...labelledEdge, data: { label: 'Readable dependency', computedPath: [{ x: 60, y: 160 }, { x: 500, y: 160 }] } },
+        { ...edges[0], data: { computedPath: [{ x: 60, y: 160 }, { x: 500, y: 160 }] } },
       ] },
     };
     const after: RoutedLayoutCandidate = {
       geometry: afterGeometry,
       staged: { committedSourceEdges: [labelledEdge], commitSnapshot: () => true, routedEdges: [
-        { ...labelledEdge, data: { label: 'Readable dependency', computedPath: [{ x: 60, y: 20 }, { x: 200, y: 20 }] } },
+        { ...edges[0], data: { computedPath: [{ x: 60, y: 20 }, { x: 200, y: 20 }] } },
       ] },
     };
 
