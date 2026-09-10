@@ -1,1 +1,1 @@
-export { measureRoutedLayoutQuality, routedLayoutDominates, type RoutedLayoutQuality } from '../routedLayoutQuality';
+export { measureRoutedLayoutQuality, routedLayoutDominates, routedLayoutImprovesReadableFlow, type RoutedLayoutQuality } from '../routedLayoutQuality';

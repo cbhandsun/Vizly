@@ -1,7 +1,8 @@
 // @vitest-environment node
 import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
-import { measureRoutedLayoutQuality, routedLayoutDominates } from './routedLayoutQuality';
+import { measureRoutedLayoutQuality, routedLayoutDominates,
+  routedLayoutImprovesReadableFlow } from './routedLayoutQuality';
 
 const nodes: Node[] = [
   { id: 'a', data: {}, position: { x: 0, y: 0 }, width: 40, height: 40 },
@@ -71,6 +72,27 @@ describe('routed layout candidate quality', () => {
     expect(routedLayoutDominates(baseline, candidate)).toBe(true);
     expect(routedLayoutDominates(candidate, baseline)).toBe(false);
   });
+  it('prefers clearer readable flow only without route or geometry regressions', () => {
+    const baseline = {
+      width: 200,
+      height: 160,
+      crossings: 0,
+      sharedLaneOverlap: 0,
+      hemisphereSharedLaneOverlap: 80,
+      flowOrthogonalDrift: 0,
+      orthogonalRouteTravel: 0,
+      pathLength: 400,
+      bends: 2,
+      backwardTravel: 0,
+    };
+    const clearer = { ...baseline, hemisphereSharedLaneOverlap: 0 };
+    expect(routedLayoutImprovesReadableFlow(baseline, clearer)).toBe(true);
+    expect(routedLayoutImprovesReadableFlow(baseline, { ...clearer, bends: baseline.bends + 1 })).toBe(false);
+    expect(routedLayoutImprovesReadableFlow(baseline, { ...clearer, pathLength: baseline.pathLength + 1 })).toBe(false);
+    expect(routedLayoutImprovesReadableFlow(baseline, baseline)).toBe(false);
+    expect(routedLayoutImprovesReadableFlow(null, clearer)).toBe(false);
+  });
+
   it('measures cross-flow drift independently from route length', () => {
     const driftNodes: Node[] = [
       { id: 'a', data: {}, position: { x: 0, y: 0 }, width: 40, height: 40 },

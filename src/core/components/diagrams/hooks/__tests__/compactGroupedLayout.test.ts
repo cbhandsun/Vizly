@@ -86,6 +86,33 @@ describe('bounded compact group comparison', () => {
 
     expect(preferCompactGroupedLayout(before, after, 'LR')).toBe(false);
   });
+  it('selects an equal-size candidate that reduces opposite-hemisphere shared lanes', () => {
+    const hub: Node = { id: 'hub', position: { x: 100, y: 100 }, width: 40, height: 40, data: { subDomain: 'Group' } };
+    const top: Node = { id: 'top', position: { x: 100, y: 0 }, width: 40, height: 40, data: { subDomain: 'Group' } };
+    const bottom: Node = { id: 'bottom', position: { x: 100, y: 220 }, width: 40, height: 40, data: { subDomain: 'Group' } };
+    const fanoutEdges: Edge[] = [
+      { id: 'hub-top', source: 'hub', target: 'top' },
+      { id: 'hub-bottom', source: 'hub', target: 'bottom' },
+    ];
+    const geometry = { nodes: [hub, top, bottom], edges: fanoutEdges };
+    const before: RoutedLayoutCandidate = {
+      geometry,
+      staged: { committedSourceEdges: fanoutEdges, commitSnapshot: () => true, routedEdges: [
+        { ...fanoutEdges[0], data: { computedPath: [{ x: 120, y: 120 }, { x: 180, y: 120 }, { x: 180, y: 20 }] } },
+        { ...fanoutEdges[1], data: { computedPath: [{ x: 120, y: 120 }, { x: 180, y: 120 }, { x: 180, y: 240 }] } },
+      ] },
+    };
+    const after: RoutedLayoutCandidate = {
+      geometry,
+      staged: { committedSourceEdges: fanoutEdges, commitSnapshot: () => true, routedEdges: [
+        { ...fanoutEdges[0], data: { computedPath: [{ x: 120, y: 100 }, { x: 180, y: 100 }, { x: 180, y: 20 }] } },
+        { ...fanoutEdges[1], data: { computedPath: [{ x: 120, y: 140 }, { x: 180, y: 140 }, { x: 180, y: 240 }] } },
+      ] },
+    };
+
+    expect(preferCompactGroupedLayout(before, after, 'LR')).toBe(true);
+  });
+
   it('rejects compact candidates that increase cross-flow drift', () => {
     const before = candidate(500);
     const after = candidate(200);

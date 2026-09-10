@@ -209,14 +209,43 @@ export function measureRoutedLayoutQuality(
   };
 }
 
+const routedLayoutQualityFields = ['width', 'height', 'pathLength', 'bends', 'crossings',
+  'sharedLaneOverlap', 'hemisphereSharedLaneOverlap', 'flowOrthogonalDrift',
+  'orthogonalRouteTravel', 'backwardTravel'] as const;
+
+function routedLayoutEvidenceIsFinite(
+  baseline: RoutedLayoutQuality | null,
+  candidate: RoutedLayoutQuality | null,
+): boolean {
+  if (!baseline || !candidate) return false;
+  return routedLayoutQualityFields.every(key => (
+    Number.isFinite(baseline[key]) && Number.isFinite(candidate[key])
+    && baseline[key] >= 0 && candidate[key] >= 0
+  ));
+}
+
 /** Strict improvement without sacrificing any measured readability dimension.
  * Keep the baseline on ties, incomplete evidence, or conflicting objectives. */
 export function routedLayoutDominates(baseline: RoutedLayoutQuality | null, candidate: RoutedLayoutQuality | null): boolean {
-  if (!baseline || !candidate) return false;
-  const fields = ['width', 'height', 'pathLength', 'bends', 'crossings', 'sharedLaneOverlap', 'hemisphereSharedLaneOverlap', 'flowOrthogonalDrift', 'orthogonalRouteTravel', 'backwardTravel'] as const;
-  if (fields.some(key => !Number.isFinite(baseline[key]) || !Number.isFinite(candidate[key])
-    || baseline[key] < 0 || candidate[key] < 0)) return false;
-  return fields.every(key => candidate[key] <= baseline[key] + 0.01)
-    && fields.some(key => candidate[key] < baseline[key] - 0.01);
+  if (!baseline || !candidate || !routedLayoutEvidenceIsFinite(baseline, candidate)) return false;
+  return routedLayoutQualityFields.every(key => candidate[key] <= baseline[key] + 0.01)
+    && routedLayoutQualityFields.some(key => candidate[key] < baseline[key] - 0.01);
+}
+
+/** Prefer clearer trunking only after hard layout dimensions and route costs stay
+ * within the current candidate. This lets an equal-size alternative win when it
+ * separates opposite-hemisphere fan-in/fan-out lanes, without buying that with
+ * extra crossings, bends, detours, or backward travel. */
+export function routedLayoutImprovesReadableFlow(
+  baseline: RoutedLayoutQuality | null,
+  candidate: RoutedLayoutQuality | null,
+): boolean {
+  if (!baseline || !candidate || !routedLayoutEvidenceIsFinite(baseline, candidate)) return false;
+  const protectedFields = ['width', 'height', 'pathLength', 'bends', 'crossings',
+    'sharedLaneOverlap', 'flowOrthogonalDrift', 'orthogonalRouteTravel', 'backwardTravel'] as const;
+  const readabilityFields = ['hemisphereSharedLaneOverlap', 'sharedLaneOverlap',
+    'flowOrthogonalDrift', 'orthogonalRouteTravel', 'backwardTravel'] as const;
+  return protectedFields.every(key => candidate[key] <= baseline[key] + 0.01)
+    && readabilityFields.some(key => candidate[key] < baseline[key] - 0.01);
 }
 

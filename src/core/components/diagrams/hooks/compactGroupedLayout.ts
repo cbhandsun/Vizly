@@ -5,7 +5,7 @@ import { prepareDomainDagreInteractiveEdges } from '../../../strategies/domainDa
 import { resolveDomainElkMainFlowOptions } from '../../../strategies/domainElkLayoutProfile';
 import { withDisplayAbsolutePositions } from '../../shared/baseReactFlowAbsolutePositions';
 import { projectBaseReactFlowDisplayWorkerInput } from '../../shared/baseReactFlowDisplayWorkerProjection';
-import { measureRoutedLayoutQuality } from '../../shared/routedLayoutQuality';
+import { measureRoutedLayoutQuality, routedLayoutImprovesReadableFlow } from '../../shared/routedLayoutQuality';
 import { prepareLayeredLayoutEdges } from './layeredLayoutEdgePreparation';
 import { calculateLayeredLayoutWithReverse } from './reverseLayeredLayoutGeometry';
 import { stripHiddenGeneratedLayoutNodes } from './layoutStrategyInputBoundary';
@@ -97,11 +97,12 @@ export function preferCompactGroupedLayout(baseline: RoutedLayoutCandidate, cand
   if (!before || !after) return false;
   const mainBefore = reversedMainEdges(baseline, direction, direction);
   const mainAfter = reversedMainEdges(candidate, direction, compactGroupInnerDirection(direction));
-  return Number.isFinite(mainBefore) && Number.isFinite(mainAfter) && mainAfter <= mainBefore
-    && after.crossings <= before.crossings && after.pathLength <= before.pathLength + 0.01
+  if (!Number.isFinite(mainBefore) || !Number.isFinite(mainAfter) || mainAfter > mainBefore) return false;
+  const qualitySafe = after.crossings <= before.crossings && after.pathLength <= before.pathLength + 0.01
     && after.sharedLaneOverlap <= before.sharedLaneOverlap + 0.01
     && after.hemisphereSharedLaneOverlap <= before.hemisphereSharedLaneOverlap + 0.01
     && after.flowOrthogonalDrift <= before.flowOrthogonalDrift + 0.01
-    && after.orthogonalRouteTravel <= before.orthogonalRouteTravel + 0.01
-    && Math.max(after.width, after.height) < Math.max(before.width, before.height) - 0.01;
+    && after.orthogonalRouteTravel <= before.orthogonalRouteTravel + 0.01;
+  return qualitySafe && (Math.max(after.width, after.height) < Math.max(before.width, before.height) - 0.01
+    || routedLayoutImprovesReadableFlow(before, after));
 }
