@@ -20,6 +20,7 @@ export type RoutedLayoutQuality = Readonly<{
   sharedLaneOverlap: number;
   hemisphereSharedLaneOverlap: number;
   flowOrthogonalDrift: number;
+  orthogonalRouteTravel: number;
   backwardTravel: number;
 }>;
 
@@ -163,7 +164,7 @@ export function measureRoutedLayoutQuality(
   let minX = Math.min(...rectangles.map(rect => rect.x)), minY = Math.min(...rectangles.map(rect => rect.y));
   let maxX = Math.max(...rectangles.map(rect => rect.x + (rect.width ?? 0)));
   let maxY = Math.max(...rectangles.map(rect => rect.y + (rect.height ?? 0)));
-  let pathLength = 0, segments = 0, backwardTravel = 0;
+  let pathLength = 0, segments = 0, backwardTravel = 0, orthogonalRouteTravel = 0;
   const horizontal = direction === 'LR' || direction === 'RL';
   const sign = direction === 'BT' || direction === 'RL' ? -1 : 1;
   for (const edge of edges) {
@@ -183,7 +184,9 @@ export function measureRoutedLayoutQuality(
       const previous = path[index - 1];
       const dx = Math.abs(point.x - previous.x), dy = Math.abs(point.y - previous.y);
       if (dx > 0.01 && dy > 0.01) return null;
-      pathLength += Math.hypot(dx, dy);
+      const segmentLength = Math.hypot(dx, dy);
+      pathLength += segmentLength;
+      orthogonalRouteTravel += horizontal ? dy : dx;
       backwardTravel += Math.max(0, -sign * (horizontal ? point.x - previous.x : point.y - previous.y));
     }
     paths.set(edge.id, path);
@@ -202,6 +205,7 @@ export function measureRoutedLayoutQuality(
     width: maxX - minX, height: maxY - minY,
     pathLength, backwardTravel, bends: scored.bends, crossings: scored.hardCrossings + scored.buddyCrossings,
     sharedLaneOverlap: scored.parallelOverlaps, hemisphereSharedLaneOverlap, flowOrthogonalDrift,
+    orthogonalRouteTravel: Math.round(orthogonalRouteTravel),
   };
 }
 
@@ -209,9 +213,10 @@ export function measureRoutedLayoutQuality(
  * Keep the baseline on ties, incomplete evidence, or conflicting objectives. */
 export function routedLayoutDominates(baseline: RoutedLayoutQuality | null, candidate: RoutedLayoutQuality | null): boolean {
   if (!baseline || !candidate) return false;
-  const fields = ['width', 'height', 'pathLength', 'bends', 'crossings', 'sharedLaneOverlap', 'hemisphereSharedLaneOverlap', 'flowOrthogonalDrift', 'backwardTravel'] as const;
+  const fields = ['width', 'height', 'pathLength', 'bends', 'crossings', 'sharedLaneOverlap', 'hemisphereSharedLaneOverlap', 'flowOrthogonalDrift', 'orthogonalRouteTravel', 'backwardTravel'] as const;
   if (fields.some(key => !Number.isFinite(baseline[key]) || !Number.isFinite(candidate[key])
     || baseline[key] < 0 || candidate[key] < 0)) return false;
   return fields.every(key => candidate[key] <= baseline[key] + 0.01)
     && fields.some(key => candidate[key] < baseline[key] - 0.01);
 }
+
