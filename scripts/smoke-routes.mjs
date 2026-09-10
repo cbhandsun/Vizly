@@ -135,6 +135,29 @@ const fail = (message, details) => {
   throw error;
 };
 
+const sameOriginAssetUrl = (url) => {
+  if (typeof url !== 'string') return false;
+  try {
+    const parsedUrl = new URL(url);
+    const baseUrl = new URL(BASE_URL);
+    return parsedUrl.origin === baseUrl.origin && parsedUrl.pathname.startsWith('/assets/');
+  } catch {
+    return false;
+  }
+};
+
+const isRouteResourceBufferIssue = (error) => {
+  const issues = Array.isArray(error?.details?.networkIssues)
+    ? error.details.networkIssues
+    : [];
+  return issues.some((issue) => (
+    issue?.type === 'loadingFailed'
+    && issue?.resourceType === 'Script'
+    && issue?.errorText === 'net::ERR_NO_BUFFER_SPACE'
+    && sameOriginAssetUrl(issue?.url)
+  ));
+};
+
 const getEnvPath = (name) => {
   const value = process.env[name];
   return value && existsSync(value) ? value : null;
@@ -613,6 +636,18 @@ const runRouteSample = async (route, sampleIndex = 0) => {
   }
 };
 
+const runRouteSampleWithInfrastructureRetry = async (route, sampleIndex = 0) => {
+  try {
+    return await runRouteSample(route, sampleIndex);
+  } catch (error) {
+    if (!isRouteResourceBufferIssue(error)) throw error;
+    const sampleSuffix = SMOKE_REPEAT > 1 ? ` [sample ${sampleIndex + 1}/${SMOKE_REPEAT}]` : '';
+    log(`Route resource buffer was exhausted for ${route.name}${sampleSuffix}; retrying one fresh target.`);
+    await delay(500);
+    return runRouteSample(route, sampleIndex);
+  }
+};
+
 let devServer;
 let browserProcess;
 
@@ -637,7 +672,7 @@ try {
   for (const route of selectedRoutes) {
     const samples = [];
     for (let sampleIndex = 0; sampleIndex < SMOKE_REPEAT; sampleIndex += 1) {
-      samples.push(await runRouteSample(route, sampleIndex));
+      samples.push(await runRouteSampleWithInfrastructureRetry(route, sampleIndex));
     }
     results.push(aggregateRouteSamples(samples));
   }

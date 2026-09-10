@@ -222,6 +222,17 @@ describe('smoke route modules', () => {
     expect(source).toContain('await session.disposeTarget()');
   });
 
+  it('retries only local script buffer exhaustion during route smoke sampling', () => {
+    const source = readFileSync(new URL('../smoke-routes.mjs', import.meta.url), 'utf8');
+    expect(source).toContain('isRouteResourceBufferIssue');
+    expect(source).toContain("issue?.type === 'loadingFailed'");
+    expect(source).toContain("issue?.resourceType === 'Script'");
+    expect(source).toContain("issue?.errorText === 'net::ERR_NO_BUFFER_SPACE'");
+    expect(source).toContain("parsedUrl.pathname.startsWith('/assets/')");
+    expect(source).toContain('runRouteSampleWithInfrastructureRetry');
+    expect(source).toContain('Route resource buffer was exhausted');
+  });
+
   it.each([{}, { success: false }, null])('rejects unconfirmed target cleanup: %j', async result => {
     const session = new CdpSession('ws://browser', 'sample-target');
     session.socket = { readyState: 1, close: vi.fn() };
