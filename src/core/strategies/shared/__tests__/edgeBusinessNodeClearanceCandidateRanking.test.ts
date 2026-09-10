@@ -130,17 +130,17 @@ describe('rankBusinessNodeClearanceCandidates', () => {
     expect(ranked.map(entry => entry.candidate)).toEqual(['first', 'second']);
   });
 
-  it('prefers candidates that stay in the terminal half-planes before bends and length', () => {
+  it('uses terminal half-planes only for otherwise equivalent geometry candidates', () => {
     const ranked = rankBusinessNodeClearanceCandidates([
-      candidate('short-backtracking', { length: 100, terminalBacktrack: 20 }),
-      candidate('long-clean', { length: 140, terminalBacktrack: 0 }),
-      candidate('bendy-clean', { bendCount: 6, length: 80, terminalBacktrack: 0 }),
+      candidate('backtracking', { length: 100, terminalBacktrack: 20 }),
+      candidate('clean', { length: 100, terminalBacktrack: 0 }),
+      candidate('shorter-backtracking', { length: 90, terminalBacktrack: 20 }),
     ], { hits: 1, commercialRisk: 10, risk: 10 });
 
     expect(ranked.map(entry => entry.candidate)).toEqual([
-      'long-clean',
-      'bendy-clean',
-      'short-backtracking',
+      'clean',
+      'backtracking',
+      'shorter-backtracking',
     ]);
   });
 

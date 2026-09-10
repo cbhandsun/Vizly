@@ -51,18 +51,10 @@ const canReplace = <T>(
   const sameLocalRiskBand = candidate.hits === best.hits
     && Math.abs(candidate.commercialRisk - best.commercialRisk) <= RISK_TOLERANCE
     && Math.abs(candidate.risk - best.risk) <= RISK_TOLERANCE;
-  const improvesStableGeometry = sameLocalRiskBand && (
-    candidate.terminalBacktrack < best.terminalBacktrack
-    || (
-      candidate.terminalBacktrack === best.terminalBacktrack
-      && candidate.bendCount < best.bendCount
-    )
-    || (
-      candidate.terminalBacktrack === best.terminalBacktrack
-      && candidate.bendCount === best.bendCount
-      && candidate.length < best.length
-    )
-  );
+  const improvesStableGeometry = sameLocalRiskBand
+    && candidate.bendCount === best.bendCount
+    && candidate.length === best.length
+    && candidate.terminalBacktrack < best.terminalBacktrack;
   if (
     candidate.hits === best.hits
     && Math.abs(candidate.commercialRisk - best.commercialRisk) <= RISK_TOLERANCE
