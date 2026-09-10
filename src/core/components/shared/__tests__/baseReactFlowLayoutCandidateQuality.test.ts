@@ -77,7 +77,7 @@ describe('routed layout candidate quality', () => {
     expect(routedLayoutDominates(candidate, baseline)).toBe(false);
   });
 
-  it('measures estimated edge label collisions before choosing a routed candidate', () => {
+  it('arranges estimated edge labels before scoring routed candidates', () => {
     const labelNodes: Node[] = [
       { id: 'a', data: {}, position: { x: 0, y: 220 }, width: 40, height: 40 },
       { id: 'b', data: {}, position: { x: 260, y: 220 }, width: 40, height: 40 },
@@ -94,7 +94,7 @@ describe('routed layout candidate quality', () => {
     const crowded = measureRoutedLayoutQuality(labelNodes, labelledOverlap);
     const separated = measureRoutedLayoutQuality(labelNodes, labelledSeparated);
 
-    expect(crowded).toMatchObject({ labelLabelOverlap: 1, labelNodeOverlap: 0 });
+    expect(crowded).toMatchObject({ labelLabelOverlap: 0, labelNodeOverlap: 0 });
     expect(separated).toMatchObject({ labelLabelOverlap: 0, labelNodeOverlap: 0 });
     expect(routedLayoutDominates(crowded, separated)).toBe(true);
     expect(routedLayoutImprovesReadableFlow(crowded, { ...separated!,
@@ -102,11 +102,11 @@ describe('routed layout candidate quality', () => {
     })).toBe(false);
   });
 
-  it('measures estimated edge label collisions with business nodes', () => {
+  it('arranges estimated edge labels away from business nodes before scoring', () => {
     const labelled = edge('labelled', [{ x: 0, y: 20 }, { x: 160, y: 20 }]);
     const quality = measureRoutedLayoutQuality(nodes, [{ ...labelled, data: { ...labelled.data, label: 'Covers source node' } }]);
 
-    expect(quality).toMatchObject({ labelNodeOverlap: 1 });
+    expect(quality).toMatchObject({ labelNodeOverlap: 0 });
   });
   it('scores labels at the same smart path anchor used by routed edge rendering', () => {
     const routeNodes: Node[] = [

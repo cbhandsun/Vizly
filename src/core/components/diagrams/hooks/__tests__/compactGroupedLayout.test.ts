@@ -143,7 +143,7 @@ describe('bounded compact group comparison', () => {
     expect(preferCompactGroupedLayout(before, after, 'LR')).toBe(true);
   });
 
-  it('rejects compact candidates that worsen estimated label collisions', () => {
+  it('allows compact candidates when source labels can be arranged away from content', () => {
     const labelledEdge: Edge = { ...edges[0], data: { label: 'Readable dependency' } };
     const beforeGeometry = {
       nodes: [nodes[0], { ...nodes[1], position: { x: 500, y: 0 } }],
@@ -166,7 +166,7 @@ describe('bounded compact group comparison', () => {
       ] },
     };
 
-    expect(preferCompactGroupedLayout(before, after, 'LR')).toBe(false);
+    expect(preferCompactGroupedLayout(before, after, 'LR')).toBe(true);
   });
 
   it('rejects compact candidates that increase cross-flow drift', () => {

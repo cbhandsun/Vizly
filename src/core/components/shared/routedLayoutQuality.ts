@@ -5,6 +5,8 @@ import type { PeerHemisphereFlowAxis } from '../../strategies/shared/edgeSharedT
 import { RoutingCrossingScorer } from '../../algorithms/routingCrossingScorer';
 import { evaluateLayoutGeometry } from '../../algorithms/layoutGeometryConstraints';
 import { getSmartLabelPosition } from '../../algorithms/smartEdgeUtils';
+import { arrangeEdgeLabels, edgeLabelRectsConflict } from '../custom-edges/edgeLabelArrangement';
+import { estimateEdgeLabelSize } from '../custom-edges/edgeLabelMeasurement';
 import { projectBaseReactFlowDisplayWorkerInput } from './baseReactFlowDisplayWorkerProjection';
 import { getDisplayComputedPath } from './baseReactFlowDisplayGeometry';
 import {
@@ -35,7 +37,6 @@ type ProjectedQualityNode = Node & {
 };
 
 const PARALLEL_LANE_TOLERANCE = 4;
-const EDGE_LABEL_MAX_WIDTH = 220;
 const EDGE_LABEL_GAP = 8;
 const EDGE_LABEL_NODE_GAP = 10;
 
@@ -86,31 +87,17 @@ export const routedEdgesWithSourceLabelsForQuality = (sourceEdges: Edge[], route
   });
 };
 
-const estimateLabelSize = (text: string): Readonly<{ width: number; height: number }> => {
-  const lines = text.split(/\r\n|\r|\n/);
-  let rows = 0;
-  let width = 42;
-  for (const line of lines) {
-    let textWidth = 0;
-    for (const glyph of line) textWidth += glyph.charCodeAt(0) < 128 ? 8 : 22;
-    width = Math.max(width, Math.min(EDGE_LABEL_MAX_WIDTH, textWidth + 22));
-    rows += Math.max(1, Math.ceil(textWidth / (EDGE_LABEL_MAX_WIDTH - 22)));
-  }
-  return { width, height: 26 + (rows - 1) * 22 };
-};
-
 const rectsConflict = (a: QualityRect, b: QualityRect, gap: number): boolean => (
   a.x < b.x + b.width + gap && a.x + a.width + gap > b.x
   && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y
 );
 
-const labelRectForPath = (edge: Edge, path: readonly Point[]): QualityRect | null => {
+const labelCenterForPath = (edge: Edge, path: readonly Point[]): Point | null => {
   const text = readEdgeLabelText(edge);
   if (!text) return null;
   const center = getSmartLabelPosition([...path]);
   if (!Number.isFinite(center.x) || !Number.isFinite(center.y)) return null;
-  const size = estimateLabelSize(text);
-  return { x: center.x - size.width / 2, y: center.y - size.height / 2, width: size.width, height: size.height };
+  return center;
 };
 
 function measureLabelOverlap(
@@ -118,16 +105,30 @@ function measureLabelOverlap(
   paths: ReadonlyMap<string, readonly Point[]>,
   rectangles: readonly QualityRect[],
 ): Pick<RoutedLayoutQuality, 'labelLabelOverlap' | 'labelNodeOverlap'> {
-  const labels = edges.flatMap(edge => {
+  const inputs = edges.flatMap(edge => {
     if (edge.hidden) return [];
     const path = paths.get(edge.id);
-    const rect = path ? labelRectForPath(edge, path) : null;
-    return rect ? [rect] : [];
+    if (!path) return [];
+    const text = readEdgeLabelText(edge);
+    const anchor = labelCenterForPath(edge, path);
+    return text && anchor ? [{
+      id: edge.id,
+      path,
+      labelPath: path,
+      anchor,
+      preferredCenter: anchor,
+      text,
+      size: estimateEdgeLabelSize(text),
+      scale: 1,
+      manual: false,
+      obstacles: rectangles,
+    }] : [];
   });
+  const labels = [...arrangeEdgeLabels(inputs).values()].map(placement => placement.rect);
   let labelLabelOverlap = 0;
   for (let firstIndex = 0; firstIndex < labels.length; firstIndex += 1) {
     for (let secondIndex = firstIndex + 1; secondIndex < labels.length; secondIndex += 1) {
-      if (rectsConflict(labels[firstIndex], labels[secondIndex], EDGE_LABEL_GAP)) labelLabelOverlap += 1;
+      if (edgeLabelRectsConflict(labels[firstIndex], labels[secondIndex], EDGE_LABEL_GAP)) labelLabelOverlap += 1;
     }
   }
   const labelNodeOverlap = labels.reduce((total, label) => (
