@@ -198,6 +198,42 @@ const TOPOLOGY_METRICS = Object.freeze(['comparedNodeCount', 'movedNodeCount',
   'totalNodeDisplacement', 'maxNodeDisplacement', 'comparedEdgeCount',
   'addedNodeCount', 'removedNodeCount', 'addedEdgeCount', 'removedEdgeCount', 'rewiredEdgeCount']);
 
+const DERIVED_METRICS = Object.freeze([
+  'meanNodeDisplacement', 'movedNodeRatio', 'changedPortRatio',
+  'changedPathRatio', 'changedGeometryRatio', 'routeLengthDelta',
+  'routeLengthDeltaRatio', 'bendDelta', 'bendDeltaRatio',
+]);
+
+const ratio = (numerator, denominator) => denominator > 0 ? numerator / denominator : 0;
+
+const deriveDisplayRoutingEditStability = sample => {
+  const routeLengthDelta = sample.afterPathLength - sample.beforePathLength;
+  const bendDelta = sample.afterBendCount - sample.beforeBendCount;
+  return {
+    meanNodeDisplacement: ratio(sample.totalNodeDisplacement, sample.comparedNodeCount),
+    movedNodeRatio: ratio(sample.movedNodeCount, sample.comparedNodeCount),
+    changedPortRatio: ratio(sample.changedPortCount, sample.comparedEdgeCount),
+    changedPathRatio: ratio(sample.changedPathCount, sample.comparedEdgeCount),
+    changedGeometryRatio: ratio(sample.changedGeometryCount, sample.comparedEdgeCount),
+    routeLengthDelta,
+    routeLengthDeltaRatio: sample.beforePathLength > 0 ? routeLengthDelta / sample.beforePathLength
+      : sample.afterPathLength > 0 ? 1 : 0,
+    bendDelta,
+    bendDeltaRatio: sample.beforeBendCount > 0 ? bendDelta / sample.beforeBendCount
+      : sample.afterBendCount > 0 ? 1 : 0,
+  };
+};
+
+const summarizeFiniteValues = (samples, keys) => Object.fromEntries(keys.map(key => {
+  const sorted = samples.map(sample => sample[key]).sort((a, b) => a - b);
+  if (sorted.some(value => !Number.isFinite(value) || Math.abs(value) > 1e15)) {
+    throw new Error('Invalid edit stability samples');
+  }
+  return [key, { min: sorted[0], max: sorted.at(-1),
+    mean: sorted.reduce((sum, value) => sum + value, 0) / sorted.length,
+    p95: sorted[Math.ceil(sorted.length * 0.95) - 1] }];
+}));
+
 export const projectDisplayRoutingTopologyStability = value => {
   if (!value || TOPOLOGY_METRICS.some(key => !Number.isFinite(value[key]) || value[key] < 0 || value[key] > 1e15
     || (key.endsWith('Count') && !Number.isSafeInteger(value[key])))) return null;
@@ -225,13 +261,10 @@ export const summarizeDisplayRoutingEditStability = values => {
   }
   const samples = values.map(projectDisplayRoutingEditStability);
   if (samples.some(value => value === null)) throw new Error('Incomplete edit stability samples');
+  const derived = samples.map(deriveDisplayRoutingEditStability);
   return {
     sampleCount: samples.length,
-    metrics: Object.fromEntries(METRICS.map(key => {
-      const sorted = samples.map(sample => sample[key]).sort((a, b) => a - b);
-      return [key, { min: sorted[0], max: sorted.at(-1),
-        mean: sorted.reduce((sum, value) => sum + value, 0) / sorted.length,
-        p95: sorted[Math.ceil(sorted.length * 0.95) - 1] }];
-    })),
+    metrics: summarizeFiniteValues(samples, METRICS),
+    derived: summarizeFiniteValues(derived, DERIVED_METRICS),
   };
 };

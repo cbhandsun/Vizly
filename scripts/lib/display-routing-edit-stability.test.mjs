@@ -59,6 +59,9 @@ describe('incremental edit stability', () => {
     }]);
     expect(summary).toMatchObject({ sampleCount: 2, metrics: {
       maxNodeDisplacement: { min: 0, max: 10, mean: 5, p95: 10 },
+    }, derived: {
+      meanNodeDisplacement: { min: 0, max: 10 / 3, mean: 5 / 3, p95: 10 / 3 },
+      movedNodeRatio: { min: 0, max: 0, mean: 0, p95: 0 },
     } });
     for (const invalid of [null, [], [null], [metrics, {}], Array(101).fill(metrics),
       [{ ...metrics, movedNodeCount: 0.5 }], [{ ...metrics, maxNodeDisplacement: Infinity }],
@@ -66,6 +69,49 @@ describe('incremental edit stability', () => {
       expect(() => summarizeDisplayRoutingEditStability(invalid)).toThrow(/stability samples/);
     }
   });
+
+  it('summarizes derived edit stability ratios, route deltas and bend deltas', () => {
+    const stable = measure(fixture(), fixture(), []);
+    const before = fixture();
+    const after = fixture();
+    after.nodes[1].position = { x: 3, y: 4 };
+    after.edges[0].sourceHandle = 'bottom';
+    after.edges[0].data.computedPath = [{ x: 0, y: 0 }, { x: 0, y: 10 }, { x: 10, y: 10 }];
+    const changed = measure(before, after, []);
+    const summary = summarizeDisplayRoutingEditStability([stable, changed]);
+    expect(summary.derived).toMatchObject({
+      meanNodeDisplacement: { min: 0, max: 5 / 3, mean: 5 / 6, p95: 5 / 3 },
+      movedNodeRatio: { min: 0, max: 1 / 3, mean: 1 / 6, p95: 1 / 3 },
+      changedPortRatio: { min: 0, max: 1, mean: 0.5, p95: 1 },
+      changedPathRatio: { min: 0, max: 1, mean: 0.5, p95: 1 },
+      changedGeometryRatio: { min: 0, max: 1, mean: 0.5, p95: 1 },
+      routeLengthDelta: { min: 0, max: 10, mean: 5, p95: 10 },
+      routeLengthDeltaRatio: { min: 0, max: 1, mean: 0.5, p95: 1 },
+      bendDelta: { min: 0, max: 1, mean: 0.5, p95: 1 },
+      bendDeltaRatio: { min: 0, max: 1, mean: 0.5, p95: 1 },
+    });
+  });
+
+  it('keeps derived edit stability finite for empty graphs and route improvements', () => {
+    const empty = measure({ nodes: [], edges: [] }, { nodes: [], edges: [] }, []);
+    expect(summarizeDisplayRoutingEditStability([empty]).derived).toMatchObject({
+      meanNodeDisplacement: { min: 0, max: 0, mean: 0, p95: 0 },
+      changedPortRatio: { min: 0, max: 0, mean: 0, p95: 0 },
+      routeLengthDeltaRatio: { min: 0, max: 0, mean: 0, p95: 0 },
+    });
+
+    const before = fixture();
+    before.edges[0].data.computedPath = [{ x: 0, y: 0 }, { x: 0, y: 10 }, { x: 10, y: 10 }];
+    const after = fixture();
+    const summary = summarizeDisplayRoutingEditStability([measure(before, after, [])]);
+    expect(summary.derived).toMatchObject({
+      routeLengthDelta: { min: -10, max: -10, mean: -10, p95: -10 },
+      routeLengthDeltaRatio: { min: -0.5, max: -0.5, mean: -0.5, p95: -0.5 },
+      bendDelta: { min: -1, max: -1, mean: -1, p95: -1 },
+      bendDeltaRatio: { min: -1, max: -1, mean: -1, p95: -1 },
+    });
+  });
+
   it('measures exact unrelated displacement, port changes, detours and bends', () => {
     const before = fixture();
     const after = fixture();
