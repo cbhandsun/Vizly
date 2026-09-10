@@ -44,6 +44,10 @@ describe('routing performance workflow', () => {
     expect(workflow).toContain('DISPLAY_ROUTING_INTERACTION_RESULT=');
     expect(workflow).toContain('interaction-paint summary: count=');
     expect(workflow).toContain('$p95Ms -gt 100');
+    expect(workflow).toContain('retrying after retryable Browser DevTools startup deadline');
+    expect(workflow).toContain('Browser DevTools startup failed:.*"reason":"deadline"');
+    expect(workflow).toContain('"probeErrorCode":"ECONNREFUSED"');
+    expect(workflow).toContain('"processSpawned":true');
   });
 
   it('always stops its own preview process and retains every isolated report', () => {
@@ -55,3 +59,4 @@ describe('routing performance workflow', () => {
     expect(occurrences('retention-days: 30')).toBe(3);
   });
 });
+
