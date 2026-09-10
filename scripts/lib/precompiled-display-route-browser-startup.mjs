@@ -12,18 +12,30 @@ const OUTPUT_MARKERS = [
   ['sandbox-failure', /No usable sandbox|sandbox.*initialization failed/i],
 ];
 
+const deterministicStartupMarkers = new Set(['profile-lock', 'bind-failure', 'sandbox-failure']);
+
+const hasOnlyRetryableStartupMarkers = markers => (
+  Array.isArray(markers)
+  && markers.every(marker => marker === 'devtools-listening')
+  && !markers.some(marker => deterministicStartupMarkers.has(marker))
+);
+
 export const isRetryableBrowserDevToolsStartupFailure = error => {
   const diagnostic = error?.browserStartupDiagnostic;
-  return diagnostic?.reason === 'deadline'
-    && diagnostic.lastProbe === 'request-failed'
+  if (diagnostic?.reason !== 'deadline'
+    || diagnostic.processSpawned !== true
+    || diagnostic.exitCode !== null
+    || diagnostic.signal !== null
+    || !hasOnlyRetryableStartupMarkers(diagnostic.outputMarkers)) return false;
+  const silentEndpointRefusal = diagnostic.lastProbe === 'request-failed'
     && diagnostic.probeErrorCode === 'ECONNREFUSED'
-    && diagnostic.processSpawned === true
-    && diagnostic.exitCode === null
-    && diagnostic.signal === null
     && diagnostic.stdoutBytes === 0
     && diagnostic.stderrBytes === 0
-    && Array.isArray(diagnostic.outputMarkers)
     && diagnostic.outputMarkers.length === 0;
+  const listeningEndpointHung = diagnostic.lastProbe === 'request-pending'
+    && diagnostic.probeErrorCode === null
+    && diagnostic.outputMarkers.includes('devtools-listening');
+  return silentEndpointRefusal || listeningEndpointHung;
 };
 
 export const runBrowserDevToolsStartupWithSingleRetry = async (

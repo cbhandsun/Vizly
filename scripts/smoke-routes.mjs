@@ -352,7 +352,7 @@ const launchBrowser = async (browserPath) => {
   return runBrowserDevToolsStartupWithSingleRetry(
     attempt => launchBrowserAttempt(browserPath, browserProfileDirs[attempt]),
     async () => {
-      log('Browser DevTools stayed unavailable without process output; retrying one fresh startup.');
+      log('Browser DevTools endpoint did not become usable; retrying one fresh startup.');
       await removeDirectoryWithRetries(browserProfileDirs[0]);
       if (!HAS_EXPLICIT_DEBUG_PORT) DEBUG_PORT = await findAvailablePort(DEBUG_PORT + 1);
     },

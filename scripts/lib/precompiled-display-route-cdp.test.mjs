@@ -65,7 +65,7 @@ describe('browser startup lifecycle and safe diagnostics', () => {
     expect(fetchEndpoint).toHaveBeenCalledTimes(2);
   });
 
-  it('retries only a silent, live browser that never opens its local endpoint', () => {
+  it('retries bounded live browser endpoint startup failures', () => {
     const diagnostic = {
       reason: 'deadline', lastProbe: 'request-failed', probeErrorCode: 'ECONNREFUSED',
       processSpawned: true, exitCode: null, signal: null, stdoutBytes: 0, stderrBytes: 0,
@@ -75,9 +75,19 @@ describe('browser startup lifecycle and safe diagnostics', () => {
       browserStartupDiagnostic: diagnostic,
     });
     expect(isRetryableBrowserDevToolsStartupFailure(failure)).toBe(true);
+    failure.browserStartupDiagnostic = {
+      ...diagnostic,
+      lastProbe: 'request-pending',
+      probeErrorCode: null,
+      stderrBytes: 99,
+      outputMarkers: ['devtools-listening'],
+    };
+    expect(isRetryableBrowserDevToolsStartupFailure(failure)).toBe(true);
     for (const override of [
       { reason: 'process-exited' }, { probeErrorCode: 'OTHER' }, { processSpawned: false },
       { exitCode: 1 }, { stdoutBytes: 1 }, { outputMarkers: ['profile-lock'] },
+      { outputMarkers: ['bind-failure'] }, { outputMarkers: ['sandbox-failure'] },
+      { lastProbe: 'body-pending', outputMarkers: ['devtools-listening'] },
     ]) {
       failure.browserStartupDiagnostic = { ...diagnostic, ...override };
       expect(isRetryableBrowserDevToolsStartupFailure(failure)).toBe(false);
@@ -344,7 +354,7 @@ describe('browser startup lifecycle and safe diagnostics', () => {
     expect(cdpSource).toContain('runBrowserDevToolsStartupWithSingleRetry(');
     expect(cdpSource).toContain("stdio: ['ignore', 'pipe', 'pipe']");
     expect(smokeSource).toContain('version = await waitForBrowserDevTools(child, DEBUG_PORT)');
-    expect(smokeSource).toContain('await killProcessTree(child);\n    throw error;');
+    expect(smokeSource).toMatch(/await killProcessTree\(child\);\r?\n    throw error;/);
     expect(smokeSource).toContain('runBrowserDevToolsStartupWithSingleRetry(');
   });
 });
