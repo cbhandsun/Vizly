@@ -108,6 +108,23 @@ describe('routed layout candidate quality', () => {
 
     expect(quality).toMatchObject({ labelNodeOverlap: 1 });
   });
+  it('scores labels at the same smart path anchor used by routed edge rendering', () => {
+    const routeNodes: Node[] = [
+      { id: 'a', data: {}, position: { x: -80, y: -80 }, width: 40, height: 40 },
+      { id: 'b', data: {}, position: { x: 260, y: 140 }, width: 40, height: 40 },
+      { id: 'c', data: {}, position: { x: 55, y: 88 }, width: 20, height: 24 },
+    ];
+    const labelled = edge('labelled', [
+      { x: 0, y: 0 },
+      { x: 20, y: 0 },
+      { x: 20, y: 100 },
+      { x: 200, y: 100 },
+      { x: 200, y: 120 },
+    ]);
+    const quality = measureRoutedLayoutQuality(routeNodes, [{ ...labelled, data: { ...labelled.data, label: 'Tag' } }]);
+
+    expect(quality).toMatchObject({ labelNodeOverlap: 0 });
+  });
   it('prefers clearer readable flow only without route or geometry regressions', () => {
     const baseline = {
       width: 200,

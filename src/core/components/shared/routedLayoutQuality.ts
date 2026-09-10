@@ -4,6 +4,7 @@ import type { LaneRankDirection } from '../../types/domainLaneRank';
 import type { PeerHemisphereFlowAxis } from '../../strategies/shared/edgeSharedTrunkSynthesisUtils';
 import { RoutingCrossingScorer } from '../../algorithms/routingCrossingScorer';
 import { evaluateLayoutGeometry } from '../../algorithms/layoutGeometryConstraints';
+import { getSmartLabelPosition } from '../../algorithms/smartEdgeUtils';
 import { projectBaseReactFlowDisplayWorkerInput } from './baseReactFlowDisplayWorkerProjection';
 import { getDisplayComputedPath } from './baseReactFlowDisplayGeometry';
 import {
@@ -98,26 +99,6 @@ const estimateLabelSize = (text: string): Readonly<{ width: number; height: numb
   return { width, height: 26 + (rows - 1) * 22 };
 };
 
-const pointAtHalfLength = (path: readonly Point[]): Point | null => {
-  let total = 0;
-  for (let index = 1; index < path.length; index += 1) {
-    total += Math.hypot(path[index].x - path[index - 1].x, path[index].y - path[index - 1].y);
-  }
-  if (!Number.isFinite(total) || total <= 0) return null;
-  let travelled = 0;
-  const target = total / 2;
-  for (let index = 1; index < path.length; index += 1) {
-    const a = path[index - 1], b = path[index];
-    const length = Math.hypot(b.x - a.x, b.y - a.y);
-    if (travelled + length >= target) {
-      const ratio = length <= 0 ? 0 : (target - travelled) / length;
-      return { x: a.x + (b.x - a.x) * ratio, y: a.y + (b.y - a.y) * ratio };
-    }
-    travelled += length;
-  }
-  return path[path.length - 1] ?? null;
-};
-
 const rectsConflict = (a: QualityRect, b: QualityRect, gap: number): boolean => (
   a.x < b.x + b.width + gap && a.x + a.width + gap > b.x
   && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y
@@ -126,8 +107,8 @@ const rectsConflict = (a: QualityRect, b: QualityRect, gap: number): boolean => 
 const labelRectForPath = (edge: Edge, path: readonly Point[]): QualityRect | null => {
   const text = readEdgeLabelText(edge);
   if (!text) return null;
-  const center = pointAtHalfLength(path);
-  if (!center) return null;
+  const center = getSmartLabelPosition([...path]);
+  if (!Number.isFinite(center.x) || !Number.isFinite(center.y)) return null;
   const size = estimateLabelSize(text);
   return { x: center.x - size.width / 2, y: center.y - size.height / 2, width: size.width, height: size.height };
 };
