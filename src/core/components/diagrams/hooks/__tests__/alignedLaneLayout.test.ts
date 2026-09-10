@@ -102,6 +102,22 @@ describe('bounded global lane alignment comparison', () => {
     after.staged.routedEdges[0] = { ...edges[0], data: { computedPath: [{ x: 60, y: 20 }, { x: 200, y: 20 }] } };
     expect(preferAlignedLaneLayout(candidate(500), after, 'LR')).toBe(false);
   });
+  it('keeps source edge labels visible to aligned candidate quality scoring', () => {
+    const labelledEdge: Edge = { ...edges[0], data: { label: 'Readable dependency' } };
+    const before: RoutedLayoutCandidate = {
+      geometry: { nodes: [nodes[0], { ...nodes[1], position: { x: 500, y: 0 } }], edges: [labelledEdge] },
+      staged: { committedSourceEdges: [labelledEdge], commitSnapshot: () => true, routedEdges: [
+        { ...edges[0], data: { computedPath: [{ x: 60, y: 160 }, { x: 500, y: 160 }] } },
+      ] },
+    };
+    const after: RoutedLayoutCandidate = {
+      geometry: { nodes: [nodes[0], { ...nodes[1], position: { x: 200, y: 0 } }], edges: [labelledEdge] },
+      staged: { committedSourceEdges: [labelledEdge], commitSnapshot: () => true, routedEdges: [
+        { ...edges[0], data: { computedPath: [{ x: 60, y: 20 }, { x: 200, y: 20 }] } },
+      ] },
+    };
+    expect(preferAlignedLaneLayout(before, after, 'LR')).toBe(false);
+  });
   it('does not count malformed geometry or absent paths as a better layout', () => {
     expect(preferAlignedLaneLayout(candidate(500), candidate(NaN), 'LR')).toBe(false);
     const incomplete = candidate(200);

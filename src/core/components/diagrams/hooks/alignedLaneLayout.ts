@@ -3,7 +3,11 @@ import type { LayoutOptions } from '../../../types/layout';
 import type { LaneRankDecision } from '../../../types/domainLaneRank';
 import type { LayoutCalculationContext } from '../../../types/layout-strategy';
 import { resolveDomainElkMainFlowOptions } from '../../../strategies/domainElkLayoutProfile';
-import { measureRoutedLayoutQuality, routedLayoutDominates } from '../../shared/routedLayoutQuality';
+import {
+  measureRoutedLayoutQuality,
+  routedEdgesWithSourceLabelsForQuality,
+  routedLayoutDominates,
+} from '../../shared/routedLayoutQuality';
 import { projectBaseReactFlowDisplayWorkerInput } from '../../shared/baseReactFlowDisplayWorkerProjection';
 import { prepareLayeredLayoutEdges } from './layeredLayoutEdgePreparation';
 import { calculateLayeredLayoutWithReverse } from './reverseLayeredLayoutGeometry';
@@ -40,8 +44,10 @@ export const preferAlignedLaneLayout = (baseline: RoutedLayoutCandidate, candida
   if (identity(baseline.geometry) !== identity(candidate.geometry)) return false;
   const before = mainReversals(baseline.geometry, direction), after = mainReversals(candidate.geometry, direction);
   return Number.isFinite(before) && Number.isFinite(after) && after <= before && routedLayoutDominates(
-    measureRoutedLayoutQuality(baseline.geometry.nodes, baseline.staged.routedEdges, direction),
-    measureRoutedLayoutQuality(candidate.geometry.nodes, candidate.staged.routedEdges, direction),
+    measureRoutedLayoutQuality(baseline.geometry.nodes,
+      routedEdgesWithSourceLabelsForQuality(baseline.geometry.edges, baseline.staged.routedEdges), direction),
+    measureRoutedLayoutQuality(candidate.geometry.nodes,
+      routedEdgesWithSourceLabelsForQuality(candidate.geometry.edges, candidate.staged.routedEdges), direction),
   );
 };
 

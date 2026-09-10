@@ -75,6 +75,16 @@ const readEdgeLabelText = (edge: Edge): string => {
   return typeof edge.label === 'string' ? edge.label.trim() : '';
 };
 
+export const routedEdgesWithSourceLabelsForQuality = (sourceEdges: Edge[], routedEdges: Edge[]): Edge[] => {
+  const sourceById = new Map(sourceEdges.map(edge => [edge.id, edge]));
+  return routedEdges.map(edge => {
+    if (readEdgeLabelText(edge)) return edge;
+    const source = sourceById.get(edge.id);
+    const label = source ? readEdgeLabelText(source) : '';
+    return label ? { ...edge, data: { ...(edge.data ?? {}), label } } : edge;
+  });
+};
+
 const estimateLabelSize = (text: string): Readonly<{ width: number; height: number }> => {
   const lines = text.split(/\r\n|\r|\n/);
   let rows = 0;

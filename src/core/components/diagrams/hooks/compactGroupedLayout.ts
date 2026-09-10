@@ -5,7 +5,11 @@ import { prepareDomainDagreInteractiveEdges } from '../../../strategies/domainDa
 import { resolveDomainElkMainFlowOptions } from '../../../strategies/domainElkLayoutProfile';
 import { withDisplayAbsolutePositions } from '../../shared/baseReactFlowAbsolutePositions';
 import { projectBaseReactFlowDisplayWorkerInput } from '../../shared/baseReactFlowDisplayWorkerProjection';
-import { measureRoutedLayoutQuality, routedLayoutImprovesReadableFlow } from '../../shared/routedLayoutQuality';
+import {
+  measureRoutedLayoutQuality,
+  routedEdgesWithSourceLabelsForQuality,
+  routedLayoutImprovesReadableFlow,
+} from '../../shared/routedLayoutQuality';
 import { prepareLayeredLayoutEdges } from './layeredLayoutEdgePreparation';
 import { calculateLayeredLayoutWithReverse } from './reverseLayeredLayoutGeometry';
 import { stripHiddenGeneratedLayoutNodes } from './layoutStrategyInputBoundary';
@@ -72,24 +76,6 @@ const reversedMainEdges = (candidate: RoutedLayoutCandidate, direction: Flowchar
   return reversed;
 };
 
-const readStringLabel = (edge: Edge): string | null => {
-  if (typeof edge.label === 'string' && edge.label.trim().length > 0) return edge.label;
-  const data = edge.data;
-  if (data && typeof data === 'object' && 'label' in data && typeof data.label === 'string'
-    && data.label.trim().length > 0) return data.label;
-  return null;
-};
-
-const routedEdgesWithSourceLabels = (sourceEdges: Edge[], routedEdges: Edge[]): Edge[] => {
-  const sourceById = new Map(sourceEdges.map(edge => [edge.id, edge]));
-  return routedEdges.map(edge => {
-    if (readStringLabel(edge)) return edge;
-    const source = sourceById.get(edge.id);
-    const label = source ? readStringLabel(source) : null;
-    return label ? { ...edge, data: { ...(edge.data ?? {}), label } } : edge;
-  });
-};
-
 /** Compactness never buys extra crossings or longer routes. Bends are reported
  * separately: a shorter orthogonal connection may legitimately turn more often. */
 export function preferCompactGroupedLayout(baseline: RoutedLayoutCandidate, candidate: RoutedLayoutCandidate,
@@ -111,9 +97,9 @@ export function preferCompactGroupedLayout(baseline: RoutedLayoutCandidate, cand
   if (JSON.stringify(edgeIdentity(baseline.geometry.edges)) !== JSON.stringify(edgeIdentity(candidate.geometry.edges))
     || JSON.stringify(businessIdentity(baseline.geometry.nodes)) !== JSON.stringify(businessIdentity(candidate.geometry.nodes))) return false;
   const before = measureRoutedLayoutQuality(baseline.geometry.nodes,
-    routedEdgesWithSourceLabels(baseline.geometry.edges, baseline.staged.routedEdges), direction);
+    routedEdgesWithSourceLabelsForQuality(baseline.geometry.edges, baseline.staged.routedEdges), direction);
   const after = measureRoutedLayoutQuality(candidate.geometry.nodes,
-    routedEdgesWithSourceLabels(candidate.geometry.edges, candidate.staged.routedEdges), direction);
+    routedEdgesWithSourceLabelsForQuality(candidate.geometry.edges, candidate.staged.routedEdges), direction);
   if (!before || !after) return false;
   const mainBefore = reversedMainEdges(baseline, direction, direction);
   const mainAfter = reversedMainEdges(candidate, direction, compactGroupInnerDirection(direction));
