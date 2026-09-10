@@ -1,5 +1,7 @@
 import { spawn } from 'node:child_process';
-import { collectJournaledRoutingSamples, createRoutingSampleFailure } from './lib/display-routing-sample-journal.mjs';
+import { setTimeout as delay } from 'node:timers/promises';
+import { collectJournaledRoutingSamples, createRoutingSampleFailure,
+  isRetryableRoutingSampleInfrastructureFailure } from './lib/display-routing-sample-journal.mjs';
 import { summarizeDisplayRoutingEditStability } from './lib/display-routing-edit-stability.mjs';
 
 import {
@@ -20,7 +22,7 @@ const parseSampleCount = (value) => {
   return parsed;
 };
 
-const runOneSample = sampleIndex => new Promise((resolve, reject) => {
+const runOneSampleProcess = sampleIndex => new Promise((resolve, reject) => {
   const child = spawn(process.execPath, ['scripts/verify-display-routing-browser.mjs'], {
     cwd: process.cwd(),
     env: {
@@ -65,6 +67,20 @@ const runOneSample = sampleIndex => new Promise((resolve, reject) => {
     }
   });
 });
+
+const runOneSample = async (sampleIndex) => {
+  const maxAttempts = 2;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await runOneSampleProcess(sampleIndex);
+    } catch (error) {
+      if (attempt >= maxAttempts || !isRetryableRoutingSampleInfrastructureFailure(error)) throw error;
+      process.stdout.write(`display-routing sample ${sampleIndex} retrying after browser startup/navigation infrastructure failure\n`);
+      await delay(2_000);
+    }
+  }
+  throw new Error('Display-routing sample retry loop exhausted');
+};
 
 const sampleCount = parseSampleCount(process.env.DISPLAY_ROUTING_SAMPLE_COUNT);
 const samples = await collectJournaledRoutingSamples({ kind: 'incremental', sampleCount,

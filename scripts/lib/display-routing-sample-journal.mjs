@@ -102,6 +102,24 @@ const projectChildFailureSummary = error => {
   };
 };
 
+
+export const isRetryableRoutingSampleInfrastructureFailure = error => {
+  const failure = projectRoutingJournalFailure(error);
+  if (failure.code !== 'sample-failed' || failure.sampleFailureCode !== 'child-exit-failed') return false;
+  const child = failure.childFailureSummary;
+  if (child && child.emittedMachineResult !== false) return false;
+  if (child?.code === 'generic-error'
+    && child.firstRepoStackFile === 'scripts/lib/precompiled-display-route-browser-startup.mjs') {
+    return true;
+  }
+  const diagnostics = failure.waitEvidence?.diagnostics ?? failure.waitEvidence?.lastObservedDiagnostics;
+  return (child == null || child.code === 'browser-state-wait-failed')
+    && failure.observedWaitStatus === 'not-ready'
+    && diagnostics?.page?.readyState === 'loading'
+    && diagnostics?.milestones?.domReadyMs === null
+    && diagnostics?.routing?.workerStartCount === null;
+};
+
 export const createRoutingSampleFailure = (sampleFailureCode, diagnostic = null) => {
   if (!sampleFailureCodes.includes(sampleFailureCode)) throw new Error('Invalid sample failure code');
   const safe = projectRoutingJournalFailure(diagnostic);

@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { collectJournaledRoutingSamples, createRoutingSampleJournal,
-  createRoutingSampleFailure, projectRoutingJournalFailure, projectRoutingJournalSample } from './display-routing-sample-journal.mjs';
+  createRoutingSampleFailure, isRetryableRoutingSampleInfrastructureFailure,
+  projectRoutingJournalFailure, projectRoutingJournalSample } from './display-routing-sample-journal.mjs';
 import { projectRoutingWaitFailureEvidence } from './display-routing-wait-failure-evidence.mjs';
 
 vi.mock('node:fs/promises', async importOriginal => {
@@ -100,6 +101,50 @@ describe('routing sample journal', () => {
       observedWaitStatus: 'not-ready', observedRoutingStage: 'worker-phase' });
     expect(JSON.stringify(entries)).not.toMatch(/Bearer|private/);
   });
+  it('classifies only browser startup and loading navigation sample failures as retryable infrastructure', () => {
+    const startupFailure = createRoutingSampleFailure('child-exit-failed', {
+      childFailure: {
+        sampleIndex: 2,
+        stdout: '',
+        stderr: `Error: safe startup failure
+ at file:///D:/a/Vizly/Vizly/scripts/lib/precompiled-display-route-browser-startup.mjs:40:13`,
+      },
+    });
+    expect(isRetryableRoutingSampleInfrastructureFailure(startupFailure)).toBe(true);
+
+    const loadingNavigationFailure = createRoutingSampleFailure('child-exit-failed', waitFailure({
+      schema: 'browser-lifecycle-v1',
+      observation: 'page-loading',
+      page: { readyState: 'loading', protocol: 'http:', captureInstalled: false,
+        rootChildCount: null, resourceErrors: 0 },
+      milestones: { domReadyMs: null, workerConstructedMs: null },
+      routing: { stage: 'unknown', workerStartCount: null },
+      requestCount: 0,
+      responseCount: 0,
+    }));
+    expect(isRetryableRoutingSampleInfrastructureFailure(loadingNavigationFailure)).toBe(true);
+
+    const budgetFailure = createRoutingSampleFailure('child-exit-failed', {
+      childFailure: {
+        sampleIndex: 3,
+        stdout: '',
+        stderr: `Error: Routing performance or lifecycle budget exceeded:
+ at file:///D:/a/Vizly/Vizly/scripts/lib/display-routing-browser-performance.mjs:477:9`,
+      },
+    });
+    expect(isRetryableRoutingSampleInfrastructureFailure(budgetFailure)).toBe(false);
+
+    const productFailureWithResult = createRoutingSampleFailure('child-exit-failed', {
+      childFailure: {
+        sampleIndex: 4,
+        stdout: 'DISPLAY_ROUTING_BROWSER_RESULT={}',
+        stderr: `Error: safe startup failure
+ at file:///D:/a/Vizly/Vizly/scripts/lib/precompiled-display-route-browser-startup.mjs:40:13`,
+      },
+    });
+    expect(isRetryableRoutingSampleInfrastructureFailure(productFailureWithResult)).toBe(false);
+  });
+
   it('persists a bounded child process failure summary without raw output', async () => {
     const directory = await createDirectory();
     const error = createRoutingSampleFailure('child-exit-failed', {

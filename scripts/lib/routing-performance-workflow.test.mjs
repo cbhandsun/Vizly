@@ -44,10 +44,12 @@ describe('routing performance workflow', () => {
     expect(workflow).toContain('DISPLAY_ROUTING_INTERACTION_RESULT=');
     expect(workflow).toContain('interaction-paint summary: count=');
     expect(workflow).toContain('$p95Ms -gt 100');
-    expect(workflow).toContain('retrying after retryable Browser DevTools startup deadline');
+    expect(workflow).toContain('retrying after retryable browser startup/navigation failure');
     expect(workflow).toContain('Browser DevTools startup failed:.*"reason":"deadline"');
     expect(workflow).toContain('"probeErrorCode":"ECONNREFUSED"');
     expect(workflow).toContain('"processSpawned":true');
+    expect(workflow).toContain('CDP command timed out: Page\\.navigate');
+    expect(workflow).toContain('Browser state wait failed.*"readyState":"loading"');
   });
 
   it('always stops its own preview process and retains every isolated report', () => {
