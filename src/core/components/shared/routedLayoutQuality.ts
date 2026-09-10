@@ -5,8 +5,6 @@ import type { PeerHemisphereFlowAxis } from '../../strategies/shared/edgeSharedT
 import { RoutingCrossingScorer } from '../../algorithms/routingCrossingScorer';
 import { evaluateLayoutGeometry } from '../../algorithms/layoutGeometryConstraints';
 import { getSmartLabelPosition } from '../../algorithms/smartEdgeUtils';
-import { arrangeEdgeLabels, edgeLabelRectsConflict } from '../custom-edges/edgeLabelArrangement';
-import { estimateEdgeLabelSize } from '../custom-edges/edgeLabelMeasurement';
 import { projectBaseReactFlowDisplayWorkerInput } from './baseReactFlowDisplayWorkerProjection';
 import { getDisplayComputedPath } from './baseReactFlowDisplayGeometry';
 import {
@@ -39,6 +37,7 @@ type ProjectedQualityNode = Node & {
 const PARALLEL_LANE_TOLERANCE = 4;
 const EDGE_LABEL_GAP = 8;
 const EDGE_LABEL_NODE_GAP = 10;
+const EDGE_LABEL_MAX_WIDTH = 220;
 
 function qualitySegments(path: readonly Point[]): QualitySegment[] {
   const segments: QualitySegment[] = [];
@@ -87,6 +86,115 @@ export const routedEdgesWithSourceLabelsForQuality = (sourceEdges: Edge[], route
   });
 };
 
+const estimateLabelSizeForQuality = (text: string): Readonly<{ width: number; height: number }> => {
+  const lines = text.split(/\r\n|\r|\n/);
+  let rows = 0;
+  let width = 42;
+  for (const line of lines) {
+    let textWidth = 0;
+    for (const glyph of line) textWidth += glyph.charCodeAt(0) < 128 ? 8 : 22;
+    width = Math.max(width, Math.min(EDGE_LABEL_MAX_WIDTH, textWidth + 22));
+    rows += Math.max(1, Math.ceil(textWidth / (EDGE_LABEL_MAX_WIDTH - 22)));
+  }
+  return { width, height: 26 + (rows - 1) * 22 };
+};
+
+
+const validQualityPoint = (point: Point): boolean => (
+  Number.isFinite(point.x) && Number.isFinite(point.y)
+  && Math.abs(point.x) <= 1_000_000 && Math.abs(point.y) <= 1_000_000
+);
+
+const distance = (a: Point, b: Point): number => Math.hypot(a.x - b.x, a.y - b.y);
+
+const labelRectForQuality = (
+  center: Point,
+  size: Readonly<{ width: number; height: number }>,
+): QualityRect => ({
+  x: center.x - size.width / 2,
+  y: center.y - size.height / 2,
+  width: size.width,
+  height: size.height,
+});
+
+const projectToSegment = (point: Point, a: Point, b: Point): Point => {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lengthSquared = dx * dx + dy * dy;
+  const t = lengthSquared ? Math.max(0, Math.min(1,
+    ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSquared)) : 0;
+  return { x: a.x + dx * t, y: a.y + dy * t };
+};
+
+const dedupeQualityPoints = (points: readonly Point[]): Point[] => (
+  [...new Map(points.filter(validQualityPoint).map(point => [`${point.x},${point.y}`, point])).values()]
+);
+
+const qualityLabelCandidates = (
+  path: readonly Point[],
+  anchor: Point,
+  preferredCenter: Point,
+  size: Readonly<{ width: number; height: number }>,
+  obstacles: readonly QualityRect[],
+): Point[] => {
+  const segments = path.slice(1).map((b, index) => {
+    const a = path[index];
+    return { a, b, near: projectToSegment(anchor, a, b) };
+  }).sort((a, b) => distance(a.near, anchor) - distance(b.near, anchor)).slice(0, 8);
+  const candidates: Point[] = [preferredCenter];
+  for (const { a, b, near } of segments) {
+    const vertical = Math.abs(a.x - b.x) < Math.abs(a.y - b.y);
+    const halfCross = (vertical ? size.width : size.height) / 2;
+    const halfAlong = (vertical ? size.height : size.width) / 2;
+    const anchors = [near, projectToSegment({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, a, b), a, b];
+    for (const obstacle of obstacles) {
+      const start = vertical ? obstacle.y : obstacle.x;
+      const end = start + (vertical ? obstacle.height : obstacle.width);
+      anchors.push(...[start - halfAlong - 10, end + halfAlong + 10]
+        .map(value => vertical ? { x: near.x, y: value } : { x: value, y: near.y })
+        .filter(point => distance(point, projectToSegment(point, a, b)) <= 320));
+    }
+    for (const candidateAnchor of anchors) {
+      for (const retreat of [0, 40, 100, 200, 320]) {
+        for (const side of [1, -1]) {
+          candidates.push(vertical
+            ? { x: candidateAnchor.x + side * (halfCross + 10 + retreat), y: candidateAnchor.y }
+            : { x: candidateAnchor.x, y: candidateAnchor.y + side * (halfCross + 10 + retreat) });
+        }
+      }
+    }
+  }
+  return dedupeQualityPoints(candidates);
+};
+
+const arrangeLabelRectsForQuality = (
+  labels: readonly { id: string; path: readonly Point[]; anchor: Point; size: Readonly<{ width: number; height: number }> }[],
+  rectangles: readonly QualityRect[],
+): QualityRect[] => {
+  const placed: QualityRect[] = [];
+  const sorted = [...labels].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  for (const label of sorted) {
+    let best = labelRectForQuality(label.anchor, label.size);
+    let bestConflicts = Number.POSITIVE_INFINITY;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (const center of qualityLabelCandidates(label.path, label.anchor, label.anchor, label.size, [...rectangles, ...placed])) {
+      const rect = labelRectForQuality(center, label.size);
+      const nodeConflicts = rectangles.filter(obstacle => rectsConflict(rect, obstacle, EDGE_LABEL_NODE_GAP)).length;
+      const labelConflicts = placed.filter(other => rectsConflict(rect, other, EDGE_LABEL_GAP)).length;
+      const conflicts = nodeConflicts + labelConflicts;
+      const candidateDistance = distance(center, label.anchor);
+      if (conflicts < bestConflicts || (conflicts === bestConflicts && candidateDistance < bestDistance)) {
+        best = rect;
+        bestConflicts = conflicts;
+        bestDistance = candidateDistance;
+        if (conflicts === 0 && candidateDistance < 0.01) break;
+      }
+    }
+    placed.push(best);
+  }
+  return placed;
+};
+
 const rectsConflict = (a: QualityRect, b: QualityRect, gap: number): boolean => (
   a.x < b.x + b.width + gap && a.x + a.width + gap > b.x
   && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y
@@ -105,30 +213,18 @@ function measureLabelOverlap(
   paths: ReadonlyMap<string, readonly Point[]>,
   rectangles: readonly QualityRect[],
 ): Pick<RoutedLayoutQuality, 'labelLabelOverlap' | 'labelNodeOverlap'> {
-  const inputs = edges.flatMap(edge => {
+  const labels = arrangeLabelRectsForQuality(edges.flatMap(edge => {
     if (edge.hidden) return [];
     const path = paths.get(edge.id);
     if (!path) return [];
     const text = readEdgeLabelText(edge);
     const anchor = labelCenterForPath(edge, path);
-    return text && anchor ? [{
-      id: edge.id,
-      path,
-      labelPath: path,
-      anchor,
-      preferredCenter: anchor,
-      text,
-      size: estimateEdgeLabelSize(text),
-      scale: 1,
-      manual: false,
-      obstacles: rectangles,
-    }] : [];
-  });
-  const labels = [...arrangeEdgeLabels(inputs).values()].map(placement => placement.rect);
+    return text && anchor ? [{ id: edge.id, path, anchor, size: estimateLabelSizeForQuality(text) }] : [];
+  }), rectangles);
   let labelLabelOverlap = 0;
   for (let firstIndex = 0; firstIndex < labels.length; firstIndex += 1) {
     for (let secondIndex = firstIndex + 1; secondIndex < labels.length; secondIndex += 1) {
-      if (edgeLabelRectsConflict(labels[firstIndex], labels[secondIndex], EDGE_LABEL_GAP)) labelLabelOverlap += 1;
+      if (rectsConflict(labels[firstIndex], labels[secondIndex], EDGE_LABEL_GAP)) labelLabelOverlap += 1;
     }
   }
   const labelNodeOverlap = labels.reduce((total, label) => (
