@@ -40,6 +40,16 @@ export const DISPLAY_ROUTING_P95_BUDGET_MS = Object.freeze({
   localRoute: 150,
 });
 
+export const DISPLAY_ROUTING_EDIT_STABILITY_P95_BUDGET = Object.freeze({
+  meanNodeDisplacement: 240,
+  movedNodeRatio: 0.75,
+  changedPortRatio: 0.75,
+  changedPathRatio: 0.95,
+  changedGeometryRatio: 0.75,
+  routeLengthDeltaRatio: 2,
+  bendDeltaRatio: 3,
+});
+
 export const isDisplayRoutingClosurePhase = trace => {
   const phase = typeof trace?.phase === 'string' ? trace.phase : '';
   return [
@@ -445,6 +455,13 @@ export const assertDisplayRoutingPerformanceSummaryBudget = summary => {
         DISPLAY_ROUTING_P95_BUDGET_MS[name],
       ]);
     }
+    for (const [name, budget] of Object.entries(DISPLAY_ROUTING_EDIT_STABILITY_P95_BUDGET)) {
+      measurements.push([
+        `${nodeId}.editStability.${name}`,
+        dragCase?.editStability?.derived?.[name]?.p95,
+        budget,
+      ]);
+    }
   }
   const exceeded = measurements.filter(([, value, budget]) => (
     !Number.isFinite(value) || value < 0 || value > budget
@@ -463,6 +480,10 @@ export const assertDisplayRoutingPerformanceSummaryBudget = summary => {
           ? [] : [[`${nodeId}.${name}.sampleCount`]]
       ))
     )),
+    ...dragEntries.flatMap(([nodeId, dragCase]) => (
+      dragCase?.editStability?.sampleCount === expectedSampleCount
+        ? [] : [[`${nodeId}.editStability.sampleCount`]]
+    )),
   ];
   const lifecycleViolations = Object.entries(summary?.dragCases ?? {}).flatMap(
     ([nodeId, dragCase]) => [
@@ -480,7 +501,10 @@ export const assertDisplayRoutingPerformanceSummaryBudget = summary => {
   if (exceeded.length === 0 && lifecycleViolations.length === 0 && sampleViolations.length === 0) return measurements;
   throw new Error(`Routing performance or lifecycle budget exceeded:\n${JSON.stringify({
     sampleCount: summary?.sampleCount ?? null,
-    budgets: DISPLAY_ROUTING_P95_BUDGET_MS,
+    budgets: {
+      timing: DISPLAY_ROUTING_P95_BUDGET_MS,
+      editStability: DISPLAY_ROUTING_EDIT_STABILITY_P95_BUDGET,
+    },
     exceeded,
     lifecycleViolations,
     sampleViolations,

@@ -522,6 +522,18 @@ describe('display routing browser performance budget', () => {
   });
 
   it('applies benchmark budgets to p95 without rejecting an isolated maximum', () => {
+    const editStability = {
+      sampleCount: 30,
+      derived: {
+        meanNodeDisplacement: { p95: 20 },
+        movedNodeRatio: { p95: 0.1 },
+        changedPortRatio: { p95: 0.1 },
+        changedPathRatio: { p95: 0.1 },
+        changedGeometryRatio: { p95: 0.1 },
+        routeLengthDeltaRatio: { p95: 0.2 },
+        bendDeltaRatio: { p95: 0.2 },
+      },
+    };
     const summary = {
       sampleCount: 30,
       initialRoute: { sampleCount: 30, p95Ms: 740, maxMs: 810 },
@@ -533,11 +545,12 @@ describe('display routing browser performance budget', () => {
           workerStartCount: 30,
           abortCount: 0,
           fallbackCount: 0,
+          editStability,
         },
       },
     };
 
-    expect(assertDisplayRoutingPerformanceSummaryBudget(summary)).toHaveLength(4);
+    expect(assertDisplayRoutingPerformanceSummaryBudget(summary)).toHaveLength(11);
     for (const invalid of [-106, NaN, null]) {
       const values = [...Array(29).fill(20), invalid];
       expect(() => assertDisplayRoutingPerformanceSummaryBudget({
@@ -582,6 +595,30 @@ describe('display routing browser performance budget', () => {
         },
       },
     })).toThrow(/fallbackCount/);
+    expect(() => assertDisplayRoutingPerformanceSummaryBudget({
+      ...summary,
+      dragCases: {
+        wms: {
+          ...summary.dragCases.wms,
+          editStability: { ...editStability, sampleCount: 29 },
+        },
+      },
+    })).toThrow(/editStability\.sampleCount/);
+    expect(() => assertDisplayRoutingPerformanceSummaryBudget({
+      ...summary,
+      dragCases: {
+        wms: {
+          ...summary.dragCases.wms,
+          editStability: {
+            ...editStability,
+            derived: {
+              ...editStability.derived,
+              routeLengthDeltaRatio: { p95: 2.01 },
+            },
+          },
+        },
+      },
+    })).toThrow(/routeLengthDeltaRatio/);
   });
 
   it('projects only bounded aggregate browser measurements', () => {
