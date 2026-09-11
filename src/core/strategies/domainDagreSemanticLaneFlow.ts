@@ -154,7 +154,8 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
       const group = originals.get(id);
       if (group && id !== domain.id) {
         const { parentId: _parent, extent: _extent, ...container } = group;
-        replacements.set(id, resize(container, bucketCross, 88, width, flowEnd - 120));
+        replacements.set(id, resize(container, bucketCross,
+        LANE_LEADING_INSET - LANE_TRAILING_INSET, width, flowEnd - LANE_LEADING_INSET));
       }
       bucketCross += width + crossGap;
     }
