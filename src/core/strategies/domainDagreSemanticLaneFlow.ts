@@ -4,7 +4,7 @@ import { getNodeDimensions, layoutWithDagre } from './DomainDagreLayoutHelpers';
 import { domainDagreDomainOf, isDomainDagreGroupNode, isDomainDagreNodeHidden } from './domainDagreHierarchy';
 import { domainDagrePeerComponentIndex } from './domainDagrePeerComponents';
 import { compactDomainDagreLaneCrossAxis } from './domainDagreLaneCrossCompaction';
-import { assignDomainDagreLaneCoordinates, type DomainDagreLaneCoordinateScope } from './domainDagreLaneCoordinateAssignment';
+import { assignDomainDagreLaneCoordinates, LANE_LEADING_INSET, LANE_TRAILING_INSET, type DomainDagreLaneCoordinateScope } from './domainDagreLaneCoordinateAssignment';
 import { COMMERCIAL_BUSINESS_NODE_CLEARANCE } from './shared/edgeBusinessNodeClearanceRepair';
 import { boundedDomainDagreNumber, getDomainDagreSubDomainOrderIndex,
   type DomainDagreDirection, type DomainDagreSubDomainOrder } from './domainDagreLayoutBoundary';
@@ -109,7 +109,7 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
     return { ...withoutAbsolutePosition(node), position: at(c, f), width, height,
       measured: { width, height }, style: { ...node.style, width, height } };
   };
-  const flowEnd = Math.max(...leaves.map(node => (globalPositions.get(node.id)?.[flow] ?? 0) + flowSize(node))) + 232;
+  const flowEnd = Math.max(...leaves.map(node => (globalPositions.get(node.id)?.[flow] ?? 0) + flowSize(node))) + LANE_LEADING_INSET + LANE_TRAILING_INSET;
   let domainCross = 0;
   const coordinateScopes: DomainDagreLaneCoordinateScope[] = [];
   for (const domain of orderedDomains) {
@@ -149,7 +149,7 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
       for (const node of bucket) {
         const leaf = withoutAbsolutePosition(node);
         replacements.set(node.id, { ...leaf, position: at(bucketCross + inset + crossPosition(node) - minCross,
-          200 + (globalPositions.get(node.id)?.[flow] ?? 0)) });
+          LANE_LEADING_INSET + (globalPositions.get(node.id)?.[flow] ?? 0)) });
       }
       const group = originals.get(id);
       if (group && id !== domain.id) {
@@ -166,7 +166,7 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
   for (const node of leaves) {
     if (replacements.has(node.id)) continue;
     replacements.set(node.id, { ...withoutAbsolutePosition(node),
-      position: at(domainCross, 200 + (globalPositions.get(node.id)?.[flow] ?? 0)) });
+      position: at(domainCross, LANE_LEADING_INSET + (globalPositions.get(node.id)?.[flow] ?? 0)) });
     domainCross += crossSize(node) + crossGap;
   }
   const layers = new Map<string, Node[]>();

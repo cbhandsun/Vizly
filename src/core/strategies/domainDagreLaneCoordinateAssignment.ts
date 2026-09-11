@@ -5,6 +5,12 @@ import { arrangeDomainDagreChildren } from './domainDagreChildArrangement';
 import { isDomainDagreNodeHidden } from './domainDagreHierarchy';
 import { COMMERCIAL_BUSINESS_NODE_CLEARANCE } from './shared/edgeBusinessNodeClearanceRepair';
 
+/** Leading flow inset inside a lane band. Part of the lane envelope model:
+ * the trailing inset stays at 32px, so the envelope reserves this plus 32px. */
+export const LANE_LEADING_INSET = 96;
+/** Trailing flow inset of a lane band. */
+export const LANE_TRAILING_INSET = 32;
+
 export type DomainDagreLaneBucket = Readonly<{ id: string; nodeIds: readonly string[] }>;
 export type DomainDagreLaneCoordinateScope = Readonly<{ domainId: string; buckets: readonly DomainDagreLaneBucket[] }>;
 
@@ -66,7 +72,7 @@ export function assignDomainDagreLaneCoordinates(
       const byId = new Map(members.map(node => [node.id, node]));
       for (const position of arrangeIndependentCards(members)) {
         const node = byId.get(position.id);
-        if (node) requiredEnd = Math.max(requiredEnd, 200 + position[flow] + flowSize(node) + 32);
+        if (node) requiredEnd = Math.max(requiredEnd, LANE_LEADING_INSET + position[flow] + flowSize(node) + 32);
       }
     }
     // Independent cards can grow the common envelope, never an individual
@@ -150,21 +156,21 @@ export function assignDomainDagreLaneCoordinates(
       // linear fill inside the same common lane envelope.
       let column = process.length ? occupiedWidth + crossGap : 0;
       let columnWidth = 0;
-      let cursor = 200;
-      const availableEnd = Math.max(200, domain.position[flow] + flowSize(domain) - 32);
+      let cursor = LANE_LEADING_INSET;
+      const availableEnd = Math.max(LANE_LEADING_INSET, domain.position[flow] + flowSize(domain) - 32);
       if (independentArrangement) {
         const byId = new Map(isolated.map(node => [node.id, node]));
-        for (const position of arrangeIndependentCards(isolated, Math.max(1, availableEnd - 200))) {
+        for (const position of arrangeIndependentCards(isolated, Math.max(1, availableEnd - LANE_LEADING_INSET))) {
           const node = byId.get(position.id);
           if (!node) continue;
-          replacements.set(node.id, { ...node, position: at(bucketCross + inset + column + position[cross], 200 + position[flow]) });
+          replacements.set(node.id, { ...node, position: at(bucketCross + inset + column + position[cross], LANE_LEADING_INSET + position[flow]) });
           occupiedWidth = Math.max(occupiedWidth, column + position[cross] + crossSize(node));
         }
       } else for (const node of isolated) {
-        if (cursor > 200 && cursor + flowSize(node) > availableEnd + 0.5) {
+        if (cursor > LANE_LEADING_INSET && cursor + flowSize(node) > availableEnd + 0.5) {
           column += columnWidth + crossGap;
           columnWidth = 0;
-          cursor = 200;
+          cursor = LANE_LEADING_INSET;
         }
         replacements.set(node.id, { ...node, position: at(bucketCross + inset + column, cursor) });
         columnWidth = Math.max(columnWidth, crossSize(node));

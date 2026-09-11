@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Node } from '@xyflow/react';
 import {
   assignDomainDagreLaneCoordinates,
+  LANE_LEADING_INSET,
   tightenDomainDagreSubGroupFlowBounds,
 } from '../domainDagreLaneCoordinateAssignment';
 
@@ -169,7 +170,8 @@ describe('final swimlane coordinate assignment', () => {
     // Horizontal lanes retain their larger title insets.
     expect(replacements.get('domain')?.[crossSize]).toBe(horizontal ? 1440 : 1384);
     for (const value of chain) expect(replacements.get(value.id)?.position[flow]).toBe(value.position.y);
-    expect(new Set(isolated.map(value => replacements.get(value.id)?.position[flow])).size).toBe(4);
+    // The tighter leading inset fits one more isolated card row in the same extent.
+    expect(new Set(isolated.map(value => replacements.get(value.id)?.position[flow])).size).toBe(5);
     expect(new Set(isolated.map(value => replacements.get(value.id)?.position[cross])).size).toBe(3);
     expect(input).toEqual(before);
   });
@@ -189,7 +191,7 @@ describe('final swimlane coordinate assignment', () => {
       .map(value => [value.id, value]));
     assignDomainDagreLaneCoordinates(values, [], [], false, 120, 120);
     assignDomainDagreLaneCoordinates(values, [{ domainId: '__proto__', buckets: [{ id: '__proto__', nodeIds: ['<svg onload=alert(1)>'] }] }], [], false, 120, 120);
-    expect(values.get('<svg onload=alert(1)>')?.position).toEqual({ x: 32, y: 200 });
+    expect(values.get('<svg onload=alert(1)>')?.position).toEqual({ x: 32, y: LANE_LEADING_INSET });
   });
 
   it.each([false, true])('keeps truly independent cards in a uniform grid and grows the common lane envelope, horizontal=%s', horizontal => {

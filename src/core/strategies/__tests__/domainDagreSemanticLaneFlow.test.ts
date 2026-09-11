@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Edge, Node } from '@xyflow/react';
 import { alignDomainDagreLaneFlow } from '../domainDagreSemanticLaneFlow';
+import { LANE_LEADING_INSET } from '../domainDagreLaneCoordinateAssignment';
 import { connectedLaneInputFingerprint } from '../domainDagreLaneRankDecision';
 import { getNodeDimensions } from '../DomainDagreLayoutHelpers';
 import { isDomainDagreGroupNode } from '../domainDagreHierarchy';
@@ -307,7 +308,7 @@ describe('semantic swimlane process geometry', () => {
     expect(arranged.find(node => node.id === 'hidden')).toBe(hidden);
     expect(arranged.map(node => node.id)).toEqual(source.map(node => node.id));
     for (const node of arranged.filter(node => !node.hidden)) expect(node).not.toHaveProperty('positionAbsolute');
-    expect(arranged.find(node => node.id === 'orphan')?.position.x).toBeGreaterThanOrEqual(200);
+    expect(arranged.find(node => node.id === 'orphan')?.position.x).toBeGreaterThanOrEqual(LANE_LEADING_INSET);
   });
 
   it('keeps cyclic and missing-endpoint input finite and bounds invalid spacing', () => {
