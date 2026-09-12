@@ -16,6 +16,7 @@ export default defineConfig([
     'scratch',
     '.tmp-vizly-smoke-profile-*',
     'thumbnails',
+    'tmp',
   ]),
   {
     files: ['**/*.{ts,tsx}'],

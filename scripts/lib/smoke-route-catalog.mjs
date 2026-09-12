@@ -127,6 +127,25 @@ export const createSmokeRouteCatalog = (BASE_URL, { includeDevRoutes = false } =
         maxActiveWorkers: 0,
         maxQueuedTasks: 0,
       },
+      stabilityTimeoutMs: 25000,
+      stabilityExpression: `(() => {
+        const displayRouting = window.__vizlyBaseReactFlowDisplayRouting;
+        const displayRoutingReady = (${isFinalWmsDisplayRoutingReady.toString()})(displayRouting);
+        return {
+          ready: displayRoutingReady,
+          errorBoundary: false,
+          displayRouting: displayRouting && {
+            stage: displayRouting.stage,
+            error: displayRouting.error,
+            workerStartCount: displayRouting.workerStartCount,
+            workerAbortCount: displayRouting.workerAbortCount,
+            workerResolution: displayRouting.workerResolution,
+            routeMs: displayRouting.routeMs,
+            finalAppliedAt: displayRouting.finalAppliedAt,
+            outputRouteSignature: displayRouting.outputRouteSignature,
+          },
+        };
+      })()`,
       expression: `(() => {
         const body = document.body?.textContent || '';
         const bridge = window.__flowDataBridge?.['wms-process-flow-v1'];
@@ -139,7 +158,6 @@ export const createSmokeRouteCatalog = (BASE_URL, { includeDevRoutes = false } =
         const workerHealthy = !parallelStats ||
           (parallelStats.activeWorkers === 0 && parallelStats.queuedTasks === 0);
         const displayRouting = window.__vizlyBaseReactFlowDisplayRouting;
-        const displayRoutingReady = (${isFinalWmsDisplayRoutingReady.toString()})(displayRouting);
         return {
           href: location.href,
           title: document.title,
@@ -168,7 +186,6 @@ export const createSmokeRouteCatalog = (BASE_URL, { includeDevRoutes = false } =
             finalAppliedAt: displayRouting.finalAppliedAt,
             outputRouteSignature: displayRouting.outputRouteSignature,
           },
-          displayRoutingReady,
           appFallback: body.includes('加载应用'),
           pageFallback: body.includes('加载图表'),
           errorBoundary: body.includes('页面出现错误'),
@@ -177,9 +194,9 @@ export const createSmokeRouteCatalog = (BASE_URL, { includeDevRoutes = false } =
           ready: Boolean(document.querySelector('.react-flow')) &&
             Boolean(document.querySelector('.react-flow__renderer')) &&
             renderedNodeCount >= 20 &&
-            renderedEdgeCount >= 35 &&
+            bridgeNodeCount >= 20 &&
+            bridgeEdgeCount >= 35 &&
             workerHealthy &&
-            displayRoutingReady &&
             !body.includes('加载图表') &&
             !body.includes('页面出现错误'),
         };
