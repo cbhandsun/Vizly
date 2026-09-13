@@ -604,8 +604,8 @@ const addComputedPathEndpointStubs = (
 export const commitComputedDisplayEdgeTerminals = (
   edges: Edge[],
   nodes: Node[],
+  nodeById: Map<string, Node> = new Map(nodes.map(node => [node.id, node])),
 ): Edge[] => {
-  const nodeById = new Map(nodes.map(node => [node.id, node]));
   let anchoredChanged = false;
   const anchored = edges.map((edge) => {
     const anchoredEdge = anchorComputedPathEndpoints(edge, nodeById);

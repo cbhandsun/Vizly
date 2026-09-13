@@ -174,9 +174,11 @@ export const commitDisplayEdgesForRenderMode = ({
   inputSignature: string;
   nodes: Node[];
 }): Edge[] => {
+  const nodeById = new Map(nodes.map(node => [node.id, node]));
   const committedQualityEdges = commitComputedDisplayEdgeTerminals(
-    materializeDisplayTerminalHandles(finalQualityEdges, nodes),
+    materializeDisplayTerminalHandles(finalQualityEdges, nodes, nodeById),
     nodes,
+    nodeById,
   );
   if (isLargeGraph) {
     return markBaseDisplayFinalized(

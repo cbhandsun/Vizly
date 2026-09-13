@@ -33,8 +33,8 @@ const getTerminalCommitPath = (edge: Edge): { x: number; y: number }[] => {
 export const materializeDisplayTerminalHandles = <T extends Edge[]>(
   edges: T,
   nodes: Node[],
+  nodeById: Map<string, Node> = new Map(nodes.map(node => [node.id, node] as const)),
 ): T => {
-  const nodeById = new Map(nodes.map(node => [node.id, node] as const));
   let changed = false;
   const resolved = edges.map((edge) => {
     const path = getTerminalCommitPath(edge);
