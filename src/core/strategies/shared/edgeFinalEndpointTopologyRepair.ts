@@ -598,6 +598,9 @@ const repairFinalSharedTerminalTrunks = (
     const oppositeTrunkMembers = new Set(baselineOrder.legalSharedTrunks
       .filter(trunk => trunk.role === oppositeRole)
       .flatMap(trunk => trunk.edgeIds));
+    const indexedEdges = current
+      .map((edge, edgeIndex) => ({ edge, edgeIndex }))
+      .sort((first, second) => first.edge.id.localeCompare(second.edge.id));
     let accepted: Edge[] | null = null;
     for (const trunk of terminalTrunks) {
       const ownerIndex = current.findIndex(edge => (
@@ -615,13 +618,11 @@ const repairFinalSharedTerminalTrunks = (
         trunk.commonStemLength,
       );
       if (!terminal || !stem) continue;
-      const siblingIndexes = current
-        .map((edge, edgeIndex) => ({ edge, edgeIndex }))
+      const siblingIndexes = indexedEdges
         .filter(({ edge }) => (
           edge[role] === trunk.nodeId
           && !terminalTrunkMembers.has(edge.id)
-        ))
-        .sort((first, second) => first.edge.id.localeCompare(second.edge.id));
+        ));
       for (const { edge, edgeIndex } of siblingIndexes) {
         const policy = readEdgeTerminalPolicy(edge, role);
         if (policy.forbidden || policy.sideFixed) continue;
