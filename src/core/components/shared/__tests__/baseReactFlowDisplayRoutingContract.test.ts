@@ -1,7 +1,11 @@
 import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
-import { createDisplayRoutingContractReport } from '../baseReactFlowDisplayRoutingContract';
+import {
+  createDisplayRoutingContractReport,
+  isDisplayRoutingContractSummary,
+  summarizeDisplayRoutingContractReport,
+} from '../baseReactFlowDisplayRoutingContract';
 import { getDisplayHardQualityGateReport } from '../baseReactFlowDisplayQualityGates';
 
 const nodes: Node[] = [
@@ -104,5 +108,32 @@ describe('display routing contract report', () => {
         count: 2,
       }),
     ]));
+  });
+
+  it('summarizes final contract defects without leaking graph content', () => {
+    const edges = [
+      edgeWithPath('bad', [
+        { x: 110, y: 30 },
+        { x: 170, y: 75 },
+        { x: 300, y: 30 },
+      ]),
+    ];
+
+    const summary = summarizeDisplayRoutingContractReport(
+      createDisplayRoutingContractReport(edges, nodes, { requireCommercialClearance: false }),
+    );
+
+    expect(isDisplayRoutingContractSummary(summary)).toBe(true);
+    expect(summary.clean).toBe(false);
+    expect(summary.violations.every(violation => (
+      Object.keys(violation).every(key => (
+        key === 'code' || key === 'phase' || key === 'severity' || key === 'count'
+      ))
+    ))).toBe(true);
+    expect(JSON.stringify(summary)).not.toContain('bad');
+    expect(isDisplayRoutingContractSummary({
+      ...summary,
+      violationCount: summary.violationCount + 1,
+    })).toBe(false);
   });
 });

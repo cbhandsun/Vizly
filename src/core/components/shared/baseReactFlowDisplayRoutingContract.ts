@@ -63,6 +63,55 @@ export type DisplayRoutingContractReport = Readonly<{
   violations: readonly DisplayRoutingContractViolation[];
 }>;
 
+export type DisplayRoutingContractSummaryViolation = Readonly<{
+  code: DisplayRoutingContractViolationCode;
+  phase: DisplayRoutingContractViolation['phase'];
+  severity: DisplayRoutingContractViolation['severity'];
+  count: number;
+}>;
+
+export type DisplayRoutingContractSummary = Readonly<{
+  clean: boolean;
+  hardClean: boolean;
+  violationCount: number;
+  violations: readonly DisplayRoutingContractSummaryViolation[];
+}>;
+
+export const DISPLAY_ROUTING_CONTRACT_VIOLATION_CODES: readonly DisplayRoutingContractViolationCode[] = [
+  'terminal-detached',
+  'terminal-unanchored',
+  'non-orthogonal-segment',
+  'obstacle-hit',
+  'strict-crossing',
+  'reverse-overlap',
+  'unrelated-overlap',
+  'unexplained-related-overlap',
+  'short-endpoint-stub',
+  'tiny-interior-dogleg',
+  'hairpin',
+  'minimum-clearance',
+  'commercial-clearance',
+  'render-unsafe-endpoint-stub',
+  'endpoint-order',
+  'passage-order',
+];
+
+const DISPLAY_ROUTING_CONTRACT_PHASES: readonly DisplayRoutingContractViolation['phase'][] = [
+  'terminal',
+  'geometry',
+  'clearance',
+  'endpoint-order',
+  'passage-order',
+  'presentation',
+];
+
+const DISPLAY_ROUTING_CONTRACT_SEVERITIES: readonly DisplayRoutingContractViolation['severity'][] = [
+  'hard',
+  'commercial',
+  'presentation',
+];
+const MAX_DISPLAY_ROUTING_CONTRACT_VIOLATION_COUNT = 160_000;
+
 const appendCountViolation = (
   violations: DisplayRoutingContractViolation[],
   code: DisplayRoutingContractViolationCode,
@@ -209,4 +258,71 @@ export const createDisplayRoutingContractReport = (
     passageOrder,
     violations,
   };
+};
+
+export const summarizeDisplayRoutingContractReport = (
+  report: DisplayRoutingContractReport,
+): DisplayRoutingContractSummary => ({
+  clean: report.clean,
+  hardClean: report.hardClean,
+  violationCount: report.violations.reduce((total, violation) => total + violation.count, 0),
+  violations: report.violations.map(violation => ({
+    code: violation.code,
+    phase: violation.phase,
+    severity: violation.severity,
+    count: violation.count,
+  })),
+});
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+);
+
+const isDisplayRoutingContractViolationCode = (
+  value: unknown,
+): value is DisplayRoutingContractViolationCode => (
+  typeof value === 'string'
+  && DISPLAY_ROUTING_CONTRACT_VIOLATION_CODES.includes(value as DisplayRoutingContractViolationCode)
+);
+
+const isDisplayRoutingContractSummaryViolation = (
+  value: unknown,
+): value is DisplayRoutingContractSummaryViolation => {
+  if (!isRecord(value) || !Object.keys(value).every(key => (
+    key === 'code' || key === 'phase' || key === 'severity' || key === 'count'
+  ))) return false;
+  const { code, phase, severity, count } = value;
+  return isDisplayRoutingContractViolationCode(code)
+  && typeof phase === 'string'
+  && DISPLAY_ROUTING_CONTRACT_PHASES.includes(phase as DisplayRoutingContractViolation['phase'])
+  && typeof severity === 'string'
+  && DISPLAY_ROUTING_CONTRACT_SEVERITIES.includes(
+    severity as DisplayRoutingContractViolation['severity'],
+  )
+  && typeof count === 'number'
+  && Number.isSafeInteger(count)
+  && count > 0
+  && count <= MAX_DISPLAY_ROUTING_CONTRACT_VIOLATION_COUNT;
+};
+
+export const isDisplayRoutingContractSummary = (
+  value: unknown,
+): value is DisplayRoutingContractSummary => {
+  if (
+    !isRecord(value)
+    || !Object.keys(value).every(key => (
+      key === 'clean' || key === 'hardClean' || key === 'violationCount' || key === 'violations'
+    ))
+    || typeof value.clean !== 'boolean'
+    || typeof value.hardClean !== 'boolean'
+    || typeof value.violationCount !== 'number'
+    || !Number.isSafeInteger(value.violationCount)
+    || value.violationCount < 0
+    || value.violationCount > MAX_DISPLAY_ROUTING_CONTRACT_VIOLATION_COUNT
+    || !Array.isArray(value.violations)
+    || value.violations.length > DISPLAY_ROUTING_CONTRACT_VIOLATION_CODES.length
+    || !value.violations.every(isDisplayRoutingContractSummaryViolation)
+  ) return false;
+  const total = value.violations.reduce((sum, violation) => sum + violation.count, 0);
+  return total === value.violationCount && value.clean === (value.violations.length === 0);
 };

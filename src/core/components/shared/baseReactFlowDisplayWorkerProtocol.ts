@@ -27,6 +27,7 @@ import type {
 } from './baseReactFlowDisplayWorkerResponseProtocol';
 import { parseDisplayRoutingWorkerCommitReceipt } from './baseReactFlowDisplayWorkerCommitReceipt';
 import { computeDisplayRoutingHardReportDigest } from './baseReactFlowDisplayHardReportDigest';
+import { isDisplayRoutingContractSummary } from './baseReactFlowDisplayRoutingContract';
 import {
   parseDisplayWorkerLayoutRepairRequest,
   type DisplayEdgesWorkerRepairRequest,
@@ -522,6 +523,21 @@ export const parseDisplayEdgesWorkerRequest = (
   return { ...routeRequest, operation: 'route' };
 };
 
+const hasFinalDisplayWorkerResponseMetadata = (value: Record<string, unknown>): boolean => (
+  typeof value.hardClean !== 'undefined'
+  || typeof value.hardReport !== 'undefined'
+  || typeof value.routingContract !== 'undefined'
+  || typeof value.routeResolution !== 'undefined'
+  || typeof value.phaseTrace !== 'undefined'
+  || typeof value.affectedEdgeCount !== 'undefined'
+  || typeof value.fallbackLevel !== 'undefined'
+  || typeof value.nextIdentity !== 'undefined'
+  || typeof value.outputRouteSignature !== 'undefined'
+  || typeof value.sessionRef !== 'undefined'
+  || typeof value.commitReceipt !== 'undefined'
+  || typeof value.workerDurationMs !== 'undefined'
+);
+
 /** Validates a response before the main thread merges worker-owned geometry. */
 export const parseDisplayEdgesWorkerResponse = (
   value: unknown,
@@ -545,57 +561,20 @@ export const parseDisplayEdgesWorkerResponse = (
     + Number(hasPhaseProgress) !== 1
   ) return null;
   if (hasError) {
-    if (
-      typeof value.routeResolution !== 'undefined'
-      || typeof value.hardReport !== 'undefined'
-      || typeof value.phaseTrace !== 'undefined'
-      || typeof value.phaseProgress !== 'undefined'
-      || typeof value.affectedEdgeCount !== 'undefined'
-      || typeof value.fallbackLevel !== 'undefined'
-      || typeof value.nextIdentity !== 'undefined'
-      || typeof value.outputRouteSignature !== 'undefined'
-      || typeof value.sessionRef !== 'undefined'
-      || typeof value.commitReceipt !== 'undefined'
-      || typeof value.workerDurationMs !== 'undefined'
-    ) return null;
+    if (hasFinalDisplayWorkerResponseMetadata(value)) return null;
     if (typeof value.error !== 'string') return null;
     return value.error.length > 0 && value.error.length <= 256
       ? { requestId: expectedRequestId, error: value.error }
       : null;
   }
   if (hasBoundedCandidate) {
-    if (
-      typeof value.hardClean !== 'undefined'
-      || typeof value.hardReport !== 'undefined'
-      || typeof value.routeResolution !== 'undefined'
-      || typeof value.phaseTrace !== 'undefined'
-      || typeof value.phaseProgress !== 'undefined'
-      || typeof value.affectedEdgeCount !== 'undefined'
-      || typeof value.fallbackLevel !== 'undefined'
-      || typeof value.nextIdentity !== 'undefined'
-      || typeof value.outputRouteSignature !== 'undefined'
-      || typeof value.sessionRef !== 'undefined'
-      || typeof value.commitReceipt !== 'undefined'
-      || typeof value.workerDurationMs !== 'undefined'
-    ) return null;
+    if (hasFinalDisplayWorkerResponseMetadata(value)) return null;
     return isDisplayWorkerBoundedCandidateReport(value.boundedCandidate)
       ? { requestId: expectedRequestId, boundedCandidate: value.boundedCandidate }
       : null;
   }
   if (hasPhaseProgress) {
-    if (
-      typeof value.hardClean !== 'undefined'
-      || typeof value.hardReport !== 'undefined'
-      || typeof value.routeResolution !== 'undefined'
-      || typeof value.phaseTrace !== 'undefined'
-      || typeof value.affectedEdgeCount !== 'undefined'
-      || typeof value.fallbackLevel !== 'undefined'
-      || typeof value.nextIdentity !== 'undefined'
-      || typeof value.outputRouteSignature !== 'undefined'
-      || typeof value.sessionRef !== 'undefined'
-      || typeof value.commitReceipt !== 'undefined'
-      || typeof value.workerDurationMs !== 'undefined'
-    ) return null;
+    if (hasFinalDisplayWorkerResponseMetadata(value)) return null;
     return isDisplayRoutingPhaseTrace(value.phaseProgress)
       ? { requestId: expectedRequestId, phaseProgress: value.phaseProgress }
       : null;
@@ -606,6 +585,9 @@ export const parseDisplayEdgesWorkerResponse = (
   const hardReport = typeof value.hardReport === 'undefined'
     ? undefined
     : (isDisplayWorkerBoundedCandidateReport(value.hardReport) ? value.hardReport : null);
+  const routingContract = typeof value.routingContract === 'undefined'
+    ? undefined
+    : (isDisplayRoutingContractSummary(value.routingContract) ? value.routingContract : null);
   const workerTiming = parseDisplayWorkerTimingMetadata(value);
   const hasIncrementalMetadata = typeof value.affectedEdgeCount !== 'undefined'
     || typeof value.fallbackLevel !== 'undefined';
@@ -645,6 +627,7 @@ export const parseDisplayEdgesWorkerResponse = (
     !isDisplayEdgesWorkerEdgeList(finalEdges)
     || !phaseTrace
     || hardReport === null
+    || routingContract === null
     || hardReport === undefined
     || workerTiming === null
     || !incrementalMetadataIsValid
@@ -666,6 +649,7 @@ export const parseDisplayEdgesWorkerResponse = (
     routingPatches: hasRoutingPatches ? value.routingPatches as RoutingPatch[] : undefined,
     hardClean: value.hardClean,
     hardReport,
+    routingContract,
     routeResolution: value.routeResolution,
     phaseTrace,
     eligibleEdgeIds,

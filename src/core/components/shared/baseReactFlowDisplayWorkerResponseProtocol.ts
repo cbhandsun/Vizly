@@ -3,6 +3,7 @@ import type { RoutingPatch } from '../../routing/routingPatch';
 import type { DisplayWorkerExecutionTiming } from './baseReactFlowDisplayWorkerExecutionTiming';
 
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
+import type { DisplayRoutingContractSummary } from './baseReactFlowDisplayRoutingContract';
 import type { DisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
 import type { DisplayRoutingWorkerCommitReceipt } from './baseReactFlowDisplayWorkerCommitReceipt';
 import type {
@@ -26,6 +27,7 @@ export type DisplayEdgesWorkerResponse = {
   routingPatches?: RoutingPatch[];
   hardClean?: boolean;
   hardReport?: BaseDisplayBoundedCandidateReport;
+  routingContract?: DisplayRoutingContractSummary;
   routeResolution?: DisplayEdgesWorkerRouteResolution;
   error?: string;
   boundedCandidate?: BaseDisplayBoundedCandidateReport;

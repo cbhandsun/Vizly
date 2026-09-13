@@ -37,6 +37,10 @@ describe('final display business-node clearance', () => {
     }, nodes);
     expect(response.hardClean).toBe(false);
     expect(response.hardReport?.commercialClearanceViolations).toBe(1);
+    expect(response.routingContract?.clean).toBe(false);
+    expect(response.routingContract?.violations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'commercial-clearance', count: 1 }),
+    ]));
   });
 
   it('accepts empty and commercially clear final geometry', () => {

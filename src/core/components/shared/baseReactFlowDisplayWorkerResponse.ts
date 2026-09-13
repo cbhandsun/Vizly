@@ -7,6 +7,10 @@ import {
 } from './baseReactFlowDisplayEvaluation';
 import { countDisplayBusinessNodeCommercialClearanceViolations } from './baseReactFlowDisplayBusinessNodeClearance';
 import { compactDisplayEdgePaths } from './baseReactFlowDisplayGeometry';
+import {
+  createDisplayRoutingContractReport,
+  summarizeDisplayRoutingContractReport,
+} from './baseReactFlowDisplayRoutingContract';
 import { calculateEdgePathQualityScoreExact } from '../../strategies/shared/edgePathQualityFullScan';
 import type {
   DisplayEdgesWorkerRequest,
@@ -48,10 +52,14 @@ export const withExactDisplayHardReport = (
     response.edges,
     repairNodes,
   );
+  const routingContract = summarizeDisplayRoutingContractReport(
+    createDisplayRoutingContractReport(response.edges, repairNodes, { hardReport }),
+  );
   return {
     ...response,
     hardClean: hardReport.hardClean,
     hardReport,
+    routingContract,
   };
 };
 

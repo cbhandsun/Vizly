@@ -23,16 +23,31 @@ import {
 } from './baseReactFlowDisplayWorkerTestFixtures';
 
 const cleanHardReport = createTestDisplayHardReport();
+const cleanRoutingContract = {
+  clean: true,
+  hardClean: true,
+  violationCount: 0,
+  violations: [],
+};
 
 describe('baseReactFlowDisplayWorkerProtocol', () => {
   it('retains counted readable crossings through the Worker report boundary', () => {
     const hardReport = { ...cleanHardReport, quality: {
       ...cleanHardReport.quality, bridgedCrossings: 3, crossingCost: 9,
     } };
-    const response = { requestId: 'bridges', edges: [], hardClean: true, hardReport, routeResolution: 'full-route' };
+    const response = {
+      requestId: 'bridges',
+      edges: [],
+      hardClean: true,
+      hardReport,
+      routingContract: cleanRoutingContract,
+      routeResolution: 'full-route',
+    };
     expect(isDisplayWorkerBoundedCandidateReport(hardReport)).toBe(true);
     expect(parseDisplayEdgesWorkerResponse(response, 'bridges')?.hardReport?.quality)
       .toMatchObject({ bridgedCrossings: 3, crossingCost: 9 });
+    expect(parseDisplayEdgesWorkerResponse(response, 'bridges')?.routingContract)
+      .toEqual(cleanRoutingContract);
     for (const key of ['bridgedCrossings', 'crossingCost']) {
       for (const invalid of [-1, 0.5, NaN, Infinity, '3', null, {}, 1e16]) {
         const malformed = { ...hardReport, quality: { ...hardReport.quality, [key]: invalid } };
@@ -88,6 +103,7 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       routeResolution: 'incremental-route',
       affectedEdgeCount: 1,
       fallbackLevel: 'none',
+      routingContract: cleanRoutingContract,
     }, sourceEdges);
     expect(compact.edges).toBeUndefined();
     expect(compact.routingPatches).toEqual([expect.objectContaining({
