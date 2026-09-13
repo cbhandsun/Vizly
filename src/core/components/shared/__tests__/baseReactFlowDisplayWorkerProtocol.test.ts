@@ -9,7 +9,6 @@ import { ROUTING_IDENTIFIER_MAX_LENGTH } from '../../../routing/routingBoundaryL
 import {
   DISPLAY_ROUTING_PHASE_TRACE_LIMIT,
   finalizeDisplayRoutingPhaseTrace,
-  startDisplayRoutingPhaseTrace,
   type DisplayRoutingPhaseTrace,
 } from '../baseReactFlowDisplayRoutingTrace';
 import { createDisplayRoutingIdentity } from '../baseReactFlowDisplayRoutingSession';
