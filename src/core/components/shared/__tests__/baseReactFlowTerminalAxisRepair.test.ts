@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { calculateEdgePathQualityScore } from '../../../strategies/shared/edgeStrictCrossingGuard';
 import {
   createDisplayTerminalValidationSnapshot,
+  createDisplayTerminalAxisRepairDiagnostics,
   displayEdgesHaveNodeAttachedTerminals,
   displayEdgesHaveNodeAnchoredTerminals,
   displayTerminalValidationDoesNotRegress,
@@ -120,6 +121,46 @@ describe('repairTerminalHandleAxisCrossings', () => {
       tinyInteriorDoglegs: 0,
       hairpins: 0,
     });
+  });
+
+  it('reports bounded aggregate repair work without exposing paths', () => {
+    const diagnostics = createDisplayTerminalAxisRepairDiagnostics();
+    const edges = [
+      edge('customs', 'loms', 'customs-node', [
+        { x: 1323, y: 803 }, { x: 1323, y: 898 }, { x: 2063, y: 898 }, { x: 2063, y: 981 },
+      ]),
+      edge('carrier', 'tms', 'carrier-node', [
+        { x: 1288, y: 961 }, { x: 1288, y: 866 }, { x: 1546.25, y: 866 },
+        { x: 1546.25, y: 585 }, { x: 1769, y: 585 }, { x: 1769, y: 278 },
+      ]),
+      edge('downstream', 'tms', 'downstream-node', [
+        { x: 1374, y: 962 }, { x: 1470, y: 962 }, { x: 1470, y: 899 },
+        { x: 2418, y: 899 }, { x: 2418, y: 239 },
+      ]),
+    ];
+
+    const result = repairTerminalHandleAxisCrossings(edges, [
+      node('loms', 1120.25, 605, 406, 197),
+      node('customs-node', 1853.25, 981.5, 420, 197),
+      node('tms', 1113.25, 962, 420, 236),
+      node('carrier-node', 1608.49, 80, 322, 197),
+      node('downstream-node', 2250.49, 119, 336, 119),
+    ], diagnostics);
+
+    expect(result).not.toBe(edges);
+    expect(diagnostics.passCount).toBeGreaterThan(0);
+    expect(diagnostics.processedEdgeCount).toBeGreaterThan(0);
+    expect(diagnostics.candidateCount).toBeGreaterThan(0);
+    expect(diagnostics.maximumCandidateCount).toBeGreaterThan(0);
+    expect(diagnostics.maximumCandidateCount).toBeLessThanOrEqual(diagnostics.candidateCount);
+    expect(diagnostics.qualityEvaluationCount).toBeGreaterThan(0);
+    expect(Object.keys(diagnostics).sort()).toEqual([
+      'candidateCount',
+      'maximumCandidateCount',
+      'passCount',
+      'processedEdgeCount',
+      'qualityEvaluationCount',
+    ]);
   });
 
   it('keeps large-graph outer-lane bounding quality-equivalent', () => {

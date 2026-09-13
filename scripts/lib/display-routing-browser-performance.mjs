@@ -308,6 +308,40 @@ export const summarizeSlowestDisplayRoutingPhases = (phaseTrace, limit = 5) => {
         ? trace.scannedEdgePairCount
         : null,
       workItemCount: Number.isFinite(trace.workItemCount) ? trace.workItemCount : null,
+      ...(Number.isFinite(trace.processedEdgeCount)
+        ? { processedEdgeCount: trace.processedEdgeCount }
+        : {}),
+      ...(Number.isFinite(trace.passCount) ? { passCount: trace.passCount } : {}),
+      ...(Number.isFinite(trace.deduplicatedCandidateCount)
+        ? { deduplicatedCandidateCount: trace.deduplicatedCandidateCount }
+        : {}),
+      ...(Number.isFinite(trace.scalarCandidateCount)
+        ? { scalarCandidateCount: trace.scalarCandidateCount }
+        : {}),
+      ...(Number.isFinite(trace.channelCandidateCount)
+        ? { channelCandidateCount: trace.channelCandidateCount }
+        : {}),
+      ...(Number.isFinite(trace.outerLaneCandidateCount)
+        ? { outerLaneCandidateCount: trace.outerLaneCandidateCount }
+        : {}),
+      ...(Number.isFinite(trace.tinyLaneCandidateCount)
+        ? { tinyLaneCandidateCount: trace.tinyLaneCandidateCount }
+        : {}),
+      ...(Number.isFinite(trace.obstacleLaneCandidateCount)
+        ? { obstacleLaneCandidateCount: trace.obstacleLaneCandidateCount }
+        : {}),
+      ...(Number.isFinite(trace.endpointLaneCandidateCount)
+        ? { endpointLaneCandidateCount: trace.endpointLaneCandidateCount }
+        : {}),
+      ...(Number.isFinite(trace.endpointOffsetCandidateCount)
+        ? { endpointOffsetCandidateCount: trace.endpointOffsetCandidateCount }
+        : {}),
+      ...(Number.isFinite(trace.terminalBridgeCandidateCount)
+        ? { terminalBridgeCandidateCount: trace.terminalBridgeCandidateCount }
+        : {}),
+      ...(Number.isFinite(trace.returnCandidateCount)
+        ? { returnCandidateCount: trace.returnCandidateCount }
+        : {}),
       candidateCount: Number.isFinite(trace.candidateCount) ? trace.candidateCount : null,
     }));
 };

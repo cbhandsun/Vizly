@@ -1,5 +1,23 @@
 import type { Edge, Node } from '@xyflow/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const emergencyHarness = vi.hoisted(() => ({ callCount: 0 }));
+
+vi.mock('../baseReactFlowDisplayEmergencyHardClosure', async importOriginal => {
+  const original = await importOriginal<
+    typeof import('../baseReactFlowDisplayEmergencyHardClosure')
+  >();
+  return {
+    ...original,
+    buildBaseReactFlowEmergencyObstacleCandidate: (
+      ...args: Parameters<typeof original.buildBaseReactFlowEmergencyObstacleCandidate>
+    ) => {
+      emergencyHarness.callCount += 1;
+      return original.buildBaseReactFlowEmergencyObstacleCandidate(...args);
+    },
+  };
+});
+
 import { markBaseDisplayFinalized } from '../baseReactFlowDisplayEdgeCore';
 import { closeBaseReactFlowFinalDisplayRoute } from '../baseReactFlowDisplayFinalRouteClosure';
 import * as finalizer from '../baseReactFlowDisplayFinalizer';
@@ -10,7 +28,10 @@ const nodes: Node[] = [
   { id: 'target', position: { x: 400, y: -40 }, width: 100, height: 80, data: {} },
 ];
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  emergencyHarness.callCount = 0;
+  vi.restoreAllMocks();
+});
 
 describe('final route closure reuse', () => {
   it.each(['current', 'older'])('repairs invalid geometry despite a %s finalized marker', (marker) => {
@@ -56,5 +77,6 @@ describe('final route closure reuse', () => {
     expect(result).toHaveLength(1);
     expect(getDisplayHardQualityGateReport(result, nodes, 'polished').hardClean).toBe(true);
     expect(repair).not.toHaveBeenCalled();
+    expect(emergencyHarness.callCount).toBe(0);
   });
 });

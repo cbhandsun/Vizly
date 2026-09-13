@@ -173,6 +173,45 @@ describe('baseReactFlowRenderableNodes', () => {
       positionAbsolute: { x: 50, y: 50 },
     });
   });
+
+  it('reconciles a clamped child local position from React Flow internals before routing', () => {
+    const parent = {
+      id: 'parent',
+      type: 'subGroup',
+      position: { x: 96, y: 404 },
+      positionAbsolute: { x: 96, y: 404 },
+      measured: { width: 800, height: 320 },
+      data: {},
+    } as unknown as Node;
+    const child = {
+      id: 'child',
+      type: 'custom',
+      parentId: 'parent',
+      position: { x: -8, y: 129 },
+      measured: { width: 172, height: 96 },
+      data: {},
+    } as unknown as Node;
+    const internalParent = {
+      ...parent,
+      internals: { positionAbsolute: { x: 96, y: 404 } },
+    } as unknown as Node;
+    const internalChild = {
+      ...child,
+      position: { x: -8, y: 129 },
+      internals: { positionAbsolute: { x: 96, y: 533 } },
+    } as unknown as Node;
+
+    const merged = mergeBaseReactFlowMeasuredNodes(
+      [parent, child],
+      [internalParent, internalChild],
+    );
+
+    expect(merged[1]).toMatchObject({
+      position: { x: 0, y: 129 },
+      positionAbsolute: { x: 96, y: 533 },
+    });
+    expect(child.position).toEqual({ x: -8, y: 129 });
+  });
 });
 
 const renderableNode = (id: string): Node => ({ id, position: { x: 0, y: 0 }, data: {} });

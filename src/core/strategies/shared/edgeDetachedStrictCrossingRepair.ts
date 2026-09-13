@@ -38,6 +38,8 @@ import {
 
 const detachedStrictCrossingRepairMemo = new DetachedStrictCrossingRepairMemo(16);
 
+export const STRICT_CROSSING_CANDIDATE_SHORTLIST_LIMIT = 384;
+
 export type DetachedStrictCrossingScoreEvaluationContext = {
   evaluate: (candidatePaths: Point[][]) => number;
   evaluateChanged: (candidatePaths: Point[][], changedIndexes: readonly number[]) => number;
@@ -48,6 +50,37 @@ export type DetachedStrictCrossingScoreEvaluationContextFactory = (
   edges: Edge[],
   nodes: ReactFlowNode[],
 ) => DetachedStrictCrossingScoreEvaluationContext;
+
+export type DetachedStrictCrossingRepairDiagnostics = {
+  generatedCandidateCount: number;
+  deduplicatedCandidateCount: number;
+  evaluatedCandidateCount: number;
+  acceptedCandidateCount: number;
+  minimumCandidateCount: number;
+  maximumCandidateCount: number;
+  strictHitCount: number;
+  iterationCount: number;
+  cacheHitCount: number;
+};
+
+export const createDetachedStrictCrossingRepairDiagnostics = (): DetachedStrictCrossingRepairDiagnostics => ({
+  generatedCandidateCount: 0,
+  deduplicatedCandidateCount: 0,
+  evaluatedCandidateCount: 0,
+  acceptedCandidateCount: 0,
+  minimumCandidateCount: 0,
+  maximumCandidateCount: 0,
+  strictHitCount: 0,
+  iterationCount: 0,
+  cacheHitCount: 0,
+});
+
+type StrictCrossingCandidateEvidence = {
+  edgeCrossings: number;
+  obstacleSafe?: boolean;
+  qualityScore?: EdgePathQualityScore;
+  detachedScore?: number;
+};
 
 const strictRepairHardQualityDoesNotRegress = (
   candidate: EdgePathQualityScore,
@@ -78,6 +111,95 @@ const materializeRepairedPaths = (
   return changed ? repaired : edges;
 };
 
+const exactPathKey = (path: readonly Point[]): string => (
+  path.map(point => `${point.x}:${point.y}`).join('|')
+);
+
+const uniqueStrictCrossingCandidatePaths = (
+  candidates: readonly Point[][],
+  originalPath: readonly Point[],
+  diagnostics?: DetachedStrictCrossingRepairDiagnostics,
+): Point[][] => {
+  if (diagnostics) diagnostics.generatedCandidateCount += candidates.length;
+  const seen = new Set<string>([exactPathKey(originalPath)]);
+  const unique: Point[][] = [];
+  for (const candidate of candidates) {
+    const key = exactPathKey(candidate);
+    if (seen.has(key)) {
+      if (diagnostics) diagnostics.deduplicatedCandidateCount += 1;
+      continue;
+    }
+    seen.add(key);
+    unique.push(candidate);
+  }
+  return unique;
+};
+
+type RankedStrictCrossingCandidatePath = Readonly<{
+  path: Point[];
+  score: number;
+  originalIndex: number;
+}>;
+
+const countInteriorBends = (path: readonly Point[]): number => {
+  let bendCount = 0;
+  for (let index = 1; index < path.length - 1; index += 1) {
+    if (axisOf(path[index - 1], path[index]) !== axisOf(path[index], path[index + 1])) {
+      bendCount += 1;
+    }
+  }
+  return bendCount;
+};
+
+const segmentCenterDistance = (path: readonly Point[], segment: PathSegmentRef): number => {
+  const segmentCenterX = (segment.a.x + segment.b.x) / 2;
+  const segmentCenterY = (segment.a.y + segment.b.y) / 2;
+  let nearest = Number.POSITIVE_INFINITY;
+  for (let index = 1; index < path.length - 1; index += 1) {
+    const point = path[index];
+    const distance = Math.abs(point.x - segmentCenterX) + Math.abs(point.y - segmentCenterY);
+    if (distance < nearest) nearest = distance;
+  }
+  return Number.isFinite(nearest) ? nearest : 0;
+};
+
+const rankStrictCrossingCandidatePaths = (
+  candidates: readonly Point[][],
+  originalPath: Point[],
+  segment: PathSegmentRef,
+  diagnostics?: DetachedStrictCrossingRepairDiagnostics,
+): Point[][] => {
+  if (candidates.length === 0) return [];
+  const shortlistedCount = Math.min(candidates.length, STRICT_CROSSING_CANDIDATE_SHORTLIST_LIMIT);
+  if (diagnostics) {
+    diagnostics.minimumCandidateCount = diagnostics.minimumCandidateCount === 0
+      ? shortlistedCount
+      : Math.min(diagnostics.minimumCandidateCount, shortlistedCount);
+    diagnostics.maximumCandidateCount = Math.max(
+      diagnostics.maximumCandidateCount,
+      shortlistedCount,
+    );
+  }
+  if (candidates.length <= STRICT_CROSSING_CANDIDATE_SHORTLIST_LIMIT) return [...candidates];
+
+  const originalLength = pathManhattanLength(originalPath);
+  const ranked: RankedStrictCrossingCandidatePath[] = candidates.map((path, originalIndex) => {
+    const lengthDelta = Math.max(0, pathManhattanLength(path) - originalLength);
+    const bendPenalty = countInteriorBends(path) * 32;
+    const localityPenalty = segmentCenterDistance(path, segment) * 0.05;
+    return {
+      path,
+      score: lengthDelta + bendPenalty + localityPenalty + originalIndex * 0.001,
+      originalIndex,
+    };
+  });
+
+  return ranked
+    .sort((left, right) => left.score - right.score || left.originalIndex - right.originalIndex)
+    .slice(0, STRICT_CROSSING_CANDIDATE_SHORTLIST_LIMIT)
+    .map(candidate => candidate.path);
+};
+
 function bypassStrictCrossingSegmentCandidates(
   path: Point[],
   segment: PathSegmentRef,
@@ -93,8 +215,13 @@ function bypassStrictCrossingSegmentCandidates(
   const clearances = Array.from(new Set([clearance, ...STRICT_BYPASS_CLEARANCES]));
   const readableBridgeClearances = Array.from(new Set([24, 32, 48, 64, 96, 128, 160]));
   const bridgeOffsets = [0, -160, -128, -96, -80, -76, -64, -48, -32, 32, 48, 64, 76, 80, 96, 128, 160];
+  const seenCandidateKeys = new Set<string>([exactPathKey(path)]);
   const pushCandidate = (points: Point[]) => {
-    candidates.push(compactPath(points));
+    const compacted = compactPath(points);
+    const key = exactPathKey(compacted);
+    if (seenCandidateKeys.has(key)) return;
+    seenCandidateKeys.add(key);
+    candidates.push(compacted);
   };
 
   if (segment.axis === 'h' && other.axis === 'v') {
@@ -322,12 +449,17 @@ const repairDetachedStrictCrossingPaths = (
   edges: Edge[],
   nodes: ReactFlowNode[],
   createScoreEvaluationContext: DetachedStrictCrossingScoreEvaluationContextFactory,
+  diagnostics?: DetachedStrictCrossingRepairDiagnostics,
 ): Point[][] => {
   let paths = inputPaths;
   const routingObstacleGate = createRoutingObstacleGate(edges, getRoutingObstacles(nodes), undefined, nodes);
   for (let iteration = 0; iteration < 3; iteration += 1) {
     const hits = findStrictCrossings(paths, edges);
     if (hits.length === 0) break;
+    if (diagnostics) {
+      diagnostics.iterationCount += 1;
+      diagnostics.strictHitCount += hits.length;
+    }
 
     const currentEdges = edgesWithPaths(edges, paths);
     const qualityContext = createEdgePathQualityEvaluationContext(currentEdges);
@@ -346,6 +478,7 @@ const repairDetachedStrictCrossingPaths = (
     }
     const maxEdgeCrossings = Math.max(...crossingCountByEdgeIndex.values());
     const mazeCandidateByEdgeIndex = new Map<number, Point[] | null>();
+    const candidateEvidenceByKey = new Map<string, StrictCrossingCandidateEvidence>();
     const getDetachedScoreContext = (): DetachedStrictCrossingScoreEvaluationContext => {
       if (!detachedScoreContext) {
         detachedScoreContext = createScoreEvaluationContext(paths, edges, nodes);
@@ -413,19 +546,35 @@ const repairDetachedStrictCrossingPaths = (
           mazeCandidate = mazeCandidateByEdgeIndex.get(segment.edgeIndex) ?? null;
         }
 
-        const candidatePathsForSegment = [
-          ...(mazeCandidate ? [mazeCandidate] : []),
-          ...shiftedCandidates,
-          ...bypassStrictCrossingSegmentCandidates(paths[segment.edgeIndex], segment, other),
-        ];
+        const candidatePathsForSegment = rankStrictCrossingCandidatePaths(
+          uniqueStrictCrossingCandidatePaths([
+            ...(mazeCandidate ? [mazeCandidate] : []),
+            ...shiftedCandidates,
+            ...bypassStrictCrossingSegmentCandidates(paths[segment.edgeIndex], segment, other),
+          ], paths[segment.edgeIndex], diagnostics),
+          paths[segment.edgeIndex],
+          segment,
+          diagnostics,
+        );
         const currentEdgeCrossings = crossingCountByEdgeIndex.get(segment.edgeIndex) ?? 0;
         for (const candidatePath of candidatePathsForSegment) {
-          const candidateEdgeCrossings = strictCrossingsForEdgeSegments(
-            extractPathSegmentRefsForPath(candidatePath, segment.edgeIndex, edges),
-            currentSegments,
-            segment.edgeIndex,
-            strictCrossingSegmentIndex,
-          );
+          if (diagnostics) diagnostics.evaluatedCandidateCount += 1;
+          const candidateEvidenceKey = `${segment.edgeIndex}:${exactPathKey(candidatePath)}`;
+          let candidateEvidence = candidateEvidenceByKey.get(candidateEvidenceKey);
+          if (candidateEvidence) {
+            if (diagnostics) diagnostics.cacheHitCount += 1;
+          } else {
+            candidateEvidence = {
+              edgeCrossings: strictCrossingsForEdgeSegments(
+                extractPathSegmentRefsForPath(candidatePath, segment.edgeIndex, edges),
+                currentSegments,
+                segment.edgeIndex,
+                strictCrossingSegmentIndex,
+              ),
+            };
+            candidateEvidenceByKey.set(candidateEvidenceKey, candidateEvidence);
+          }
+          const candidateEdgeCrossings = candidateEvidence.edgeCrossings;
           if (candidateEdgeCrossings > currentEdgeCrossings) continue;
 
           const candidateStrictCrossings = currentQualityScore.strictCrossings
@@ -435,13 +584,35 @@ const repairDetachedStrictCrossingPaths = (
           const tiesReducedStrictCrossings = candidateStrictCrossings === bestQualityScore.strictCrossings
             && candidateStrictCrossings < currentQualityScore.strictCrossings;
           if (!reducesStrictCrossings && !tiesReducedStrictCrossings) continue;
-          const candidatePaths = paths.map((path, index) => (index === segment.edgeIndex ? candidatePath : path));
-          if (!routingObstacleGate(paths, candidatePaths, [segment.edgeIndex])) continue;
-          const candidateEdges = edgesWithPaths(currentEdges, candidatePaths, [segment.edgeIndex]);
-          const candidateQualityScore = qualityContext.evaluateChanged(
-            candidateEdges,
-            [segment.edgeIndex],
-          );
+          let candidatePaths: Point[][] | null = null;
+          const getCandidatePaths = (): Point[][] => {
+            if (!candidatePaths) {
+              candidatePaths = paths.map((path, index) => (
+                index === segment.edgeIndex ? candidatePath : path
+              ));
+            }
+            return candidatePaths;
+          };
+          if (typeof candidateEvidence.obstacleSafe !== 'boolean') {
+            candidateEvidence.obstacleSafe = routingObstacleGate(
+              paths,
+              getCandidatePaths(),
+              [segment.edgeIndex],
+            );
+          }
+          if (!candidateEvidence.obstacleSafe) continue;
+          if (!candidateEvidence.qualityScore) {
+            const candidateEdges = edgesWithPaths(
+              currentEdges,
+              getCandidatePaths(),
+              [segment.edgeIndex],
+            );
+            candidateEvidence.qualityScore = qualityContext.evaluateChanged(
+              candidateEdges,
+              [segment.edgeIndex],
+            );
+          }
+          const candidateQualityScore = candidateEvidence.qualityScore;
           if (!strictRepairHardQualityDoesNotRegress(
             candidateQualityScore,
             currentQualityScore,
@@ -450,10 +621,13 @@ const repairDetachedStrictCrossingPaths = (
           let improvesReducedStrictCandidate = false;
           if (tiesReducedStrictCrossings) {
             const currentBestScore = getBestDetachedScore();
-            candidateScore = getDetachedScoreContext().evaluateChanged(
-              candidatePaths,
-              [segment.edgeIndex],
-            );
+            if (typeof candidateEvidence.detachedScore !== 'number') {
+              candidateEvidence.detachedScore = getDetachedScoreContext().evaluateChanged(
+                getCandidatePaths(),
+                [segment.edgeIndex],
+              );
+            }
+            candidateScore = candidateEvidence.detachedScore;
             improvesReducedStrictCandidate = candidateScore < currentBestScore - 25
               || compareQualityScores(candidateQualityScore, bestQualityScore) < 0;
           }
@@ -463,8 +637,9 @@ const repairDetachedStrictCrossingPaths = (
           ) {
             bestScore = reducesStrictCrossings ? null : candidateScore;
             bestQualityScore = candidateQualityScore;
-            bestPaths = candidatePaths;
+            bestPaths = getCandidatePaths();
             bestChangedEdgeIndex = segment.edgeIndex;
+            if (diagnostics) diagnostics.acceptedCandidateCount += 1;
           }
         }
       }
@@ -499,19 +674,27 @@ const buildPathPatches = (
     : [{ edgeIndex, path }]
 ));
 
-export function repairDetachedStrictCrossingBypasses(edges: Edge[], nodes: ReactFlowNode[]): Edge[] {
+export function repairDetachedStrictCrossingBypasses(
+  edges: Edge[],
+  nodes: ReactFlowNode[],
+  diagnostics?: DetachedStrictCrossingRepairDiagnostics,
+): Edge[] {
   const inputPaths = edges.map(edge => compactPath(getEdgePath(edge)));
   if (inputPaths.filter(path => path.length >= 2).length < 2) return edges;
 
   const inputSignature = buildDetachedStrictCrossingRepairSignature(edges, nodes, inputPaths);
   const cachedPatches = detachedStrictCrossingRepairMemo.get(inputSignature);
-  if (cachedPatches) return materializeRepairedPaths(edges, cachedPatches);
+  if (cachedPatches) {
+    if (diagnostics) diagnostics.cacheHitCount += 1;
+    return materializeRepairedPaths(edges, cachedPatches);
+  }
 
   const paths = repairDetachedStrictCrossingPaths(
     inputPaths,
     edges,
     nodes,
     createDetachedOverlapStateEvaluationContext,
+    diagnostics,
   );
   const patches = buildPathPatches(inputPaths, paths);
   detachedStrictCrossingRepairMemo.set(inputSignature, patches);

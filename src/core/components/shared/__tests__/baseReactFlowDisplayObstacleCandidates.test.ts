@@ -12,6 +12,7 @@ import {
   withDisplayComputedPath,
 } from '../baseReactFlowDisplayGeometry';
 import {
+  createDisplayObstacleRepairDiagnostics,
   repairDisplayObstacleHits,
   resolveDisplayObstacleRepairBudget,
 } from '../baseReactFlowDisplayObstacleRepair';
@@ -99,6 +100,41 @@ describe('display obstacle candidates', () => {
     )).toEqual([]);
   });
 
+  it('prioritizes commercial full-span skirt lanes inside a bounded candidate window', () => {
+    const edge: Edge = {
+      id: 'bounded-full-span',
+      source: 'source',
+      target: 'target',
+      data: {
+        computedPath: [{ x: 0, y: 0 }, { x: 400, y: 0 }],
+      },
+    };
+    const nodes: Node[] = [{
+      id: 'blocker',
+      position: { x: 150, y: -40 },
+      width: 100,
+      height: 80,
+      measured: { width: 100, height: 80 },
+      data: {},
+    }];
+
+    const bounded = buildObstacleSkirtCandidates(
+      getDisplayComputedPath(edge),
+      nodes,
+      edge,
+      [edge],
+      undefined,
+      4,
+    );
+
+    expect(bounded).toContainEqual([
+      { x: 0, y: 0 },
+      { x: 0, y: 89 },
+      { x: 400, y: 89 },
+      { x: 400, y: 0 },
+    ]);
+  });
+
   it('routes a two-point orthogonal path around an unrelated node', () => {
     const edge: Edge = {
       id: 'straight-through-obstacle',
@@ -143,6 +179,42 @@ describe('display obstacle candidates', () => {
         x: 150, y: -40, width: 100, height: 80,
       })).toBeGreaterThanOrEqual(48);
     }
+  });
+
+  it('records bounded obstacle-repair diagnostics without changing the accepted route', () => {
+    const edge: Edge = {
+      id: 'diagnosed-obstacle',
+      source: 'source',
+      target: 'target',
+      data: {
+        computedPath: [{ x: 0, y: 0 }, { x: 400, y: 0 }],
+      },
+    };
+    const nodes: Node[] = [{
+      id: 'blocker',
+      position: { x: 150, y: -40 },
+      width: 100,
+      height: 80,
+      measured: { width: 100, height: 80 },
+      data: {},
+    }];
+    const diagnostics = createDisplayObstacleRepairDiagnostics();
+
+    const repaired = repairDisplayObstacleHits(
+      [edge],
+      nodes,
+      'LR',
+      {
+        ...DISPLAY_FINAL_OVERLAP_OBSTACLE_REPAIR_OPTIONS,
+        diagnostics,
+      },
+    );
+
+    expect(countDisplayObstacleHits(repaired, nodes)).toBe(0);
+    expect(diagnostics.initialObstacleHits).toBe(1);
+    expect(diagnostics.finalObstacleHits).toBe(0);
+    expect(diagnostics.generatedCandidateCount).toBeGreaterThan(0);
+    expect(diagnostics.scoredCandidateCount).toBeGreaterThan(0);
   });
 
   it('filters terminal-regressing shortcuts before candidate truncation', () => {

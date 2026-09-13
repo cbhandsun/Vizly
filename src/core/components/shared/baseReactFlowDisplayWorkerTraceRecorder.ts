@@ -61,6 +61,51 @@ export const appendDisplayRoutingPhaseTrace = (
       fallback: 4,
     } as const;
     const workItemCount = sumOptionalCount(existing.workItemCount, trace.workItemCount);
+    const processedEdgeCount = sumOptionalCount(
+      existing.processedEdgeCount,
+      trace.processedEdgeCount,
+    );
+    const passCount = sumOptionalCount(existing.passCount, trace.passCount);
+    const deduplicatedCandidateCount = sumOptionalCount(
+      existing.deduplicatedCandidateCount,
+      trace.deduplicatedCandidateCount,
+    );
+    const scalarCandidateCount = sumOptionalCount(
+      existing.scalarCandidateCount,
+      trace.scalarCandidateCount,
+    );
+    const channelCandidateCount = sumOptionalCount(
+      existing.channelCandidateCount,
+      trace.channelCandidateCount,
+    );
+    const outerLaneCandidateCount = sumOptionalCount(
+      existing.outerLaneCandidateCount,
+      trace.outerLaneCandidateCount,
+    );
+    const tinyLaneCandidateCount = sumOptionalCount(
+      existing.tinyLaneCandidateCount,
+      trace.tinyLaneCandidateCount,
+    );
+    const obstacleLaneCandidateCount = sumOptionalCount(
+      existing.obstacleLaneCandidateCount,
+      trace.obstacleLaneCandidateCount,
+    );
+    const endpointLaneCandidateCount = sumOptionalCount(
+      existing.endpointLaneCandidateCount,
+      trace.endpointLaneCandidateCount,
+    );
+    const endpointOffsetCandidateCount = sumOptionalCount(
+      existing.endpointOffsetCandidateCount,
+      trace.endpointOffsetCandidateCount,
+    );
+    const terminalBridgeCandidateCount = sumOptionalCount(
+      existing.terminalBridgeCandidateCount,
+      trace.terminalBridgeCandidateCount,
+    );
+    const returnCandidateCount = sumOptionalCount(
+      existing.returnCandidateCount,
+      trace.returnCandidateCount,
+    );
     const budgetCount = sumOptionalCount(existing.budgetCount, trace.budgetCount);
     const underBudgetCount = sumOptionalCount(
       existing.underBudgetCount,
@@ -92,6 +137,42 @@ export const appendDisplayRoutingPhaseTrace = (
       ),
       ...(workItemCount !== undefined
         ? { workItemCount }
+        : {}),
+      ...(processedEdgeCount !== undefined
+        ? { processedEdgeCount }
+        : {}),
+      ...(passCount !== undefined
+        ? { passCount }
+        : {}),
+      ...(deduplicatedCandidateCount !== undefined
+        ? { deduplicatedCandidateCount }
+        : {}),
+      ...(scalarCandidateCount !== undefined
+        ? { scalarCandidateCount }
+        : {}),
+      ...(channelCandidateCount !== undefined
+        ? { channelCandidateCount }
+        : {}),
+      ...(outerLaneCandidateCount !== undefined
+        ? { outerLaneCandidateCount }
+        : {}),
+      ...(tinyLaneCandidateCount !== undefined
+        ? { tinyLaneCandidateCount }
+        : {}),
+      ...(obstacleLaneCandidateCount !== undefined
+        ? { obstacleLaneCandidateCount }
+        : {}),
+      ...(endpointLaneCandidateCount !== undefined
+        ? { endpointLaneCandidateCount }
+        : {}),
+      ...(endpointOffsetCandidateCount !== undefined
+        ? { endpointOffsetCandidateCount }
+        : {}),
+      ...(terminalBridgeCandidateCount !== undefined
+        ? { terminalBridgeCandidateCount }
+        : {}),
+      ...(returnCandidateCount !== undefined
+        ? { returnCandidateCount }
         : {}),
       ...(budgetCount !== undefined
         ? { budgetCount }

@@ -33,6 +33,13 @@ const finiteNodeNumber = (value: unknown): number | undefined => (
   typeof value === 'number' && Number.isFinite(value) ? value : undefined
 );
 
+const finiteNodePosition = (value: unknown): XYPosition | undefined => {
+  if (!isRecord(value)) return undefined;
+  const x = finiteNodeNumber(value.x);
+  const y = finiteNodeNumber(value.y);
+  return x === undefined || y === undefined ? undefined : { x, y };
+};
+
 type BaseReactFlowInternalNode = Node & {
   internals?: { positionAbsolute?: XYPosition };
   positionAbsolute?: XYPosition;
@@ -103,6 +110,17 @@ export const mergeBaseReactFlowMeasuredNodes = (
 ): Node[] => {
   if (sourceNodes.length === 0 || internalNodes.length === 0) return sourceNodes;
   const internalById = new Map(internalNodes.map(node => [node.id, node] as const));
+  const sourceById = new Map(sourceNodes.map(node => [node.id, node] as const));
+  const absoluteById = new Map<string, XYPosition>();
+  for (const sourceNode of sourceNodes) {
+    const internalNode = internalById.get(sourceNode.id);
+    const internalDisplayNode = internalNode as BaseReactFlowInternalNode | undefined;
+    const sourceDisplayNode = sourceNode as BaseReactFlowInternalNode;
+    const positionAbsolute = finiteNodePosition(internalDisplayNode?.internals?.positionAbsolute)
+      ?? finiteNodePosition(internalDisplayNode?.positionAbsolute)
+      ?? finiteNodePosition(sourceDisplayNode.positionAbsolute);
+    if (positionAbsolute) absoluteById.set(sourceNode.id, positionAbsolute);
+  }
   let changed = false;
   const merged = sourceNodes.map((sourceNode) => {
     const internalNode = internalById.get(sourceNode.id);
@@ -119,15 +137,31 @@ export const mergeBaseReactFlowMeasuredNodes = (
       ?? finiteNodeNumber(internalNode.height)
       ?? finiteNodeNumber(sourceMeasured?.height)
       ?? finiteNodeNumber(sourceNode.height);
-    const position = internalNode.position ?? sourceNode.position;
-    const positionAbsolute = internalDisplayNode.internals?.positionAbsolute
-      ?? internalDisplayNode.positionAbsolute
-      ?? sourceDisplayNode.positionAbsolute;
+    const positionAbsolute = finiteNodePosition(internalDisplayNode.internals?.positionAbsolute)
+      ?? finiteNodePosition(internalDisplayNode.positionAbsolute)
+      ?? finiteNodePosition(sourceDisplayNode.positionAbsolute);
+    const parentAbsolute = typeof sourceNode.parentId === 'string'
+      ? absoluteById.get(sourceNode.parentId)
+        ?? finiteNodePosition((internalById.get(sourceNode.parentId) as BaseReactFlowInternalNode | undefined)
+          ?.internals?.positionAbsolute)
+        ?? finiteNodePosition((internalById.get(sourceNode.parentId) as BaseReactFlowInternalNode | undefined)
+          ?.positionAbsolute)
+        ?? finiteNodePosition((sourceById.get(sourceNode.parentId) as BaseReactFlowInternalNode | undefined)
+          ?.positionAbsolute)
+      : undefined;
+    const position = positionAbsolute && parentAbsolute
+      ? {
+        x: positionAbsolute.x - parentAbsolute.x,
+        y: positionAbsolute.y - parentAbsolute.y,
+      }
+      : internalNode.position ?? sourceNode.position;
     const nextMeasured = width !== undefined || height !== undefined
       ? { width, height }
       : sourceMeasured;
-    const geometryChanged = position !== sourceNode.position
-      || positionAbsolute !== sourceDisplayNode.positionAbsolute
+    const geometryChanged = position.x !== sourceNode.position.x
+      || position.y !== sourceNode.position.y
+      || positionAbsolute?.x !== sourceDisplayNode.positionAbsolute?.x
+      || positionAbsolute?.y !== sourceDisplayNode.positionAbsolute?.y
       || width !== finiteNodeNumber(sourceMeasured?.width ?? sourceNode.width)
       || height !== finiteNodeNumber(sourceMeasured?.height ?? sourceNode.height);
     if (!geometryChanged) return sourceNode;

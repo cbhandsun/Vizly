@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import '../../../../test/setup';
+
 import { describe, expect, it } from 'vitest';
 
 import wmsProcessFlowStandardData from '../../../../data/standardized/WmsProcessFlowStandardData.json';

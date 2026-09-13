@@ -48,9 +48,13 @@ export const buildObstacleSkirtCandidates = (
   const otherSegments = allSegments
     .filter(segment => allEdges[segment.edgeIndex]?.id !== edge.id);
   const candidates: DisplayPoint[][] = [];
+  const seenCandidateKeys = new Set<string>();
   const appendCandidate = (candidate: DisplayPoint[]): boolean => {
     const compacted = compactOrthogonalPath(candidate);
     if (compacted.length < 2 || !compacted.every(isFinitePoint)) return false;
+    const key = compacted.map(point => `${Math.round(point.x)},${Math.round(point.y)}`).join('|');
+    if (seenCandidateKeys.has(key)) return false;
+    seenCandidateKeys.add(key);
     candidates.push(compacted);
     return candidates.length >= candidateLimit;
   };
@@ -124,6 +128,15 @@ export const buildObstacleSkirtCandidates = (
               ...path.slice(segmentIndex + 2),
             ])) return candidates;
           }
+        }
+
+        for (const detourY of fullSpanDetourLanes) {
+          if (appendCandidate([
+            ...path.slice(0, segmentIndex + 1),
+            { x: start.x, y: detourY },
+            { x: end.x, y: detourY },
+            ...path.slice(segmentIndex + 1),
+          ])) return candidates;
         }
 
         for (const detourY of localBoxY.slice(0, 8)) {
@@ -267,6 +280,15 @@ export const buildObstacleSkirtCandidates = (
               ...path.slice(segmentIndex + 2),
             ])) return candidates;
           }
+        }
+
+        for (const detourX of fullSpanDetourLanes) {
+          if (appendCandidate([
+            ...path.slice(0, segmentIndex + 1),
+            { x: detourX, y: start.y },
+            { x: detourX, y: end.y },
+            ...path.slice(segmentIndex + 1),
+          ])) return candidates;
         }
 
         for (const detourX of localBoxX.slice(0, 8)) {

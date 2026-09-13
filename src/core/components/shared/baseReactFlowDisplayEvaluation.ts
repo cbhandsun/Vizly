@@ -32,6 +32,17 @@ export type DisplaySoftQualityOptions = {
   maxCandidatesPerEdge: number;
   maxQualityEvaluations: number;
   skipOuterFallback?: boolean;
+  diagnostics?: DisplayObstacleRepairDiagnostics;
+};
+
+export type DisplayObstacleRepairDiagnostics = {
+  generatedCandidateCount: number;
+  scoredCandidateCount: number;
+  evaluatedCandidateCount: number;
+  quickAcceptedCount: number;
+  processedEdgeCount: number;
+  initialObstacleHits: number;
+  finalObstacleHits: number;
 };
 
 export type DisplayQualityBudget = {

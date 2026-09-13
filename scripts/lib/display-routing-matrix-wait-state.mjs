@@ -136,6 +136,18 @@ export const summarizeDisplayRoutingWaitState = (
       scannedSegmentCount: integer(trace.scannedSegmentCount),
       scannedEdgePairCount: integer(trace.scannedEdgePairCount),
       workItemCount: integer(trace.workItemCount),
+      processedEdgeCount: integer(trace.processedEdgeCount),
+      passCount: integer(trace.passCount),
+      deduplicatedCandidateCount: integer(trace.deduplicatedCandidateCount),
+      scalarCandidateCount: integer(trace.scalarCandidateCount),
+      channelCandidateCount: integer(trace.channelCandidateCount),
+      outerLaneCandidateCount: integer(trace.outerLaneCandidateCount),
+      tinyLaneCandidateCount: integer(trace.tinyLaneCandidateCount),
+      obstacleLaneCandidateCount: integer(trace.obstacleLaneCandidateCount),
+      endpointLaneCandidateCount: integer(trace.endpointLaneCandidateCount),
+      endpointOffsetCandidateCount: integer(trace.endpointOffsetCandidateCount),
+      terminalBridgeCandidateCount: integer(trace.terminalBridgeCandidateCount),
+      returnCandidateCount: integer(trace.returnCandidateCount),
       resolution: token(trace.resolution),
     };
   };

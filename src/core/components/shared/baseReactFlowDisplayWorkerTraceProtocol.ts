@@ -12,6 +12,18 @@ const OPTIONAL_COUNT_KEYS = [
   'scannedSegmentCount',
   'scannedEdgePairCount',
   'workItemCount',
+  'processedEdgeCount',
+  'passCount',
+  'deduplicatedCandidateCount',
+  'scalarCandidateCount',
+  'channelCandidateCount',
+  'outerLaneCandidateCount',
+  'tinyLaneCandidateCount',
+  'obstacleLaneCandidateCount',
+  'endpointLaneCandidateCount',
+  'endpointOffsetCandidateCount',
+  'terminalBridgeCandidateCount',
+  'returnCandidateCount',
   'budgetCount',
   'underBudgetCount',
   'minimumCandidateCount',
@@ -44,7 +56,7 @@ export const isDisplayRoutingPhaseTrace = (
   if (!isRecord(value)) return false;
   const keys = Object.keys(value);
   return keys.length >= 5
-    && keys.length <= 17
+    && keys.length <= 29
     && keys.every(key => (
       key === 'phase'
       || key === 'parentPhase'

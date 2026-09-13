@@ -89,6 +89,12 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
   'quality-crossing-final-candidates-post-shared',
   'quality-crossing-final-candidates-post-lane',
   'quality-strict-closure',
+  'quality-strict-closure-initial-scan',
+  'quality-strict-closure-sweep',
+  'quality-strict-closure-endpoint-lane',
+  'quality-strict-closure-bypass',
+  'quality-strict-closure-post-bypass',
+  'quality-strict-closure-loop',
   'quality-polish',
   'quality-polish-candidates',
   'quality-polish-local',
@@ -230,6 +236,18 @@ export type DisplayRoutingPhaseMetrics = Readonly<{
   scannedSegmentCount?: number;
   scannedEdgePairCount?: number;
   workItemCount?: number;
+  processedEdgeCount?: number;
+  passCount?: number;
+  deduplicatedCandidateCount?: number;
+  scalarCandidateCount?: number;
+  channelCandidateCount?: number;
+  outerLaneCandidateCount?: number;
+  tinyLaneCandidateCount?: number;
+  obstacleLaneCandidateCount?: number;
+  endpointLaneCandidateCount?: number;
+  endpointOffsetCandidateCount?: number;
+  terminalBridgeCandidateCount?: number;
+  returnCandidateCount?: number;
   budgetCount?: number;
   underBudgetCount?: number;
   minimumCandidateCount?: number;
@@ -249,6 +267,18 @@ export type DisplayRoutingPhaseTrace = Readonly<{
   scannedSegmentCount?: number;
   scannedEdgePairCount?: number;
   workItemCount?: number;
+  processedEdgeCount?: number;
+  passCount?: number;
+  deduplicatedCandidateCount?: number;
+  scalarCandidateCount?: number;
+  channelCandidateCount?: number;
+  outerLaneCandidateCount?: number;
+  tinyLaneCandidateCount?: number;
+  obstacleLaneCandidateCount?: number;
+  endpointLaneCandidateCount?: number;
+  endpointOffsetCandidateCount?: number;
+  terminalBridgeCandidateCount?: number;
+  returnCandidateCount?: number;
   budgetCount?: number;
   underBudgetCount?: number;
   minimumCandidateCount?: number;
@@ -365,6 +395,12 @@ const DISPLAY_ROUTING_PHASE_PARENTS: Readonly<
   'quality-crossing-final-candidates-post-shared': 'quality-crossing-final-shared-lane',
   'quality-crossing-final-candidates-post-lane': 'quality-crossing-final-shared-lane',
   'quality-strict-closure': 'quality',
+  'quality-strict-closure-initial-scan': 'quality-strict-closure',
+  'quality-strict-closure-sweep': 'quality-strict-closure',
+  'quality-strict-closure-endpoint-lane': 'quality-strict-closure',
+  'quality-strict-closure-bypass': 'quality-strict-closure',
+  'quality-strict-closure-post-bypass': 'quality-strict-closure',
+  'quality-strict-closure-loop': 'quality-strict-closure',
   'quality-polish': 'quality',
   'quality-polish-candidates': 'quality-polish',
   'quality-polish-local': 'quality-polish-candidates',
@@ -563,6 +599,42 @@ export const startDisplayRoutingPhaseTrace = ({
         scannedEdgePairCount: toBoundedCount(metrics.scannedEdgePairCount ?? 0),
         ...(typeof metrics.workItemCount === 'number'
           ? { workItemCount: toBoundedCount(metrics.workItemCount) }
+          : {}),
+        ...(typeof metrics.processedEdgeCount === 'number'
+          ? { processedEdgeCount: toBoundedCount(metrics.processedEdgeCount) }
+          : {}),
+        ...(typeof metrics.passCount === 'number'
+          ? { passCount: toBoundedCount(metrics.passCount) }
+          : {}),
+        ...(typeof metrics.deduplicatedCandidateCount === 'number'
+          ? { deduplicatedCandidateCount: toBoundedCount(metrics.deduplicatedCandidateCount) }
+          : {}),
+        ...(typeof metrics.scalarCandidateCount === 'number'
+          ? { scalarCandidateCount: toBoundedCount(metrics.scalarCandidateCount) }
+          : {}),
+        ...(typeof metrics.channelCandidateCount === 'number'
+          ? { channelCandidateCount: toBoundedCount(metrics.channelCandidateCount) }
+          : {}),
+        ...(typeof metrics.outerLaneCandidateCount === 'number'
+          ? { outerLaneCandidateCount: toBoundedCount(metrics.outerLaneCandidateCount) }
+          : {}),
+        ...(typeof metrics.tinyLaneCandidateCount === 'number'
+          ? { tinyLaneCandidateCount: toBoundedCount(metrics.tinyLaneCandidateCount) }
+          : {}),
+        ...(typeof metrics.obstacleLaneCandidateCount === 'number'
+          ? { obstacleLaneCandidateCount: toBoundedCount(metrics.obstacleLaneCandidateCount) }
+          : {}),
+        ...(typeof metrics.endpointLaneCandidateCount === 'number'
+          ? { endpointLaneCandidateCount: toBoundedCount(metrics.endpointLaneCandidateCount) }
+          : {}),
+        ...(typeof metrics.endpointOffsetCandidateCount === 'number'
+          ? { endpointOffsetCandidateCount: toBoundedCount(metrics.endpointOffsetCandidateCount) }
+          : {}),
+        ...(typeof metrics.terminalBridgeCandidateCount === 'number'
+          ? { terminalBridgeCandidateCount: toBoundedCount(metrics.terminalBridgeCandidateCount) }
+          : {}),
+        ...(typeof metrics.returnCandidateCount === 'number'
+          ? { returnCandidateCount: toBoundedCount(metrics.returnCandidateCount) }
           : {}),
         ...(typeof metrics.budgetCount === 'number'
           ? { budgetCount: toBoundedCount(metrics.budgetCount) }

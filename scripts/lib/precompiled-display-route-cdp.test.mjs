@@ -11,6 +11,7 @@ import {
 import {
   CdpPageSession,
   closePrecompiledRouteBrowser,
+  parsePrecompiledRouteBrowserVisible,
   parsePrecompiledRouteCdpCommandTimeoutMs,
   retryPrecompiledRouteBrowserProfileCleanup,
   terminatePrecompiledRouteBrowserProcessTree,
@@ -407,6 +408,23 @@ describe('precompiled display route CDP boundary', () => {
     'rejects an invalid command timeout: %s',
     value => expect(() => parsePrecompiledRouteCdpCommandTimeoutMs(value)).toThrow(
       'Invalid PRECOMPILED_ROUTE_CDP_COMMAND_TIMEOUT_MS',
+    ),
+  );
+
+  it.each([undefined, null, '', '0', 'false', 'no', 'headless'])(
+    'keeps the CDP browser headless by default or explicit false value %s',
+    value => expect(parsePrecompiledRouteBrowserVisible(value)).toBe(false),
+  );
+
+  it.each(['1', 'true', 'yes', 'visible'])(
+    'allows an explicit visible CDP browser value %s',
+    value => expect(parsePrecompiledRouteBrowserVisible(value)).toBe(true),
+  );
+
+  it.each(['maybe', {}, []])(
+    'rejects invalid non-empty browser visibility values: %s',
+    value => expect(() => parsePrecompiledRouteBrowserVisible(value)).toThrow(
+      'Invalid PRECOMPILED_ROUTE_VISIBLE',
     ),
   );
 

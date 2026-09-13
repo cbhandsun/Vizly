@@ -74,6 +74,42 @@ const projectPhaseTrace = value => Array.isArray(value) ? value.slice(0, 128).fl
     scannedSegmentCount: finiteMetric(trace.scannedSegmentCount),
     scannedEdgePairCount: finiteMetric(trace.scannedEdgePairCount),
     workItemCount: finiteMetric(trace.workItemCount),
+    ...(finiteMetric(trace.processedEdgeCount) !== null
+      ? { processedEdgeCount: finiteMetric(trace.processedEdgeCount) }
+      : {}),
+    ...(finiteMetric(trace.passCount) !== null
+      ? { passCount: finiteMetric(trace.passCount) }
+      : {}),
+    ...(finiteMetric(trace.deduplicatedCandidateCount) !== null
+      ? { deduplicatedCandidateCount: finiteMetric(trace.deduplicatedCandidateCount) }
+      : {}),
+    ...(finiteMetric(trace.scalarCandidateCount) !== null
+      ? { scalarCandidateCount: finiteMetric(trace.scalarCandidateCount) }
+      : {}),
+    ...(finiteMetric(trace.channelCandidateCount) !== null
+      ? { channelCandidateCount: finiteMetric(trace.channelCandidateCount) }
+      : {}),
+    ...(finiteMetric(trace.outerLaneCandidateCount) !== null
+      ? { outerLaneCandidateCount: finiteMetric(trace.outerLaneCandidateCount) }
+      : {}),
+    ...(finiteMetric(trace.tinyLaneCandidateCount) !== null
+      ? { tinyLaneCandidateCount: finiteMetric(trace.tinyLaneCandidateCount) }
+      : {}),
+    ...(finiteMetric(trace.obstacleLaneCandidateCount) !== null
+      ? { obstacleLaneCandidateCount: finiteMetric(trace.obstacleLaneCandidateCount) }
+      : {}),
+    ...(finiteMetric(trace.endpointLaneCandidateCount) !== null
+      ? { endpointLaneCandidateCount: finiteMetric(trace.endpointLaneCandidateCount) }
+      : {}),
+    ...(finiteMetric(trace.endpointOffsetCandidateCount) !== null
+      ? { endpointOffsetCandidateCount: finiteMetric(trace.endpointOffsetCandidateCount) }
+      : {}),
+    ...(finiteMetric(trace.terminalBridgeCandidateCount) !== null
+      ? { terminalBridgeCandidateCount: finiteMetric(trace.terminalBridgeCandidateCount) }
+      : {}),
+    ...(finiteMetric(trace.returnCandidateCount) !== null
+      ? { returnCandidateCount: finiteMetric(trace.returnCandidateCount) }
+      : {}),
     budgetCount: finiteMetric(trace.budgetCount),
     underBudgetCount: finiteMetric(trace.underBudgetCount),
     minimumCandidateCount: finiteMetric(trace.minimumCandidateCount),

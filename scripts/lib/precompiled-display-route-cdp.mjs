@@ -25,6 +25,14 @@ export const parsePrecompiledRouteCdpCommandTimeoutMs = (
   return candidate;
 };
 
+export const parsePrecompiledRouteBrowserVisible = rawValue => {
+  if (rawValue === undefined || rawValue === null || rawValue === '') return false;
+  const normalized = String(rawValue).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'visible'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'headless'].includes(normalized)) return false;
+  throw new Error('Invalid PRECOMPILED_ROUTE_VISIBLE');
+};
+
 const findBrowserExecutable = () => {
   const candidates = [
     process.env.CHROME_PATH,
@@ -269,8 +277,9 @@ export const withPrecompiledRouteBrowser = async (run) => {
     await runBrowserDevToolsStartupWithSingleRetry(async (startupAttempt) => {
       port = await findAvailablePort();
       profile = await mkdtemp(join(tmpdir(), 'vizly-precompiled-routes-'));
+      const visible = parsePrecompiledRouteBrowserVisible(process.env.PRECOMPILED_ROUTE_VISIBLE);
       browser = spawn(browserPath, [
-        '--headless=new',
+        ...(visible ? [] : ['--headless=new']),
         '--disable-gpu',
         '--disable-gpu-compositing',
         '--disable-gpu-sandbox',
@@ -286,7 +295,7 @@ export const withPrecompiledRouteBrowser = async (run) => {
         `--remote-debugging-port=${port}`,
         `--user-data-dir=${profile}`,
         'about:blank',
-      ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+      ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: !visible });
       try {
         await waitForBrowserDevTools(browser, port, { startupAttempt });
       } catch (error) {

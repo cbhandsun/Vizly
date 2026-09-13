@@ -192,6 +192,29 @@ export const closeBaseReactFlowFinalDisplayRoute = ({
     inputSignature,
     nodes: repairNodes,
   });
+  const committedRenderReport = evaluationSession.hardReport(committedRenderCandidate);
+  const committedRenderUnsafeStubs = evaluationSession.unsafeEndpointStubs(
+    committedRenderCandidate,
+  );
+  if (
+    committedRenderReport.hardClean
+    && (committedRenderReport.commercialClearanceViolations ?? 0) === 0
+    && committedRenderUnsafeStubs === 0
+  ) {
+    safetyClosureTimer.finish(
+      commercialClosureReady ? 'skip' : 'accepted',
+      committedRenderCandidate === commercialEdges ? 0 : committedRenderCandidate.length,
+    );
+    finalOrderTimer.finish(
+      'accepted',
+      committedRenderCandidate.length,
+      diffBaseReactFlowEvaluationMetrics(
+        finalOrderMetricsBefore,
+        evaluationSession.readMetrics(),
+      ),
+    );
+    return committedRenderCandidate;
+  }
   const emergencyObstacleCandidate = buildBaseReactFlowEmergencyObstacleCandidate(
     committedRenderCandidate,
     repairNodes,

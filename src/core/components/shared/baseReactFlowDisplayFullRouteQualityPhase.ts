@@ -3,14 +3,10 @@ import type { Edge } from '@xyflow/react';
 import {
   createDisplayMicroCleanupDiagnostics,
 } from '../../strategies/shared/edgeDisplayMicroCleanup';
-import { repairEndpointLaneCrossings } from '../../strategies/shared/edgeEndpointLaneNudgeRepair';
 import { repairEndpointOrthogonalPaths } from '../../strategies/shared/edgeEndpointPathRepair';
-import { refineGlobalEdgeWaypoints } from '../../strategies/shared/edgeGlobalWaypointRefinement';
 import { createLocalDoglegRepairDiagnostics } from '../../strategies/shared/edgeLocalDoglegRepair';
 import {
   calculateEdgePathQualityScore,
-  chooseFewestStrictCrossings,
-  countStrictEdgeCrossings,
 } from '../../strategies/shared/edgeStrictCrossingGuard';
 import { synthesizeSharedTargetTrunks } from '../../strategies/shared/edgeSharedTrunkSynthesis';
 import {
@@ -61,6 +57,7 @@ import { repairDisplayQualityTopology } from './baseReactFlowDisplayQualityTopol
 import { repairBaseReactFlowQualityStructuralCrossings } from './baseReactFlowDisplayQualityStructuralCrossing';
 import { createDisplayQualityPostEndpointAlternatives } from './baseReactFlowDisplayQualityPostEndpointAlternatives';
 import { tryDisplayQualityEarlyClosure } from './baseReactFlowDisplayQualityEarlyClosure';
+import { repairDisplayQualityStrictClosure } from './baseReactFlowDisplayQualityStrictClosure';
 
 export {
   boundedQualityPolishNeedsMicroRepair,
@@ -274,7 +271,22 @@ export const createBaseReactFlowFullRouteQualityEdges = (
       cacheHitCount: initialDoglegDiagnostics.cacheHitCount
         + initialDoglegDiagnostics.deduplicatedCandidateCount,
       candidateCount: initialDoglegDiagnostics.candidateCount,
+      deduplicatedCandidateCount: initialDoglegDiagnostics.deduplicatedCandidateCount,
       evaluationCount: initialDoglegDiagnostics.qualityEvaluationCount,
+      channelCandidateCount: initialDoglegDiagnostics.channelCandidateCount,
+      endpointLaneCandidateCount: initialDoglegDiagnostics.endpointLaneCandidateCount,
+      endpointOffsetCandidateCount: initialDoglegDiagnostics.endpointOffsetCandidateCount,
+      maximumCandidateCount: initialDoglegDiagnostics.maximumCandidateCount,
+      minimumCandidateCount: initialDoglegDiagnostics.minimumCandidateCount,
+      obstacleLaneCandidateCount: initialDoglegDiagnostics.obstacleLaneCandidateCount,
+      outerLaneCandidateCount: initialDoglegDiagnostics.outerLaneCandidateCount,
+      passCount: initialDoglegDiagnostics.passCount,
+      processedEdgeCount: initialDoglegDiagnostics.processedEdgeCount,
+      returnCandidateCount: initialDoglegDiagnostics.returnCandidateCount,
+      scalarCandidateCount: initialDoglegDiagnostics.scalarCandidateCount,
+      terminalBridgeCandidateCount: initialDoglegDiagnostics.terminalBridgeCandidateCount,
+      tinyLaneCandidateCount: initialDoglegDiagnostics.tinyLaneCandidateCount,
+      workItemCount: initialDoglegDiagnostics.processedEdgeCount,
     },
   );
   const doglegCandidateEdgeIndexes = collectDisplayRoutingAffectedEdgeIndexes(
@@ -305,7 +317,22 @@ export const createBaseReactFlowFullRouteQualityEdges = (
       cacheHitCount: finalDoglegDiagnostics.cacheHitCount
         + finalDoglegDiagnostics.deduplicatedCandidateCount,
       candidateCount: finalDoglegDiagnostics.candidateCount,
+      deduplicatedCandidateCount: finalDoglegDiagnostics.deduplicatedCandidateCount,
       evaluationCount: finalDoglegDiagnostics.qualityEvaluationCount,
+      channelCandidateCount: finalDoglegDiagnostics.channelCandidateCount,
+      endpointLaneCandidateCount: finalDoglegDiagnostics.endpointLaneCandidateCount,
+      endpointOffsetCandidateCount: finalDoglegDiagnostics.endpointOffsetCandidateCount,
+      maximumCandidateCount: finalDoglegDiagnostics.maximumCandidateCount,
+      minimumCandidateCount: finalDoglegDiagnostics.minimumCandidateCount,
+      obstacleLaneCandidateCount: finalDoglegDiagnostics.obstacleLaneCandidateCount,
+      outerLaneCandidateCount: finalDoglegDiagnostics.outerLaneCandidateCount,
+      passCount: finalDoglegDiagnostics.passCount,
+      processedEdgeCount: finalDoglegDiagnostics.processedEdgeCount,
+      returnCandidateCount: finalDoglegDiagnostics.returnCandidateCount,
+      scalarCandidateCount: finalDoglegDiagnostics.scalarCandidateCount,
+      terminalBridgeCandidateCount: finalDoglegDiagnostics.terminalBridgeCandidateCount,
+      tinyLaneCandidateCount: finalDoglegDiagnostics.tinyLaneCandidateCount,
+      workItemCount: finalDoglegDiagnostics.processedEdgeCount,
     },
   );
   const earlyClosed = tryDisplayQualityEarlyClosure({
@@ -361,70 +388,10 @@ export const createBaseReactFlowFullRouteQualityEdges = (
       : finalQualityCandidateEdges.length,
   );
   crossingPhaseTrace.forEach(trace => onPhaseTrace?.(trace));
-  const strictClosureTimer = startDisplayRoutingPhaseTrace({
-    phase: 'quality-strict-closure',
-    candidateCount: finalQualityCandidateEdges.length,
-    onTrace: onPhaseTrace,
-  });
-  const finalQualityBaseEdges = countStrictEdgeCrossings(finalQualityCandidateEdges) === 0
-    ? finalQualityCandidateEdges
-    : (() => {
-      const finalStrictSweepCandidate = repairEndpointOrthogonalPaths(
-        refineGlobalEdgeWaypoints(finalQualityCandidateEdges, repairNodes),
-        repairNodes,
-      );
-      const finalStrictEndpointLaneCandidate = repairEndpointOrthogonalPaths(
-        repairEndpointLaneCrossings(finalQualityCandidateEdges, repairNodes),
-        repairNodes,
-      );
-      const finalStrictBypassRawCandidate = repairStrictBypassesIfNeeded(
-        finalQualityCandidateEdges,
-        repairNodes,
-      );
-      const finalStrictBypassCandidate = repairEndpointOrthogonalPaths(
-        finalStrictBypassRawCandidate,
-        repairNodes,
-      );
-      const strictBaseEdges = chooseFewestStrictCrossings(
-        finalQualityCandidateEdges,
-        finalStrictSweepCandidate,
-        finalStrictEndpointLaneCandidate,
-        finalStrictBypassRawCandidate,
-        finalStrictBypassCandidate,
-      );
-      const finalPostQualityStrictBypassRawCandidate = repairStrictBypassesIfNeeded(
-        strictBaseEdges,
-        repairNodes,
-      );
-      const finalPostQualityStrictBypassCandidate = repairEndpointOrthogonalPaths(
-        finalPostQualityStrictBypassRawCandidate,
-        repairNodes,
-      );
-      return chooseFewestStrictCrossings(
-        strictBaseEdges,
-        finalPostQualityStrictBypassRawCandidate,
-        finalPostQualityStrictBypassCandidate,
-      );
-    })();
-  let finalQualityEdges = finalQualityBaseEdges;
-  for (let pass = 0; pass < 3; pass += 1) {
-    if (countStrictEdgeCrossings(finalQualityEdges) === 0) break;
-    const strictBypassRawCandidate = repairStrictBypassesIfNeeded(finalQualityEdges, repairNodes);
-    const strictBypassCandidate = repairEndpointOrthogonalPaths(
-      strictBypassRawCandidate,
-      repairNodes,
-    );
-    const nextFinalQualityEdges = chooseFewestStrictCrossings(
-      finalQualityEdges,
-      strictBypassRawCandidate,
-      strictBypassCandidate,
-    );
-    if (nextFinalQualityEdges === finalQualityEdges) break;
-    finalQualityEdges = nextFinalQualityEdges;
-  }
-  strictClosureTimer.finish(
-    finalQualityEdges === finalQualityCandidateEdges ? 'skip' : 'accepted',
-    finalQualityEdges === finalQualityCandidateEdges ? 0 : finalQualityEdges.length,
+  let finalQualityEdges = repairDisplayQualityStrictClosure(
+    finalQualityCandidateEdges,
+    repairNodes,
+    onPhaseTrace,
   );
   const polishTimer = startDisplayRoutingPhaseTrace({
     phase: 'quality-polish',

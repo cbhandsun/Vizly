@@ -1,8 +1,10 @@
 import type { Edge, Node } from '@xyflow/react';
 
-import { calculateEdgePathQualityScore } from '../../strategies/shared/edgeStrictCrossingGuard';
 import { startDisplayRoutingPhaseTrace, type DisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
-import { repairTerminalHandleAxisCrossings } from './baseReactFlowTerminalAxisRepair';
+import {
+  createDisplayTerminalAxisRepairDiagnostics,
+  repairTerminalHandleAxisCrossings,
+} from './baseReactFlowTerminalAxisRepair';
 
 export const repairBaseReactFlowTerminalAxisSeed = ({
   edges,
@@ -20,13 +22,19 @@ export const repairBaseReactFlowTerminalAxisSeed = ({
         onTrace: onPhaseTrace,
       })
     : null;
-  const quality = calculateEdgePathQualityScore(edges);
-  const repaired = quality.strictCrossings > 0
-    || quality.reverseOverlap > 0
-    || quality.unrelatedOverlap > 0
-    || quality.unexplainedRelatedOverlap > 0
-    ? repairTerminalHandleAxisCrossings(edges, nodes)
-    : edges;
-  timer?.finish(repaired === edges ? 'skip' : 'accepted', repaired === edges ? 0 : repaired.length);
+  const diagnostics = createDisplayTerminalAxisRepairDiagnostics();
+  const repaired = repairTerminalHandleAxisCrossings(edges, nodes, diagnostics);
+  timer?.finish(
+    repaired === edges ? 'skip' : 'accepted',
+    repaired === edges ? 0 : repaired.length,
+    {
+      candidateCount: diagnostics.candidateCount,
+      evaluationCount: diagnostics.qualityEvaluationCount,
+      maximumCandidateCount: diagnostics.maximumCandidateCount,
+      passCount: diagnostics.passCount,
+      processedEdgeCount: diagnostics.processedEdgeCount,
+      workItemCount: diagnostics.processedEdgeCount,
+    },
+  );
   return repaired;
 };

@@ -6,7 +6,11 @@ import {
   DetachedStrictCrossingRepairMemo,
   type DetachedStrictCrossingPathPatch,
 } from '../edgeDetachedStrictCrossingMemo';
-import { repairDetachedStrictCrossingBypasses } from '../edgeDetachedStrictCrossingRepair';
+import {
+  createDetachedStrictCrossingRepairDiagnostics,
+  repairDetachedStrictCrossingBypasses,
+  STRICT_CROSSING_CANDIDATE_SHORTLIST_LIMIT,
+} from '../edgeDetachedStrictCrossingRepair';
 
 type Point = { x: number; y: number };
 
@@ -125,6 +129,20 @@ describe('DetachedStrictCrossingRepairMemo', () => {
     ((nodes[0] as any).positionAbsolute as { x: number; y: number }).x += 1;
 
     expect(buildDetachedStrictCrossingRepairSignature(edges, nodes, paths)).not.toBe(before);
+  });
+
+  it('keeps strict-crossing candidate evaluation bounded by a ranked shortlist', () => {
+    const diagnostics = createDetachedStrictCrossingRepairDiagnostics();
+
+    repairDetachedStrictCrossingBypasses(crossingEdges('shortlist-diagnostics'), [], diagnostics);
+
+    expect(diagnostics.generatedCandidateCount)
+      .toBeGreaterThan(STRICT_CROSSING_CANDIDATE_SHORTLIST_LIMIT);
+    expect(diagnostics.evaluatedCandidateCount)
+      .toBeLessThan(diagnostics.generatedCandidateCount);
+    expect(diagnostics.maximumCandidateCount)
+      .toBeLessThanOrEqual(STRICT_CROSSING_CANDIDATE_SHORTLIST_LIMIT);
+    expect(diagnostics.minimumCandidateCount).toBeGreaterThan(0);
   });
 
   it('applies a cached route patch to the latest edges without replacing business attributes', () => {

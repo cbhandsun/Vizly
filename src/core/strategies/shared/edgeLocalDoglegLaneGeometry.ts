@@ -14,6 +14,8 @@ import {
   toSegments,
 } from './edgeLocalDoglegGeometry';
 
+export const OUTER_LANE_CONTRACTION_CANDIDATE_LIMIT = 512;
+
 const resolveOtherSegments = (
   pathByEdgeKey: Map<string, Point[]>,
   edgeKey: string,
@@ -271,6 +273,28 @@ export function buildOuterLaneContractionCandidates(
   if (!a || !b || !c || !d) return [];
 
   const candidates: Point[][] = [];
+  const rankHorizontalCandidate = (laneX: number, mainMin: number, mainMax: number, value: number, entryY: number) => (
+    Math.abs(value - (laneX < mainMin ? mainMin - MIN_CONTRACTED_OUTER_LANE : mainMax + MIN_CONTRACTED_OUTER_LANE))
+    * 10
+    + Math.abs(entryY - a.y)
+  );
+  const rankVerticalCandidate = (laneY: number, mainMin: number, mainMax: number, value: number, entryX: number) => (
+    Math.abs(value - (laneY < mainMin ? mainMin - MIN_CONTRACTED_OUTER_LANE : mainMax + MIN_CONTRACTED_OUTER_LANE))
+    * 10
+    + Math.abs(entryX - a.x)
+  );
+  const appendRankedCandidates = (
+    ranked: { path: Point[]; rank: number }[],
+  ) => {
+    if (ranked.length <= OUTER_LANE_CONTRACTION_CANDIDATE_LIMIT) {
+      candidates.push(...ranked.map(candidate => candidate.path));
+      return;
+    }
+    ranked
+      .sort((left, right) => left.rank - right.rank)
+      .slice(0, OUTER_LANE_CONTRACTION_CANDIDATE_LIMIT)
+      .forEach(candidate => candidates.push(candidate.path));
+  };
 
   if (
     axisOf(a, b) === 'h'
@@ -301,6 +325,7 @@ export function buildOuterLaneContractionCandidates(
             addOuterLaneCandidate(values, maxX + clearance, laneX, mainMin, mainMax);
           }
       }
+      const ranked: { path: Point[]; rank: number }[] = [];
       for (const value of values) {
         for (const entryY of buildHorizontalBridgeYValues(
           points,
@@ -314,9 +339,13 @@ export function buildOuterLaneContractionCandidates(
           shifted[index].y = entryY;
           shifted[index + 1] = { x: value, y: entryY };
           shifted[index + 2].x = value;
-          candidates.push(shifted);
+          ranked.push({
+            path: shifted,
+            rank: rankHorizontalCandidate(laneX, mainMin, mainMax, value, entryY),
+          });
         }
       }
+      appendRankedCandidates(ranked);
     }
   }
 
@@ -349,6 +378,7 @@ export function buildOuterLaneContractionCandidates(
             addOuterLaneCandidate(values, maxY + clearance, laneY, mainMin, mainMax);
           }
       }
+      const ranked: { path: Point[]; rank: number }[] = [];
       for (const value of values) {
         for (const entryX of buildVerticalBridgeXValues(
           points,
@@ -362,9 +392,13 @@ export function buildOuterLaneContractionCandidates(
           shifted[index].x = entryX;
           shifted[index + 1] = { x: entryX, y: value };
           shifted[index + 2].y = value;
-          candidates.push(shifted);
+          ranked.push({
+            path: shifted,
+            rank: rankVerticalCandidate(laneY, mainMin, mainMax, value, entryX),
+          });
         }
       }
+      appendRankedCandidates(ranked);
     }
   }
 

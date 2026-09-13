@@ -24,6 +24,13 @@ import {
   selectTerminalAxisOuterCoordinates,
   type TerminalAxisCandidateSeed,
 } from './baseReactFlowTerminalAxisCandidateSelection';
+import {
+  compactTerminalAxisPath,
+  hasTerminalAxisHairpin,
+  hasTinyTerminalInteriorDogleg,
+  terminalAxisPathLength,
+  terminalAxisSegments,
+} from './baseReactFlowTerminalAxisPathMetrics';
 
 export {
   createDisplayTerminalValidationSnapshot,
@@ -44,34 +51,25 @@ const VISUAL_LANE_TOLERANCE = 4;
 const OBSTACLE_PADDING = 4;
 const MAX_TERMINAL_LANES = 8;
 const MAX_TRUNK_LANES = 24;
-const MAX_AXIS_CANDIDATES = 4_096;
+const MAX_AXIS_CANDIDATES = 512;
 const MAX_TERMINAL_AXIS_REPAIR_PASSES = 4;
 const LOCAL_OVERLAP_BYPASS_SPAN = 140;
 
-const compactPath = (path: Point[]): Point[] => {
-  const deduped: Point[] = [];
-  for (const point of path) {
-    const previous = deduped[deduped.length - 1];
-    if (!previous || Math.abs(previous.x - point.x) > EPS || Math.abs(previous.y - point.y) > EPS) {
-      deduped.push({ x: Math.round(point.x * 100) / 100, y: Math.round(point.y * 100) / 100 });
-    }
-  }
-  if (deduped.length < 3) return deduped;
-  const result: Point[] = [deduped[0]];
-  for (let index = 1; index < deduped.length - 1; index += 1) {
-    const previous = result[result.length - 1];
-    const current = deduped[index];
-    const next = deduped[index + 1];
-    if (axisOf(previous, current) && axisOf(current, next) === axisOf(previous, current)) continue;
-    result.push(current);
-  }
-  result.push(deduped[deduped.length - 1]);
-  return result;
+export type DisplayTerminalAxisRepairDiagnostics = {
+  passCount: number;
+  processedEdgeCount: number;
+  candidateCount: number;
+  maximumCandidateCount: number;
+  qualityEvaluationCount: number;
 };
 
-const segments = (path: Point[]) => path.slice(0, -1)
-  .map((a, index) => ({ a, b: path[index + 1], axis: axisOf(a, path[index + 1]), index }))
-  .filter((segment): segment is { a: Point; b: Point; axis: Axis; index: number } => Boolean(segment.axis));
+export const createDisplayTerminalAxisRepairDiagnostics = (): DisplayTerminalAxisRepairDiagnostics => ({
+  passCount: 0,
+  processedEdgeCount: 0,
+  candidateCount: 0,
+  maximumCandidateCount: 0,
+  qualityEvaluationCount: 0,
+});
 
 const strictCrosses = (
   first: { a: Point; b: Point; axis: Axis },
@@ -102,8 +100,8 @@ const parallelOverlapLength = (
 };
 
 const harmfulParallelOverlapForPair = (
-  firstSegments: ReturnType<typeof segments>,
-  secondSegments: ReturnType<typeof segments>,
+  firstSegments: ReturnType<typeof terminalAxisSegments>,
+  secondSegments: ReturnType<typeof terminalAxisSegments>,
   firstEdge: Edge | undefined,
   secondEdge: Edge | undefined,
 ): number => {
@@ -124,7 +122,7 @@ const harmfulParallelOverlapForPair = (
 
 const createHarmfulParallelOverlapContext = (paths: Point[][], edges: Edge[]) => {
   const edgeCount = paths.length;
-  const segmentsByEdge = paths.map(segments);
+  const segmentsByEdge = paths.map(terminalAxisSegments);
   const pairScores = new Map<number, number>();
   const involvedIndexes = new Set<number>();
   let baseline = 0;
@@ -149,7 +147,7 @@ const createHarmfulParallelOverlapContext = (paths: Point[][], edges: Edge[]) =>
     baseline,
     involvedIndexes,
     evaluate(edgeIndex: number, candidatePath: Point[]): number {
-      const candidateSegments = segments(candidatePath);
+      const candidateSegments = terminalAxisSegments(candidatePath);
       let score = baseline;
       for (let otherIndex = 0; otherIndex < edgeCount; otherIndex += 1) {
         if (otherIndex === edgeIndex) continue;
@@ -178,9 +176,9 @@ const createHarmfulParallelOverlapContext = (paths: Point[][], edges: Edge[]) =>
 const crossingEdgeIndexes = (paths: Point[][]): Set<number> => {
   const indexes = new Set<number>();
   for (let first = 0; first < paths.length; first += 1) {
-    const firstSegments = segments(paths[first]);
+    const firstSegments = terminalAxisSegments(paths[first]);
     for (let second = first + 1; second < paths.length; second += 1) {
-      const secondSegments = segments(paths[second]);
+      const secondSegments = terminalAxisSegments(paths[second]);
       if (firstSegments.some(a => secondSegments.some(b => strictCrosses(a, b)))) {
         indexes.add(first);
         indexes.add(second);
@@ -188,6 +186,18 @@ const crossingEdgeIndexes = (paths: Point[][]): Set<number> => {
     }
   }
   return indexes;
+};
+
+const collectStrictCrossingEdgeIndexes = (
+  paths: Point[][],
+  qualityContext: ReturnType<typeof createEdgePathQualityEvaluationContext>,
+): Set<number> => {
+  if (!qualityContext.edgeHasPairRepairOpportunity) return crossingEdgeIndexes(paths);
+  const indexes = new Set<number>();
+  for (let edgeIndex = 0; edgeIndex < paths.length; edgeIndex += 1) {
+    if (qualityContext.edgeHasPairRepairOpportunity(edgeIndex)) indexes.add(edgeIndex);
+  }
+  return indexes.size > 0 ? indexes : crossingEdgeIndexes(paths);
 };
 
 const routingObstacles = (nodes: Node[]): Map<string, Rect> => {
@@ -235,40 +245,6 @@ const pathHitsObstacle = (path: Point[], edge: Edge, obstacles: Map<string, Rect
       if (nodeId === edge.source || nodeId === edge.target) continue;
       if (segmentHitsRect(path[index], path[index + 1], rect)) return true;
     }
-  }
-  return false;
-};
-
-const pathLength = (path: Point[]): number => path.slice(0, -1).reduce((total, point, index) => (
-  total + Math.abs(point.x - path[index + 1].x) + Math.abs(point.y - path[index + 1].y)
-), 0);
-
-const hasAxisHairpin = (path: Point[]): boolean => {
-  const pathSegments = segments(path).map(segment => ({
-    ...segment,
-    direction: segment.axis === 'v'
-      ? Math.sign(segment.b.y - segment.a.y)
-      : Math.sign(segment.b.x - segment.a.x),
-    length: Math.abs(segment.b.x - segment.a.x) + Math.abs(segment.b.y - segment.a.y),
-  }));
-  for (let index = 0; index < pathSegments.length - 2; index += 1) {
-    const first = pathSegments[index];
-    const middle = pathSegments[index + 1];
-    const last = pathSegments[index + 2];
-    if (
-      first.axis === last.axis
-      && first.direction === -last.direction
-      && middle.length < 140
-    ) return true;
-  }
-  return false;
-};
-
-const hasTinyInteriorDogleg = (path: Point[]): boolean => {
-  for (let index = 1; index < path.length - 2; index += 1) {
-    const length = Math.abs(path[index].x - path[index + 1].x)
-      + Math.abs(path[index].y - path[index + 1].y);
-    if (length < LANE_GAP) return true;
   }
   return false;
 };
@@ -438,7 +414,11 @@ const terminalAxisCandidates = (
     pushCandidate(candidate, 4);
   }
 
-  return selectBoundedTerminalAxisCandidates(candidateSeeds, compactPath, MAX_AXIS_CANDIDATES);
+  return selectBoundedTerminalAxisCandidates(
+    candidateSeeds,
+    compactTerminalAxisPath,
+    MAX_AXIS_CANDIDATES,
+  );
 };
 
 const terminalEndpointNudgeCandidates = (
@@ -467,11 +447,11 @@ const terminalEndpointNudgeCandidates = (
   if (sourceRect && sourceSide && expectedAxis(sourceSide) === axisOf(source, sourceNeighbor)) {
     if (sourceSide === 't' || sourceSide === 'b') {
       for (const x of shiftedCoordinates(source.x, sourceRect.x, sourceRect.x + sourceRect.width)) {
-        candidates.push(compactPath([{ x, y: source.y }, { x, y: sourceNeighbor.y }, ...path.slice(2)]));
+        candidates.push(compactTerminalAxisPath([{ x, y: source.y }, { x, y: sourceNeighbor.y }, ...path.slice(2)]));
       }
     } else {
       for (const y of shiftedCoordinates(source.y, sourceRect.y, sourceRect.y + sourceRect.height)) {
-        candidates.push(compactPath([{ x: source.x, y }, { x: sourceNeighbor.x, y }, ...path.slice(2)]));
+        candidates.push(compactTerminalAxisPath([{ x: source.x, y }, { x: sourceNeighbor.x, y }, ...path.slice(2)]));
       }
     }
   }
@@ -479,7 +459,7 @@ const terminalEndpointNudgeCandidates = (
   if (targetRect && targetSide && expectedAxis(targetSide) === axisOf(targetNeighbor, target)) {
     if (targetSide === 't' || targetSide === 'b') {
       for (const x of shiftedCoordinates(target.x, targetRect.x, targetRect.x + targetRect.width)) {
-        candidates.push(compactPath([
+        candidates.push(compactTerminalAxisPath([
           ...path.slice(0, -2),
           { x, y: targetNeighbor.y },
           { x, y: target.y },
@@ -487,7 +467,7 @@ const terminalEndpointNudgeCandidates = (
       }
     } else {
       for (const y of shiftedCoordinates(target.y, targetRect.y, targetRect.y + targetRect.height)) {
-        candidates.push(compactPath([
+        candidates.push(compactTerminalAxisPath([
           ...path.slice(0, -2),
           { x: targetNeighbor.x, y },
           { x: target.x, y },
@@ -509,7 +489,7 @@ const localOverlapBypassCandidates = (
   if (!edge || path.length < 4) return [];
   const candidates: Point[][] = [];
 
-  for (const movable of segments(path)) {
+  for (const movable of terminalAxisSegments(path)) {
     if (movable.index <= 0 || movable.index >= path.length - 2) continue;
     for (let otherIndex = 0; otherIndex < paths.length; otherIndex += 1) {
       if (otherIndex === edgeIndex) continue;
@@ -519,7 +499,7 @@ const localOverlapBypassCandidates = (
         || edge.source === otherEdge.target
         || edge.target === otherEdge.source
         || edge.target === otherEdge.target;
-      for (const blocker of segments(paths[otherIndex])) {
+      for (const blocker of terminalAxisSegments(paths[otherIndex])) {
         const overlap = parallelOverlapLength(movable, blocker);
         if (overlap <= 24) continue;
         const movableDirection = movable.axis === 'v'
@@ -539,7 +519,7 @@ const localOverlapBypassCandidates = (
             || exitY >= Math.max(movable.a.y, movable.b.y) - 24
           ) continue;
           for (const detourX of [movable.a.x - 48, movable.a.x - 24, movable.a.x + 24, movable.a.x + 48]) {
-            candidates.push(compactPath([
+            candidates.push(compactTerminalAxisPath([
               ...path.slice(0, movable.index + 1),
               { x: detourX, y: movable.a.y },
               { x: detourX, y: exitY },
@@ -556,7 +536,7 @@ const localOverlapBypassCandidates = (
             || exitX >= Math.max(movable.a.x, movable.b.x) - 24
           ) continue;
           for (const detourY of [movable.a.y - 48, movable.a.y - 24, movable.a.y + 24, movable.a.y + 48]) {
-            candidates.push(compactPath([
+            candidates.push(compactTerminalAxisPath([
               ...path.slice(0, movable.index + 1),
               { x: movable.a.x, y: detourY },
               { x: exitX, y: detourY },
@@ -595,7 +575,11 @@ const terminalAxisMismatch = (
   );
 };
 
-export const repairTerminalHandleAxisCrossings = (edges: Edge[], nodes: Node[]): Edge[] => {
+export const repairTerminalHandleAxisCrossings = (
+  edges: Edge[],
+  nodes: Node[],
+  diagnostics?: DisplayTerminalAxisRepairDiagnostics,
+): Edge[] => {
   let current = edges;
   const obstacles = routingObstacles(nodes);
   const nodeRects = new Map<string, Rect>();
@@ -610,18 +594,20 @@ export const repairTerminalHandleAxisCrossings = (edges: Edge[], nodes: Node[]):
     const overlapContext = createHarmfulParallelOverlapContext(paths, current);
     const baselineOverlap = overlapContext.baseline;
     if (baselineCrossings === 0 && baselineOverlap <= EPS) break;
+    if (diagnostics) diagnostics.passCount += 1;
     const involvedIndexes = baselineCrossings > 0
-      ? crossingEdgeIndexes(paths)
+      ? collectStrictCrossingEdgeIndexes(paths, qualityContext)
       : overlapContext.involvedIndexes;
     const involved = [...involvedIndexes]
       .sort((first, second) => (
         Number(terminalAxisMismatch(current[second], paths[second], nodeRects))
         - Number(terminalAxisMismatch(current[first], paths[first], nodeRects))
         || (baselineCrossings > 0
-          ? pathLength(paths[second]) - pathLength(paths[first])
-          : pathLength(paths[first]) - pathLength(paths[second]))
+          ? terminalAxisPathLength(paths[second]) - terminalAxisPathLength(paths[first])
+          : terminalAxisPathLength(paths[first]) - terminalAxisPathLength(paths[second]))
       ))
       .slice(0, 2);
+    if (diagnostics) diagnostics.processedEdgeCount += involved.length;
     const pools = createTerminalAxisCoordinatePools(paths, obstacles, LANE_GAP, MIN_STUB);
     let best = current;
     let bestScore = Number.POSITIVE_INFINITY;
@@ -635,15 +621,27 @@ export const repairTerminalHandleAxisCrossings = (edges: Edge[], nodes: Node[]):
         localOverlapBypassCandidates(edgeIndex, paths, current),
         terminalAxisCandidates(edge, path, pools, nodeRects, current.length > 24),
       ];
+      const edgeCandidateCount = candidateGroups.reduce(
+        (total, candidates) => total + candidates.length,
+        0,
+      );
+      if (diagnostics) {
+        diagnostics.candidateCount += edgeCandidateCount;
+        diagnostics.maximumCandidateCount = Math.max(
+          diagnostics.maximumCandidateCount,
+          edgeCandidateCount,
+        );
+      }
       for (const candidatePathsForEdge of candidateGroups) {
         for (const candidatePath of candidatePathsForEdge) {
           if (!terminalDirectionsAreValid(candidatePath, edge, nodeRects)) continue;
-          if (hasAxisHairpin(candidatePath)) continue;
-          if (hasTinyInteriorDogleg(candidatePath)) continue;
+          if (hasTerminalAxisHairpin(candidatePath)) continue;
+          if (hasTinyTerminalInteriorDogleg(candidatePath, LANE_GAP)) continue;
           if (pathHitsObstacle(candidatePath, edge, obstacles)) continue;
           const candidateEdges = current.map((candidate, index) => (
             index === edgeIndex ? withPath(candidate, candidatePath) : candidate
           ));
+          if (diagnostics) diagnostics.qualityEvaluationCount += 1;
           const crossings = qualityContext.evaluateChanged(candidateEdges, [edgeIndex]).strictCrossings;
           const overlap = overlapContext.evaluate(edgeIndex, candidatePath);
           if (baselineCrossings > 0) {
@@ -653,9 +651,9 @@ export const repairTerminalHandleAxisCrossings = (edges: Edge[], nodes: Node[]):
           }
           const directLaneBonus = candidatePath.length <= 4 ? 10_000 : 0;
           const score = baselineCrossings > 0
-            ? crossings * 1_000_000 + pathLength(candidatePath)
+            ? crossings * 1_000_000 + terminalAxisPathLength(candidatePath)
               + Math.max(0, candidatePath.length - 2) * 400 - directLaneBonus
-            : overlap * 1_000 + pathLength(candidatePath)
+            : overlap * 1_000 + terminalAxisPathLength(candidatePath)
               + Math.max(0, candidatePath.length - 2) * 400 - directLaneBonus;
           if (score >= bestScore) continue;
           best = candidateEdges;

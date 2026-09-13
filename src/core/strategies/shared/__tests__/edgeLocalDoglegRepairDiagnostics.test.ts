@@ -8,9 +8,13 @@ import {
 import {
   createEdgeObstacleInteractionContext,
   createEdgePathInteractionContext,
+  type Point,
   toSegments,
 } from '../edgeLocalDoglegGeometry';
-import { buildOuterLaneContractionCandidates } from '../edgeLocalDoglegLaneGeometry';
+import {
+  OUTER_LANE_CONTRACTION_CANDIDATE_LIMIT,
+  buildOuterLaneContractionCandidates,
+} from '../edgeLocalDoglegLaneGeometry';
 
 const nodes: Node[] = [
   { id: 'source', position: { x: -80, y: -30 }, data: {}, measured: { width: 60, height: 60 } },
@@ -45,16 +49,42 @@ describe('local dogleg repair diagnostics', () => {
     expect(diagnostics.qualityEvaluationCount).toBeGreaterThan(0);
     expect(diagnostics.qualityEvaluationCount).toBeLessThan(diagnostics.candidateCount);
     expect(diagnostics.passCount).toBeGreaterThan(1);
+    expect(diagnostics.minimumCandidateCount).toBeGreaterThan(0);
+    expect(diagnostics.maximumCandidateCount)
+      .toBeGreaterThanOrEqual(diagnostics.minimumCandidateCount);
+    expect(diagnostics.maximumCandidateCount)
+      .toBeLessThanOrEqual(diagnostics.candidateCount);
     expect(diagnostics.cacheHitCount).toBeGreaterThan(0);
     expect(diagnostics.deduplicatedCandidateCount).toBeGreaterThan(0);
+    const familyCandidateCount = diagnostics.scalarCandidateCount
+      + diagnostics.channelCandidateCount
+      + diagnostics.outerLaneCandidateCount
+      + diagnostics.tinyLaneCandidateCount
+      + diagnostics.obstacleLaneCandidateCount
+      + diagnostics.endpointLaneCandidateCount
+      + diagnostics.endpointOffsetCandidateCount
+      + diagnostics.terminalBridgeCandidateCount
+      + diagnostics.returnCandidateCount;
+    expect(familyCandidateCount).toBe(diagnostics.candidateCount);
     expect(Object.keys(diagnostics).sort()).toEqual([
       'cacheHitCount',
       'candidateCount',
+      'channelCandidateCount',
       'deduplicatedCandidateCount',
+      'endpointLaneCandidateCount',
+      'endpointOffsetCandidateCount',
+      'maximumCandidateCount',
+      'minimumCandidateCount',
+      'obstacleLaneCandidateCount',
+      'outerLaneCandidateCount',
       'passCount',
       'processedEdgeCount',
       'qualityEvaluationCount',
+      'returnCandidateCount',
       'riskyEdgeCount',
+      'scalarCandidateCount',
+      'terminalBridgeCandidateCount',
+      'tinyLaneCandidateCount',
     ]);
   });
 
@@ -104,6 +134,36 @@ describe('local dogleg repair diagnostics', () => {
       snapshot.otherSegments,
     )).toEqual(exhaustive);
     expect(Object.isFrozen(snapshot.otherSegments)).toBe(true);
+  });
+
+  it('keeps outer-lane contraction candidates bounded by ranked local relevance', () => {
+    const edge: Edge = { id: 'current', source: 'source', target: 'target', data: {} };
+    const path = [
+      { x: 0, y: 0 },
+      { x: -10_000, y: 0 },
+      { x: -10_000, y: 100 },
+      { x: 50, y: 100 },
+    ];
+    const peerPaths: [string, Point[]][] = Array.from({ length: OUTER_LANE_CONTRACTION_CANDIDATE_LIMIT + 200 }, (_, index) => {
+      const x = -9_900 + index * 12;
+      return [`peer-${index}`, [{ x, y: 50 }, { x: x + 4, y: 50 }]];
+    });
+    const paths = new Map<string, Point[]>([
+      ['current', path],
+      ...peerPaths,
+    ]);
+
+    const candidates = buildOuterLaneContractionCandidates(
+      path,
+      0,
+      edge,
+      'current',
+      paths,
+      new Map(),
+    );
+
+    expect(candidates).toHaveLength(OUTER_LANE_CONTRACTION_CANDIDATE_LIMIT);
+    expect(candidates[0]?.[1]?.x).toBeGreaterThan(candidates.at(-1)?.[1]?.x ?? Number.NEGATIVE_INFINITY);
   });
 
   it('returns an exact count below a bound and stops only after proving rejection', () => {

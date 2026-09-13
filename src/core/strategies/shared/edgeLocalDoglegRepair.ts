@@ -83,12 +83,37 @@ const exactCandidatePathKey = (path: readonly Point[]): string | null => {
   return path.map(point => `${point.x}:${point.y}`).join('|');
 };
 
+const LOCAL_DOGLEG_CANDIDATE_FAMILY_METRIC_KEYS = {
+  scalar: 'scalarCandidateCount',
+  channel: 'channelCandidateCount',
+  outerLane: 'outerLaneCandidateCount',
+  tinyLane: 'tinyLaneCandidateCount',
+  obstacleLane: 'obstacleLaneCandidateCount',
+  endpointLane: 'endpointLaneCandidateCount',
+  endpointOffset: 'endpointOffsetCandidateCount',
+  terminalBridge: 'terminalBridgeCandidateCount',
+  returnShape: 'returnCandidateCount',
+} as const;
+
+type LocalDoglegCandidateFamily = keyof typeof LOCAL_DOGLEG_CANDIDATE_FAMILY_METRIC_KEYS;
+
 export type LocalDoglegRepairDiagnostics = {
   riskyEdgeCount: number;
   processedEdgeCount: number;
   passCount: number;
   candidateCount: number;
   deduplicatedCandidateCount: number;
+  minimumCandidateCount: number;
+  maximumCandidateCount: number;
+  scalarCandidateCount: number;
+  channelCandidateCount: number;
+  outerLaneCandidateCount: number;
+  tinyLaneCandidateCount: number;
+  obstacleLaneCandidateCount: number;
+  endpointLaneCandidateCount: number;
+  endpointOffsetCandidateCount: number;
+  terminalBridgeCandidateCount: number;
+  returnCandidateCount: number;
   qualityEvaluationCount: number;
   cacheHitCount: number;
 };
@@ -99,6 +124,17 @@ export const createLocalDoglegRepairDiagnostics = (): LocalDoglegRepairDiagnosti
   passCount: 0,
   candidateCount: 0,
   deduplicatedCandidateCount: 0,
+  minimumCandidateCount: 0,
+  maximumCandidateCount: 0,
+  scalarCandidateCount: 0,
+  channelCandidateCount: 0,
+  outerLaneCandidateCount: 0,
+  tinyLaneCandidateCount: 0,
+  obstacleLaneCandidateCount: 0,
+  endpointLaneCandidateCount: 0,
+  endpointOffsetCandidateCount: 0,
+  terminalBridgeCandidateCount: 0,
+  returnCandidateCount: 0,
   qualityEvaluationCount: 0,
   cacheHitCount: 0,
 });
@@ -155,9 +191,17 @@ function findBestLocalDoglegCandidate(
   let bestTinyInteriorSegments = currentTinyInteriorSegments;
   let bestQuality = currentQuality;
   const evaluatedCandidatePathKeys = new Set<string>();
-  const tryCandidate = (candidate: Point[] | null, options: { preserveEndpoints?: boolean } = {}) => {
+  const tryCandidate = (candidate: Point[] | null, options: {
+    family?: LocalDoglegCandidateFamily;
+    preserveEndpoints?: boolean;
+  } = {}) => {
     if (!candidate) return;
     candidateCount += 1;
+    if (diagnostics) {
+      diagnostics[
+        LOCAL_DOGLEG_CANDIDATE_FAMILY_METRIC_KEYS[options.family ?? 'scalar']
+      ] += 1;
+    }
     const preserveEndpoints = options.preserveEndpoints !== false;
     const snapshot = createLocalDoglegCandidateSnapshot(candidate);
     const normalized = snapshot.path;
@@ -299,7 +343,7 @@ function findBestLocalDoglegCandidate(
     targetRect,
     interactionContext.otherSegments,
   )) {
-    tryCandidate(candidate, { preserveEndpoints: false });
+    tryCandidate(candidate, { family: 'channel', preserveEndpoints: false });
   }
 
   for (let index = 1; index + 3 < path.length - 1; index += 1) {
@@ -313,7 +357,7 @@ function findBestLocalDoglegCandidate(
       obstacles,
       interactionContext.otherSegments,
     )) {
-      tryCandidate(candidate);
+      tryCandidate(candidate, { family: 'outerLane' });
     }
   }
   for (let index = 0; index + 3 < path.length; index += 1) {
@@ -323,8 +367,12 @@ function findBestLocalDoglegCandidate(
     tryCandidate(buildTinyInteriorBridgeCollapseCandidate(path, index));
     tryCandidate(buildTinyCornerBypassCandidate(path, index));
     tryCandidate(buildTinyCornerReadableLadderCandidate(path, index));
-    for (const candidate of buildTinyCornerLaneBypassCandidates(path, index)) tryCandidate(candidate);
-    for (const candidate of buildTinyCornerObstacleBypassCandidates(path, index, edge, obstacles)) tryCandidate(candidate);
+    for (const candidate of buildTinyCornerLaneBypassCandidates(path, index)) {
+      tryCandidate(candidate, { family: 'tinyLane' });
+    }
+    for (const candidate of buildTinyCornerObstacleBypassCandidates(path, index, edge, obstacles)) {
+      tryCandidate(candidate, { family: 'obstacleLane' });
+    }
     for (const candidate of buildEndpointTinyCornerLaneCandidates(
       path,
       index,
@@ -333,30 +381,48 @@ function findBestLocalDoglegCandidate(
       sourceRect,
       interactionContext.otherSegments,
     )) {
-      tryCandidate(candidate, { preserveEndpoints: false });
+      tryCandidate(candidate, { family: 'endpointLane', preserveEndpoints: false });
     }
-    for (const candidate of buildTinyLeadingBridgeWidenCandidates(path, index)) tryCandidate(candidate);
+    for (const candidate of buildTinyLeadingBridgeWidenCandidates(path, index)) {
+      tryCandidate(candidate, { family: 'tinyLane' });
+    }
   }
   for (let index = 0; index + 3 < path.length; index += 1) {
     for (const candidate of buildTinyEndpointOffsetCandidates(path, index, sourceRect, targetRect)) {
-      tryCandidate(candidate, { preserveEndpoints: false });
+      tryCandidate(candidate, { family: 'endpointOffset', preserveEndpoints: false });
     }
     for (const candidate of buildTinyTerminalBridgeCollapseCandidates(path, index, sourceRect, targetRect)) {
-      tryCandidate(candidate.path, { preserveEndpoints: candidate.preserveEndpoints });
+      tryCandidate(candidate.path, {
+        family: 'terminalBridge',
+        preserveEndpoints: candidate.preserveEndpoints,
+      });
     }
   }
   for (let index = 1; index + 4 < path.length - 1; index += 1) {
-    tryCandidate(buildReturnNotchCandidate(path, index));
-    tryCandidate(buildBroadReturnCandidate(path, index));
-    tryCandidate(buildOppositeReturnOffsetCandidate(path, index));
+    tryCandidate(buildReturnNotchCandidate(path, index), { family: 'returnShape' });
+    tryCandidate(buildBroadReturnCandidate(path, index), { family: 'returnShape' });
+    tryCandidate(buildOppositeReturnOffsetCandidate(path, index), { family: 'returnShape' });
   }
   for (let index = 0; index + 5 < path.length; index += 1) {
-    tryCandidate(buildNearReturnContinuationCollapseCandidate(path, index));
-    tryCandidate(buildFiveSegmentHairpinCollapseCandidate(path, index));
+    tryCandidate(buildNearReturnContinuationCollapseCandidate(path, index), {
+      family: 'returnShape',
+    });
+    tryCandidate(buildFiveSegmentHairpinCollapseCandidate(path, index), {
+      family: 'returnShape',
+    });
   }
 
   if (diagnostics) {
     diagnostics.candidateCount += candidateCount;
+    if (candidateCount > 0) {
+      diagnostics.minimumCandidateCount = diagnostics.minimumCandidateCount === 0
+        ? candidateCount
+        : Math.min(diagnostics.minimumCandidateCount, candidateCount);
+    }
+    diagnostics.maximumCandidateCount = Math.max(
+      diagnostics.maximumCandidateCount,
+      candidateCount,
+    );
     diagnostics.qualityEvaluationCount += qualityEvaluationCount;
   }
   return bestPath;

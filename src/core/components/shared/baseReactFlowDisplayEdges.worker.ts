@@ -80,6 +80,7 @@ import {
 } from './baseReactFlowDisplayWorkerFinalEvaluation';
 import { finalizeBaseReactFlowExactCommercialClearance, isCommercialClearanceOnlyFailure } from './baseReactFlowDisplayFinalCommercialClearanceTransaction';
 import { runDisplayWorkerLayoutRepairTransaction } from './baseReactFlowDisplayWorkerLayoutTransaction';
+import { selectHardCleanDisplayParallelLaneCandidate } from './baseReactFlowDisplayParallelLaneSeparation';
 
 const finalizeContainerClearanceResponse = (
   response: DisplayEdgesWorkerResponse,
@@ -331,8 +332,9 @@ const finalizeContainerClearanceResponse = (
     nodes: repairNodes,
     onPhaseTrace: options.onPhaseTrace,
   });
+  const parallelLaneSeparatedEdges = selectHardCleanDisplayParallelLaneCandidate(finalCommercialSafetyClosedEdges, repairNodes);
   const finalizedResponse = commitBaseReactFlowFinalCommercialSafety({
-    closedEdges: finalCommercialSafetyClosedEdges,
+    closedEdges: parallelLaneSeparatedEdges,
     eligibleEdgeIds: options.eligibleEdgeIds,
     evaluation: finalEvaluation,
     nodes,

@@ -44,6 +44,7 @@ import {
   repairDisplayObstacleHits,
   repairStrictBypassesIfNeeded,
 } from './baseReactFlowDisplayObstacleRepair';
+import { repairDisplayObstacleHitsWithTrace } from './baseReactFlowDisplayRenderObstacleRepair';
 import {
   DISPLAY_BOUNDED_DETACHED_OVERLAP_REPAIR_OPTIONS,
   DISPLAY_BOUNDED_RESIDUAL_OVERLAP_REPAIR_OPTIONS,
@@ -360,25 +361,15 @@ export const finishInteractiveDisplayEdgesForRenderMode = ({
     localCleaned === microCleaned ? 'skip' : 'accepted',
     countChangedRoutingItems(microCleaned, localCleaned),
   );
-  const obstacleTimer = onPhaseTrace
-    ? startDisplayRoutingPhaseTrace({
-        phase: 'seed-interactive-finish-obstacle',
-        candidateCount: localCleaned.length,
-        onTrace: onPhaseTrace,
-      })
-    : null;
-  const obstacleCleaned = repairDisplayObstacleHits(
-    localCleaned,
-    repairNodes,
+  const obstacleCleaned = repairDisplayObstacleHitsWithTrace({
+    edges: localCleaned,
+    nodes: repairNodes,
     layoutDirection,
-    deferOuterObstacleRepair
+    options: deferOuterObstacleRepair
       ? { ...DISPLAY_FINAL_OVERLAP_OBSTACLE_REPAIR_OPTIONS, skipOuterFallback: true }
       : DISPLAY_FINAL_OVERLAP_OBSTACLE_REPAIR_OPTIONS,
-  );
-  obstacleTimer?.finish(
-    obstacleCleaned === localCleaned ? 'skip' : 'accepted',
-    countChangedRoutingItems(localCleaned, obstacleCleaned),
-  );
+    onPhaseTrace,
+  });
   if (deferOuterObstacleRepair) {
     // Deferring outer routing must not omit the bounded local closure for a
     // crossing next to a bend. This preserves the interactive work budget.

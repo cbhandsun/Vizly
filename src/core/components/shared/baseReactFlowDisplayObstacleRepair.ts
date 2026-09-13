@@ -1,6 +1,9 @@
 import type { Edge, Node } from '@xyflow/react';
 
-import { repairDetachedStrictCrossingBypasses } from '../../strategies/shared/edgeDetachedStrictCrossingRepair';
+import {
+  repairDetachedStrictCrossingBypasses,
+  type DetachedStrictCrossingRepairDiagnostics,
+} from '../../strategies/shared/edgeDetachedStrictCrossingRepair';
 import { separateDetachedParallelOverlaps } from '../../strategies/shared/edgeDetachedOverlapRepair';
 import { repairDisplayMicroArtifacts } from '../../strategies/shared/edgeDisplayMicroCleanup';
 import { repairDisplaySoftQualityRisks } from '../../strategies/shared/edgeDisplaySoftQualityRepair';
@@ -37,6 +40,7 @@ import {
   obstacleRepairHardQualityIsAcceptable,
   obstacleRepairScore,
   type DisplayObstacleEvaluationContext,
+  type DisplayObstacleRepairDiagnostics,
   type DisplaySoftQualityOptions,
 } from './baseReactFlowDisplayEvaluation';
 import {
@@ -71,6 +75,16 @@ export type ResolvedDisplayObstacleRepairBudget = Readonly<{
   maxCandidatesPerEdge: number;
   maxQualityEvaluations: number;
 }>;
+
+export const createDisplayObstacleRepairDiagnostics = (): DisplayObstacleRepairDiagnostics => ({
+  generatedCandidateCount: 0,
+  scoredCandidateCount: 0,
+  evaluatedCandidateCount: 0,
+  quickAcceptedCount: 0,
+  processedEdgeCount: 0,
+  initialObstacleHits: 0,
+  finalObstacleHits: 0,
+});
 
 /** Keeps explicit bounded latency budgets as caps instead of graph-size floors. */
 export const resolveDisplayObstacleRepairBudget = (
@@ -263,7 +277,13 @@ export const repairDisplayObstacleHits = <T extends Edge[]>(
 ): T => {
   if (edges.length === 0 || nodes.length === 0) return edges;
   const hitContext = createDisplayObstacleHitContext(nodes);
-  if (hitContext.obstacles.size === 0 || hitContext.countEdgesUnrelated(edges, getDisplayComputedPath) === 0) {
+  const diagnostics = options.diagnostics;
+  const initialObstacleHits = hitContext.countEdgesUnrelated(edges, getDisplayComputedPath);
+  if (diagnostics) {
+    diagnostics.initialObstacleHits = initialObstacleHits;
+    diagnostics.finalObstacleHits = initialObstacleHits;
+  }
+  if (hitContext.obstacles.size === 0 || initialObstacleHits === 0) {
     return edges;
   }
   let current = edges;
@@ -307,11 +327,22 @@ export const repairDisplayObstacleHits = <T extends Edge[]>(
       const cached = candidatePools.get(edgeIndex);
       if (cached?.baseline === current && cached.pathKey === pathKey) return cached;
       const seenPaths = new Set<string>();
+      const skirtCandidateLimit = Math.max(128, maxCandidatesPerEdge * 4);
+      const skirtCandidates = buildObstacleSkirtCandidates(
+        path,
+        nodes,
+        edge,
+        current,
+        segmentsForCurrent(),
+        skirtCandidateLimit,
+      );
+      const outerCandidates = buildObstacleOuterEscapeCandidates(path, nodes, edge);
+      if (diagnostics) {
+        diagnostics.generatedCandidateCount += skirtCandidates.length + outerCandidates.length;
+      }
       const scored = [
-        ...buildObstacleSkirtCandidates(path, nodes, edge, current, segmentsForCurrent())
-          .map(candidate => ({ path: candidate, priority: 0 })),
-        ...buildObstacleOuterEscapeCandidates(path, nodes, edge)
-          .map(candidate => ({ path: candidate, priority: 1 })),
+        ...skirtCandidates.map(candidate => ({ path: candidate, priority: 0 })),
+        ...outerCandidates.map(candidate => ({ path: candidate, priority: 1 })),
       ]
         .map(candidate => ({
           path: compactOrthogonalPath(candidate.path),
@@ -334,6 +365,7 @@ export const repairDisplayObstacleHits = <T extends Edge[]>(
           hits: hitContext.countUnrelated(candidate.path, edge),
           length: displayPathLength(candidate.path),
         }));
+      if (diagnostics) diagnostics.scoredCandidateCount += scored.length;
       const pool = {
         baseline: current,
         pathKey,
@@ -406,6 +438,7 @@ export const repairDisplayObstacleHits = <T extends Edge[]>(
         const candidateObstacleHits = contexts.baselineObstacleHits - baselinePathHits + candidate.hits;
         if (candidateObstacleHits >= contexts.baselineObstacleHits) continue;
         current = candidateEdges;
+        if (diagnostics) diagnostics.quickAcceptedCount += 1;
         changed = true;
         break;
       }
@@ -430,6 +463,11 @@ export const repairDisplayObstacleHits = <T extends Edge[]>(
       let bestScore = obstacleRepairScore(baselineQuality, baselineObstacleHits);
 
       const candidatePool = getCandidatePool(entry.edgeIndex, edge, path);
+      const waypointCandidateLimit = Math.max(128, maxCandidatesPerEdge * 4);
+      const waypointCandidates = generateWaypointCandidates(path, layoutDirection, nodes, edge, {
+        includeNodeAwareLanes: true,
+      }).slice(1, waypointCandidateLimit + 1);
+      if (diagnostics) diagnostics.generatedCandidateCount += waypointCandidates.length;
       const rawCandidates: Array<{
         path: DisplayPoint[];
         priority: number;
@@ -437,11 +475,7 @@ export const repairDisplayObstacleHits = <T extends Edge[]>(
         length?: number;
       }> = [
         ...candidatePool.scored,
-        ...generateWaypointCandidates(path, layoutDirection, nodes, edge, {
-          includeNodeAwareLanes: true,
-        })
-          .slice(1)
-          .map(candidate => ({ path: candidate, priority: 2 })),
+        ...waypointCandidates.map(candidate => ({ path: candidate, priority: 2 })),
       ];
       const seenCandidatePaths = new Set<string>();
       const candidates = rawCandidates
@@ -474,6 +508,7 @@ export const repairDisplayObstacleHits = <T extends Edge[]>(
           || first.length - second.length
         ))
         .slice(0, maxCandidatesPerEdge);
+      if (diagnostics) diagnostics.scoredCandidateCount += candidates.length;
 
       for (const candidate of candidates) {
         if (qualityEvaluations >= maxQualityEvaluations) break;
@@ -487,6 +522,7 @@ export const repairDisplayObstacleHits = <T extends Edge[]>(
         if (candidateObstacleHits >= baselineObstacleHits) continue;
         const candidateQuality = qualityContext.evaluateChanged(candidateEdges, [entry.edgeIndex]);
         qualityEvaluations += 1;
+        if (diagnostics) diagnostics.evaluatedCandidateCount = qualityEvaluations;
         if (!obstacleRepairHardQualityIsAcceptable(baselineQuality, candidateQuality)) continue;
         const candidateScore = obstacleRepairScore(candidateQuality, candidateObstacleHits);
         if (
@@ -521,21 +557,36 @@ export const repairDisplayObstacleHits = <T extends Edge[]>(
         current = polished;
         changed = true;
         processed += 1;
+        if (diagnostics) diagnostics.processedEdgeCount += 1;
         if (contextsForCurrent().baselineObstacleHits === 0) break;
       }
     }
     if (!changed) break;
   }
 
-  return options.skipOuterFallback
-    ? current
-    : repairRemainingObstacleHitsWithOuterLanes(current, nodes, hitContext);
+  if (options.skipOuterFallback) {
+    if (diagnostics) {
+      diagnostics.evaluatedCandidateCount = qualityEvaluations;
+      diagnostics.finalObstacleHits = hitContext.countEdgesUnrelated(current, getDisplayComputedPath);
+    }
+    return current;
+  }
+  const repaired = repairRemainingObstacleHitsWithOuterLanes(current, nodes, hitContext);
+  if (diagnostics) {
+    diagnostics.evaluatedCandidateCount = qualityEvaluations;
+    diagnostics.finalObstacleHits = hitContext.countEdgesUnrelated(repaired, getDisplayComputedPath);
+  }
+  return repaired;
 };
 
-export const repairStrictBypassesIfNeeded = <T extends Edge[]>(edges: T, nodes: Node[]): T => (
+export const repairStrictBypassesIfNeeded = <T extends Edge[]>(
+  edges: T,
+  nodes: Node[],
+  diagnostics?: DetachedStrictCrossingRepairDiagnostics,
+): T => (
   countStrictEdgeCrossings(edges) === 0
     ? edges
-    : repairDetachedStrictCrossingBypasses(edges, nodes) as T
+    : repairDetachedStrictCrossingBypasses(edges, nodes, diagnostics) as T
 );
 
 export const finishDisplaySoftQuality = <T extends Edge[]>(

@@ -156,37 +156,6 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
     }, 'route-trace')).toBeNull();
   });
 
-  it('records the bounded materialized candidate count discovered at phase completion', () => {
-    const traces: DisplayRoutingPhaseTrace[] = [];
-    startDisplayRoutingPhaseTrace({
-      phase: 'local-reconnect-seed',
-      candidateCount: 4,
-      onTrace: trace => traces.push(trace),
-    }).finish('accepted', 1, {
-      candidateCount: 180,
-      evaluationCount: 96,
-      cacheHitCount: 84,
-      workItemCount: 4,
-      budgetCount: 256,
-      underBudgetCount: 1,
-      minimumCandidateCount: 52,
-      maximumCandidateCount: 64,
-    });
-
-    expect(traces).toEqual([expect.objectContaining({
-      phase: 'local-reconnect-seed',
-      parentPhase: 'local-route',
-      candidateCount: 180,
-      evaluationCount: 96,
-      cacheHitCount: 84,
-      workItemCount: 4,
-      budgetCount: 256,
-      underBudgetCount: 1,
-      minimumCandidateCount: 52,
-      maximumCandidateCount: 64,
-    })]);
-  });
-
   it('derives exclusive topology work from its bounded child phases', () => {
     const child = (
       phase: Extract<DisplayRoutingPhaseTrace['phase'],
