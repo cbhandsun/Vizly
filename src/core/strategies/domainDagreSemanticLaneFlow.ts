@@ -61,10 +61,11 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
     5000,
   );
   const crossGap = boundedDomainDagreNumber(requestedCrossGap, 120, 120, 5000);
-  const maxFlowBandGap = Math.min(
-    horizontal ? 96 : 64,
-    flowGap,
-  );
+  const MIN_RENDER_SAFE_ROUTE_ENDPOINT_STUB = 56;
+  const renderSafeObstacleGap = MIN_RENDER_SAFE_ROUTE_ENDPOINT_STUB + COMMERCIAL_BUSINESS_NODE_CLEARANCE;
+  const renderSafeFacingTerminalGap = MIN_RENDER_SAFE_ROUTE_ENDPOINT_STUB * 2 + 2;
+  const renderSafeRouteBandGap = Math.max(renderSafeObstacleGap, renderSafeFacingTerminalGap);
+  const maxFlowBandGap = Math.min(renderSafeRouteBandGap, flowGap);
   const leaves = nodes.filter(node => !isDomainDagreGroupNode(node) && !isDomainDagreNodeHidden(node));
   if (!leaves.length) return nodes;
   if (leaves.some(node => !Number.isFinite(node.position.x) || !Number.isFinite(node.position.y))) {
