@@ -26,6 +26,14 @@ const endpointTopologyDoesNotRegress = (before: Edge[], after: Edge[], nodes: No
     && preservesCommercialTrueTrunkMembership(baseline.legalSharedTrunks, candidate.legalSharedTrunks);
 };
 
+const createLockedComputedPathCommit = (repairNodes: Node[]): ((edges: Edge[]) => Edge[]) => {
+  let nodeById: Map<string, Node> | null = null;
+  return (edges: Edge[]): Edge[] => {
+    nodeById ??= new Map(repairNodes.map(node => [node.id, node]));
+    return lockFinalDisplayComputedPaths(edges, repairNodes, nodeById);
+  };
+};
+
 export const isCommercialClearanceOnlyFailure = (
   response: DisplayEdgesWorkerResponse,
 ): boolean => Boolean(
@@ -40,6 +48,7 @@ const finalizeExactCommercialDetours = ({
   exactBaseline,
   repairNodes,
   exactReport,
+  lockComputedPaths,
 }: Readonly<{
   exactBaseline: DisplayEdgesWorkerResponse;
   repairNodes: Node[];
@@ -47,6 +56,7 @@ const finalizeExactCommercialDetours = ({
     candidate: DisplayEdgesWorkerResponse,
     repairNodes: Node[],
   ) => DisplayEdgesWorkerResponse;
+  lockComputedPaths?: (edges: Edge[]) => Edge[];
 }>): DisplayEdgesWorkerResponse => {
   const baselineEdges = exactBaseline.edges;
   if (!exactBaseline.hardClean || !baselineEdges) return exactBaseline;
@@ -74,9 +84,10 @@ const finalizeExactCommercialDetours = ({
     changedEdgeIndexes.length === 0
     || repairedIssues.length > baselineIssues.length
   ) return exactBaseline;
+  const lockPaths = lockComputedPaths ?? createLockedComputedPathCommit(repairNodes);
   const repairedResponse = exactReport({
     ...exactBaseline,
-    edges: lockFinalDisplayComputedPaths(repairedEdges, repairNodes),
+    edges: lockPaths(repairedEdges),
   }, repairNodes);
   const qualityImproves = repairedIssues.length < baselineIssues.length || (
     repairedResponse.hardReport && exactBaseline.hardReport
@@ -107,9 +118,15 @@ const finalizeExactCommercialClearanceCandidate = ({
     repairNodes: Node[],
   ) => DisplayEdgesWorkerResponse;
 }>): DisplayEdgesWorkerResponse => {
+  const lockComputedPaths = createLockedComputedPathCommit(repairNodes);
   const commerciallyPolishedBaseline = !eligibleEdgeIds
     && exactBaseline.routeResolution !== 'incremental-route'
-    ? finalizeExactCommercialDetours({ exactBaseline, repairNodes, exactReport })
+    ? finalizeExactCommercialDetours({
+      exactBaseline,
+      repairNodes,
+      exactReport,
+      lockComputedPaths,
+    })
     : exactBaseline;
   if (commerciallyPolishedBaseline.hardClean) return commerciallyPolishedBaseline;
   const fullGraph = !eligibleEdgeIds && commerciallyPolishedBaseline.routeResolution !== 'incremental-route';
@@ -121,7 +138,7 @@ const finalizeExactCommercialClearanceCandidate = ({
     if (sharedCandidate !== baselineEdges) {
       const repaired = exactReport({
         ...commerciallyPolishedBaseline,
-        edges: lockFinalDisplayComputedPaths(sharedCandidate, repairNodes),
+        edges: lockComputedPaths(sharedCandidate),
       }, repairNodes);
       if (repaired.hardClean) return repaired;
     }
@@ -136,7 +153,7 @@ const finalizeExactCommercialClearanceCandidate = ({
       );
       const repaired = exactReport({
         ...commerciallyPolishedBaseline,
-        edges: lockFinalDisplayComputedPaths(closed, repairNodes),
+        edges: lockComputedPaths(closed),
       }, repairNodes);
       if (repaired.hardClean
         && countRenderUnsafeEndpointStubs(repaired.edges ?? []) <= countRenderUnsafeEndpointStubs(baselineEdges)
@@ -154,7 +171,7 @@ const finalizeExactCommercialClearanceCandidate = ({
     if (closed !== commerciallyPolishedBaseline.edges) {
       const repaired = exactReport({
         ...commerciallyPolishedBaseline,
-        edges: lockFinalDisplayComputedPaths(closed, repairNodes),
+        edges: lockComputedPaths(closed),
       }, repairNodes);
       if (repaired.hardClean) return repaired;
     }
@@ -169,8 +186,9 @@ export const finalizeBaseReactFlowExactCommercialClearance = (
   if (!response.hardClean || !response.edges) return response;
   const separated = repairDisplayDualTrunkJunctions(response.edges, args.repairNodes, args.eligibleEdgeIds);
   if (separated === response.edges) return response;
+  const lockComputedPaths = createLockedComputedPathCommit(args.repairNodes);
   const exact = (args.exactReport ?? withExactDisplayHardReport)({
-    ...response, edges: lockFinalDisplayComputedPaths(separated, args.repairNodes),
+    ...response, edges: lockComputedPaths(separated),
   }, args.repairNodes);
   return exact.hardClean ? exact : response;
 };
