@@ -27,7 +27,8 @@ describe('precompiled display route layout capture', () => {
     const session = {
       evaluate: vi.fn()
         .mockResolvedValueOnce(true)
-        .mockResolvedValueOnce({ x: 10, y: 20, clickedAt: 1234 }),
+        .mockResolvedValueOnce({ x: 10, y: 20, clickedAt: 1234 })
+        .mockResolvedValueOnce({ appliedKey: 'domain-lanes-lr' }),
       send: vi.fn(),
     };
     const wait = vi.fn();
@@ -66,7 +67,8 @@ describe('precompiled display route layout capture', () => {
         .mockResolvedValueOnce(true)
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce({ x: 10, y: 20 })
-        .mockResolvedValueOnce({ x: 30, y: 40, clickedAt: 5678 }),
+        .mockResolvedValueOnce({ x: 30, y: 40, clickedAt: 5678 })
+        .mockResolvedValueOnce({ appliedKey: 'domain-lanes-lr' }),
       send: vi.fn(),
     };
     const wait = vi.fn();
@@ -95,5 +97,40 @@ describe('precompiled display route layout capture', () => {
       '../unsafe',
       wait,
     )).rejects.toThrow(/Unknown precompiled layout variant/);
+  });
+
+  it('waits through transient toolbar selection before accepting a layout variant', async () => {
+    const session = {
+      evaluate: vi.fn()
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce({ x: 10, y: 20, clickedAt: 1234 })
+        .mockResolvedValueOnce({ appliedKey: 'domain-dagre-lr' })
+        .mockResolvedValueOnce({ appliedKey: 'domain-lanes-lr' }),
+      send: vi.fn(),
+    };
+    const wait = vi.fn();
+
+    await expect(clickPrecompiledDisplayRouteLayoutVariant(
+      session,
+      'domain-lanes-lr',
+      wait,
+    )).resolves.toBe(1234);
+    expect(wait).toHaveBeenCalledWith(250);
+  });
+
+  it('fails when a clicked layout variant keeps a different toolbar selection', async () => {
+    const session = {
+      evaluate: vi.fn()
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce({ x: 10, y: 20, clickedAt: 1234 })
+        .mockResolvedValue({ appliedKey: 'domain-dagre-lr' }),
+      send: vi.fn(),
+    };
+
+    await expect(clickPrecompiledDisplayRouteLayoutVariant(
+      session,
+      'domain-lanes-lr',
+      vi.fn(),
+    )).rejects.toThrow(/committed a different layout than requested/);
   });
 });

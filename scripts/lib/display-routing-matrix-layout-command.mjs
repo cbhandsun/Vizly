@@ -96,7 +96,16 @@ export const clickLayout = async (session, layoutCase, wait = delay) => {
   return clicked;
 };
 
-export const assertRequestedLayoutSelected = async (session, caseId) => {
+export const assertRequestedLayoutSelected = async (
+  session,
+  caseId,
+  {
+    attempts = 20,
+    failFastRecognizedMismatch = true,
+    waitMs = 50,
+    wait = delay,
+  } = {},
+) => {
   // Other legacy engines still have intentional topology fallbacks. Explicit
   // standard, swimlane, and compound commands must preserve the requested
   // arrangement so the initial preset layout remains replayable from the UI.
@@ -113,7 +122,7 @@ export const assertRequestedLayoutSelected = async (session, caseId) => {
   )) ? value : 'unrecognized';
   const requested = knownSelectionKey(caseId);
   let applied = 'unrecognized';
-  for (let attempt = 0; attempt < 20; attempt += 1) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
     const selection = await session.evaluate(`(() => ({
       requested: window.__vizlyRequestedLayoutLabel,
       applied: Array.from(document.querySelectorAll('button'))
@@ -127,18 +136,18 @@ export const assertRequestedLayoutSelected = async (session, caseId) => {
     applied = appliedKey === 'unrecognized' ? knownSelection(selection?.applied) : appliedKey;
     if (appliedKey !== 'unrecognized') {
       if (requested === applied) return;
-      break;
+      if (failFastRecognizedMismatch) break;
     }
     if (applied !== 'unrecognized') {
       if (requested === applied) return;
-      break;
+      if (failFastRecognizedMismatch) break;
     }
     if (displayRoutingLayoutSelectionMatches(selection?.requested, selection?.applied)) {
       return;
     }
     // The toolbar may render before its stable key and translated status text
     // settle after a page switch. Only recognized mismatches fail immediately.
-    await delay(50);
+    await wait(waitMs);
   }
   throw new Error(`${caseId} committed a different layout than requested`
     + ` (requested=${requested}, applied=${applied})`);
