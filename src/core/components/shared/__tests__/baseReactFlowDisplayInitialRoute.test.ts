@@ -152,6 +152,32 @@ describe('initial obstacle-aware display routing', () => {
       .toMatchObject({ attached: true, anchored: true });
   });
 
+  it('uses bend clarity, not only length savings, to flatten clear generated same-axis seeds', () => {
+    const nodes = [node('source', 0, 0), node('target', 130, 0)];
+    const generatedSmallDogleg: Edge = {
+      ...edge,
+      sourceHandle: 'right',
+      targetHandle: 'left',
+      data: {
+        algorithm: 'domain-dagre-interactive',
+        runtimeHandleLock: { source: true, target: true },
+        layoutPathLocked: true,
+        computedPath: [
+          { x: 100, y: 30 },
+          { x: 110, y: 30 },
+          { x: 110, y: 36 },
+          { x: 130, y: 36 },
+          { x: 130, y: 30 },
+        ],
+      },
+    };
+
+    const [routed] = seedObstacleAwareDisplayRoutes([generatedSmallDogleg], nodes);
+
+    expect(routed).toMatchObject({ sourceHandle: 'right', targetHandle: 'left' });
+    expect(getDisplayComputedPath(routed)).toEqual([{ x: 100, y: 30 }, { x: 130, y: 30 }]);
+  });
+
   it('does not simplify generated same-axis detours through blocked or authored corridors', () => {
     const blocker = node('blocker', 180, 0);
     const nodes = [node('source', 0, 0), node('target', 420, 0), blocker];

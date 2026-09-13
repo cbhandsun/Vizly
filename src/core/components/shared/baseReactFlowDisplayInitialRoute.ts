@@ -69,6 +69,24 @@ const pathLength = (path: readonly { x: number; y: number }[]): number => (
   ), 0)
 );
 
+const pathTurnCount = (path: readonly { x: number; y: number }[]): number => {
+  let previousAxis: 'h' | 'v' | null = null;
+  let turns = 0;
+  for (let index = 1; index < path.length; index += 1) {
+    const previous = path[index - 1];
+    const current = path[index];
+    const axis = Math.abs(previous.y - current.y) <= 0.5
+      ? 'h'
+      : Math.abs(previous.x - current.x) <= 0.5
+        ? 'v'
+        : null;
+    if (!axis) continue;
+    if (previousAxis && previousAxis !== axis) turns += 1;
+    previousAxis = axis;
+  }
+  return turns;
+};
+
 const clearFacingAxisRouteIsAvailable = (
   edge: Edge,
   source: NodeRect,
@@ -106,8 +124,13 @@ const clearFacingAxisRouteIsAvailable = (
     || !edgeTerminalSideCanSwitch(edge, 'target', targetSide)
   ) return false;
   const baselineLength = pathLength(baselinePath);
+  const baselineTurns = pathTurnCount(compactOrthogonalPath([...baselinePath]));
   return corridorCandidates(source, target, sourceSide, targetSide, [], []).some((candidate) => {
-    if (baselineLength - pathLength(candidate) < MIN_CLEAR_FACING_REBUILD_SAVINGS) return false;
+    const candidateLength = pathLength(candidate);
+    const candidateTurns = pathTurnCount(candidate);
+    const hasMeaningfulLengthGain = baselineLength - candidateLength >= MIN_CLEAR_FACING_REBUILD_SAVINGS;
+    const hasMeaningfulClarityGain = candidateTurns + 1 < baselineTurns;
+    if (!hasMeaningfulLengthGain && !hasMeaningfulClarityGain) return false;
     for (let index = 0; index < candidate.length - 1; index += 1) {
       const segment = { a: candidate[index], b: candidate[index + 1] };
       if ([source, target].some(rect => segmentIntersectsClearanceRect(segment, rect, 0))) {
