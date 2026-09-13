@@ -53,7 +53,7 @@ describe('edgeLocalDoglegRepair', () => {
     ]);
   });
 
-  it('keeps a short return notch when it routes around an unrelated node', () => {
+  it('moves a short return notch to a clearer lane when the direct route is blocked', () => {
     const nodes: Node[] = [
       ...baseNodes,
       { id: 'blocker', position: { x: 88, y: -18 }, data: {}, measured: { width: 28, height: 36 } },
@@ -80,8 +80,15 @@ describe('edgeLocalDoglegRepair', () => {
 
     const [repaired] = repairLocalDoglegArtifacts(edges, nodes);
 
-    expect((repaired.data as any).computedPath).toEqual(computedPath);
-    expect((repaired.data as any).localDoglegRepaired).toBeUndefined();
+    expect((repaired.data as any).computedPath).toEqual([
+      { x: 0, y: 0 },
+      { x: 80, y: 0 },
+      { x: 80, y: -54 },
+      { x: 124, y: -54 },
+      { x: 124, y: 0 },
+      { x: 200, y: 0 },
+    ]);
+    expect((repaired.data as any).localDoglegRepaired).toBe(true);
   });
 
   it('keeps endpoint-adjacent notches so endpoint stubs remain visible', () => {

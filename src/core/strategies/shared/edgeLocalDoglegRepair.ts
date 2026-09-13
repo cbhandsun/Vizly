@@ -70,6 +70,7 @@ import {
 } from './edgeWaypointCandidateRepair';
 
 type LocalDoglegObstacleContext = EdgeObstacleInteractionContext & {
+  commercialClearanceRisk: (path: Point[]) => number;
   preservesClearance: (baseline: Point[], candidate: Point[]) => boolean;
 };
 
@@ -187,6 +188,7 @@ function findBestLocalDoglegCandidate(
   let bestObstacleHits = currentObstacleHits;
   let bestTerminalStubScore = terminalStubScore(path);
   let bestVisualNoise = localVisualNoise(path);
+  let bestCommercialClearanceRisk = obstacleContext.commercialClearanceRisk(path);
   const currentTinyInteriorSegments = countTinyInteriorSegments(path);
   let bestTinyInteriorSegments = currentTinyInteriorSegments;
   let bestQuality = currentQuality;
@@ -229,6 +231,7 @@ function findBestLocalDoglegCandidate(
     const parallelOverlap = interactionContext.countParallelOverlap(snapshot.segments);
     const stubScore = terminalStubScore(normalized);
     const visualNoise = localVisualNoise(normalized);
+    const commercialClearanceRisk = obstacleContext.commercialClearanceRisk(normalized);
     const tinyInteriorSegments = countTinyInteriorSegments(normalized);
     const fewerCrossings = crossings < bestCrossings;
     const fewerParallelOverlap = parallelOverlap < bestParallelOverlap;
@@ -248,6 +251,9 @@ function findBestLocalDoglegCandidate(
     const betterTerminalStub = bestTerminalStubScore < MIN_TERMINAL_STUB
       && stubScore > bestTerminalStubScore + MIN_LENGTH_SAVING
       && length <= bestLength + MAX_TERMINAL_STUB_LENGTH_PENALTY;
+    const betterCommercialClearance = commercialClearanceRisk < bestCommercialClearanceRisk - 1
+      && bends <= bestBends + 2
+      && length <= bestLength + MAX_VISUAL_POLISH_LENGTH_PENALTY;
     if (
       !fewerCrossings
       && !fewerParallelOverlap
@@ -258,6 +264,7 @@ function findBestLocalDoglegCandidate(
       && !hardTinyCleanup
       && !fewerTinyDoglegs
       && !betterTerminalStub
+      && !betterCommercialClearance
     ) return;
     // Obstacle intersection uses an 8px envelope. A shorter, intersection-free
     // lane must also preserve the separate hard and commercial clearances.
@@ -314,6 +321,7 @@ function findBestLocalDoglegCandidate(
       && !hardTinyCleanup
       && !fewerTinyDoglegs
       && !betterTerminalStub
+      && !betterCommercialClearance
     ) return;
 
     bestPath = normalized;
@@ -324,6 +332,7 @@ function findBestLocalDoglegCandidate(
     bestObstacleHits = obstacleHits;
     bestTerminalStubScore = stubScore;
     bestVisualNoise = visualNoise;
+    bestCommercialClearanceRisk = commercialClearanceRisk;
     bestTinyInteriorSegments = tinyInteriorSegments;
     bestQuality = candidateQuality;
     // Candidate acceptance changes the comparison baseline. Keep deduplication
@@ -686,6 +695,9 @@ export function repairLocalDoglegArtifacts(
     const initialClearance = scoreClearance(getEdgePath(edge));
     const obstacleContext: LocalDoglegObstacleContext = {
       ...createEdgeObstacleInteractionContext(edge, obstacles),
+      commercialClearanceRisk(candidate) {
+        return scoreClearance(candidate)[1];
+      },
       preservesClearance(baseline, candidate) {
         const before = scoreClearance(baseline);
         const after = scoreClearance(candidate);
