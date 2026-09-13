@@ -625,11 +625,11 @@ export const repairBaseReactFlowFinalSafetyClosure = <T extends Edge[]>(
   // It may accept a direct 56px render preference, but must not launch another
   // graph-wide crossing repair for geometry that already meets the formal 48px
   // hard minimum.
-  const allowStrictStubFallback = options.traceParentPhase
-    !== 'final-commercial-safety-closure';
-  const renderSafe = repairFinalSafetyRenderSafeEndpointStubs(
-    microClosed, nodes, options.evaluation, allowStrictStubFallback,
-  );
+  const allowStrictStubFallback = options.traceParentPhase !== 'final-commercial-safety-closure';
+  const microClosedUnsafeEndpointStubs = countUnsafeEndpointStubs(microClosed);
+  const renderSafe = microClosedUnsafeEndpointStubs === 0
+    ? microClosed
+    : repairFinalSafetyRenderSafeEndpointStubs(microClosed, nodes, options.evaluation, allowStrictStubFallback);
   if (
     !sameEdgeReferences(microClosed, renderSafe)
     && candidateIsAccepted(renderSafe)
@@ -639,7 +639,7 @@ export const repairBaseReactFlowFinalSafetyClosure = <T extends Edge[]>(
   }
   stubStage.finish(
     sameEdgeReferences(microClosed, renderSafe) ? 'skip' : 'fallback',
-    1,
+    microClosedUnsafeEndpointStubs === 0 ? 0 : 1,
     renderSafe,
   );
 
@@ -671,12 +671,13 @@ export const repairBaseReactFlowFinalSafetyClosure = <T extends Edge[]>(
   );
   const orderFinishStage = startRepairStage('final-safety-repair-order-finish');
   const orderedMicroClosed = repairDisplayMicroArtifacts(orderedStrictClosed);
-  const orderedRenderSafe = repairFinalSafetyRenderSafeEndpointStubs(
-    orderedMicroClosed, nodes, options.evaluation, allowStrictStubFallback,
-  );
+  const orderedMicroClosedUnsafeEndpointStubs = countUnsafeEndpointStubs(orderedMicroClosed);
+  const orderedRenderSafe = orderedMicroClosedUnsafeEndpointStubs === 0
+    ? orderedMicroClosed
+    : repairFinalSafetyRenderSafeEndpointStubs(orderedMicroClosed, nodes, options.evaluation, allowStrictStubFallback);
   orderFinishStage.finish(
     sameEdgeReferences(orderedStrictClosed, orderedRenderSafe) ? 'skip' : 'accepted',
-    1,
+    orderedMicroClosedUnsafeEndpointStubs === 0 ? 0 : 1,
     orderedRenderSafe,
   );
   const terminalStage = startRepairStage('final-safety-repair-terminal');
