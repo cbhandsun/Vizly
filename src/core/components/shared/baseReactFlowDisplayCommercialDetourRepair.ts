@@ -45,7 +45,10 @@ import { withDisplayLocalShortcutSoftCrossingBridge } from './baseReactFlowDispl
 import { repairAxisMismatchedTerminalsWithBoundedPortRoles } from './baseReactFlowDisplayTerminalPortRepair';
 import { preservesCommercialTrueTrunkMembership } from './baseReactFlowDisplayTrueTrunkContract';
 import { repairTerminalPreservingOuterStairs } from './baseReactFlowDisplayCommercialOuterStairRepair';
-import { startDisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
+import {
+  countChangedRoutingItems,
+  startDisplayRoutingPhaseTrace,
+} from './baseReactFlowDisplayRoutingTrace';
 
 const FINAL_COMMERCIAL_DETOUR_QUALITY_BUDGET = 128;
 const FINAL_COMMERCIAL_DETOUR_PASSES = 1;
@@ -457,8 +460,13 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
       candidateCount: candidateEdges.length,
       onTrace: options.onPhaseTrace,
     });
+    const phaseMetricsBefore = evaluation.readMetrics();
     const repaired = repair(candidateEdges);
-    timer.finish(repaired === candidateEdges ? 'skip' : 'accepted');
+    timer.finish(
+      repaired === candidateEdges ? 'skip' : 'accepted',
+      countChangedRoutingItems(candidateEdges, repaired),
+      diffBaseReactFlowEvaluationMetrics(phaseMetricsBefore, evaluation.readMetrics()),
+    );
     return repaired;
   };
   const preserveOuterStairs = (candidateEdges: T): T => runCommercialPhase(
