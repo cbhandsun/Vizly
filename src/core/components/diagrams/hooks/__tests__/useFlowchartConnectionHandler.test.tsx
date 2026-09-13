@@ -1,3 +1,4 @@
+/** @vitest-environment jsdom */
 import type { Dispatch, SetStateAction } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 import { renderHook } from '@testing-library/react';

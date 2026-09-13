@@ -1,3 +1,4 @@
+/** @vitest-environment jsdom */
 import type { Connection, Edge, Node } from '@xyflow/react';
 import { renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
