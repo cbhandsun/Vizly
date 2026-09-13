@@ -419,17 +419,18 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
         true,
       ),
     }) as T;
-    const commerciallyUnsafeEdgeIds = new Set(regularCandidate.flatMap(edge => (
-      (!options.eligibleEdgeIds || options.eligibleEdgeIds.has(edge.id))
-        && scoreNodeClearanceRisk(
+    const commerciallyUnsafeEdgeIds = new Set<string>();
+    const clearanceEvaluation = evaluation.businessNodeClearanceGeometry.clearance;
+    for (const edge of regularCandidate) {
+      if (
+        (!options.eligibleEdgeIds || options.eligibleEdgeIds.has(edge.id))
+        && clearanceEvaluation.score(
           getEdgePath(edge),
-          nodes,
           edge,
           COMMERCIAL_BUSINESS_NODE_CLEARANCE,
         ) > 0.5
-        ? [edge.id]
-        : []
-    )));
+      ) commerciallyUnsafeEdgeIds.add(edge.id);
+    }
     if (commerciallyUnsafeEdgeIds.size === 0) return regularCandidate;
 
     return repairBusinessNodeClearanceRisks(regularCandidate, nodes, {
