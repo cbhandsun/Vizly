@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, open, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { projectDisplayRoutingEditStability } from './display-routing-edit-stability.mjs';
+import { projectDisplayRoutingContractSummary } from './display-routing-browser-result.mjs';
 import { projectPrecompiledRouteLongTasks } from './precompiled-display-route-long-tasks.mjs';
 import { projectPrecompiledWorkerExecution } from './precompiled-display-route-worker-execution.mjs';
 import { projectRoutingWaitFailureEvidence } from './display-routing-wait-failure-evidence.mjs';
@@ -148,6 +149,7 @@ export const projectRoutingJournalSample = (kind, sample) => {
         editStability: projectDisplayRoutingEditStability(item?.editStability),
         mainThreadLongTasks: projectPrecompiledRouteLongTasks(item?.mainThreadLongTasks),
         workerExecution: projectPrecompiledWorkerExecution(item?.workerExecution),
+        routingContract: projectDisplayRoutingContractSummary(item?.routingContract),
         workerTimings: item?.workerTimings == null ? null : fields(item.workerTimings,
           ['prewarmLeadMs', 'requestPreparationMs', 'firstResponseMs', 'workerDeliveryOverheadMs',
             'workerMonotonicDeliveryOverheadMs', 'responseParseMs', 'responseApplyMs']),

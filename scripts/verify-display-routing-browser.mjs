@@ -82,7 +82,6 @@ if (INTERACTION_ONLY && COLLECT_PERFORMANCE_SAMPLES) {
   throw new Error('--interaction-only cannot collect incremental-route performance samples');
 }
 
-
 const initialReadyExpression = `(() => {
   const replayResponseEdges = ${replayDisplayRoutingResponseEdges.toString()};
   const selectAuditRoute = ${selectDisplayRoutingAuditRoute.toString()};
@@ -119,6 +118,7 @@ const initialReadyExpression = `(() => {
       finalAppliedAt: routing.finalAppliedAt,
       totalRouteMs: routing.totalRouteMs,
       workerDurationMs: response.workerDurationMs,
+      routingContract: response.routingContract,
       phaseTrace: routing.phaseTrace,
     }
     : null;
@@ -297,6 +297,7 @@ const finalIncrementalExpression = nodeId => `(() => {
       routeResolution: response.routeResolution,
       affectedEdgeCount: response.affectedEdgeCount,
       fallbackLevel: response.fallbackLevel,
+      routingContract: response.routingContract,
       phaseTrace: response.phaseTrace,
       edgeCount: Array.isArray(response.edges)
         ? response.edges.length
@@ -795,5 +796,4 @@ const main = async () => {
   }
   return machineResult;
 };
-
 await main();

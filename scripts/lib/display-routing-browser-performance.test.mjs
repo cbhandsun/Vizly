@@ -637,6 +637,13 @@ describe('display routing browser performance budget', () => {
         finalAppliedAt: 1_050,
         totalRouteMs: 50,
         workerDurationMs: 20,
+        routingContract: {
+          clean: true,
+          hardClean: true,
+          violationCount: 0,
+          violations: [],
+          privatePath: 'discarded',
+        },
         phaseTrace: [{
           phase: 'candidate-validation',
           durationMs: 20,
@@ -703,6 +710,18 @@ describe('display routing browser performance budget', () => {
           affectedEdgeCount: 4,
           fallbackLevel: 'none',
           workerDurationMs: 35,
+          routingContract: {
+            clean: false,
+            hardClean: true,
+            violationCount: 1,
+            violations: [{
+              code: 'commercial-clearance',
+              phase: 'clearance',
+              severity: 'commercial',
+              count: 1,
+              privateEdgeIds: ['private-edge'],
+            }],
+          },
           phaseTrace: [{ phase: 'local-route', durationMs: 30 }],
         },
       },
@@ -726,6 +745,12 @@ describe('display routing browser performance budget', () => {
         workerBoundaryParseMs: 4,
         parsedToFinalMs: 4,
         totalRouteMs: 50,
+        routingContract: {
+          clean: true,
+          hardClean: true,
+          violationCount: 0,
+          violations: [],
+        },
         phaseTrace: [{
           phase: 'candidate-validation',
           parentPhase: null,
@@ -765,6 +790,17 @@ describe('display routing browser performance budget', () => {
         fallbackLevel: 'none',
         workerStartCount: 1,
         workerAbortCount: 0,
+        routingContract: {
+          clean: false,
+          hardClean: true,
+          violationCount: 1,
+          violations: [{
+            code: 'commercial-clearance',
+            phase: 'clearance',
+            severity: 'commercial',
+            count: 1,
+          }],
+        },
         driftProbe: {
           initial: {
             operation: 'validate-or-route',

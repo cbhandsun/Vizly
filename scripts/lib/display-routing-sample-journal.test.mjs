@@ -24,7 +24,11 @@ afterEach(async () => {
   for (const directory of directories.splice(0)) await rm(directory, { recursive: true, force: true });
 });
 const sample = { presets: [{ presetId: 'logistics-architecture-v1', routeMs: 10,
-  workerDurationMs: 8, workerResolution: 'full-route' }] };
+  workerDurationMs: 8, workerResolution: 'full-route',
+  routingContract: { clean: false, hardClean: true, violationCount: 1,
+    violations: [{ code: 'commercial-clearance', phase: 'clearance',
+      severity: 'commercial', count: 1, privateEdgeIds: ['private-edge'] }],
+    privatePath: 'private-path' } }] };
 const records = async directory => {
   const runs = await readdir(directory);
   return Promise.all(runs.map(async run => (await readFile(join(directory, run, 'samples.jsonl'), 'utf8'))
@@ -175,6 +179,8 @@ describe('routing sample journal', () => {
       postReadyDispatchMs: 2, executionMs: 3, responseDeliveryMs: 4, readyAt: 'private' };
     const projected = projectRoutingJournalSample('cold', { presets: [{ ...sample.presets[0], workerExecution }] });
     expect(projected.presets[0].workerExecution).toMatchObject({ status: 'available', postReadyDispatchMs: 2 });
+    expect(projected.presets[0].routingContract).toEqual({ clean: false, hardClean: true, violationCount: 1,
+      violations: [{ code: 'commercial-clearance', phase: 'clearance', severity: 'commercial', count: 1 }] });
     expect(JSON.stringify(projected)).not.toMatch(/private|readyAt/);
     expect(projectRoutingJournalSample('cold', sample).presets[0].workerExecution).toEqual({ status: 'unavailable' });
   });

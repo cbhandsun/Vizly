@@ -4,6 +4,33 @@ const finiteMetric = value => Number.isFinite(value) && value >= 0 ? value : nul
 const safeProbeDigest = value => (
   typeof value === 'string' && /^probe-v1:[0-9a-f]{32}$/.test(value) ? value : null
 );
+const routingContractCodes = new Set([
+  'terminal-detached',
+  'terminal-unanchored',
+  'non-orthogonal-segment',
+  'obstacle-hit',
+  'strict-crossing',
+  'reverse-overlap',
+  'unrelated-overlap',
+  'unexplained-related-overlap',
+  'short-endpoint-stub',
+  'tiny-interior-dogleg',
+  'hairpin',
+  'minimum-clearance',
+  'commercial-clearance',
+  'render-unsafe-endpoint-stub',
+  'endpoint-order',
+  'passage-order',
+]);
+const routingContractPhases = new Set([
+  'terminal',
+  'geometry',
+  'clearance',
+  'endpoint-order',
+  'passage-order',
+  'presentation',
+]);
+const routingContractSeverities = new Set(['hard', 'commercial', 'presentation']);
 
 const projectDriftProbeSide = value => {
   if (!value || value.schema !== 'routing-drift-v1') return null;
@@ -118,6 +145,43 @@ const projectPhaseTrace = value => Array.isArray(value) ? value.slice(0, 128).fl
   }];
 }) : [];
 
+export const projectDisplayRoutingContractSummary = value => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const violationCount = Number.isSafeInteger(value.violationCount)
+    && value.violationCount >= 0
+    && value.violationCount <= 160_000
+    ? value.violationCount
+    : null;
+  const violations = Array.isArray(value.violations)
+    ? value.violations.slice(0, routingContractCodes.size).flatMap((violation) => {
+      if (!violation || typeof violation !== 'object' || Array.isArray(violation)) return [];
+      const count = Number.isSafeInteger(violation.count)
+        && violation.count > 0
+        && violation.count <= 160_000
+        ? violation.count
+        : null;
+      if (
+        !routingContractCodes.has(violation.code)
+        || !routingContractPhases.has(violation.phase)
+        || !routingContractSeverities.has(violation.severity)
+        || count === null
+      ) return [];
+      return [{
+        code: violation.code,
+        phase: violation.phase,
+        severity: violation.severity,
+        count,
+      }];
+    })
+    : [];
+  return {
+    clean: typeof value.clean === 'boolean' ? value.clean : null,
+    hardClean: typeof value.hardClean === 'boolean' ? value.hardClean : null,
+    violationCount,
+    violations,
+  };
+};
+
 export const buildDisplayRoutingMachineResult = (results, benchmarkValue = null) => ({
   benchmark: {
     sampleIndex: Number.isSafeInteger(benchmarkValue?.sampleIndex)
@@ -170,6 +234,7 @@ export const buildDisplayRoutingMachineResult = (results, benchmarkValue = null)
       ? Math.max(0, result.initial.finalAppliedAt - result.initial.workerResponseParsedAt)
       : null,
     totalRouteMs: finiteMetric(result?.initial?.totalRouteMs),
+    routingContract: projectDisplayRoutingContractSummary(result?.initial?.routingContract),
     phaseTrace: projectPhaseTrace(result?.initial?.phaseTrace),
   })) : [],
   dragCases: Array.isArray(results) ? results.map((result) => {
@@ -194,6 +259,9 @@ export const buildDisplayRoutingMachineResult = (results, benchmarkValue = null)
       fallbackLevel: result?.incremental?.response?.fallbackLevel === 'none' ? 'none' : 'full',
       workerStartCount: finiteMetric(result?.incremental?.routing?.workerStartCountDelta),
       workerAbortCount: finiteMetric(result?.incremental?.routing?.workerAbortCountDelta),
+      routingContract: projectDisplayRoutingContractSummary(
+        result?.incremental?.response?.routingContract,
+      ),
       driftProbe: projectDriftProbe(result?.incremental?.driftProbe),
       editStability: projectDisplayRoutingEditStability(result?.editStability),
       phaseTrace: projectPhaseTrace(result?.incremental?.response?.phaseTrace),
