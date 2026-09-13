@@ -9,6 +9,8 @@ import {
 } from '../../strategies/shared/edgeEndpointLaneNudgeRepair';
 import { repairEndpointOrthogonalPaths } from '../../strategies/shared/edgeEndpointPathRepair';
 import { repairLocalDoglegArtifacts } from '../../strategies/shared/edgeLocalDoglegRepair';
+import { COMMERCIAL_BUSINESS_NODE_CLEARANCE } from '../../strategies/shared/edgeBusinessNodeClearanceRepair';
+import { createNodeClearanceGraphEvaluationContext } from '../../strategies/shared/edgeWaypointCandidateRepair';
 import {
   reduceEdgeCrossingsWithWaypoints,
   repairSharedTrunkAwareCrossings,
@@ -16,8 +18,10 @@ import {
 import { buildQualityInputSnapshot } from '../../strategies/shared/edgePathQualityInputSnapshot';
 import {
   chooseFewestStrictCrossings,
+  calculateEdgePathQualityScore,
   countStrictEdgeCrossings,
 } from '../../strategies/shared/edgeStrictCrossingGuard';
+import { compareEdgePathQualityScores } from '../../strategies/shared/edgePathQualityGeometry';
 import {
   repairSharedTargetEntryCrossings,
   synthesizeSharedEndpointTrunks,
@@ -43,6 +47,27 @@ import {
 } from './baseReactFlowDisplayRoutingTrace';
 
 type QualitySeedCandidateChooser<T extends Edge[]> = (...candidates: T[]) => T;
+const QUALITY_SEED_HARD_KEYS = [
+  'nonOrthogonalSegments',
+  'strictCrossings',
+  'reverseOverlap',
+  'unrelatedOverlap',
+  'unexplainedRelatedOverlap',
+  'shortEndpointStubs',
+  'tinyInteriorDoglegs',
+  'hairpins',
+] as const;
+
+const compareQualitySeedHardScores = (
+  first: ReturnType<typeof calculateEdgePathQualityScore>,
+  second: ReturnType<typeof calculateEdgePathQualityScore>,
+): number => {
+  for (const key of QUALITY_SEED_HARD_KEYS) {
+    const delta = first[key] - second[key];
+    if (delta !== 0) return delta;
+  }
+  return 0;
+};
 
 export const chooseDistinctQualitySeedCandidate = <T extends Edge[]>(
   candidates: readonly T[],
@@ -66,15 +91,45 @@ export const chooseObstacleSafeQualitySeedCandidate = (
 ): Edge[] => {
   if (candidates.length === 0) return [];
   const context = createDisplayObstacleHitContext(nodes);
+  const clearance = createNodeClearanceGraphEvaluationContext(nodes);
   const scored = candidates.map(edges => ({
     edges,
     hits: edges.reduce((count, edge) => (
       count + context.countRouting(getDisplayComputedPath(edge), edge)
     ), 0),
+    clearanceRisk: edges.reduce((risk, edge) => (
+      risk + clearance.score(getDisplayComputedPath(edge), edge, COMMERCIAL_BUSINESS_NODE_CLEARANCE)
+    ), 0),
   }));
   const minimumHits = Math.min(...scored.map(candidate => candidate.hits));
-  return chooseFewestStrictCrossings(...scored
-    .filter(candidate => candidate.hits === minimumHits)
+  const hitFinalists = scored.filter(candidate => candidate.hits === minimumHits);
+  const qualityFinalists = hitFinalists.map(candidate => ({
+    ...candidate,
+    quality: calculateEdgePathQualityScore(candidate.edges),
+  }));
+  let best = qualityFinalists[0];
+  for (let index = 1; index < qualityFinalists.length; index += 1) {
+    const candidate = qualityFinalists[index];
+    const hardQualityDelta = compareQualitySeedHardScores(candidate.quality, best.quality);
+    const clearanceDelta = candidate.clearanceRisk - best.clearanceRisk;
+    const readabilityDelta = compareEdgePathQualityScores(candidate.quality, best.quality);
+    if (
+      hardQualityDelta < 0
+      || (
+        hardQualityDelta === 0
+        && (
+          clearanceDelta < -0.5
+          || (Math.abs(clearanceDelta) <= 0.5 && readabilityDelta < 0)
+        )
+      )
+    ) best = candidate;
+  }
+  const minimumClearanceRisk = best.clearanceRisk;
+  return chooseFewestStrictCrossings(...qualityFinalists
+    .filter(candidate => (
+      compareQualitySeedHardScores(candidate.quality, best.quality) === 0
+      && candidate.clearanceRisk <= minimumClearanceRisk + 0.5
+    ))
     .map(candidate => candidate.edges));
 };
 

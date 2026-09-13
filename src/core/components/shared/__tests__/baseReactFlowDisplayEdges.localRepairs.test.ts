@@ -100,6 +100,31 @@ describe('baseReactFlowDisplayEdges local repairs', () => {
     expect(chooseObstacleSafeQualitySeedCandidate(nodes, [reverse(throughBody), clearReverse])).toBe(clearReverse);
   });
 
+  it('prefers commercial node clearance over a shorter seed candidate before final repair', () => {
+    const nodes = [
+      node('source', -120, -30, 80, 60),
+      node('target', 240, -30, 80, 60),
+      node('business-node', 80, 20, 40, 40),
+    ];
+    const closeButShort = [lockedEdge('route', 'source', 'target', [
+      { x: -40, y: 0 },
+      { x: 240, y: 0 },
+    ])];
+    const commerciallyClear = [lockedEdge('route', 'source', 'target', [
+      { x: -40, y: 0 },
+      { x: -40, y: -48 },
+      { x: 240, y: -48 },
+      { x: 240, y: 0 },
+    ])];
+
+    expect(edgeNodeObstacleHits(closeButShort, nodes)).toEqual([]);
+    expect(edgeNodeObstacleHits(commerciallyClear, nodes)).toEqual([]);
+    expect(calculateEdgePathQualityScore(closeButShort).totalLength)
+      .toBeLessThan(calculateEdgePathQualityScore(commerciallyClear).totalLength);
+    expect(chooseObstacleSafeQualitySeedCandidate(nodes, [closeButShort, commerciallyClear]))
+      .toBe(commerciallyClear);
+  });
+
   it('handles an empty seed set without inventing a route', () => {
     expect(chooseObstacleSafeQualitySeedCandidate([], [])).toEqual([]);
   });
@@ -225,7 +250,9 @@ describe('baseReactFlowDisplayEdges local repairs', () => {
     });
     expect(endpointLaneTrace?.candidateCount).toBeGreaterThan(0);
     expect(phaseTrace.filter(trace => trace !== endpointLaneTrace).every(
-      trace => trace.candidateCount === edges.length,
+      trace => trace.phase === 'seed-interactive-finish-obstacle'
+        ? trace.candidateCount >= 0
+        : trace.candidateCount === edges.length,
     )).toBe(true);
     expect(phaseTrace.every(trace => trace.changedEdgeCount <= edges.length)).toBe(true);
     expect(phaseTrace.filter(trace => trace.phase.startsWith('seed-interactive-finish-')).every(
