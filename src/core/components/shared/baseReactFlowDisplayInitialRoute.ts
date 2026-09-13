@@ -16,6 +16,8 @@ const SIDES: readonly SharedNodePortSide[] = ['bottom', 'top', 'right', 'left'];
 const MAX_SEED_NODES = 96;
 const MAX_SEED_EDGE_NODE_PAIRS = 5_000;
 const MAX_COORDINATE = 10_000_000;
+const GENERATED_LAYOUT_ALGORITHMS = new Set(['domain-dagre-interactive', 'domain-dagre-simplified']);
+const MIN_CLEAR_FACING_REBUILD_SAVINGS = MIN_RENDER_SAFE_ENDPOINT_STUB * 2;
 const isBoundedNumber = (value: unknown): value is number => (
   typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= MAX_COORDINATE
 );
@@ -58,6 +60,67 @@ const corridorCandidates = (
         && Math.abs(side === 'top' || side === 'bottom' ? p.x - q.x : p.y - q.y) < 0.5;
     };
     return escapes(path[0], path[1], sourceSide) && escapes(path[path.length - 1], path[path.length - 2], targetSide);
+  });
+};
+
+const pathLength = (path: readonly { x: number; y: number }[]): number => (
+  path.slice(1).reduce((sum, point, index) => (
+    sum + Math.abs(point.x - path[index].x) + Math.abs(point.y - path[index].y)
+  ), 0)
+);
+
+const clearFacingAxisRouteIsAvailable = (
+  edge: Edge,
+  source: NodeRect,
+  target: NodeRect,
+  baselinePath: readonly { x: number; y: number }[],
+  obstacles: ReadonlyMap<string, NodeRect>,
+): boolean => {
+  if (
+    baselinePath.length <= 2
+    || !GENERATED_LAYOUT_ALGORITHMS.has(String(edge.data?.algorithm ?? ''))
+  ) return false;
+  const sourceCenter = { x: source.x + source.width / 2, y: source.y + source.height / 2 };
+  const targetCenter = { x: target.x + target.width / 2, y: target.y + target.height / 2 };
+  const horizontalGap = Math.max(
+    target.x - (source.x + source.width),
+    source.x - (target.x + target.width),
+  );
+  const verticalGap = Math.max(
+    target.y - (source.y + source.height),
+    source.y - (target.y + target.height),
+  );
+  const sameRow = horizontalGap > 0
+    && Math.abs(sourceCenter.y - targetCenter.y) <= Math.min(source.height, target.height) / 2;
+  const sameColumn = verticalGap > 0
+    && Math.abs(sourceCenter.x - targetCenter.x) <= Math.min(source.width, target.width) / 2;
+  if (!sameRow && !sameColumn) return false;
+  const sourceSide: SharedNodePortSide = sameRow
+    ? (targetCenter.x >= sourceCenter.x ? 'right' : 'left')
+    : (targetCenter.y >= sourceCenter.y ? 'bottom' : 'top');
+  const targetSide: SharedNodePortSide = sameRow
+    ? (targetCenter.x >= sourceCenter.x ? 'left' : 'right')
+    : (targetCenter.y >= sourceCenter.y ? 'top' : 'bottom');
+  if (
+    !edgeTerminalSideCanSwitch(edge, 'source', sourceSide)
+    || !edgeTerminalSideCanSwitch(edge, 'target', targetSide)
+  ) return false;
+  const baselineLength = pathLength(baselinePath);
+  return corridorCandidates(source, target, sourceSide, targetSide, [], []).some((candidate) => {
+    if (baselineLength - pathLength(candidate) < MIN_CLEAR_FACING_REBUILD_SAVINGS) return false;
+    for (let index = 0; index < candidate.length - 1; index += 1) {
+      const segment = { a: candidate[index], b: candidate[index + 1] };
+      if ([source, target].some(rect => segmentIntersectsClearanceRect(segment, rect, 0))) {
+        return false;
+      }
+      for (const [id, rect] of obstacles) {
+        if (id === edge.source || id === edge.target) continue;
+        if (segmentToClearanceRectDistance(segment, rect) < COMMERCIAL_BUSINESS_NODE_CLEARANCE) {
+          return false;
+        }
+      }
+    }
+    return true;
   });
 };
 
@@ -112,6 +175,10 @@ export const seedObstacleAwareDisplayRoutes = (edges: Edge[], inputNodes: Node[]
     const waypoints = edge.data?.waypoints;
     const preservesAuthoredPath = waypoints !== undefined
       && (!Array.isArray(waypoints) || waypoints.length > 0);
+    const sourceNode = byId.get(edge.source);
+    const targetNode = byId.get(edge.target);
+    const source = sourceNode ? getDisplayNodeRect(sourceNode) : null;
+    const target = targetNode ? getDisplayNodeRect(targetNode) : null;
     // Simplified Dagre paths have not passed the full generator's joint repair.
     // Reconstruct only a proposal that violates the display clearance contract;
     // unknown provenance and authored waypoints retain their existing ownership.
@@ -119,17 +186,17 @@ export const seedObstacleAwareDisplayRoutes = (edges: Edge[], inputNodes: Node[]
       && canCompareGeneratedRoutes
       && path.length >= 2 && path.length <= 128 && !preservesAuthoredPath
       && scoreNodeClearanceRisk(path, nodes, edge, COMMERCIAL_BUSINESS_NODE_CLEARANCE) > 0.5;
+    const rebuildClearFacingLayoutPath = canCompareGeneratedRoutes
+      && path.length >= 2 && path.length <= 128 && !preservesAuthoredPath
+      && source && target
+      && clearFacingAxisRouteIsAvailable(edge, source, target, path, obstacles);
     if (preservesAuthoredPath) return edge;
     if (path.length >= 2 && (
-      (!rebuildRuntimePaths && !rebuildSimplifiedLayoutPath)
+      (!rebuildRuntimePaths && !rebuildSimplifiedLayoutPath && !rebuildClearFacingLayoutPath)
       || readEdgeTerminalPolicy(edge, 'source').sourceExactFixed
       || readEdgeTerminalPolicy(edge, 'target').sourceExactFixed
     )) return edge;
     if (!['', 'stablepath', 'advanced-smart-step', 'default', 'smoothstep'].includes(String(edge.type ?? '').toLowerCase())) return edge;
-    const sourceNode = byId.get(edge.source);
-    const targetNode = byId.get(edge.target);
-    const source = sourceNode ? getDisplayNodeRect(sourceNode) : null;
-    const target = targetNode ? getDisplayNodeRect(targetNode) : null;
     if (!source || !target || edge.source === edge.target) return edge;
     type Candidate = { path: Array<{ x: number; y: number }>; sourceSide: SharedNodePortSide; targetSide: SharedNodePortSide; risk: number; cost: number };
     let best: Candidate | undefined;

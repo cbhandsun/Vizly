@@ -125,6 +125,59 @@ describe('initial obstacle-aware display routing', () => {
     expect(seedObstacleAwareDisplayRoutes(safe, nodes.slice(0, 2))).toBe(safe);
   });
 
+  it('reconsiders clear generated same-axis detours during seed routing instead of post-final repair', () => {
+    const nodes = [node('source', 0, 0), node('target', 320, 0)];
+    const generatedDetour: Edge = {
+      ...edge,
+      sourceHandle: 'bottom',
+      targetHandle: 'bottom',
+      data: {
+        algorithm: 'domain-dagre-interactive',
+        runtimeHandleLock: { source: true, target: true },
+        layoutPathLocked: true,
+        computedPath: [
+          { x: 50, y: 60 },
+          { x: 50, y: 180 },
+          { x: 370, y: 180 },
+          { x: 370, y: 60 },
+        ],
+      },
+    };
+
+    const [routed] = seedObstacleAwareDisplayRoutes([generatedDetour], nodes);
+
+    expect(routed).toMatchObject({ sourceHandle: 'right', targetHandle: 'left' });
+    expect(getDisplayComputedPath(routed)).toEqual([{ x: 100, y: 30 }, { x: 320, y: 30 }]);
+    expect(createDisplayTerminalValidationSnapshot(nodes).validateEdge(routed))
+      .toMatchObject({ attached: true, anchored: true });
+  });
+
+  it('does not simplify generated same-axis detours through blocked or authored corridors', () => {
+    const blocker = node('blocker', 180, 0);
+    const nodes = [node('source', 0, 0), node('target', 420, 0), blocker];
+    const generatedDetour: Edge = {
+      ...edge,
+      sourceHandle: 'bottom',
+      targetHandle: 'bottom',
+      data: {
+        algorithm: 'domain-dagre-interactive',
+        runtimeHandleLock: { source: true, target: true },
+        layoutPathLocked: true,
+        computedPath: [
+          { x: 50, y: 60 },
+          { x: 50, y: 180 },
+          { x: 470, y: 180 },
+          { x: 470, y: 60 },
+        ],
+      },
+    };
+
+    const blocked = [generatedDetour];
+    expect(seedObstacleAwareDisplayRoutes(blocked, nodes)).toBe(blocked);
+    const authored = [{ ...generatedDetour, data: { ...generatedDetour.data, waypoints: [{ x: 50, y: 180 }] } }];
+    expect(seedObstacleAwareDisplayRoutes(authored, nodes.slice(0, 2))).toBe(authored);
+  });
+
   it('reconstructs only unsafe simplified-layout proposals while preserving authored geometry and fixed ports', () => {
     const blocker = node('blocker', 240, 0);
     const nodes = [node('source', 0, 0), node('target', 600, 0), blocker];
