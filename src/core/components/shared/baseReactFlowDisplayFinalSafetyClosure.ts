@@ -11,9 +11,7 @@ import {
   repairFinalSameSidePassageOrder,
 } from '../../strategies/shared/edgeFinalSameSidePassageOrderRepair';
 import { repairBaseReactFlowFinalEndpointOrder } from './baseReactFlowDisplayFinalEndpointOrder';
-import {
-  countRenderUnsafeEndpointStubs,
-} from './baseReactFlowDisplayEndpointStubRepair';
+import { countRenderUnsafeEndpointStubs } from './baseReactFlowDisplayEndpointStubRepair';
 import { repairFinalSafetyRenderSafeEndpointStubs } from './baseReactFlowDisplayFinalSafetyStubPreference';
 import { repairFastDisplayHardSafety } from './baseReactFlowFastEdgeSafety';
 import { getDisplayHardQualityGateReport } from './baseReactFlowDisplayQualityGates';
@@ -355,6 +353,9 @@ export const repairBaseReactFlowFinalSafetyClosure = <T extends Edge[]>(
   const startRepairStage = (phase: BaseReactFlowFinalSafetyRepairPhase) => (
     startBaseReactFlowFinalSafetyRepairStage(edges, options, phase)
   );
+  const countUnsafeEndpointStubs = (candidate: Edge[]): number => (
+    options.evaluation?.unsafeEndpointStubs(candidate) ?? countRenderUnsafeEndpointStubs(candidate)
+  );
   const baselineStage = startRepairStage('final-safety-repair-baseline');
   if (candidateIsAccepted(edges)) {
     baselineStage.finish('skip', 1);
@@ -368,7 +369,7 @@ export const repairBaseReactFlowFinalSafetyClosure = <T extends Edge[]>(
   const baselinePassageOrder = options.evaluation?.passageOrder(edges)
     ?? auditFinalSameSidePassageOrder(edges, nodes);
   const onlyNearTrunkOpportunityRemains = baselineReport.hardClean
-    && countRenderUnsafeEndpointStubs(edges) === 0
+    && countUnsafeEndpointStubs(edges) === 0
     && baselineEndpointOrder.inversions === 0
     && baselineEndpointOrder.ambiguousLaneTies === 0
     && baselineEndpointOrder.collapsedLanePairs === 0
@@ -550,7 +551,7 @@ export const repairBaseReactFlowFinalSafetyClosure = <T extends Edge[]>(
       : null;
     if (
       !corridorReport.hardClean
-      || countRenderUnsafeEndpointStubs(corridor) !== 0
+      || countUnsafeEndpointStubs(corridor) !== 0
       || !corridorOrder
       || !preservesInitialTrueTrunks(
         getInitialTrueTrunks(),
