@@ -304,17 +304,23 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
       : candidate;
     if (options.onFinalEvaluation) {
       const report = evaluation.hardReport(stableCandidate);
-      const endpointOrder = evaluation.endpointOrder(stableCandidate);
-      const passageOrder = evaluation.passageOrder(stableCandidate);
+      const renderSafe = report.hardClean
+        && evaluation.unsafeEndpointStubs(stableCandidate) === 0;
+      const endpointOrder = renderSafe
+        ? evaluation.endpointOrder(stableCandidate)
+        : null;
+      const passageOrder = endpointOrder
+        && endpointOrder.inversions === 0
+        && endpointOrder.ambiguousLaneTies === 0
+        && endpointOrder.collapsedLanePairs === 0
+        ? evaluation.passageOrder(stableCandidate)
+        : null;
+      const closureReady = passageOrder !== null
+        && passageOrder.passageDefects === 0
+        && passageOrder.nearTrunkOpportunities === 0;
       options.onFinalEvaluation({
         edges: stableCandidate,
-        closureReady: report.hardClean
-          && evaluation.unsafeEndpointStubs(candidate) === 0
-          && endpointOrder.inversions === 0
-          && endpointOrder.ambiguousLaneTies === 0
-          && endpointOrder.collapsedLanePairs === 0
-          && passageOrder.passageDefects === 0
-          && passageOrder.nearTrunkOpportunities === 0,
+        closureReady,
       });
     }
     evaluationTimer.finish(
@@ -352,18 +358,17 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
     const changedEdgeIndexes = reclaimedTargetTrunkCandidate.flatMap((edge, index) => (
       edge !== baseline[index] ? [index] : []
     ));
+    const clearanceEvaluation = evaluation.businessNodeClearanceGeometry.clearance;
     const baselineClearanceRisk = changedEdgeIndexes.reduce((total, index) => (
-      total + scoreNodeClearanceRisk(
+      total + clearanceEvaluation.score(
         getEdgePath(baseline[index]),
-        nodes,
         baseline[index],
         COMMERCIAL_BUSINESS_NODE_CLEARANCE,
       )
     ), 0);
     const candidateClearanceRisk = changedEdgeIndexes.reduce((total, index) => (
-      total + scoreNodeClearanceRisk(
+      total + clearanceEvaluation.score(
         getEdgePath(reclaimedTargetTrunkCandidate[index]),
-        nodes,
         reclaimedTargetTrunkCandidate[index],
         COMMERCIAL_BUSINESS_NODE_CLEARANCE,
       )
@@ -553,20 +558,28 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
     candidate = next;
   }
   const baselineTrunks = evaluation.endpointOrder(baseline).legalSharedTrunks;
+  let baselineUnsafeEndpointStubs: number | undefined;
+  const readBaselineUnsafeEndpointStubs = (): number => {
+    if (typeof baselineUnsafeEndpointStubs === 'number') return baselineUnsafeEndpointStubs;
+    baselineUnsafeEndpointStubs = evaluation.unsafeEndpointStubs(baseline);
+    return baselineUnsafeEndpointStubs;
+  };
   const candidateCanCommit = (next: T): boolean => {
     const report = evaluation.hardReport(next);
+    if (
+      !report.hardClean
+      || report.quality.detourPenalty > baselineReport.quality.detourPenalty
+      || report.quality.totalLength >= baselineReport.quality.totalLength
+      || evaluation.unsafeEndpointStubs(next) > readBaselineUnsafeEndpointStubs()
+    ) return false;
     const changedEdgeIndexes = next.flatMap((edge, index) => (
       edge !== baseline[index] ? [index] : []
     ));
-    return report.hardClean
-      && report.quality.detourPenalty <= baselineReport.quality.detourPenalty
-      && report.quality.totalLength < baselineReport.quality.totalLength
-      && commercialEdgeDetoursDoNotRegress(
-        baseline,
-        next,
-        changedEdgeIndexes,
-      )
-      && evaluation.unsafeEndpointStubs(next) <= evaluation.unsafeEndpointStubs(baseline)
+    return commercialEdgeDetoursDoNotRegress(
+      baseline,
+      next,
+      changedEdgeIndexes,
+    )
       && preservesCommercialTrueTrunkMembership(
         baselineTrunks,
         evaluation.endpointOrder(next).legalSharedTrunks,
