@@ -126,7 +126,8 @@ export const commitBaseReactFlowFinalCommercialSafety = ({
     )
     ? outcome.edges
     : response.edges;
-  const lockedEdges = lockFinalDisplayComputedPaths(contractEdges, repairNodes);
+  const nodeById = new Map(repairNodes.map(node => [node.id, node]));
+  const lockedEdges = lockFinalDisplayComputedPaths(contractEdges, repairNodes, nodeById);
   // Port locking may add a narrow bridge after the earlier commercial pass.
   // Close that structural contract on the exact render geometry without
   // moving either terminal, then re-lock to retain the render authority.
@@ -143,7 +144,9 @@ export const commitBaseReactFlowFinalCommercialSafety = ({
       { evaluation: finalEvaluation },
       finalEvaluation,
     );
-  const relockedEdges = lockFinalDisplayComputedPaths(commerciallyClosedEdges, repairNodes);
+  const relockedEdges = commerciallyClosedEdges === lockedEdges
+    ? lockedEdges
+    : lockFinalDisplayComputedPaths(commerciallyClosedEdges, repairNodes, nodeById);
   const relockedReport = finalEvaluation.hardReport(relockedEdges);
   const edges = relockedReport.hardClean
     && baseReactFlowDisplayCandidateCommercialQualityIsClean(relockedEdges)
