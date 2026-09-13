@@ -60,6 +60,24 @@ const coerceNodeId = (value: unknown): string | null => (
   typeof value === 'string' && value.trim() ? value.trim() : null
 );
 
+const hasStringArray = (value: unknown): boolean => (
+  Array.isArray(value) && value.some(item => typeof item === 'string' && item.trim().length > 0)
+);
+
+const hasSubDomainOrder = (value: unknown): boolean => {
+  if (hasStringArray(value)) return true;
+  if (!isRecord(value)) return false;
+  return Object.values(value).some(hasStringArray);
+};
+
+const hasOrderedLaneIntent = (layout: unknown): boolean => {
+  if (!isRecord(layout)) return false;
+  const hasExplicitDomainOrder = hasStringArray(layout.domainOrder) || hasStringArray(layout.laneOrder);
+  const hasExplicitSubDomainOrder = hasSubDomainOrder(layout.subDomainOrder);
+  return (layout.autoDirection === true || layout.fitDomainContent === true)
+    && (hasExplicitDomainOrder || hasExplicitSubDomainOrder);
+};
+
 const isDirectedForestPresetGraph = (preset: { nodes?: unknown; edges?: unknown }): boolean => {
   const rawNodes = Array.isArray(preset.nodes) ? preset.nodes : [];
   const rawEdges = Array.isArray(preset.edges) ? preset.edges : [];
@@ -124,7 +142,7 @@ export const resolveInitialLayoutSelectionFromStandardPreset = (
   ) {
     return {
       version: 2,
-      strategy: 'domain-dagre',
+      strategy: hasOrderedLaneIntent(preset.layout) ? 'domain-lanes' : 'domain-dagre',
       direction: selection.direction,
       nodeLayout: 'dagre',
       laneRankPreference: 'auto',

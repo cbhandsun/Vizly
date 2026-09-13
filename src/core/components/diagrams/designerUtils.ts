@@ -17,6 +17,11 @@ import {
 import { LayoutOptimizer } from '../layout/LayoutOptimizer';
 import { sanitizeCanvasEdgesForNodes } from '../../utils/canvasEdgeSanitizer';
 import { resolveInitialLayoutSelectionFromStandardPreset } from './standardPresetLayoutSelection';
+import {
+    isOrderedDomainLaneLayoutStrategy,
+    resolveDomainLaneSpacing,
+    resolveDomainLayoutRoutingQuality,
+} from './flowchartLayoutStrategyMode';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
     Boolean(value && typeof value === 'object' && !Array.isArray(value))
@@ -592,23 +597,32 @@ export const standardDataToCanvas = async (
             try {
                 const usesVerticalStrategy = initialLayoutSelection.strategy === 'domain-vertical';
                 const usesHorizontalStrategy = initialLayoutSelection.strategy === 'domain-horizontal';
+                const usesOrderedDomainLanes = isOrderedDomainLaneLayoutStrategy(initialLayoutSelection.strategy);
                 const strategy = usesVerticalStrategy
                     ? new (await import('../../strategies/DomainVerticalLayoutStrategy')).DomainVerticalLayoutStrategy()
                     : usesHorizontalStrategy
                         ? new (await import('../../strategies/DomainHorizontalLayoutStrategy')).DomainHorizontalLayoutStrategy()
                         : new (await import('../../strategies/DomainDagreLayoutStrategy')).DomainDagreLayoutStrategy();
                 const layoutRecord = data.layout as unknown as Record<string, unknown>;
-                const nodeLayout = optionalLayoutType(layoutRecord.nodeLayout)
-                    ?? optionalLayoutType(initialLayoutSelection.nodeLayout);
+                const nodeLayout = usesOrderedDomainLanes
+                    ? optionalLayoutType(initialLayoutSelection.nodeLayout)
+                    : (optionalLayoutType(layoutRecord.nodeLayout)
+                        ?? optionalLayoutType(initialLayoutSelection.nodeLayout));
+                const edgeRoutingQuality = options.edgeRoutingQuality
+                    ?? resolveDomainLayoutRoutingQuality(initialLayoutSelection.strategy);
                 const layoutOptions: LayoutOptions = {
                     type: LayoutType.DOMAIN_FIRST,
                     direction: direction as 'TB' | 'LR',
                     ...(nodeLayout ? { nodeLayout: optionalLayoutType(nodeLayout) } : {}),
-                    spacing: data.layout?.spacing || { horizontal: 50, vertical: 50 },
+                    spacing: usesOrderedDomainLanes
+                        ? resolveDomainLaneSpacing(initialLayoutSelection.direction)
+                        : (data.layout?.spacing || { horizontal: 50, vertical: 50 }),
                     padding: { top: 40, right: 20, bottom: 20, left: 20 },
                     ...resolveGeneratedGroupLayoutOptions(data.layout),
-                    ...(options.edgeRoutingQuality ? { edgeRoutingQuality: options.edgeRoutingQuality } : {}),
+                    ...(edgeRoutingQuality ? { edgeRoutingQuality } : {}),
                     fitDomainContent: true,
+                    domainPlacement: usesOrderedDomainLanes ? 'ordered-lanes' : 'topology',
+                    laneRankPreference: initialLayoutSelection.laneRankPreference,
                     domainOrder: data.layout?.domainOrder,
                     subDomainOrder: data.layout?.subDomainOrder,
                 };

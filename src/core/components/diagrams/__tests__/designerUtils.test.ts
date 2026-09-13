@@ -11,9 +11,11 @@ vi.mock('../../layout/LayoutOptimizer', () => ({
 }));
 
 import type { StandardDiagramData } from '../../../models/DiagramModels';
+import demandAllocationData from '../../../../data/standardized/DeamndAllocation.json';
 import logisticsStandardData from '../../../../data/standardized/LogisticsStandardData.json';
 import { canvasToPureStandardData, canvasToStandardData, standardDataToCanvas } from '../designerUtils';
 import { coerceStandardDiagramImport } from '../../../utils/diagramJsonImport';
+import { DomainDagreLayoutStrategy } from '../../../strategies/DomainDagreLayoutStrategy';
 import {
     createPersistedRoutingCandidate,
     createRoutingOnlyDocumentSnapshot,
@@ -59,7 +61,10 @@ const makeDiagram = (): StandardDiagramData => ({
     theme: { name: 'manual', displayName: 'Manual', domains: {} },
 });
 
-afterEach(() => clearRoutingOnlyDocumentCandidates());
+afterEach(() => {
+    vi.restoreAllMocks();
+    clearRoutingOnlyDocumentCandidates();
+});
 
 describe('standardDataToCanvas', () => {
     it('preserves the hidden mind-map persistence payload produced by plugin migration', async () => {
@@ -341,4 +346,29 @@ describe('standardDataToCanvas', () => {
             markerEnd: { type: MarkerType.ArrowClosed, color: '#78909C' },
         });
     }, 20_000);
+
+    it('replays ordered auto initial presets through the selectable domain-lanes strategy', async () => {
+        const calculateLayout = vi.spyOn(DomainDagreLayoutStrategy.prototype, 'calculateLayout')
+            .mockImplementation(async (layoutNodes, layoutEdges) => ({
+                nodes: layoutNodes,
+                edges: layoutEdges,
+            }));
+        const diagram = coerceStandardDiagramImport(demandAllocationData, {
+            id: 'wms-demand-allocation-strategy-v2',
+            title: 'Demand allocation',
+        });
+
+        await standardDataToCanvas(diagram);
+
+        expect(calculateLayout).toHaveBeenCalledTimes(1);
+        expect(calculateLayout.mock.calls[0]?.[2]).toMatchObject({
+            direction: 'LR',
+            domainPlacement: 'ordered-lanes',
+            edgeRoutingQuality: 'interactive',
+            spacing: { horizontal: 160, vertical: 120 },
+            laneRankPreference: 'auto',
+            nodeLayout: 'dagre',
+            domainOrder: ['策略计算', '资源分配', '作业执行'],
+        });
+    });
 });

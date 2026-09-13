@@ -75,6 +75,28 @@ describe('standardPresetLayoutSelection', () => {
     });
   });
 
+  it('maps complex ordered auto custom presets to replayable domain lanes', () => {
+    expect(resolveInitialLayoutSelectionFromStandardPreset({
+      layout: {
+        type: 'DomainVerticalLayout',
+        nodeLayout: 'vertical',
+        direction: 'LR',
+        autoDirection: true,
+        fitDomainContent: true,
+        domainOrder: ['策略计算', '资源分配', '作业执行'],
+        subDomainOrder: { 策略计算: ['数据准备', '初分逻辑'] },
+      },
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      edges: [{ id: 'a-c', source: 'a', target: 'c' }, { id: 'b-c', source: 'b', target: 'c' }],
+    })).toEqual({
+      version: 2,
+      strategy: 'domain-lanes',
+      direction: 'LR',
+      nodeLayout: 'dagre',
+      laneRankPreference: 'auto',
+    });
+  });
+
   it('does not overwrite an explicit persisted layout selection', () => {
     const metadata = createStandardPresetInitialMetadata({
       layout: { direction: 'LR' },

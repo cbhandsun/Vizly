@@ -102,7 +102,7 @@ export const resolveDomainLaneSpacing = (
     direction: FlowchartLayoutDirection,
 ): { horizontal: number; vertical: number } => (
     direction === 'LR' || direction === 'RL'
-        ? { horizontal: 96, vertical: 120 }
+        ? { horizontal: 160, vertical: 120 }
         : { horizontal: 120, vertical: 96 }
 );
 
