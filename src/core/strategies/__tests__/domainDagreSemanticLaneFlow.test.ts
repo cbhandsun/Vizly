@@ -227,6 +227,7 @@ describe('semantic swimlane process geometry', () => {
       direction,
       nodeToSubGroup: membership,
       domainOrder: ['a', 'b'],
+      alignGlobalLanePeers: true,
     });
     const flow = direction === 'LR' ? 'x' : 'y';
     const flowDimension = direction === 'LR' ? 'width' : 'height';

@@ -323,7 +323,15 @@ describe('standardPresetCanvasCache', () => {
         expect(convert).toHaveBeenCalledTimes(2);
     });
 
-    it('uses interactive edge routing only for large standard presets', () => {
+    it('uses interactive edge routing for ordered lane presets and large standard presets', () => {
+        expect(resolveStandardPresetEdgeRoutingQuality({
+            layout: { type: 'DomainVerticalLayout', direction: 'LR', autoDirection: true, fitDomainContent: true, domainOrder: ['a', 'b'] },
+            nodes: [{ id: 'a', domain: 'a' }, { id: 'b', domain: 'b' }],
+            edges: [
+                { id: 'ab', source: 'a', target: 'b' },
+                { id: 'ba', source: 'b', target: 'a' },
+            ],
+        })).toBe('interactive');
         expect(resolveStandardPresetEdgeRoutingQuality({
             nodes: Array.from({ length: 12 }, (_, index) => ({ id: `n-${index}` })),
             edges: Array.from({ length: 16 }, (_, index) => ({ id: `e-${index}` })),

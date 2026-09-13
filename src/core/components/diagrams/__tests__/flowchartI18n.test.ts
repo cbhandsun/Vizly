@@ -134,7 +134,9 @@ describe('flowchart interaction copy', () => {
         }
         for (const key of [
             'cut', 'copy', 'paste', 'duplicate', 'duplicateSelection', 'delete',
-            'lock', 'unlock', 'lockSelection', 'unlockSelection', 'bringToFront',
+            'lock', 'unlock', 'lockSelection', 'unlockSelection',
+            'pinLayout', 'unpinLayout', 'pinLayoutSelection', 'unpinLayoutSelection',
+            'bringToFront',
             'bringSelectionToFront', 'sendToBack', 'sendSelectionToBack', 'align',
             'alignLeft', 'alignCenter', 'alignRight', 'alignTop', 'alignMiddle',
             'alignBottom', 'distributeHorizontal', 'distributeVertical', 'matchSize',

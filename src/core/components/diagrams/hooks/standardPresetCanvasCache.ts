@@ -3,6 +3,8 @@ import { EDGE_ROUTING_CACHE_VERSION } from '../../../routing/routingVersion';
 import { isSafeCssColor } from '../../../themes/themeImportSecurity';
 import { coerceStandardDiagramImport } from '../../../utils/diagramJsonImport';
 import { appendBaseReactFlowEdgeSemanticClassName } from '../../shared/baseReactFlowEdgePresentation';
+import { isOrderedDomainLaneLayoutStrategy } from '../flowchartLayoutStrategyMode';
+import { resolveInitialLayoutSelectionFromStandardPreset } from '../standardPresetLayoutSelection';
 
 export type CanvasData = { nodes: Node[]; edges: Edge[] };
 export interface StandardPresetInput {
@@ -24,6 +26,8 @@ const INTERACTIVE_EDGE_ROUTING_NODE_THRESHOLD = 36;
 const INTERACTIVE_EDGE_ROUTING_EDGE_THRESHOLD = 36;
 
 export const resolveStandardPresetEdgeRoutingQuality = (preset: StandardPresetInput): 'full' | 'interactive' => {
+    const initialLayoutSelection = resolveInitialLayoutSelectionFromStandardPreset(preset);
+    if (isOrderedDomainLaneLayoutStrategy(initialLayoutSelection.strategy)) return 'interactive';
     const nodeCount = Array.isArray(preset.nodes) ? preset.nodes.length : 0;
     const edgeCount = Array.isArray(preset.edges) ? preset.edges.length : 0;
     return nodeCount > INTERACTIVE_EDGE_ROUTING_NODE_THRESHOLD

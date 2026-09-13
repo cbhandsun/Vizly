@@ -5,6 +5,16 @@ import { act, render, waitFor } from '@testing-library/react';
 import { applyNodeChanges, type Edge, type Node, type NodeChange } from '@xyflow/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.hoisted(() => {
+  Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+    writable: true,
+    value: () => ({
+      font: '',
+      measureText: (text: string) => ({ width: String(text || '').length * 8 }),
+    }),
+  });
+});
+
 const baseReactFlowProps = vi.fn();
 const lightweightReactFlowProps = vi.fn();
 const baseReactFlowMounts = vi.fn();

@@ -1,11 +1,11 @@
 {
   "schema": "vizly-precompiled-display-route-v1",
   "routingVersion": "21",
-  "routingSourceHash": "source-v1:345cd55fced5e734a4b56dc0869a426266175eb09c63fa5f8f6a68b186217b17",
+  "routingSourceHash": "source-v1:637739031c56c359e008ac1b6bee9f52747cf458cd3e605183022651fdf1b82b",
   "sourceHash": "source-v1:ea82c502ab6535b5c8f8367c591861e540396a41955a15c6b5f94f922264b7de",
-  "inputSignature": "831788229",
-  "inputGeometryDigest": "geometry-v1:ffc618b03c1da934836b3edef1fcce28",
-  "outputRouteSignature": "route-v2:26:79:a7d999e0229acbe6",
+  "inputSignature": "3004810106",
+  "inputGeometryDigest": "geometry-v1:95c9ed0f44e4583bff796ff1b532e467",
+  "outputRouteSignature": "route-v2:26:67:712ed2fbea179705",
   "hardClean": true,
   "routingContract": {
     "clean": true,
@@ -24,11 +24,11 @@
       "data": {
         "computedPath": [
           {
-            "x": 4476.5,
+            "x": 4278,
             "y": 1784
           },
           {
-            "x": 4744.5,
+            "x": 4530,
             "y": 1784
           }
         ]
@@ -44,15 +44,14 @@
       "data": {
         "computedPath": [
           {
-            "x": 1299,
-            "y": 184
+            "x": 1244,
+            "y": 200
           },
           {
-            "x": 1411,
-            "y": 184
+            "x": 1340,
+            "y": 200
           }
-        ],
-        "sharedTrunkSynthesized": true
+        ]
       }
     },
     {
@@ -65,11 +64,11 @@
       "data": {
         "computedPath": [
           {
-            "x": 3136.5,
+            "x": 2992,
             "y": 1040
           },
           {
-            "x": 3248.5,
+            "x": 3088,
             "y": 1040
           }
         ]
@@ -80,21 +79,21 @@
       "source": "calc-theory-ratio",
       "target": "sort-demand",
       "type": "stablePath",
-      "sourceHandle": "bottom",
-      "targetHandle": "left",
+      "sourceHandle": "right",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {
-            "x": 1658,
-            "y": 248
+            "x": 1586,
+            "y": 200
           },
           {
-            "x": 1658,
-            "y": 512
+            "x": 1784,
+            "y": 200
           },
           {
-            "x": 1771,
-            "y": 512
+            "x": 1784,
+            "y": 464
           }
         ]
       }
@@ -109,15 +108,14 @@
       "data": {
         "computedPath": [
           {
-            "x": 912,
-            "y": 184
+            "x": 875,
+            "y": 200
           },
           {
-            "x": 1024,
-            "y": 184
+            "x": 971,
+            "y": 200
           }
-        ],
-        "sharedTrunkSynthesized": true
+        ]
       }
     },
     {
@@ -125,37 +123,27 @@
       "source": "check-inv-sufficiency",
       "target": "calc-theory-ratio",
       "type": "stablePath",
-      "sourceHandle": "right",
-      "targetHandle": "left",
+      "sourceHandle": "top",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {
-            "x": 912,
-            "y": 200
+            "x": 773,
+            "y": 152
           },
           {
-            "x": 977,
-            "y": 200
+            "x": 773,
+            "y": 96
           },
           {
-            "x": 977,
-            "y": 296
+            "x": 1463,
+            "y": 96
           },
           {
-            "x": 1346,
-            "y": 296
-          },
-          {
-            "x": 1346,
-            "y": 200
-          },
-          {
-            "x": 1411,
-            "y": 200
+            "x": 1463,
+            "y": 152
           }
-        ],
-        "sharedTrunkAware": true,
-        "sharedTrunkSynthesized": true
+        ]
       }
     },
     {
@@ -168,15 +156,14 @@
       "data": {
         "computedPath": [
           {
-            "x": 2340,
-            "y": 496
+            "x": 2231,
+            "y": 512
           },
           {
-            "x": 2452,
-            "y": 496
+            "x": 2327,
+            "y": 512
           }
-        ],
-        "sharedTrunkSynthesized": true
+        ]
       }
     },
     {
@@ -184,28 +171,23 @@
       "source": "check-limit",
       "target": "pool-b-entry",
       "type": "stablePath",
-      "sourceHandle": "right",
+      "sourceHandle": "bottom",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 2340,
-            "y": 512
+            "x": 2107,
+            "y": 560
           },
           {
-            "x": 2396,
-            "y": 512
-          },
-          {
-            "x": 2396,
+            "x": 2107,
             "y": 728
           },
           {
-            "x": 2614,
+            "x": 2488,
             "y": 728
           }
         ],
-        "sharedTrunkAware": true,
         "sharedTrunkSynthesized": true
       }
     },
@@ -219,23 +201,14 @@
       "data": {
         "computedPath": [
           {
-            "x": 4323,
-            "y": 1484
+            "x": 4124,
+            "y": 1472
           },
           {
-            "x": 4379,
-            "y": 1484
-          },
-          {
-            "x": 4379,
-            "y": 1460
-          },
-          {
-            "x": 4589,
-            "y": 1460
+            "x": 4374,
+            "y": 1472
           }
-        ],
-        "sharedTrunkSynthesized": true
+        ]
       }
     },
     {
@@ -248,19 +221,18 @@
       "data": {
         "computedPath": [
           {
-            "x": 4213.5,
-            "y": 1508.5
+            "x": 4016,
+            "y": 1509
           },
           {
-            "x": 4213.5,
-            "y": 2136
+            "x": 4016,
+            "y": 2152
           },
           {
-            "x": 5071,
-            "y": 2136
+            "x": 4838,
+            "y": 2152
           }
-        ],
-        "sharedTrunkSynthesized": true
+        ]
       }
     },
     {
@@ -269,28 +241,22 @@
       "target": "task-direct-b",
       "type": "stablePath",
       "sourceHandle": "right",
-      "targetHandle": "left",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {
-            "x": 4958,
-            "y": 1821
+            "x": 4742,
+            "y": 1784
           },
           {
-            "x": 5014,
-            "y": 1821
+            "x": 5244,
+            "y": 1784
           },
           {
-            "x": 5014,
-            "y": 2584
-          },
-          {
-            "x": 5391,
-            "y": 2584
+            "x": 5244,
+            "y": 2536
           }
-        ],
-        "sharedTrunkAware": true,
-        "sharedTrunkSynthesized": true
+        ]
       }
     },
     {
@@ -299,28 +265,22 @@
       "target": "task-rep-b",
       "type": "stablePath",
       "sourceHandle": "right",
-      "targetHandle": "left",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {
-            "x": 4958,
-            "y": 1821
+            "x": 4742,
+            "y": 1784
           },
           {
-            "x": 5023,
-            "y": 1821
+            "x": 5084,
+            "y": 1784
           },
           {
-            "x": 5023,
-            "y": 2368
-          },
-          {
-            "x": 5221,
-            "y": 2368
+            "x": 5084,
+            "y": 2320
           }
-        ],
-        "sharedTrunkAware": true,
-        "sharedTrunkSynthesized": true
+        ]
       }
     },
     {
@@ -329,28 +289,22 @@
       "target": "greedy-spec",
       "type": "stablePath",
       "sourceHandle": "right",
-      "targetHandle": "left",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {
-            "x": 3502,
-            "y": 1088
+            "x": 3340,
+            "y": 1040
           },
           {
-            "x": 3559,
-            "y": 1088
+            "x": 3546,
+            "y": 1040
           },
           {
-            "x": 3559,
-            "y": 1472
-          },
-          {
-            "x": 3615,
-            "y": 1472
+            "x": 3546,
+            "y": 1424
           }
-        ],
-        "sharedTrunkAware": true,
-        "sharedTrunkSynthesized": true
+        ]
       }
     },
     {
@@ -358,28 +312,23 @@
       "source": "fix-quota",
       "target": "merge-res",
       "type": "stablePath",
-      "sourceHandle": "right",
+      "sourceHandle": "bottom",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 3502,
+            "x": 3214,
             "y": 1088
           },
           {
-            "x": 3558,
-            "y": 1088
-          },
-          {
-            "x": 3558,
+            "x": 3214,
             "y": 1784
           },
           {
-            "x": 3779,
+            "x": 3600,
             "y": 1784
           }
-        ],
-        "sharedTrunkSynthesized": true
+        ]
       }
     },
     {
@@ -392,11 +341,11 @@
       "data": {
         "computedPath": [
           {
-            "x": 3836.5,
+            "x": 3656,
             "y": 1472
           },
           {
-            "x": 4104,
+            "x": 3907,
             "y": 1472
           }
         ]
@@ -412,11 +361,11 @@
       "data": {
         "computedPath": [
           {
-            "x": 594,
+            "x": 575,
             "y": 200
           },
           {
-            "x": 706,
+            "x": 671,
             "y": 200
           }
         ]
@@ -432,11 +381,11 @@
       "data": {
         "computedPath": [
           {
-            "x": 3992,
+            "x": 3811,
             "y": 1784
           },
           {
-            "x": 4270.5,
+            "x": 4074,
             "y": 1784
           }
         ]
@@ -448,28 +397,22 @@
       "target": "calc-real-ratio",
       "type": "stablePath",
       "sourceHandle": "right",
-      "targetHandle": "left",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {
-            "x": 2670,
+            "x": 2544,
             "y": 512
           },
           {
-            "x": 2887.5,
+            "x": 2896,
             "y": 512
           },
           {
-            "x": 2887.5,
-            "y": 1021
-          },
-          {
-            "x": 2943.5,
-            "y": 1021
+            "x": 2896,
+            "y": 992
           }
-        ],
-        "sharedTrunkAware": true,
-        "sharedTrunkSynthesized": true
+        ]
       }
     },
     {
@@ -477,25 +420,23 @@
       "source": "pool-b-entry",
       "target": "calc-real-ratio",
       "type": "stablePath",
-      "sourceHandle": "bottom",
-      "targetHandle": "left",
+      "sourceHandle": "right",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {
-            "x": 2830,
-            "y": 776
+            "x": 2704,
+            "y": 728
           },
           {
-            "x": 2830,
-            "y": 1033
+            "x": 2896,
+            "y": 728
           },
           {
-            "x": 2943,
-            "y": 1033
+            "x": 2896,
+            "y": 992
           }
-        ],
-        "sharedTrunkAware": true,
-        "sharedTrunkSynthesized": true
+        ]
       }
     },
     {
@@ -503,29 +444,23 @@
       "source": "pool-b-entry",
       "target": "merge-res",
       "type": "stablePath",
-      "sourceHandle": "right",
+      "sourceHandle": "bottom",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 2830,
-            "y": 752
+            "x": 2596,
+            "y": 776
           },
           {
-            "x": 3185,
-            "y": 752
-          },
-          {
-            "x": 3185,
+            "x": 2596,
             "y": 1784
           },
           {
-            "x": 3779,
+            "x": 3600,
             "y": 1784
           }
-        ],
-        "sharedTrunkAware": true,
-        "sharedTrunkSynthesized": true
+        ]
       }
     },
     {
@@ -538,11 +473,11 @@
       "data": {
         "computedPath": [
           {
-            "x": 1977,
+            "x": 1886,
             "y": 512
           },
           {
-            "x": 2089,
+            "x": 1982,
             "y": 512
           }
         ]
@@ -553,24 +488,23 @@
       "source": "sort-rem-round",
       "target": "task-direct-a",
       "type": "stablePath",
-      "sourceHandle": "right",
-      "targetHandle": "top",
+      "sourceHandle": "bottom",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 4794,
+            "x": 4476,
             "y": 1520
           },
           {
-            "x": 5083,
-            "y": 1520
+            "x": 4476,
+            "y": 2152
           },
           {
-            "x": 5083,
-            "y": 2104
+            "x": 4838,
+            "y": 2152
           }
-        ],
-        "sharedTrunkAware": true
+        ]
       }
     },
     {
@@ -583,11 +517,11 @@
       "data": {
         "computedPath": [
           {
-            "x": 269,
+            "x": 268,
             "y": 200
           },
           {
-            "x": 381,
+            "x": 364,
             "y": 200
           }
         ]
@@ -599,27 +533,22 @@
       "target": "end-wms",
       "type": "stablePath",
       "sourceHandle": "right",
-      "targetHandle": "left",
+      "targetHandle": "top",
       "data": {
         "computedPath": [
           {
-            "x": 5244,
+            "x": 5010,
             "y": 2152
           },
           {
-            "x": 5605,
+            "x": 5513,
             "y": 2152
           },
           {
-            "x": 5605,
-            "y": 2368
-          },
-          {
-            "x": 5677,
-            "y": 2368
+            "x": 5513,
+            "y": 2320
           }
-        ],
-        "sharedTrunkSynthesized": true
+        ]
       }
     },
     {
@@ -627,24 +556,23 @@
       "source": "task-direct-b",
       "target": "end-wms",
       "type": "stablePath",
-      "sourceHandle": "top",
-      "targetHandle": "left",
+      "sourceHandle": "right",
+      "targetHandle": "bottom",
       "data": {
         "computedPath": [
           {
-            "x": 5525,
-            "y": 2536
+            "x": 5330,
+            "y": 2584
           },
           {
-            "x": 5525,
-            "y": 2368
+            "x": 5513,
+            "y": 2584
           },
           {
-            "x": 5677,
-            "y": 2368
+            "x": 5513,
+            "y": 2416
           }
-        ],
-        "sharedTrunkSynthesized": true
+        ]
       }
     },
     {
@@ -657,11 +585,11 @@
       "data": {
         "computedPath": [
           {
-            "x": 5414,
+            "x": 5179,
             "y": 2368
           },
           {
-            "x": 5676.5,
+            "x": 5426,
             "y": 2368
           }
         ]

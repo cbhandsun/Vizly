@@ -17,51 +17,51 @@ const generatedPrecompiledRouteAsset0 = new URL(
 const generatedPrecompiledRouteDescriptor0: GeneratedBaseReactFlowPrecompiledRouteDescriptor = {
   presetId: "wms-process-flow-v1",
   variantId: "initial",
-  routingSourceHash: "source-v1:345cd55fced5e734a4b56dc0869a426266175eb09c63fa5f8f6a68b186217b17",
+  routingSourceHash: "source-v1:637739031c56c359e008ac1b6bee9f52747cf458cd3e605183022651fdf1b82b",
   sourceHash: "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
   geometryDigest: "geometry-v1:25fffd342dc29dc0a02dee32faca612c",
   load: () => loadBaseReactFlowPrecompiledRouteAsset(generatedPrecompiledRouteAsset0),
 };
 
 const generatedPrecompiledRouteAsset1 = new URL(
-  './precompiledRoutes/route-3179279980.json',
+  './precompiledRoutes/route-2125591414.json',
   import.meta.url,
 );
 
 const generatedPrecompiledRouteDescriptor1: GeneratedBaseReactFlowPrecompiledRouteDescriptor = {
-  presetId: "logistics-architecture-v1",
-  variantId: "initial",
-  routingSourceHash: "source-v1:345cd55fced5e734a4b56dc0869a426266175eb09c63fa5f8f6a68b186217b17",
-  sourceHash: "source-v1:da286fbefa1a0d0a3ba3bf5a6589d2edba849af0f477ddb910ecad4d91649986",
-  geometryDigest: "geometry-v1:9748639c3654c11860e6a7da9649bfc4",
+  presetId: "wms-process-flow-v1",
+  variantId: "domain-lanes-lr",
+  routingSourceHash: "source-v1:637739031c56c359e008ac1b6bee9f52747cf458cd3e605183022651fdf1b82b",
+  sourceHash: "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
+  geometryDigest: "geometry-v1:0db6d7d00701fa1c7db955925161db08",
   load: () => loadBaseReactFlowPrecompiledRouteAsset(generatedPrecompiledRouteAsset1),
 };
 
 const generatedPrecompiledRouteAsset2 = new URL(
-  './precompiledRoutes/route-4103710537.json',
+  './precompiledRoutes/route-3004810106.json',
   import.meta.url,
 );
 
 const generatedPrecompiledRouteDescriptor2: GeneratedBaseReactFlowPrecompiledRouteDescriptor = {
-  presetId: "wms-process-flow-v1",
-  variantId: "domain-lanes-lr",
-  routingSourceHash: "source-v1:345cd55fced5e734a4b56dc0869a426266175eb09c63fa5f8f6a68b186217b17",
-  sourceHash: "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
-  geometryDigest: "geometry-v1:5c90308c9a3e8cd0c4eaf3cac68212f4",
+  presetId: "wms-demand-allocation-strategy-v2",
+  variantId: "initial",
+  routingSourceHash: "source-v1:637739031c56c359e008ac1b6bee9f52747cf458cd3e605183022651fdf1b82b",
+  sourceHash: "source-v1:ea82c502ab6535b5c8f8367c591861e540396a41955a15c6b5f94f922264b7de",
+  geometryDigest: "geometry-v1:95c9ed0f44e4583bff796ff1b532e467",
   load: () => loadBaseReactFlowPrecompiledRouteAsset(generatedPrecompiledRouteAsset2),
 };
 
 const generatedPrecompiledRouteAsset3 = new URL(
-  './precompiledRoutes/route-831788229.json',
+  './precompiledRoutes/route-3179279980.json',
   import.meta.url,
 );
 
 const generatedPrecompiledRouteDescriptor3: GeneratedBaseReactFlowPrecompiledRouteDescriptor = {
-  presetId: "wms-demand-allocation-strategy-v2",
+  presetId: "logistics-architecture-v1",
   variantId: "initial",
-  routingSourceHash: "source-v1:345cd55fced5e734a4b56dc0869a426266175eb09c63fa5f8f6a68b186217b17",
-  sourceHash: "source-v1:ea82c502ab6535b5c8f8367c591861e540396a41955a15c6b5f94f922264b7de",
-  geometryDigest: "geometry-v1:ffc618b03c1da934836b3edef1fcce28",
+  routingSourceHash: "source-v1:637739031c56c359e008ac1b6bee9f52747cf458cd3e605183022651fdf1b82b",
+  sourceHash: "source-v1:da286fbefa1a0d0a3ba3bf5a6589d2edba849af0f477ddb910ecad4d91649986",
+  geometryDigest: "geometry-v1:9748639c3654c11860e6a7da9649bfc4",
   load: () => loadBaseReactFlowPrecompiledRouteAsset(generatedPrecompiledRouteAsset3),
 };
 
@@ -71,9 +71,9 @@ export const GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_LOADERS: Record<
   GeneratedBaseReactFlowPrecompiledRouteDescriptor
 > = {
   "1902262462": generatedPrecompiledRouteDescriptor0,
-  "3179279980": generatedPrecompiledRouteDescriptor1,
-  "4103710537": generatedPrecompiledRouteDescriptor2,
-  "831788229": generatedPrecompiledRouteDescriptor3,
+  "2125591414": generatedPrecompiledRouteDescriptor1,
+  "3004810106": generatedPrecompiledRouteDescriptor2,
+  "3179279980": generatedPrecompiledRouteDescriptor3,
 };
 
 /**
@@ -85,6 +85,6 @@ export const GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_PREFETCH_LOADERS: Recor
   GeneratedBaseReactFlowPrecompiledRouteDescriptor
 > = {
   "wms-process-flow-v1": generatedPrecompiledRouteDescriptor0,
-  "logistics-architecture-v1": generatedPrecompiledRouteDescriptor1,
-  "wms-demand-allocation-strategy-v2": generatedPrecompiledRouteDescriptor3,
+  "wms-demand-allocation-strategy-v2": generatedPrecompiledRouteDescriptor2,
+  "logistics-architecture-v1": generatedPrecompiledRouteDescriptor3,
 };

@@ -48,6 +48,9 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
   const reversed = direction === 'BT' || direction === 'RL';
   const flow = horizontal ? 'x' : 'y';
   const cross = horizontal ? 'y' : 'x';
+  // Ranking semantics are explicit; adding isolated nodes never changes them.
+  const compactLaneRanks = options.rankMode === 'compact';
+  const alignGlobalPeers = options.alignGlobalLanePeers === true && !compactLaneRanks;
   // Flow-axis spacing controls process density, while cross-axis spacing keeps
   // adjacent lanes and their orthogonal connectors apart. Treating both as a
   // 120px lane gap silently discarded the validated 30/40px layout settings
@@ -65,15 +68,19 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
   const renderSafeObstacleGap = MIN_RENDER_SAFE_ROUTE_ENDPOINT_STUB + COMMERCIAL_BUSINESS_NODE_CLEARANCE;
   const renderSafeFacingTerminalGap = MIN_RENDER_SAFE_ROUTE_ENDPOINT_STUB * 2 + 2;
   const renderSafeRouteBandGap = Math.max(renderSafeObstacleGap, renderSafeFacingTerminalGap);
-  const maxFlowBandGap = Math.min(renderSafeRouteBandGap, flowGap);
+  const legacyCompactBandGap = horizontal ? 96 : 64;
+  const maxFlowBandGap = Math.min(
+    alignGlobalPeers ? renderSafeRouteBandGap : legacyCompactBandGap,
+    flowGap,
+  );
+  const largeFlowGraph = nodes.length > 36 || edges.length > 36;
+  const largeGraphPeerFlowGap = horizontal ? 32 : 32;
+  const peerFlowGap = largeFlowGraph ? Math.min(flowGap, largeGraphPeerFlowGap) : flowGap;
   const leaves = nodes.filter(node => !isDomainDagreGroupNode(node) && !isDomainDagreNodeHidden(node));
   if (!leaves.length) return nodes;
   if (leaves.some(node => !Number.isFinite(node.position.x) || !Number.isFinite(node.position.y))) {
     throw geometryBoundsError();
   }
-  // Ranking semantics are explicit; adding isolated nodes never changes them.
-  const compactLaneRanks = options.rankMode === 'compact';
-  const alignGlobalPeers = options.alignGlobalLanePeers === true && !compactLaneRanks;
   const positionScopes = new Map<string, Node[]>();
   for (const node of leaves) {
     const key = compactLaneRanks ? domainDagreDomainOf(node) : '';
@@ -274,7 +281,7 @@ export const alignDomainDagreLaneFlow = (nodes: Node[], edges: Edge[], options: 
           // Shared phases can remain aligned when a complete routed candidate
           // validates their channels. Domain-local compact ranks keep corridors.
           peerOffset += reuseSpacing ? Math.max(flowGap, flowSize(current) + COMMERCIAL_BUSINESS_NODE_CLEARANCE)
-            : alignGlobalPeers ? 0 : flowGap;
+            : alignGlobalPeers ? 0 : peerFlowGap;
           return positioned;
         });
     });

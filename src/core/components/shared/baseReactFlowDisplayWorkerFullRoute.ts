@@ -1,7 +1,6 @@
 import type { Node } from '@xyflow/react';
 
 import { computeBaseDisplayInputSignature } from './baseReactFlowDisplayEdgeCore';
-import { baseReactFlowDisplayCommercialQualityIsClean } from './baseReactFlowDisplayCommercialQuality';
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
 import {
   finalizeBaseReactFlowDisplayEdgesWithReport,
@@ -24,6 +23,7 @@ import {
   type DisplayWorkerFinalEvaluation,
   type DisplayWorkerFinalizationOptions,
 } from './baseReactFlowDisplayWorkerFinalEvaluation';
+import { createDisplayRoutingContractReport } from './baseReactFlowDisplayRoutingContract';
 import { startDisplayRoutingPhaseTrace, type DisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
 
 type WorkerFullRouteInput = Readonly<{
@@ -94,12 +94,15 @@ export const runBaseReactFlowDisplayWorkerFullRoute = ({
     smartEdgePadding: request.smartEdgePadding,
     isLargeGraph: request.isLargeGraph,
   });
+  const responseDisplayContractIsClean = (response: DisplayEdgesWorkerResponse): boolean => (
+    response.hardClean === true
+    && Boolean(response.edges)
+    && createDisplayRoutingContractReport(response.edges ?? [], repairNodes, {
+      hardReport: response.hardReport,
+    }).clean
+  );
   const closeFinalContract = (response: DisplayEdgesWorkerResponse): DisplayEdgesWorkerResponse => {
-    if (
-      response.hardClean === true
-      && response.edges
-      && baseReactFlowDisplayCommercialQualityIsClean(response.edges)
-    ) return response;
+    if (responseDisplayContractIsClean(response)) return response;
     const closureSeed = resolveBaseReactFlowFullRouteClosureSeed(response, fullRouteEdges);
     const closedEdges = closeBaseReactFlowFinalDisplayRoute({
       args: {
@@ -120,9 +123,7 @@ export const runBaseReactFlowDisplayWorkerFullRoute = ({
       ...response,
       edges: endpointClosedEdges,
     }, repairNodes);
-    return closedResponse.hardClean === true
-      && closedResponse.edges
-      && baseReactFlowDisplayCommercialQualityIsClean(closedResponse.edges)
+    return responseDisplayContractIsClean(closedResponse)
       ? closedResponse
       : response;
   };
