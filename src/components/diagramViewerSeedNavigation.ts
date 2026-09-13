@@ -5,6 +5,7 @@ import {
     clearPreviousDiagramAutoSave,
     persistDiagramFreshSeed,
 } from './diagramViewerStorage';
+import { createStandardPresetInitialMetadata } from '@/core/components/diagrams/standardPresetLayoutSelection';
 
 const STANDARD_EDGE_TYPES = new Set(['main', 'dependency', 'support', 'data', 'feedback', 'custom']);
 
@@ -85,6 +86,7 @@ export const normalizeDiagramSeedData = async ({
                 nodes: layoutResult.nodes,
                 edges: layoutResult.edges || data.edges || [],
                 layout: data.layout || { type: 'DomainDagreLayout', direction: 'TB' },
+                metadata: createStandardPresetInitialMetadata(data),
             };
         } catch (error) {
             logLayoutFallbackFailure(error);

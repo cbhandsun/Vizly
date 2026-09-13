@@ -13,7 +13,23 @@ export type LayoutStrategyPresetOptions = Readonly<{
     generatedGroupOptions: ReturnType<typeof resolveLayoutStrategyGeneratedGroupOptions>;
     domainOrder?: string[];
     subDomainOrder?: Record<string, string[]>;
+    spacing?: { horizontal: number; vertical: number };
 }>;
+
+const coerceFiniteLayoutNumber = (value: unknown): number | undefined => (
+    typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 10_000
+        ? value
+        : undefined
+);
+
+const coerceLayoutStrategySpacing = (value: unknown): LayoutStrategyPresetOptions['spacing'] => {
+    const record = asRecord(value);
+    const horizontal = coerceFiniteLayoutNumber(record.horizontal);
+    const vertical = coerceFiniteLayoutNumber(record.vertical);
+    return horizontal === undefined || vertical === undefined
+        ? undefined
+        : { horizontal, vertical };
+};
 
 export const resolveLayoutStrategyPresetOptions = async ({
     strategyName,
@@ -45,6 +61,7 @@ export const resolveLayoutStrategyPresetOptions = async ({
     generatedGroupOptions = resolveLayoutStrategyGeneratedGroupOptions(preset, allNodes);
     domainOrder = coerceLayoutStrategyStringArray(presetLayout.domainOrder);
     subDomainOrder = coerceLayoutStrategyStringArrayRecord(presetLayout.subDomainOrder);
+    const spacing = coerceLayoutStrategySpacing(presetLayout.spacing);
     if (!domainOrder && Array.isArray(presetRecord.nodes)) {
         const implicitOrder: string[] = [];
         const implicitSubOrder: Record<string, string[]> = {};
@@ -64,5 +81,5 @@ export const resolveLayoutStrategyPresetOptions = async ({
             if (!subDomainOrder) subDomainOrder = implicitSubOrder;
         }
     }
-    return { generatedGroupOptions, domainOrder, subDomainOrder };
+    return { generatedGroupOptions, domainOrder, subDomainOrder, spacing };
 };

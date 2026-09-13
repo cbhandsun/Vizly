@@ -197,6 +197,9 @@ export const buildFlowchartLayoutMenuModel = ({
         force: translate('designer.flowchart.layout.forceExplore', '⊙ 关系探索（力导向）'),
         domainGroup: translate('designer.flowchart.layout.advancedDomainGroup', '保留域的布局'),
         domainDagreTb: translate('designer.flowchart.layout.standardProcessTB', '标准流程（保留域·上→下）'),
+        domainDagreBt: translate('designer.flowchart.layout.standardProcessBT', '标准流程（保留域·下→上）'),
+        domainDagreLr: translate('designer.flowchart.layout.standardProcessLR', '标准流程（保留域·左→右）'),
+        domainDagreRl: translate('designer.flowchart.layout.standardProcessRL', '标准流程（保留域·右→左）'),
         domainDagreSubHorizontalTb: translate(
             'designer.flowchart.layout.standardProcessSubHorizontalTB',
             '标准流程（子域横排）',
@@ -326,6 +329,9 @@ export const buildFlowchartLayoutMenuModel = ({
         'tree-rl': labels.treeRl,
         force: labels.force,
         'domain-dagre-tb': labels.domainDagreTb,
+        'domain-dagre-bt': labels.domainDagreBt,
+        'domain-dagre-lr': labels.domainDagreLr,
+        'domain-dagre-rl': labels.domainDagreRl,
         'domain-dagre-sub-horizontal-tb': labels.domainDagreSubHorizontalTb,
         'domain-compound-elk-tb': labels.domainCompoundElkTb,
         'domain-compound-elk-bt': labels.domainCompoundElkBt,
@@ -475,6 +481,18 @@ export const buildFlowchartLayoutMenuModel = ({
                         <FaRegObjectGroup />,
                     ),
                     domainItem(
+                        'domain-dagre-bt',
+                        labels.domainDagreBt,
+                        () => onStrategyLayout('domain-dagre', undefined, 'BT'),
+                        <FaRegObjectGroup style={{ transform: 'rotate(180deg)' }} />,
+                    ),
+                    domainItem(
+                        'domain-dagre-rl',
+                        labels.domainDagreRl,
+                        () => onStrategyLayout('domain-dagre', undefined, 'RL'),
+                        <FaRegObjectGroup style={{ transform: 'rotate(90deg)' }} />,
+                    ),
+                    domainItem(
                         'domain-compound-elk-tb',
                         labels.domainCompoundElkTb,
                         () => onStrategyLayout('domain-compound-elk', undefined, 'TB'),
@@ -578,6 +596,12 @@ export const buildFlowchartLayoutMenuModel = ({
                     onClick: () => { void onSmartLayout(); },
                 }] : []),
                 primaryTopBottomItem,
+                domainItem(
+                    'domain-dagre-lr',
+                    labels.domainDagreLr,
+                    () => onStrategyLayout?.('domain-dagre', undefined, 'LR'),
+                    <FaRegObjectGroup style={{ transform: 'rotate(-90deg)' }} />,
+                ),
                 domainItem(
                     'domain-compound-elk-lr',
                     labels.domainCompoundElkLr,

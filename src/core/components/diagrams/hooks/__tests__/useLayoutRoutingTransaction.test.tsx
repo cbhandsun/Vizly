@@ -924,3 +924,36 @@ it('carries explicit final swimlane constraints through the actual strategy comm
   });
   expect(mocks.stageLayoutRouting.mock.lastCall?.[0].layoutConstraints).toBeUndefined();
 });
+
+it('reuses preset spacing when replaying the initial standard DomainDagre layout intent', async () => {
+  vi.clearAllMocks();
+  mocks.calculateLayeredLayoutWithReverse.mockResolvedValue({ nodes, edges });
+  mocks.stageLayoutRouting.mockResolvedValue({
+    committedSourceEdges: edges,
+    routedEdges,
+    commitSnapshot: () => true,
+  });
+  const options = createOptions();
+  const { result } = renderHook(() => useLayoutStrategy({
+    ...options,
+    diagramId: 'wms-process-flow-v1',
+    reactFlowInstance: null,
+    loadLayoutPresetMap: async () => ({
+      'wms-process-flow-v1': {
+        layout: {
+          direction: 'LR',
+          spacing: { horizontal: 72, vertical: 48 },
+        },
+      },
+    }),
+  }));
+
+  await act(async () => {
+    expect(await result.current.handleStrategyLayout('domain-dagre', undefined, 'LR')).toBe(true);
+  });
+
+  expect(mocks.calculateLayeredLayoutWithReverse.mock.lastCall?.[3]).toMatchObject({
+    direction: 'LR',
+    spacing: { horizontal: 72, vertical: 48 },
+  });
+});

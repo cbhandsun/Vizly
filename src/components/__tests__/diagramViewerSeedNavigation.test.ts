@@ -58,6 +58,15 @@ describe('diagramViewerSeedNavigation', () => {
         expect(result.nodes).toEqual([{ id: 'canvas-1', data: { label: 'A' } }]);
         expect(result.edges).toEqual([{ id: 'edge-1' }]);
         expect(result.layout).toEqual({ type: 'DomainDagreLayout', direction: 'TB' });
+        expect(result.metadata).toEqual({
+            layoutSelection: {
+                version: 2,
+                strategy: 'domain-dagre',
+                direction: 'TB',
+                nodeLayout: 'dagre',
+                laneRankPreference: 'auto',
+            },
+        });
     });
 
     it('logs and falls back to the original data when conversion fails', async () => {

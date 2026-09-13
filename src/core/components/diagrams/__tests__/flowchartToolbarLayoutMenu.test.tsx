@@ -182,7 +182,7 @@ describe('flowchartToolbarLayoutMenu', () => {
     const elkRl = items.find(item => item.key === 'domain-elk-rl');
     const globalGroup = items.find(item => item.key === 'group-tree');
     const domainGroup = items.find(item => item.key === 'group-domain');
-    const legacyDagreLr = items.find(item => item.key === 'domain-dagre-lr');
+    const standardDagreLr = items.find(item => item.key === 'domain-dagre-lr');
 
     expect(elkTb).toBeDefined();
     expect(elkBt).toBeDefined();
@@ -200,7 +200,7 @@ describe('flowchartToolbarLayoutMenu', () => {
       'domain-elk-rl',
     ]);
     expect(collectItems(domainGroup?.children).map(item => item.key)).not.toContain('domain-elk-tb');
-    expect(legacyDagreLr).toBeUndefined();
+    expect(standardDagreLr).toBeDefined();
     expect(model.selectedKeys).toContain('domain-elk-lr');
     expect(model.selectedKeys).not.toContain('node-elk');
     expect(model.statusText).not.toContain(' + ');
@@ -216,6 +216,8 @@ describe('flowchartToolbarLayoutMenu', () => {
     if (typeof elkRl?.onClick === 'function') elkRl.onClick();
     expect(onStrategyLayout).toHaveBeenCalledWith('domain-elk', 'elk-layered', 'BT');
     expect(onStrategyLayout).toHaveBeenCalledWith('domain-elk', 'elk-layered', 'RL');
+    if (typeof standardDagreLr?.onClick === 'function') standardDagreLr.onClick();
+    expect(onStrategyLayout).toHaveBeenCalledWith('domain-dagre', undefined, 'LR');
     const treeBt = items.find(item => item.key === 'tree-bt');
     const treeRl = items.find(item => item.key === 'tree-rl');
     if (typeof treeBt?.onClick === 'function') treeBt.onClick();
@@ -388,6 +390,7 @@ describe('flowchartToolbarLayoutMenu', () => {
     expect(collectItems(recommended.children).map(item => item.key)).toEqual([
       'smart-recommendation',
       'domain-dagre-tb',
+      'domain-dagre-lr',
       'domain-compound-elk-lr',
       'domain-lanes-tb',
       'domain-lanes-lr',
@@ -406,6 +409,7 @@ describe('flowchartToolbarLayoutMenu', () => {
     ]);
     expect(moreEngines.key).toBe('more-layout-engines');
     expect(collectItems(moreEngines.children).map(item => item.key)).toContain('domain-elk-lr');
+    expect(collectItems(moreEngines.children).map(item => item.key)).toContain('domain-dagre-rl');
 
     const smart = collectItems(recommended.children)
       .find(item => item.key === 'smart-recommendation');
@@ -529,6 +533,7 @@ describe('flowchartToolbarLayoutMenu', () => {
     expect(rootItems.find(item => item.key === 'group-custom-combination')?.label).toContain('当前图含合流或循环');
     expect(recommended.map(item => item.key)).toEqual([
       'domain-compound-elk-tb',
+      'domain-dagre-lr',
       'domain-compound-elk-lr',
       'domain-lanes-tb',
       'domain-lanes-lr',

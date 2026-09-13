@@ -20,6 +20,7 @@ import {
     logDesignerSystemSyncStandardDataToCanvasFailure,
 } from './designerSystemSyncLogging';
 import { registerRoutingOnlyDocumentCandidate } from '../../../routing/routingDocumentCandidateRegistry';
+import { createStandardPresetInitialMetadata } from '../standardPresetLayoutSelection';
 
 const PLUGIN_EMPTY_CANVAS_IDS = new Set(['flowchart']);
 
@@ -142,6 +143,7 @@ export const useDesignerInitialDiagramLoad = ({
         } else if (preset) {
             loadStandardPresetCanvas(String(id || ''), preset).then(({ nodes, edges }) => {
                 commitInitialization(() => {
+                    restoreAutoSaveMetadata?.(createStandardPresetInitialMetadata(preset));
                     suspendLayoutTransitions(setNodes);
                     setNodes(nodes);
                     setEdges(edges);

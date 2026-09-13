@@ -368,11 +368,13 @@ export function useLayoutStrategy({
                 let generatedGroupOptions = resolveLayoutStrategyGeneratedGroupOptions(undefined, allNodes);
                 let domainOrder: string[] | undefined;
                 let subDomainOrder: Record<string, string[]> | undefined;
+                let presetSpacing: { horizontal: number; vertical: number } | undefined;
                 try {
                     const resolvedPresetOptions = await presetOptions;
                     generatedGroupOptions = resolvedPresetOptions.generatedGroupOptions;
                     domainOrder = resolvedPresetOptions.domainOrder;
                     subDomainOrder = resolvedPresetOptions.subDomainOrder;
+                    presetSpacing = resolvedPresetOptions.spacing;
                 } catch { /* ignore */ }
 
                 generatedGroupOptions = resolveLayoutCommandGroupOptions(strategyName, generatedGroupOptions);
@@ -391,15 +393,18 @@ export function useLayoutStrategy({
                     strategy = new (await import('../../../strategies/DomainVerticalLayoutStrategy')).DomainVerticalLayoutStrategy();
                 }
 
+                const defaultSpacing = isDomainElk || isDomainCompoundElk
+                    ? { horizontal: 120, vertical: 120 }
+                    : isDomainLane
+                        ? resolveDomainLaneSpacing(dir)
+                        : { horizontal: 50, vertical: 50 };
                 const layoutOptions: LayoutOptions = {
                     type: strategy.getName() as LayoutOptions['type'],
                     direction: dir,
                     nodeLayout: finalNodeLayout as LayoutOptions['nodeLayout'],
-                    spacing: isDomainElk || isDomainCompoundElk
-                        ? { horizontal: 120, vertical: 120 }
-                        : isDomainLane
-                            ? resolveDomainLaneSpacing(dir)
-                            : { horizontal: 50, vertical: 50 },
+                    spacing: !isDomainElk && !isDomainCompoundElk && !isDomainLane
+                        ? (presetSpacing ?? defaultSpacing)
+                        : defaultSpacing,
                     edgeRouting: isDomainElk || isDomainCompoundElk ? 'ORTHOGONAL' : undefined,
                     edgeRoutingQuality: resolveDomainLayoutRoutingQuality(strategyName),
                     padding: { top: 40, right: 20, bottom: 20, left: 20 },
