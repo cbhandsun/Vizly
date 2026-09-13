@@ -49,6 +49,7 @@ export interface DesignerCanvasFeaturesLayerProps {
         | 'handleGroupWithToast'
         | 'handleUngroupWithToast'
         | 'handleLock'
+        | 'handleLayoutPin'
         | 'handleOpacity'
         | 'handleBringToFront'
         | 'handleSendToBack'
@@ -140,6 +141,7 @@ export const DesignerCanvasFeaturesLayer = React.memo(
                 handleGroupWithToast={hoverToolbar.handleGroupWithToast}
                 handleUngroupWithToast={hoverToolbar.handleUngroupWithToast}
                 handleLock={hoverToolbar.handleLock}
+                handleLayoutPin={hoverToolbar.handleLayoutPin}
                 handleOpacity={hoverToolbar.handleOpacity}
                 handleBringToFront={hoverToolbar.handleBringToFront}
                 handleSendToBack={hoverToolbar.handleSendToBack}

@@ -10,10 +10,10 @@ import {
   assignChildrenToSubGroupsBySemantic,
   normalizeMissingNodeSubDomainByDomain,
   normalizeSubGroupDomainByChildren,
-  ensureMeasuredForNodes,
   recomputeSubGroupContainersBasic,
   enforceSubGroupTitleClearance,
 } from '../utils/layoutUtils';
+import { ensureMeasuredForNodes } from '../utils/layout/ensureMeasuredForNodes';
 import { logLayoutWorkerTimeout, logWorkerLayoutFailure } from './layoutLogging';
 import { runElkLayout } from '../workers/elkLayoutClient';
 import {

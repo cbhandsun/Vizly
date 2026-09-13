@@ -13,7 +13,6 @@ import {
     LockKeyhole,
     type LucideIcon
 } from 'lucide-react';
-import { motion } from 'framer-motion';
 import EnhancedStyleSwitcher from '@/components/shared/EnhancedStyleSwitcher';
 import { EnhancedThemeSelector } from './EnhancedThemeSelector';
 import { LayoutStrategyManager, type ILayoutStrategy } from '@/core/strategies/LayoutStrategyManager';
@@ -193,10 +192,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                 
                 {/* 视觉风格组 */}
                 <SectionHeader title={t('designer.settings.group.visual', '外观视觉')} first={true} />
-                <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-white dark:bg-[#1A1A1C]/60 backdrop-blur-md border border-black/[0.06] dark:border-white/[0.08] rounded-[var(--glass-radius)] overflow-hidden shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]">
+                <div className="diagram-settings-section-card bg-white dark:bg-[#1A1A1C]/60 backdrop-blur-md border border-black/[0.06] dark:border-white/[0.08] rounded-[var(--glass-radius)] overflow-hidden shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]">
                     <SettingRow 
                         icon={Palette} 
                         label={t('designer.settings.theme', '颜色主题')}
@@ -230,15 +226,11 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                             />
                         </div>
                     </SettingRow>
-                </motion.div>
+                </div>
 
                 {/* 引擎策略组 */}
                 <SectionHeader title={t('designer.settings.group.engine', '引擎策略')} />
-                <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 }}
-                    className="bg-white dark:bg-[#1A1A1C]/60 backdrop-blur-md border border-black/[0.06] dark:border-white/[0.08] rounded-[var(--glass-radius)] overflow-hidden shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]">
+                <div className="diagram-settings-section-card diagram-settings-section-card--delay-1 bg-white dark:bg-[#1A1A1C]/60 backdrop-blur-md border border-black/[0.06] dark:border-white/[0.08] rounded-[var(--glass-radius)] overflow-hidden shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]">
                     <SettingRow 
                         icon={Zap} 
                         label={t('designer.settings.edgeMode')}
@@ -462,15 +454,11 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                             );
                         })()}
                     </SettingRow>
-                </motion.div>
+                </div>
 
                 {/* 视图控制组 */}
                 <SectionHeader title={t('designer.settings.group.view', '视图控制')} />
-                <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="bg-white dark:bg-[#1A1A1C]/60 backdrop-blur-md border border-black/[0.06] dark:border-white/[0.08] rounded-[var(--glass-radius)] overflow-hidden shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]">
+                <div className="diagram-settings-section-card diagram-settings-section-card--delay-2 bg-white dark:bg-[#1A1A1C]/60 backdrop-blur-md border border-black/[0.06] dark:border-white/[0.08] rounded-[var(--glass-radius)] overflow-hidden shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]">
                     <SettingRow 
                         icon={Filter} 
                         label={t('designer.settings.showMainFlow')}
@@ -484,14 +472,10 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                             disabled={!isMainFlowToggleSupported}
                         />
                     </SettingRow>
-                </motion.div>
+                </div>
 
                 {/* 高级配置入口 */}
-                <motion.div 
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.3 }}
-                    className="mt-6 mb-2">
+                <div className="diagram-settings-section-card diagram-settings-section-card--delay-3 mt-6 mb-2">
                     <button
                         type="button"
                         disabled={!editingEnabled}
@@ -516,7 +500,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                             <ChevronRight size={16} />
                         </div>
                     </button>
-                </motion.div>
+                </div>
             </div>
         </div>
             

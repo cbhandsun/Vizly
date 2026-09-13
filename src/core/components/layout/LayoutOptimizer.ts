@@ -651,4 +651,3 @@ export class LayoutOptimizer {
 
 // 导出类和单例实例
 export default LayoutOptimizer;
-export const layoutOptimizer = LayoutOptimizer.getInstance();

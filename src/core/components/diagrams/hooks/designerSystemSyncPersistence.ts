@@ -6,6 +6,7 @@ import { expandHandle } from '../../../routing/utils/handleUtils';
 import { isSafeCssColor } from '../../../themes/themeImportSecurity';
 import { parseAutoSavePayload } from '../../../utils/autoSaveStorage';
 import { appendBaseReactFlowEdgeSemanticClassName } from '../../shared/baseReactFlowEdgePresentation';
+import { LayoutOptimizer } from '../../layout/LayoutOptimizer';
 import { invalidateStalePresetEdgeAutomaticRoute } from './autosaveRoutingMigration';
 import { logDesignerSystemSyncFreshSeedClearFailure } from './designerSystemSyncLogging';
 
@@ -214,7 +215,6 @@ const mergePresetEdgePresentation = (
 };
 
 const defaultOptimizerLoader = async (): Promise<NodeSizeOptimizer> => {
-  const { LayoutOptimizer } = await import('../../layout/LayoutOptimizer');
   return LayoutOptimizer.getInstance();
 };
 

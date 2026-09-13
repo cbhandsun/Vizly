@@ -9,6 +9,7 @@ import {
     type FlowchartLayoutDirection,
 } from './flowchartLayoutStrategyMode';
 import type { LaneRankDecision, LaneRankPreference } from '../../types/domainLaneRank';
+import type { LayoutScopeRequest } from './hooks/layoutScopeBoundary';
 
 type ToolbarMenuItem = Extract<
     NonNullable<NonNullable<MenuProps['items']>[number]>,
@@ -32,9 +33,12 @@ interface BuildFlowchartLayoutMenuModelOptions {
         nodeLayout?: string,
         direction?: FlowchartLayoutDirection,
         laneRankPreference?: LaneRankPreference,
+        layoutScope?: LayoutScopeRequest,
     ) => void;
     laneRankPreference?: LaneRankPreference;
     laneRankDecision?: LaneRankDecision;
+    selectedNodesCount?: number;
+    selectedEdgesCount?: number;
     translate: TranslateLayoutLabel;
 }
 
@@ -43,6 +47,13 @@ export interface FlowchartLayoutMenuModel {
     selectedKeys: string[];
     statusText?: string;
     tooltipText?: string;
+}
+
+export interface FlowchartScopedLayoutMenuCommand {
+    strategyName: string;
+    nodeLayout?: string;
+    direction: FlowchartLayoutDirection;
+    laneRankPreference?: LaneRankPreference;
 }
 
 const radioMenuItem = (item: LayoutRadioMenuItem): LayoutRadioMenuItem => item;
@@ -83,6 +94,55 @@ export const resolveNodeLayoutHostStrategy = (
         ).strategyName
 );
 
+export const resolveScopedLayoutMenuCommand = ({
+    lastDomainStrategy,
+    lastDomainDirection,
+    lastNodeLayout,
+    laneRankPreference,
+}: Readonly<{
+    lastDomainStrategy?: string;
+    lastDomainDirection?: FlowchartLayoutDirection;
+    lastNodeLayout?: string;
+    laneRankPreference?: LaneRankPreference;
+}>): FlowchartScopedLayoutMenuCommand => {
+    const direction = lastDomainDirection ?? 'TB';
+    if (lastDomainStrategy === 'domain-vertical' || lastDomainStrategy === 'domain-horizontal') {
+        const command = createCustomDomainLayoutCommand(
+            resolveCustomDomainLayoutDirection(lastDomainStrategy, lastDomainDirection),
+            lastNodeLayout,
+        );
+        return {
+            strategyName: command.strategyName,
+            nodeLayout: command.nodeLayout,
+            direction: command.direction,
+        };
+    }
+    if (lastDomainStrategy === 'domain-lanes') {
+        return {
+            strategyName: 'domain-lanes',
+            nodeLayout: coerceFlowchartDomainNodeArrangement(lastNodeLayout),
+            direction,
+            laneRankPreference,
+        };
+    }
+    if (lastDomainStrategy === 'domain-elk') {
+        return { strategyName: 'domain-elk', nodeLayout: 'elk-layered', direction };
+    }
+    if (lastDomainStrategy === 'domain-dagre-sub-horizontal') {
+        return { strategyName: 'domain-dagre-sub-horizontal', nodeLayout: 'dagre', direction };
+    }
+    if (
+        lastDomainStrategy === 'domain-dagre'
+        || lastDomainStrategy === 'domain-compound-elk'
+        || lastDomainStrategy === 'compact-groups'
+        || lastDomainStrategy === 'force'
+        || lastDomainStrategy === 'tree'
+    ) {
+        return { strategyName: lastDomainStrategy, direction };
+    }
+    return { strategyName: 'tree', direction };
+};
+
 export const buildFlowchartLayoutMenuModel = ({
     customDomainLayoutAvailable = true,
     lastDomainDirection,
@@ -92,6 +152,8 @@ export const buildFlowchartLayoutMenuModel = ({
     onStrategyLayout,
     laneRankPreference = 'auto',
     laneRankDecision,
+    selectedNodesCount,
+    selectedEdgesCount,
     translate,
 }: BuildFlowchartLayoutMenuModelOptions): FlowchartLayoutMenuModel => {
     const activeDomainKey = resolveActiveDomainLayoutKey(lastDomainStrategy, lastDomainDirection);
@@ -118,6 +180,13 @@ export const buildFlowchartLayoutMenuModel = ({
         customUnavailable: translate(
             'designer.flowchart.layout.customUnavailable',
             '当前图含合流或循环，请使用常用场景',
+        ),
+        scopedGroup: translate('designer.flowchart.layout.scopedGroup', '局部布局'),
+        scopedSelection: translate('designer.flowchart.layout.scopedSelection', '只布局选区'),
+        scopedNeighborhood: translate('designer.flowchart.layout.scopedNeighborhood', '布局选区邻域'),
+        scopedUnavailable: translate(
+            'designer.flowchart.layout.scopedUnavailable',
+            '先选择节点或连线后再执行局部布局',
         ),
         moreEngines: translate('designer.flowchart.layout.moreEngines', '更多布局引擎'),
         treeGroup: translate('designer.flowchart.layout.advancedGlobalGroup', '全图布局（隐藏域容器）'),
@@ -320,6 +389,58 @@ export const buildFlowchartLayoutMenuModel = ({
         ),
     }));
 
+    const safeSelectedNodesCount = Number.isFinite(selectedNodesCount)
+        ? Math.max(0, Math.floor(selectedNodesCount ?? 0))
+        : 0;
+    const safeSelectedEdgesCount = Number.isFinite(selectedEdgesCount)
+        ? Math.max(0, Math.floor(selectedEdgesCount ?? 0))
+        : 0;
+    const hasScopedSelection = safeSelectedNodesCount > 0 || safeSelectedEdgesCount > 0;
+    const scopedLayoutCommand = resolveScopedLayoutMenuCommand({
+        lastDomainStrategy,
+        lastDomainDirection,
+        lastNodeLayout,
+        laneRankPreference,
+    });
+    const scopedLayoutItem = (
+        key: string,
+        label: string,
+        scope: LayoutScopeRequest,
+        icon: React.ReactNode,
+    ): ToolbarMenuItem => {
+        const disabled = !hasScopedSelection;
+        return {
+            key,
+            label,
+            icon,
+            disabled,
+            title: disabled ? labels.scopedUnavailable : undefined,
+            onClick: disabled
+                ? undefined
+                : () => onStrategyLayout?.(
+                    scopedLayoutCommand.strategyName,
+                    scopedLayoutCommand.nodeLayout,
+                    scopedLayoutCommand.direction,
+                    scopedLayoutCommand.laneRankPreference,
+                    scope,
+                ),
+        };
+    };
+    const scopedLayoutItems: NonNullable<MenuProps['items']> = [
+        scopedLayoutItem(
+            'scoped-selection-layout',
+            labels.scopedSelection,
+            { mode: 'selection' },
+            <FaRegObjectGroup />,
+        ),
+        scopedLayoutItem(
+            'scoped-neighborhood-layout',
+            labels.scopedNeighborhood,
+            { mode: 'selection-neighborhood', neighborhoodDepth: 1 },
+            <FaSitemap />,
+        ),
+    ];
+
     const primaryTopBottomItem = customDomainLayoutAvailable
         ? domainItem(
             'domain-dagre-tb',
@@ -478,6 +599,12 @@ export const buildFlowchartLayoutMenuModel = ({
             ],
         },
         { type: 'divider' as const },
+        ...(onStrategyLayout ? [{
+            key: 'group-scoped-layout',
+            label: labels.scopedGroup,
+            type: 'group' as const,
+            children: scopedLayoutItems,
+        }, { type: 'divider' as const }] : []),
         ...(supportsLaneRank ? [{
             key: 'group-lane-rank',
             label: labels.laneRankGroup,

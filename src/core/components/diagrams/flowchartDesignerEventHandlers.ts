@@ -1,4 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
+import type { LayoutScopeRequest } from './hooks/layoutScopeBoundary';
 
 import {
     createFlowchartEditorCommandEventHandler,
@@ -69,6 +70,8 @@ export const createFlowchartDesignerCommandEventHandler = ({
         engineName: string,
         nodeLayout: string | undefined,
         direction: FlowchartLayoutDirection,
+        laneRankPreference?: undefined,
+        layoutScope?: LayoutScopeRequest,
     ) => void;
     handleExport: () => void;
     setAiChatVisible: (visible: boolean) => void;

@@ -38,11 +38,21 @@ describe('flowchartEditorCommand', () => {
       strategy: ' Domain Vertical Layout ',
       nodeLayout: ' grid ',
       direction: ' LR ',
+      scope: ' selection-neighborhood ',
+      neighborhoodDepth: 2,
+      selectedNodeIds: ['n1', 'n1', 'bad\u0001id', 'n2'],
+      selectedEdgeIds: ['e1'],
     })).toEqual({
       action: 'apply-layout',
       strategy: 'Domain Vertical Layout',
       nodeLayout: 'grid',
       direction: 'LR',
+      scope: {
+        mode: 'selection-neighborhood',
+        neighborhoodDepth: 2,
+        selectedNodeIds: ['n1', 'n2'],
+        selectedEdgeIds: ['e1'],
+      },
     });
 
     expect(coerceFlowchartEditorCommandDetail(null)).toBeNull();
@@ -56,6 +66,15 @@ describe('flowchartEditorCommand', () => {
     expect(coerceFlowchartEditorCommandDetail({
       action: 'apply-layout',
       nodeLayout: '<script>',
+    })).toBeNull();
+    expect(coerceFlowchartEditorCommandDetail({
+      action: 'apply-layout',
+      scope: 'document',
+    })).toBeNull();
+    expect(coerceFlowchartEditorCommandDetail({
+      action: 'apply-layout',
+      scope: 'selection',
+      selectedNodeIds: 'n1',
     })).toBeNull();
   });
 
@@ -109,6 +128,41 @@ describe('flowchartEditorCommand', () => {
     expect(handled).toBe(true);
     expect(handleStrategyLayout).toHaveBeenCalledWith('dagre', 'grid', 'RL');
     expect(resolveFlowchartLayoutDirection('BT')).toBe('BT');
+  });
+
+  it('routes scoped apply-layout commands through the fifth layout argument', () => {
+    const handleStrategyLayout = vi.fn();
+
+    const handled = handleFlowchartEditorCommand({
+      detail: {
+        action: 'apply-layout',
+        strategy: 'domain_elk',
+        direction: 'LR',
+        scope: 'selection',
+        selectedNodeIds: ['node-a'],
+      },
+      handleSmartLayout: vi.fn(),
+      handleStrategyLayout,
+      handleExport: vi.fn(),
+      findToolbarExportButton: () => null,
+      setAiChatVisible: vi.fn(),
+      setActiveRightTab: vi.fn(),
+      reactFlowInstance: null,
+      setNodes: vi.fn(),
+      newNodeLabel: 'New Node',
+      windowWidth: 1200,
+      windowHeight: 800,
+      confirmClearCanvas: vi.fn(),
+    });
+
+    expect(handled).toBe(true);
+    expect(handleStrategyLayout).toHaveBeenCalledWith(
+      'domain-elk',
+      undefined,
+      'LR',
+      undefined,
+      { mode: 'selection', selectedNodeIds: ['node-a'] },
+    );
   });
 
   it('adds a viewport-centered node for add-node commands', () => {

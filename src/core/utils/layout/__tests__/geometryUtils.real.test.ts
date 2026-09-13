@@ -29,11 +29,11 @@ import {
   calculateBoundingBox,
   countNodeOverlapsByDomain,
   countRectOverlaps,
-  ensureMeasuredForNodes,
   pushFreeNodesBelowSubGroupRow,
   scatterNodesAtSamePoint,
   sortNodesInRow,
 } from '../geometryUtils';
+import { ensureMeasuredForNodes } from '../ensureMeasuredForNodes';
 
 describe('layout geometryUtils', () => {
   it('sorts nodes by sequence/order before x position', () => {

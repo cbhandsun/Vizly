@@ -4,8 +4,7 @@ import {
     FaSearchPlus, FaSearchMinus, FaCompressArrowsAlt,
     FaMagic, FaTh, FaKeyboard, FaBorderAll, FaBorderNone,
     FaSitemap, FaObjectGroup, FaRuler,
-    FaEllipsisH, FaTrashAlt,
-    FaMagnet, FaPen,
+    FaEllipsisH, FaTrashAlt, FaMagnet, FaPen,
     FaFolderOpen, FaFileExport, FaMap, FaSearch,
 } from 'react-icons/fa';
 import { BackgroundVariant } from '@xyflow/react';
@@ -24,6 +23,7 @@ import { useFlowchartLayoutMenu } from './hooks/useFlowchartLayoutMenu';
 import { getFlowchartLayoutMenuPlacements } from './flowchartLayoutMenuPlacement';
 import type { FlowchartLayoutDirection } from './flowchartLayoutStrategyMode';
 import type { LaneRankDecision, LaneRankPreference } from '../../types/domainLaneRank';
+import type { LayoutScopeRequest } from './hooks/layoutScopeBoundary';
 import { buildToolModeMenuItems, resolveActiveToolModeKey } from './flowchartToolbarToolModeMenu';
 import { getFlowchartZoomControlState } from './flowchartZoomControlState';
 import { useKeyboardAccessibleDropdown } from './hooks/useKeyboardAccessibleDropdown';
@@ -35,7 +35,6 @@ import {
     COMMERCIAL_VIEWPORT_MODAL_Z_INDEX,
     getViewportOverlayContainer,
 } from '../ui/viewportOverlayPortal';
-
 interface FlowchartToolbarProps {
     customDomainLayoutAvailable?: boolean;
     canUndo: boolean;
@@ -59,6 +58,7 @@ interface FlowchartToolbarProps {
         nodeLayout?: string,
         direction?: FlowchartLayoutDirection,
         laneRankPreference?: LaneRankPreference,
+        layoutScope?: LayoutScopeRequest,
     ) => void;
     /** 根据当前图结构选择低风险布局预设 */
     onSmartLayout?: () => void | Promise<void>;
@@ -152,6 +152,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     showMinimap,
     toggleMinimap,
     selectedNodesCount,
+    selectedEdgesCount,
     zoomPercent,
     snapToGrid,
     onToggleSnap,
@@ -220,7 +221,8 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
 
     const { layoutMenuModel, layoutTriggerLabel } = useFlowchartLayoutMenu({
         customDomainLayoutAvailable, lastDomainDirection, lastDomainStrategy, lastNodeLayout,
-        laneRankPreference, laneRankDecision, onSmartLayout, onStrategyLayout,
+        laneRankPreference, laneRankDecision, selectedNodesCount, selectedEdgesCount,
+        onSmartLayout, onStrategyLayout,
     });
     const zoomControlState = getFlowchartZoomControlState(zoomPercent);
     const normalizedZoomPercent = zoomControlState.percent;

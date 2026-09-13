@@ -138,6 +138,14 @@ vi.mock('../designerFlowDataBridgeProjection', () => ({
   projectDesignerStandardNodes: () => ({ standardNodes: [], groups: [] }),
 }));
 
+vi.mock('../../../layout/LayoutOptimizer', () => ({
+  LayoutOptimizer: {
+    getInstance: () => ({
+      calculateNodeWidth: () => 120,
+    }),
+  },
+}));
+
 import { useDesignerSystemSync } from '../useDesignerSystemSync';
 
 interface DeferredCanvas {
@@ -212,6 +220,7 @@ describe('useDesignerSystemSync initialization race safety', () => {
   const renderSync = (
     initialId: string,
     messageApi?: Pick<MessageInstance, 'info' | 'success'>,
+    initialCanvas: { nodes?: Node[]; edges?: Edge[] } = {},
   ) => {
     const setNodes = createSetter<Node>();
     const setEdges = createSetter<Edge>();
@@ -222,8 +231,8 @@ describe('useDesignerSystemSync initialization race safety', () => {
       ({ id }) => useDesignerSystemSync({
         id,
         diagramIdForExport: id,
-        nodes: [],
-        edges: [],
+        nodes: initialCanvas.nodes ?? [],
+        edges: initialCanvas.edges ?? [],
         setNodes,
         setEdges,
         reactFlowInstance: null,
@@ -247,6 +256,80 @@ describe('useDesignerSystemSync initialization race safety', () => {
       edges: [],
       routingSnapshot: mocks.routingSnapshot,
     });
+  });
+
+  it('validates AI bridge connections before adding programmatic edges', async () => {
+    const bridgeNodes: Node[] = [
+      { id: 'a', position: { x: 0, y: 0 }, data: { label: 'Start' } },
+      { id: 'b', position: { x: 100, y: 0 }, data: { label: 'Target' } },
+    ];
+    const existingEdges: Edge[] = [{ id: 'a-b-existing', source: 'a', target: 'b' }];
+    const { setEdges } = renderSync('diagram-bridge-connect', undefined, {
+      nodes: bridgeNodes,
+      edges: existingEdges,
+    });
+    const bridge = mocks.registeredBridges.get('diagram-bridge-connect');
+    const connectNodes = bridge?.connectNodes as ((payload: unknown) => Promise<unknown>) | undefined;
+    expect(connectNodes).toBeDefined();
+    setEdges.mockClear();
+
+    await act(async () => {
+      await connectNodes?.({ source: 'a', target: 'b', label: 'duplicate' });
+      await connectNodes?.({ source: 'missing', target: 'b', label: 'missing source' });
+      await connectNodes?.({ source: 'a', target: 'a', label: 'self loop' });
+    });
+
+    expect(setEdges).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await connectNodes?.({ source: 'b', target: 'a', label: 'valid reverse' });
+    });
+
+    expect(setEdges).toHaveBeenCalledOnce();
+    const update = setEdges.mock.calls[0]?.[0];
+    expect(typeof update).toBe('function');
+    const nextEdges = typeof update === 'function' ? update(existingEdges) : update;
+    expect(nextEdges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        source: 'b',
+        target: 'a',
+        label: 'valid reverse',
+        markerEnd: expect.objectContaining({ type: 'arrowclosed' }),
+      }),
+    ]));
+  });
+
+  it('sanitizes bridge snapshot replacement before restoring edges', () => {
+    const bridgeNodes: Node[] = [
+      { id: 'a', position: { x: 0, y: 0 }, data: { label: 'A' } },
+      { id: 'b', position: { x: 100, y: 0 }, data: { label: 'B' } },
+    ];
+    const { setNodes, setEdges } = renderSync('diagram-bridge-replace', undefined, {
+      nodes: bridgeNodes,
+      edges: [],
+    });
+    const bridge = mocks.registeredBridges.get('diagram-bridge-replace');
+    const replaceCanvasSnapshot = bridge?.replaceCanvasSnapshot as ((snapshot: unknown) => void) | undefined;
+    expect(replaceCanvasSnapshot).toBeDefined();
+    setNodes.mockClear();
+    setEdges.mockClear();
+
+    act(() => {
+      replaceCanvasSnapshot?.({
+        nodes: bridgeNodes,
+        edges: [
+          { id: 'valid-edge', source: 'a', target: 'b' },
+          { id: 'duplicate-edge', source: 'a', target: 'b' },
+          { id: 'self-loop', source: 'a', target: 'a' },
+          { id: 'missing-target', source: 'a', target: 'missing' },
+        ],
+      });
+    });
+
+    expect(setNodes).toHaveBeenCalledExactlyOnceWith(bridgeNodes);
+    expect(setEdges).toHaveBeenCalledExactlyOnceWith([
+      expect.objectContaining({ id: 'valid-edge' }),
+    ]);
   });
 
   it('keeps the latest diagram when an older preset finishes last', async () => {

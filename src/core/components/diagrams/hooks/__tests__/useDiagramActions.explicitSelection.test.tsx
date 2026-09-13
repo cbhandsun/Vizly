@@ -627,6 +627,51 @@ describe('useDiagramActions explicit selection targets', () => {
         expect(takeSnapshot).toHaveBeenCalledTimes(2);
     });
 
+    it('pins explicit layout targets without mutation-locking them', () => {
+        const initialNodes = [node('node-1', true), node('node-2', true), node('node-3')];
+        const nodesRef = { current: initialNodes };
+        let currentNodes = initialNodes;
+        const setNodes = vi.fn((update: SetStateAction<Node[]>) => {
+            currentNodes = typeof update === 'function' ? update(currentNodes) : update;
+        });
+        const takeSnapshot = vi.fn();
+
+        const { result } = renderHook(() => useDiagramActions({
+            nodes: [],
+            edges: [],
+            nodesRef,
+            edgesRef: { current: [] },
+            setNodes,
+            setEdges: vi.fn(),
+            selectedNodes: [],
+            selectedEdges: [],
+            takeSnapshot,
+            reactFlowInstance: null,
+        }));
+
+        act(() => result.current.handleLayoutPin(['node-1', 'node-2'], true));
+
+        expect(takeSnapshot).toHaveBeenCalledTimes(1);
+        expect(currentNodes.map(item => ({
+            id: item.id,
+            fixed: item.data.fixed,
+            locked: item.data.locked,
+            draggable: item.draggable,
+        }))).toEqual([
+            { id: 'node-1', fixed: true, locked: undefined, draggable: undefined },
+            { id: 'node-2', fixed: true, locked: undefined, draggable: undefined },
+            { id: 'node-3', fixed: undefined, locked: undefined, draggable: undefined },
+        ]);
+
+        act(() => result.current.handleLayoutPin(['node-1', 'node-2'], false));
+
+        expect(takeSnapshot).toHaveBeenCalledTimes(2);
+        expect(currentNodes.slice(0, 2).map(item => item.data.fixed)).toEqual([false, false]);
+
+        act(() => result.current.handleLayoutPin(['node-1', 'node-2'], false));
+        expect(takeSnapshot).toHaveBeenCalledTimes(2);
+    });
+
     it('moves every explicit layer target in one history step', () => {
         const initialNodes = [
             node('parent-a'),

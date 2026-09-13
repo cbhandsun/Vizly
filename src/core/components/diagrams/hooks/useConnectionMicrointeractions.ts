@@ -1,6 +1,7 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { Node, Edge, Connection, OnConnectStart, OnConnectEnd, ReactFlowInstance } from '@xyflow/react';
 import { logConnectionMicrointeractionFailure } from './diagramInteractionLogging';
+import type { ConnectionValidationResult } from '../../../types/connection';
 
 /**
  * Hook for managing connection microinteractions and animations
@@ -15,6 +16,7 @@ export interface UseConnectionMicrointeractionsProps {
     setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
     onConnect: (connection: Connection) => void;
     onConnectEnd?: OnConnectEnd;
+    validateConnection?: (connection: Connection) => ConnectionValidationResult;
     reactFlowInstance: ReactFlowInstance | null;
 }
 
@@ -27,10 +29,12 @@ export const useConnectionMicrointeractions = ({
     setEdges,
     onConnect,
     onConnectEnd,
+    validateConnection,
     reactFlowInstance,
 }: UseConnectionMicrointeractionsProps) => {
     const [isConnecting, setIsConnecting] = useState(false);
     const [connectPreview, setConnectPreview] = useState<{ x: number; y: number; side: 'top' | 'right' | 'bottom' | 'left' } | null>(null);
+    const [lastConnectionValidation, setLastConnectionValidation] = useState<ConnectionValidationResult | null>(null);
 
     const connectSourceRef = useRef<{ nodeId: string; handleId: string | null } | null>(null);
     const connectPointerRef = useRef<{ clientX: number; clientY: number } | null>(null);
@@ -44,6 +48,16 @@ export const useConnectionMicrointeractions = ({
     useEffect(() => {
         nodesRef.current = nodes;
     }, [nodes]);
+
+    useEffect(() => {
+        if (!lastConnectionValidation || lastConnectionValidation.valid || typeof window === 'undefined') return;
+        const timeoutId = window.setTimeout(() => {
+            setLastConnectionValidation(current => (
+                current === lastConnectionValidation ? null : current
+            ));
+        }, 4_500);
+        return () => window.clearTimeout(timeoutId);
+    }, [lastConnectionValidation]);
 
     // [Performance Mode logic moved to useDesignerInteractions for unified monitoring]
 
@@ -237,6 +251,7 @@ export const useConnectionMicrointeractions = ({
     const onConnectStart: OnConnectStart = useCallback((_event, { nodeId, handleId }) => {
         if (!nodeId) return;
         setIsConnecting(true);
+        setLastConnectionValidation(null);
         connectSourceRef.current = { nodeId, handleId };
 
         // 🚀 P4: 直接 DOM 操作替代 setNodes — 连接开始时 O(n) DOM 批量操作
@@ -250,32 +265,38 @@ export const useConnectionMicrointeractions = ({
         }
     }, [domBatchAddClass, domSetConnectHighlight]);
 
+    const clearConnectionInteraction = useCallback(() => {
+        setIsConnecting(false);
+        connectSourceRef.current = null;
+        connectPointerRef.current = null;
+        connectPreviewRef.current = null;
+        setConnectPreview(null);
+        connectPreviewNodeIdRef.current = null;
+        connectPreviewKeyRef.current = null;
+        domBatchRemoveClasses(ALL_CONNECT_CLASSES);
+        domSetConnectHighlight(null, false);
+        if (typeof document !== 'undefined') {
+            document.body.classList.remove('performance-mode');
+        }
+    }, [domBatchRemoveClasses, domSetConnectHighlight]);
+
     const enhancedOnConnect = useCallback((connection: Connection) => {
+        const validation = validateConnection?.(connection);
+        if (validation && !validation.valid) {
+            setLastConnectionValidation(validation);
+            clearConnectionInteraction();
+            return;
+        }
+
         onConnect(connection);
+        setLastConnectionValidation(null);
 
         // Clear previous edge animation timer
         if (edgeAnimationTimerRef.current) {
             clearTimeout(edgeAnimationTimerRef.current);
         }
 
-        // Clear connecting states
-        setIsConnecting(false);
-        connectSourceRef.current = null;
-        connectPointerRef.current = null;
-        connectPreviewRef.current = null;
-        setConnectPreview(null);
-
-        connectPreviewNodeIdRef.current = null;
-        connectPreviewKeyRef.current = null;
-
-        // 🚀 P4: 直接 DOM 操作批量清理所有连接类名
-        domBatchRemoveClasses(ALL_CONNECT_CLASSES);
-        domSetConnectHighlight(null, false);
-        
-        // 🚀 P5: 清理全局性能模式
-        if (typeof document !== 'undefined') {
-            document.body.classList.remove('performance-mode');
-        }
+        clearConnectionInteraction();
 
         // Add success animation to the new edge (with cleanup)
         edgeAnimationTimerRef.current = setTimeout(() => {
@@ -293,7 +314,7 @@ export const useConnectionMicrointeractions = ({
                 edgeAnimationTimerRef.current = null;
             }, 1000);
         }, 50);
-    }, [onConnect, setEdges, domBatchRemoveClasses, domSetConnectHighlight]);
+    }, [onConnect, setEdges, validateConnection, clearConnectionInteraction]);
 
     const enhancedOnConnectEnd: OnConnectEnd = useCallback((event, connectionState) => {
         const preview = connectPreviewRef.current;
@@ -308,43 +329,37 @@ export const useConnectionMicrointeractions = ({
         const toHandleId: string | null = connectionState.toHandle?.id ?? (usePreview ? preview.handleId : null);
 
         const hasEndpoints = !!fromNodeId && !!toNodeId && fromNodeId !== toNodeId;
-
-        if (hasEndpoints) {
-            enhancedOnConnect({
+        const candidateConnection = hasEndpoints
+            ? {
                 source: fromNodeId as string,
                 target: toNodeId as string,
                 sourceHandle: fromHandleId,
                 targetHandle: toHandleId,
-            });
+            }
+            : null;
+        const validation = candidateConnection && validateConnection
+            ? validateConnection(candidateConnection)
+            : null;
+        if (validation && !validation.valid) {
+            setLastConnectionValidation(validation);
+        }
+
+        if (candidateConnection && (!validation || validation.valid)) {
+            enhancedOnConnect(candidateConnection);
         } else {
             if (onConnectEnd) {
                 onConnectEnd(event, connectionState);
             }
 
-            // Clear connection states (only when not handled by enhancedOnConnect)
-            setIsConnecting(false);
-            connectSourceRef.current = null;
-            connectPointerRef.current = null;
-            connectPreviewRef.current = null;
-            setConnectPreview(null);
-
-            connectPreviewNodeIdRef.current = null;
-            connectPreviewKeyRef.current = null;
-
-            // 🚀 P4: 直接 DOM 操作批量清理
-            domBatchRemoveClasses(ALL_CONNECT_CLASSES);
-            domSetConnectHighlight(null, false);
-
-            // 🚀 P5: 清理全局性能模式
-            if (typeof document !== 'undefined') {
-                document.body.classList.remove('performance-mode');
-            }
+            clearConnectionInteraction();
         }
-    }, [enhancedOnConnect, onConnectEnd, domBatchRemoveClasses, domSetConnectHighlight]);
+    }, [enhancedOnConnect, onConnectEnd, validateConnection, clearConnectionInteraction]);
 
     return {
         isConnecting,
         connectPreview,
+        lastConnectionValidation,
+        setConnectionValidationFeedback: setLastConnectionValidation,
         onConnectStart,
         enhancedOnConnect,
         enhancedOnConnectEnd

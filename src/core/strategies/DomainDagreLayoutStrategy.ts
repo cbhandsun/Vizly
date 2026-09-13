@@ -10,9 +10,9 @@ import {
     collapseGeneratedDomainAliasSubGroups,
     assignChildrenToSubGroupsBySemantic,
     normalizeSubGroupDomainByChildren,
-    ensureMeasuredForNodes,
     centerSubGroupsInDomain
 } from '../utils/layoutUtils';
+import { ensureMeasuredForNodes } from '../utils/layout/ensureMeasuredForNodes';
 import {
     calculateBounds,
 } from './DomainDagreLayoutHelpers';

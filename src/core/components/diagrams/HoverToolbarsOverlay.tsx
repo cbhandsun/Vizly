@@ -35,6 +35,7 @@ interface HoverToolbarsOverlayProps {
     handleGroupWithToast: () => void;
     handleUngroupWithToast: (targetId?: string) => void;
     handleLock: (target?: DiagramActionTarget, locked?: boolean) => void;
+    handleLayoutPin?: (target?: DiagramActionTarget, fixed?: boolean) => void;
     handleOpacity: (opacity: number) => void;
     handleBringToFront: (target?: DiagramActionTarget) => void;
     handleSendToBack: (target?: DiagramActionTarget) => void;
@@ -84,6 +85,7 @@ export const HoverToolbarsOverlay: React.FC<HoverToolbarsOverlayProps> = ({
     handleGroupWithToast,
     handleUngroupWithToast,
     handleLock,
+    handleLayoutPin,
     handleOpacity,
     handleBringToFront,
     handleSendToBack,
@@ -141,6 +143,9 @@ export const HoverToolbarsOverlay: React.FC<HoverToolbarsOverlayProps> = ({
                     }}
 
                     onLock={(locked) => handleLock(selectedNodeIds, locked)}
+                    onLayoutPin={handleLayoutPin
+                        ? (fixed) => handleLayoutPin(selectedNodeIds, fixed)
+                        : undefined}
                     onOpacity={handleOpacity}
                     onBringToFront={() => handleBringToFront(selectedNodeIds)}
                     onSendToBack={() => handleSendToBack(selectedNodeIds)}

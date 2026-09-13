@@ -716,6 +716,3 @@ export class EdgeFactory {
     }
   }
 }
-
-// 导出单例实例
-export const edgeFactory = EdgeFactory.getInstance();

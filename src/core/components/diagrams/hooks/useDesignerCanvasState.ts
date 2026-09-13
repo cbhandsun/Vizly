@@ -111,9 +111,8 @@ export function useDesignerCanvasState({
         setEdges,
         onNodesChange,
         onEdgesChange,
-        onConnect,
         diagramHistory
-    } = useFlowchartState(internalEdgeMode);
+    } = useFlowchartState();
 
     useEffect(() => {
         setEdges(eds => {
@@ -239,7 +238,6 @@ export function useDesignerCanvasState({
         setEdges,
         onNodesChange,
         onEdgesChange,
-        onConnect,
         diagramHistory,
         
         nodesRef,

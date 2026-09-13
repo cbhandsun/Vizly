@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Edge, Node, ReactFlowInstance } from '@xyflow/react';
 import { diagramConfigManager, EdgeConfig } from '@/core/config/DiagramConfig';
 import { useLayoutStrategy } from './useLayoutStrategy';
@@ -44,6 +45,7 @@ export function useAutoRouting({
     loadLayoutPresetMap,
     messageApi,
 }: UseAutoRoutingOptions) {
+    const { t } = useTranslation();
     // [FIX] Read initial value from DiagramConfig instead of hardcoding false.
     // When autoRoutingEnabled starts as false, BaseReactFlow converts 'advanced-smart-step'
     // edges to built-in 'step' type. Later when it switches to true, the edge type changes,
@@ -94,8 +96,8 @@ export function useAutoRouting({
     }, []);
 
     const onLayoutFailure = useCallback((code: DisplayLayoutTransactionErrorCode) => {
-        presentLayoutFailure(messageApi, code);
-    }, [messageApi]);
+        presentLayoutFailure(messageApi, code, t);
+    }, [messageApi, t]);
 
     // 布局策略
     const { handleStrategyLayout: _handleStrategyLayout, lastDomainStrategy, lastDomainDirection, lastNodeLayout,

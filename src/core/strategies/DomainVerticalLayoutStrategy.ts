@@ -1,9 +1,10 @@
 import type { Node as ReactFlowNode, Edge } from '@xyflow/react';
 import type { LayoutOptions } from '../types/layout';
+import { ensureMeasuredForNodes } from '../utils/layout/ensureMeasuredForNodes';
 
 import { pushFreeNodesBelowSubGroupRow, resolveDomainContainerOverlaps, scatterNodesAtSamePoint } from '../utils/layoutUtils';
 import { ILayoutStrategy } from './LayoutStrategyManager';
-import { assignChildrenToSubGroupsBySemantic, enforceDomainContainerStrictContainment, recomputeSubGroupContainersBasic, purgeSubGroupChildrenBySemantic, resolveSubGroupOverlaps, resolveFreeNodeOverlapsInDomain, resolveSubGroupChildrenOverlapsStrict, expandSubGroupContainersBySemantic, enforceSubGroupStrictContainmentByChildren, finalizeSubGroupHeightsByProjectionPreserveAnchor, finalizeDomainWidthsByProjection, ensureMeasuredForNodes, finalizeSubGroupWidthsByProjectionPreserveAnchor, unifySubGroupWidthsByDomain, finalizeDomainHeightsByProjection, packSubGroupChildrenRigid, clampDomainHeightsToSubGroups, unifySubGroupGapsInDomain, unifySubGroupHeightsByDomain, syncDagreChildPositions, centerSubGroupsInDomain, scaleDomainContentToFitWidthAll } from '../utils/layoutUtils';
+import { assignChildrenToSubGroupsBySemantic, enforceDomainContainerStrictContainment, recomputeSubGroupContainersBasic, purgeSubGroupChildrenBySemantic, resolveSubGroupOverlaps, resolveFreeNodeOverlapsInDomain, resolveSubGroupChildrenOverlapsStrict, expandSubGroupContainersBySemantic, enforceSubGroupStrictContainmentByChildren, finalizeSubGroupHeightsByProjectionPreserveAnchor, finalizeDomainWidthsByProjection, finalizeSubGroupWidthsByProjectionPreserveAnchor, unifySubGroupWidthsByDomain, finalizeDomainHeightsByProjection, packSubGroupChildrenRigid, clampDomainHeightsToSubGroups, unifySubGroupGapsInDomain, unifySubGroupHeightsByDomain, syncDagreChildPositions, centerSubGroupsInDomain, scaleDomainContentToFitWidthAll } from '../utils/layoutUtils';
 import { centerSubGroupChildrenHorizontally, centerSubGroupChildrenVertically, layoutSubGroupChildrenInRow, alignSubGroupGridRows, alignSubGroupStack } from '../utils/layoutUtils';
 import { ensureDomainContainment } from './shared/geometryGuard';
 import { unifyContainerWidthsByMaximum } from './shared/domainContainerSizeNormalization';

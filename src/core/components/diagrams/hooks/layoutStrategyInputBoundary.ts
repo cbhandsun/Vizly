@@ -1,6 +1,8 @@
 import type { Edge, Node } from '@xyflow/react';
+import { evaluateLayoutGeometry, type LayoutGeometryConstraints } from '../../../algorithms/layoutGeometryConstraints';
 import { coerceDiagramId } from '../../../utils/inputBoundary';
 import { getNodeAbsolutePosition } from './diagramNodeParenting';
+import { isNodeMutationLocked } from '../nodeLockPolicy';
 
 export const asLayoutStrategyRecord = (value: unknown): Record<string, unknown> => (
     value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -34,6 +36,79 @@ export const prepareFlatLayoutStrategyGraph = (nodes: Node[], edges: Edge[]) => 
     const nodeIds = new Set(layoutNodes.map(node => node.id));
     const layoutEdges = edges.filter(edge => nodeIds.has(edge.source) && nodeIds.has(edge.target));
     return { layoutNodes, layoutEdges, nonLayoutTypes };
+};
+
+const GENERATED_LAYOUT_CONTAINER_TYPES = new Set(['titleGroup', 'subGroup', 'group', 'domain', 'subDomain', 'swimlane']);
+
+const isGeneratedLayoutContainerNode = (node: Node): boolean => (
+    typeof node.type === 'string' && GENERATED_LAYOUT_CONTAINER_TYPES.has(node.type)
+);
+
+const isFixedLayoutNode = (node: Node): boolean => {
+    if (isGeneratedLayoutContainerNode(node)) return false;
+    return isNodeMutationLocked(node) || asLayoutStrategyRecord(node.data).fixed === true;
+};
+
+const finitePosition = (position: Node['position'] | undefined): Node['position'] => ({
+    x: Number.isFinite(position?.x) ? Number(position?.x) : 0,
+    y: Number.isFinite(position?.y) ? Number(position?.y) : 0,
+});
+
+const resolveCandidateParentAbsolutePosition = (
+    parentId: string | undefined,
+    nodeById: ReadonlyMap<string, Node>,
+): Node['position'] => {
+    if (!parentId) return { x: 0, y: 0 };
+    const parent = nodeById.get(parentId);
+    if (!parent) return { x: 0, y: 0 };
+    return getNodeAbsolutePosition(parent, [...nodeById.values()]);
+};
+
+export const applyLayoutFixedNodeConstraints = (
+    candidateNodes: Node[],
+    sourceNodes: Node[],
+    layoutConstraints?: LayoutGeometryConstraints,
+): Node[] => {
+    if (candidateNodes.length === 0 || sourceNodes.length === 0) return candidateNodes;
+    const sourceById = new Map(sourceNodes.map(node => [node.id, node] as const));
+    const fixedAbsoluteById = new Map<string, Node['position']>();
+    for (const sourceNode of sourceNodes) {
+        if (!isFixedLayoutNode(sourceNode)) continue;
+        fixedAbsoluteById.set(
+            sourceNode.id,
+            getNodeAbsolutePosition(sourceNode, sourceNodes),
+        );
+    }
+    if (fixedAbsoluteById.size === 0) return candidateNodes;
+
+    const candidateById = new Map(candidateNodes.map(node => [node.id, node] as const));
+    let changed = false;
+    const constrained = candidateNodes.map((node) => {
+        const fixedAbsolute = fixedAbsoluteById.get(node.id);
+        const sourceNode = sourceById.get(node.id);
+        if (!fixedAbsolute || !sourceNode) return node;
+
+        const parentAbsolute = resolveCandidateParentAbsolutePosition(node.parentId, candidateById);
+        const nextPosition = {
+            x: fixedAbsolute.x - parentAbsolute.x,
+            y: fixedAbsolute.y - parentAbsolute.y,
+        };
+        const currentPosition = finitePosition(node.position);
+        if (
+            currentPosition.x === nextPosition.x
+            && currentPosition.y === nextPosition.y
+        ) return node;
+        changed = true;
+        return {
+            ...node,
+            position: nextPosition,
+        } as Node;
+    });
+
+    if (!changed) return candidateNodes;
+    const candidateReport = evaluateLayoutGeometry(candidateNodes, layoutConstraints);
+    const constrainedReport = evaluateLayoutGeometry(constrained, layoutConstraints);
+    return candidateReport.clean && !constrainedReport.clean ? candidateNodes : constrained;
 };
 
 export const coerceLayoutStrategyStringArray = (value: unknown): string[] | undefined => {

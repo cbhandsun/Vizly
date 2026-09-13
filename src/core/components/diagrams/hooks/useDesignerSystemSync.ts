@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from 'react';
-import { MarkerType, type Edge, type Node, type ReactFlowInstance } from '@xyflow/react';
+import { MarkerType, type Connection, type Edge, type Node, type ReactFlowInstance } from '@xyflow/react';
 import type { MessageInstance } from 'antd/es/message/interface';
 import { useAutoSave } from './useAutoSave';
 import { readReactFlowCanvasSize } from '../../../utils/domViewport';
@@ -24,9 +24,16 @@ import {
     registerFlowDesignerCloudOpener,
     type FlowDataBridgeEntry,
 } from '../../../utils/flowDataBridge';
+import {
+    connectionToken,
+    validateConnectionDetailed,
+} from './connectionValidationPolicy';
 import type { StandardDiagramData } from '../../../models/DiagramModels';
 import { createBaseReactFlowRoutingOnlyDocumentSnapshot } from '../../shared/baseReactFlowDisplayCommittedSnapshot';
 import type { BaseReactFlowRoutingSessionRuntime } from '../../shared/baseReactFlowRoutingSessionRuntime';
+import { LayoutOptimizer } from '../../layout/LayoutOptimizer';
+import { applyParallelEdgePresentation } from '../parallelEdgePresentation';
+import { sanitizeCanvasEdgesForNodes } from '../../../utils/canvasEdgeSanitizer';
 
 export interface UseDesignerSystemSyncProps {
     id?: string;
@@ -43,6 +50,30 @@ export interface UseDesignerSystemSyncProps {
     restoreAutoSaveMetadata?: (metadata: unknown) => { nodes: Node[]; edges: Edge[] } | null;
     routingSessionRuntime?: BaseReactFlowRoutingSessionRuntime;
 }
+
+const BRIDGE_CONNECTION_DEFAULT_TYPE = 'advanced-smart-step';
+const BRIDGE_CONNECTION_LABEL_MAX_LENGTH = 200;
+
+interface BridgeConnectNodesPayload {
+    source: string;
+    target: string;
+    label?: string;
+    type: string;
+}
+
+const parseBridgeConnectNodesPayload = (args: unknown): BridgeConnectNodesPayload | null => {
+    if (args === null || typeof args !== 'object' || Array.isArray(args)) return null;
+    const record = args as Record<string, unknown>;
+    const source = connectionToken(record.source);
+    const target = connectionToken(record.target);
+    if (!source || !target) return null;
+    const type = connectionToken(record.type) || BRIDGE_CONNECTION_DEFAULT_TYPE;
+    const rawLabel = typeof record.label === 'string' ? record.label.trim() : '';
+    const label = rawLabel.length > 0 && rawLabel.length <= BRIDGE_CONNECTION_LABEL_MAX_LENGTH
+        ? rawLabel
+        : undefined;
+    return { source, target, type, ...(label ? { label } : {}) };
+};
 
 export function useDesignerSystemSync({
     id, diagramIdForExport, nodes, edges, setNodes, setEdges,
@@ -159,7 +190,10 @@ export function useDesignerSystemSync({
                 enumerable: false,
                 value: (snapshot: { nodes?: Node[]; edges?: Edge[] }) => {
                     const nextNodes = Array.isArray(snapshot?.nodes) ? snapshot.nodes : [];
-                    const nextEdges = Array.isArray(snapshot?.edges) ? snapshot.edges : [];
+                    const nextEdges = sanitizeCanvasEdgesForNodes(
+                        nextNodes,
+                        Array.isArray(snapshot?.edges) ? snapshot.edges : [],
+                    );
                     nodesRef.current = nextNodes;
                     edgesRef.current = nextEdges;
                     setNodes(nextNodes);
@@ -174,7 +208,7 @@ export function useDesignerSystemSync({
                     const { id: incomingId, label, type: incomingType, shape = 'rectangle', parentId, position } = args;
                     const id = incomingId || `node_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
                     
-                    const layoutOptimizer = (await import('../../layout/LayoutOptimizer')).LayoutOptimizer.getInstance();
+                    const layoutOptimizer = LayoutOptimizer.getInstance();
                     const width = layoutOptimizer.calculateNodeWidth(label);
 
                     // 默认类型映射逻辑
@@ -260,10 +294,24 @@ export function useDesignerSystemSync({
 
             Object.defineProperty(standardData, 'connectNodes', {
                 enumerable: false,
-                value: async (args: { source: string; target: string; label?: string; type?: string }) => {
-                    const { source, target, label, type = 'advanced-smart-step' } = args;
+                value: async (args: unknown) => {
+                    const payload = parseBridgeConnectNodesPayload(args);
+                    if (!payload) return undefined;
+                    const { source, target, label, type } = payload;
                     const id = `edge_${source}_${target}_${Date.now().toString().substring(7)}`;
-                    
+                    const connection: Connection = {
+                        source,
+                        target,
+                        sourceHandle: null,
+                        targetHandle: null,
+                    };
+                    const validation = validateConnectionDetailed({
+                        nodes: nodesRef.current,
+                        edges: edgesRef.current,
+                        connection,
+                    });
+                    if (!validation.valid) return undefined;
+
                     const newEdge: Edge = {
                         id,
                         source,
@@ -273,7 +321,17 @@ export function useDesignerSystemSync({
                         markerEnd: { type: MarkerType.ArrowClosed }
                     };
 
-                    setEdges((eds) => [...eds, newEdge]);
+                    setEdges((eds) => {
+                        const latestValidation = validateConnectionDetailed({
+                            nodes: nodesRef.current,
+                            edges: eds,
+                            connection: newEdge,
+                        });
+                        if (!latestValidation.valid) return eds;
+                        const nextEdges = applyParallelEdgePresentation([...eds, newEdge]);
+                        edgesRef.current = nextEdges;
+                        return nextEdges;
+                    });
                     return id;
                 }
             });
@@ -282,9 +340,7 @@ export function useDesignerSystemSync({
                 enumerable: false,
                 value: async (id: string, data: Record<string, unknown>) => {
                     const label = typeof data.label === 'string' ? data.label : undefined;
-                    const layoutOptimizer = label
-                        ? (await import('../../layout/LayoutOptimizer')).LayoutOptimizer.getInstance()
-                        : null;
+                    const layoutOptimizer = label ? LayoutOptimizer.getInstance() : null;
                     setNodes((nds) => nds.map((n) => {
                         if (n.id === id) {
                             const newData = { ...n.data, ...data };
@@ -541,4 +597,3 @@ export function useDesignerSystemSync({
         isInitialDiagramLoading: !activePresetLookup.ready || !isCurrentDiagramInitialized,
     };
 }
-

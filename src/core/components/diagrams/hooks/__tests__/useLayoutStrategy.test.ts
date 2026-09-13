@@ -7,6 +7,7 @@ import { resolveLayoutStrategyGeometryConstraints } from '../layoutStrategyGeome
 import { prepareFlatLayoutStrategyGraph } from '../layoutStrategyInputBoundary';
 import { parsePersistedLayoutSelection, usePersistedLayoutSelection, useLayoutAutoSaveMetadata } from '../usePersistedLayoutSelection';
 import {
+  applyLayoutFixedNodeConstraints,
   clearLayoutRuntimeAbsolutePosition,
   LAYERED_TREE_ROUTING_SPACING,
   loadLayoutStrategyPresetFromCandidates,
@@ -165,6 +166,109 @@ describe('clearLayoutRuntimeAbsolutePosition', () => {
 
     expect(result.position).toEqual({ x: 400, y: 500 });
     expect(result.positionAbsolute).toBeUndefined();
+  });
+});
+
+describe('applyLayoutFixedNodeConstraints', () => {
+  it('preserves locked root nodes at their source absolute position', () => {
+    const source: Node[] = [
+      { id: 'fixed', position: { x: 100, y: 200 }, data: { locked: true } },
+      { id: 'free', position: { x: 300, y: 400 }, data: {} },
+    ];
+    const candidate: Node[] = [
+      { ...source[0], position: { x: 900, y: 800 }, data: { locked: true } },
+      { ...source[1], position: { x: 500, y: 600 } },
+    ];
+
+    const constrained = applyLayoutFixedNodeConstraints(candidate, source);
+
+    expect(constrained[0]).toMatchObject({
+      position: { x: 100, y: 200 },
+      data: { locked: true },
+    });
+    expect(constrained[1]).toBe(candidate[1]);
+    expect(source[0].position).toEqual({ x: 100, y: 200 });
+  });
+
+  it('preserves fixed child nodes by converting their absolute position into the new parent space', () => {
+    const source: Node[] = [
+      { id: 'group', type: 'titleGroup', position: { x: 100, y: 200 }, data: {} },
+      { id: 'child', parentId: 'group', position: { x: 20, y: 30 }, data: { fixed: true } },
+    ];
+    const candidate: Node[] = [
+      { id: 'group', type: 'titleGroup', position: { x: 400, y: 500 }, data: {} },
+      { id: 'child', parentId: 'group', position: { x: 80, y: 90 }, data: { fixed: true } },
+    ];
+
+    const constrained = applyLayoutFixedNodeConstraints(candidate, source);
+
+    expect(constrained[1]).toMatchObject({
+      parentId: 'group',
+      position: { x: -280, y: -270 },
+      data: { fixed: true },
+    });
+  });
+
+  it('does not pin generated layout containers that are non-draggable by policy', () => {
+    const source: Node[] = [
+      { id: 'titlegroup-a', type: 'titleGroup', draggable: false, position: { x: 10, y: 20 }, data: {} },
+      { id: 'business', position: { x: 30, y: 40 }, data: {} },
+    ];
+    const candidate: Node[] = [
+      { id: 'titlegroup-a', type: 'titleGroup', draggable: false, position: { x: 300, y: 400 }, data: {} },
+      { id: 'business', position: { x: 90, y: 100 }, data: {} },
+    ];
+
+    expect(applyLayoutFixedNodeConstraints(candidate, source)).toBe(candidate);
+  });
+
+  it('falls back to the routed candidate when a fixed child would break compound geometry', () => {
+    const source: Node[] = [
+      {
+        id: 'group',
+        type: 'titleGroup',
+        position: { x: 100, y: 100 },
+        width: 200,
+        height: 200,
+        data: {},
+      },
+      {
+        id: 'child',
+        parentId: 'group',
+        position: { x: 50, y: 50 },
+        width: 40,
+        height: 40,
+        data: { fixed: true },
+      },
+    ];
+    const candidate: Node[] = [
+      {
+        id: 'group',
+        type: 'titleGroup',
+        position: { x: 500, y: 500 },
+        width: 200,
+        height: 200,
+        data: {},
+      },
+      {
+        id: 'child',
+        parentId: 'group',
+        position: { x: 20, y: 20 },
+        width: 40,
+        height: 40,
+        data: { fixed: true },
+      },
+    ];
+
+    expect(applyLayoutFixedNodeConstraints(candidate, source)).toBe(candidate);
+  });
+
+  it('leaves unconstrained layouts untouched', () => {
+    const source: Node[] = [{ id: 'free', position: { x: 0, y: 0 }, data: {} }];
+    const candidate: Node[] = [{ id: 'free', position: { x: 10, y: 20 }, data: {} }];
+
+    expect(applyLayoutFixedNodeConstraints(candidate, source)).toBe(candidate);
+    expect(applyLayoutFixedNodeConstraints([], source)).toEqual([]);
   });
 });
 

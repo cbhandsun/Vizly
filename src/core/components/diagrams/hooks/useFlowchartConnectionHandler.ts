@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { addEdge, type Connection, type Edge } from '@xyflow/react';
 
 import type { UseDesignerInteractionsProps } from './useDesignerInteractions';
+import { applyParallelEdgePresentation } from '../parallelEdgePresentation';
 
 type ConnectionHandlerOptions = Pick<
     UseDesignerInteractionsProps,
@@ -29,9 +30,9 @@ export const useFlowchartConnectionHandler = ({
             data: { label: relationshipLabel },
             animated: true,
         };
-        setEdges(edges => addEdge(relationshipEdge, edges));
+        setEdges(edges => applyParallelEdgePresentation(addEdge(relationshipEdge, edges)));
         return;
     }
 
-    setEdges(edges => addEdge(connection, edges));
+    setEdges(edges => applyParallelEdgePresentation(addEdge(connection, edges)));
 }, [edgesRef, nodesRef, relationshipLabel, setEdges, takeSnapshot]);

@@ -74,6 +74,7 @@ export interface FlowchartCanvasShellProps {
     routingSessionRuntime?: BaseReactFlowRoutingSessionRuntime;
     backgroundGridColor?: string;
     viewportPersistenceKey?: string;
+    isMobile?: boolean;
     defaultCanvasHiddenFromAssistiveTech?: boolean;
     children?: React.ReactNode;
 }
@@ -131,6 +132,7 @@ export const AdvancedFlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> =
     routingSessionRuntime,
     backgroundGridColor,
     viewportPersistenceKey,
+    isMobile = false,
     defaultCanvasHiddenFromAssistiveTech = false,
     children
 }) => {
@@ -238,7 +240,7 @@ export const AdvancedFlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> =
             onConnect={editingEnabled ? onConnect : undefined}
             onConnectStart={editingEnabled ? onConnectStart : undefined}
             onConnectEnd={editingEnabled ? onConnectEnd : undefined}
-            fitMode="restoreOrFitAll"
+            fitMode={isMobile ? 'fitWidthTop' : 'restoreOrFitAll'}
             fitPadding={0.1}
             pinFit={false}
             viewportPersistenceKey={viewportPersistenceKey}

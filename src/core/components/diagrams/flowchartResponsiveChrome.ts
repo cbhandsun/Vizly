@@ -50,3 +50,13 @@ export const shouldFitFlowchartAfterMobileTransition = (
     && Number.isFinite(nodeCount)
     && nodeCount > 0
 );
+
+export const createFlowchartViewportPersistenceKey = ({
+    diagramId,
+    pageId,
+    isMobile,
+}: {
+    diagramId: string;
+    pageId: string;
+    isMobile: boolean;
+}): string => `${diagramId}:${pageId}:${isMobile ? 'mobile' : 'desktop'}`;

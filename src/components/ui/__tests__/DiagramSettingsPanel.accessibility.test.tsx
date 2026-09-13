@@ -10,12 +10,6 @@ vi.mock('react-i18next', () => ({
     useTranslation: () => ({ t: (key: string, fallback?: string) => fallback ?? key }),
 }));
 
-vi.mock('framer-motion', () => ({
-    motion: {
-        div: ({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) => <div {...props}>{children}</div>,
-    },
-}));
-
 vi.mock('@/components/shared/EnhancedStyleSwitcher', () => ({
     default: ({ ariaLabel }: { ariaLabel?: string }) => <button aria-label={ariaLabel}>style</button>,
 }));

@@ -9,7 +9,6 @@
 
 import React, { useMemo } from 'react';
 import { EdgeProps, getBezierPath } from '@xyflow/react';
-import { useSpring, animated } from '@react-spring/web';
 import {
     computeManhattanPath,
     parseHandleDirection,
@@ -70,31 +69,23 @@ export function EnhancedAnimatedEdge({
     }, [sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data?.elkPath, data?.workerPath]);
     const isComputing = false;
 
-    // 使用 react-spring 实现路径平滑过渡
-    const animatedProps = useSpring({
-        d: pathData,
-        strokeDasharray: isComputing ? '5 5' : '0 0',
-        opacity: isComputing ? 0.6 : 1,
-        config: {
-            tension: 280,
-            friction: 60
-        }
-    });
+    const strokeDasharray = isComputing ? '5 5' : '0 0';
+    const opacity = isComputing ? 0.6 : 1;
 
     return (
         <g>
-            {/* 主路径：使用动画 */}
-            <animated.path
+            {/* 主路径：使用原生 SVG/CSS 过渡，避免引入动画运行时 */}
+            <path
                 id={id}
-                d={animatedProps.d}
+                d={pathData}
                 fill="none"
                 stroke={style?.stroke || '#94a3b8'}
                 strokeWidth={style?.strokeWidth || 2}
-                strokeDasharray={animatedProps.strokeDasharray}
-                opacity={animatedProps.opacity}
+                strokeDasharray={strokeDasharray}
+                opacity={opacity}
                 markerEnd={markerEnd}
                 style={{
-                    transition: 'stroke 0.2s',
+                    transition: 'd 0.24s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.2s, opacity 0.2s',
                     ...style
                 }}
             />

@@ -278,6 +278,48 @@ describe('standardDataToCanvas', () => {
         });
     });
 
+    it('sanitizes imported canvas edges before they reach layout or state', async () => {
+        const diagram = makeDiagram();
+        diagram.edges = [
+            { id: 'valid-edge', source: 'valid', target: 'invalid', type: 'main', label: 'primary' },
+            { id: 'duplicate-edge', source: 'valid', target: 'invalid', type: 'main', label: 'primary' },
+            { id: 'semantic-parallel', source: 'valid', target: 'invalid', type: 'dependency', label: 'secondary' },
+            { id: 'unknown-source', source: 'missing', target: 'invalid', type: 'main' },
+            { id: 'self-loop', source: 'valid', target: 'valid', type: 'main' },
+        ];
+
+        const result = await standardDataToCanvas(diagram);
+
+        expect(result.edges.map(edge => edge.id)).toEqual(['valid-edge', 'semantic-parallel']);
+        expect(result.edges.find(edge => edge.id === 'semantic-parallel')).toMatchObject({
+            source: 'valid',
+            target: 'invalid',
+            type: 'dependency',
+            label: 'secondary',
+        });
+    });
+
+    it('removes restored edges that point to hidden imported nodes', async () => {
+        const diagram = makeDiagram();
+        diagram.nodes.push({
+            id: 'hidden',
+            description: 'Hidden',
+            type: 'flowchart',
+            domain: 'core',
+            metadata: { canvasPosition: { x: 300, y: 20 } },
+            data: { hidden: true },
+        });
+        diagram.edges = [
+            { id: 'visible-edge', source: 'valid', target: 'invalid', type: 'main' },
+            { id: 'hidden-edge', source: 'valid', target: 'hidden', type: 'main' },
+        ];
+
+        const result = await standardDataToCanvas(diagram);
+
+        expect(result.nodes.some(node => node.id === 'hidden')).toBe(false);
+        expect(result.edges.map(edge => edge.id)).toEqual(['visible-edge']);
+    });
+
     it('keeps logistics multi-domain semantic styles and derives matching marker colors', async () => {
         const diagram = coerceStandardDiagramImport(logisticsStandardData, {
             id: 'logistics-architecture-v1',

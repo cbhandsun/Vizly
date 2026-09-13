@@ -4,7 +4,6 @@ import { createLayoutAlternativeComparison } from './layoutAlternativeComparison
 import { Node, Edge, ReactFlowInstance } from '@xyflow/react';
 import { requestLayoutCommitFit } from '../../shared/diagramControlRequest';
 import { applyLayout, forceDirectedLayout, treeLayout } from '../../../utils/LayoutAlgorithms';
-import { getQueryOrHashParamFromLocation } from '../../../utils/inputBoundary';
 import {
     preserveEdgesOnEmptyLayoutResult,
     resolveLayoutSourceEdges,
@@ -22,7 +21,11 @@ import { normalizeLayoutVisibilityNodes } from './layoutVisibilityNodes';
 import { isDirectedForestLayoutGraph } from './treeLayoutTopology';
 import { commitCyclicTreeLayeredLayout } from './cyclicTreeLayeredLayout';
 import { calculateLayeredLayoutWithReverse } from './reverseLayeredLayoutGeometry';
-import { resolveLayoutStrategyGeometryConstraints } from './layoutStrategyGeometryConstraints';
+import {
+    resolveLayoutScope,
+    type LayoutScopeRequest,
+} from './layoutScopeBoundary';
+import { commitLayoutStrategyAttempt } from './layoutStrategyCommitAttempt';
 import {
     clearLayoutEdgeRoutingType,
     prepareLayeredLayoutEdges,
@@ -41,7 +44,6 @@ import {
     isOrderedDomainLaneLayoutStrategy,
     resolveDomainLaneSpacing,
     resolveDomainLayoutRoutingQuality,
-    resolveLayoutDomainOrder,
     shouldPromoteDomainDagreRouteCandidate,
     shouldRetryRejectedDomainLayoutWithCompoundElk,
     type FlowchartLayoutDirection,
@@ -53,15 +55,12 @@ import {
     loadDomainElkStrategy,
 } from './layoutStrategyRuntime';
 import {
-    asLayoutStrategyRecord as asRecord,
     prepareFlatLayoutStrategyGraph,
-    coerceLayoutStrategyStringArray as coerceStringArray,
-    coerceLayoutStrategyStringArrayRecord as coerceStringArrayRecord,
-    loadLayoutStrategyPresetFromCandidates,
     resolveLayoutCommandGroupOptions,
     resolveLayoutStrategyGeneratedGroupOptions,
     stripHiddenGeneratedLayoutNodes,
 } from './layoutStrategyInputBoundary';
+import { resolveLayoutStrategyPresetOptions } from './layoutStrategyPresetOptions';
 
 export {
     LAYERED_TREE_ROUTING_SPACING,
@@ -71,6 +70,7 @@ export {
 export { normalizeLayoutVisibilityNodes } from './layoutVisibilityNodes';
 export {
     clearLayoutRuntimeAbsolutePosition,
+    applyLayoutFixedNodeConstraints,
     loadLayoutStrategyPresetFromCandidates,
     resolveLayoutStrategyGeneratedGroupOptions,
     resolveLayoutStrategyPresetFromCandidates,
@@ -152,6 +152,7 @@ export function useLayoutStrategy({
         nodeLayout?: string,
         direction?: FlowchartLayoutDirection,
         laneRankPreference: LaneRankPreference = layoutSelection.laneRankPreference,
+        layoutScopeRequest?: LayoutScopeRequest,
     ) => {
         // The layout intent must own the Canvas routing epoch before any
         // asynchronous strategy/ELK work starts. Otherwise a stale layout
@@ -197,7 +198,17 @@ export function useLayoutStrategy({
                 new Set(allNodes.map(node => node.id)),
             );
 
-            const { layoutNodes, layoutEdges, nonLayoutTypes } = prepareFlatLayoutStrategyGraph(allNodes, allEdges);
+            const layoutScope = resolveLayoutScope(allNodes, allEdges, layoutScopeRequest);
+            if (layoutScope.status === 'empty-selection') {
+                logLayoutNoLayoutableNodes();
+                transactionDiagnostics.noLayoutableNodes();
+                onLayoutFailure?.('no-layoutable-nodes');
+                return false;
+            }
+            const layoutInputNodes = layoutScope.status === 'scoped' ? layoutScope.nodes : allNodes;
+            const layoutInputEdges = layoutScope.status === 'scoped' ? layoutScope.edges : allEdges;
+
+            const { layoutNodes, layoutEdges, nonLayoutTypes } = prepareFlatLayoutStrategyGraph(layoutInputNodes, layoutInputEdges);
             if (layoutNodes.length === 0) {
                 logLayoutNoLayoutableNodes();
                 transactionDiagnostics.noLayoutableNodes();
@@ -209,12 +220,16 @@ export function useLayoutStrategy({
             const commitLayoutAttempt = async (
                 request: Parameters<typeof commitLayout>[0],
             ): Promise<void> => {
-                transactionDiagnostics.finishPhase('layout-calculation');
-                transactionDiagnostics.beginAttempt();
-                await commitLayout({ ...request, diagnostics: transactionDiagnostics,
-                    layoutConstraints: resolveLayoutStrategyGeometryConstraints(
-                        appliedStrategyName, appliedDirection, request.nodes, appliedLaneDomainOrder, allNodes,
-                    ),
+                await commitLayoutStrategyAttempt({
+                    request,
+                    layoutScope,
+                    allNodes,
+                    allEdges,
+                    appliedStrategyName,
+                    appliedDirection,
+                    appliedLaneDomainOrder,
+                    transactionDiagnostics,
+                    commitLayout,
                     commitSelection: () => commitLayoutSelection({ version: 2,
                         strategy: appliedStrategyName, direction: appliedDirection,
                         nodeLayout: appliedNodeLayout && !isGlobalFullGraphLayoutStrategy(appliedStrategyName)
@@ -234,7 +249,7 @@ export function useLayoutStrategy({
                     });
                     const newNodes = applyLayout(layoutNodes, positions);
                     const treeNodeIds = new Set(newNodes.map(n => n.id));
-                    const treePreserved = allNodes.filter(n => (
+                    const treePreserved = layoutInputNodes.filter(n => (
                         nonLayoutTypes.has(n.type || '') && !treeNodeIds.has(n.id)
                     ));
                     const treeResult = refineLayout([...newNodes, ...treePreserved], layoutEdges, {
@@ -304,7 +319,7 @@ export function useLayoutStrategy({
                 }
                 // [FIX] 保留非流程图节点
                 const forceNodeIds = new Set(newNodes.map(n => n.id));
-                const forcePreserved = allNodes.filter(n => nonLayoutTypes.has(n.type || '') && !forceNodeIds.has(n.id));
+                const forcePreserved = layoutInputNodes.filter(n => nonLayoutTypes.has(n.type || '') && !forceNodeIds.has(n.id));
                 const forceResultRaw = [...newNodes, ...forcePreserved];
                 // ⭐ 路由感知后处理
                 const forceResult = forceEngine === 'force'
@@ -344,52 +359,20 @@ export function useLayoutStrategy({
                 // Explicit semantic order wins. Ordinary domain layouts retain
                 // the legacy scan-order fallback; cyclic swimlanes leave an
                 // absent order unset so their bounded net-flow sweep can run.
+                const presetOptions = resolveLayoutStrategyPresetOptions({
+                    strategyName,
+                    allNodes,
+                    diagramId,
+                    loadLayoutPresetMap,
+                });
+                let generatedGroupOptions = resolveLayoutStrategyGeneratedGroupOptions(undefined, allNodes);
                 let domainOrder: string[] | undefined;
                 let subDomainOrder: Record<string, string[]> | undefined;
-                let generatedGroupOptions = resolveLayoutStrategyGeneratedGroupOptions(undefined, allNodes);
-                const locationDiagramId = getQueryOrHashParamFromLocation(
-                    typeof window === 'undefined' ? undefined : window.location,
-                    'diagram'
-                );
-                const presetCandidate = loadLayoutStrategyPresetFromCandidates(
-                    loadLayoutPresetMap,
-                    [diagramId, locationDiagramId || undefined],
-                );
                 try {
-                    const candidate = await presetCandidate;
-                    const preset = candidate.preset;
-                    if (preset) {
-                        const presetRecord = asRecord(preset);
-                        const presetLayout = asRecord(presetRecord.layout);
-                        generatedGroupOptions = resolveLayoutStrategyGeneratedGroupOptions(preset, allNodes);
-                        // 优先显式配置
-                        domainOrder = coerceStringArray(presetLayout.domainOrder);
-                        subDomainOrder = coerceStringArrayRecord(presetLayout.subDomainOrder);
-                        // 回退：从节点出现顺序推导
-                        if (!domainOrder && Array.isArray(presetRecord.nodes)) {
-                            const implicitOrder: string[] = [];
-                            const implicitSubOrder: Record<string, string[]> = {};
-                            for (const rawNode of presetRecord.nodes) {
-                                const presetNode = asRecord(rawNode);
-                                const d = String(presetNode.domain || '').trim();
-                                if (!d || d === '默认域' || d === 'default') continue;
-                                if (!implicitOrder.includes(d)) implicitOrder.push(d);
-                                const s = String(presetNode.subDomain || '').trim();
-                                if (s) {
-                                    if (!implicitSubOrder[d]) implicitSubOrder[d] = [];
-                                    if (!implicitSubOrder[d].includes(s)) implicitSubOrder[d].push(s);
-                                }
-                            }
-                            if (implicitOrder.length > 0) {
-                                domainOrder = resolveLayoutDomainOrder(
-                                    strategyName,
-                                    domainOrder,
-                                    implicitOrder,
-                                );
-                                if (!subDomainOrder) subDomainOrder = implicitSubOrder;
-                            }
-                        }
-                    }
+                    const resolvedPresetOptions = await presetOptions;
+                    generatedGroupOptions = resolvedPresetOptions.generatedGroupOptions;
+                    domainOrder = resolvedPresetOptions.domainOrder;
+                    subDomainOrder = resolvedPresetOptions.subDomainOrder;
                 } catch { /* ignore */ }
 
                 generatedGroupOptions = resolveLayoutCommandGroupOptions(strategyName, generatedGroupOptions);
@@ -547,7 +530,7 @@ export function useLayoutStrategy({
                         // Preserve non-flow nodes; semantic containers are
                         // regenerated by the domain-aware strategy itself.
                         const resultNodeIds = new Set(candidate.nodes.map(node => node.id));
-                        const preservedNodes = allNodes.filter(n => (
+                        const preservedNodes = layoutInputNodes.filter(n => (
                             nonLayoutTypes.has(n.type || '') && !resultNodeIds.has(n.id)
                         ));
                         const finalNodes = stripHiddenGeneratedLayoutNodes(

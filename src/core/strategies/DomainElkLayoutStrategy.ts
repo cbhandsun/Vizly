@@ -6,12 +6,12 @@ import { diagramConfigManager } from '../config/DiagramConfig'
 import { LayeredConfigManager } from '../config/LayeredConfigManager';
 import { ILayoutStrategy } from './LayoutStrategyManager'
 import {
-  ensureMeasuredForNodes,
   recomputeSubGroupContainersBasic,
   finalizeDomainWidthsByProjection,
   finalizeDomainHeightsByProjection,
   resolveDomainContainerOverlaps,
 } from '../utils/layoutUtils'
+import { ensureMeasuredForNodes } from '../utils/layout/ensureMeasuredForNodes';
 import { logDomainElkContainerUpdateFailure } from './layoutLogging';
 import { resolveDomainNodeLayoutAlgorithm } from './domainNodeLayoutEngine';
 import {

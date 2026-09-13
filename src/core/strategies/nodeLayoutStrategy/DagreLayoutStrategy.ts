@@ -1,8 +1,9 @@
 import type { Node as ReactFlowNode, Edge } from '@xyflow/react';
 import type { LayoutOptions } from '../../types/layout';
 import { ILayoutStrategy } from '../LayoutStrategyManager';
-import { reflowSubGroupChildrenDagre, applySubGrouping, assignChildrenToSubGroupsBySemantic, applyDomainGrouping, ensureMeasuredForNodes, recomputeSubGroupContainersBasic, enforceDomainContainerStrictContainment, resolveDomainContainerOverlaps, finalizeDomainWidthsByProjection, finalizeDomainHeightsByProjection } from '../../utils/layoutUtils';
+import { reflowSubGroupChildrenDagre, applySubGrouping, assignChildrenToSubGroupsBySemantic, applyDomainGrouping, recomputeSubGroupContainersBasic, enforceDomainContainerStrictContainment, resolveDomainContainerOverlaps, finalizeDomainWidthsByProjection, finalizeDomainHeightsByProjection } from '../../utils/layoutUtils';
 import { diagramConfigManager } from '../../config/DiagramConfig';
+import { ensureMeasuredForNodes } from '../../utils/layout/ensureMeasuredForNodes';
 
 const stringArray = (value: unknown): string[] | undefined =>
     Array.isArray(value) && value.every(item => typeof item === 'string')

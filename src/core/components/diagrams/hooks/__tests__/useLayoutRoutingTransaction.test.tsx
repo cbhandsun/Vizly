@@ -315,6 +315,11 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
       nodes,
       edges: cyclicEdges,
     });
+    mocks.stageLayoutRouting.mockResolvedValueOnce({
+      committedSourceEdges: cyclicEdges,
+      routedEdges: cyclicEdges,
+      commitSnapshot: () => true,
+    });
     const options = createOptions();
     options.edgesRef.current = cyclicEdges;
     const { result } = renderHook(() => useLayoutStrategy({
@@ -339,6 +344,35 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
     expect(mocks.stageLayoutRouting).toHaveBeenCalledWith(expect.objectContaining({
       candidateRepairPolicy: 'skip-exact-clean',
     }));
+  });
+
+  it('merges scoped tree layout results back into the full canvas without deleting out-of-scope nodes', async () => {
+    const scopedNodes: Node[] = [
+      ...nodes,
+      { id: 'orphan', position: { x: 500, y: 500 }, width: 60, height: 40, data: {} },
+    ];
+    const options = createOptions();
+    options.nodesRef.current = scopedNodes;
+    const { result } = renderHook(() => useLayoutStrategy({
+      ...options,
+      reactFlowInstance: null,
+    }));
+
+    await act(async () => {
+      await expect(result.current.handleStrategyLayout('tree', undefined, 'TB', 'auto', {
+        mode: 'selection',
+        selectedNodeIds: ['source', 'target'],
+      })).resolves.toBe(true);
+    });
+
+    const stagedNodes = mocks.stageLayoutRouting.mock.lastCall?.[0].sourceNodes as Node[];
+    expect(stagedNodes.map(node => node.id)).toEqual(['source', 'target', 'orphan']);
+    expect(stagedNodes.find(node => node.id === 'orphan')).toMatchObject({
+      position: { x: 500, y: 500 },
+    });
+    expect(options.setNodes).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ id: 'orphan', position: { x: 500, y: 500 } }),
+    ]));
   });
 
   it('keeps layout stability paused across a rejected legacy domain attempt and compound fallback', async () => {
@@ -558,6 +592,29 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
     });
 
     expect(options.publishLayoutPreview).toHaveBeenCalledTimes(1);
+    expect(options.clearLayoutPreview).toHaveBeenCalledWith(routingJob);
+    expect(options.setNodes).not.toHaveBeenCalled();
+    expect(options.setEdges).not.toHaveBeenCalled();
+    expect(options.takeSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('rejects a staged routing receipt that drops source edges before state commit', async () => {
+    const commitSnapshot = vi.fn(() => true);
+    mocks.stageLayoutRouting.mockResolvedValueOnce({
+      committedSourceEdges: [],
+      routedEdges: [],
+      commitSnapshot,
+    });
+    const options = createOptions();
+    const routingJob = options.routingSessionRuntime.beginJob('layout');
+    const { result } = renderHook(() => useLayoutRoutingTransaction(options));
+
+    await act(async () => {
+      await expect(result.current({ nodes, edges, routingJob }))
+        .rejects.toThrow('layout-routing-hard-quality-rejected');
+    });
+
+    expect(commitSnapshot).not.toHaveBeenCalled();
     expect(options.clearLayoutPreview).toHaveBeenCalledWith(routingJob);
     expect(options.setNodes).not.toHaveBeenCalled();
     expect(options.setEdges).not.toHaveBeenCalled();

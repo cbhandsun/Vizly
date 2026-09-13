@@ -706,6 +706,33 @@
             "zoomIn": "Zoom in",
             "zoomOut": "Zoom out"
         },
+        "connectionValidation": {
+            "plugin-rejected": "This diagram type does not allow that connection.",
+            "missing-endpoint": "Choose both a source and a target node.",
+            "unknown-source-node": "The source node no longer exists.",
+            "unknown-target-node": "The target node no longer exists.",
+            "self-loop-disabled": "This diagram does not allow a node to connect to itself.",
+            "duplicate-connection": "An identical connection already exists.",
+            "terminal-node-source": "End nodes cannot start outgoing connections.",
+            "source-handle-limit": "This source handle has reached its connection limit.",
+            "target-handle-limit": "This target handle has reached its connection limit.",
+            "missing-source-port": "Select a semantic source port before connecting.",
+            "missing-target-port": "Select a semantic target port before connecting.",
+            "unknown-source-port": "Source port “{{port}}” is not available.",
+            "unknown-target-port": "Target port “{{port}}” is not available.",
+            "source-port-direction": "Port “{{port}}” cannot start connections.",
+            "target-port-direction": "Port “{{port}}” cannot receive connections.",
+            "source-port-capacity": "Source port “{{port}}” has reached capacity.",
+            "target-port-capacity": "Target port “{{port}}” has reached capacity.",
+            "port-type-incompatible": "The source and target port data types are incompatible.",
+            "source-port-relation": "Source port “{{port}}” does not allow relation “{{relation}}”.",
+            "target-port-relation": "Target port “{{port}}” does not allow relation “{{relation}}”.",
+            "unknown-relation": "Relation “{{relation}}” is not defined for this diagram.",
+            "relation-source-role": "Relation “{{relation}}” does not allow this source port role.",
+            "relation-target-role": "Relation “{{relation}}” does not allow this target port role.",
+            "relation-source-type": "Relation “{{relation}}” does not allow this source data type.",
+            "relation-target-type": "Relation “{{relation}}” does not allow this target data type."
+        },
         "edgeEditor": {
             "editLabel": "Edit edge label: {{label}}",
             "labelInput": "Edge label",
@@ -1086,6 +1113,12 @@
             "layout": {
                 "tooltip": "Auto Layout",
                 "applying": "Applying layout…",
+                "failure": {
+                    "noLayoutableNodes": "There are no layoutable nodes in the current scope.",
+                    "hardQualityRejected": "This layout did not meet edge quality requirements, so the canvas was preserved. Adjust nodes or choose another layout.",
+                    "workerTimeout": "Layout calculation timed out, so the canvas was preserved. Try again in a moment.",
+                    "strategyFailed": "Layout calculation failed, so the canvas was preserved. Try again or choose another layout."
+                },
                 "dagreTB": "Dagre Vertical (TB)",
                 "dagreLR": "Dagre Horizontal (LR)",
                 "elkTB": "ELK Orthogonal Layered (Top–Bottom)",

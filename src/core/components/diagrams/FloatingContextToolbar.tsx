@@ -6,7 +6,8 @@ import type { LayerConfig } from './hooks/useLayerManagement';
 import type { AggregationColor } from 'antd/es/color-picker/color';
 import {
     FaTrash, FaCopy, FaLock, FaLockOpen, FaLayerGroup,
-    FaArrowsAlt, FaShapes, FaStar, FaPaintBrush, FaObjectGroup, FaRegObjectGroup
+    FaArrowsAlt, FaShapes, FaStar, FaPaintBrush, FaObjectGroup, FaRegObjectGroup,
+    FaMapPin,
 } from 'react-icons/fa';
 import {
     MdAlignHorizontalLeft, MdAlignHorizontalCenter, MdAlignHorizontalRight,
@@ -19,6 +20,7 @@ import { ShapePreview } from './ShapePreview';
 import type { FlowchartShape } from '../../types/flowchart-node';
 import { resolveFloatingContextToolbarOffset } from './floatingContextToolbarPosition';
 import { hasMutationLockedNode } from './nodeLockPolicy';
+import { areAllNodesLayoutPinned } from './nodeLayoutPinPolicy';
 import { resolveFloatingToolbarStyleState } from './floatingContextToolbarState';
 import {
     ToolbarContainer,
@@ -70,6 +72,7 @@ export interface FloatingContextToolbarProps {
     onChangeColor: (color: string) => void;
     onChangeColorComplete?: (color: string) => void;
     onLock: (locked: boolean) => void;
+    onLayoutPin?: (fixed: boolean) => void;
     onOpacity: (opacity: number) => void;
     onBringToFront: () => void;
     onSendToBack: () => void;
@@ -174,7 +177,7 @@ const DomainClassPanel: React.FC<{ onChangeDomainClass: (domainClass: string) =>
 export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = React.memo(({
     selectedNodes, onDelete, onDuplicate, onChangeColor,
     onChangeColorComplete,
-    onLock, onOpacity, onBringToFront, onSendToBack, onUpdateStyle, onUpdateNodes,
+    onLock, onLayoutPin, onOpacity, onBringToFront, onSendToBack, onUpdateStyle, onUpdateNodes,
     layers, onMoveToLayer, onChangeShape, onSaveAsComponent, onChangeDomainClass,
     onCopyStyle, onPasteStyle, hasCopiedStyle, onGroup, onUngroup, extraToolbarContent, excludeToolbarFeatures,
     overrideDefaultToolbar
@@ -217,6 +220,7 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
     // ─── Derived state ───────────────────────────────────────────────────────
     const isHide = (feature: ToolbarFeature) => excludeToolbarFeatures?.includes(feature);
     const allLocked = selectedNodes.every(node => node.data?.locked === true || node.draggable === false);
+    const allLayoutPinned = areAllNodesLayoutPinned(selectedNodes);
     const hasLockedSelection = hasMutationLockedNode(selectedNodes);
     const hasUngroupableSelection = selectedNodes.some(node => node.type === 'titleGroup' || node.type === 'subGroup');
     const lockedActionLabel = (label: string) => hasLockedSelection
@@ -310,6 +314,17 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
                         onClick={() => onLock(!allLocked)}
                         active={allLocked}
                     />
+                    {onLayoutPin && (
+                        <ToolbarButton
+                            icon={<FaMapPin />}
+                            label={allLayoutPinned
+                                ? t('designer.contextMenu.unpinLayout', '取消固定布局位置')
+                                : t('designer.contextMenu.pinLayout', '固定布局位置')}
+                            onClick={() => onLayoutPin(!allLayoutPinned)}
+                            active={allLayoutPinned}
+                            disabled={hasLockedSelection}
+                        />
+                    )}
                     <ToolbarButton icon={<FaCopy />} label={lockedActionLabel(`${t('designer.contextMenu.duplicate')} (Ctrl+D)`)} onClick={onDuplicate} disabled={hasLockedSelection} />
                     <ToolbarButton icon={<FaTrash />} label={lockedActionLabel(`${t('designer.contextMenu.delete')} (Del)`)} onClick={onDelete} disabled={hasLockedSelection} danger />
 

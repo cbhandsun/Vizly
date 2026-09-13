@@ -1,8 +1,11 @@
 import type { Node } from '@xyflow/react';
 import type { FlowchartLayoutDirection as LayoutDirection } from './flowchartLayoutStrategyMode';
+import type { LayoutScopeRequest } from './hooks/layoutScopeBoundary';
 
 const FLOWCHART_COMMAND_TEXT_MAX_CHARS = 80;
 const FLOWCHART_COMMAND_TEXT_PATTERN = /^[A-Za-z0-9 _+.-]+$/;
+const FLOWCHART_COMMAND_SCOPE_MAX_IDS = 1_000;
+const FLOWCHART_COMMAND_SCOPE_ID_MAX_CHARS = 512;
 const FLOWCHART_EDITOR_ACTIONS: ReadonlySet<string> = new Set([
     'smart-layout',
     'apply-layout',
@@ -33,6 +36,7 @@ export type FlowchartEditorCommandDetail = {
     strategy?: string;
     nodeLayout?: string | undefined;
     direction?: string;
+    scope?: LayoutScopeRequest;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
@@ -52,6 +56,59 @@ const coerceCommandText = (value: unknown): string | undefined => {
     return normalized;
 };
 
+const coerceLayoutScopeRequest = (
+    value: unknown,
+    depthValue: unknown,
+    selectedNodeIdsValue?: unknown,
+    selectedEdgeIdsValue?: unknown,
+): LayoutScopeRequest | undefined | null => {
+    if (
+        value === undefined
+        && depthValue === undefined
+        && selectedNodeIdsValue === undefined
+        && selectedEdgeIdsValue === undefined
+    ) return undefined;
+    const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (normalized !== 'selection' && normalized !== 'selection-neighborhood') return null;
+    const depth = typeof depthValue === 'number' && Number.isFinite(depthValue)
+        ? Math.floor(depthValue)
+        : undefined;
+    const selectedNodeIds = coerceScopeIds(selectedNodeIdsValue);
+    const selectedEdgeIds = coerceScopeIds(selectedEdgeIdsValue);
+    if (selectedNodeIds === null || selectedEdgeIds === null) return null;
+    return {
+        mode: normalized,
+        ...(depth !== undefined ? { neighborhoodDepth: depth } : {}),
+        ...(selectedNodeIds ? { selectedNodeIds } : {}),
+        ...(selectedEdgeIds ? { selectedEdgeIds } : {}),
+    };
+};
+
+const isScopeId = (value: unknown): value is string => {
+    if (
+        typeof value !== 'string'
+        || value.length === 0
+        || value.length > FLOWCHART_COMMAND_SCOPE_ID_MAX_CHARS
+    ) return false;
+    return !Array.from(value).some((character) => {
+        const codePoint = character.codePointAt(0) ?? 0;
+        return codePoint <= 0x1F || codePoint === 0x7F;
+    });
+};
+
+const coerceScopeIds = (value: unknown): readonly string[] | undefined | null => {
+    if (value === undefined) return undefined;
+    if (!Array.isArray(value)) return null;
+    const ids: string[] = [];
+    const seen = new Set<string>();
+    for (const item of value.slice(0, FLOWCHART_COMMAND_SCOPE_MAX_IDS)) {
+        if (!isScopeId(item) || seen.has(item)) continue;
+        seen.add(item);
+        ids.push(item);
+    }
+    return ids;
+};
+
 export const coerceFlowchartEditorCommandDetail = (value: unknown): FlowchartEditorCommandDetail | null => {
     if (!isRecord(value)) return null;
 
@@ -61,15 +118,23 @@ export const coerceFlowchartEditorCommandDetail = (value: unknown): FlowchartEdi
     const strategy = coerceCommandText(value.strategy);
     const nodeLayout = coerceCommandText(value.nodeLayout);
     const direction = coerceCommandText(value.direction);
+    const scope = coerceLayoutScopeRequest(
+        value.scope,
+        value.neighborhoodDepth,
+        value.selectedNodeIds,
+        value.selectedEdgeIds,
+    );
     if (value.strategy !== undefined && !strategy) return null;
     if (value.nodeLayout !== undefined && !nodeLayout) return null;
     if (value.direction !== undefined && !direction) return null;
+    if (scope === null) return null;
 
     return {
         action,
         ...(strategy ? { strategy } : {}),
         ...(nodeLayout ? { nodeLayout } : {}),
         ...(direction ? { direction } : {}),
+        ...(scope ? { scope } : {}),
     };
 };
 
@@ -172,7 +237,13 @@ export const handleFlowchartEditorCommand = ({
 }: {
     detail: unknown;
     handleSmartLayout: () => void;
-    handleStrategyLayout: (engineName: string, nodeLayout: string | undefined, direction: LayoutDirection) => void;
+    handleStrategyLayout: (
+        engineName: string,
+        nodeLayout: string | undefined,
+        direction: LayoutDirection,
+        laneRankPreference?: undefined,
+        layoutScope?: LayoutScopeRequest,
+    ) => void;
     handleExport: () => void;
     findToolbarExportButton: () => ToolbarExportButton | null;
     setAiChatVisible: (visible: boolean) => void;
@@ -196,11 +267,13 @@ export const handleFlowchartEditorCommand = ({
     }
 
     if (action === 'apply-layout') {
-        handleStrategyLayout(
-            resolveFlowchartLayoutEngine(safeDetail.strategy),
-            safeDetail.nodeLayout,
-            resolveFlowchartLayoutDirection(safeDetail.direction)
-        );
+        const engineName = resolveFlowchartLayoutEngine(safeDetail.strategy);
+        const layoutDirection = resolveFlowchartLayoutDirection(safeDetail.direction);
+        if (safeDetail.scope) {
+            handleStrategyLayout(engineName, safeDetail.nodeLayout, layoutDirection, undefined, safeDetail.scope);
+        } else {
+            handleStrategyLayout(engineName, safeDetail.nodeLayout, layoutDirection);
+        }
         return true;
     }
 

@@ -1,12 +1,10 @@
 import React from 'react';
 import { layoutSelectionToolbarProps } from './ui/designerHeaderMemoState';
 import { ConnectionMode } from '@xyflow/react';
-
 import { LiveCursors } from './collaboration/LiveCursors';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { LayoutStabilityContext } from '../../context/LayoutStabilityContext';
 import { diffDiagrams } from '../../utils/diagramDiff';
-import { GestureOverlay } from '../shared/GestureOverlay';
 import { CanvasRuler, RulerCorner } from './CanvasRuler';
 import { ContextMenuLayer } from './ContextMenuLayer';
 import { DesignerCanvasFeaturesLayer } from './ui/DesignerCanvasFeaturesLayer';
@@ -37,9 +35,8 @@ import { filterCommentsForPage } from './commentPageScope';
 import { useFlowchartDesignerViewSetup } from './useFlowchartDesignerViewSetup';
 import { resolveDesignerDragRenderPolicy } from './designerDragRenderPolicy';
 import { FlowchartLoadingOverlay } from './FlowchartLoadingOverlay';
-import { FlowchartLayoutProgress } from './FlowchartLayoutProgress';
 import { FlowchartReadonlyStatus } from './FlowchartReadonlyStatus';
-
+import { FlowchartCanvasTransientOverlays } from './FlowchartCanvasTransientOverlays';
 export type { FlowchartDesignerViewModel } from './flowchartDesignerViewModel';
 
 import {
@@ -109,6 +106,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         handleImport,
         handleRequestImport,
         handleLock,
+        handleLayoutPin,
         handleOpacity,
         handleOpenJsonEditor,
         handleOpenSettings,
@@ -155,6 +153,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         jsonEditorVisible,
         jumpTo,
         layoutSelection,
+        lastConnectionValidation,
         layerSyncedNodes,
         layoutPresentationPreview,
         leftDrawerOpen,
@@ -511,13 +510,15 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                 onTouchStart={handleTouchStart}
                                 onTouchEnd={handleTouchEnd}
                             >
-                                <FlowchartLayoutProgress
-                                    visible={isLayoutBusy}
-                                    label={t('designer.flowchart.layout.applying', '正在应用布局…')}
+                                <FlowchartCanvasTransientOverlays
+                                    layoutBusy={isLayoutBusy}
+                                    layoutLabel={t('designer.flowchart.layout.applying', '正在应用布局…')}
+                                    connectionValidation={lastConnectionValidation}
+                                    gesture={{ zoom: currentZoom, visible: showOverlay }}
                                 />
-                                <GestureOverlay zoom={currentZoom} visible={showOverlay} />
                                 <FlowchartCanvasShell
                                     viewportPersistenceKey={viewportPersistenceKey}
+                                    isMobile={isMobile}
                                     nodes={layoutPresentation.nodes}
                                     displayEdges={layoutPresentation.displayEdges}
                                     nodeTypes={dynamicNodeTypes}
@@ -598,6 +599,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                             handleGroupWithToast,
                                             handleUngroupWithToast,
                                             handleLock,
+                                            handleLayoutPin,
                                             handleOpacity,
                                             handleBringToFront,
                                             handleSendToBack,

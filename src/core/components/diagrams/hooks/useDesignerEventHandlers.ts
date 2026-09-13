@@ -99,6 +99,7 @@ export function useDesignerEventHandlers({
         handleSendToBack, 
         onContextMenuAction,
         handleLock,
+        handleLayoutPin,
         handleMatchSize,
         handleReverseEdge,
     } = useDiagramActions({
@@ -368,6 +369,7 @@ export function useDesignerEventHandlers({
         handleUngroupWithToast,
         onContextMenuActionWithToast,
         handleLock,
+        handleLayoutPin,
         // 暴露隐藏功能
         handleMatchSize,
         handleReverseEdge,

@@ -14,6 +14,8 @@ import {
     logDesignerUtilsMigrationFailure,
     logDesignerUtilsThemeRestoreFailure,
 } from './designerUtilsLogging';
+import { LayoutOptimizer } from '../layout/LayoutOptimizer';
+import { sanitizeCanvasEdgesForNodes } from '../../utils/canvasEdgeSanitizer';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
     Boolean(value && typeof value === 'object' && !Array.isArray(value))
@@ -304,7 +306,8 @@ const finalizeStandardDataCanvasResult = (
     edges: Edge[],
 ): { nodes: Node[]; edges: Edge[] } => {
     if (data.routingSnapshot) registerRoutingOnlyDocumentCandidate(data.routingSnapshot);
-    return { nodes: stripHiddenCanvasNodes(nodes), edges };
+    const visibleNodes = stripHiddenCanvasNodes(nodes);
+    return { nodes: visibleNodes, edges: sanitizeCanvasEdgesForNodes(visibleNodes, edges) };
 };
 
 /**
@@ -352,8 +355,7 @@ export const standardDataToCanvas = async (
     }
 
     let nodes: Node[] = [];
-    const edges: Edge[] = [];
-    const { LayoutOptimizer } = await import('../layout/LayoutOptimizer');
+    let edges: Edge[] = [];
     const optimizer = LayoutOptimizer.getInstance();
 
     // ═══ 检测是否有已保存坐标 ═══
@@ -561,6 +563,7 @@ export const standardDataToCanvas = async (
             });
         }
     });
+    edges = sanitizeCanvasEdgesForNodes(nodes, edges);
 
     // ═══ 4. 内置布局（对齐新项目 standardToGraphData） ═══
     if (!hasCanvasPositions && nodes.length > 0) {

@@ -18,6 +18,7 @@ vi.mock('../FloatingContextToolbar', async () => {
         FloatingContextToolbar: (props: {
             onBringToFront: () => void;
             onSendToBack: () => void;
+            onLayoutPin?: (fixed: boolean) => void;
         }) => React.createElement(
             React.Fragment,
             null,
@@ -30,6 +31,11 @@ vi.mock('../FloatingContextToolbar', async () => {
                 type: 'button',
                 'aria-label': 'mock-send-back',
                 onClick: props.onSendToBack,
+            }),
+            React.createElement('button', {
+                type: 'button',
+                'aria-label': 'mock-layout-pin',
+                onClick: () => props.onLayoutPin?.(true),
             }),
         ),
     };
@@ -80,5 +86,37 @@ describe('HoverToolbarsOverlay layer actions', () => {
 
         expect(handleBringToFront).toHaveBeenCalledWith(['node-1', 'node-2']);
         expect(handleSendToBack).toHaveBeenCalledWith(['node-1', 'node-2']);
+    });
+
+    it('forwards layout pin requests to the complete selected-node target', () => {
+        const handleLayoutPin = vi.fn();
+
+        render(<HoverToolbarsOverlay
+            selectedNodes={[node('node-1'), node('node-2')]}
+            selectedEdges={[]}
+            quickAddMenuVisible={false}
+            isContextToolbarHidden={false}
+            isDragging={false}
+            isConnecting={false}
+            nodeTypes={{}}
+            updateNodesBatch={vi.fn()}
+            updateEdgesBatch={vi.fn()}
+            handleDeleteWithToast={vi.fn()}
+            handleDuplicateWithToast={vi.fn()}
+            handleGroupWithToast={vi.fn()}
+            handleUngroupWithToast={vi.fn()}
+            handleLock={vi.fn()}
+            handleLayoutPin={handleLayoutPin}
+            handleOpacity={vi.fn()}
+            handleBringToFront={vi.fn()}
+            handleSendToBack={vi.fn()}
+            copyStyle={vi.fn()}
+            pasteStyle={vi.fn()}
+            hasCopiedStyle={false}
+        />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'mock-layout-pin' }));
+
+        expect(handleLayoutPin).toHaveBeenCalledWith(['node-1', 'node-2'], true);
     });
 });

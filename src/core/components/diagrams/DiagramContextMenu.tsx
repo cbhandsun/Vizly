@@ -11,6 +11,7 @@ import {
   GroupOutlined,
   LockOutlined,
   UnlockOutlined,
+  PushpinOutlined,
   SwapOutlined,
   UndoOutlined,
   EditOutlined,
@@ -58,6 +59,7 @@ export interface ContextMenuProps {
 
 import './DiagramContextMenu.css';
 import { hasMutationLockedNode, isNodeMutationLocked } from './nodeLockPolicy';
+import { areAllNodesLayoutPinned } from './nodeLayoutPinPolicy';
 import { isEdgeMutationLocked, isEdgeUserLocked } from './edgeMutationPolicy';
 import type { DiagramContextSubmenuPlacement } from './diagramContextMenuPlacement';
 
@@ -65,6 +67,8 @@ const MULTI_SELECTION_ACTIONS = new Set([
   'duplicate',
   'lock',
   'unlock',
+  'pinLayout',
+  'unpinLayout',
   'bringToFront',
   'sendToBack',
 ]);
@@ -99,6 +103,7 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
   const hasLockedActionTarget = hasMutationLockedNode(nodeActionTargets);
   const allActionTargetsLocked = nodeActionTargets.length > 0
     && nodeActionTargets.every(isNodeMutationLocked);
+  const allActionTargetsLayoutPinned = areAllNodesLayoutPinned(nodeActionTargets);
   const nodeActionTargetIds = new Set(nodeActionTargets.map(node => node.id));
   const canBringToFront = !nodes
     || reorderNodesWithinParentScopes(nodes, nodeActionTargetIds, 'front').changed;
@@ -204,6 +209,18 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
             : isLocked
               ? t('designer.contextMenu.unlock')
               : t('designer.contextMenu.lock'),
+        });
+        items.push({
+          key: allActionTargetsLayoutPinned ? 'unpinLayout' : 'pinLayout',
+          icon: <PushpinOutlined />,
+          label: type === 'multi-node'
+            ? allActionTargetsLayoutPinned
+              ? t('designer.contextMenu.unpinLayoutSelection', '取消固定选区布局位置')
+              : t('designer.contextMenu.pinLayoutSelection', '固定选区布局位置')
+            : allActionTargetsLayoutPinned
+              ? t('designer.contextMenu.unpinLayout', '取消固定布局位置')
+              : t('designer.contextMenu.pinLayout', '固定布局位置'),
+          disabled: hasLockedActionTarget,
         });
 
         // Container auto-layout

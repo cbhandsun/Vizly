@@ -6,7 +6,6 @@ import {
   auditAndFixSubGroupChildrenBindings,
   enforceSubGroupStrictContainmentByChildren,
   enforceSubGroupTitleClearance,
-  ensureMeasuredForNodes,
   finalizeDomainHeightsByProjection,
   finalizeDomainWidthsByProjection,
   finalizeSubGroupHeightsByProjectionPreserveAnchor,
@@ -18,6 +17,7 @@ import {
   scatterNodesAtSamePoint,
   syncDagreChildPositions,
 } from '../../utils/layoutUtils';
+import { ensureMeasuredForNodes } from '../../utils/layout/ensureMeasuredForNodes';
 import { safeLog } from '../../utils/consoleCleanup';
 import {
   injectSemanticSubGroupsForMissingKeys,

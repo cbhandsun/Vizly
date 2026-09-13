@@ -760,6 +760,3 @@ export class NodeFactory {
     }
   }
 }
-
-// 导出单例实例
-export const nodeFactory = NodeFactory.getInstance();

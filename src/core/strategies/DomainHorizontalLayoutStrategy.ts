@@ -39,9 +39,9 @@ import {
   equalizeSubGroupMarginsByProjection,
 
   finalizeSubGroupWidthsByProjectionPreserveAnchor,
-  ensureMeasuredForNodes,
   reflowSubGroupChildrenDagre
 } from '../utils/layoutUtils';
+import { ensureMeasuredForNodes } from '../utils/layout/ensureMeasuredForNodes';
 import { runEdgeRoutingPipeline } from './shared/edgeRoutingPipeline';
 import { resolveDomainHorizontalLayoutBoundary } from './domainHorizontalLayoutBoundary';
 import {

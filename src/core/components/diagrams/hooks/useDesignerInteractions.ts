@@ -193,17 +193,25 @@ export function useDesignerInteractions({
         });
     }, [edgesWithGhost, showOnlyMainFlow, highlightMainFlow, isMainEdge]);
 
-    const { isConnecting, connectPreview, onConnectStart, enhancedOnConnect, enhancedOnConnectEnd } = useConnectionMicrointeractions({
-        nodes, setEdges, onConnect, onConnectEnd: quickAddOnConnectEnd, reactFlowInstance
-    });
-
-    const { isValidConnection } = useConnectionValidation(
+    const { isValidConnection, validateConnection } = useConnectionValidation(
         nodes,
         edges,
         pluginCtx ?? undefined,
         activePlugin,
         {},
     );
+
+    const {
+        isConnecting,
+        connectPreview,
+        lastConnectionValidation,
+        setConnectionValidationFeedback,
+        onConnectStart,
+        enhancedOnConnect,
+        enhancedOnConnectEnd,
+    } = useConnectionMicrointeractions({
+        nodes, setEdges, onConnect, onConnectEnd: quickAddOnConnectEnd, validateConnection, reactFlowInstance
+    });
 
     const reconnectNodesRef = useRef(nodes);
     const reconnectEdgesRef = useRef(edges);
@@ -214,9 +222,18 @@ export function useDesignerInteractions({
 
     const handleReconnect = useCallback((oldEdge: Edge, newConnection: Connection) => {
         if (!canReconnectEdge(oldEdge)) return;
+        const validation = validateConnection(
+            { ...oldEdge, ...newConnection },
+            { ignoredEdgeIds: new Set([oldEdge.id]) },
+        );
+        if (!validation.valid) {
+            setConnectionValidationFeedback(validation);
+            return;
+        }
+        setConnectionValidationFeedback(null);
         takeSnapshot(reconnectNodesRef.current, reconnectEdgesRef.current);
         setEdges((eds) => reconnectEdge(oldEdge, newConnection, eds));
-    }, [setEdges, takeSnapshot]);
+    }, [setEdges, setConnectionValidationFeedback, takeSnapshot, validateConnection]);
 
     const handleReconnectStart = useCallback((_event: MouseEvent | React.MouseEvent | TouchEvent | React.TouchEvent, _edge: Edge, _handleType: 'source' | 'target') => {}, []);
     const handleReconnectEnd = useCallback((_event: MouseEvent | React.MouseEvent | TouchEvent | React.TouchEvent, _edge: Edge) => {}, []);
@@ -315,7 +332,7 @@ export function useDesignerInteractions({
         ANNOTATION_COLORS,
         quickAddMenu, handleAddNode, closeMenu, openQuickAddMenu, getFlowPosition,
         setQuickConnectPreview, nodesWithGhost, finalEdgesWithGhost,
-        isConnecting, connectPreview, onConnectStart, enhancedOnConnect, enhancedOnConnectEnd,
+        isConnecting, connectPreview, lastConnectionValidation, onConnectStart, enhancedOnConnect, enhancedOnConnectEnd,
         isValidConnection,
         handleReconnect, handleReconnectStart, handleReconnectEnd,
         onDragOver, onDrop, wrappedOnNodeDragStart: onNodeDragStart, onNodeDrag, onNodeDragStop,

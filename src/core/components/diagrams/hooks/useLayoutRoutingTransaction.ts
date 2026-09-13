@@ -24,7 +24,7 @@ import {
   type RoutedLayoutCandidate,
 } from './layoutCandidateSelection';
 
-type LayoutRoutingTransactionRequest = Readonly<{
+export type LayoutRoutingTransactionRequest = Readonly<{
   nodes: Node[];
   edges: Edge[];
   routingJob: BaseReactFlowRoutingSessionJob;
@@ -58,6 +58,29 @@ type UseLayoutRoutingTransactionOptions = Readonly<{
   publishLayoutPreview?: (request: LayoutPresentationPreviewRequest) => void;
   clearLayoutPreview?: (routingJob: BaseReactFlowRoutingSessionJob) => boolean | undefined;
 }>;
+
+const assertLayoutRoutingPreservesSourceEdges = (
+  sourceEdges: Edge[],
+  committedSourceEdges: Edge[],
+): void => {
+  if (sourceEdges.length === 0) return;
+  if (committedSourceEdges.length !== sourceEdges.length) {
+    throw new Error('layout-routing-hard-quality-rejected');
+  }
+  const sourceEdgeIds = new Set(sourceEdges.map(edge => edge.id));
+  const committedEdgeIds = new Set(committedSourceEdges.map(edge => edge.id));
+  if (
+    sourceEdgeIds.size !== sourceEdges.length
+    || committedEdgeIds.size !== committedSourceEdges.length
+  ) {
+    throw new Error('layout-routing-hard-quality-rejected');
+  }
+  for (const edgeId of sourceEdgeIds) {
+    if (!committedEdgeIds.has(edgeId)) {
+      throw new Error('layout-routing-hard-quality-rejected');
+    }
+  }
+};
 
 /**
  * Keeps the current graph visible while target geometry is routed off-screen,
@@ -168,6 +191,7 @@ export const useLayoutRoutingTransaction = ({
             candidateRepairPolicy,
           });
           const staged = diagnostics ? await diagnostics.measurePhase('worker-routing', route) : await route();
+          assertLayoutRoutingPreservesSourceEdges(candidate.edges, staged.committedSourceEdges);
           if (!layoutCandidateAcceptanceMatches(acceptance, candidate.nodes, null)) {
             throw new Error('layout-routing-hard-quality-rejected');
           }

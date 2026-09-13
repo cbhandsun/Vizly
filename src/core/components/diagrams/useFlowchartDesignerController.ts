@@ -48,6 +48,7 @@ import { useFlowchartPaneDoubleClick } from './hooks/useFlowchartPaneDoubleClick
 import { useFlowchartImportHandler } from './hooks/useFlowchartImportHandler';
 import { useFlowchartReverseImportFeedback } from './hooks/useFlowchartReverseImportFeedback';
 import { useFlowchartReactFlowInit } from './hooks/useFlowchartReactFlowInit';
+import { useFlowchartViewportPersistenceKey } from './hooks/useFlowchartViewportPersistenceKey';
 import { resolveFlowchartCustomDomainLayoutCapability } from './flowchartLayoutCapabilities';
 
 export const useFlowchartDesignerController = ({
@@ -339,7 +340,7 @@ export const useFlowchartDesignerController = ({
         annotations, annotationMode, addAnnotation, updateAnnotation, deleteAnnotation, toggleResolved, ANNOTATION_COLORS,
         quickAddMenu, handleAddNode, closeMenu, openQuickAddMenu,
         setQuickConnectPreview, nodesWithGhost, finalEdgesWithGhost,
-        isConnecting, connectPreview, onConnectStart, enhancedOnConnect, enhancedOnConnectEnd,
+        isConnecting, connectPreview, lastConnectionValidation, onConnectStart, enhancedOnConnect, enhancedOnConnectEnd,
         isValidConnection,
         handleReconnect, handleReconnectStart, handleReconnectEnd,
         onDragOver, onDrop, wrappedOnNodeDragStart, onNodeDrag, onNodeDragStop,
@@ -424,7 +425,7 @@ export const useFlowchartDesignerController = ({
         createLocalizedPageName,
     );
     const getOperationScope = useDiagramOperationScope(diagramId, multiPage.getPageOperationScope);
-    const viewportPersistenceKey = `${diagramIdForExport}:${multiPage.activePageId}`;
+    const viewportPersistenceKey = useFlowchartViewportPersistenceKey({ diagramId: diagramIdForExport, pageId: multiPage.activePageId, isMobile });
     const commentAwarePageLifecycle = useCommentAwarePageDeletion(
         multiPage.deletePage,
         multiPage.restoreDeletedPage,
@@ -452,6 +453,7 @@ export const useFlowchartDesignerController = ({
         handleGroupWithToast,
         handleUngroupWithToast,
         handleLock,
+        handleLayoutPin,
         // 隐藏功能暴露
         handleMatchSize,
         handleReverseEdge,
@@ -656,13 +658,13 @@ export const useFlowchartDesignerController = ({
 
     const viewModel = {
         ANNOTATION_COLORS, activeLayerId, activePlugin, activeRightTab, activeUsers, addAnnotation, aiChatVisible, annotationMode, annotations, autoRoutingEnabled,
-        canRedo, canUndo, canvasBg, canvasSearchVisible, canvasSearchReplaceVisible, closeMenu, commandPaletteItems, commandPaletteVisible, connectPreview, copyStyle, createLayer,
+        canRedo, canUndo, canvasBg, canvasSearchVisible, canvasSearchReplaceVisible, closeMenu, commandPaletteItems, commandPaletteVisible, connectPreview, lastConnectionValidation, copyStyle, createLayer,
         customDomainLayoutAvailable: customDomainLayoutCapability.available,
         currentZoom, deleteAnnotation, deleteLayer, deleteTemplate, diagramIdForExport, diffResult, dynamicEdgeTypes, dynamicNodeTypes, edges,
         edgesRef, enhancedOnConnect, enhancedOnConnectEnd, exportModalVisible, extraExportItems, fileInputRef,
         getPreviousState, getReactFlowSnapshot, gridColor, gridVariant, groupedTemplates, guides, handleAddFreehandStroke, handleAddMindMap, handleAddNode, handleAddStickyNote, handleAlign,
         handleBeforeUpdate, handleBringToFront, handleContextMenuAction, handleDeleteWithToast, handleDistribute, handleDuplicateWithToast, handleGroupWithToast, handleUngroupWithToast,
-        handleEdgeClick, handleEdgeDoubleClick, handleFitView, handleFocusNode, handleGridRotate, handleImport, handleRequestImport, handleLock, handleOpacity,
+        handleEdgeClick, handleEdgeDoubleClick, handleFitView, handleFocusNode, handleGridRotate, handleImport, handleRequestImport, handleLock, handleLayoutPin, handleOpacity,
         handleSmartLayout,
         handleOpenJsonEditor, handleOpenSettings, handlePaneClick, handlePresentationFocus, handleReactFlowInit, handleReadonlyChange, handleReconnect,
         handleReconnectEnd, handleReconnectStart, handleSearchReplaceAll, handleSearchReplaceMatch, handleSendToBack, handleSmartOptimize, handleStrategyLayout,

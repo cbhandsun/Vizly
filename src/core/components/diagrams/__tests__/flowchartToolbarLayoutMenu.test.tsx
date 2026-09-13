@@ -4,6 +4,7 @@ import {
   buildFlowchartLayoutMenuModel,
   resolveActiveDomainLayoutKey,
   resolveNodeLayoutHostStrategy,
+  resolveScopedLayoutMenuCommand,
 } from '../flowchartToolbarLayoutMenu';
 import {
   coerceFlowchartDomainNodeArrangement,
@@ -411,6 +412,101 @@ describe('flowchartToolbarLayoutMenu', () => {
     expect(typeof smart?.onClick).toBe('function');
     if (typeof smart?.onClick === 'function') smart.onClick();
     expect(onSmartLayout).toHaveBeenCalledOnce();
+  });
+
+  it('exposes scoped layout commands only after a node or edge selection exists', () => {
+    const disabledHandler = vi.fn();
+    const disabledModel = buildFlowchartLayoutMenuModel({
+      lastDomainStrategy: 'domain-compound-elk',
+      lastDomainDirection: 'LR',
+      selectedNodesCount: 0,
+      selectedEdgesCount: 0,
+      onStrategyLayout: disabledHandler,
+      translate: (_key, fallback) => fallback,
+    });
+    const disabledItems = collectItems(disabledModel.items);
+    const disabledSelection = disabledItems.find(item => item.key === 'scoped-selection-layout');
+    const disabledNeighborhood = disabledItems.find(item => item.key === 'scoped-neighborhood-layout');
+
+    expect(disabledItems.find(item => item.key === 'group-scoped-layout')?.label).toBe('局部布局');
+    expect(disabledSelection?.disabled).toBe(true);
+    expect(disabledSelection?.title).toBe('先选择节点或连线后再执行局部布局');
+    expect(disabledNeighborhood?.disabled).toBe(true);
+    expect(disabledSelection?.onClick).toBeUndefined();
+
+    const onStrategyLayout = vi.fn();
+    const enabledModel = buildFlowchartLayoutMenuModel({
+      lastDomainStrategy: 'domain-compound-elk',
+      lastDomainDirection: 'LR',
+      selectedNodesCount: 1,
+      selectedEdgesCount: 0,
+      onStrategyLayout,
+      translate: (_key, fallback) => fallback,
+    });
+    const enabledItems = collectItems(enabledModel.items);
+    const selection = enabledItems.find(item => item.key === 'scoped-selection-layout');
+    const neighborhood = enabledItems.find(item => item.key === 'scoped-neighborhood-layout');
+
+    expect(selection?.disabled).toBe(false);
+    expect(neighborhood?.disabled).toBe(false);
+    if (typeof selection?.onClick === 'function') selection.onClick();
+    if (typeof neighborhood?.onClick === 'function') neighborhood.onClick();
+    expect(onStrategyLayout).toHaveBeenNthCalledWith(
+      1,
+      'domain-compound-elk',
+      undefined,
+      'LR',
+      undefined,
+      { mode: 'selection' },
+    );
+    expect(onStrategyLayout).toHaveBeenNthCalledWith(
+      2,
+      'domain-compound-elk',
+      undefined,
+      'LR',
+      undefined,
+      { mode: 'selection-neighborhood', neighborhoodDepth: 1 },
+    );
+  });
+
+  it('reuses the active layout semantics for scoped layout commands', () => {
+    expect(resolveScopedLayoutMenuCommand({
+      lastDomainStrategy: 'domain-horizontal',
+      lastDomainDirection: 'TB',
+      lastNodeLayout: 'grid',
+    })).toEqual({
+      strategyName: 'domain-horizontal',
+      nodeLayout: 'grid',
+      direction: 'LR',
+    });
+    expect(resolveScopedLayoutMenuCommand({
+      lastDomainStrategy: 'domain-lanes',
+      lastDomainDirection: 'BT',
+      lastNodeLayout: 'vertical',
+      laneRankPreference: 'compact',
+    })).toEqual({
+      strategyName: 'domain-lanes',
+      nodeLayout: 'vertical',
+      direction: 'BT',
+      laneRankPreference: 'compact',
+    });
+    expect(resolveScopedLayoutMenuCommand({
+      lastDomainStrategy: 'domain-elk',
+      lastDomainDirection: 'RL',
+      lastNodeLayout: 'grid',
+    })).toEqual({
+      strategyName: 'domain-elk',
+      nodeLayout: 'elk-layered',
+      direction: 'RL',
+    });
+    expect(resolveScopedLayoutMenuCommand({
+      lastDomainStrategy: 'unexpected',
+      lastDomainDirection: 'LR',
+      lastNodeLayout: 'grid',
+    })).toEqual({
+      strategyName: 'tree',
+      direction: 'LR',
+    });
   });
 
   it('disables only custom composition controls for graphs that require a preset engine', () => {

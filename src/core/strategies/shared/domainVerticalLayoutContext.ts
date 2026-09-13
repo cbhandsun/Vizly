@@ -7,12 +7,12 @@ import {
   applyDomainGrouping,
   applySubGrouping,
   collapseGeneratedDomainAliasSubGroups,
-  ensureMeasuredForNodes,
   normalizeMissingNodeSubDomainByDomain,
   normalizeSubGroupDomainByChildren,
   reflowSubGroupChildrenGrid,
   reflowSubGroupChildrenVertical,
 } from '../../utils/layoutUtils';
+import { ensureMeasuredForNodes } from '../../utils/layout/ensureMeasuredForNodes';
 import {
   layoutSubGroupChildrenByMode,
 } from './domainVerticalSubGroupChildLayout';

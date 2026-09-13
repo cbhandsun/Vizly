@@ -4,14 +4,10 @@ import {
     Edge,
     NodeChange,
     EdgeChange,
-    Connection,
     applyNodeChanges,
     applyEdgeChanges,
-    addEdge,
-    MarkerType,
 } from '@xyflow/react';
 import { useDiagramHistory } from '../../../hooks/useDiagramHistory';
-import { useDiagramStylePreset_v2 } from '../../../hooks/useDiagramStylePreset_v2';
 import { useDiagramStore } from '../../../store/useDiagramStore';
 import {
     resolveHistoryNodeFocusAfterChange,
@@ -21,7 +17,7 @@ import {
 } from '../flowchartHistoryFocus';
 import { scheduleFlowchartEmptyStateFocus } from '../flowchartDeletionFocus';
 
-export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advanced-smart') => {
+export const useFlowchartState = () => {
     const { t } = useTranslation();
     const nodes = useDiagramStore(state => state.nodes);
     const edges = useDiagramStore(state => state.edges);
@@ -65,8 +61,6 @@ export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advan
         removeScopes,
     } = useDiagramHistory(nodes, edges, historyLabels);
 
-    // Presets
-    const preset = useDiagramStylePreset_v2();
 
     // Track resizing state to prevent history flooding
     const isResizingRef = useRef(false);
@@ -140,61 +134,6 @@ export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advan
         [setEdges, takeSnapshot],
     );
 
-    const onConnect = useCallback(
-        (connection: Connection) => {
-            // Self-loop prevention
-            if (connection.source === connection.target) return;
-
-            takeSnapshot(nodesRef.current, edgesRef.current); // 🚀 使用 ref 避免 stale closure
-
-            // Apply global preset styles to the new edge
-            const edgeToken = preset.edges.main;
-
-            // Check if this is a relationship edge (from mind map)
-            const isRelationship = connection.sourceHandle?.includes('relationship') || connection.targetHandle?.includes('relationship');
-
-            // Default Style
-            const defaultStyle = {
-                type: isRelationship ? 'relationshipEdge' : (edgeMode === 'native' ? 'smoothstep' : 'advanced-smart-step'),
-                style: {
-                    stroke: edgeToken.color,
-                    strokeWidth: edgeToken.width,
-                    strokeDasharray: isRelationship ? '5,5' : edgeToken.dash,
-                },
-                markerEnd: isRelationship ? undefined : {
-                    type: MarkerType.ArrowClosed,
-                    color: edgeToken.color,
-                    width: edgeToken.arrow.width,
-                    height: edgeToken.arrow.height,
-                }
-            };
-
-            // 🔥 决策节点出边自动标签
-            let autoLabel: string | undefined;
-            const sourceNode = nodesRef.current.find(n => n.id === connection.source);
-            const sourceShape = (sourceNode?.data as Record<string, unknown>)?.shape;
-            if (sourceShape === 'diamond') {
-                const existingOutEdges = edgesRef.current.filter(e => e.source === connection.source);
-                const labels = ['Yes', 'No'];
-                const idx = existingOutEdges.length;
-                if (idx < labels.length) {
-                    autoLabel = labels[idx];
-                }
-            }
-
-            setEdges((eds) => addEdge({
-                ...connection,
-                ...defaultStyle,
-                ...(autoLabel ? { label: autoLabel } : {}),
-                data: {
-                    manualHandles: true,
-                    auto: []
-                },
-            }, eds));
-        },
-        [edgeMode, preset, setEdges, takeSnapshot],
-    );
-
     const commitHistoryState = useCallback((state: { nodes: typeof nodes; edges: typeof edges }) => {
         nodesRef.current = state.nodes;
         edgesRef.current = state.edges;
@@ -256,7 +195,6 @@ export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advan
         edgesRef,
         onNodesChange,
         onEdgesChange,
-        onConnect,
         diagramHistory: {
             takeSnapshot,
             notifyHistoryChanged,

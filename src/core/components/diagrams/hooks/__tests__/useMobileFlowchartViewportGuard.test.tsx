@@ -7,6 +7,10 @@ import {
     useMobileFlowchartViewportGuard,
     useScheduledFlowchartFit,
 } from '../useMobileFlowchartViewportGuard';
+import { useFlowchartViewportPersistenceKey } from '../useFlowchartViewportPersistenceKey';
+import { createFlowchartViewportPersistenceKey } from '../../flowchartResponsiveChrome';
+import flowchartDesignerViewSource from '../../FlowchartDesignerView.tsx?raw';
+import advancedFlowchartCanvasShellSource from '../../AdvancedFlowchartCanvasShell.tsx?raw';
 
 describe('mobile flowchart viewport guard', () => {
     afterEach(() => {
@@ -45,5 +49,41 @@ describe('mobile flowchart viewport guard', () => {
 
         act(() => vi.advanceTimersByTime(1));
         expect(fitView).toHaveBeenCalledTimes(1);
+    });
+
+    it('separates persisted desktop and mobile viewports for the same diagram page', () => {
+        expect(createFlowchartViewportPersistenceKey({
+            diagramId: 'diagram-a',
+            pageId: 'page-1',
+            isMobile: false,
+        })).toBe('diagram-a:page-1:desktop');
+
+        expect(createFlowchartViewportPersistenceKey({
+            diagramId: 'diagram-a',
+            pageId: 'page-1',
+            isMobile: true,
+        })).toBe('diagram-a:page-1:mobile');
+    });
+
+    it('memoizes the responsive viewport persistence scope for the active page', () => {
+        const { result, rerender } = renderHook(
+            ({ isMobile }) => useFlowchartViewportPersistenceKey({
+                diagramId: 'diagram-a',
+                pageId: 'page-1',
+                isMobile,
+            }),
+            { initialProps: { isMobile: false } },
+        );
+
+        expect(result.current).toBe('diagram-a:page-1:desktop');
+        rerender({ isMobile: true });
+        expect(result.current).toBe('diagram-a:page-1:mobile');
+    });
+
+    it('wires mobile viewport isolation to the canvas fit policy', () => {
+        expect(flowchartDesignerViewSource).toContain('isMobile={isMobile}');
+        expect(advancedFlowchartCanvasShellSource).toContain(
+            "fitMode={isMobile ? 'fitWidthTop' : 'restoreOrFitAll'}",
+        );
     });
 });

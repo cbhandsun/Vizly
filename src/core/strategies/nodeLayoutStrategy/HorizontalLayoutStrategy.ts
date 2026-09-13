@@ -4,8 +4,9 @@ import type { StandardNodeData } from '../../models/DiagramModels';
 import { diagramConfigManager } from '../../config/DiagramConfig';
 import type { LayoutOptions } from '../../types/layout';
 import { ILayoutStrategy } from '../LayoutStrategyManager';
-import { calculateHorizontalLayout, applySubGrouping, assignChildrenToSubGroupsBySemantic, applyDomainGrouping, resolveSubGroupOverlaps, enforceDomainContainerStrictContainment, resolveDomainContainerOverlaps, scatterNodesAtSamePoint, resolveSubGroupChildrenOverlapsStrict, recomputeSubGroupContainersBasic, resolveFreeNodeOverlapsInDomain, finalizeDomainWidthsByProjection, finalizeDomainHeightsByProjection, clampNodesToContainers, centerSubGroupsInDomain, ensureMeasuredForNodes } from '../../utils/layoutUtils';
+import { calculateHorizontalLayout, applySubGrouping, assignChildrenToSubGroupsBySemantic, applyDomainGrouping, resolveSubGroupOverlaps, enforceDomainContainerStrictContainment, resolveDomainContainerOverlaps, scatterNodesAtSamePoint, resolveSubGroupChildrenOverlapsStrict, recomputeSubGroupContainersBasic, resolveFreeNodeOverlapsInDomain, finalizeDomainWidthsByProjection, finalizeDomainHeightsByProjection, clampNodesToContainers, centerSubGroupsInDomain } from '../../utils/layoutUtils';
 import { runElkLayout } from '../../workers/elkLayoutClient';
+import { ensureMeasuredForNodes } from '../../utils/layout/ensureMeasuredForNodes';
 
 type LayoutNode = ReactFlowNode<Record<string, unknown>>;
 

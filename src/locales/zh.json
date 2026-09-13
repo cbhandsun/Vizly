@@ -707,6 +707,33 @@
             "zoomIn": "放大",
             "zoomOut": "缩小"
         },
+        "connectionValidation": {
+            "plugin-rejected": "当前图表类型不允许这条连接。",
+            "missing-endpoint": "请选择完整的起点和终点节点。",
+            "unknown-source-node": "起点节点已不存在。",
+            "unknown-target-node": "终点节点已不存在。",
+            "self-loop-disabled": "当前图表不允许节点连接到自身。",
+            "duplicate-connection": "相同的连接已经存在。",
+            "terminal-node-source": "结束节点不能作为连线起点。",
+            "source-handle-limit": "此起点连接点已达到连接上限。",
+            "target-handle-limit": "此终点连接点已达到连接上限。",
+            "missing-source-port": "请先选择语义起点端口。",
+            "missing-target-port": "请先选择语义终点端口。",
+            "unknown-source-port": "起点端口“{{port}}”不可用。",
+            "unknown-target-port": "终点端口“{{port}}”不可用。",
+            "source-port-direction": "端口“{{port}}”不能发起连接。",
+            "target-port-direction": "端口“{{port}}”不能接收连接。",
+            "source-port-capacity": "起点端口“{{port}}”已达到容量上限。",
+            "target-port-capacity": "终点端口“{{port}}”已达到容量上限。",
+            "port-type-incompatible": "起点和终点端口的数据类型不兼容。",
+            "source-port-relation": "起点端口“{{port}}”不允许关系“{{relation}}”。",
+            "target-port-relation": "终点端口“{{port}}”不允许关系“{{relation}}”。",
+            "unknown-relation": "当前图表未定义关系“{{relation}}”。",
+            "relation-source-role": "关系“{{relation}}”不允许此起点端口角色。",
+            "relation-target-role": "关系“{{relation}}”不允许此终点端口角色。",
+            "relation-source-type": "关系“{{relation}}”不允许此起点数据类型。",
+            "relation-target-type": "关系“{{relation}}”不允许此终点数据类型。"
+        },
         "edgeEditor": {
             "editLabel": "编辑连线标签：{{label}}",
             "labelInput": "连线标签",
@@ -987,6 +1014,12 @@
             "layout": {
                 "tooltip": "自动布局",
                 "applying": "正在应用布局…",
+                "failure": {
+                    "noLayoutableNodes": "当前没有可布局的节点。",
+                    "hardQualityRejected": "此布局未满足连线质量要求，已保留原画布。请调整节点或选择其他布局。",
+                    "workerTimeout": "布局计算超时，已保留原画布。请稍后重试。",
+                    "strategyFailed": "布局计算失败，已保留原画布。请重试或选择其他布局。"
+                },
                 "dagreTB": "Dagre 垂直布局（TB）",
                 "dagreLR": "Dagre 水平布局（LR）",
                 "elkTB": "ELK 正交分层（上→下）",

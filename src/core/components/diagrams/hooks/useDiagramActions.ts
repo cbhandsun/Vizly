@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { PluginContext, DiagramTypePlugin } from '../../../types/plugin';
 import { useDiagramStore } from '../../../store/useDiagramStore';
 import { hasMutationLockedNode, resolveTargetNodes } from '../nodeLockPolicy';
+import { applyNodeLayoutPinnedState } from '../nodeLayoutPinPolicy';
 import {
     applyEdgeLockState,
     hasMutationLockedEdge,
@@ -336,6 +337,25 @@ export const useDiagramActions = ({
         diagramStore.setSelectedEdges(updateEdgeSelection(diagramStore.selectedEdges));
     }, [nodes, edges, nodesRef, edgesRef, selectedNodes, selectedEdges, setNodes, setEdges, takeSnapshot]);
 
+    const handleLayoutPin = useCallback((target?: DiagramActionTarget, fixed: boolean = true) => {
+        const targetIds = target
+            ? toTargetIds(target)
+            : new Set(selectedNodes.map(node => node.id));
+        if (targetIds.size === 0) return;
+        const currentNodes = nodesRef?.current ?? nodes;
+        const currentEdges = edgesRef?.current ?? edges;
+        const result = applyNodeLayoutPinnedState(currentNodes, targetIds, fixed);
+        if (!result.changed) return;
+
+        takeSnapshot(currentNodes, currentEdges);
+        if (nodesRef) nodesRef.current = result.nodes;
+        setNodes(result.nodes);
+
+        const nodeById = new Map(result.nodes.map(node => [node.id, node]));
+        const diagramStore = useDiagramStore.getState();
+        diagramStore.setSelectedNodes(diagramStore.selectedNodes.map(node => nodeById.get(node.id) ?? node));
+    }, [nodes, edges, nodesRef, edgesRef, selectedNodes, setNodes, takeSnapshot]);
+
     const handleSelectAll = useCallback(() => {
         setNodes(nds => nds.map(n => ({ ...n, selected: true })));
         setEdges(eds => eds.map(e => ({ ...e, selected: true })));
@@ -552,6 +572,12 @@ export const useDiagramActions = ({
             case 'unlock':
                 handleLock(targetId, false);
                 break;
+            case 'pinLayout':
+                handleLayoutPin(targetId, true);
+                break;
+            case 'unpinLayout':
+                handleLayoutPin(targetId, false);
+                break;
             case 'reverseEdge':
                 return handleReverseEdge(targetId);
             case 'resetWaypoints':
@@ -590,7 +616,7 @@ export const useDiagramActions = ({
                 }
                 break;
         }
-    }, [handleDelete, handleDuplicate, handleBringToFront, handleSendToBack, handleFitView, handleLock, handleReverseEdge, handleResetWaypoints, handleConvertToEditable, handleStopEditing, handleAlign, handleDistribute, handleMatchSize, reactFlowInstance, pluginCtx]);
+    }, [handleDelete, handleDuplicate, handleBringToFront, handleSendToBack, handleFitView, handleLock, handleLayoutPin, handleReverseEdge, handleResetWaypoints, handleConvertToEditable, handleStopEditing, handleAlign, handleDistribute, handleMatchSize, reactFlowInstance, pluginCtx]);
 
     return {
         handleDelete,
@@ -601,6 +627,7 @@ export const useDiagramActions = ({
         handleSendToBack,
         onContextMenuAction,
         handleLock,
+        handleLayoutPin,
         // 暴露之前仅内部使用的功能，供命令面板和统一入口使用
         handleMatchSize,
         handleReverseEdge,

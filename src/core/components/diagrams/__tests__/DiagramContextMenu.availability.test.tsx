@@ -4,7 +4,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import type { Node } from '@xyflow/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DiagramContextMenu } from '../DiagramContextMenu';
+import { DiagramContextMenu, type ContextMenuProps } from '../DiagramContextMenu';
 
 interface MockMenuItem {
   key?: string;
@@ -40,6 +40,11 @@ vi.mock('react-i18next', () => ({
       'designer.contextMenu.redo': 'Redo',
       'designer.contextMenu.bringToFront': 'Bring to front',
       'designer.contextMenu.sendToBack': 'Send to back',
+      'designer.contextMenu.lock': 'Lock',
+      'designer.contextMenu.pinLayout': 'Pin layout position',
+      'designer.contextMenu.unpinLayout': 'Unpin layout position',
+      'designer.contextMenu.pinLayoutSelection': 'Pin selection layout position',
+      'designer.contextMenu.unpinLayoutSelection': 'Unpin selection layout position',
     })[key] ?? key,
   }),
 }));
@@ -72,18 +77,22 @@ const renderNodeMenu = ({
   allNodes,
   targetId,
   selectedNodes,
+  type = 'node',
+  onAction = vi.fn(),
 }: {
   allNodes?: Node[];
   targetId: string;
   selectedNodes: Node[];
+  type?: 'node' | 'multi-node';
+  onAction?: ContextMenuProps['onAction'];
 }) => render(
   <DiagramContextMenu
     top={0}
     left={0}
-    type="node"
+    type={type}
     targetId={targetId}
     onClose={vi.fn()}
-    onAction={vi.fn()}
+    onAction={onAction}
     selectedNodes={selectedNodes}
     selectedEdges={[]}
     nodes={allNodes}
@@ -184,5 +193,41 @@ describe('DiagramContextMenu action availability', () => {
       .toBe(false);
     expect((screen.getByRole('button', { name: 'Send to back' }) as HTMLButtonElement).disabled)
       .toBe(false);
+  });
+
+  it('exposes layout pinning separately from mutation locking', () => {
+    const selected = node('selected');
+    const pinned = { ...node('pinned'), data: { label: 'pinned', fixed: true } };
+    const { unmount } = renderNodeMenu({
+      targetId: selected.id,
+      selectedNodes: [selected],
+    });
+
+    expect(screen.getByRole('button', { name: 'Lock' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Pin layout position' })).toBeTruthy();
+
+    unmount();
+    renderNodeMenu({
+      targetId: pinned.id,
+      selectedNodes: [pinned],
+    });
+
+    expect(screen.getByRole('button', { name: 'Unpin layout position' })).toBeTruthy();
+  });
+
+  it('dispatches multi-node layout pinning against the current selection', () => {
+    const first = node('first');
+    const second = node('second');
+    const onAction = vi.fn();
+    renderNodeMenu({
+      type: 'multi-node',
+      targetId: first.id,
+      selectedNodes: [first, second],
+      onAction,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pin selection layout position' }));
+
+    expect(onAction).toHaveBeenCalledWith('pinLayout', undefined);
   });
 });
