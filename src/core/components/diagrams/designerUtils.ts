@@ -16,6 +16,7 @@ import {
 } from './designerUtilsLogging';
 import { LayoutOptimizer } from '../layout/LayoutOptimizer';
 import { sanitizeCanvasEdgesForNodes } from '../../utils/canvasEdgeSanitizer';
+import { resolveInitialLayoutSelectionFromStandardPreset } from './standardPresetLayoutSelection';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
     Boolean(value && typeof value === 'object' && !Array.isArray(value))
@@ -567,7 +568,11 @@ export const standardDataToCanvas = async (
 
     // ═══ 4. 内置布局（对齐新项目 standardToGraphData） ═══
     if (!hasCanvasPositions && nodes.length > 0) {
-        const direction = (data.layout?.direction === 'LR' || data.layout?.direction === 'RL') ? 'LR' : 'TB';
+        const initialLayoutSelection = resolveInitialLayoutSelectionFromStandardPreset(data);
+        const direction = (
+            initialLayoutSelection.direction === 'LR'
+            || initialLayoutSelection.direction === 'RL'
+        ) ? 'LR' : 'TB';
         const isHorizontal = direction === 'LR';
 
         // ═══ 域检测（对齐新项目 hasMeaningfulDomains） ═══
@@ -585,9 +590,8 @@ export const standardDataToCanvas = async (
         if (hasDomains) {
             // ═══ 有多域 → 按标准数据 layout.type 选择域策略；未声明时保持 DomainDagre 兼容默认 ═══
             try {
-                const layoutType = String(data.layout?.type || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '');
-                const usesVerticalStrategy = layoutType === 'domainvertical' || layoutType === 'domainverticallayout';
-                const usesHorizontalStrategy = layoutType === 'domainhorizontal' || layoutType === 'domainhorizontallayout';
+                const usesVerticalStrategy = initialLayoutSelection.strategy === 'domain-vertical';
+                const usesHorizontalStrategy = initialLayoutSelection.strategy === 'domain-horizontal';
                 const strategy = usesVerticalStrategy
                     ? new (await import('../../strategies/DomainVerticalLayoutStrategy')).DomainVerticalLayoutStrategy()
                     : usesHorizontalStrategy
@@ -595,7 +599,7 @@ export const standardDataToCanvas = async (
                         : new (await import('../../strategies/DomainDagreLayoutStrategy')).DomainDagreLayoutStrategy();
                 const layoutRecord = data.layout as unknown as Record<string, unknown>;
                 const nodeLayout = optionalLayoutType(layoutRecord.nodeLayout)
-                    ?? ((usesVerticalStrategy || usesHorizontalStrategy) ? 'vertical' : undefined);
+                    ?? optionalLayoutType(initialLayoutSelection.nodeLayout);
                 const layoutOptions: LayoutOptions = {
                     type: LayoutType.DOMAIN_FIRST,
                     direction: direction as 'TB' | 'LR',
