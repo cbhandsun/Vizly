@@ -45,6 +45,9 @@ export const finalSafetyCandidateIsAccepted = (
   const unsafeEndpointStubCount = options.evaluation?.unsafeEndpointStubs(candidate)
     ?? countRenderUnsafeEndpointStubs(candidate);
   if (unsafeEndpointStubCount !== 0) return false;
+  const report = options.evaluation?.hardReport(candidate)
+    ?? getDisplayHardQualityGateReport(candidate, nodes, 'polished');
+  if (!report.hardClean) return false;
   const endpointOrder = options.evaluation?.endpointOrder(candidate)
     ?? auditFinalSameSideEndpointOrder(candidate, nodes);
   const passageOrder = options.evaluation?.passageOrder(candidate)
@@ -56,9 +59,6 @@ export const finalSafetyCandidateIsAccepted = (
     || passageOrder.passageDefects !== 0
     || passageOrder.nearTrunkOpportunities !== 0
   ) return false;
-  const report = options.evaluation?.hardReport(candidate)
-    ?? getDisplayHardQualityGateReport(candidate, nodes, 'polished');
-  if (!report.hardClean) return false;
   const initialTrueTrunks = sameFinalSafetyEdgeReferences(baseline, candidate)
     ? endpointOrder.legalSharedTrunks
     : getInitialTrueTrunks();
