@@ -352,6 +352,10 @@ export function useLayoutStrategy({
                 const isDomainElk = strategyName === 'domain-elk' || strategyName === 'elk';
                 const isCompactGroups = strategyName === 'compact-groups';
                 const isDomainCompoundElk = strategyName === 'domain-compound-elk' || isCompactGroups;
+                const preserveRequestedStandardLayout =
+                    strategyName === 'domain-dagre'
+                    || strategyName === 'domain-dagre-sub-horizontal'
+                    || strategyName === 'dagre';
                 const finalNodeLayout = isDomainDagre && !isDomainLane
                     ? 'dagre'
                     : (nodeLayout || 'dagre');
@@ -455,7 +459,8 @@ export function useLayoutStrategy({
                     appliedNodeLayout = undefined;
                     return fallbackResult;
                 };
-                const topologyFallback = !isDomainElk && !isDomainCompoundElk && !isDomainLane
+                const topologyFallback = !preserveRequestedStandardLayout
+                    && !isDomainElk && !isDomainCompoundElk && !isDomainLane
                     ? legacyFallback.resolveLegacyDomainTopologyFallback(
                         generatedGroupOptions,
                         layoutNodes,
@@ -495,7 +500,8 @@ export function useLayoutStrategy({
                     isDomainLane || usedDomainCompoundElk,
                     layoutContext,
                 );
-                if (!usedDomainElk && !usedDomainCompoundElk && !isDomainLane) {
+                if (!preserveRequestedStandardLayout
+                    && !usedDomainElk && !usedDomainCompoundElk && !isDomainLane) {
                     const qualityFallback = legacyFallback.resolveLegacyDomainQualityFallback(
                         generatedGroupOptions,
                         result.nodes,
@@ -616,7 +622,7 @@ export function useLayoutStrategy({
                             legacyFallback.isLayoutRoutingHardQualityRejection(error),
                         );
                         const canRetryWithDomainCompoundElk = shouldRetryRejectedDomainLayoutWithCompoundElk({
-                            preserveOrderedLanes: isDomainLane,
+                            preserveOrderedLanes: isDomainLane || preserveRequestedStandardLayout,
                             usedDomainElk,
                             usedDomainCompoundElk,
                             canUseFlatElkFallback,

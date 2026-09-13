@@ -108,8 +108,8 @@ export const resolveDomainLaneSpacing = (
 
 /** Layout routes are candidates only; the hidden transaction still hard-gates them. */
 export const shouldPromoteDomainDagreRouteCandidate = (
-    _strategyName?: string,
-): boolean => true;
+    strategyName?: string,
+): boolean => isOrderedDomainLaneLayoutStrategy(strategyName);
 
 export const shouldRetryRejectedDomainLayoutWithCompoundElk = ({
     preserveOrderedLanes = false,

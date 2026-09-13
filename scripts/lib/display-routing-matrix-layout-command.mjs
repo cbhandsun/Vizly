@@ -98,8 +98,13 @@ export const clickLayout = async (session, layoutCase) => {
 
 export const assertRequestedLayoutSelected = async (session, caseId) => {
   // Other legacy engines still have intentional topology fallbacks. Explicit
-  // swimlane and compound commands must preserve the requested arrangement.
-  if (!caseId.startsWith('domain-lanes-') && !caseId.startsWith('domain-compound-elk-')) return;
+  // standard, swimlane, and compound commands must preserve the requested
+  // arrangement so the initial preset layout remains replayable from the UI.
+  if (
+    !caseId.startsWith('domain-dagre-')
+    && !caseId.startsWith('domain-lanes-')
+    && !caseId.startsWith('domain-compound-elk-')
+  ) return;
   const knownSelection = value => DISPLAY_ROUTING_LAYOUT_CASES.find(candidate => (
     displayRoutingLayoutSelectionMatches(candidate.label, value)
   ))?.id ?? 'unrecognized';

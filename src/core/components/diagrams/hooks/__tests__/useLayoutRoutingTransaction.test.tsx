@@ -375,7 +375,7 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
     ]));
   });
 
-  it('keeps layout stability paused across a rejected legacy domain attempt and compound fallback', async () => {
+  it('keeps layout stability paused across a rejected ELK attempt and compound fallback', async () => {
     const groupedNodes = nodes.map(node => ({
       ...node,
       data: { ...node.data, domain: 'operations' },
@@ -401,7 +401,7 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
     }));
 
     await act(async () => {
-      await expect(result.current.handleStrategyLayout('domain-dagre', undefined, 'LR'))
+      await expect(result.current.handleStrategyLayout('domain-elk', 'elk-layered', 'LR'))
         .resolves.toBe(true);
     });
 
@@ -955,5 +955,39 @@ it('reuses preset spacing when replaying the initial standard DomainDagre layout
   expect(mocks.calculateLayeredLayoutWithReverse.mock.lastCall?.[3]).toMatchObject({
     direction: 'LR',
     spacing: { horizontal: 72, vertical: 48 },
+  });
+});
+
+it('does not silently replace an explicit standard DomainDagre command with compound ELK', async () => {
+  vi.clearAllMocks();
+  const dagNodes: Node[] = [
+    { id: 'a', position: { x: 0, y: 0 }, width: 60, height: 40, data: { domain: 'ops' } },
+    { id: 'b', position: { x: 0, y: 100 }, width: 60, height: 40, data: { domain: 'ops' } },
+    { id: 'c', position: { x: 200, y: 50 }, width: 60, height: 40, data: { domain: 'ops' } },
+  ];
+  const dagEdges: Edge[] = [
+    { id: 'a-c', source: 'a', target: 'c' },
+    { id: 'b-c', source: 'b', target: 'c' },
+  ];
+  mocks.calculateLayeredLayoutWithReverse.mockResolvedValue({ nodes: dagNodes, edges: dagEdges });
+  mocks.stageLayoutRouting.mockResolvedValue({
+    committedSourceEdges: dagEdges,
+    routedEdges: dagEdges,
+    commitSnapshot: () => true,
+  });
+  const options = createOptions();
+  options.nodesRef.current = dagNodes;
+  options.edgesRef.current = dagEdges;
+  const { result } = renderHook(() => useLayoutStrategy({ ...options, reactFlowInstance: null }));
+
+  await act(async () => {
+    expect(await result.current.handleStrategyLayout('domain-dagre', undefined, 'LR')).toBe(true);
+  });
+
+  expect(mocks.calculateLayeredLayoutWithReverse).toHaveBeenCalledTimes(1);
+  expect(mocks.loadDomainCompoundElkStrategy).not.toHaveBeenCalled();
+  expect(result.current.layoutSelection).toMatchObject({
+    strategy: 'domain-dagre',
+    direction: 'LR',
   });
 });

@@ -272,6 +272,13 @@ describe('display routing matrix cases', () => {
     await expect(assertRequestedLayoutSelected(fallback, 'domain-lanes-tb')).rejects.toThrow('different layout');
     await expect(assertRequestedLayoutSelected(fallback, 'domain-compound-elk-bt')).rejects.toThrow('different layout');
     expect(fallback.evaluate).toHaveBeenCalledTimes(2);
+    const standard = { evaluate: vi.fn().mockResolvedValue({
+      requested: '标准流程（保留域·左→右）',
+      applied: '自动布局',
+      appliedKey: 'domain-dagre-lr',
+    }) };
+    await expect(assertRequestedLayoutSelected(standard, 'domain-dagre-lr')).resolves.toBeUndefined();
+    expect(standard.evaluate).toHaveBeenCalledTimes(1);
     await expect(assertRequestedLayoutSelected({}, 'tree-tb')).resolves.toBeUndefined();
   });
 
@@ -356,6 +363,10 @@ describe('display routing matrix cases', () => {
   });
   it('covers every layout action currently exposed by the flowchart toolbar', () => {
     expect(DISPLAY_ROUTING_LAYOUT_CASES.map(layoutCase => layoutCase.id)).toEqual([
+      'domain-dagre-tb',
+      'domain-dagre-bt',
+      'domain-dagre-lr',
+      'domain-dagre-rl',
       'domain-compound-elk-tb',
       'domain-compound-elk-bt',
       'domain-compound-elk-lr',
@@ -437,7 +448,7 @@ describe('display routing matrix cases', () => {
       fullSequence,
       known,
       DISPLAY_ROUTING_LAYOUT_CASES.length - 1,
-    )).toHaveLength(15);
+    )).toHaveLength(19);
     expect(() => parseDisplayRoutingMatrixCaseList('tree-bt,tree-bt', known)).toThrow();
     expect(() => parseDisplayRoutingMatrixCaseList('unknown', known)).toThrow();
     expect(() => parseDisplayRoutingMatrixCaseList('x'.repeat(2_000), known)).toThrow();

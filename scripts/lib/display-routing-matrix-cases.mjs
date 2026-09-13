@@ -38,6 +38,10 @@ export const DISPLAY_ROUTING_BUSINESS_EDIT_CASE_ID = 'business-edit-stability';
 export const DISPLAY_ROUTING_SWIMLANE_EDIT_CASE_ID = 'swimlane-edit-stability';
 
 export const DISPLAY_ROUTING_LAYOUT_CASES = Object.freeze([
+  Object.freeze({ id: 'domain-dagre-tb', label: '标准流程（保留域·上→下）' }),
+  Object.freeze({ id: 'domain-dagre-bt', label: '标准流程（保留域·下→上）' }),
+  Object.freeze({ id: 'domain-dagre-lr', label: '标准流程（保留域·左→右）' }),
+  Object.freeze({ id: 'domain-dagre-rl', label: '标准流程（保留域·右→左）' }),
   Object.freeze({ id: 'domain-compound-elk-tb', label: '复杂流程（保留域·上→下）' }),
   Object.freeze({ id: 'domain-compound-elk-bt', label: '复杂流程（保留域·下→上）' }),
   Object.freeze({ id: 'domain-compound-elk-lr', label: '复杂流程（保留域·左→右）' }),

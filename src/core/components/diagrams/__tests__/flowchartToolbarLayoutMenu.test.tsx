@@ -108,7 +108,7 @@ describe('flowchartToolbarLayoutMenu', () => {
     expect(resolveDomainLaneSpacing('LR')).toEqual({ horizontal: 96, vertical: 120 });
     expect(resolveDomainLaneSpacing('RL')).toEqual({ horizontal: 96, vertical: 120 });
     expect(shouldPromoteDomainDagreRouteCandidate('domain-lanes')).toBe(true);
-    expect(shouldPromoteDomainDagreRouteCandidate('domain-dagre')).toBe(true);
+    expect(shouldPromoteDomainDagreRouteCandidate('domain-dagre')).toBe(false);
     expect(shouldRetryRejectedDomainLayoutWithCompoundElk({
       usedDomainElk: false,
       usedDomainCompoundElk: false,
