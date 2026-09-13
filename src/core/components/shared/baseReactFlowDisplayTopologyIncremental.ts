@@ -102,10 +102,12 @@ const lockTopologyEligibleEdges = <T extends Edge[]>(
   edges: T,
   nodes: Node[],
   eligibleEdgeIds: ReadonlySet<string>,
+  nodeById?: Map<string, Node>,
 ): T => {
   const lockedById = new Map(lockFinalDisplayComputedPaths(
     edges.filter(edge => eligibleEdgeIds.has(edge.id)),
     nodes,
+    nodeById,
   ).map(edge => [edge.id, edge] as const));
   return edges.map(edge => lockedById.get(edge.id) ?? edge) as T;
 };
@@ -544,11 +546,14 @@ export const createBaseReactFlowTopologyIncrementalDisplayEdges = ({
   if (!candidate) return { edges: null, eligibleEdgeIds: [] };
   const evaluation = createBaseReactFlowFinalEndpointEvaluation(nodes);
   const eligibleIds = new Set(candidate.eligibleEdgeIds);
+  const nodeById = new Map(nodes.map(node => [node.id, node]));
+  const eligibleEdges = candidate.edges.filter(edge => eligibleIds.has(edge.id));
   const terminalCommittedById = new Map(
     repairAxisMismatchedTerminalsWithBoundedPortRoles(
       commitComputedDisplayEdgeTerminals(
-        candidate.edges.filter(edge => eligibleIds.has(edge.id)),
+        eligibleEdges,
         nodes,
+        nodeById,
       ),
       nodes,
       Math.max(8, eligibleIds.size * 4),
@@ -558,6 +563,7 @@ export const createBaseReactFlowTopologyIncrementalDisplayEdges = ({
     candidate.edges.map(edge => terminalCommittedById.get(edge.id) ?? edge),
     nodes,
     eligibleIds,
+    nodeById,
   );
   let hardReport = evaluation.hardReport(candidateEdges);
   if (reportHasOnlyStrictDefects(hardReport)) {
@@ -581,6 +587,7 @@ export const createBaseReactFlowTopologyIncrementalDisplayEdges = ({
         transactionCandidate,
         nodes,
         eligibleIds,
+        nodeById,
       );
       const transactionReport = evaluation.hardReport(lockedTransaction);
       if (
@@ -595,7 +602,7 @@ export const createBaseReactFlowTopologyIncrementalDisplayEdges = ({
     if (reportHasOnlyStrictDefects(hardReport)) {
       const strictRepaired = repairFinalResidualStrictCrossings(candidateEdges, nodes);
       if (preservesTopologyBoundary(projection.edges, strictRepaired, eligibleIds)) {
-        candidateEdges = lockTopologyEligibleEdges(strictRepaired, nodes, eligibleIds);
+        candidateEdges = lockTopologyEligibleEdges(strictRepaired, nodes, eligibleIds, nodeById);
       }
       hardReport = evaluation.hardReport(candidateEdges);
     }
@@ -643,6 +650,7 @@ export const createBaseReactFlowTopologyIncrementalDisplayEdges = ({
         clearanceRepaired,
         nodes,
         eligibleIds,
+        nodeById,
       );
     }
     hardReport = evaluation.hardReport(candidateEdges);

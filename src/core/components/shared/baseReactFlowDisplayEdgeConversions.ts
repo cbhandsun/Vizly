@@ -39,8 +39,11 @@ const hasTrustedComputedPath = (edge: Edge): boolean => {
 export const lockFinalDisplayComputedPaths = <T extends Edge[]>(
   edges: T,
   nodes?: Node[],
+  nodeById?: Map<string, Node>,
 ): T => {
-  const resolvedEdges = nodes ? materializeDisplayTerminalHandles(edges, nodes) : edges;
+  const resolvedEdges = nodes
+    ? materializeDisplayTerminalHandles(edges, nodes, nodeById)
+    : edges;
   return resolvedEdges.map((edge) => {
     const data = asRecord(edge.data);
     const hasRenderableComputedPath = Array.isArray(data.computedPath)

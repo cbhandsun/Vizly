@@ -16,21 +16,23 @@ export const recommitBaseReactFlowTopologyEligibleTerminals = ({
   nodes: Node[];
   eligibleEdgeIds: ReadonlySet<string>;
 }): Edge[] | null => {
+  const nodeById = new Map(nodes.map(node => [node.id, node]));
+  const eligibleEdges = edges.filter(edge => eligibleEdgeIds.has(edge.id));
   const committedById = new Map(
     repairAxisMismatchedTerminalsWithBoundedPortRoles(
       commitComputedDisplayEdgeTerminals(
-        edges.filter(edge => eligibleEdgeIds.has(edge.id)),
+        eligibleEdges,
         nodes,
+        nodeById,
       ),
       nodes,
       Math.max(8, eligibleEdgeIds.size * 4),
     ).map(edge => [edge.id, edge] as const),
   );
   const lockedById = new Map(lockFinalDisplayComputedPaths(
-    edges
-      .filter(edge => eligibleEdgeIds.has(edge.id))
-      .map(edge => committedById.get(edge.id) ?? edge),
+    eligibleEdges.map(edge => committedById.get(edge.id) ?? edge),
     nodes,
+    nodeById,
   ).map(edge => [edge.id, edge] as const));
   const committed = edges.map(edge => lockedById.get(edge.id) ?? edge);
   return preservesTopologyBoundary(baselineEdges, committed, eligibleEdgeIds)
