@@ -518,6 +518,7 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
   // Establish the commercial node gap before ranking loop shortcuts so a
   // successful shortcut cannot make the clearance pass conditional.
   baseline = repairCommercialClearance(baseline);
+  let clearanceFixedPointBaseline: T | null = baseline;
   const clearanceRepairedEdgeIds = new Set(baseline.flatMap(edge => (
     edge.data?.displayNodeClearanceRepaired === true
       && (!options.eligibleEdgeIds || options.eligibleEdgeIds.has(edge.id))
@@ -525,6 +526,7 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
       : []
   )));
   if (clearanceRepairedEdgeIds.size > 0) {
+    const beforeClearanceFollowUp = baseline;
     baseline = runCommercialPhase(
       'final-commercial-terminal-preserving',
       baseline,
@@ -535,6 +537,10 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
         evaluation,
       ),
     );
+    if (
+      baseline !== beforeClearanceFollowUp
+      && !baseline.every((edge, index) => edge === beforeClearanceFollowUp[index])
+    ) clearanceFixedPointBaseline = null;
   }
 
   const baselineReport = evaluation.hardReport(baseline);
@@ -589,7 +595,9 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
     // Commercial clearance is an independent final contract. A route that has
     // no profitable loop shortcut can still run too close to an unrelated
     // business node, so it must not bypass the bounded clearance transaction.
-    return finish(repairClearanceToBoundedFixedPoint(baseline));
+    return finish(clearanceFixedPointBaseline === baseline
+      ? baseline
+      : repairClearanceToBoundedFixedPoint(baseline));
   }
   const clearanceCandidate = repairClearanceToBoundedFixedPoint(candidate);
   if (
