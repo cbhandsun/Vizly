@@ -1,11 +1,11 @@
 {
   "schema": "vizly-precompiled-display-route-v1",
   "routingVersion": "21",
-  "routingSourceHash": "source-v1:637739031c56c359e008ac1b6bee9f52747cf458cd3e605183022651fdf1b82b",
+  "routingSourceHash": "source-v1:a32d8e6c889c93fa91a22735e4a76a12cf596c1de0f6a5f1dc7386267bef4666",
   "sourceHash": "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
   "inputSignature": "1902262462",
   "inputGeometryDigest": "geometry-v1:25fffd342dc29dc0a02dee32faca612c",
-  "outputRouteSignature": "route-v2:44:163:95aaa6053c37a3e3",
+  "outputRouteSignature": "route-v2:44:166:f91e06ff5880dd29",
   "hardClean": true,
   "routingContract": {
     "clean": true,
@@ -218,11 +218,11 @@
         "computedPath": [
           {
             "x": 5290,
-            "y": 2035
+            "y": 1999
           },
           {
             "x": 5538,
-            "y": 2035
+            "y": 1999
           },
           {
             "x": 5538,
@@ -260,25 +260,37 @@
       "source": "labor-schedule-feedback",
       "target": "allocation",
       "type": "stablePath",
-      "sourceHandle": "bottom",
+      "sourceHandle": "left",
       "targetHandle": "bottom",
       "data": {
         "computedPath": [
           {
-            "x": 6246,
-            "y": 1612
+            "x": 6145,
+            "y": 1582
           },
           {
-            "x": 6246,
-            "y": 2385
+            "x": 6089,
+            "y": 1582
           },
           {
-            "x": 1183,
-            "y": 2385
+            "x": 6089,
+            "y": 2121
           },
           {
-            "x": 1183,
-            "y": 1514
+            "x": 4972,
+            "y": 2121
+          },
+          {
+            "x": 4972,
+            "y": 2071
+          },
+          {
+            "x": 1182.8,
+            "y": 2071
+          },
+          {
+            "x": 1182.8,
+            "y": 1513.5
           }
         ],
         "sharedTrunkAware": true,
@@ -304,15 +316,15 @@
           },
           {
             "x": 6088.849999999999,
-            "y": 1148.5
+            "y": 1149
           },
           {
-            "x": 3132.1499999999996,
-            "y": 1148.5
+            "x": 3139,
+            "y": 1149
           },
           {
-            "x": 3132.1499999999996,
-            "y": 1204.5
+            "x": 3139,
+            "y": 1205
           }
         ],
         "sharedTrunkAware": true
@@ -539,15 +551,15 @@
             "y": 850
           },
           {
-            "x": 4373,
+            "x": 4603,
             "y": 850
           },
           {
-            "x": 4373,
+            "x": 4603,
             "y": 1349
           },
           {
-            "x": 5127.849999999999,
+            "x": 5128,
             "y": 1349
           }
         ],

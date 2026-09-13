@@ -90,7 +90,10 @@ export const displayMicroCleanupNeedsRepair = (
   || quality.tinyInteriorDoglegs > 0
   || quality.hairpins > 0
   || quality.detourPenalty > 0
-  || edges.some(edge => hasVisualSmallInteriorSegment(compactPath(getEdgePath(edge))));
+  || edges.some((edge) => {
+    const path = compactPath(getEdgePath(edge));
+    return hasVisualSmallInteriorSegment(path) || hasMonotonicStairCollapseOpportunity(path);
+  });
 
 import {
   buildTerminalStubSideApproachCandidates,
@@ -196,6 +199,13 @@ function buildMonotonicStairCollapseCandidate(points: Point[], index: number): P
   if (candidate.length >= points.length) return null;
   if (pathLength(candidate) > pathLength(points) + EPS) return null;
   return candidate;
+}
+
+function hasMonotonicStairCollapseOpportunity(points: Point[]): boolean {
+  for (let index = 0; index + 4 < points.length; index += 1) {
+    if (buildMonotonicStairCollapseCandidate(points, index)) return true;
+  }
+  return false;
 }
 
 function buildReturnLoopCollapseCandidates(points: Point[], index: number): Point[][] {
@@ -496,12 +506,14 @@ export function repairDisplayMicroArtifacts(
       if (path.length < 3) continue;
       const pathMetrics = pathMicroMetrics(path);
       const hasVisualSmallSegmentForEdge = hasVisualSmallInteriorSegment(path);
+      const hasMonotonicStairForEdge = hasMonotonicStairCollapseOpportunity(path);
       if (
         pathMetrics.shortEndpointStubs === 0
         && pathMetrics.tinyInteriorDoglegs === 0
         && pathMetrics.hairpins === 0
         && pathDetourPenalty(path) === 0
         && !hasVisualSmallSegmentForEdge
+        && !hasMonotonicStairForEdge
       ) {
         continue;
       }
