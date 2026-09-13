@@ -145,6 +145,7 @@ export const loadBaseReactFlowPrecompiledRouteCandidateFromRegistry = async (
       inputSignature: input.inputSignature,
       inputGeometryDigest,
       sourceHash: descriptor.sourceHash,
+      routingSourceHash: descriptor.routingSourceHash,
     });
     if (!entry) return null;
     return mergeTrustedBaseReactFlowPrecompiledRouteArtifact(input.edges, entry);

@@ -30,12 +30,14 @@ import { GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_LOADERS } from '../generate
 import { getGeneratedPrecompiledRouteArtifactForTest } from './fixtures/generatedPrecompiledRouteArtifacts';
 
 const SOURCE_HASH = `source-v1:${'a'.repeat(64)}`;
+const ROUTING_SOURCE_HASH = `source-v1:${'b'.repeat(64)}`;
 const TEST_PRESET_ID = 'test-preset';
 const generatedDemandAllocationArtifact = getGeneratedPrecompiledRouteArtifactForTest(
   'wms-demand-allocation-strategy-v2',
 ) as {
   schema: typeof BASE_REACT_FLOW_PRECOMPILED_ROUTE_SCHEMA;
   routingVersion: string;
+  routingSourceHash: string;
   sourceHash: string;
   inputSignature: string;
   inputGeometryDigest: string;
@@ -113,6 +115,7 @@ const outputRouteSignature = computeBaseReactFlowDisplayOutputRouteSignature(rou
 const artifact = {
   schema: BASE_REACT_FLOW_PRECOMPILED_ROUTE_SCHEMA,
   routingVersion: BASE_DISPLAY_ROUTING_VERSION,
+  routingSourceHash: ROUTING_SOURCE_HASH,
   sourceHash: SOURCE_HASH,
   inputSignature,
   inputGeometryDigest,
@@ -620,6 +623,33 @@ describe('baseReactFlowPrecompiledRouteRegistry', () => {
     )).toBeNull();
   });
 
+  it('rejects artifacts generated against a stale routing source hash', async () => {
+    const staleRoutingSourceHash = `source-v1:${'c'.repeat(64)}`;
+    expect(parseBaseReactFlowPrecompiledRouteArtifact(
+      { ...artifact, routingSourceHash: staleRoutingSourceHash },
+      {
+        inputSignature,
+        inputGeometryDigest,
+        sourceHash: SOURCE_HASH,
+        routingSourceHash: ROUTING_SOURCE_HASH,
+      },
+    )).toBeNull();
+
+    const load = vi.fn(async () => ({ ...artifact, routingSourceHash: staleRoutingSourceHash }));
+    await expect(loadBaseReactFlowPrecompiledRouteCandidateFromRegistry(
+      { ...identityInput, inputSignature },
+      {
+        [inputSignature]: {
+          sourceHash: SOURCE_HASH,
+          routingSourceHash: ROUTING_SOURCE_HASH,
+          geometryDigest: inputGeometryDigest,
+          load,
+        },
+      },
+    )).resolves.toBeNull();
+    expect(load).toHaveBeenCalledOnce();
+  });
+
   it('accepts compact clean routing contract summaries and rejects graph-bearing diagnostics', () => {
     const routingContract = {
       clean: true,
@@ -748,6 +778,7 @@ describe('baseReactFlowPrecompiledRouteRegistry', () => {
     expect({
       schema: generatedDemandAllocationArtifact.schema,
       routingVersion: generatedDemandAllocationArtifact.routingVersion,
+      routingSourceHash: generatedDemandAllocationArtifact.routingSourceHash,
       sourceHash: generatedDemandAllocationArtifact.sourceHash,
       inputSignature: generatedDemandAllocationArtifact.inputSignature,
       inputGeometryDigest: generatedDemandAllocationArtifact.inputGeometryDigest,
@@ -755,6 +786,7 @@ describe('baseReactFlowPrecompiledRouteRegistry', () => {
     }).toEqual({
       schema: BASE_REACT_FLOW_PRECOMPILED_ROUTE_SCHEMA,
       routingVersion: BASE_DISPLAY_ROUTING_VERSION,
+      routingSourceHash: descriptor.routingSourceHash,
       sourceHash: descriptor.sourceHash,
       inputSignature: generatedSignature,
       inputGeometryDigest: descriptor.geometryDigest,
@@ -764,6 +796,7 @@ describe('baseReactFlowPrecompiledRouteRegistry', () => {
       inputSignature: generatedSignature,
       inputGeometryDigest: descriptor.geometryDigest,
       sourceHash: descriptor.sourceHash,
+      routingSourceHash: descriptor.routingSourceHash,
     })).not.toBeNull();
   });
 });

@@ -72,7 +72,7 @@ const writeAtomic = async (path, contents) => {
   await rename(temporary, path);
 };
 
-const captureTarget = async (session, target, source, routingVersion) => {
+const captureTarget = async (session, target, source, routingVersion, routingSourceHash) => {
   const preset = JSON.parse(source);
   if (!preset || typeof preset.id !== 'string' || !preset.id) {
     throw new Error(`${target.sourcePath} does not contain a preset id`);
@@ -215,6 +215,7 @@ const captureTarget = async (session, target, source, routingVersion) => {
     artifact: {
       schema: SCHEMA,
       routingVersion,
+      routingSourceHash,
       sourceHash: hashPrecompiledDisplayRouteSource(source),
       inputSignature: routing.signature,
       inputGeometryDigest,
@@ -311,6 +312,7 @@ const main = async () => {
   });
   await assertProductionPreview();
   const routingVersion = await readRoutingVersion();
+  const routingSourceHash = await computePrecompiledDisplayRoutingSourceHash(ROOT);
   const sources = await Promise.all(captureTargets.map(async target => ({
     target,
     source: await readFile(resolve(ROOT, target.sourcePath), 'utf8'),
@@ -319,7 +321,13 @@ const main = async () => {
     await session.send('Page.addScriptToEvaluateOnNewDocument', { source: PRECOMPILED_DISPLAY_ROUTE_BROWSER_CAPTURE_SCRIPT });
     const generated = [];
     for (const item of sources) {
-      generated.push(await captureTarget(session, item.target, item.source, routingVersion));
+      generated.push(await captureTarget(
+        session,
+        item.target,
+        item.source,
+        routingVersion,
+        routingSourceHash,
+      ));
     }
     return generated;
   });
@@ -343,7 +351,6 @@ const main = async () => {
     return;
   }
   const identitySourceHash = hashPrecompiledDisplayRouteSource(await readFile(INPUT_IDENTITY_PATH, 'utf8'));
-  const routingSourceHash = await computePrecompiledDisplayRoutingSourceHash(ROOT);
   await mkdir(ARTIFACT_DIR, { recursive: true });
   const entries = [];
   const artifactContents = new Map();
@@ -402,7 +409,7 @@ const main = async () => {
     entries,
   };
   const manifestContents = renderPrecompiledRouteManifest(manifest);
-  const loaderContents = renderPrecompiledRouteLoaders(entries);
+  const loaderContents = renderPrecompiledRouteLoaders(entries, { routingSourceHash });
   const expectedArtifactFiles = [...artifactContents.keys()].sort();
   const existingArtifactFiles = await listGeneratedArtifactFiles();
   if (CHECK_MODE) {

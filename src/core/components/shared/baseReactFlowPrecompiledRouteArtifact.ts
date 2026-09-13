@@ -42,6 +42,7 @@ const TREE_ROUTING_KEYS = new Set(['effectiveSourceHandle', 'effectiveTargetHand
 export type BaseReactFlowPrecompiledRouteArtifact = {
   schema: typeof BASE_REACT_FLOW_PRECOMPILED_ROUTE_SCHEMA;
   routingVersion: string;
+  routingSourceHash: string;
   sourceHash: string;
   inputSignature: string;
   inputGeometryDigest: string;
@@ -55,6 +56,7 @@ export type BaseReactFlowPrecompiledRouteArtifactExpectation = {
   inputSignature: string;
   inputGeometryDigest: string;
   sourceHash: string;
+  routingSourceHash?: string;
   routingVersion?: string;
 };
 
@@ -244,6 +246,7 @@ export const parseBaseReactFlowPrecompiledRouteArtifact = (
   const expectedKeys = [
     'schema',
     'routingVersion',
+    'routingSourceHash',
     'sourceHash',
     'inputSignature',
     'inputGeometryDigest',
@@ -262,6 +265,12 @@ export const parseBaseReactFlowPrecompiledRouteArtifact = (
   if (
     value.schema !== BASE_REACT_FLOW_PRECOMPILED_ROUTE_SCHEMA
     || value.routingVersion !== routingVersion
+    || typeof value.routingSourceHash !== 'string'
+    || !BASE_REACT_FLOW_PRECOMPILED_SOURCE_HASH_PATTERN.test(value.routingSourceHash)
+    || (
+      typeof expectation.routingSourceHash !== 'undefined'
+      && value.routingSourceHash !== expectation.routingSourceHash
+    )
     || value.sourceHash !== expectation.sourceHash
     || !BASE_REACT_FLOW_PRECOMPILED_SOURCE_HASH_PATTERN.test(expectation.sourceHash)
     || !BASE_REACT_FLOW_PRECOMPILED_INPUT_SIGNATURE_PATTERN.test(expectation.inputSignature)

@@ -110,6 +110,7 @@ for (const entry of manifest.entries) {
   const requiredArtifactKeys = [
       'schema',
       'routingVersion',
+      'routingSourceHash',
       'sourceHash',
       'inputSignature',
       'inputGeometryDigest',
@@ -125,6 +126,7 @@ for (const entry of manifest.entries) {
     ))
     || artifact?.schema !== ARTIFACT_SCHEMA
     || artifact.routingVersion !== routingVersion
+    || artifact.routingSourceHash !== routingSourceHash
     || artifact.sourceHash !== expectedSourceHash
     || entry.sourceHash !== expectedSourceHash
     || artifact.inputSignature !== entry.inputSignature
@@ -165,7 +167,7 @@ if (existingArtifactFiles.join('\n') !== expectedArtifactFiles.join('\n')) {
   throw new Error('Precompiled route artifact directory contains stale generated files');
 }
 const loaderSource = await readFile(LOADERS_PATH, 'utf8');
-if (loaderSource !== renderPrecompiledRouteLoaders(manifest.entries)) {
+if (loaderSource !== renderPrecompiledRouteLoaders(manifest.entries, { routingSourceHash })) {
   throw new Error('Precompiled route loader registry is stale or non-canonical');
 }
 

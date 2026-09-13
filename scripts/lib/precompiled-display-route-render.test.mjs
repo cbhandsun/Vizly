@@ -6,6 +6,8 @@ import {
 } from './precompiled-display-route-render.mjs';
 
 describe('precompiled display route loader rendering', () => {
+  const routingSourceHash = `source-v1:${'a'.repeat(64)}`;
+
   it('emits bounded data-asset loading instead of executable JSON chunks', () => {
     const source = renderPrecompiledRouteLoaders([{
       artifactFile: 'route-123.json',
@@ -15,10 +17,11 @@ describe('precompiled display route loader rendering', () => {
       presetId: 'preset',
       sourceHash: 'source-v1:test',
       variantId: 'initial',
-    }]);
+    }], { routingSourceHash });
 
     expect(source).toContain("new URL(\n  './precompiledRoutes/route-123.json',\n  import.meta.url,\n)");
     expect(source).toContain('loadBaseReactFlowPrecompiledRouteAsset(generatedPrecompiledRouteAsset0)');
+    expect(source).toContain(`routingSourceHash: "${routingSourceHash}"`);
     expect(source).not.toContain("import('./precompiledRoutes/route-123.json')");
   });
 
@@ -42,7 +45,7 @@ describe('precompiled display route loader rendering', () => {
       },
     ];
 
-    const source = renderPrecompiledRouteLoaders(entries);
+    const source = renderPrecompiledRouteLoaders(entries, { routingSourceHash });
     const registrySource = source.slice(
       source.indexOf('GENERATED_BASE_REACT_FLOW_PRECOMPILED_ROUTE_LOADERS'),
       source.indexOf('/**\n * Preset ids only'),

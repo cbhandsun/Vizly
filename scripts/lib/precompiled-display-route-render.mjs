@@ -8,7 +8,10 @@ const groupPrecompiledRouteEntriesBySignature = entries => {
   return [...buckets.entries()];
 };
 
-export const renderPrecompiledRouteLoaders = entries => {
+export const renderPrecompiledRouteLoaders = (entries, { routingSourceHash = null } = {}) => {
+  if (typeof routingSourceHash !== 'string' || !/^source-v1:[0-9a-f]{64}$/.test(routingSourceHash)) {
+    throw new TypeError('renderPrecompiledRouteLoaders requires a routing source hash');
+  }
   const signatureBuckets = groupPrecompiledRouteEntriesBySignature(entries);
   const hasSignatureCollisions = signatureBuckets.some(([, indexes]) => indexes.length > 1);
   const initialEntries = entries
@@ -19,6 +22,7 @@ export const renderPrecompiledRouteLoaders = entries => {
 export type GeneratedBaseReactFlowPrecompiledRouteDescriptor = {
   presetId?: string;
   variantId?: string;
+  routingSourceHash?: string;
   sourceHash: string;
   geometryDigest: string;
   load: () => Promise<unknown>;
@@ -32,6 +36,7 @@ ${entries.map((entry, index) => `const generatedPrecompiledRouteAsset${index} = 
 const generatedPrecompiledRouteDescriptor${index}: GeneratedBaseReactFlowPrecompiledRouteDescriptor = {
   presetId: ${JSON.stringify(entry.presetId)},
   variantId: ${JSON.stringify(entry.variantId)},
+  routingSourceHash: ${JSON.stringify(routingSourceHash)},
   sourceHash: ${JSON.stringify(entry.sourceHash)},
   geometryDigest: ${JSON.stringify(entry.inputGeometryDigest)},
   load: () => loadBaseReactFlowPrecompiledRouteAsset(generatedPrecompiledRouteAsset${index}),
