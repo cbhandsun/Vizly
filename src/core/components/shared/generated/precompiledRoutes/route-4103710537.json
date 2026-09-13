@@ -1,11 +1,11 @@
 {
   "schema": "vizly-precompiled-display-route-v1",
   "routingVersion": "21",
-  "routingSourceHash": "source-v1:887b67c05128d27181d714b276fc96011d6865e3b084ee85c3c096c265f0e16c",
+  "routingSourceHash": "source-v1:d3b54ef695b2c04374521e2eb9f8e32637b71bc8c4f13e675039dc2f63c432be",
   "sourceHash": "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
-  "inputSignature": "2838894796",
-  "inputGeometryDigest": "geometry-v1:7e952f505932c8ac666224022730fb88",
-  "outputRouteSignature": "route-v2:44:152:38497ae62e3791c4",
+  "inputSignature": "4103710537",
+  "inputGeometryDigest": "geometry-v1:5c90308c9a3e8cd0c4eaf3cac68212f4",
+  "outputRouteSignature": "route-v2:44:134:ffd787a2a9ed4af4",
   "hardClean": true,
   "patches": [
     {
@@ -18,19 +18,19 @@
       "data": {
         "computedPath": [
           {
-            "x": 654,
+            "x": 679,
             "y": 1596
           },
           {
-            "x": 1674,
+            "x": 741,
             "y": 1596
           },
           {
-            "x": 1674,
+            "x": 741,
             "y": 2175
           },
           {
-            "x": 2208,
+            "x": 815,
             "y": 2175
           }
         ]
@@ -41,24 +41,20 @@
       "source": "allocation",
       "target": "atp-check",
       "type": "stablePath",
-      "sourceHandle": "right",
+      "sourceHandle": "top",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 654,
-            "y": 1596
+            "x": 576,
+            "y": 1548
           },
           {
-            "x": 1674,
-            "y": 1596
-          },
-          {
-            "x": 1674,
+            "x": 576,
             "y": 1210
           },
           {
-            "x": 1730,
+            "x": 817,
             "y": 1210
           }
         ]
@@ -74,19 +70,19 @@
       "data": {
         "computedPath": [
           {
-            "x": 654,
+            "x": 679,
             "y": 1596
           },
           {
-            "x": 1674,
+            "x": 741,
             "y": 1596
           },
           {
-            "x": 1674,
+            "x": 741,
             "y": 1789
           },
           {
-            "x": 2004,
+            "x": 803,
             "y": 1789
           }
         ]
@@ -97,24 +93,20 @@
       "source": "allocation",
       "target": "reservation",
       "type": "stablePath",
-      "sourceHandle": "right",
+      "sourceHandle": "top",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 654,
-            "y": 1596
+            "x": 576,
+            "y": 1548
           },
           {
-            "x": 1674,
-            "y": 1596
-          },
-          {
-            "x": 1674,
+            "x": 576,
             "y": 1403
           },
           {
-            "x": 1821,
+            "x": 812,
             "y": 1403
           }
         ]
@@ -130,11 +122,11 @@
       "data": {
         "computedPath": [
           {
-            "x": 654,
+            "x": 679,
             "y": 1596
           },
           {
-            "x": 1910,
+            "x": 805,
             "y": 1596
           }
         ]
@@ -145,24 +137,24 @@
       "source": "allocation",
       "target": "task-generate",
       "type": "stablePath",
-      "sourceHandle": "left",
+      "sourceHandle": "right",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 448,
+            "x": 679,
             "y": 1596
           },
           {
-            "x": 392,
+            "x": 740,
             "y": 1596
           },
           {
-            "x": 392,
+            "x": 740,
             "y": 2867
           },
           {
-            "x": 448,
+            "x": 796,
             "y": 2867
           }
         ]
@@ -178,19 +170,19 @@
       "data": {
         "computedPath": [
           {
-            "x": 654,
+            "x": 679,
             "y": 1596
           },
           {
-            "x": 1674,
+            "x": 741,
             "y": 1596
           },
           {
-            "x": 1674,
+            "x": 741,
             "y": 1982
           },
           {
-            "x": 2094,
+            "x": 797,
             "y": 1982
           }
         ]
@@ -202,24 +194,20 @@
       "target": "labor-kpi",
       "type": "stablePath",
       "sourceHandle": "right",
-      "targetHandle": "right",
+      "targetHandle": "bottom",
       "data": {
         "computedPath": [
           {
-            "x": 638,
+            "x": 2070,
             "y": 6630
           },
           {
-            "x": 1005,
+            "x": 2301,
             "y": 6630
           },
           {
-            "x": 1005,
-            "y": 6257
-          },
-          {
-            "x": 949,
-            "y": 6257
+            "x": 2301,
+            "y": 6305
           }
         ]
       }
@@ -229,25 +217,17 @@
       "source": "labor-kpi",
       "target": "labor-schedule-feedback",
       "type": "stablePath",
-      "sourceHandle": "bottom",
-      "targetHandle": "bottom",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 842,
-            "y": 6305
+            "x": 2408,
+            "y": 6257
           },
           {
-            "x": 842,
-            "y": 6399
-          },
-          {
-            "x": 3674,
-            "y": 6399
-          },
-          {
-            "x": 3674,
-            "y": 6287
+            "x": 2522,
+            "y": 6257
           }
         ]
       }
@@ -262,19 +242,19 @@
       "data": {
         "computedPath": [
           {
-            "x": 3674,
+            "x": 2623,
             "y": 6227
           },
           {
-            "x": 3674,
-            "y": 1700
+            "x": 2623,
+            "y": 4050
           },
           {
-            "x": 551,
-            "y": 1700
+            "x": 576,
+            "y": 4050
           },
           {
-            "x": 551,
+            "x": 576,
             "y": 1644
           }
         ]
@@ -290,19 +270,19 @@
       "data": {
         "computedPath": [
           {
-            "x": 3674,
+            "x": 2623,
             "y": 6227
           },
           {
-            "x": 3674,
+            "x": 2623,
             "y": 3842
           },
           {
-            "x": 551,
+            "x": 1221,
             "y": 3842
           },
           {
-            "x": 551,
+            "x": 1221,
             "y": 3898
           }
         ]
@@ -314,24 +294,20 @@
       "target": "exception-alert",
       "type": "stablePath",
       "sourceHandle": "bottom",
-      "targetHandle": "top",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 608,
+            "x": 1598,
             "y": 5241
           },
           {
-            "x": 608,
-            "y": 6537
+            "x": 1598,
+            "y": 6630
           },
           {
-            "x": 543,
-            "y": 6537
-          },
-          {
-            "x": 543,
-            "y": 6593
+            "x": 1880,
+            "y": 6630
           }
         ]
       }
@@ -341,20 +317,24 @@
       "source": "operation",
       "target": "labor-kpi",
       "type": "stablePath",
-      "sourceHandle": "right",
+      "sourceHandle": "bottom",
       "targetHandle": "top",
       "data": {
         "computedPath": [
           {
-            "x": 767,
-            "y": 5204
+            "x": 1598,
+            "y": 5241
           },
           {
-            "x": 842,
-            "y": 5204
+            "x": 1598,
+            "y": 5971
           },
           {
-            "x": 842,
+            "x": 2301,
+            "y": 5971
+          },
+          {
+            "x": 2301,
             "y": 6209
           }
         ]
@@ -365,24 +345,20 @@
       "source": "operation",
       "target": "loading-handover",
       "type": "stablePath",
-      "sourceHandle": "right",
+      "sourceHandle": "bottom",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 767,
-            "y": 5204
+            "x": 1598,
+            "y": 5241
           },
           {
-            "x": 2778,
-            "y": 5204
-          },
-          {
-            "x": 2778,
+            "x": 1598,
             "y": 5564
           },
           {
-            "x": 3310,
+            "x": 1886,
             "y": 5564
           }
         ]
@@ -398,11 +374,11 @@
       "data": {
         "computedPath": [
           {
-            "x": 767,
+            "x": 1757,
             "y": 5204
           },
           {
-            "x": 3118,
+            "x": 1886,
             "y": 5204
           }
         ]
@@ -414,24 +390,20 @@
       "target": "path-heatmap",
       "type": "stablePath",
       "sourceHandle": "bottom",
-      "targetHandle": "top",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 608,
+            "x": 1598,
             "y": 5241
           },
           {
-            "x": 608,
-            "y": 6357
+            "x": 1598,
+            "y": 6443
           },
           {
-            "x": 447,
-            "y": 6357
-          },
-          {
-            "x": 447,
-            "y": 6413
+            "x": 1882,
+            "y": 6443
           }
         ]
       }
@@ -441,24 +413,20 @@
       "source": "operation",
       "target": "picking-exec",
       "type": "stablePath",
-      "sourceHandle": "right",
+      "sourceHandle": "top",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 767,
-            "y": 5204
+            "x": 1598,
+            "y": 5168
           },
           {
-            "x": 2778,
-            "y": 5204
-          },
-          {
-            "x": 2778,
+            "x": 1598,
             "y": 4632
           },
           {
-            "x": 2834,
+            "x": 1890,
             "y": 4632
           }
         ]
@@ -469,24 +437,20 @@
       "source": "operation",
       "target": "qc-exec",
       "type": "stablePath",
-      "sourceHandle": "right",
+      "sourceHandle": "bottom",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 767,
-            "y": 5204
+            "x": 1598,
+            "y": 5241
           },
           {
-            "x": 2778,
-            "y": 5204
-          },
-          {
-            "x": 2778,
+            "x": 1598,
             "y": 5384
           },
           {
-            "x": 3234,
+            "x": 1906,
             "y": 5384
           }
         ]
@@ -497,21 +461,21 @@
       "source": "operation",
       "target": "real-time-board",
       "type": "stablePath",
-      "sourceHandle": "left",
-      "targetHandle": "top",
+      "sourceHandle": "bottom",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 448,
-            "y": 5204
+            "x": 1598,
+            "y": 5241
           },
           {
-            "x": 255,
-            "y": 5204
+            "x": 1598,
+            "y": 6064
           },
           {
-            "x": 255,
-            "y": 6027
+            "x": 1908,
+            "y": 6064
           }
         ]
       }
@@ -521,24 +485,20 @@
       "source": "operation",
       "target": "replenish-exec",
       "type": "stablePath",
-      "sourceHandle": "right",
+      "sourceHandle": "top",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 767,
-            "y": 5204
+            "x": 1598,
+            "y": 5168
           },
           {
-            "x": 2778,
-            "y": 5204
-          },
-          {
-            "x": 2778,
+            "x": 1598,
             "y": 4825
           },
           {
-            "x": 2932,
+            "x": 1892,
             "y": 4825
           }
         ]
@@ -549,24 +509,20 @@
       "source": "operation",
       "target": "sorting-exec",
       "type": "stablePath",
-      "sourceHandle": "right",
+      "sourceHandle": "top",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 767,
-            "y": 5204
+            "x": 1598,
+            "y": 5168
           },
           {
-            "x": 2778,
-            "y": 5204
-          },
-          {
-            "x": 2778,
+            "x": 1598,
             "y": 5018
           },
           {
-            "x": 3028,
+            "x": 1892,
             "y": 5018
           }
         ]
@@ -577,37 +533,21 @@
       "source": "operation",
       "target": "uph-calc",
       "type": "stablePath",
-      "sourceHandle": "left",
-      "targetHandle": "top",
+      "sourceHandle": "bottom",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 448,
-            "y": 5204
+            "x": 1598,
+            "y": 5241
           },
           {
-            "x": 351,
-            "y": 5204
+            "x": 1598,
+            "y": 6257
           },
           {
-            "x": 351,
-            "y": 5987
-          },
-          {
-            "x": 375,
-            "y": 5987
-          },
-          {
-            "x": 375,
-            "y": 6140
-          },
-          {
-            "x": 351,
-            "y": 6140
-          },
-          {
-            "x": 351,
-            "y": 6220
+            "x": 1888,
+            "y": 6257
           }
         ]
       }
@@ -617,24 +557,20 @@
       "source": "operation",
       "target": "wcs-integration",
       "type": "stablePath",
-      "sourceHandle": "right",
+      "sourceHandle": "bottom",
       "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 767,
-            "y": 5204
+            "x": 1598,
+            "y": 5241
           },
           {
-            "x": 2778,
-            "y": 5204
-          },
-          {
-            "x": 2778,
+            "x": 1598,
             "y": 5751
           },
           {
-            "x": 3391,
+            "x": 1871,
             "y": 5751
           }
         ]
@@ -646,24 +582,20 @@
       "target": "allocation",
       "type": "stablePath",
       "sourceHandle": "bottom",
-      "targetHandle": "top",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 578,
+            "x": 226,
             "y": 559
           },
           {
-            "x": 578,
-            "y": 1492
+            "x": 226,
+            "y": 1596
           },
           {
-            "x": 551,
-            "y": 1492
-          },
-          {
-            "x": 551,
-            "y": 1548
+            "x": 473,
+            "y": 1596
           }
         ]
       }
@@ -678,15 +610,15 @@
       "data": {
         "computedPath": [
           {
-            "x": 578,
+            "x": 226,
             "y": 559
           },
           {
-            "x": 578,
+            "x": 226,
             "y": 897
           },
           {
-            "x": 2703,
+            "x": 481,
             "y": 897
           }
         ]
@@ -702,15 +634,15 @@
       "data": {
         "computedPath": [
           {
-            "x": 578,
+            "x": 226,
             "y": 463
           },
           {
-            "x": 578,
+            "x": 226,
             "y": 125
           },
           {
-            "x": 2309,
+            "x": 471,
             "y": 125
           }
         ]
@@ -726,11 +658,11 @@
       "data": {
         "computedPath": [
           {
-            "x": 708,
+            "x": 356,
             "y": 511
           },
           {
-            "x": 2511,
+            "x": 481,
             "y": 511
           }
         ]
@@ -746,15 +678,15 @@
       "data": {
         "computedPath": [
           {
-            "x": 578,
+            "x": 226,
             "y": 559
           },
           {
-            "x": 578,
+            "x": 226,
             "y": 704
           },
           {
-            "x": 2627,
+            "x": 501,
             "y": 704
           }
         ]
@@ -770,15 +702,15 @@
       "data": {
         "computedPath": [
           {
-            "x": 578,
+            "x": 226,
             "y": 463
           },
           {
-            "x": 578,
+            "x": 226,
             "y": 318
           },
           {
-            "x": 2404,
+            "x": 470,
             "y": 318
           }
         ]
@@ -790,24 +722,20 @@
       "target": "labor-kpi",
       "type": "stablePath",
       "sourceHandle": "right",
-      "targetHandle": "left",
+      "targetHandle": "bottom",
       "data": {
         "computedPath": [
           {
-            "x": 540,
+            "x": 2068,
             "y": 6443
           },
           {
-            "x": 678,
+            "x": 2301,
             "y": 6443
           },
           {
-            "x": 678,
-            "y": 6257
-          },
-          {
-            "x": 734,
-            "y": 6257
+            "x": 2301,
+            "y": 6305
           }
         ]
       }
@@ -822,15 +750,15 @@
       "data": {
         "computedPath": [
           {
-            "x": 322,
+            "x": 2042,
             "y": 6064
           },
           {
-            "x": 842,
+            "x": 2301,
             "y": 6064
           },
           {
-            "x": 842,
+            "x": 2301,
             "y": 6209
           }
         ]
@@ -846,15 +774,15 @@
       "data": {
         "computedPath": [
           {
-            "x": 552,
+            "x": 900,
             "y": 2915
           },
           {
-            "x": 552,
+            "x": 900,
             "y": 3247
           },
           {
-            "x": 1200,
+            "x": 1130,
             "y": 3247
           }
         ]
@@ -870,15 +798,15 @@
       "data": {
         "computedPath": [
           {
-            "x": 552,
+            "x": 900,
             "y": 2819
           },
           {
-            "x": 552,
+            "x": 900,
             "y": 2488
           },
           {
-            "x": 821,
+            "x": 1134,
             "y": 2488
           }
         ]
@@ -894,15 +822,15 @@
       "data": {
         "computedPath": [
           {
-            "x": 552,
+            "x": 900,
             "y": 2915
           },
           {
-            "x": 552,
+            "x": 900,
             "y": 3054
           },
           {
-            "x": 1128,
+            "x": 1154,
             "y": 3054
           }
         ]
@@ -918,15 +846,15 @@
       "data": {
         "computedPath": [
           {
-            "x": 552,
+            "x": 900,
             "y": 2819
           },
           {
-            "x": 552,
+            "x": 900,
             "y": 2681
           },
           {
-            "x": 928,
+            "x": 1146,
             "y": 2681
           }
         ]
@@ -942,11 +870,11 @@
       "data": {
         "computedPath": [
           {
-            "x": 656,
+            "x": 1004,
             "y": 2867
           },
           {
-            "x": 1015,
+            "x": 1136,
             "y": 2867
           }
         ]
@@ -958,16 +886,20 @@
       "target": "task-group",
       "type": "stablePath",
       "sourceHandle": "bottom",
-      "targetHandle": "top",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 551,
+            "x": 900,
             "y": 2915
           },
           {
-            "x": 551,
-            "y": 3898
+            "x": 900,
+            "y": 3946
+          },
+          {
+            "x": 1118,
+            "y": 3946
           }
         ]
       }
@@ -982,11 +914,11 @@
       "data": {
         "computedPath": [
           {
-            "x": 654,
+            "x": 1324,
             "y": 3946
           },
           {
-            "x": 1462,
+            "x": 1511,
             "y": 3946
           }
         ]
@@ -1002,15 +934,15 @@
       "data": {
         "computedPath": [
           {
-            "x": 551,
+            "x": 1221,
             "y": 3994
           },
           {
-            "x": 551,
+            "x": 1221,
             "y": 4319
           },
           {
-            "x": 1677,
+            "x": 1533,
             "y": 4319
           }
         ]
@@ -1022,24 +954,20 @@
       "target": "operation",
       "type": "stablePath",
       "sourceHandle": "bottom",
-      "targetHandle": "top",
+      "targetHandle": "left",
       "data": {
         "computedPath": [
           {
-            "x": 551,
+            "x": 1221,
             "y": 3994
           },
           {
-            "x": 551,
-            "y": 5112
+            "x": 1221,
+            "y": 5204
           },
           {
-            "x": 608,
-            "y": 5112
-          },
-          {
-            "x": 608,
-            "y": 5168
+            "x": 1438,
+            "y": 5204
           }
         ]
       }
@@ -1054,15 +982,15 @@
       "data": {
         "computedPath": [
           {
-            "x": 551,
+            "x": 1221,
             "y": 3994
           },
           {
-            "x": 551,
+            "x": 1221,
             "y": 4132
           },
           {
-            "x": 1552,
+            "x": 1505,
             "y": 4132
           }
         ]
@@ -1078,19 +1006,19 @@
       "data": {
         "computedPath": [
           {
-            "x": 654,
+            "x": 1324,
             "y": 3946
           },
           {
-            "x": 1206,
+            "x": 1447,
             "y": 3946
           },
           {
-            "x": 1206,
+            "x": 1447,
             "y": 3560
           },
           {
-            "x": 1262,
+            "x": 1503,
             "y": 3560
           }
         ]
@@ -1106,19 +1034,19 @@
       "data": {
         "computedPath": [
           {
-            "x": 654,
+            "x": 1324,
             "y": 3946
           },
           {
-            "x": 1206,
+            "x": 1447,
             "y": 3946
           },
           {
-            "x": 1206,
+            "x": 1447,
             "y": 3753
           },
           {
-            "x": 1368,
+            "x": 1513,
             "y": 3753
           }
         ]
@@ -1134,11 +1062,11 @@
       "data": {
         "computedPath": [
           {
-            "x": 438,
+            "x": 2062,
             "y": 6257
           },
           {
-            "x": 734,
+            "x": 2193,
             "y": 6257
           }
         ]

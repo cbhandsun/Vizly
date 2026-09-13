@@ -1,0 +1,671 @@
+{
+  "schema": "vizly-precompiled-display-route-v1",
+  "routingVersion": "21",
+  "routingSourceHash": "source-v1:d3b54ef695b2c04374521e2eb9f8e32637b71bc8c4f13e675039dc2f63c432be",
+  "sourceHash": "source-v1:ea82c502ab6535b5c8f8367c591861e540396a41955a15c6b5f94f922264b7de",
+  "inputSignature": "831788229",
+  "inputGeometryDigest": "geometry-v1:ffc618b03c1da934836b3edef1fcce28",
+  "outputRouteSignature": "route-v2:26:79:a7d999e0229acbe6",
+  "hardClean": true,
+  "routingContract": {
+    "clean": true,
+    "hardClean": true,
+    "violationCount": 0,
+    "violations": []
+  },
+  "patches": [
+    {
+      "id": "e18",
+      "source": "alloc-mixed",
+      "target": "check-source",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4476.5,
+            "y": 1784
+          },
+          {
+            "x": 4744.5,
+            "y": 1784
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-rate-applied",
+      "source": "apply-satisfaction-rate",
+      "target": "calc-theory-ratio",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1299,
+            "y": 184
+          },
+          {
+            "x": 1411,
+            "y": 184
+          }
+        ],
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "e9",
+      "source": "calc-real-ratio",
+      "target": "fix-quota",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 3136.5,
+            "y": 1040
+          },
+          {
+            "x": 3248.5,
+            "y": 1040
+          }
+        ]
+      }
+    },
+    {
+      "id": "e3",
+      "source": "calc-theory-ratio",
+      "target": "sort-demand",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1658,
+            "y": 248
+          },
+          {
+            "x": 1658,
+            "y": 512
+          },
+          {
+            "x": 1771,
+            "y": 512
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-shortage-yes",
+      "source": "check-inv-sufficiency",
+      "target": "apply-satisfaction-rate",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 912,
+            "y": 184
+          },
+          {
+            "x": 1024,
+            "y": 184
+          }
+        ],
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "e-shortage-no",
+      "source": "check-inv-sufficiency",
+      "target": "calc-theory-ratio",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 912,
+            "y": 200
+          },
+          {
+            "x": 977,
+            "y": 200
+          },
+          {
+            "x": 977,
+            "y": 296
+          },
+          {
+            "x": 1346,
+            "y": 296
+          },
+          {
+            "x": 1346,
+            "y": 200
+          },
+          {
+            "x": 1411,
+            "y": 200
+          }
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "e5",
+      "source": "check-limit",
+      "target": "pool-a-entry",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2340,
+            "y": 496
+          },
+          {
+            "x": 2452,
+            "y": 496
+          }
+        ],
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "e6",
+      "source": "check-limit",
+      "target": "pool-b-entry",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2340,
+            "y": 512
+          },
+          {
+            "x": 2396,
+            "y": 512
+          },
+          {
+            "x": 2396,
+            "y": 728
+          },
+          {
+            "x": 2614,
+            "y": 728
+          }
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "e12",
+      "source": "check-rem",
+      "target": "sort-rem-round",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4323,
+            "y": 1484
+          },
+          {
+            "x": 4379,
+            "y": 1484
+          },
+          {
+            "x": 4379,
+            "y": 1460
+          },
+          {
+            "x": 4589,
+            "y": 1460
+          }
+        ],
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "e13",
+      "source": "check-rem",
+      "target": "task-direct-a",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4213.5,
+            "y": 1508.5
+          },
+          {
+            "x": 4213.5,
+            "y": 2136
+          },
+          {
+            "x": 5071,
+            "y": 2136
+          }
+        ],
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "e20",
+      "source": "check-source",
+      "target": "task-direct-b",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4958,
+            "y": 1821
+          },
+          {
+            "x": 5014,
+            "y": 1821
+          },
+          {
+            "x": 5014,
+            "y": 2584
+          },
+          {
+            "x": 5391,
+            "y": 2584
+          }
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "e19",
+      "source": "check-source",
+      "target": "task-rep-b",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4958,
+            "y": 1821
+          },
+          {
+            "x": 5023,
+            "y": 1821
+          },
+          {
+            "x": 5023,
+            "y": 2368
+          },
+          {
+            "x": 5221,
+            "y": 2368
+          }
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "e10",
+      "source": "fix-quota",
+      "target": "greedy-spec",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 3502,
+            "y": 1088
+          },
+          {
+            "x": 3559,
+            "y": 1088
+          },
+          {
+            "x": 3559,
+            "y": 1472
+          },
+          {
+            "x": 3615,
+            "y": 1472
+          }
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "e16",
+      "source": "fix-quota",
+      "target": "merge-res",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 3502,
+            "y": 1088
+          },
+          {
+            "x": 3558,
+            "y": 1088
+          },
+          {
+            "x": 3558,
+            "y": 1784
+          },
+          {
+            "x": 3779,
+            "y": 1784
+          }
+        ],
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "e11",
+      "source": "greedy-spec",
+      "target": "check-rem",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 3836.5,
+            "y": 1472
+          },
+          {
+            "x": 4104,
+            "y": 1472
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-check-inv",
+      "source": "init-data",
+      "target": "check-inv-sufficiency",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 594,
+            "y": 200
+          },
+          {
+            "x": 706,
+            "y": 200
+          }
+        ]
+      }
+    },
+    {
+      "id": "e17",
+      "source": "merge-res",
+      "target": "alloc-mixed",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 3992,
+            "y": 1784
+          },
+          {
+            "x": 4270.5,
+            "y": 1784
+          }
+        ]
+      }
+    },
+    {
+      "id": "e7",
+      "source": "pool-a-entry",
+      "target": "calc-real-ratio",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2670,
+            "y": 512
+          },
+          {
+            "x": 2887.5,
+            "y": 512
+          },
+          {
+            "x": 2887.5,
+            "y": 1021
+          },
+          {
+            "x": 2943.5,
+            "y": 1021
+          }
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "e8",
+      "source": "pool-b-entry",
+      "target": "calc-real-ratio",
+      "type": "stablePath",
+      "sourceHandle": "bottom",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2830,
+            "y": 776
+          },
+          {
+            "x": 2830,
+            "y": 1033
+          },
+          {
+            "x": 2943,
+            "y": 1033
+          }
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "e15",
+      "source": "pool-b-entry",
+      "target": "merge-res",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 2830,
+            "y": 752
+          },
+          {
+            "x": 3185,
+            "y": 752
+          },
+          {
+            "x": 3185,
+            "y": 1784
+          },
+          {
+            "x": 3779,
+            "y": 1784
+          }
+        ],
+        "sharedTrunkAware": true,
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "e4",
+      "source": "sort-demand",
+      "target": "check-limit",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 1977,
+            "y": 512
+          },
+          {
+            "x": 2089,
+            "y": 512
+          }
+        ]
+      }
+    },
+    {
+      "id": "e14",
+      "source": "sort-rem-round",
+      "target": "task-direct-a",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "top",
+      "data": {
+        "computedPath": [
+          {
+            "x": 4794,
+            "y": 1520
+          },
+          {
+            "x": 5083,
+            "y": 1520
+          },
+          {
+            "x": 5083,
+            "y": 2104
+          }
+        ],
+        "sharedTrunkAware": true
+      }
+    },
+    {
+      "id": "e1",
+      "source": "start-calc",
+      "target": "init-data",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 269,
+            "y": 200
+          },
+          {
+            "x": 381,
+            "y": 200
+          }
+        ]
+      }
+    },
+    {
+      "id": "e21",
+      "source": "task-direct-a",
+      "target": "end-wms",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 5244,
+            "y": 2152
+          },
+          {
+            "x": 5605,
+            "y": 2152
+          },
+          {
+            "x": 5605,
+            "y": 2368
+          },
+          {
+            "x": 5677,
+            "y": 2368
+          }
+        ],
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "e23",
+      "source": "task-direct-b",
+      "target": "end-wms",
+      "type": "stablePath",
+      "sourceHandle": "top",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 5525,
+            "y": 2536
+          },
+          {
+            "x": 5525,
+            "y": 2368
+          },
+          {
+            "x": 5677,
+            "y": 2368
+          }
+        ],
+        "sharedTrunkSynthesized": true
+      }
+    },
+    {
+      "id": "e22",
+      "source": "task-rep-b",
+      "target": "end-wms",
+      "type": "stablePath",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "data": {
+        "computedPath": [
+          {
+            "x": 5414,
+            "y": 2368
+          },
+          {
+            "x": 5676.5,
+            "y": 2368
+          }
+        ]
+      }
+    }
+  ]
+}
