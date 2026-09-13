@@ -15,10 +15,17 @@ import { buildTerminalPreservingInteriorShortcutCandidates } from './baseReactFl
 import { displayPathLength, getDisplayComputedPath, withDisplayComputedPath } from './baseReactFlowDisplayGeometry';
 
 const FINAL_COMMERCIAL_OUTER_STAIR_EVALUATIONS = 16;
+type DisplayPath = ReturnType<typeof getDisplayComputedPath>;
+
+type TerminalPreservingBaselineMetrics = Readonly<{
+  clearanceRisk: number;
+  length: number;
+  path: DisplayPath;
+}>;
 
 const withTerminalPreservingOuterStairPath = (
   edge: Edge,
-  path: ReturnType<typeof getDisplayComputedPath>,
+  path: DisplayPath,
 ): Edge => {
   const changed = withDisplayComputedPath(edge, path);
   if (changed.data?.displayNodeClearanceRepaired !== true) return changed;
@@ -29,10 +36,10 @@ const withTerminalPreservingOuterStairPath = (
 
 export const rankCommercialInteriorShortcutCandidates = (
   edge: Edge,
-  path: ReturnType<typeof getDisplayComputedPath>,
+  path: DisplayPath,
   nodes: Node[],
   includeCorners = true,
-): ReturnType<typeof getDisplayComputedPath>[] => {
+): DisplayPath[] => {
   return buildTerminalPreservingInteriorShortcutCandidates(path, includeCorners ? 32 : 8, includeCorners)
     .map((candidatePath, originalIndex) => {
       const candidateEdge = withTerminalPreservingOuterStairPath(edge, candidatePath);
@@ -67,6 +74,30 @@ export const repairTerminalPreservingOuterStairs = <T extends Edge[]>(
   let bestReport = evaluation.hardReport(best);
   if (!bestReport.hardClean) return edges;
   let evaluations = 0;
+  let bestUnsafeEndpointStubs: number | undefined;
+  const baselineMetricsByEdge = new WeakMap<Edge, TerminalPreservingBaselineMetrics>();
+  const readBaselineMetrics = (edge: Edge): TerminalPreservingBaselineMetrics => {
+    const cached = baselineMetricsByEdge.get(edge);
+    if (cached) return cached;
+    const path = getDisplayComputedPath(edge);
+    const metrics: TerminalPreservingBaselineMetrics = {
+      clearanceRisk: scoreNodeClearanceRisk(
+        path,
+        nodes,
+        edge,
+        COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+      ),
+      length: displayPathLength(path),
+      path,
+    };
+    baselineMetricsByEdge.set(edge, metrics);
+    return metrics;
+  };
+  const readBestUnsafeEndpointStubs = (): number => {
+    if (typeof bestUnsafeEndpointStubs === 'number') return bestUnsafeEndpointStubs;
+    bestUnsafeEndpointStubs = evaluation.unsafeEndpointStubs(best);
+    return bestUnsafeEndpointStubs;
+  };
   // Corner shortcuts can occupy corridors still needed by clearance repair.
   // Enable them only after the whole graph has reached the clearance target.
   const includeCorners = displayBusinessNodeCommercialClearanceIsClean(edges, nodes);
@@ -119,30 +150,25 @@ export const repairTerminalPreservingOuterStairs = <T extends Edge[]>(
     const entry = pending.shift();
     if (!entry) break;
     const { edgeIndex, candidates } = entry;
-    const baselinePath = getDisplayComputedPath(best[edgeIndex]);
     const next = candidates.next();
     if (next.done) continue;
     const candidatePath = next.value;
     pending.push(entry);
-    const baselineLength = displayPathLength(baselinePath);
+    const baselineMetrics = readBaselineMetrics(best[edgeIndex]);
     const candidateLength = displayPathLength(candidatePath);
-    const reducesBendsAtEqualLength = candidatePath.length < baselinePath.length
-      && candidateLength <= baselineLength + 0.5;
-    if (candidateLength >= baselineLength - 0.5 && !reducesBendsAtEqualLength) continue;
-    const candidate = best.map((edge, index) => (
-      index === edgeIndex
-        ? withTerminalPreservingOuterStairPath(edge, candidatePath)
-        : edge
-    )) as T;
-    const candidateEdge = candidate[edgeIndex];
+    const reducesBendsAtEqualLength = candidatePath.length < baselineMetrics.path.length
+      && candidateLength <= baselineMetrics.length + 0.5;
+    if (candidateLength >= baselineMetrics.length - 0.5 && !reducesBendsAtEqualLength) continue;
+    const candidateEdge = withTerminalPreservingOuterStairPath(best[edgeIndex], candidatePath);
     // Reject candidates that cannot pass the existing per-edge clearance gate
     // before spending one of the bounded whole-graph quality evaluations.
     if (scoreNodeClearanceRisk(
       candidatePath, nodes, candidateEdge, COMMERCIAL_BUSINESS_NODE_CLEARANCE,
-    ) > scoreNodeClearanceRisk(
-      baselinePath, nodes, best[edgeIndex], COMMERCIAL_BUSINESS_NODE_CLEARANCE,
-    )) continue;
+    ) > baselineMetrics.clearanceRisk) continue;
     if (evaluations >= FINAL_COMMERCIAL_OUTER_STAIR_EVALUATIONS) return best;
+    const candidate = best.map((edge, index) => (
+      index === edgeIndex ? candidateEdge : edge
+    )) as T;
     evaluations += 1;
     const candidateReport = evaluation.hardReport(candidate);
     const accepted = !(
@@ -154,7 +180,7 @@ export const repairTerminalPreservingOuterStairs = <T extends Edge[]>(
         && candidateReport.quality.bends >= bestReport.quality.bends
       )
       || candidateReport.quality.detourPenalty > bestReport.quality.detourPenalty
-      || evaluation.unsafeEndpointStubs(candidate) > evaluation.unsafeEndpointStubs(best)
+      || evaluation.unsafeEndpointStubs(candidate) > readBestUnsafeEndpointStubs()
       || !changedEdgesObstacleHitsDoNotRegress(best, candidate, [edgeIndex], nodes)
       || !visualPolishHardQualityDoesNotRegress(
         bestReport.quality,
@@ -171,6 +197,7 @@ export const repairTerminalPreservingOuterStairs = <T extends Edge[]>(
     if (accepted) {
       best = candidate;
       bestReport = candidateReport;
+      bestUnsafeEndpointStubs = undefined;
       pending.pop();
     }
   }
