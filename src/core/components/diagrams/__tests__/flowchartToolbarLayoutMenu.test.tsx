@@ -532,17 +532,21 @@ describe('flowchartToolbarLayoutMenu', () => {
     expect(items.find(item => item.key === 'domain-compound-elk-lr')?.disabled).not.toBe(true);
     expect(rootItems.find(item => item.key === 'group-custom-combination')?.label).toContain('当前图含合流或循环');
     expect(recommended.map(item => item.key)).toEqual([
-      'domain-compound-elk-tb',
+      'domain-dagre-tb',
       'domain-dagre-lr',
       'domain-compound-elk-lr',
       'domain-lanes-tb',
       'domain-lanes-lr',
     ]);
-    expect(moreEngines.map(item => item.key)).not.toContain('domain-compound-elk-tb');
+    expect(moreEngines.map(item => item.key)).toEqual(expect.arrayContaining([
+      'domain-dagre-bt',
+      'domain-dagre-rl',
+      'domain-compound-elk-tb',
+    ]));
 
-    const topBottom = recommended.find(item => item.key === 'domain-compound-elk-tb');
+    const topBottom = recommended.find(item => item.key === 'domain-dagre-tb');
     if (typeof topBottom?.onClick === 'function') topBottom.onClick();
-    expect(onStrategyLayout).toHaveBeenCalledWith('domain-compound-elk', undefined, 'TB');
+    expect(onStrategyLayout).toHaveBeenCalledWith('domain-dagre', undefined, 'TB');
   });
 
   it('uses only committed lane-rank props for selection and passes the fourth layout argument', () => {

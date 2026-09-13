@@ -447,19 +447,12 @@ export const buildFlowchartLayoutMenuModel = ({
         ),
     ];
 
-    const primaryTopBottomItem = customDomainLayoutAvailable
-        ? domainItem(
-            'domain-dagre-tb',
-            labels.domainDagreTb,
-            () => onStrategyLayout?.('domain-dagre', undefined, 'TB'),
-            <FaRegObjectGroup />,
-        )
-        : domainItem(
-            'domain-compound-elk-tb',
-            labels.domainCompoundElkTb,
-            () => onStrategyLayout?.('domain-compound-elk', undefined, 'TB'),
-            <FaObjectGroup />,
-        );
+    const primaryTopBottomItem = domainItem(
+        'domain-dagre-tb',
+        labels.domainDagreTb,
+        () => onStrategyLayout?.('domain-dagre', undefined, 'TB'),
+        <FaRegObjectGroup />,
+    );
 
     const moreEngineItems: NonNullable<MenuProps['items']> = [
         ...(onStrategyLayout ? [{
@@ -480,25 +473,25 @@ export const buildFlowchartLayoutMenuModel = ({
                         () => onStrategyLayout('domain-dagre-sub-horizontal', 'dagre', 'TB'),
                         <FaRegObjectGroup />,
                     ),
-                    domainItem(
-                        'domain-dagre-bt',
-                        labels.domainDagreBt,
-                        () => onStrategyLayout('domain-dagre', undefined, 'BT'),
-                        <FaRegObjectGroup style={{ transform: 'rotate(180deg)' }} />,
-                    ),
-                    domainItem(
-                        'domain-dagre-rl',
-                        labels.domainDagreRl,
-                        () => onStrategyLayout('domain-dagre', undefined, 'RL'),
-                        <FaRegObjectGroup style={{ transform: 'rotate(90deg)' }} />,
-                    ),
-                    domainItem(
-                        'domain-compound-elk-tb',
-                        labels.domainCompoundElkTb,
-                        () => onStrategyLayout('domain-compound-elk', undefined, 'TB'),
-                        <FaObjectGroup />,
-                    ),
                 ] : []),
+                domainItem(
+                    'domain-dagre-bt',
+                    labels.domainDagreBt,
+                    () => onStrategyLayout('domain-dagre', undefined, 'BT'),
+                    <FaRegObjectGroup style={{ transform: 'rotate(180deg)' }} />,
+                ),
+                domainItem(
+                    'domain-dagre-rl',
+                    labels.domainDagreRl,
+                    () => onStrategyLayout('domain-dagre', undefined, 'RL'),
+                    <FaRegObjectGroup style={{ transform: 'rotate(90deg)' }} />,
+                ),
+                domainItem(
+                    'domain-compound-elk-tb',
+                    labels.domainCompoundElkTb,
+                    () => onStrategyLayout('domain-compound-elk', undefined, 'TB'),
+                    <FaObjectGroup />,
+                ),
                 domainItem(
                     'domain-compound-elk-bt',
                     labels.domainCompoundElkBt,
