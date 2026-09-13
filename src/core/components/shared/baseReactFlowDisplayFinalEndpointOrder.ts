@@ -318,9 +318,7 @@ export const repairBaseReactFlowFinalEndpointOrder = <T extends Edge[]>(
       options.preferredEdges,
       {
         finalizeCandidate: candidateEdges => repairPreferredSourceBranchCorridors(
-          residualRepair.strict(
-            repairFinalSharedTargetTerminalTrunks(candidateEdges, repairNodes),
-          ),
+          repairFinalSharedTargetTerminalTrunks(candidateEdges, repairNodes),
           repairNodes,
           options.preferredEdges,
         ),
