@@ -7,7 +7,7 @@ import {
 } from './precompiled-display-route-targets.mjs';
 
 describe('precompiled display route layout capture', () => {
-  it('adds the exact WMS domain-lanes-lr target without replacing initial targets', () => {
+  it('keeps only exact replayable layout targets without replacing initial targets', () => {
     expect(PRECOMPILED_DISPLAY_ROUTE_LAYOUT_TARGETS).toEqual([{
       presetId: 'wms-process-flow-v1',
       sourcePath: 'src/data/standardized/WmsProcessFlowStandardData.json',
@@ -27,7 +27,7 @@ describe('precompiled display route layout capture', () => {
     const session = {
       evaluate: vi.fn()
         .mockResolvedValueOnce(true)
-        .mockResolvedValueOnce(1234),
+        .mockResolvedValueOnce({ x: 10, y: 20, clickedAt: 1234 }),
       send: vi.fn(),
     };
     const wait = vi.fn();
@@ -38,7 +38,25 @@ describe('precompiled display route layout capture', () => {
       wait,
     )).resolves.toBe(1234);
     expect(wait).toHaveBeenCalledWith(300);
-    expect(session.send).not.toHaveBeenCalled();
+    expect(session.send).toHaveBeenNthCalledWith(1, 'Input.dispatchMouseEvent', {
+      type: 'mouseMoved',
+      x: 10,
+      y: 20,
+    });
+    expect(session.send).toHaveBeenNthCalledWith(2, 'Input.dispatchMouseEvent', {
+      type: 'mousePressed',
+      x: 10,
+      y: 20,
+      button: 'left',
+      clickCount: 1,
+    });
+    expect(session.send).toHaveBeenNthCalledWith(3, 'Input.dispatchMouseEvent', {
+      type: 'mouseReleased',
+      x: 10,
+      y: 20,
+      button: 'left',
+      clickCount: 1,
+    });
     expect(session.evaluate.mock.calls[1][0]).toContain('domain-lanes-lr');
   });
 
@@ -48,7 +66,7 @@ describe('precompiled display route layout capture', () => {
         .mockResolvedValueOnce(true)
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce({ x: 10, y: 20 })
-        .mockResolvedValueOnce(5678),
+        .mockResolvedValueOnce({ x: 30, y: 40, clickedAt: 5678 }),
       send: vi.fn(),
     };
     const wait = vi.fn();
@@ -62,6 +80,13 @@ describe('precompiled display route layout capture', () => {
       type: 'mouseMoved',
       x: 10,
       y: 20,
+    });
+    expect(session.send).toHaveBeenCalledWith('Input.dispatchMouseEvent', {
+      type: 'mousePressed',
+      x: 30,
+      y: 40,
+      button: 'left',
+      clickCount: 1,
     });
     expect(wait).toHaveBeenNthCalledWith(1, 300);
     expect(wait).toHaveBeenNthCalledWith(2, 500);

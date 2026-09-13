@@ -6,7 +6,7 @@ import {
   resolveDisplayRoutingMenuPointerTarget,
 } from './display-routing-matrix-cases.mjs';
 
-export const clickLayout = async (session, layoutCase) => {
+export const clickLayout = async (session, layoutCase, wait = delay) => {
   const opened = await session.evaluate(`(() => {
     const trigger = Array.from(document.querySelectorAll('button'))
       .find(button => /自动布局|layout/i.test(button.getAttribute('aria-label') || ''));
@@ -14,7 +14,7 @@ export const clickLayout = async (session, layoutCase) => {
     return Boolean(trigger);
   })()`);
   if (!opened) throw new Error('Layout menu trigger was not found');
-  await delay(300);
+  await wait(300);
   const clickVisibleItem = async () => {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const target = await session.evaluate(`(() => {
@@ -35,7 +35,7 @@ export const clickLayout = async (session, layoutCase) => {
       if (!target) return null;
       if (target.inaccessible) {
         if (attempt === 0) {
-          await delay(120);
+          await wait(120);
           continue;
         }
         throw new Error(`${layoutCase.id} menu item is outside the viewport or covered`);
@@ -73,7 +73,7 @@ export const clickLayout = async (session, layoutCase) => {
         if (!target) return false;
         if (target.inaccessible) {
           if (attempt === 0) {
-            await delay(120);
+            await wait(120);
             continue;
           }
           throw new Error('More layouts menu item is outside the viewport or covered');
@@ -88,7 +88,7 @@ export const clickLayout = async (session, layoutCase) => {
       return false;
     };
     if (await revealMoreLayouts()) {
-      await delay(500);
+      await wait(500);
       clicked = await clickVisibleItem();
     }
   }

@@ -102,13 +102,22 @@ const captureTarget = async (session, target, source, routingVersion, routingSou
   await session.send('Page.navigate', { url });
   const deadline = Date.now() + readGenerationTimeoutMs();
   if (isLayoutVariant) {
+    // Layout variants intentionally start from the preset canvas and then
+    // issue a concrete layout command. Some presets can reject their initial
+    // automatic route before that command runs, so readiness here is the
+    // bounded UI command surface rather than a successful initial route.
     await waitForDisplayRoutingBrowserValue(session, `(() => (
       document.readyState === 'complete'
-      && window.__vizlyBaseReactFlowDisplayRouting?.stage === 'final-applied'
+      && ['final-applied', 'final-quality-rejected', 'final-safety-rejected'].includes(
+        window.__vizlyBaseReactFlowDisplayRouting?.stage,
+      )
       && Array.from(document.querySelectorAll('button')).some(
         button => /自动布局|layout/i.test(button.getAttribute('aria-label') || ''),
       )
-    ))()`, Math.max(0, deadline - Date.now()), { stopOnQualityRejection: true });
+      && Array.from(document.querySelectorAll('button')).some(
+        button => button.hasAttribute('data-flowchart-layout-selection'),
+      )
+    ))()`, Math.max(0, deadline - Date.now()));
     await clickPrecompiledDisplayRouteLayoutVariant(session, variantId);
   }
   const captured = await waitForDisplayRoutingBrowserValue(session,
