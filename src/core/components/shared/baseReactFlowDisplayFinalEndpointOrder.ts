@@ -28,7 +28,6 @@ import {
 } from '../../strategies/shared/edgeFinalEndpointTopologyRepair';
 import { createBaseReactFlowFinalEndpointResidualRepair } from './baseReactFlowDisplayFinalEndpointResidualRepair';
 import { buildSharedEndpointTrunkSynthesisCandidates } from './baseReactFlowDisplayEndpointTrunkCandidates';
-import { repairDisplayLoopShortcuts } from './baseReactFlowDisplayLoopShortcutRepair';
 import {
   createBaseReactFlowFinalEndpointEvaluation,
   diffBaseReactFlowEvaluationMetrics,
@@ -51,6 +50,9 @@ import {
   exactTrueTrunkSignature,
   traceSkippedFinalEndpointPhases,
 } from './baseReactFlowDisplayFinalEndpointTrace';
+import {
+  repairBaseReactFlowFinalEndpointCommercialClosure,
+} from './baseReactFlowDisplayFinalEndpointCommercialClosure';
 
 export { finalSameSideTrueTrunksDoNotRegress } from './baseReactFlowDisplayTrueTrunkContract';
 export {
@@ -212,39 +214,6 @@ const commitRenderSafeStubCandidate = (
       options,
       evaluation,
     )
-    ? candidate
-    : baseline;
-};
-
-const commitExcessiveDetourCandidate = (
-  baseline: Edge[],
-  repairNodes: Node[],
-  options: BaseReactFlowFinalEndpointOrderOptions,
-  evaluation: BaseReactFlowFinalEndpointEvaluation,
-): Edge[] => {
-  if (options.eligibleEdgeIds) return baseline;
-  const baselineReport = evaluation.hardReport(baseline);
-  const candidate = repairDisplayLoopShortcuts(
-    baseline,
-    repairNodes,
-    16,
-  );
-  if (candidate === baseline) return baseline;
-  const changed = evaluateBaseReactFlowChangedCandidateReport(baseline, candidate, evaluation);
-  if (!changed) return baseline;
-  const { changedEdgeIndexes, report: candidateReport } = changed;
-  if (
-    !candidateReport.hardClean
-    || candidateReport.quality.detourPenalty >= baselineReport.quality.detourPenalty
-    || candidateReport.quality.totalLength >= baselineReport.quality.totalLength
-  ) return baseline;
-  return passesFinalDisplayGate(
-    baseline,
-    candidate,
-    changedEdgeIndexes,
-    options,
-    evaluation,
-  )
     ? candidate
     : baseline;
 };
@@ -656,16 +625,17 @@ export const repairBaseReactFlowFinalEndpointOrder = <T extends Edge[]>(
   );
   const commercialClosureTimer = closureStage('final-endpoint-closure-commercial');
   const beforeCommercialClosure = repaired;
-  repaired = commitExcessiveDetourCandidate(repaired, repairNodes, options, evaluation);
-  if (evaluation.hardReport(repaired).hardClean) {
-    repaired = restorePreferredSourceTrunks(repaired);
-    // Restoring an authored trunk can pull a nearby independent branch back
-    // inside the visual port-gap floor. Revalidate the endpoint contract after
-    // restoration; true trunk blocks stay atomic, so only the independent
-    // branch moves when that is the safe minimal correction.
-    repaired = repairEndpointOrder(repaired);
-    repaired = separatePreferredSourceBranches(repaired);
-  }
+  repaired = repairBaseReactFlowFinalEndpointCommercialClosure(
+    repaired,
+    repairNodes,
+    options,
+    evaluation,
+    {
+      restorePreferredSourceTrunks,
+      repairEndpointOrder,
+      separatePreferredSourceBranches,
+    },
+  );
   commercialClosureTimer.finish(
     repaired === beforeCommercialClosure ? 'skip' : 'accepted',
     countChangedRoutingItems(beforeCommercialClosure, repaired),

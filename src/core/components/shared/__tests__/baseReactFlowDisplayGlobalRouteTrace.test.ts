@@ -70,4 +70,38 @@ describe('baseReactFlowDisplayGlobalRouteTrace', () => {
       parentPhase === 'quality-global-route'
     ))).toBe(true);
   });
+
+  it('breaks commercial endpoint closure into attributable child phases', () => {
+    const trace = (
+      phase: DisplayRoutingPhaseTrace['phase'],
+      durationMs: number,
+    ): DisplayRoutingPhaseTrace => ({
+      phase,
+      durationMs,
+      candidateCount: 12,
+      changedEdgeCount: 0,
+      resolution: 'skip',
+    });
+    const traces = finalizeDisplayRoutingPhaseTrace([
+      trace('final-endpoint-closure', 160),
+      trace('final-endpoint-closure-commercial', 100),
+      trace('final-endpoint-closure-commercial-detour', 20),
+      trace('final-endpoint-closure-commercial-hard-gate', 5),
+      trace('final-endpoint-closure-commercial-restore-source', 30),
+      trace('final-endpoint-closure-commercial-endpoint-order', 10),
+      trace('final-endpoint-closure-commercial-source-branches', 15),
+    ]);
+
+    expect(traces[0]).toMatchObject({
+      parentPhase: 'finalizer',
+      exclusiveDurationMs: 60,
+    });
+    expect(traces[1]).toMatchObject({
+      parentPhase: 'final-endpoint-closure',
+      exclusiveDurationMs: 20,
+    });
+    expect(traces.slice(2).every(({ parentPhase }) => (
+      parentPhase === 'final-endpoint-closure-commercial'
+    ))).toBe(true);
+  });
 });

@@ -181,6 +181,11 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
   'final-endpoint-closure-terminal-stubs',
   'final-endpoint-closure-terminal-micro',
   'final-endpoint-closure-commercial',
+  'final-endpoint-closure-commercial-detour',
+  'final-endpoint-closure-commercial-hard-gate',
+  'final-endpoint-closure-commercial-restore-source',
+  'final-endpoint-closure-commercial-endpoint-order',
+  'final-endpoint-closure-commercial-source-branches',
   'final-safety-closure',
   'final-safety-hard-gate',
   'final-safety-stubs',
@@ -214,7 +219,7 @@ export const DISPLAY_ROUTING_PHASE_NAMES = [
 // One aggregate entry per declared phase plus headroom for the small number of
 // phases that can run under two explicit parents. Repeated work is folded by
 // the Worker recorder, so the bound no longer truncates late final-gate phases.
-export const DISPLAY_ROUTING_PHASE_TRACE_LIMIT = 196;
+export const DISPLAY_ROUTING_PHASE_TRACE_LIMIT = 224;
 
 export const DISPLAY_ROUTING_PHASE_RESOLUTIONS = [
   'hit',
@@ -471,6 +476,11 @@ const DISPLAY_ROUTING_PHASE_PARENTS: Readonly<
   'final-endpoint-closure-terminal-stubs': 'final-endpoint-closure-terminal',
   'final-endpoint-closure-terminal-micro': 'final-endpoint-closure-terminal',
   'final-endpoint-closure-commercial': 'final-endpoint-closure',
+  'final-endpoint-closure-commercial-detour': 'final-endpoint-closure-commercial',
+  'final-endpoint-closure-commercial-hard-gate': 'final-endpoint-closure-commercial',
+  'final-endpoint-closure-commercial-restore-source': 'final-endpoint-closure-commercial',
+  'final-endpoint-closure-commercial-endpoint-order': 'final-endpoint-closure-commercial',
+  'final-endpoint-closure-commercial-source-branches': 'final-endpoint-closure-commercial',
   'final-safety-closure': 'finalizer',
   'final-safety-hard-gate': 'final-safety-closure',
   'final-safety-stubs': 'final-safety-closure',
