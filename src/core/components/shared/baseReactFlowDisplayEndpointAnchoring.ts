@@ -606,15 +606,22 @@ export const commitComputedDisplayEdgeTerminals = (
   nodes: Node[],
 ): Edge[] => {
   const nodeById = new Map(nodes.map(node => [node.id, node]));
-  const anchored = edges
-    .map(edge => anchorComputedPathEndpoints(edge, nodeById))
-    .map(normalizeComputedDisplayPath);
-  const accepted = [...anchored];
-  accepted.forEach((edge, index) => {
+  let anchoredChanged = false;
+  const anchored = edges.map((edge) => {
+    const anchoredEdge = anchorComputedPathEndpoints(edge, nodeById);
+    const normalizedEdge = normalizeComputedDisplayPath(anchoredEdge);
+    if (normalizedEdge !== edge) anchoredChanged = true;
+    return normalizedEdge;
+  });
+  let accepted: Edge[] | null = null;
+  anchored.forEach((edge, index) => {
     const candidate = addComputedPathEndpointStubs(edge, nodeById);
     if (candidate === edge) return;
-    if (fastDisplayHardSafetyIsClean([candidate], nodes)) accepted[index] = candidate;
+    if (!fastDisplayHardSafetyIsClean([candidate], nodes)) return;
+    accepted ??= [...anchored];
+    accepted[index] = candidate;
   });
+  if (!accepted) return anchoredChanged ? anchored : edges;
   const baselineQuality = calculateEdgePathQualityScore(anchored);
   const acceptedQuality = calculateEdgePathQualityScore(accepted);
   return acceptedQuality.nonOrthogonalSegments <= baselineQuality.nonOrthogonalSegments

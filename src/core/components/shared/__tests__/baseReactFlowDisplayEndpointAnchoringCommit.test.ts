@@ -12,6 +12,28 @@ const nodes: Node[] = [
 ];
 
 describe('baseReactFlowDisplayEndpointAnchoring terminal commit', () => {
+  it('returns the existing edge set when terminal geometry is already committed', () => {
+    const edgeSet = [{
+      id: 'already-committed-terminals',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'bottom',
+      targetHandle: 'top',
+      data: {
+        computedPath: [
+          { x: 50, y: 60 },
+          { x: 50, y: 120 },
+          { x: 350, y: 120 },
+          { x: 350, y: 200 },
+        ],
+      },
+    }];
+
+    const result = commitComputedDisplayEdgeTerminals(edgeSet, nodes);
+
+    expect(result).toBe(edgeSet);
+  });
+
   it('extends an available terminal lane to 48px without adding a tiny dogleg', () => {
     const [result] = commitComputedDisplayEdgeTerminals([{
       id: 'short-available-terminal-lane',
