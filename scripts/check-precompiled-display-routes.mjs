@@ -13,6 +13,7 @@ import {
 import { hashPrecompiledDisplayRouteSource } from './lib/precompiled-display-route-source-hash.mjs';
 import { computePrecompiledDisplayRoutingSourceHash } from './lib/precompiled-display-route-source-set.mjs';
 import { auditPrecompiledDisplayRouteCommercialQuality } from './lib/precompiled-display-route-commercial-quality.mjs';
+import { isPrecompiledDisplayRoutingContractSummary } from './lib/precompiled-display-route-capture.mjs';
 
 const ROOT = resolve(process.cwd());
 const GENERATED_DIR = resolve(ROOT, 'src/core/components/shared/generated');
@@ -106,9 +107,7 @@ for (const entry of manifest.entries) {
   }
   const artifact = JSON.parse(artifactSource);
   const artifactKeys = Object.keys(artifact || {});
-  if (
-    artifactKeys.length !== 8
-    || ![
+  const requiredArtifactKeys = [
       'schema',
       'routingVersion',
       'sourceHash',
@@ -117,7 +116,13 @@ for (const entry of manifest.entries) {
       'outputRouteSignature',
       'hardClean',
       'patches',
-    ].every(key => artifactKeys.includes(key))
+    ];
+  const optionalArtifactKeys = ['routingContract'];
+  if (
+    !requiredArtifactKeys.every(key => artifactKeys.includes(key))
+    || !artifactKeys.every(key => (
+      requiredArtifactKeys.includes(key) || optionalArtifactKeys.includes(key)
+    ))
     || artifact?.schema !== ARTIFACT_SCHEMA
     || artifact.routingVersion !== routingVersion
     || artifact.sourceHash !== expectedSourceHash
@@ -126,6 +131,14 @@ for (const entry of manifest.entries) {
     || artifact.inputGeometryDigest !== entry.inputGeometryDigest
     || artifact.outputRouteSignature !== entry.outputRouteSignature
     || artifact.hardClean !== true
+    || (
+      typeof artifact.routingContract !== 'undefined'
+      && (
+        !isPrecompiledDisplayRoutingContractSummary(artifact.routingContract)
+        || artifact.routingContract.clean !== true
+        || artifact.routingContract.hardClean !== true
+      )
+    )
     || !Array.isArray(artifact.patches)
     || artifact.patches.length === 0
   ) throw new Error(`Precompiled route artifact ${entry.artifactFile} is stale or malformed`);

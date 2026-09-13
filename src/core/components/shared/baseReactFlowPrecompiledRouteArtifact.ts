@@ -10,6 +10,7 @@ import {
 import { isBaseReactFlowDisplayGeometryDigest } from './baseReactFlowDisplayInputIdentity';
 import { displayTerminalHandleChangeIsAllowed } from './baseReactFlowDisplayTerminalPolicy';
 import { baseReactFlowDisplayCommercialQualityIsClean } from './baseReactFlowDisplayCommercialQuality';
+import { isDisplayRoutingContractSummary } from './baseReactFlowDisplayRoutingContract';
 
 export const BASE_REACT_FLOW_PRECOMPILED_ROUTE_SCHEMA = 'vizly-precompiled-display-route-v1';
 export const BASE_REACT_FLOW_PRECOMPILED_SOURCE_HASH_PATTERN = /^source-v1:[0-9a-f]{64}$/;
@@ -46,6 +47,7 @@ export type BaseReactFlowPrecompiledRouteArtifact = {
   inputGeometryDigest: string;
   outputRouteSignature: string;
   hardClean: true;
+  routingContract?: unknown;
   patches: RoutingPatch[];
 };
 
@@ -249,7 +251,11 @@ export const parseBaseReactFlowPrecompiledRouteArtifact = (
     'hardClean',
     'patches',
   ];
-  if (keys.length !== expectedKeys.length || !keys.every(key => expectedKeys.includes(key))) {
+  const optionalKeys = ['routingContract'];
+  if (
+    !expectedKeys.every(key => keys.includes(key))
+    || !keys.every(key => expectedKeys.includes(key) || optionalKeys.includes(key))
+  ) {
     return null;
   }
   const routingVersion = expectation.routingVersion ?? BASE_DISPLAY_ROUTING_VERSION;
@@ -264,6 +270,14 @@ export const parseBaseReactFlowPrecompiledRouteArtifact = (
     || !isBaseReactFlowDisplayGeometryDigest(value.inputGeometryDigest)
     || value.hardClean !== true
     || !isBaseReactFlowDisplayOutputRouteSignature(value.outputRouteSignature)
+    || (
+      typeof value.routingContract !== 'undefined'
+      && (
+        !isDisplayRoutingContractSummary(value.routingContract)
+        || value.routingContract.clean !== true
+        || value.routingContract.hardClean !== true
+      )
+    )
     || !Array.isArray(value.patches)
     || value.patches.length === 0
     || value.patches.length > MAX_PATCHES

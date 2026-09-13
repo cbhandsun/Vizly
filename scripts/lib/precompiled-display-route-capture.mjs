@@ -41,6 +41,67 @@ export const isMatchingHardCleanDisplayWorkerResponse = (request, response) => (
   && response.edges.length === request.edges.length
 );
 
+export const isPrecompiledDisplayRoutingContractSummary = value => {
+  const isRecord = item => Boolean(item) && typeof item === 'object' && !Array.isArray(item);
+  const codes = new Set([
+    'terminal-detached',
+    'terminal-unanchored',
+    'non-orthogonal-segment',
+    'obstacle-hit',
+    'strict-crossing',
+    'reverse-overlap',
+    'unrelated-overlap',
+    'unexplained-related-overlap',
+    'short-endpoint-stub',
+    'tiny-interior-dogleg',
+    'hairpin',
+    'minimum-clearance',
+    'commercial-clearance',
+    'render-unsafe-endpoint-stub',
+    'endpoint-order',
+    'passage-order',
+  ]);
+  const phases = new Set([
+    'terminal',
+    'geometry',
+    'clearance',
+    'endpoint-order',
+    'passage-order',
+    'presentation',
+  ]);
+  const severities = new Set(['hard', 'commercial', 'presentation']);
+  if (
+    !isRecord(value)
+    || !Object.keys(value).every(key => (
+      key === 'clean' || key === 'hardClean' || key === 'violationCount' || key === 'violations'
+    ))
+    || typeof value.clean !== 'boolean'
+    || typeof value.hardClean !== 'boolean'
+    || !Number.isSafeInteger(value.violationCount)
+    || value.violationCount < 0
+    || value.violationCount > 160_000
+    || !Array.isArray(value.violations)
+    || value.violations.length > codes.size
+  ) return false;
+  let total = 0;
+  for (const violation of value.violations) {
+    if (
+      !isRecord(violation)
+      || !Object.keys(violation).every(key => (
+        key === 'code' || key === 'phase' || key === 'severity' || key === 'count'
+      ))
+      || !codes.has(violation.code)
+      || !phases.has(violation.phase)
+      || !severities.has(violation.severity)
+      || !Number.isSafeInteger(violation.count)
+      || violation.count <= 0
+      || violation.count > 160_000
+    ) return false;
+    total += violation.count;
+  }
+  return total === value.violationCount && value.clean === (value.violations.length === 0);
+};
+
 export const createPrecompiledDisplayRoutePatches = (sourceEdges, routedEdges) => {
   let totalPathPoints = 0;
   const isRecord = value => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -337,6 +398,7 @@ export const renderPrecompiledDisplayRouteCaptureExpression = (
   const replayPatches = ${replayPrecompiledDisplayRoutePatches.toString()};
   const replayTrustedPatches = ${replayTrustedDisplayRoutePatches.toString()};
   const routeContractsMatch = ${precompiledDisplayRouteContractsMatch.toString()};
+  const isContractSummary = ${isPrecompiledDisplayRoutingContractSummary.toString()};
   const projectTimings = ${projectPrecompiledDisplayRouteTimings.toString()};
   const measureWorkerExecution = ${measurePrecompiledWorkerExecution.toString()};
   const hashQueryIndex = window.location.hash.indexOf('?');
@@ -359,6 +421,9 @@ export const renderPrecompiledDisplayRouteCaptureExpression = (
     && isMatchingResponse(request, response)
     && isFreshRequestResponse(request, response)
     && routing.workerResolution === response.routeResolution
+    && isContractSummary(response.routingContract)
+    && response.routingContract.clean === true
+    && response.routingContract.hardClean === true
   );
   if (activeTargetId !== ${JSON.stringify(targetId)}
     || routing.stage !== 'final-applied'
@@ -402,6 +467,7 @@ export const renderPrecompiledDisplayRouteCaptureExpression = (
     provenance: committed.provenance ?? 'fresh-full-route',
     workerResolution: isLayoutCapture ? routing.workerResolution : response.routeResolution,
     workerDurationMs: isLayoutCapture ? routing.routeMs : response.workerDurationMs,
+    routingContract: isLayoutCapture ? null : response.routingContract,
     workerExecution: isLayoutCapture ? { status: 'unavailable' } : measureWorkerExecution(
       window.__vizlyPrecompiledRouteTiming, response.workerExecutionTiming, performance.timeOrigin,
     ),

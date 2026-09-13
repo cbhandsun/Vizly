@@ -220,6 +220,7 @@ const captureTarget = async (session, target, source, routingVersion) => {
       inputGeometryDigest,
       outputRouteSignature,
       hardClean: true,
+      ...(captured.routingContract ? { routingContract: captured.routingContract } : {}),
       patches,
     },
     measurement: {

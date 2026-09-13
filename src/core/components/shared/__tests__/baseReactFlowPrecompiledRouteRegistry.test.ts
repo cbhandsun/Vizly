@@ -620,6 +620,51 @@ describe('baseReactFlowPrecompiledRouteRegistry', () => {
     )).toBeNull();
   });
 
+  it('accepts compact clean routing contract summaries and rejects graph-bearing diagnostics', () => {
+    const routingContract = {
+      clean: true,
+      hardClean: true,
+      violationCount: 0,
+      violations: [],
+    };
+    expect(parseBaseReactFlowPrecompiledRouteArtifact(
+      { ...artifact, routingContract },
+      {
+        inputSignature,
+        inputGeometryDigest,
+        sourceHash: SOURCE_HASH,
+      },
+    )).not.toBeNull();
+    expect(parseBaseReactFlowPrecompiledRouteArtifact(
+      {
+        ...artifact,
+        routingContract: {
+          ...routingContract,
+          privateEdgeIds: ['edge'],
+        },
+      },
+      {
+        inputSignature,
+        inputGeometryDigest,
+        sourceHash: SOURCE_HASH,
+      },
+    )).toBeNull();
+    expect(parseBaseReactFlowPrecompiledRouteArtifact(
+      {
+        ...artifact,
+        routingContract: {
+          ...routingContract,
+          hardClean: false,
+        },
+      },
+      {
+        inputSignature,
+        inputGeometryDigest,
+        sourceHash: SOURCE_HASH,
+      },
+    )).toBeNull();
+  });
+
   it('rejects an unknown renderer even with a matching output signature', async () => {
     const unknownRendererEdges = [{ ...routedEdges[0], type: 'unknown-renderer' }];
     const unknownRendererArtifact = {

@@ -58,6 +58,7 @@ import {
   isFreshFullRouteResolution,
   isFreshFullRouteRequestResponse,
   isMatchingHardCleanDisplayWorkerResponse,
+  isPrecompiledDisplayRoutingContractSummary,
   precompiledDisplayRouteContractsMatch,
   replayPrecompiledDisplayRoutePatches,
   replayTrustedDisplayRoutePatches,
@@ -143,6 +144,36 @@ describe('precompiled display route capture', () => {
   it('captures bounded worker compute duration for cold-route diagnostics', () => {
     expect(renderPrecompiledDisplayRouteCaptureExpression('safe-preset'))
       .toContain('workerDurationMs: isLayoutCapture ? routing.routeMs : response.workerDurationMs');
+    expect(renderPrecompiledDisplayRouteCaptureExpression('safe-preset'))
+      .toContain('response.routingContract.clean === true');
+    expect(renderPrecompiledDisplayRouteCaptureExpression('safe-preset'))
+      .toContain('response.routingContract.hardClean === true');
+    expect(renderPrecompiledDisplayRouteCaptureExpression('safe-preset'))
+      .toContain('routingContract: isLayoutCapture ? null : response.routingContract');
+  });
+
+  it('accepts only compact clean routing contract summaries for precompiled capture', () => {
+    const clean = { clean: true, hardClean: true, violationCount: 0, violations: [] };
+    expect(isPrecompiledDisplayRoutingContractSummary(clean)).toBe(true);
+    expect(isPrecompiledDisplayRoutingContractSummary({
+      clean: false,
+      hardClean: false,
+      violationCount: 1,
+      violations: [{
+        code: 'commercial-clearance',
+        phase: 'clearance',
+        severity: 'commercial',
+        count: 1,
+      }],
+    })).toBe(true);
+    expect(isPrecompiledDisplayRoutingContractSummary({
+      ...clean,
+      privatePath: [{ x: 0, y: 0 }],
+    })).toBe(false);
+    expect(isPrecompiledDisplayRoutingContractSummary({
+      ...clean,
+      clean: false,
+    })).toBe(false);
   });
 
   it('binds layout capture to the exact committed variant and fresh provenance', () => {
