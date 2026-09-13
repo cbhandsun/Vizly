@@ -17,7 +17,7 @@ const generatedPrecompiledRouteAsset0 = new URL(
 const generatedPrecompiledRouteDescriptor0: GeneratedBaseReactFlowPrecompiledRouteDescriptor = {
   presetId: "wms-process-flow-v1",
   variantId: "initial",
-  routingSourceHash: "source-v1:d3b54ef695b2c04374521e2eb9f8e32637b71bc8c4f13e675039dc2f63c432be",
+  routingSourceHash: "source-v1:345cd55fced5e734a4b56dc0869a426266175eb09c63fa5f8f6a68b186217b17",
   sourceHash: "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
   geometryDigest: "geometry-v1:25fffd342dc29dc0a02dee32faca612c",
   load: () => loadBaseReactFlowPrecompiledRouteAsset(generatedPrecompiledRouteAsset0),
@@ -31,7 +31,7 @@ const generatedPrecompiledRouteAsset1 = new URL(
 const generatedPrecompiledRouteDescriptor1: GeneratedBaseReactFlowPrecompiledRouteDescriptor = {
   presetId: "logistics-architecture-v1",
   variantId: "initial",
-  routingSourceHash: "source-v1:d3b54ef695b2c04374521e2eb9f8e32637b71bc8c4f13e675039dc2f63c432be",
+  routingSourceHash: "source-v1:345cd55fced5e734a4b56dc0869a426266175eb09c63fa5f8f6a68b186217b17",
   sourceHash: "source-v1:da286fbefa1a0d0a3ba3bf5a6589d2edba849af0f477ddb910ecad4d91649986",
   geometryDigest: "geometry-v1:9748639c3654c11860e6a7da9649bfc4",
   load: () => loadBaseReactFlowPrecompiledRouteAsset(generatedPrecompiledRouteAsset1),
@@ -45,7 +45,7 @@ const generatedPrecompiledRouteAsset2 = new URL(
 const generatedPrecompiledRouteDescriptor2: GeneratedBaseReactFlowPrecompiledRouteDescriptor = {
   presetId: "wms-process-flow-v1",
   variantId: "domain-lanes-lr",
-  routingSourceHash: "source-v1:d3b54ef695b2c04374521e2eb9f8e32637b71bc8c4f13e675039dc2f63c432be",
+  routingSourceHash: "source-v1:345cd55fced5e734a4b56dc0869a426266175eb09c63fa5f8f6a68b186217b17",
   sourceHash: "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
   geometryDigest: "geometry-v1:5c90308c9a3e8cd0c4eaf3cac68212f4",
   load: () => loadBaseReactFlowPrecompiledRouteAsset(generatedPrecompiledRouteAsset2),
@@ -59,7 +59,7 @@ const generatedPrecompiledRouteAsset3 = new URL(
 const generatedPrecompiledRouteDescriptor3: GeneratedBaseReactFlowPrecompiledRouteDescriptor = {
   presetId: "wms-demand-allocation-strategy-v2",
   variantId: "initial",
-  routingSourceHash: "source-v1:d3b54ef695b2c04374521e2eb9f8e32637b71bc8c4f13e675039dc2f63c432be",
+  routingSourceHash: "source-v1:345cd55fced5e734a4b56dc0869a426266175eb09c63fa5f8f6a68b186217b17",
   sourceHash: "source-v1:ea82c502ab6535b5c8f8367c591861e540396a41955a15c6b5f94f922264b7de",
   geometryDigest: "geometry-v1:ffc618b03c1da934836b3edef1fcce28",
   load: () => loadBaseReactFlowPrecompiledRouteAsset(generatedPrecompiledRouteAsset3),

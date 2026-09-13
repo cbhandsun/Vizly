@@ -17,10 +17,14 @@ import { computeBaseReactFlowDisplayEdgesWorkerResponse } from '../baseReactFlow
 import { computeBaseReactFlowDisplayInputIdentityBundle } from '../baseReactFlowDisplayInputIdentity';
 import { createDisplayRoutingIdentity } from '../baseReactFlowDisplayRoutingSession';
 
-it('preserves generated group topology when independent clearance seeds degrade the joint route', () => {
+it('preserves generated group topology when independent clearance seeds would otherwise degrade the joint route', () => {
   const fixture = structuredClone(jointLayoutSeed);
   const before = structuredClone(fixture);
-  expect(seedObstacleAwareDisplayRoutes(fixture.edges, fixture.nodes)).toBe(fixture.edges);
+  const independentSeed = seedObstacleAwareDisplayRoutes(fixture.edges, fixture.nodes);
+  expect(independentSeed).toHaveLength(fixture.edges.length);
+  expect(independentSeed.map(edge => ({ id: edge.id, source: edge.source, target: edge.target })))
+    .toEqual(fixture.edges.map(edge => ({ id: edge.id, source: edge.source, target: edge.target })));
+  expect(fixture).toEqual(before);
   const input = { ...fixture, enableSmartEdges: true, smartEdgePadding: 20, isLargeGraph: false };
   const identity = computeBaseReactFlowDisplayInputIdentityBundle(input);
   const result = computeBaseReactFlowDisplayEdgesWorkerResponse({ ...input,
@@ -29,7 +33,10 @@ it('preserves generated group topology when independent clearance seeds degrade 
   });
   expect(result.hardReport).toMatchObject({ hardClean: true, commercialClearanceViolations: 0,
     quality: { hairpins: 0, strictCrossings: 0, unrelatedOverlap: 0 } });
-  expect(result.edges).toHaveLength(input.edges.length);
+  const resultEdges = result.edges ?? [];
+  expect(resultEdges).toHaveLength(input.edges.length);
+  expect(resultEdges.map(edge => ({ id: edge.id, source: edge.source, target: edge.target })))
+    .toEqual(input.edges.map(edge => ({ id: edge.id, source: edge.source, target: edge.target })));
   expect(fixture).toEqual(before);
 }, 15_000);
 

@@ -1,5 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Node } from '@xyflow/react';
+
+vi.mock('../../../layout/LayoutOptimizer', () => ({
+  LayoutOptimizer: {
+    getInstance: () => ({
+      calculateNodeWidth: () => 160,
+      calculateNodeHeight: () => 80,
+    }),
+  },
+}));
 
 import { shouldFitInitialDesignerCanvas } from '../useDesignerInitialDiagramLoad';
 

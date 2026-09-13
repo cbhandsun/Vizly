@@ -87,6 +87,55 @@ const pathTurnCount = (path: readonly { x: number; y: number }[]): number => {
   return turns;
 };
 
+const sideAxis = (handle: unknown): 'horizontal' | 'vertical' | null => {
+  const value = String(handle ?? '').toLowerCase();
+  if (value.includes('left') || value.includes('right')) return 'horizontal';
+  if (value.includes('top') || value.includes('bottom')) return 'vertical';
+  return null;
+};
+
+const generatedGroupedTopologyAlreadyMatchesFlow = (
+  edges: readonly Edge[],
+  nodes: readonly Node[],
+  nodeById: ReadonlyMap<string, Node>,
+): boolean => {
+  const hasGroupedTopology = nodes.some(node => node.parentId || isDisplayContainerNode(node));
+  if (!hasGroupedTopology || edges.length <= 1) return false;
+  if (!edges.every(edge => edge.data?.algorithm === 'domain-dagre-simplified')) return false;
+
+  let comparable = 0;
+  let matching = 0;
+  let verticalMatching = 0;
+  for (const edge of edges) {
+    const source = nodeById.get(edge.source);
+    const target = nodeById.get(edge.target);
+    const sourceRect = source ? getDisplayNodeRect(source) : null;
+    const targetRect = target ? getDisplayNodeRect(target) : null;
+    const sourceAxis = sideAxis(edge.sourceHandle);
+    const targetAxis = sideAxis(edge.targetHandle);
+    if (!sourceRect || !targetRect || !sourceAxis || !targetAxis || sourceAxis !== targetAxis) continue;
+    const sourceCenter = {
+      x: sourceRect.x + sourceRect.width / 2,
+      y: sourceRect.y + sourceRect.height / 2,
+    };
+    const targetCenter = {
+      x: targetRect.x + targetRect.width / 2,
+      y: targetRect.y + targetRect.height / 2,
+    };
+    const flowAxis = Math.abs(targetCenter.x - sourceCenter.x) >= Math.abs(targetCenter.y - sourceCenter.y)
+      ? 'horizontal'
+      : 'vertical';
+    comparable += 1;
+    if (sourceAxis === flowAxis) {
+      matching += 1;
+      if (sourceAxis === 'vertical') verticalMatching += 1;
+    }
+  }
+  return comparable >= Math.max(3, Math.ceil(edges.length * 0.75))
+    && matching / comparable >= 0.75
+    && verticalMatching / comparable >= 0.75;
+};
+
 const clearFacingAxisRouteIsAvailable = (
   edge: Edge,
   source: NodeRect,
@@ -180,6 +229,7 @@ export const seedObstacleAwareDisplayRoutes = (edges: Edge[], inputNodes: Node[]
     !fastDisplayHardSafetyIsClean([edge], nodes)
   )).length > Math.min(edges.length / 2, repairCapacity);
   const byId = new Map(nodes.map(node => [node.id, node]));
+  if (generatedGroupedTopologyAlreadyMatchesFlow(edges, nodes, byId)) return edges;
   const obstacles = buildDisplayRoutingObstacles(nodes);
   const xLanes = [...new Set([...obstacles.values()].flatMap(r => [r.x - COMMERCIAL_BUSINESS_NODE_CLEARANCE, r.x + r.width + COMMERCIAL_BUSINESS_NODE_CLEARANCE]))];
   const yLanes = [...new Set([...obstacles.values()].flatMap(r => [r.y - COMMERCIAL_BUSINESS_NODE_CLEARANCE, r.y + r.height + COMMERCIAL_BUSINESS_NODE_CLEARANCE]))];

@@ -2,6 +2,15 @@ import type { Node } from '@xyflow/react';
 import { describe, expect, it, vi } from 'vitest';
 import { EDGE_ROUTING_CACHE_VERSION } from '../../../../routing/routingVersion';
 
+vi.mock('../../../layout/LayoutOptimizer', () => ({
+  LayoutOptimizer: {
+    getInstance: () => ({
+      calculateNodeWidth: () => 160,
+      calculateNodeHeight: () => 80,
+    }),
+  },
+}));
+
 import {
   clearDesignerFreshSeedFlag,
   mergePresetExplicitEdgeHandles,

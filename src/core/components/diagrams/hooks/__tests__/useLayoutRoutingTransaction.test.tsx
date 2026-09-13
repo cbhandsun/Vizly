@@ -450,7 +450,7 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
       expect.objectContaining({
         direction,
         spacing: direction === 'LR'
-          ? { horizontal: 96, vertical: 120 }
+          ? { horizontal: 160, vertical: 120 }
           : { horizontal: 120, vertical: 96 },
       }),
     );

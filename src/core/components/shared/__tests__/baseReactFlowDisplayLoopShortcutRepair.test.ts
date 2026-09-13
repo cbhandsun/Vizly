@@ -3,6 +3,16 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Edge, Node } from '@xyflow/react';
 
+vi.hoisted(() => {
+  Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+    writable: true,
+    value: () => ({
+      font: '',
+      measureText: (text: string) => ({ width: String(text || '').length * 8 }),
+    }),
+  });
+});
+
 import wmsStandardData from '../../../../data/standardized/WmsStandardData.json';
 import { standardDataToCanvas } from '../../diagrams/designerUtils';
 import * as loopCandidates from '../baseReactFlowDisplayLoopShortcutCandidates';

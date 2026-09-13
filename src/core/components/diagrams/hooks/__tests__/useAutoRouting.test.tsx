@@ -18,6 +18,17 @@ vi.mock('@/core/config/DiagramConfig', () => ({
     },
 }));
 
+vi.mock('react-i18next', () => ({
+    useTranslation: () => ({
+        t: (key: string) => ({
+            'designer.flowchart.layout.failure.noLayoutableNodes': '当前没有可布局的节点。',
+            'designer.flowchart.layout.failure.hardQualityRejected': '此布局未满足连线质量要求，已保留原画布。',
+            'designer.flowchart.layout.failure.workerTimeout': '布局计算超时，已保留原画布。',
+            'designer.flowchart.layout.failure.strategyFailed': '布局计算失败，已保留原画布。',
+        })[key] ?? key,
+    }),
+}));
+
 vi.mock('../useLayoutStrategy', () => ({
     useLayoutStrategy: (options: unknown) => {
         mocks.layoutOptions = options;

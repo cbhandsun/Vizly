@@ -1,7 +1,17 @@
 // @vitest-environment jsdom
 
 import type { Edge, Node } from '@xyflow/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.hoisted(() => {
+  Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+    writable: true,
+    value: () => ({
+      font: '',
+      measureText: (text: string) => ({ width: String(text || '').length * 8 }),
+    }),
+  });
+});
 
 import tmsStandardData from '../../../../data/standardized/TmsStandardData.json';
 import { standardDataToCanvas } from '../../diagrams/designerUtils';
