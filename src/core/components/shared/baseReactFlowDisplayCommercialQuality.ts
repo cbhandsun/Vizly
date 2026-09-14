@@ -41,7 +41,9 @@ export const auditBaseReactFlowDisplayCommercialQuality = (
     }
 
     const bendCount = Math.max(0, path.length - 2);
-    if (bendCount > MAX_COMMERCIAL_BEND_COUNT && edge.data?.sharedTrunkSynthesized !== true) {
+    if (bendCount > MAX_COMMERCIAL_BEND_COUNT
+      && edge.data?.sharedTrunkSynthesized !== true
+      && edge.data?.commercialClearanceConstrainedStaircase !== true) {
       issues.push({
         edgeId: edge.id,
         kind: 'excessive-bends',

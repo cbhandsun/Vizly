@@ -120,6 +120,29 @@ describe('baseReactFlowDisplayCommercialQuality', () => {
     expect(baseReactFlowDisplayCandidateCommercialQualityIsClean([candidate])).toBe(false);
   });
 
+  it('accepts a final clearance-constrained staircase without hiding other structural issues', () => {
+    const constrained = edgeWithPath('constrained', [
+      { x: 0, y: 0 }, { x: 0, y: 48 }, { x: 48, y: 48 }, { x: 48, y: 96 },
+      { x: 96, y: 96 }, { x: 96, y: 144 }, { x: 144, y: 144 }, { x: 144, y: 192 },
+      { x: 192, y: 192 },
+    ]);
+    constrained.data = { ...constrained.data, commercialClearanceConstrainedStaircase: true };
+    const constrainedWithMicroSegment = edgeWithPath('constrained-micro', [
+      { x: 0, y: 0 }, { x: 0, y: 48 }, { x: 8, y: 48 }, { x: 8, y: 96 },
+      { x: 48, y: 96 }, { x: 48, y: 144 }, { x: 96, y: 144 }, { x: 96, y: 192 },
+      { x: 144, y: 192 },
+    ]);
+    constrainedWithMicroSegment.data = {
+      ...constrainedWithMicroSegment.data,
+      commercialClearanceConstrainedStaircase: true,
+    };
+
+    expect(auditBaseReactFlowDisplayCommercialQuality([constrained])).toEqual([]);
+    expect(auditBaseReactFlowDisplayCommercialQuality([constrainedWithMicroSegment])).toEqual([
+      expect.objectContaining({ edgeId: 'constrained-micro', kind: 'tiny-interior-segment' }),
+    ]);
+  });
+
   it('commits an exact reusable candidate without repeating final stabilization', () => {
     const clean = edgeWithPath('stable', [
       { x: 0, y: 0 },

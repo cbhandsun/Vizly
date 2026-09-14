@@ -101,16 +101,18 @@ const finalizeContainerClearanceResponse = (
   } = finalEvaluationScope;
   const finalizeExactCommercialResponse = (
     exactCandidate: DisplayEdgesWorkerResponse,
-  ): DisplayEdgesWorkerResponse => (
-    (options.commercialStabilizationPass ?? 0) > 0
-      ? exactCandidate
-      : finalizeBaseReactFlowExactCommercialClearance({
-        exactBaseline: exactCandidate,
-        repairNodes,
-        eligibleEdgeIds: options.eligibleEdgeIds,
-        exactReport: candidate => withExactHardReport(candidate),
-      })
-  );
+  ): DisplayEdgesWorkerResponse => {
+    if (
+      (options.commercialStabilizationPass ?? 0) > 0
+      && (!exactCandidate.edges || baseReactFlowDisplayCommercialQualityIsClean(exactCandidate.edges))
+    ) return exactCandidate;
+    return finalizeBaseReactFlowExactCommercialClearance({
+      exactBaseline: exactCandidate,
+      repairNodes,
+      eligibleEdgeIds: options.eligibleEdgeIds,
+      exactReport: candidate => withExactHardReport(candidate),
+    });
+  };
   const clearanceTimer = startDisplayRoutingPhaseTrace({
     phase: 'final-clearance',
     candidateCount: response.edges.length,
