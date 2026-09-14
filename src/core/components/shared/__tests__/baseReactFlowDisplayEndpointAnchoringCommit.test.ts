@@ -34,6 +34,56 @@ describe('baseReactFlowDisplayEndpointAnchoring terminal commit', () => {
     expect(result).toBe(edgeSet);
   });
 
+  it('centers a unique auto terminal during final terminal commit', () => {
+    const [result] = commitComputedDisplayEdgeTerminals([{
+      id: 'final-commit-single-source-terminal',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'bottom',
+      targetHandle: 'top',
+      data: {
+        computedPath: [
+          { x: 2, y: 60 },
+          { x: 2, y: 120 },
+          { x: 350, y: 120 },
+          { x: 350, y: 200 },
+        ],
+      },
+    }], nodes);
+
+    expect(result.data?.computedPath).toEqual([
+      { x: 50, y: 60 },
+      { x: 50, y: 120 },
+      { x: 350, y: 120 },
+      { x: 350, y: 200 },
+    ]);
+    expect(result.data?.renderPortCenterAligned).toBe(true);
+    expect(fastDisplayHardSafetyIsClean([result], nodes)).toBe(true);
+  });
+
+  it('preserves authored exact terminal positions during final terminal commit', () => {
+    const originalPath = [
+      { x: 2, y: 60 },
+      { x: 2, y: 120 },
+      { x: 350, y: 120 },
+      { x: 350, y: 200 },
+    ];
+    const [result] = commitComputedDisplayEdgeTerminals([{
+      id: 'final-commit-authored-terminal',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'source-bottom-port-1',
+      targetHandle: 'target-top-port-1',
+      data: {
+        computedPath: originalPath,
+        manualHandles: { source: true, target: true },
+      },
+    }], nodes);
+
+    expect(result.data?.computedPath).toEqual(originalPath);
+    expect(result.data?.renderPortCenterAligned).toBeUndefined();
+  });
+
   it('extends an available terminal lane to 48px without adding a tiny dogleg', () => {
     const [result] = commitComputedDisplayEdgeTerminals([{
       id: 'short-available-terminal-lane',

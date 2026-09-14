@@ -608,15 +608,30 @@ export const commitComputedDisplayEdgeTerminals = (
     if (normalizedEdge !== edge) anchoredChanged = true;
     return normalizedEdge;
   });
-  let accepted: Edge[] | null = null;
-  anchored.forEach((edge, index) => {
+  const accepted = [...anchored];
+  let acceptedChanged = anchoredChanged;
+  const terminalCounts = countTerminalsByNodeSide(accepted, nodeById);
+  accepted.forEach((edge, index) => {
+    const candidate = centerUniqueAutoTerminals(edge, nodeById, terminalCounts);
+    if (candidate === edge) return;
+    if (displayEndpointCandidateDegradesGraph({
+      candidate,
+      original: edge,
+      edgeIndex: index,
+      contextEdges: accepted,
+      nodes,
+    })) return;
+    accepted[index] = candidate;
+    acceptedChanged = true;
+  });
+  accepted.forEach((edge, index) => {
     const candidate = addComputedPathEndpointStubs(edge, nodeById);
     if (candidate === edge) return;
     if (!fastDisplayHardSafetyIsClean([candidate], nodes)) return;
-    accepted ??= [...anchored];
     accepted[index] = candidate;
+    acceptedChanged = true;
   });
-  if (!accepted) return anchoredChanged ? anchored : edges;
+  if (!acceptedChanged) return edges;
   const baselineQuality = calculateEdgePathQualityScore(anchored);
   const acceptedQuality = calculateEdgePathQualityScore(accepted);
   return acceptedQuality.nonOrthogonalSegments <= baselineQuality.nonOrthogonalSegments
