@@ -8,6 +8,7 @@ import { displayHardQualityReportGeometryIsClean } from './baseReactFlowDisplayE
 import { repairBaseReactFlowFinalCommercialDetours } from './baseReactFlowDisplayCommercialDetourRepair';
 import {
   auditBaseReactFlowDisplayCommercialQuality,
+  baseReactFlowDisplayCommercialQualityIsClean,
   MAX_COMMERCIAL_BEND_COUNT,
 } from './baseReactFlowDisplayCommercialQuality';
 import type { DisplayEdgesWorkerResponse } from './baseReactFlowDisplayWorkerProtocol';
@@ -355,4 +356,29 @@ export const finalizeBaseReactFlowExactCommercialClearance = (
     ...response, edges: lockComputedPaths(separated),
   }, args.repairNodes);
   return exact.hardClean ? exact : response;
+};
+
+export const finalizeBaseReactFlowExactCommercialClearanceForStabilization = ({
+  exactCandidate,
+  repairNodes,
+  eligibleEdgeIds,
+  commercialStabilizationPass,
+  exactReport,
+}: Readonly<{
+  exactCandidate: DisplayEdgesWorkerResponse;
+  repairNodes: Node[];
+  eligibleEdgeIds?: ReadonlySet<string>;
+  commercialStabilizationPass?: number;
+  exactReport: (candidate: DisplayEdgesWorkerResponse) => DisplayEdgesWorkerResponse;
+}>): DisplayEdgesWorkerResponse => {
+  if (
+    (commercialStabilizationPass ?? 0) > 0
+    && (!exactCandidate.edges || baseReactFlowDisplayCommercialQualityIsClean(exactCandidate.edges))
+  ) return exactCandidate;
+  return finalizeBaseReactFlowExactCommercialClearance({
+    exactBaseline: exactCandidate,
+    repairNodes,
+    eligibleEdgeIds,
+    exactReport: candidate => exactReport(candidate),
+  });
 };

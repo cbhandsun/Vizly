@@ -78,7 +78,10 @@ import {
   finalizeBoundedDisplayWorkerRepairResponse,
   type DisplayWorkerFinalizationOptions,
 } from './baseReactFlowDisplayWorkerFinalEvaluation';
-import { finalizeBaseReactFlowExactCommercialClearance, isCommercialClearanceOnlyFailure } from './baseReactFlowDisplayFinalCommercialClearanceTransaction';
+import {
+  finalizeBaseReactFlowExactCommercialClearanceForStabilization,
+  isCommercialClearanceOnlyFailure,
+} from './baseReactFlowDisplayFinalCommercialClearanceTransaction';
 import { runDisplayWorkerLayoutRepairTransaction } from './baseReactFlowDisplayWorkerLayoutTransaction';
 import { selectHardCleanDisplayParallelLaneCandidate } from './baseReactFlowDisplayParallelLaneSeparation';
 
@@ -101,18 +104,13 @@ const finalizeContainerClearanceResponse = (
   } = finalEvaluationScope;
   const finalizeExactCommercialResponse = (
     exactCandidate: DisplayEdgesWorkerResponse,
-  ): DisplayEdgesWorkerResponse => {
-    if (
-      (options.commercialStabilizationPass ?? 0) > 0
-      && (!exactCandidate.edges || baseReactFlowDisplayCommercialQualityIsClean(exactCandidate.edges))
-    ) return exactCandidate;
-    return finalizeBaseReactFlowExactCommercialClearance({
-      exactBaseline: exactCandidate,
-      repairNodes,
-      eligibleEdgeIds: options.eligibleEdgeIds,
-      exactReport: candidate => withExactHardReport(candidate),
-    });
-  };
+  ): DisplayEdgesWorkerResponse => finalizeBaseReactFlowExactCommercialClearanceForStabilization({
+    exactCandidate,
+    repairNodes,
+    eligibleEdgeIds: options.eligibleEdgeIds,
+    commercialStabilizationPass: options.commercialStabilizationPass,
+    exactReport: candidate => withExactHardReport(candidate),
+  });
   const clearanceTimer = startDisplayRoutingPhaseTrace({
     phase: 'final-clearance',
     candidateCount: response.edges.length,
