@@ -443,7 +443,7 @@ describe('baseReactFlowDisplayEdgeCore', () => {
     });
     const path = (result[0].data as any).computedPath as Array<{ x: number; y: number }>;
 
-    expect(path[0]).toEqual({ x: 0, y: 260 });
+    expect(path[0]).toEqual({ x: 50, y: 260 });
     expect(path.at(-1)).toEqual({ x: 350, y: 0 });
     expect(path.every((point, index) => (
       index === 0 || point.x === path[index - 1].x || point.y === path[index - 1].y
@@ -578,8 +578,8 @@ describe('baseReactFlowDisplayEdgeCore', () => {
 
     expect(result.sourceHandle).toBe('left');
     expect((result.data as any).computedPath).toEqual([
-      { x: 300, y: 44 },
-      { x: 50, y: 44 },
+      { x: 300, y: 30 },
+      { x: 50, y: 30 },
       { x: 50, y: 200 },
     ]);
     expect((result.data as any).renderPortSideReason).toBe(

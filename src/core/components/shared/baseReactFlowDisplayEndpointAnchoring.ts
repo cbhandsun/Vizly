@@ -2,6 +2,7 @@ import type { Edge, Node, XYPosition } from '@xyflow/react';
 
 import {
   edgeTerminalSideCanSwitch,
+  readEdgeTerminalPolicy,
   resolveEdgeTerminalHandleForSide,
 } from '../../routing/utils/edgeTerminalPolicy';
 import { calculateEdgePathQualityScore } from '../../strategies/shared/edgeStrictCrossingGuard';
@@ -21,6 +22,11 @@ import {
   computedEndpointPathOf,
   displayEndpointCandidateDegradesGraph,
 } from './baseReactFlowDisplayEndpointCandidateQuality';
+import {
+  centerUniqueAutoTerminals,
+  countTerminalsByNodeSide,
+  insetTerminalOnSide,
+} from './baseReactFlowDisplayEndpointTerminalPlacement';
 
 type EndpointEdgeData = Record<string, unknown> & {
   computedPath?: unknown;
@@ -33,7 +39,6 @@ const DISPLAY_ENDPOINT_OUTWARD_STUB = 48;
 const DISPLAY_ENDPOINT_MIN_OUTWARD_STUB = 32;
 const DISPLAY_PORT_AXIS_DOMINANCE = 1.4;
 const DISPLAY_PORT_CORNER_TOLERANCE = 16;
-const DISPLAY_PORT_CORNER_INSET = 16;
 const DISPLAY_PORT_MAX_LENGTH_FACTOR = 1.15;
 
 const closestRectSide = (point: XYPosition, rect: NodeRect): AnchorSide => {
@@ -56,6 +61,7 @@ const anchorLockedTerminal = (
   terminalIndex: number,
   rect: NodeRect,
   handle?: string | null,
+  options: { insetTerminal?: boolean } = {},
 ): boolean => {
   const terminal = path[terminalIndex];
   if (!terminal) return false;
@@ -92,6 +98,11 @@ const anchorLockedTerminal = (
       desired.x = boundaryX;
       desired.y = clampToRange(terminal.y, rect.y, rect.y + rect.height);
     }
+    const anchored = options.insetTerminal === true
+      ? insetTerminalOnSide(desired, rect, side)
+      : desired;
+    desired.x = anchored.x;
+    desired.y = anchored.y;
     if (Math.abs(desired.x - terminal.x) <= 0.5 && Math.abs(desired.y - terminal.y) <= 0.5) continue;
     path[terminalIndex] = desired;
     const neighborIndex = terminalIndex === 0 ? 1 : terminalIndex - 1;
@@ -281,27 +292,6 @@ const preferredDisplayPortSides = (
   return null;
 };
 
-const insetTerminalOnSide = (
-  terminal: XYPosition,
-  rect: NodeRect,
-  side: AnchorSide,
-): XYPosition => {
-  if (side === 'left' || side === 'right') {
-    const minY = rect.y + Math.min(DISPLAY_PORT_CORNER_INSET, rect.height / 2);
-    const maxY = rect.y + rect.height - Math.min(DISPLAY_PORT_CORNER_INSET, rect.height / 2);
-    return {
-      x: side === 'left' ? rect.x : rect.x + rect.width,
-      y: clampToRange(terminal.y, minY, maxY),
-    };
-  }
-  const minX = rect.x + Math.min(DISPLAY_PORT_CORNER_INSET, rect.width / 2);
-  const maxX = rect.x + rect.width - Math.min(DISPLAY_PORT_CORNER_INSET, rect.width / 2);
-  return {
-    x: clampToRange(terminal.x, minX, maxX),
-    y: side === 'top' ? rect.y : rect.y + rect.height,
-  };
-};
-
 const foldTerminalCornerElbow = ({
   path,
   rect,
@@ -433,12 +423,17 @@ const anchorComputedPathEndpoints = (
   const targetRect = getNodeRect(nodeById.get(edge.target), nodeById);
   if (!sourceRect || !targetRect || path.length < 2) return edge;
 
-  const sourceAnchored = anchorLockedTerminal(path, 0, sourceRect, edge.sourceHandle);
+  const sourcePolicy = readEdgeTerminalPolicy(edge, 'source');
+  const targetPolicy = readEdgeTerminalPolicy(edge, 'target');
+  const sourceAnchored = anchorLockedTerminal(path, 0, sourceRect, edge.sourceHandle, {
+    insetTerminal: !sourcePolicy.sideFixed,
+  });
   const targetAnchored = anchorLockedTerminal(
     path,
     path.length - 1,
     targetRect,
     edge.targetHandle,
+    { insetTerminal: !targetPolicy.sideFixed },
   );
   const anchoredSourceSide = closestRectSide(path[0], sourceRect);
   const anchoredTargetSide = closestRectSide(path[path.length - 1], targetRect);
@@ -642,6 +637,17 @@ export const anchorComputedDisplayEdgeEndpoints = (edges: Edge[], nodes: Node[])
   const accepted = [...anchored];
   accepted.forEach((edge, index) => {
     const candidate = buildPreferredPortSideCandidate(edge, nodeById);
+    if (candidate !== edge && !displayEndpointCandidateDegradesGraph({
+      candidate,
+      original: edge,
+      edgeIndex: index,
+      contextEdges: accepted,
+      nodes,
+    })) accepted[index] = candidate;
+  });
+  const terminalCounts = countTerminalsByNodeSide(accepted, nodeById);
+  accepted.forEach((edge, index) => {
+    const candidate = centerUniqueAutoTerminals(edge, nodeById, terminalCounts);
     if (candidate !== edge && !displayEndpointCandidateDegradesGraph({
       candidate,
       original: edge,
