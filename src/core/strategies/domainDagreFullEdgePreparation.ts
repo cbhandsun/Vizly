@@ -15,6 +15,10 @@ import { separateDetachedParallelOverlaps } from './shared/edgeDetachedOverlapRe
 import { reorderDomainDagrePortAnchors } from './domainDagrePortAnchorOrdering';
 import { prepareDomainDagreInteractiveEdges } from './domainDagreInteractiveEdgePreparation';
 import {
+    domainDagreRouteHandleNeedsGeometryFlip,
+    resolveDomainDagreGeometryFacingHandles,
+} from './domainDagreGeometryFacingHandles';
+import {
     applyAutoHandleData,
     asRoutingRecord,
     readDirectionalHandlePolicy,
@@ -26,6 +30,15 @@ import {
 } from './domainDagreEdgePreparationSupport';
 
 import type { DomainDagreEdgePreparationInput } from './DomainDagreEdgePreparation';
+
+type DomainDagreRoutingResult = Readonly<{
+    type: ReturnType<typeof decideEdgeRouting>['type'] | 'advanced-smart-step';
+    sourceHandle?: string | null;
+    targetHandle?: string | null;
+    autoSource?: boolean;
+    autoTarget?: boolean;
+    computedPath?: Array<{ x: number; y: number }>;
+}>;
 
 export async function prepareDomainDagreFullEdges({
     nodes: updatedNodes,
@@ -268,7 +281,7 @@ export async function prepareDomainDagreFullEdges({
             }
         }
 
-        const routingResult = explicitSourceHandle && explicitTargetHandle
+        let routingResult: DomainDagreRoutingResult = explicitSourceHandle && explicitTargetHandle
             ? {
                 type: 'advanced-smart-step' as const,
                 sourceHandle: explicitSourceHandle,
@@ -285,6 +298,28 @@ export async function prepareDomainDagreFullEdges({
                 { source: sUsage, target: tUsage },
                 true
             );
+        const geometryFacingHandles = resolveDomainDagreGeometryFacingHandles(source, target);
+        if (
+            geometryFacingHandles
+            && domainDagreRouteHandleNeedsGeometryFlip(
+                routingResult.sourceHandle,
+                routingResult.targetHandle,
+                geometryFacingHandles,
+            )
+        ) {
+            routingResult = {
+                ...routingResult,
+                sourceHandle: hasManualSourceHandle
+                    ? routingResult.sourceHandle
+                    : geometryFacingHandles.sourceHandle,
+                targetHandle: hasManualTargetHandle
+                    ? routingResult.targetHandle
+                    : geometryFacingHandles.targetHandle,
+                autoSource: hasManualSourceHandle ? routingResult.autoSource : true,
+                autoTarget: hasManualTargetHandle ? routingResult.autoTarget : true,
+                computedPath: undefined,
+            };
+        }
 
         const sourceHandle = expandHandle(routingResult.sourceHandle || 'bottom');
         const targetHandle = expandHandle(routingResult.targetHandle || 'top');
@@ -323,8 +358,8 @@ export async function prepareDomainDagreFullEdges({
                 }
             };
 
-            const startPt = handleToAnchor(sPos, sW, sH, routingResult.sourceHandle);
-            const endPt = handleToAnchor(tPos, tW, tH, routingResult.targetHandle);
+            const startPt = handleToAnchor(sPos, sW, sH, routingResult.sourceHandle || 'bottom');
+            const endPt = handleToAnchor(tPos, tW, tH, routingResult.targetHandle || 'top');
             routedPaths.push({ points: [startPt, endPt] });
         }
 
@@ -601,7 +636,7 @@ export function applyDomainDagreEdgeRouting(
             && manualSides.includes('source')
             && manualSides.includes('target');
 
-        let routingResult;
+        let routingResult: DomainDagreRoutingResult;
         if (preserveManualHandles) {
             routingResult = {
                 type: 'advanced-smart-step' as const,
@@ -639,6 +674,29 @@ export function applyDomainDagreEdgeRouting(
                 { source: sUsage, target: tUsage },
                 true
             );
+        }
+        const geometryFacingHandles = resolveDomainDagreGeometryFacingHandles(source, target);
+        if (
+            !preserveManualHandles
+            && geometryFacingHandles
+            && domainDagreRouteHandleNeedsGeometryFlip(
+                routingResult.sourceHandle,
+                routingResult.targetHandle,
+                geometryFacingHandles,
+            )
+        ) {
+            routingResult = {
+                ...routingResult,
+                sourceHandle: manualSides.includes('source')
+                    ? routingResult.sourceHandle
+                    : geometryFacingHandles.sourceHandle,
+                targetHandle: manualSides.includes('target')
+                    ? routingResult.targetHandle
+                    : geometryFacingHandles.targetHandle,
+                autoSource: manualSides.includes('source') ? routingResult.autoSource : true,
+                autoTarget: manualSides.includes('target') ? routingResult.autoTarget : true,
+                computedPath: undefined,
+            };
         }
 
         const sourceHandle = expandHandle(routingResult.sourceHandle || 'bottom');
