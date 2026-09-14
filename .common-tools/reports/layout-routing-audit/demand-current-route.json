@@ -1,0 +1,4660 @@
+{
+  "nodes": [
+    {
+      "id": "titlegroup-策略计算",
+      "type": "titleGroup",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "positionAbsolute": {
+        "x": 0,
+        "y": 0
+      },
+      "width": 1814,
+      "height": 1406,
+      "measured": {
+        "width": 1814,
+        "height": 1406
+      },
+      "style": {
+        "width": 1813.9699999999998,
+        "height": 1406
+      },
+      "data": {}
+    },
+    {
+      "id": "titlegroup-资源分配",
+      "type": "titleGroup",
+      "position": {
+        "x": 1973.9699999999998,
+        "y": 0
+      },
+      "positionAbsolute": {
+        "x": 1973.9699999999998,
+        "y": 0
+      },
+      "width": 1038,
+      "height": 871,
+      "measured": {
+        "width": 1038,
+        "height": 871
+      },
+      "style": {
+        "width": 1037.77,
+        "height": 871
+      },
+      "data": {}
+    },
+    {
+      "id": "titlegroup-作业执行",
+      "type": "titleGroup",
+      "position": {
+        "x": 3171.74,
+        "y": 0
+      },
+      "positionAbsolute": {
+        "x": 3171.74,
+        "y": 0
+      },
+      "width": 284,
+      "height": 1036,
+      "measured": {
+        "width": 284,
+        "height": 1036
+      },
+      "style": {
+        "width": 283.65,
+        "height": 1036
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-策略计算-数据准备",
+      "type": "subGroup",
+      "parentId": "titlegroup-策略计算",
+      "position": {
+        "x": 32,
+        "y": 84
+      },
+      "positionAbsolute": {
+        "x": 32,
+        "y": 84
+      },
+      "width": 370,
+      "height": 1234,
+      "measured": {
+        "width": 370,
+        "height": 1234
+      },
+      "style": {
+        "width": 369.95,
+        "height": 1234
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-策略计算-初分逻辑",
+      "type": "subGroup",
+      "parentId": "titlegroup-策略计算",
+      "position": {
+        "x": 721.95,
+        "y": 84
+      },
+      "positionAbsolute": {
+        "x": 721.95,
+        "y": 84
+      },
+      "width": 342,
+      "height": 978,
+      "measured": {
+        "width": 342,
+        "height": 978
+      },
+      "style": {
+        "width": 342.34999999999997,
+        "height": 978
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-策略计算-库存修正",
+      "type": "subGroup",
+      "parentId": "titlegroup-策略计算",
+      "position": {
+        "x": 1384.3,
+        "y": 84
+      },
+      "positionAbsolute": {
+        "x": 1384.3,
+        "y": 84
+      },
+      "width": 346,
+      "height": 466,
+      "measured": {
+        "width": 346,
+        "height": 466
+      },
+      "style": {
+        "width": 345.79999999999995,
+        "height": 466
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-资源分配-直拣池分配",
+      "type": "subGroup",
+      "parentId": "titlegroup-资源分配",
+      "position": {
+        "x": 32,
+        "y": 84
+      },
+      "positionAbsolute": {
+        "x": 2005.9699999999998,
+        "y": 84
+      },
+      "width": 309,
+      "height": 699,
+      "measured": {
+        "width": 309,
+        "height": 699
+      },
+      "style": {
+        "width": 309,
+        "height": 699
+      },
+      "data": {}
+    },
+    {
+      "id": "subgroup-资源分配-补货池分配",
+      "type": "subGroup",
+      "parentId": "titlegroup-资源分配",
+      "position": {
+        "x": 661,
+        "y": 84
+      },
+      "positionAbsolute": {
+        "x": 2634.97,
+        "y": 84
+      },
+      "width": 300,
+      "height": 699,
+      "measured": {
+        "width": 300,
+        "height": 699
+      },
+      "style": {
+        "width": 299.8000000000002,
+        "height": 699
+      },
+      "data": {}
+    },
+    {
+      "id": "start-calc",
+      "type": "custom",
+      "parentId": "subgroup-策略计算-数据准备",
+      "position": {
+        "x": 28,
+        "y": 62
+      },
+      "positionAbsolute": {
+        "x": 60,
+        "y": 146
+      },
+      "width": 172,
+      "height": 96,
+      "measured": {
+        "width": 172,
+        "height": 96
+      },
+      "style": {
+        "width": 172,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "init-data",
+      "type": "custom",
+      "parentId": "subgroup-策略计算-数据准备",
+      "position": {
+        "x": 28,
+        "y": 318
+      },
+      "positionAbsolute": {
+        "x": 60,
+        "y": 402
+      },
+      "width": 211,
+      "height": 96,
+      "measured": {
+        "width": 211,
+        "height": 96
+      },
+      "style": {
+        "width": 211,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "check-inv-sufficiency",
+      "type": "custom",
+      "parentId": "subgroup-策略计算-数据准备",
+      "position": {
+        "x": 28,
+        "y": 574
+      },
+      "positionAbsolute": {
+        "x": 60,
+        "y": 658
+      },
+      "width": 204,
+      "height": 96,
+      "measured": {
+        "width": 204,
+        "height": 96
+      },
+      "style": {
+        "width": 204,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "apply-satisfaction-rate",
+      "type": "custom",
+      "parentId": "subgroup-策略计算-数据准备",
+      "position": {
+        "x": 28,
+        "y": 830
+      },
+      "positionAbsolute": {
+        "x": 60,
+        "y": 914
+      },
+      "width": 273,
+      "height": 96,
+      "measured": {
+        "width": 273,
+        "height": 96
+      },
+      "style": {
+        "width": 273,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "calc-theory-ratio",
+      "type": "custom",
+      "parentId": "subgroup-策略计算-数据准备",
+      "position": {
+        "x": 28,
+        "y": 1086
+      },
+      "positionAbsolute": {
+        "x": 60,
+        "y": 1170
+      },
+      "width": 246,
+      "height": 96,
+      "measured": {
+        "width": 246,
+        "height": 96
+      },
+      "style": {
+        "width": 246,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "sort-demand",
+      "type": "custom",
+      "parentId": "subgroup-策略计算-初分逻辑",
+      "position": {
+        "x": 28,
+        "y": 62
+      },
+      "positionAbsolute": {
+        "x": 749.95,
+        "y": 146
+      },
+      "width": 204,
+      "height": 96,
+      "measured": {
+        "width": 204,
+        "height": 96
+      },
+      "style": {
+        "width": 204,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "check-limit",
+      "type": "custom",
+      "parentId": "subgroup-策略计算-初分逻辑",
+      "position": {
+        "x": 28,
+        "y": 318
+      },
+      "positionAbsolute": {
+        "x": 749.95,
+        "y": 402
+      },
+      "width": 249,
+      "height": 96,
+      "measured": {
+        "width": 249,
+        "height": 96
+      },
+      "style": {
+        "width": 249,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "pool-a-entry",
+      "type": "custom",
+      "parentId": "subgroup-策略计算-初分逻辑",
+      "position": {
+        "x": 28,
+        "y": 574
+      },
+      "positionAbsolute": {
+        "x": 749.95,
+        "y": 658
+      },
+      "width": 217,
+      "height": 96,
+      "measured": {
+        "width": 217,
+        "height": 96
+      },
+      "style": {
+        "width": 217,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "pool-b-entry",
+      "type": "custom",
+      "parentId": "subgroup-策略计算-初分逻辑",
+      "position": {
+        "x": 28,
+        "y": 830
+      },
+      "positionAbsolute": {
+        "x": 749.95,
+        "y": 914
+      },
+      "width": 216,
+      "height": 96,
+      "measured": {
+        "width": 216,
+        "height": 96
+      },
+      "style": {
+        "width": 216,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "calc-real-ratio",
+      "type": "custom",
+      "parentId": "subgroup-策略计算-库存修正",
+      "position": {
+        "x": 28,
+        "y": 62
+      },
+      "positionAbsolute": {
+        "x": 1412.3,
+        "y": 146
+      },
+      "width": 192,
+      "height": 96,
+      "measured": {
+        "width": 192,
+        "height": 96
+      },
+      "style": {
+        "width": 192,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "fix-quota",
+      "type": "custom",
+      "parentId": "subgroup-策略计算-库存修正",
+      "position": {
+        "x": 28,
+        "y": 318
+      },
+      "positionAbsolute": {
+        "x": 1412.3,
+        "y": 402
+      },
+      "width": 252,
+      "height": 96,
+      "measured": {
+        "width": 252,
+        "height": 96
+      },
+      "style": {
+        "width": 252,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "greedy-spec",
+      "type": "custom",
+      "parentId": "subgroup-资源分配-直拣池分配",
+      "position": {
+        "x": 28,
+        "y": 62
+      },
+      "positionAbsolute": {
+        "x": 2033.9699999999998,
+        "y": 146
+      },
+      "width": 220,
+      "height": 96,
+      "measured": {
+        "width": 220,
+        "height": 96
+      },
+      "style": {
+        "width": 220,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "check-rem",
+      "type": "custom",
+      "parentId": "subgroup-资源分配-直拣池分配",
+      "position": {
+        "x": 28,
+        "y": 318
+      },
+      "positionAbsolute": {
+        "x": 2033.9699999999998,
+        "y": 402
+      },
+      "width": 217,
+      "height": 73,
+      "measured": {
+        "width": 217,
+        "height": 73
+      },
+      "style": {
+        "width": 217,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "sort-rem-round",
+      "type": "custom",
+      "parentId": "subgroup-资源分配-直拣池分配",
+      "position": {
+        "x": 28,
+        "y": 551
+      },
+      "positionAbsolute": {
+        "x": 2033.9699999999998,
+        "y": 635
+      },
+      "width": 204,
+      "height": 96,
+      "measured": {
+        "width": 204,
+        "height": 96
+      },
+      "style": {
+        "width": 204,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "merge-res",
+      "type": "custom",
+      "parentId": "subgroup-资源分配-补货池分配",
+      "position": {
+        "x": 28,
+        "y": 62
+      },
+      "positionAbsolute": {
+        "x": 2662.97,
+        "y": 146
+      },
+      "width": 211,
+      "height": 96,
+      "measured": {
+        "width": 211,
+        "height": 96
+      },
+      "style": {
+        "width": 211,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "alloc-mixed",
+      "type": "custom",
+      "parentId": "subgroup-资源分配-补货池分配",
+      "position": {
+        "x": 28,
+        "y": 318
+      },
+      "positionAbsolute": {
+        "x": 2662.97,
+        "y": 402
+      },
+      "width": 204,
+      "height": 96,
+      "measured": {
+        "width": 204,
+        "height": 96
+      },
+      "style": {
+        "width": 204,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "check-source",
+      "type": "custom",
+      "parentId": "subgroup-资源分配-补货池分配",
+      "position": {
+        "x": 28,
+        "y": 574
+      },
+      "positionAbsolute": {
+        "x": 2662.97,
+        "y": 658
+      },
+      "width": 212,
+      "height": 73,
+      "measured": {
+        "width": 212,
+        "height": 73
+      },
+      "style": {
+        "width": 212,
+        "height": 73
+      },
+      "data": {}
+    },
+    {
+      "id": "task-direct-a",
+      "type": "custom",
+      "parentId": "titlegroup-作业执行",
+      "position": {
+        "x": 32,
+        "y": 84
+      },
+      "positionAbsolute": {
+        "x": 3203.74,
+        "y": 84
+      },
+      "width": 172,
+      "height": 96,
+      "measured": {
+        "width": 172,
+        "height": 96
+      },
+      "style": {
+        "width": 172,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "task-rep-b",
+      "type": "custom",
+      "parentId": "titlegroup-作业执行",
+      "position": {
+        "x": 32,
+        "y": 340
+      },
+      "positionAbsolute": {
+        "x": 3203.74,
+        "y": 340
+      },
+      "width": 191,
+      "height": 96,
+      "measured": {
+        "width": 191,
+        "height": 96
+      },
+      "style": {
+        "width": 191,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "task-direct-b",
+      "type": "custom",
+      "parentId": "titlegroup-作业执行",
+      "position": {
+        "x": 32,
+        "y": 596
+      },
+      "positionAbsolute": {
+        "x": 3203.74,
+        "y": 596
+      },
+      "width": 172,
+      "height": 96,
+      "measured": {
+        "width": 172,
+        "height": 96
+      },
+      "style": {
+        "width": 172,
+        "height": 96
+      },
+      "data": {}
+    },
+    {
+      "id": "end-wms",
+      "type": "custom",
+      "parentId": "titlegroup-作业执行",
+      "position": {
+        "x": 32,
+        "y": 852
+      },
+      "positionAbsolute": {
+        "x": 3203.74,
+        "y": 852
+      },
+      "width": 174,
+      "height": 96,
+      "measured": {
+        "width": 174,
+        "height": 96
+      },
+      "style": {
+        "width": 174,
+        "height": 96
+      },
+      "data": {}
+    }
+  ],
+  "sourceEdges": [
+    {
+      "id": "e18",
+      "source": "alloc-mixed",
+      "target": "check-source",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 2765,
+            "y": 499
+          },
+          {
+            "x": 2765,
+            "y": 658
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "algorithm": "domain-dagre-full"
+      }
+    },
+    {
+      "id": "e-rate-applied",
+      "source": "apply-satisfaction-rate",
+      "target": "calc-theory-ratio",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "修正需求 (Q*Rate)",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 197,
+            "y": 1011
+          },
+          {
+            "x": 197,
+            "y": 1170
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "algorithm": "domain-dagre-full"
+      }
+    },
+    {
+      "id": "e9",
+      "source": "calc-real-ratio",
+      "target": "fix-quota",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "Real_Ratio",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 1508,
+            "y": 243
+          },
+          {
+            "x": 1508,
+            "y": 402
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "algorithm": "domain-dagre-full"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "calc-theory-ratio",
+      "target": "sort-demand",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "type": "advanced-smart-step",
+      "label": "Max_Ratio",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 183,
+            "y": 1169
+          },
+          {
+            "x": 183,
+            "y": 1097
+          },
+          {
+            "x": 185,
+            "y": 1097
+          },
+          {
+            "x": 185,
+            "y": 1182
+          },
+          {
+            "x": 660,
+            "y": 1182
+          },
+          {
+            "x": 660,
+            "y": 240
+          },
+          {
+            "x": 860,
+            "y": 240
+          },
+          {
+            "x": 860,
+            "y": 261
+          },
+          {
+            "x": 852,
+            "y": 261
+          },
+          {
+            "x": 852,
+            "y": 243
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "crossingOptimized": true,
+        "sharedTrunkAware": true,
+        "algorithm": "domain-dagre-full"
+      }
+    },
+    {
+      "id": "e-shortage-yes",
+      "source": "check-inv-sufficiency",
+      "target": "apply-satisfaction-rate",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "缺货 (Inv < Demand)",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 196,
+            "y": 755
+          },
+          {
+            "x": 196,
+            "y": 914
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "algorithm": "domain-dagre-full"
+      }
+    },
+    {
+      "id": "e-shortage-no",
+      "source": "check-inv-sufficiency",
+      "target": "calc-theory-ratio",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "充足",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 128,
+            "y": 755
+          },
+          {
+            "x": 128,
+            "y": 904
+          },
+          {
+            "x": 142,
+            "y": 904
+          },
+          {
+            "x": 142,
+            "y": 890
+          },
+          {
+            "x": 36,
+            "y": 890
+          },
+          {
+            "x": 36,
+            "y": 1034
+          },
+          {
+            "x": 142,
+            "y": 1034
+          },
+          {
+            "x": 142,
+            "y": 1169
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": false,
+        "sharedTrunkAware": true,
+        "algorithm": "domain-dagre-full"
+      }
+    },
+    {
+      "id": "e5",
+      "source": "check-limit",
+      "target": "pool-a-entry",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "Yes (未满)",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 916,
+            "y": 499
+          },
+          {
+            "x": 916,
+            "y": 571
+          },
+          {
+            "x": 858,
+            "y": 571
+          },
+          {
+            "x": 858,
+            "y": 657
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "algorithm": "domain-dagre-full"
+      }
+    },
+    {
+      "id": "e6",
+      "source": "check-limit",
+      "target": "pool-b-entry",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "No (溢出)",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 833,
+            "y": 499
+          },
+          {
+            "x": 833,
+            "y": 648
+          },
+          {
+            "x": 846,
+            "y": 648
+          },
+          {
+            "x": 846,
+            "y": 487
+          },
+          {
+            "x": 977,
+            "y": 487
+          },
+          {
+            "x": 977,
+            "y": 841
+          },
+          {
+            "x": 858,
+            "y": 841
+          },
+          {
+            "x": 858,
+            "y": 913
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "crossingOptimized": true,
+        "sharedTrunkAware": true,
+        "algorithm": "domain-dagre-full"
+      }
+    },
+    {
+      "id": "e12",
+      "source": "check-rem",
+      "target": "sort-rem-round",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "有剩余",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 2142,
+            "y": 476
+          },
+          {
+            "x": 2142,
+            "y": 635
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "algorithm": "domain-dagre-full"
+      }
+    },
+    {
+      "id": "e13",
+      "source": "check-rem",
+      "target": "task-direct-a",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "label": "耗尽",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 2252,
+            "y": 439
+          },
+          {
+            "x": 2609,
+            "y": 439
+          },
+          {
+            "x": 2609,
+            "y": 290
+          },
+          {
+            "x": 2922,
+            "y": 290
+          },
+          {
+            "x": 2922,
+            "y": 198
+          },
+          {
+            "x": 2946,
+            "y": 198
+          },
+          {
+            "x": 2946,
+            "y": 116
+          },
+          {
+            "x": 3203,
+            "y": 116
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "displayNodeClearanceRepaired": true,
+        "crossingOptimized": true,
+        "sharedTrunkAware": true,
+        "algorithm": "domain-dagre-full"
+      }
+    },
+    {
+      "id": "e20",
+      "source": "check-source",
+      "target": "task-direct-b",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "label": "拣选捡漏",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 2876,
+            "y": 707
+          },
+          {
+            "x": 3203,
+            "y": 707
+          },
+          {
+            "x": 3203,
+            "y": 694
+          },
+          {
+            "x": 3215,
+            "y": 694
+          },
+          {
+            "x": 3215,
+            "y": 657
+          },
+          {
+            "x": 3131,
+            "y": 657
+          },
+          {
+            "x": 3131,
+            "y": 644
+          },
+          {
+            "x": 3203,
+            "y": 644
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "crossingOptimized": true,
+        "sharedTrunkAware": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "algorithm": "domain-dagre-full"
+      }
+    },
+    {
+      "id": "e19",
+      "source": "check-source",
+      "target": "task-rep-b",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "label": "用到存储",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 2875,
+            "y": 658
+          },
+          {
+            "x": 2875,
+            "y": 603
+          },
+          {
+            "x": 2930,
+            "y": 603
+          },
+          {
+            "x": 2930,
+            "y": 682
+          },
+          {
+            "x": 3119,
+            "y": 682
+          },
+          {
+            "x": 3119,
+            "y": 541
+          },
+          {
+            "x": 3131,
+            "y": 541
+          },
+          {
+            "x": 3131,
+            "y": 388
+          },
+          {
+            "x": 3203,
+            "y": 388
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": true,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "crossingOptimized": true,
+        "sharedTrunkAware": true,
+        "algorithm": "domain-dagre-full"
+      }
+    },
+    {
+      "id": "e10",
+      "source": "fix-quota",
+      "target": "greedy-spec",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "label": "Quota A",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 1665,
+            "y": 434
+          },
+          {
+            "x": 1737,
+            "y": 434
+          },
+          {
+            "x": 1737,
+            "y": 460
+          },
+          {
+            "x": 1993.9699999999998,
+            "y": 460
+          },
+          {
+            "x": 1993.9699999999998,
+            "y": 200
+          },
+          {
+            "x": 1961,
+            "y": 200
+          },
+          {
+            "x": 1961,
+            "y": 194
+          },
+          {
+            "x": 2033,
+            "y": 194
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "displayNodeClearanceRepaired": true,
+        "algorithm": "domain-dagre-full"
+      }
+    },
+    {
+      "id": "e16",
+      "source": "fix-quota",
+      "target": "merge-res",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "label": "余量传递",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 1665,
+            "y": 466
+          },
+          {
+            "x": 1737,
+            "y": 466
+          },
+          {
+            "x": 1737,
+            "y": 760
+          },
+          {
+            "x": 1986,
+            "y": 760
+          },
+          {
+            "x": 1986,
+            "y": 99
+          },
+          {
+            "x": 2582,
+            "y": 99
+          },
+          {
+            "x": 2582,
+            "y": 178
+          },
+          {
+            "x": 2662,
+            "y": 178
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "detachedOverlapSeparated": true,
+        "displayNodeClearanceRepaired": true,
+        "crossingOptimized": true,
+        "sharedTrunkAware": true,
+        "algorithm": "domain-dagre-full"
+      }
+    },
+    {
+      "id": "e11",
+      "source": "greedy-spec",
+      "target": "check-rem",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 2144,
+            "y": 243
+          },
+          {
+            "x": 2144,
+            "y": 402
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "algorithm": "domain-dagre-full"
+      }
+    },
+    {
+      "id": "e-check-inv",
+      "source": "init-data",
+      "target": "check-inv-sufficiency",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "基础数据",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 166,
+            "y": 499
+          },
+          {
+            "x": 166,
+            "y": 658
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "algorithm": "domain-dagre-full"
+      }
+    },
+    {
+      "id": "e17",
+      "source": "merge-res",
+      "target": "alloc-mixed",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 2705,
+            "y": 243
+          },
+          {
+            "x": 2705,
+            "y": 283
+          },
+          {
+            "x": 2609,
+            "y": 283
+          },
+          {
+            "x": 2609,
+            "y": 362
+          },
+          {
+            "x": 2768,
+            "y": 362
+          },
+          {
+            "x": 2768,
+            "y": 402
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "sameNodeInOutCrossingRepaired": true,
+        "algorithm": "domain-dagre-full"
+      }
+    },
+    {
+      "id": "e7",
+      "source": "pool-a-entry",
+      "target": "calc-real-ratio",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "label": "汇聚",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 967,
+            "y": 658
+          },
+          {
+            "x": 967,
+            "y": 586
+          },
+          {
+            "x": 1023,
+            "y": 586
+          },
+          {
+            "x": 1023,
+            "y": 178
+          },
+          {
+            "x": 1411,
+            "y": 178
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": true,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "detachedOverlapSeparated": true,
+        "displayNodeClearanceRepaired": true,
+        "sameNodeInOutCrossingRepaired": true,
+        "algorithm": "domain-dagre-full"
+      }
+    },
+    {
+      "id": "e8",
+      "source": "pool-b-entry",
+      "target": "calc-real-ratio",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "label": "汇聚",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 966,
+            "y": 914
+          },
+          {
+            "x": 966,
+            "y": 842
+          },
+          {
+            "x": 1038,
+            "y": 842
+          },
+          {
+            "x": 1038,
+            "y": 946
+          },
+          {
+            "x": 1392,
+            "y": 946
+          },
+          {
+            "x": 1392,
+            "y": 546
+          },
+          {
+            "x": 1392,
+            "y": 200
+          },
+          {
+            "x": 1339,
+            "y": 200
+          },
+          {
+            "x": 1339,
+            "y": 210
+          },
+          {
+            "x": 1411,
+            "y": 210
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "crossingOptimized": true,
+        "sharedTrunkAware": true,
+        "detachedSourceEndpointReanchored": true,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "displayNodeClearanceRepaired": true,
+        "algorithm": "domain-dagre-full"
+      }
+    },
+    {
+      "id": "e15",
+      "source": "pool-b-entry",
+      "target": "merge-res",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "label": "Pool B Demand",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 967,
+            "y": 978
+          },
+          {
+            "x": 2632,
+            "y": 978
+          },
+          {
+            "x": 2632,
+            "y": 779
+          },
+          {
+            "x": 2915,
+            "y": 778
+          },
+          {
+            "x": 2915,
+            "y": 354
+          },
+          {
+            "x": 2934,
+            "y": 354
+          },
+          {
+            "x": 2934,
+            "y": 200
+          },
+          {
+            "x": 2590,
+            "y": 200
+          },
+          {
+            "x": 2590,
+            "y": 210
+          },
+          {
+            "x": 2662,
+            "y": 210
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "crossingOptimized": true,
+        "sharedTrunkAware": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "displayNodeClearanceRepaired": true,
+        "algorithm": "domain-dagre-full"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "sort-demand",
+      "target": "check-limit",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "label": "循环处理",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 852,
+            "y": 243
+          },
+          {
+            "x": 852,
+            "y": 402
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "algorithm": "domain-dagre-full"
+      }
+    },
+    {
+      "id": "e14",
+      "source": "sort-rem-round",
+      "target": "task-direct-a",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "advanced-smart-step",
+      "label": "分配完",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 2238,
+            "y": 635
+          },
+          {
+            "x": 2310,
+            "y": 635
+          },
+          {
+            "x": 2310,
+            "y": 98
+          },
+          {
+            "x": 3003,
+            "y": 98
+          },
+          {
+            "x": 3003,
+            "y": 148
+          },
+          {
+            "x": 3203,
+            "y": 148
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": true,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "detachedOverlapSeparated": true,
+        "displayNodeClearanceRepaired": true,
+        "algorithm": "domain-dagre-full"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "start-calc",
+      "target": "init-data",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 146,
+            "y": 243
+          },
+          {
+            "x": 146,
+            "y": 402
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "algorithm": "domain-dagre-full"
+      }
+    },
+    {
+      "id": "e21",
+      "source": "task-direct-a",
+      "target": "end-wms",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 3290,
+            "y": 181
+          },
+          {
+            "x": 3290,
+            "y": 253
+          },
+          {
+            "x": 3194,
+            "y": 253
+          },
+          {
+            "x": 3194,
+            "y": 330
+          },
+          {
+            "x": 3247,
+            "y": 330
+          },
+          {
+            "x": 3247,
+            "y": 316
+          },
+          {
+            "x": 3418.74,
+            "y": 316
+          },
+          {
+            "x": 3418.74,
+            "y": 460
+          },
+          {
+            "x": 3247,
+            "y": 460
+          },
+          {
+            "x": 3247,
+            "y": 572
+          },
+          {
+            "x": 3399.74,
+            "y": 572
+          },
+          {
+            "x": 3399.74,
+            "y": 716
+          },
+          {
+            "x": 3247,
+            "y": 716
+          },
+          {
+            "x": 3247,
+            "y": 851
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": false,
+        "sharedTrunkAware": true,
+        "algorithm": "domain-dagre-full"
+      }
+    },
+    {
+      "id": "e23",
+      "source": "task-direct-b",
+      "target": "end-wms",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 3290,
+            "y": 693
+          },
+          {
+            "x": 3290,
+            "y": 852
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "algorithm": "domain-dagre-full"
+      }
+    },
+    {
+      "id": "e22",
+      "source": "task-rep-b",
+      "target": "end-wms",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "advanced-smart-step",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 3299,
+            "y": 437
+          },
+          {
+            "x": 3299,
+            "y": 509
+          },
+          {
+            "x": 3386,
+            "y": 509
+          },
+          {
+            "x": 3386,
+            "y": 586
+          },
+          {
+            "x": 3334,
+            "y": 586
+          },
+          {
+            "x": 3334,
+            "y": 572
+          },
+          {
+            "x": 3399.74,
+            "y": 572
+          },
+          {
+            "x": 3399.74,
+            "y": 716
+          },
+          {
+            "x": 3334,
+            "y": 716
+          },
+          {
+            "x": 3334,
+            "y": 851
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": false,
+        "sharedTrunkAware": true,
+        "algorithm": "domain-dagre-full"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e18",
+      "source": "alloc-mixed",
+      "target": "check-source",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "stablePath",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 2765,
+            "y": 499
+          },
+          {
+            "x": 2765,
+            "y": 658
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "algorithm": "domain-dagre-full",
+        "_layoutPathLocked": true,
+        "__baseDisplayFinalizedSignature": "477900964"
+      }
+    },
+    {
+      "id": "e-rate-applied",
+      "source": "apply-satisfaction-rate",
+      "target": "calc-theory-ratio",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "stablePath",
+      "label": "修正需求 (Q*Rate)",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 170,
+            "y": 1011
+          },
+          {
+            "x": 170,
+            "y": 1170
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "algorithm": "domain-dagre-full",
+        "sharedTrunkSynthesized": true,
+        "localDoglegRepaired": true,
+        "_layoutPathLocked": true,
+        "__baseDisplayFinalizedSignature": "477900964",
+        "sharedEndpointPortOrderRepaired": true,
+        "terminalMicroDoglegRepaired": true
+      }
+    },
+    {
+      "id": "e9",
+      "source": "calc-real-ratio",
+      "target": "fix-quota",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "stablePath",
+      "label": "Real_Ratio",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 1508,
+            "y": 243
+          },
+          {
+            "x": 1508,
+            "y": 402
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "algorithm": "domain-dagre-full",
+        "_layoutPathLocked": true,
+        "__baseDisplayFinalizedSignature": "477900964"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "calc-theory-ratio",
+      "target": "sort-demand",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "type": "stablePath",
+      "label": "Max_Ratio",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 183,
+            "y": 1169
+          },
+          {
+            "x": 183,
+            "y": 1097
+          },
+          {
+            "x": 626,
+            "y": 1097
+          },
+          {
+            "x": 626,
+            "y": 298
+          },
+          {
+            "x": 796,
+            "y": 298
+          },
+          {
+            "x": 796,
+            "y": 242
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "crossingOptimized": true,
+        "sharedTrunkAware": true,
+        "algorithm": "domain-dagre-full",
+        "localDoglegRepaired": true,
+        "displayMicroCleaned": true,
+        "_layoutPathLocked": true,
+        "__baseDisplayFinalizedSignature": "477900964",
+        "terminalBoundaryStairRepaired": true,
+        "displaySoftQualityRepaired": true
+      }
+    },
+    {
+      "id": "e-shortage-yes",
+      "source": "check-inv-sufficiency",
+      "target": "apply-satisfaction-rate",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "stablePath",
+      "label": "缺货 (Inv < Demand)",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 162,
+            "y": 755
+          },
+          {
+            "x": 162,
+            "y": 914
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "algorithm": "domain-dagre-full",
+        "sharedTrunkSynthesized": true,
+        "localDoglegRepaired": true,
+        "_layoutPathLocked": true,
+        "__baseDisplayFinalizedSignature": "477900964",
+        "sharedEndpointPortOrderRepaired": true,
+        "terminalMicroDoglegRepaired": true
+      }
+    },
+    {
+      "id": "e-shortage-no",
+      "source": "check-inv-sufficiency",
+      "target": "calc-theory-ratio",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "stablePath",
+      "label": "充足",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 162,
+            "y": 755
+          },
+          {
+            "x": 162,
+            "y": 866
+          },
+          {
+            "x": 12,
+            "y": 866
+          },
+          {
+            "x": 12,
+            "y": 1058
+          },
+          {
+            "x": 170,
+            "y": 1058
+          },
+          {
+            "x": 170,
+            "y": 1169
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": false,
+        "sharedTrunkAware": true,
+        "algorithm": "domain-dagre-full",
+        "sharedTrunkSynthesized": true,
+        "_layoutPathLocked": true,
+        "__baseDisplayFinalizedSignature": "477900964",
+        "displayNodeClearanceRepaired": true
+      }
+    },
+    {
+      "id": "e5",
+      "source": "check-limit",
+      "target": "pool-a-entry",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "stablePath",
+      "label": "Yes (未满)",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 858,
+            "y": 499
+          },
+          {
+            "x": 858,
+            "y": 657
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "algorithm": "domain-dagre-full",
+        "sharedTrunkSynthesized": true,
+        "crossingOptimized": true,
+        "sharedTrunkAware": true,
+        "localDoglegRepaired": true,
+        "_layoutPathLocked": true,
+        "__baseDisplayFinalizedSignature": "477900964"
+      }
+    },
+    {
+      "id": "e6",
+      "source": "check-limit",
+      "target": "pool-b-entry",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "stablePath",
+      "label": "No (溢出)",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 875,
+            "y": 499
+          },
+          {
+            "x": 875,
+            "y": 571
+          },
+          {
+            "x": 1014.95,
+            "y": 571
+          },
+          {
+            "x": 1014.95,
+            "y": 841
+          },
+          {
+            "x": 858,
+            "y": 841
+          },
+          {
+            "x": 858,
+            "y": 913
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "crossingOptimized": true,
+        "sharedTrunkAware": true,
+        "algorithm": "domain-dagre-full",
+        "sharedTrunkSynthesized": true,
+        "localDoglegRepaired": true,
+        "displayMicroCleaned": true,
+        "_layoutPathLocked": true,
+        "__baseDisplayFinalizedSignature": "477900964"
+      }
+    },
+    {
+      "id": "e12",
+      "source": "check-rem",
+      "target": "sort-rem-round",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "stablePath",
+      "label": "有剩余",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 2142,
+            "y": 476
+          },
+          {
+            "x": 2142,
+            "y": 635
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "algorithm": "domain-dagre-full",
+        "_layoutPathLocked": true,
+        "__baseDisplayFinalizedSignature": "477900964"
+      }
+    },
+    {
+      "id": "e13",
+      "source": "check-rem",
+      "target": "task-direct-a",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "stablePath",
+      "label": "耗尽",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 2252,
+            "y": 439
+          },
+          {
+            "x": 2539,
+            "y": 439
+          },
+          {
+            "x": 2539,
+            "y": 354
+          },
+          {
+            "x": 3131,
+            "y": 354
+          },
+          {
+            "x": 3131,
+            "y": 132
+          },
+          {
+            "x": 3203,
+            "y": 132
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "crossingOptimized": true,
+        "sharedTrunkAware": true,
+        "algorithm": "domain-dagre-full",
+        "sharedTrunkSynthesized": true,
+        "localDoglegRepaired": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "endpointLaneNudged": true,
+        "_layoutPathLocked": true,
+        "__baseDisplayFinalizedSignature": "477900964",
+        "displaySoftQualityRepaired": true
+      }
+    },
+    {
+      "id": "e20",
+      "source": "check-source",
+      "target": "task-direct-b",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "stablePath",
+      "label": "拣选捡漏",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 2876,
+            "y": 683
+          },
+          {
+            "x": 2938,
+            "y": 683
+          },
+          {
+            "x": 2938,
+            "y": 657
+          },
+          {
+            "x": 3203,
+            "y": 657
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "crossingOptimized": true,
+        "sharedTrunkAware": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "algorithm": "domain-dagre-full",
+        "sharedTrunkSynthesized": true,
+        "localDoglegRepaired": true,
+        "_layoutPathLocked": true,
+        "__baseDisplayFinalizedSignature": "477900964"
+      }
+    },
+    {
+      "id": "e19",
+      "source": "check-source",
+      "target": "task-rep-b",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "stablePath",
+      "label": "用到存储",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 2875,
+            "y": 658
+          },
+          {
+            "x": 2931,
+            "y": 658
+          },
+          {
+            "x": 2931,
+            "y": 388
+          },
+          {
+            "x": 3203,
+            "y": 388
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": true,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "crossingOptimized": true,
+        "sharedTrunkAware": true,
+        "algorithm": "domain-dagre-full",
+        "sharedTrunkSynthesized": true,
+        "localDoglegRepaired": true,
+        "_layoutPathLocked": true,
+        "__baseDisplayFinalizedSignature": "477900964",
+        "displaySoftQualityRepaired": true
+      }
+    },
+    {
+      "id": "e10",
+      "source": "fix-quota",
+      "target": "greedy-spec",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "stablePath",
+      "label": "Quota A",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 1665,
+            "y": 450
+          },
+          {
+            "x": 1749,
+            "y": 450
+          },
+          {
+            "x": 1749,
+            "y": 194
+          },
+          {
+            "x": 2033,
+            "y": 194
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "displayNodeClearanceRepaired": true,
+        "algorithm": "domain-dagre-full",
+        "sharedTrunkSynthesized": true,
+        "crossingOptimized": true,
+        "sharedTrunkAware": true,
+        "_layoutPathLocked": true,
+        "__baseDisplayFinalizedSignature": "477900964"
+      }
+    },
+    {
+      "id": "e16",
+      "source": "fix-quota",
+      "target": "merge-res",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "stablePath",
+      "label": "余量传递",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 1665,
+            "y": 450
+          },
+          {
+            "x": 1826,
+            "y": 450
+          },
+          {
+            "x": 1826,
+            "y": 290
+          },
+          {
+            "x": 2590,
+            "y": 290
+          },
+          {
+            "x": 2590,
+            "y": 194
+          },
+          {
+            "x": 2662,
+            "y": 194
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "detachedOverlapSeparated": true,
+        "crossingOptimized": true,
+        "sharedTrunkAware": true,
+        "algorithm": "domain-dagre-full",
+        "sharedTrunkSynthesized": true,
+        "localDoglegRepaired": true,
+        "_layoutPathLocked": true,
+        "__baseDisplayFinalizedSignature": "477900964",
+        "displaySoftQualityRepaired": true
+      }
+    },
+    {
+      "id": "e11",
+      "source": "greedy-spec",
+      "target": "check-rem",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "stablePath",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 2144,
+            "y": 243
+          },
+          {
+            "x": 2144,
+            "y": 402
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "algorithm": "domain-dagre-full",
+        "_layoutPathLocked": true,
+        "__baseDisplayFinalizedSignature": "477900964"
+      }
+    },
+    {
+      "id": "e-check-inv",
+      "source": "init-data",
+      "target": "check-inv-sufficiency",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "stablePath",
+      "label": "基础数据",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 166,
+            "y": 499
+          },
+          {
+            "x": 166,
+            "y": 658
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "algorithm": "domain-dagre-full",
+        "_layoutPathLocked": true,
+        "__baseDisplayFinalizedSignature": "477900964"
+      }
+    },
+    {
+      "id": "e17",
+      "source": "merge-res",
+      "target": "alloc-mixed",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "stablePath",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 2705,
+            "y": 243
+          },
+          {
+            "x": 2705,
+            "y": 315
+          },
+          {
+            "x": 2768,
+            "y": 315
+          },
+          {
+            "x": 2768,
+            "y": 402
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "sameNodeInOutCrossingRepaired": true,
+        "algorithm": "domain-dagre-full",
+        "localDoglegRepaired": true,
+        "_layoutPathLocked": true,
+        "__baseDisplayFinalizedSignature": "477900964"
+      }
+    },
+    {
+      "id": "e7",
+      "source": "pool-a-entry",
+      "target": "calc-real-ratio",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "stablePath",
+      "label": "汇聚",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 967,
+            "y": 658
+          },
+          {
+            "x": 1039,
+            "y": 658
+          },
+          {
+            "x": 1039,
+            "y": 546
+          },
+          {
+            "x": 1063,
+            "y": 546
+          },
+          {
+            "x": 1063,
+            "y": 178
+          },
+          {
+            "x": 1411,
+            "y": 178
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": true,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "detachedOverlapSeparated": true,
+        "sameNodeInOutCrossingRepaired": true,
+        "algorithm": "domain-dagre-full",
+        "sharedTrunkSynthesized": true,
+        "localDoglegRepaired": true,
+        "terminalBoundaryStairRepaired": true,
+        "displayMicroCleaned": true,
+        "_layoutPathLocked": true,
+        "__baseDisplayFinalizedSignature": "477900964"
+      }
+    },
+    {
+      "id": "e8",
+      "source": "pool-b-entry",
+      "target": "calc-real-ratio",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "stablePath",
+      "label": "汇聚",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 966,
+            "y": 914
+          },
+          {
+            "x": 1288,
+            "y": 914
+          },
+          {
+            "x": 1288,
+            "y": 194
+          },
+          {
+            "x": 1411,
+            "y": 194
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "crossingOptimized": true,
+        "sharedTrunkAware": true,
+        "detachedSourceEndpointReanchored": true,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "algorithm": "domain-dagre-full",
+        "sharedTrunkSynthesized": true,
+        "localDoglegRepaired": true,
+        "_layoutPathLocked": true,
+        "__baseDisplayFinalizedSignature": "477900964",
+        "displaySoftQualityRepaired": true
+      }
+    },
+    {
+      "id": "e15",
+      "source": "pool-b-entry",
+      "target": "merge-res",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "stablePath",
+      "label": "Pool B Demand",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 967,
+            "y": 974
+          },
+          {
+            "x": 2590,
+            "y": 974
+          },
+          {
+            "x": 2590,
+            "y": 194
+          },
+          {
+            "x": 2662,
+            "y": 194
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "crossingOptimized": true,
+        "sharedTrunkAware": true,
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "displayNodeClearanceRepaired": true,
+        "algorithm": "domain-dagre-full",
+        "sharedTrunkSynthesized": true,
+        "localDoglegRepaired": true,
+        "_layoutPathLocked": true,
+        "__baseDisplayFinalizedSignature": "477900964",
+        "sharedEndpointPortOrderRepaired": true,
+        "terminalMicroDoglegRepaired": true
+      }
+    },
+    {
+      "id": "e4",
+      "source": "sort-demand",
+      "target": "check-limit",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "stablePath",
+      "label": "循环处理",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 852,
+            "y": 243
+          },
+          {
+            "x": 852,
+            "y": 402
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "algorithm": "domain-dagre-full",
+        "_layoutPathLocked": true,
+        "__baseDisplayFinalizedSignature": "477900964"
+      }
+    },
+    {
+      "id": "e14",
+      "source": "sort-rem-round",
+      "target": "task-direct-a",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "type": "stablePath",
+      "label": "分配完",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": false,
+        "autoTarget": false,
+        "auto": [],
+        "computedPath": [
+          {
+            "x": 2238,
+            "y": 635
+          },
+          {
+            "x": 2614,
+            "y": 635
+          },
+          {
+            "x": 2614,
+            "y": 290
+          },
+          {
+            "x": 2921.97,
+            "y": 290
+          },
+          {
+            "x": 2921.97,
+            "y": 132
+          },
+          {
+            "x": 3203,
+            "y": 132
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": true,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "detachedOverlapSeparated": true,
+        "algorithm": "domain-dagre-full",
+        "sharedTrunkSynthesized": true,
+        "crossingOptimized": true,
+        "sharedTrunkAware": true,
+        "_layoutPathLocked": true,
+        "__baseDisplayFinalizedSignature": "477900964"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "start-calc",
+      "target": "init-data",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "stablePath",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 146,
+            "y": 243
+          },
+          {
+            "x": 146,
+            "y": 402
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "algorithm": "domain-dagre-full",
+        "_layoutPathLocked": true,
+        "__baseDisplayFinalizedSignature": "477900964"
+      }
+    },
+    {
+      "id": "e21",
+      "source": "task-direct-a",
+      "target": "end-wms",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "stablePath",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 3290,
+            "y": 181
+          },
+          {
+            "x": 3290,
+            "y": 292
+          },
+          {
+            "x": 3155,
+            "y": 292
+          },
+          {
+            "x": 3155,
+            "y": 740
+          },
+          {
+            "x": 3290,
+            "y": 740
+          },
+          {
+            "x": 3290,
+            "y": 851
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": false,
+        "sharedTrunkAware": true,
+        "algorithm": "domain-dagre-full",
+        "sharedTrunkSynthesized": true,
+        "localDoglegRepaired": true,
+        "_layoutPathLocked": true,
+        "__baseDisplayFinalizedSignature": "477900964"
+      }
+    },
+    {
+      "id": "e23",
+      "source": "task-direct-b",
+      "target": "end-wms",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "stablePath",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 3290,
+            "y": 693
+          },
+          {
+            "x": 3290,
+            "y": 852
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "algorithm": "domain-dagre-full",
+        "_layoutPathLocked": true,
+        "__baseDisplayFinalizedSignature": "477900964"
+      }
+    },
+    {
+      "id": "e22",
+      "source": "task-rep-b",
+      "target": "end-wms",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "type": "stablePath",
+      "markerEnd": {
+        "type": "arrowclosed"
+      },
+      "data": {
+        "autoSource": true,
+        "autoTarget": true,
+        "auto": [
+          "source",
+          "target"
+        ],
+        "computedPath": [
+          {
+            "x": 3299,
+            "y": 437
+          },
+          {
+            "x": 3299,
+            "y": 548
+          },
+          {
+            "x": 3425,
+            "y": 548
+          },
+          {
+            "x": 3425,
+            "y": 740
+          },
+          {
+            "x": 3290,
+            "y": 740
+          },
+          {
+            "x": 3290,
+            "y": 851
+          }
+        ],
+        "layoutPathLocked": true,
+        "runtimeHandleLock": {
+          "source": true,
+          "target": true
+        },
+        "detachedSourceEndpointReanchored": false,
+        "detachedTargetEndpointReanchored": false,
+        "endpointOrthogonalRepaired": true,
+        "hardObstacleRepaired": true,
+        "obstacleClearanceOptimized": false,
+        "sharedTrunkAware": true,
+        "algorithm": "domain-dagre-full",
+        "sharedTrunkSynthesized": true,
+        "localDoglegRepaired": true,
+        "crossingOptimized": true,
+        "_layoutPathLocked": true,
+        "__baseDisplayFinalizedSignature": "477900964"
+      }
+    }
+  ],
+  "routing": {
+    "stage": "final-applied",
+    "signature": "387913625",
+    "inputGeometryDigest": "geometry-v1:8b0fd9bae9ee6c26fb3391a01a77d0c2",
+    "outputRouteSignature": "route-v2:26:100:85239ce90e81bd2b",
+    "routingVersion": "21",
+    "workerResolution": "full-route",
+    "nodeCount": 29,
+    "edgeCount": 26,
+    "updatedAt": 1789282146875,
+    "renderAuthorityStatus": "accepted",
+    "scheduledAt": 1789282145584,
+    "workerStartCount": 1,
+    "workerAbortCount": 0,
+    "geometryBarrierResolution": "stable",
+    "geometryBarrierMs": 134,
+    "geometryBarrierSamples": 4,
+    "incrementalPlanStatus": "missing-baseline",
+    "requestId": "387913625:1",
+    "workerStartedAt": 1789282145720,
+    "phaseProgressTrace": [
+      {
+        "phase": "candidate-validation",
+        "durationMs": 0.1,
+        "candidateCount": 0,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "skip"
+      },
+      {
+        "phase": "seed",
+        "durationMs": 609.5,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 1,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 1775,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "workItemCount": 0,
+        "resolution": "accepted"
+      },
+      {
+        "phase": "seed-interactive",
+        "parentPhase": "seed",
+        "durationMs": 605.7,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted"
+      },
+      {
+        "phase": "seed-interactive-trunk-seed",
+        "parentPhase": "seed-interactive-route",
+        "durationMs": 25.1,
+        "candidateCount": 26,
+        "changedEdgeCount": 16,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted"
+      },
+      {
+        "phase": "seed-interactive-local-seed",
+        "parentPhase": "seed-interactive-route",
+        "durationMs": 185.7,
+        "candidateCount": 26,
+        "changedEdgeCount": 13,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted"
+      },
+      {
+        "phase": "seed-interactive-crossing-repair",
+        "parentPhase": "seed-interactive-route",
+        "durationMs": 57.4,
+        "candidateCount": 26,
+        "changedEdgeCount": 14,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted"
+      },
+      {
+        "phase": "seed-interactive-lane-repair",
+        "parentPhase": "seed-interactive-route",
+        "durationMs": 27.3,
+        "candidateCount": 273,
+        "changedEdgeCount": 1,
+        "evaluationCount": 299,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 11045,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted"
+      },
+      {
+        "phase": "seed-interactive-global-route",
+        "parentPhase": "seed-interactive-route",
+        "durationMs": 78.2,
+        "candidateCount": 26,
+        "changedEdgeCount": 9,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted"
+      },
+      {
+        "phase": "seed-interactive-local-polish",
+        "parentPhase": "seed-interactive-route",
+        "durationMs": 51.1,
+        "candidateCount": 26,
+        "changedEdgeCount": 5,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted"
+      },
+      {
+        "phase": "seed-interactive-finish-hard-gate",
+        "parentPhase": "seed-interactive-finish",
+        "durationMs": 1.7,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 1,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 29,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "fallback"
+      },
+      {
+        "phase": "seed-interactive-finish-local",
+        "parentPhase": "seed-interactive-finish",
+        "durationMs": 33.8,
+        "candidateCount": 26,
+        "changedEdgeCount": 2,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted"
+      },
+      {
+        "phase": "seed-interactive-finish-obstacle",
+        "parentPhase": "seed-interactive-finish",
+        "durationMs": 72,
+        "candidateCount": 1860,
+        "changedEdgeCount": 2,
+        "evaluationCount": 40,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "workItemCount": 2,
+        "budgetCount": 2,
+        "underBudgetCount": 0,
+        "maximumCandidateCount": 498,
+        "resolution": "accepted"
+      },
+      {
+        "phase": "seed-interactive-finish",
+        "parentPhase": "seed-interactive-route",
+        "durationMs": 143.8,
+        "candidateCount": 26,
+        "changedEdgeCount": 26,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted"
+      },
+      {
+        "phase": "seed-interactive-route",
+        "parentPhase": "seed-interactive",
+        "durationMs": 601.1,
+        "candidateCount": 26,
+        "changedEdgeCount": 26,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted"
+      },
+      {
+        "phase": "final-endpoint-seed",
+        "parentPhase": "finalizer",
+        "durationMs": 24.7,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "fallback"
+      },
+      {
+        "phase": "final-endpoint-closure",
+        "parentPhase": "finalizer",
+        "durationMs": 40.9,
+        "candidateCount": 26,
+        "changedEdgeCount": 3,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted"
+      },
+      {
+        "phase": "final-safety-passage-order",
+        "parentPhase": "final-safety-closure",
+        "durationMs": 0.3,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 1,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "workItemCount": 0,
+        "resolution": "rejected"
+      },
+      {
+        "phase": "final-commercial-terminal-preserving",
+        "parentPhase": "final-commercial-evaluation",
+        "durationMs": 38.1,
+        "candidateCount": 26,
+        "changedEdgeCount": 6,
+        "evaluationCount": 23,
+        "cacheHitCount": 37,
+        "scannedNodeCount": 1132,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 275,
+        "workItemCount": 0,
+        "resolution": "accepted"
+      },
+      {
+        "phase": "final-commercial-clearance",
+        "parentPhase": "final-commercial-evaluation",
+        "durationMs": 59.7,
+        "candidateCount": 26,
+        "changedEdgeCount": 5,
+        "evaluationCount": 28,
+        "cacheHitCount": 28,
+        "scannedNodeCount": 1149,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "workItemCount": 0,
+        "resolution": "accepted"
+      },
+      {
+        "phase": "final-commercial-evaluation",
+        "parentPhase": "finalizer",
+        "durationMs": 216,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 84,
+        "cacheHitCount": 125,
+        "scannedNodeCount": 3377,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 541,
+        "workItemCount": 0,
+        "resolution": "accepted"
+      },
+      {
+        "phase": "finalizer",
+        "durationMs": 487.6,
+        "candidateCount": 26,
+        "changedEdgeCount": 26,
+        "evaluationCount": 124,
+        "cacheHitCount": 279,
+        "scannedNodeCount": 4504,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 567,
+        "workItemCount": 0,
+        "resolution": "accepted"
+      }
+    ],
+    "lastPhaseTrace": {
+      "phase": "finalizer",
+      "durationMs": 487.6,
+      "candidateCount": 26,
+      "changedEdgeCount": 26,
+      "evaluationCount": 124,
+      "cacheHitCount": 279,
+      "scannedNodeCount": 4504,
+      "scannedSegmentCount": 0,
+      "scannedEdgePairCount": 567,
+      "workItemCount": 0,
+      "resolution": "accepted"
+    },
+    "hardGateDiagnostics": {
+      "candidate": "polished",
+      "hardClean": true,
+      "obstacleHits": 0,
+      "terminalsAttached": true,
+      "terminalsAnchored": true,
+      "quality": {
+        "nonOrthogonalSegments": 0,
+        "strictCrossings": 0,
+        "reverseOverlap": 0,
+        "unrelatedOverlap": 0,
+        "relatedOverlap": 879,
+        "unexplainedRelatedOverlap": 0,
+        "shortEndpointStubs": 0,
+        "tinyInteriorDoglegs": 0,
+        "hairpins": 0,
+        "backtrackPenalty": 0,
+        "detourPenalty": 0,
+        "bends": 48,
+        "totalLength": 16676,
+        "bridgedCrossings": 9,
+        "crossingCost": 15
+      },
+      "minimumClearanceViolations": 0,
+      "minimumClearanceViolationEdgeIds": [],
+      "commercialClearanceViolations": 0
+    },
+    "workerResponseParsedAt": 1789282146854,
+    "finalAppliedAt": 1789282146868,
+    "routeMs": 1148,
+    "totalRouteMs": 1284,
+    "cacheTrustLevel": "miss",
+    "phaseTrace": [
+      {
+        "phase": "candidate-validation",
+        "durationMs": 0.1,
+        "candidateCount": 0,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "skip",
+        "exclusiveDurationMs": 0.1
+      },
+      {
+        "phase": "seed",
+        "durationMs": 609.5,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 1,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 1775,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "workItemCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 2.3
+      },
+      {
+        "phase": "seed-interactive",
+        "parentPhase": "seed",
+        "durationMs": 605.7,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 0
+      },
+      {
+        "phase": "seed-interactive-normalize",
+        "parentPhase": "seed-interactive-route",
+        "durationMs": 2.4,
+        "candidateCount": 26,
+        "changedEdgeCount": 1,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 29,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 2.4
+      },
+      {
+        "phase": "seed-interactive-endpoint-seed",
+        "parentPhase": "seed-interactive-route",
+        "durationMs": 12.9,
+        "candidateCount": 26,
+        "changedEdgeCount": 5,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 12.9
+      },
+      {
+        "phase": "seed-interactive-trunk-seed",
+        "parentPhase": "seed-interactive-route",
+        "durationMs": 25.1,
+        "candidateCount": 26,
+        "changedEdgeCount": 16,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 25.1
+      },
+      {
+        "phase": "seed-interactive-local-seed",
+        "parentPhase": "seed-interactive-route",
+        "durationMs": 185.7,
+        "candidateCount": 26,
+        "changedEdgeCount": 13,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 185.7
+      },
+      {
+        "phase": "seed-interactive-crossing-repair",
+        "parentPhase": "seed-interactive-route",
+        "durationMs": 57.4,
+        "candidateCount": 26,
+        "changedEdgeCount": 14,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 57.4
+      },
+      {
+        "phase": "seed-interactive-lane-repair",
+        "parentPhase": "seed-interactive-route",
+        "durationMs": 27.3,
+        "candidateCount": 273,
+        "changedEdgeCount": 1,
+        "evaluationCount": 299,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 11045,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 27.3
+      },
+      {
+        "phase": "seed-interactive-global-route",
+        "parentPhase": "seed-interactive-route",
+        "durationMs": 78.2,
+        "candidateCount": 26,
+        "changedEdgeCount": 9,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 78.2
+      },
+      {
+        "phase": "seed-interactive-local-polish",
+        "parentPhase": "seed-interactive-route",
+        "durationMs": 51.1,
+        "candidateCount": 26,
+        "changedEdgeCount": 5,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 51.1
+      },
+      {
+        "phase": "seed-interactive-detached-repair",
+        "parentPhase": "seed-interactive-route",
+        "durationMs": 3.3,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "skip",
+        "exclusiveDurationMs": 3.3
+      },
+      {
+        "phase": "seed-interactive-endpoint-final",
+        "parentPhase": "seed-interactive-route",
+        "durationMs": 2.1,
+        "candidateCount": 26,
+        "changedEdgeCount": 5,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 2.1
+      },
+      {
+        "phase": "seed-interactive-finish-projection",
+        "parentPhase": "seed-interactive-finish",
+        "durationMs": 10.3,
+        "candidateCount": 26,
+        "changedEdgeCount": 26,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 10.3
+      },
+      {
+        "phase": "seed-interactive-finish-hard-gate",
+        "parentPhase": "seed-interactive-finish",
+        "durationMs": 1.7,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 1,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 29,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "fallback",
+        "exclusiveDurationMs": 1.7
+      },
+      {
+        "phase": "seed-interactive-finish-micro",
+        "parentPhase": "seed-interactive-finish",
+        "durationMs": 22.5,
+        "candidateCount": 26,
+        "changedEdgeCount": 3,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 22.5
+      },
+      {
+        "phase": "seed-interactive-finish-local",
+        "parentPhase": "seed-interactive-finish",
+        "durationMs": 33.8,
+        "candidateCount": 26,
+        "changedEdgeCount": 2,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 33.8
+      },
+      {
+        "phase": "seed-interactive-finish-obstacle",
+        "parentPhase": "seed-interactive-finish",
+        "durationMs": 72,
+        "candidateCount": 1860,
+        "changedEdgeCount": 2,
+        "evaluationCount": 40,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "workItemCount": 2,
+        "budgetCount": 2,
+        "underBudgetCount": 0,
+        "maximumCandidateCount": 498,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 72
+      },
+      {
+        "phase": "seed-interactive-finish-commit",
+        "parentPhase": "seed-interactive-finish",
+        "durationMs": 0.3,
+        "candidateCount": 26,
+        "changedEdgeCount": 26,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 0.3
+      },
+      {
+        "phase": "seed-interactive-finish",
+        "parentPhase": "seed-interactive-route",
+        "durationMs": 143.8,
+        "candidateCount": 26,
+        "changedEdgeCount": 26,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 3.2
+      },
+      {
+        "phase": "seed-interactive-route",
+        "parentPhase": "seed-interactive",
+        "durationMs": 601.1,
+        "candidateCount": 26,
+        "changedEdgeCount": 26,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 11.8
+      },
+      {
+        "phase": "seed-interactive-terminal-cleanup",
+        "parentPhase": "seed-interactive",
+        "durationMs": 4.6,
+        "candidateCount": 26,
+        "changedEdgeCount": 26,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 4.6
+      },
+      {
+        "phase": "seed-initial-gate",
+        "parentPhase": "seed",
+        "durationMs": 1.5,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 1.5
+      },
+      {
+        "phase": "final-evaluation-context",
+        "parentPhase": "finalizer",
+        "durationMs": 0,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "hit",
+        "exclusiveDurationMs": 0
+      },
+      {
+        "phase": "final-clearance",
+        "parentPhase": "finalizer",
+        "durationMs": 32.3,
+        "candidateCount": 52,
+        "changedEdgeCount": 52,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 32.3
+      },
+      {
+        "phase": "final-hard-safety",
+        "parentPhase": "finalizer",
+        "durationMs": 1.4,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "skip",
+        "exclusiveDurationMs": 1.4
+      },
+      {
+        "phase": "final-endpoint-seed",
+        "parentPhase": "finalizer",
+        "durationMs": 24.7,
+        "candidateCount": 52,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "fallback",
+        "exclusiveDurationMs": 24.7
+      },
+      {
+        "phase": "final-endpoint-topology",
+        "parentPhase": "finalizer",
+        "durationMs": 16.4,
+        "candidateCount": 52,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "skip",
+        "exclusiveDurationMs": 16.4
+      },
+      {
+        "phase": "final-endpoint-order",
+        "parentPhase": "finalizer",
+        "durationMs": 18.1,
+        "candidateCount": 52,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "skip",
+        "exclusiveDurationMs": 18.1
+      },
+      {
+        "phase": "final-endpoint-closure-residual",
+        "parentPhase": "final-endpoint-closure",
+        "durationMs": 0.1,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "skip",
+        "exclusiveDurationMs": 0.1
+      },
+      {
+        "phase": "final-endpoint-closure-trunks",
+        "parentPhase": "final-endpoint-closure",
+        "durationMs": 7.6,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "skip",
+        "exclusiveDurationMs": 7.6
+      },
+      {
+        "phase": "final-endpoint-closure-obstacles-post-trunk",
+        "parentPhase": "final-endpoint-closure-obstacles",
+        "durationMs": 0.1,
+        "candidateCount": 0,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 1,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "workItemCount": 0,
+        "resolution": "skip",
+        "exclusiveDurationMs": 0.1
+      },
+      {
+        "phase": "final-endpoint-closure-obstacles-sibling",
+        "parentPhase": "final-endpoint-closure-obstacles",
+        "durationMs": 0.2,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 1,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "workItemCount": 0,
+        "resolution": "skip",
+        "exclusiveDurationMs": 0.2
+      },
+      {
+        "phase": "final-endpoint-closure-obstacles-micro",
+        "parentPhase": "final-endpoint-closure-obstacles",
+        "durationMs": 0,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 1,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "workItemCount": 0,
+        "resolution": "skip",
+        "exclusiveDurationMs": 0
+      },
+      {
+        "phase": "final-endpoint-closure-obstacles",
+        "parentPhase": "final-endpoint-closure",
+        "durationMs": 0.7,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "skip",
+        "exclusiveDurationMs": 0.4
+      },
+      {
+        "phase": "final-endpoint-closure-terminal-stubs",
+        "parentPhase": "final-endpoint-closure-terminal",
+        "durationMs": 0.1,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 1,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "workItemCount": 0,
+        "resolution": "skip",
+        "exclusiveDurationMs": 0.1
+      },
+      {
+        "phase": "final-endpoint-closure-terminal-micro",
+        "parentPhase": "final-endpoint-closure-terminal",
+        "durationMs": 17.4,
+        "candidateCount": 26,
+        "changedEdgeCount": 3,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 17.4
+      },
+      {
+        "phase": "final-endpoint-closure-terminal",
+        "parentPhase": "final-endpoint-closure",
+        "durationMs": 17.5,
+        "candidateCount": 26,
+        "changedEdgeCount": 3,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 0
+      },
+      {
+        "phase": "final-endpoint-closure-commercial-detour",
+        "parentPhase": "final-endpoint-closure-commercial",
+        "durationMs": 12,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 1,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "workItemCount": 0,
+        "resolution": "skip",
+        "exclusiveDurationMs": 12
+      },
+      {
+        "phase": "final-endpoint-closure-commercial-hard-gate",
+        "parentPhase": "final-endpoint-closure-commercial",
+        "durationMs": 0,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 1,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "workItemCount": 0,
+        "resolution": "hit",
+        "exclusiveDurationMs": 0
+      },
+      {
+        "phase": "final-endpoint-closure-commercial-restore-source",
+        "parentPhase": "final-endpoint-closure-commercial",
+        "durationMs": 0.1,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "workItemCount": 0,
+        "resolution": "skip",
+        "exclusiveDurationMs": 0.1
+      },
+      {
+        "phase": "final-endpoint-closure-commercial-endpoint-order",
+        "parentPhase": "final-endpoint-closure-commercial",
+        "durationMs": 2.1,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "workItemCount": 0,
+        "resolution": "skip",
+        "exclusiveDurationMs": 2.1
+      },
+      {
+        "phase": "final-endpoint-closure-commercial-source-branches",
+        "parentPhase": "final-endpoint-closure-commercial",
+        "durationMs": 0.2,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "workItemCount": 0,
+        "resolution": "skip",
+        "exclusiveDurationMs": 0.2
+      },
+      {
+        "phase": "final-endpoint-closure-commercial",
+        "parentPhase": "final-endpoint-closure",
+        "durationMs": 14.7,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "skip",
+        "exclusiveDurationMs": 0.3
+      },
+      {
+        "phase": "final-endpoint-closure",
+        "parentPhase": "finalizer",
+        "durationMs": 40.9,
+        "candidateCount": 52,
+        "changedEdgeCount": 3,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 0.3
+      },
+      {
+        "phase": "final-safety-hard-gate",
+        "parentPhase": "final-safety-closure",
+        "durationMs": 0,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 1,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "workItemCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 0
+      },
+      {
+        "phase": "final-safety-stubs",
+        "parentPhase": "final-safety-closure",
+        "durationMs": 0,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 1,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "workItemCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 0
+      },
+      {
+        "phase": "final-safety-endpoint-order",
+        "parentPhase": "final-safety-closure",
+        "durationMs": 0,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 1,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "workItemCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 0
+      },
+      {
+        "phase": "final-safety-passage-order",
+        "parentPhase": "final-safety-closure",
+        "durationMs": 0.3,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 1,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "workItemCount": 0,
+        "resolution": "rejected",
+        "exclusiveDurationMs": 0.3
+      },
+      {
+        "phase": "final-safety-repair-baseline",
+        "parentPhase": "final-safety-closure",
+        "durationMs": 3.5,
+        "candidateCount": 2,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 8,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "workItemCount": 0,
+        "resolution": "skip",
+        "exclusiveDurationMs": 3.5
+      },
+      {
+        "phase": "final-safety-closure",
+        "parentPhase": "finalizer",
+        "durationMs": 5.4,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "skip",
+        "exclusiveDurationMs": 1.6
+      },
+      {
+        "phase": "final-commercial-terminal-preserving",
+        "parentPhase": "final-commercial-evaluation",
+        "durationMs": 62.4,
+        "candidateCount": 78,
+        "changedEdgeCount": 10,
+        "evaluationCount": 38,
+        "cacheHitCount": 63,
+        "scannedNodeCount": 1754,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 416,
+        "workItemCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 62.4
+      },
+      {
+        "phase": "final-commercial-source-stairs",
+        "parentPhase": "final-commercial-evaluation",
+        "durationMs": 13.7,
+        "candidateCount": 26,
+        "changedEdgeCount": 1,
+        "evaluationCount": 5,
+        "cacheHitCount": 10,
+        "scannedNodeCount": 106,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 50,
+        "workItemCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 13.7
+      },
+      {
+        "phase": "final-commercial-terminal-changing",
+        "parentPhase": "final-commercial-evaluation",
+        "durationMs": 9.7,
+        "candidateCount": 52,
+        "changedEdgeCount": 0,
+        "evaluationCount": 6,
+        "cacheHitCount": 14,
+        "scannedNodeCount": 159,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 75,
+        "workItemCount": 0,
+        "resolution": "skip",
+        "exclusiveDurationMs": 9.7
+      },
+      {
+        "phase": "final-commercial-clearance",
+        "parentPhase": "final-commercial-evaluation",
+        "durationMs": 59.7,
+        "candidateCount": 26,
+        "changedEdgeCount": 5,
+        "evaluationCount": 28,
+        "cacheHitCount": 28,
+        "scannedNodeCount": 1149,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "workItemCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 59.7
+      },
+      {
+        "phase": "final-commercial-evaluation",
+        "parentPhase": "finalizer",
+        "durationMs": 216,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 84,
+        "cacheHitCount": 125,
+        "scannedNodeCount": 3377,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 541,
+        "workItemCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 70.5
+      },
+      {
+        "phase": "final-safety-repair-baseline",
+        "parentPhase": "final-commercial-safety-closure",
+        "durationMs": 4.5,
+        "candidateCount": 2,
+        "changedEdgeCount": 0,
+        "evaluationCount": 3,
+        "cacheHitCount": 5,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "workItemCount": 0,
+        "resolution": "skip",
+        "exclusiveDurationMs": 4.5
+      },
+      {
+        "phase": "final-commercial-safety-closure",
+        "parentPhase": "finalizer",
+        "durationMs": 7.5,
+        "candidateCount": 26,
+        "changedEdgeCount": 0,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "skip",
+        "exclusiveDurationMs": 3
+      },
+      {
+        "phase": "final-exact-hard-report",
+        "parentPhase": "finalizer",
+        "durationMs": 4.8,
+        "candidateCount": 52,
+        "changedEdgeCount": 52,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 4.8
+      },
+      {
+        "phase": "finalizer",
+        "durationMs": 487.6,
+        "candidateCount": 26,
+        "changedEdgeCount": 26,
+        "evaluationCount": 124,
+        "cacheHitCount": 279,
+        "scannedNodeCount": 4504,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 567,
+        "workItemCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 120.1
+      },
+      {
+        "phase": "session-commit",
+        "durationMs": 8.7,
+        "candidateCount": 26,
+        "changedEdgeCount": 26,
+        "evaluationCount": 0,
+        "cacheHitCount": 0,
+        "scannedNodeCount": 0,
+        "scannedSegmentCount": 0,
+        "scannedEdgePairCount": 0,
+        "resolution": "accepted",
+        "exclusiveDurationMs": 8.7
+      }
+    ]
+  },
+  "contract": {
+    "clean": false,
+    "hardClean": true,
+    "violationCount": 2,
+    "violations": [
+      {
+        "code": "passage-order",
+        "phase": "passage-order",
+        "severity": "presentation",
+        "count": 2
+      }
+    ]
+  }
+}

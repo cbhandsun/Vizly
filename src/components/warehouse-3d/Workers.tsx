@@ -1,20 +1,16 @@
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
-import { Instances, Instance } from '@react-three/drei';
 import { WAREHOUSE } from './constants';
+import { WarehouseInstancedMesh } from './WarehouseInstancedMesh';
+
+const headGeo = new THREE.SphereGeometry(0.3, 8, 8);
+const bodyGeo = new THREE.BoxGeometry(0.6, 0.8, 0.35);
+const legsGeo = new THREE.BoxGeometry(0.25, 0.9, 0.25);
+const skinMat = new THREE.MeshStandardMaterial({ color: '#f5cba7' });
+const vestMat = new THREE.MeshStandardMaterial({ color: '#00ff00', emissive: '#003300', emissiveIntensity: 0.2 });
+const pantsMat = new THREE.MeshStandardMaterial({ color: '#1a1a1a' });
 
 const Workers: React.FC = () => {
-    // Shared Geometry for Worker (Simplified Low Poly)
-    // Head, Body/Vest, Legs
-    const headGeo = new THREE.SphereGeometry(0.3, 8, 8); // Slightly larger head
-    const bodyGeo = new THREE.BoxGeometry(0.6, 0.8, 0.35); // Slightly larger body
-    const legsGeo = new THREE.BoxGeometry(0.25, 0.9, 0.25); // Thicker legs
-
-    // Materials - High Contrast
-    const skinMat = new THREE.MeshStandardMaterial({ color: "#f5cba7" });
-    const vestMat = new THREE.MeshStandardMaterial({ color: "#00ff00", emissive: "#003300", emissiveIntensity: 0.2 }); // Neon Green + basic emissive
-    const pantsMat = new THREE.MeshStandardMaterial({ color: "#1a1a1a" }); // Black pants
-
     // Generate positions
     const workerPositions = useMemo(() => {
         const pos = [];
@@ -47,31 +43,39 @@ const Workers: React.FC = () => {
     return (
         <group>
             {/* Heads */}
-            <Instances range={100} geometry={headGeo} material={skinMat} castShadow>
-                {workerPositions.map((p, i) => (
-                    <Instance key={`head-${i}`} position={[p[0], 1.7, p[1]] as [number, number, number]} />
-                ))}
-            </Instances>
+            <WarehouseInstancedMesh
+                capacity={100}
+                geometry={headGeo}
+                material={skinMat}
+                instances={workerPositions.map(p => ({ position: [p[0], 1.7, p[1]] as [number, number, number] }))}
+                castShadow
+            />
 
             {/* Bodies (Vests) */}
-            <Instances range={100} geometry={bodyGeo} material={vestMat} castShadow>
-                {workerPositions.map((p, i) => (
-                    <Instance key={`body-${i}`} position={[p[0], 1.15, p[1]] as [number, number, number]} />
-                ))}
-            </Instances>
+            <WarehouseInstancedMesh
+                capacity={100}
+                geometry={bodyGeo}
+                material={vestMat}
+                instances={workerPositions.map(p => ({ position: [p[0], 1.15, p[1]] as [number, number, number] }))}
+                castShadow
+            />
 
             {/* Left Leg */}
-            <Instances range={100} geometry={legsGeo} material={pantsMat} castShadow>
-                {workerPositions.map((p, i) => (
-                    <Instance key={`lleg-${i}`} position={[p[0] - 0.15, 0.45, p[1]] as [number, number, number]} />
-                ))}
-            </Instances>
+            <WarehouseInstancedMesh
+                capacity={100}
+                geometry={legsGeo}
+                material={pantsMat}
+                instances={workerPositions.map(p => ({ position: [p[0] - 0.15, 0.45, p[1]] as [number, number, number] }))}
+                castShadow
+            />
             {/* Right Leg */}
-            <Instances range={100} geometry={legsGeo} material={pantsMat} castShadow>
-                {workerPositions.map((p, i) => (
-                    <Instance key={`rleg-${i}`} position={[p[0] + 0.15, 0.45, p[1]] as [number, number, number]} />
-                ))}
-            </Instances>
+            <WarehouseInstancedMesh
+                capacity={100}
+                geometry={legsGeo}
+                material={pantsMat}
+                instances={workerPositions.map(p => ({ position: [p[0] + 0.15, 0.45, p[1]] as [number, number, number] }))}
+                castShadow
+            />
         </group>
     );
 };

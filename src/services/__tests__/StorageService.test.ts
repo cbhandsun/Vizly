@@ -1,11 +1,10 @@
 // @vitest-environment jsdom
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StandardDiagramData } from '@/core/models/DiagramModels';
 import type { StorageConfig } from '../StorageService';
 
-const sendMock = vi.fn();
-const commandPayloads: unknown[] = [];
+const fetchMock = vi.fn<typeof fetch>();
 const safeLogState = vi.hoisted(() => ({
     debug: vi.fn(),
     info: vi.fn(),
@@ -18,31 +17,16 @@ vi.mock('@/core/utils/consoleCleanup', () => ({
     safeLog: safeLogState,
 }));
 
-vi.mock('@aws-sdk/client-s3', () => ({
-    S3Client: class {
-        send = sendMock;
-    },
-    DeleteObjectCommand: class {
-        constructor(payload: unknown) {
-            commandPayloads.push(payload);
-        }
-    },
-    GetObjectCommand: class {
-        constructor(payload: unknown) {
-            commandPayloads.push(payload);
-        }
-    },
-    ListObjectsV2Command: class {
-        constructor(payload: unknown) {
-            commandPayloads.push(payload);
-        }
-    },
-    PutObjectCommand: class {
-        constructor(payload: unknown) {
-            commandPayloads.push(payload);
-        }
-    },
-}));
+
+const xmlListResponse = (body = '<ListBucketResult />') => new Response(body, {
+    headers: { 'content-type': 'application/xml' },
+    status: 200,
+});
+
+const jsonObjectResponse = (body: string, lastModified = 'Thu, 01 Jan 2026 00:00:00 GMT') => new Response(body, {
+    headers: { 'last-modified': lastModified },
+    status: 200,
+});
 
 const config: StorageConfig = {
     endpoint: 'https://s3.amazonaws.com',
@@ -59,12 +43,17 @@ const loadStorageService = async () => {
 };
 
 describe('S3StorageProvider', () => {
+    beforeEach(() => {
+        fetchMock.mockReset();
+        vi.stubGlobal('fetch', fetchMock);
+    });
+
     afterEach(() => {
         localStorage.clear();
         sessionStorage.clear();
-        sendMock.mockReset();
-        commandPayloads.length = 0;
+        fetchMock.mockReset();
         Object.values(safeLogState).forEach(mock => mock.mockReset());
+        vi.unstubAllGlobals();
         vi.restoreAllMocks();
         vi.resetModules();
     });
@@ -208,24 +197,19 @@ describe('S3StorageProvider', () => {
     });
 
     it('loads remote S3 diagram JSON through bounded normalization', async () => {
-        sendMock.mockResolvedValueOnce({
-            Body: {
-                transformToString: async () => JSON.stringify({
-                    name: 'Remote Diagram',
-                    nodes: [
-                        {
-                            id: 'n1',
-                            label: 'Node 1',
-                            domain: 'ops',
-                            constructor: { polluted: true },
-                        },
-                    ],
-                    edges: [],
-                    metadata: { title: 'Remote Title' },
-                }),
-            },
-            LastModified: new Date('2026-01-01T00:00:00.000Z'),
-        });
+        fetchMock.mockResolvedValueOnce(jsonObjectResponse(JSON.stringify({
+            name: 'Remote Diagram',
+            nodes: [
+                {
+                    id: 'n1',
+                    label: 'Node 1',
+                    domain: 'ops',
+                    constructor: { polluted: true },
+                },
+            ],
+            edges: [],
+            metadata: { title: 'Remote Title' },
+        })));
 
         const { s3Storage } = await loadStorageService();
         s3Storage.saveConfig(config);
@@ -247,11 +231,7 @@ describe('S3StorageProvider', () => {
     });
 
     it('rejects oversized remote S3 diagram JSON before parsing', async () => {
-        sendMock.mockResolvedValueOnce({
-            Body: {
-                transformToString: async () => `{ "nodes": [], "padding": "${'x'.repeat(5 * 1024 * 1024)}" }`,
-            },
-        });
+        fetchMock.mockResolvedValueOnce(jsonObjectResponse(`{ "nodes": [], "padding": "${'x'.repeat(5 * 1024 * 1024)}" }`));
 
         const { s3Storage } = await loadStorageService();
         s3Storage.saveConfig(config);
@@ -260,11 +240,7 @@ describe('S3StorageProvider', () => {
     });
 
     it('rejects invalid remote S3 diagram structures', async () => {
-        sendMock.mockResolvedValueOnce({
-            Body: {
-                transformToString: async () => JSON.stringify({ nodes: 'bad', edges: [] }),
-            },
-        });
+        fetchMock.mockResolvedValueOnce(jsonObjectResponse(JSON.stringify({ nodes: 'bad', edges: [] })));
 
         const { s3Storage } = await loadStorageService();
         s3Storage.saveConfig(config);
@@ -274,7 +250,7 @@ describe('S3StorageProvider', () => {
 
     it('propagates S3 delete failures instead of reporting false success', async () => {
         const failure = new Error('delete failed');
-        sendMock.mockRejectedValueOnce(failure);
+        fetchMock.mockRejectedValueOnce(failure);
 
         const { s3Storage } = await loadStorageService();
         s3Storage.saveConfig(config);
@@ -288,7 +264,7 @@ describe('S3StorageProvider', () => {
             message: 'Authorization AWS4-HMAC-SHA256 Credential=AKIA_TEST/20260612 Signature=abcdef1234',
             secretAccessKey: 'super-secret',
         };
-        sendMock.mockRejectedValueOnce(failure);
+        fetchMock.mockRejectedValueOnce(failure);
 
         const { s3Storage } = await loadStorageService();
         s3Storage.saveConfig(config);
@@ -303,7 +279,7 @@ describe('S3StorageProvider', () => {
 
     it('tests ad-hoc S3 config without persisting failed connection settings', async () => {
         const failure = new Error('connection failed');
-        sendMock.mockRejectedValueOnce(failure);
+        fetchMock.mockRejectedValueOnce(failure);
 
         const { s3Storage } = await loadStorageService();
 
@@ -315,13 +291,13 @@ describe('S3StorageProvider', () => {
     });
 
     it('forwards the abort signal to the S3 connection request', async () => {
-        sendMock.mockResolvedValueOnce({});
+        fetchMock.mockResolvedValueOnce(xmlListResponse());
         const controller = new AbortController();
         const { s3Storage } = await loadStorageService();
 
         await s3Storage.testConnection(config, controller.signal);
 
-        expect(sendMock).toHaveBeenCalledWith(expect.anything(), { abortSignal: controller.signal });
+        expect(fetchMock).toHaveBeenCalledWith(expect.any(URL), expect.objectContaining({ signal: controller.signal }));
     });
 
     it('redacts storage bootstrap errors before logging them', async () => {

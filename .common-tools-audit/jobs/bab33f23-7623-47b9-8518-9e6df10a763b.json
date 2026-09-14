@@ -1,0 +1,211 @@
+{
+  "id": "bab33f23-7623-47b9-8518-9e6df10a763b",
+  "capability": "project-audit",
+  "ownerId": "local-user",
+  "idempotencyKey": "2c345b4a77139f3c2408c17d2574fcfc8b88a7e4de88f8e17b571cec470e8d5a",
+  "status": "succeeded",
+  "attempt": 1,
+  "maxAttempts": 1,
+  "createdAt": "2026-09-12T20:41:52.966Z",
+  "updatedAt": "2026-09-12T20:42:17.112Z",
+  "expiresAt": "2026-09-13T20:41:52.960Z",
+  "artifacts": [
+    {
+      "name": "project-audit-report.json",
+      "mediaType": "application/json",
+      "uri": "E:\\DEV\\WorkSpace\\Antigravity-WS\\Vizly\\.common-tools\\reports\\project-audit-layout-routing-experience-deep\\project-audit-report.json",
+      "sha256": "1ef0e6bd56e8d9fe1a77c2f65288eb20b2c657a318e3c11725c023f6ec8ef4ac"
+    },
+    {
+      "name": "project-audit-report.md",
+      "mediaType": "text/markdown",
+      "uri": "E:\\DEV\\WorkSpace\\Antigravity-WS\\Vizly\\.common-tools\\reports\\project-audit-layout-routing-experience-deep\\project-audit-report.md",
+      "sha256": "f7f3ce929bfbc2b28812e82355be3bcb71d2c87b1f6d8049bfbfc50df12e791a"
+    }
+  ],
+  "project": {
+    "root": "E:\\DEV\\WorkSpace\\Antigravity-WS\\Vizly"
+  },
+  "output": {
+    "path": "E:\\DEV\\WorkSpace\\Antigravity-WS\\Vizly\\.common-tools\\reports\\project-audit-layout-routing-experience-deep"
+  },
+  "audit": {
+    "runGates": false,
+    "gateTimeoutMs": 120000,
+    "mode": "experience",
+    "level": "deep",
+    "coverageStrategy": "risk-driven-comprehensive",
+    "evidenceExpectation": "risk-driven comprehensive runtime, accessibility, security, and delivery evidence",
+    "requiredExperienceScenarios": [
+      "first-visit",
+      "core-flow",
+      "result-followup",
+      "state-feedback",
+      "recovery",
+      "responsive",
+      "keyboard",
+      "console-network"
+    ],
+    "requiresRuntimeGates": true,
+    "scopes": [
+      "visual-interaction"
+    ],
+    "experience": {
+      "schemaVersion": 1,
+      "scenarios": [
+        {
+          "id": "first-visit",
+          "status": "passed",
+          "evidence": [
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/screenshots/first-visit-desktop.png",
+              "line": 1,
+              "rule": "experience-screenshot"
+            },
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/experience-console-summary.json",
+              "line": 1,
+              "rule": "experience-console"
+            }
+          ]
+        },
+        {
+          "id": "core-flow",
+          "status": "passed",
+          "evidence": [
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/screenshots/core-flow-diagram.png",
+              "line": 1,
+              "rule": "experience-screenshot"
+            },
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/experience-console-summary.json",
+              "line": 1,
+              "rule": "experience-console"
+            }
+          ]
+        },
+        {
+          "id": "result-followup",
+          "status": "passed",
+          "evidence": [
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/screenshots/result-followup-core-actions.png",
+              "line": 1,
+              "rule": "experience-screenshot"
+            },
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/experience-console-summary.json",
+              "line": 1,
+              "rule": "experience-console"
+            }
+          ]
+        },
+        {
+          "id": "state-feedback",
+          "status": "passed",
+          "evidence": [
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/screenshots/state-feedback-after-layout.png",
+              "line": 1,
+              "rule": "experience-screenshot"
+            },
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/experience-console-summary.json",
+              "line": 1,
+              "rule": "experience-console"
+            }
+          ]
+        },
+        {
+          "id": "recovery",
+          "status": "passed",
+          "evidence": [
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/screenshots/responsive-mobile-core-flow.png",
+              "line": 1,
+              "rule": "experience-screenshot"
+            },
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/experience-console-summary.json",
+              "line": 1,
+              "rule": "experience-console"
+            }
+          ]
+        },
+        {
+          "id": "responsive",
+          "status": "passed",
+          "evidence": [
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/screenshots/responsive-mobile-first-visit.png",
+              "line": 1,
+              "rule": "experience-screenshot"
+            },
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/screenshots/responsive-mobile-core-flow.png",
+              "line": 1,
+              "rule": "experience-screenshot"
+            },
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/experience-console-summary.json",
+              "line": 1,
+              "rule": "experience-console"
+            }
+          ]
+        },
+        {
+          "id": "keyboard",
+          "status": "passed",
+          "evidence": [
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/experience-console-summary.json",
+              "line": 1,
+              "rule": "experience-console"
+            }
+          ]
+        },
+        {
+          "id": "console-network",
+          "status": "passed",
+          "evidence": [
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/experience-console-summary.json",
+              "line": 1,
+              "rule": "experience-console"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "quality": {
+    "passed": true,
+    "checks": [
+      {
+        "name": "project-scanned",
+        "passed": true
+      },
+      {
+        "name": "reports-generated",
+        "passed": true
+      },
+      {
+        "name": "no-audit-warnings",
+        "passed": true
+      },
+      {
+        "name": "level-required-experience",
+        "passed": true
+      }
+    ],
+    "metrics": {
+      "scanned-files": 10000,
+      "warnings": 0,
+      "runtime-gates-executed": 0,
+      "experience-scenarios": 8,
+      "required-experience-scenarios": 8,
+      "artifacts": 2
+    }
+  }
+}

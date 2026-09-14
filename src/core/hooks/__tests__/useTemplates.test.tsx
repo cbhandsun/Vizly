@@ -78,4 +78,40 @@ describe('useTemplates', () => {
     expect(JSON.stringify(safeLogState.warn.mock.calls.at(-1)?.[1])).toContain('[redacted]');
     expect(JSON.stringify(safeLogState.warn.mock.calls.at(-1)?.[1])).not.toContain('test-api-key-placeholder-0004');
   });
+
+  it('deep clones template diagram data with the local clone helper', async () => {
+    const { useTemplates } = await import('../useTemplates');
+    const { result } = renderHook(() => useTemplates());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    const nodes = [{ id: 'node-1', data: { label: 'Original' } }];
+    const edges = [{ id: 'edge-1', source: 'node-1', target: 'node-2', data: { weight: 1 } }];
+
+    let savedId = '';
+    act(() => {
+      const saved = result.current.saveAsTemplate(
+        {
+          name: 'Clone Template',
+          category: TemplateCategory.CUSTOM,
+        },
+        nodes,
+        edges
+      );
+      savedId = saved?.id ?? '';
+    });
+
+    nodes[0].data.label = 'Mutated source';
+    edges[0].data.weight = 2;
+
+    const created = result.current.createFromTemplate(savedId);
+    expect(created?.nodes).toEqual([{ id: 'node-1', data: { label: 'Original' } }]);
+    expect(created?.edges).toEqual([{ id: 'edge-1', source: 'node-1', target: 'node-2', data: { weight: 1 } }]);
+
+    const createdNodes = created?.nodes as typeof nodes | undefined;
+    if (createdNodes) createdNodes[0].data.label = 'Mutated clone';
+
+    const createdAgain = result.current.createFromTemplate(savedId);
+    expect(createdAgain?.nodes).toEqual([{ id: 'node-1', data: { label: 'Original' } }]);
+  });
 });

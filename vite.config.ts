@@ -61,7 +61,6 @@ const vendorChunkRules: Array<[string, string[]]> = [
     'longest-streak',
   ]],
   ['vendor-supabase', ['@supabase']],
-  ['vendor-aws-sdk', ['@aws-sdk', '@smithy', '@aws-crypto']],
   ['vendor-collab', ['yjs', 'y-websocket', 'lib0']],
   ['vendor-pdf-core', [
     'jspdf',
@@ -108,7 +107,6 @@ const vendorChunkRules: Array<[string, string[]]> = [
   ]],
   ['vendor-layout-graph', ['dagre', 'graphlib', 'd3-force', 'd3-quadtree']],
   ['vendor-mindmap', ['mind-elixir']],
-  ['vendor-motion', ['framer-motion', '@react-spring', 'motion-dom', 'motion-utils']],
   ['vendor-drawing', ['roughjs', 'perfect-freehand']],
   ['vendor-state', ['zustand', 'immer', 'lodash', 'use-sync-external-store']],
 ]

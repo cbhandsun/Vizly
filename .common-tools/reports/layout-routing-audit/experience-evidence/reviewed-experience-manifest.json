@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "first-visit",
+      "status": "passed",
+      "evidence": [
+        {
+          "kind": "screenshot",
+          "file": ".common-tools/reports/layout-routing-audit/experience-evidence/screenshots/first-visit-desktop.png"
+        },
+        {
+          "kind": "console",
+          "file": ".common-tools/reports/layout-routing-audit/experience-evidence/experience-console-summary.json"
+        }
+      ]
+    },
+    {
+      "id": "core-flow",
+      "status": "passed",
+      "evidence": [
+        {
+          "kind": "screenshot",
+          "file": ".common-tools/reports/layout-routing-audit/experience-evidence/screenshots/core-flow-diagram.png"
+        },
+        {
+          "kind": "console",
+          "file": ".common-tools/reports/layout-routing-audit/experience-evidence/experience-console-summary.json"
+        }
+      ]
+    },
+    {
+      "id": "result-followup",
+      "status": "passed",
+      "evidence": [
+        {
+          "kind": "screenshot",
+          "file": ".common-tools/reports/layout-routing-audit/experience-evidence/screenshots/result-followup-core-actions.png"
+        },
+        {
+          "kind": "console",
+          "file": ".common-tools/reports/layout-routing-audit/experience-evidence/experience-console-summary.json"
+        }
+      ]
+    },
+    {
+      "id": "state-feedback",
+      "status": "passed",
+      "evidence": [
+        {
+          "kind": "screenshot",
+          "file": ".common-tools/reports/layout-routing-audit/experience-evidence/screenshots/state-feedback-after-layout.png"
+        },
+        {
+          "kind": "console",
+          "file": ".common-tools/reports/layout-routing-audit/experience-evidence/experience-console-summary.json"
+        }
+      ]
+    },
+    {
+      "id": "recovery",
+      "status": "passed",
+      "evidence": [
+        {
+          "kind": "screenshot",
+          "file": ".common-tools/reports/layout-routing-audit/experience-evidence/screenshots/responsive-mobile-core-flow.png"
+        },
+        {
+          "kind": "console",
+          "file": ".common-tools/reports/layout-routing-audit/experience-evidence/experience-console-summary.json"
+        }
+      ]
+    },
+    {
+      "id": "responsive",
+      "status": "passed",
+      "evidence": [
+        {
+          "kind": "screenshot",
+          "file": ".common-tools/reports/layout-routing-audit/experience-evidence/screenshots/responsive-mobile-first-visit.png"
+        },
+        {
+          "kind": "screenshot",
+          "file": ".common-tools/reports/layout-routing-audit/experience-evidence/screenshots/responsive-mobile-core-flow.png"
+        },
+        {
+          "kind": "console",
+          "file": ".common-tools/reports/layout-routing-audit/experience-evidence/experience-console-summary.json"
+        }
+      ]
+    },
+    {
+      "id": "keyboard",
+      "status": "passed",
+      "evidence": [
+        {
+          "kind": "console",
+          "file": ".common-tools/reports/layout-routing-audit/experience-evidence/experience-console-summary.json"
+        }
+      ]
+    },
+    {
+      "id": "console-network",
+      "status": "passed",
+      "evidence": [
+        {
+          "kind": "console",
+          "file": ".common-tools/reports/layout-routing-audit/experience-evidence/experience-console-summary.json"
+        }
+      ]
+    }
+  ]
+}

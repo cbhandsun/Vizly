@@ -122,11 +122,14 @@ describe('flowchartClipboard', () => {
         if (!routingSnapshot) throw new Error('expected a valid routing snapshot');
 
         const result = coerceClipboardData({
-            nodes: [{ id: 'a', position: { x: 0, y: 0 } }],
+            nodes: [
+                { id: 'a', position: { x: 0, y: 0 } },
+                { id: 'b', position: { x: 100, y: 0 } },
+            ],
             edges: [{
                 id: 'edge',
                 source: 'a',
-                target: 'a',
+                target: 'b',
                 type: 'stablePath',
                 sourceHandle: 'right',
                 data: {
@@ -174,9 +177,12 @@ describe('flowchartClipboard', () => {
 
     it('filters edges that reference missing nodes', () => {
         const result = coerceClipboardData({
-            nodes: [{ id: 'a', position: { x: 0, y: 0 } }],
+            nodes: [
+                { id: 'a', position: { x: 0, y: 0 } },
+                { id: 'b', position: { x: 100, y: 0 } },
+            ],
             edges: [
-                { id: 'valid', source: 'a', target: 'a' },
+                { id: 'valid', source: 'a', target: 'b' },
                 { id: 'bad', source: 'a', target: 'missing' },
             ],
         });
@@ -212,17 +218,36 @@ describe('flowchartClipboard', () => {
             nodes: [
                 { id: ' a ', position: { x: 0, y: 0 } },
                 { id: 'a', position: { x: 10, y: 10 } },
+                { id: 'b', position: { x: 100, y: 10 } },
             ],
             edges: [
-                { id: ' e ', source: ' a ', target: 'a' },
+                { id: ' e ', source: ' a ', target: 'b' },
             ],
         });
 
-        expect(result?.nodes).toHaveLength(1);
+        expect(result?.nodes).toHaveLength(2);
         expect(result?.nodes[0].id).toBe('a');
         expect(result?.edges).toEqual([
-            expect.objectContaining({ id: 'e', source: 'a', target: 'a' }),
+            expect.objectContaining({ id: 'e', source: 'a', target: 'b' }),
         ]);
+    });
+
+    it('sanitizes clipboard edges that would reintroduce invalid topology', () => {
+        const result = coerceClipboardData({
+            nodes: [
+                { id: 'a', position: { x: 0, y: 0 } },
+                { id: 'b', position: { x: 100, y: 0 } },
+            ],
+            edges: [
+                { id: 'valid', source: 'a', target: 'b' },
+                { id: 'duplicate-identity', source: 'a', target: 'b' },
+                { id: 'duplicate-id', source: 'b', target: 'a' },
+                { id: 'duplicate-id', source: 'b', target: 'a', label: 'second' },
+                { id: 'self-loop', source: 'a', target: 'a' },
+            ],
+        });
+
+        expect(result?.edges.map(edge => edge.id)).toEqual(['valid', 'duplicate-id']);
     });
 
     it('parses JSON safely without throwing on malformed input', () => {
@@ -245,19 +270,22 @@ describe('flowchartClipboard', () => {
 
     it('strips dangerous nested keys from node and edge data', () => {
         const result = coerceClipboardData(JSON.parse(`{
-            "nodes": [{
-                "id": "a",
-                "position": { "x": 0, "y": 0 },
-                "data": {
-                    "label": "A",
-                    "constructor": { "polluted": true },
-                    "nested": { "__proto__": { "polluted": true }, "safe": true }
-                }
-            }],
+            "nodes": [
+                {
+                    "id": "a",
+                    "position": { "x": 0, "y": 0 },
+                    "data": {
+                        "label": "A",
+                        "constructor": { "polluted": true },
+                        "nested": { "__proto__": { "polluted": true }, "safe": true }
+                    }
+                },
+                { "id": "b", "position": { "x": 10, "y": 0 } }
+            ],
             "edges": [{
                 "id": "e",
                 "source": "a",
-                "target": "a",
+                "target": "b",
                 "data": {
                     "label": "edge",
                     "prototype": { "polluted": true }

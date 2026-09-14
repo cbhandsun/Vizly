@@ -1,14 +1,14 @@
 import React from 'react';
-import { Html } from '@react-three/drei';
+import { WarehouseHtmlOverlay } from './WarehouseScenePrimitives';
 import { WAREHOUSE } from './constants';
 import { useWarehouse3D } from './useWarehouse3D';
 
 const FloatingLabel: React.FC<{ position: [number, number, number], text: string, color?: string }> = ({ position, text, color = WAREHOUSE.COLORS.ZONE_LABELS }) => {
     return (
-        <Html
+        <WarehouseHtmlOverlay
             center
-            transform
             distanceFactor={25}
+            pointerEvents="none"
             position={[position[0], position[1] + 2, position[2]]} // Lift slightly higher
             zIndexRange={[20, 0]}
         >
@@ -28,7 +28,7 @@ const FloatingLabel: React.FC<{ position: [number, number, number], text: string
             >
                 {text}
             </div>
-        </Html>
+        </WarehouseHtmlOverlay>
     );
 };
 

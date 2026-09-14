@@ -6,6 +6,7 @@ import { DiagramVersion } from '@/services/storage/types';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { getFlowDataBridge } from '@/core/utils/flowDataBridge';
 import { coerceClipboardData } from '@/core/utils/flowchartClipboard';
+import { sanitizeCanvasEdgesForNodes } from '@/core/utils/canvasEdgeSanitizer';
 import {
     coerceDiagramVersion,
     parseDiagramVersionList,
@@ -18,16 +19,24 @@ import {
 } from './diagramStorageLogging';
 
 const loadUnifiedStorage = async () => (await import('@/services/UnifiedStorageService')).unifiedStorage;
+const sanitizeVersionCanvasSnapshot = (snapshot: ReturnType<typeof coerceClipboardData>) => (
+    snapshot
+        ? {
+            ...snapshot,
+            edges: sanitizeCanvasEdgesForNodes(snapshot.nodes, snapshot.edges),
+        }
+        : null
+);
 const readBridgeCanvasSnapshot = (bridge: ReturnType<typeof getFlowDataBridge>) => {
     if (!bridge) return null;
     const candidate = typeof bridge.getCanvasSnapshot === 'function'
         ? bridge.getCanvasSnapshot()
         : { nodes: bridge.nodes, edges: bridge.edges };
-    return coerceClipboardData(candidate);
+    return sanitizeVersionCanvasSnapshot(coerceClipboardData(candidate));
 };
 const readCurrentCanvasSnapshot = (getNodes: () => Node[], getEdges: () => Edge[]) => {
     try {
-        return coerceClipboardData({ nodes: getNodes(), edges: getEdges() });
+        return sanitizeVersionCanvasSnapshot(coerceClipboardData({ nodes: getNodes(), edges: getEdges() }));
     } catch {
         return null;
     }
@@ -166,7 +175,7 @@ export function useVersionHistory(diagramId: string) {
             return false;
         }
 
-        const snapshot = coerceClipboardData(fullVersion.snapshotData);
+        const snapshot = sanitizeVersionCanvasSnapshot(coerceClipboardData(fullVersion.snapshotData));
         if (!snapshot) {
             appMessage.error(t('designer.versionHistoryPanel.previewInvalid'));
             return false;
@@ -217,7 +226,7 @@ export function useVersionHistory(diagramId: string) {
             return false;
         }
 
-        const snapshot = coerceClipboardData(fullVersion.snapshotData);
+        const snapshot = sanitizeVersionCanvasSnapshot(coerceClipboardData(fullVersion.snapshotData));
         if (!snapshot) {
             appMessage.error(t('designer.versionHistoryPanel.restoreInvalid'));
             return false;
@@ -230,7 +239,7 @@ export function useVersionHistory(diagramId: string) {
         }
 
         const backupSnapshot = previewBaseRef.current?.diagramId === diagramId
-            ? coerceClipboardData(previewBaseRef.current)
+            ? sanitizeVersionCanvasSnapshot(coerceClipboardData(previewBaseRef.current))
             : readBridgeCanvasSnapshot(bridge);
         if (!backupSnapshot) {
             appMessage.error(t('designer.versionHistoryPanel.backupFailed'));

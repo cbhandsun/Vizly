@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "first-visit",
+      "status": "not-verified",
+      "evidence": []
+    },
+    {
+      "id": "core-flow",
+      "status": "not-verified",
+      "evidence": []
+    },
+    {
+      "id": "result-followup",
+      "status": "not-verified",
+      "evidence": []
+    },
+    {
+      "id": "state-feedback",
+      "status": "not-verified",
+      "evidence": []
+    },
+    {
+      "id": "recovery",
+      "status": "not-verified",
+      "evidence": []
+    },
+    {
+      "id": "responsive",
+      "status": "not-verified",
+      "evidence": []
+    },
+    {
+      "id": "keyboard",
+      "status": "not-verified",
+      "evidence": []
+    },
+    {
+      "id": "console-network",
+      "status": "not-verified",
+      "evidence": []
+    }
+  ]
+}

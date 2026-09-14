@@ -1,0 +1,77 @@
+# Project audit
+
+## Overall judgment
+
+0 review item(s) and 2 evidence gap(s) were identified. Static matches are candidate evidence, not proof that the related design or control is healthy.
+
+## Scope and limits
+
+- Audit level: standard
+- Coverage strategy: representative-journeys
+- Evidence expectation: representative journey, state, viewport, and related code evidence
+- Required experience scenarios: first-visit, core-flow, state-feedback, responsive, keyboard
+- Runtime gates required by level: yes
+- Audit mode: enhanced
+- Audit domains: visual-interaction, engineering-delivery
+- Project profile: application
+- Static analysis: enhanced-scoped-candidate-scan-completed
+- Runtime verification: not-verified
+- Experience verification: not-verified
+- Visual verification: not-verified
+- Scanned files: 10000
+- Warnings: 0
+- Not verified: 2
+
+## Review items
+
+- No confirmed warning-level static findings. This does not close the evidence gaps below.
+
+## Evidence gaps
+
+| Area | Missing verification | Next evidence |
+| --- | --- | --- |
+| runtime-gates | runtime gates were not requested; static evidence does not prove tests, builds, SCA or production behavior | Run the declared check, lint, typecheck, test, and build gates only with explicit authorization. |
+| experience-review | 5 required experience scenario(s) are not verified for the selected audit level | Capture and inspect the primary journey, responsive, keyboard, accessibility, console, and network scenarios. |
+
+## Requested review coverage
+
+- 视觉、交互与无障碍: visual-interaction-evidence: observed; interaction-feedback-evidence: observed; responsive-evidence: observed; accessibility-evidence: observed; experience-review: not-verified
+- 工程与交付: package-manifest: observed; dependency-lock: observed; automated-tests: observed; ci-workflows: observed; observability-evidence: observed; operations-evidence: observed; release-governance-evidence: observed; runtime-gates: not-verified
+
+## Evidence inventory
+
+| Area | Assessment | Status | Evidence | Candidate signal |
+| --- | --- | --- | --- | --- |
+| project-profile | observed | observed | package.json:1 | Node package profile; 4986 text source file(s) examined |
+| visual-interaction-evidence | observed | observed | scripts/lib/test-ci-runner-policy.test.mjs:35, src/app/__tests__/AntdThemeBridge.test.tsx:1, src/app/__tests__/AppRouteError.test.tsx:2 (+22 more) | 198 candidate component or browser interaction test detected |
+| responsive-evidence | observed | observed | .coverage/lcov-report/prettify.js:2, .coverage/prettify.js:2, dist-readable/assets/c-9ozz1YKu.js:517 (+22 more) | 172 candidate responsive layout detected |
+| accessibility-evidence | observed | observed | dist-readable/assets/c-1UwZK3vp.js:12, dist-readable/assets/c-4nwj2SuQ2.js:78, dist-readable/assets/c-5mvFlz2l.js:419 (+22 more) | 459 candidate accessibility semantic detected |
+| package-manifest | observed | observed | package.json:1 | package.json detected |
+| dependency-lock | observed | observed | package-lock.json:1 | lockfile detected |
+| automated-tests | observed | observed | scripts/lib/architecture-boundaries.test.mjs:1, scripts/lib/bundle-static-import-graph.test.mjs:1, scripts/lib/coverage-policy.test.mjs:1 (+22 more) | 1185 test file(s) detected |
+| ci-workflows | observed | observed | .github/workflows/ci.yml:1, .github/workflows/display-routing-matrix.yml:1, .github/workflows/routing-performance.yml:1 | 3 CI workflow file(s) detected |
+| operations-evidence | observed | observed | .github/workflows/ci.yml:1, .github/workflows/display-routing-matrix.yml:1, .github/workflows/routing-performance.yml:1 | 3 deployment, health or CI evidence detected |
+| interaction-feedback-evidence | observed | observed | .coverage/lcov-report/sorter.js:192, .coverage/sorter.js:192, dist-readable/assets/c-0skcFDX_2.js:1505 (+22 more) | 449 candidate interaction or user-feedback implementation detected |
+| observability-evidence | observed | observed | .codex-ci-install-134/package-lock.json:615, .codex-ci-install-134/package.json:37, .common-tools-audit/jobs/4085e7d6-63a4-449d-ba1d-0a924d0fc8d1.json:77 (+22 more) | 337 candidate observability, telemetry, or structured logging implementation detected |
+| release-governance-evidence | observed | observed | .github/workflows/ci.yml:16, .github/workflows/display-routing-matrix.yml:36, .github/workflows/routing-performance.yml:114 | 3 candidate release, health, rollback, smoke, artifact, or SBOM control detected |
+| runtime-gates | not-verified | not-verified | none | runtime gates were not requested; static evidence does not prove tests, builds, SCA or production behavior |
+| experience-review | not-verified | not-verified | none | 5 required experience scenario(s) are not verified for the selected audit level |
+
+## Local runtime gates
+
+| Gate | Status | Duration (ms) |
+| --- | --- | ---: |
+| not requested | not-verified | 0 |
+
+## Experience evidence
+
+- Supplied scenarios: 0
+- A supplied manifest proves only that bounded capture files exist. Inspect every screenshot and console/network artifact before promoting a scenario to verified health.
+
+## Interpretation
+
+- Audit level controls depth and evidence expectations; it does not authorize browser automation, project gates, or remote upload.
+- `observed` means candidate source or artifact evidence was found; it is not a design-quality pass.
+- `not-verified` requires real browser, keyboard, responsive, accessibility, network, gate, or deployment evidence.
+- Runtime gates run only when explicitly requested locally; this audit never runs project code by default.
+- Possible-secret evidence identifies only relative paths and line numbers. It never includes matched values.

@@ -5,6 +5,7 @@ import {
     type RoutingOnlyDocumentSnapshot,
 } from '../routing/persistedRoutingCandidate';
 import { stripRoutingOwnedDocumentEdge } from '../routing/routingDocumentSanitizer';
+import { sanitizeCanvasEdgesForNodes } from './canvasEdgeSanitizer';
 
 export interface ClipboardData {
     nodes: Node[];
@@ -222,7 +223,7 @@ export const coerceClipboardData = (value: unknown, options: ClipboardCoerceOpti
     const routingSnapshot = parseRoutingOnlyDocumentSnapshot(record.routingSnapshot);
     return {
         nodes,
-        edges,
+        edges: sanitizeCanvasEdgesForNodes(nodes, edges),
         ...(routingSnapshot ? { routingSnapshot } : {}),
     };
 };

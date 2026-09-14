@@ -1,0 +1,1028 @@
+{
+  "generatedAt": "2026-09-12T20:41:04.183Z",
+  "baseUrl": "http://127.0.0.1:4174",
+  "presetId": "wms-demand-allocation-strategy-v2",
+  "console": {
+    "firstVisit": {
+      "errors": [],
+      "warnings": [],
+      "unhandledRejections": [],
+      "fetches": [
+        {
+          "method": "GET",
+          "url": "http://127.0.0.1:4174/assets/zh-BSFQCIU7.json",
+          "status": 200,
+          "ok": true,
+          "durationMs": 12
+        }
+      ],
+      "xhrs": [],
+      "resourceSummary": {
+        "count": 101,
+        "zeroTransferCount": 0,
+        "slowCount": 0,
+        "largest": [
+          {
+            "name": "/assets/c-d2BC4cv6.js",
+            "durationMs": 91,
+            "transferSize": 154651,
+            "decodedBodySize": 510621
+          },
+          {
+            "name": "/assets/c-D5lCzF4m.js",
+            "durationMs": 76,
+            "transferSize": 92439,
+            "decodedBodySize": 305618
+          },
+          {
+            "name": "/assets/c-DGpMvAJA.js",
+            "durationMs": 63,
+            "transferSize": 102597,
+            "decodedBodySize": 301307
+          },
+          {
+            "name": "/assets/c-DkaFpug-.js",
+            "durationMs": 66,
+            "transferSize": 88890,
+            "decodedBodySize": 282594
+          },
+          {
+            "name": "/assets/c-B2q_WiJ7.js",
+            "durationMs": 32,
+            "transferSize": 32094,
+            "decodedBodySize": 150011
+          },
+          {
+            "name": "/assets/index-iV0h0dIq.css",
+            "durationMs": 18,
+            "transferSize": 23681,
+            "decodedBodySize": 145373
+          },
+          {
+            "name": "/assets/zh-BSFQCIU7.json",
+            "durationMs": 14,
+            "transferSize": 47620,
+            "decodedBodySize": 136050
+          },
+          {
+            "name": "/assets/c-rVIELD2S.js",
+            "durationMs": 37,
+            "transferSize": 42792,
+            "decodedBodySize": 134491
+          },
+          {
+            "name": "/assets/c-DaEYZZ3_.js",
+            "durationMs": 57,
+            "transferSize": 41364,
+            "decodedBodySize": 132006
+          },
+          {
+            "name": "/assets/c-bkxyMktT.js",
+            "durationMs": 50,
+            "transferSize": 35121,
+            "decodedBodySize": 106696
+          },
+          {
+            "name": "/assets/c-CWl-oT4h.js",
+            "durationMs": 57,
+            "transferSize": 33425,
+            "decodedBodySize": 103490
+          },
+          {
+            "name": "/assets/FlowchartDesigner-v_USiY8q.css",
+            "durationMs": 24,
+            "transferSize": 15308,
+            "decodedBodySize": 87686
+          }
+        ]
+      }
+    },
+    "coreFlow": {
+      "errors": [],
+      "warnings": [],
+      "unhandledRejections": [],
+      "fetches": [
+        {
+          "method": "GET",
+          "url": "http://127.0.0.1:4174/assets/zh-BSFQCIU7.json",
+          "status": 200,
+          "ok": true,
+          "durationMs": 10
+        },
+        {
+          "method": "GET",
+          "url": "http://127.0.0.1:4174/assets/DeamndAllocation-CWZp_oP6.json",
+          "status": 200,
+          "ok": true,
+          "durationMs": 57
+        },
+        {
+          "method": "GET",
+          "url": "http://127.0.0.1:4174/assets/route-785374153-CF0pVYUX.json",
+          "status": 200,
+          "ok": true,
+          "durationMs": 25
+        }
+      ],
+      "xhrs": [],
+      "resourceSummary": {
+        "count": 118,
+        "zeroTransferCount": 0,
+        "slowCount": 0,
+        "largest": [
+          {
+            "name": "/assets/baseReactFlowDisplayEdges.worker-DfvGa83e.js",
+            "durationMs": -191,
+            "transferSize": 291734,
+            "decodedBodySize": 1007268
+          },
+          {
+            "name": "/assets/c-9G8h6rhr2.js",
+            "durationMs": 41,
+            "transferSize": 56819,
+            "decodedBodySize": 198693
+          },
+          {
+            "name": "/assets/c-Vg1Y9Z8Z.js",
+            "durationMs": 38,
+            "transferSize": 44135,
+            "decodedBodySize": 137158
+          },
+          {
+            "name": "/assets/zh-BSFQCIU7.json",
+            "durationMs": 8,
+            "transferSize": 300,
+            "decodedBodySize": 136050
+          },
+          {
+            "name": "/assets/c-CQdC7Kqu.js",
+            "durationMs": 18,
+            "transferSize": 35223,
+            "decodedBodySize": 119649
+          },
+          {
+            "name": "/assets/c-Ceh08vNj.js",
+            "durationMs": 23,
+            "transferSize": 24919,
+            "decodedBodySize": 80236
+          },
+          {
+            "name": "/assets/c-DSHPFvnd2.js",
+            "durationMs": 18,
+            "transferSize": 18594,
+            "decodedBodySize": 69763
+          },
+          {
+            "name": "/assets/c-Dk6cT9zj.js",
+            "durationMs": 7,
+            "transferSize": 15525,
+            "decodedBodySize": 58063
+          },
+          {
+            "name": "/assets/c-XLmbbcyW2.js",
+            "durationMs": 22,
+            "transferSize": 15612,
+            "decodedBodySize": 50831
+          },
+          {
+            "name": "/assets/c-FcVNpg1F2.js",
+            "durationMs": 22,
+            "transferSize": 15133,
+            "decodedBodySize": 46502
+          },
+          {
+            "name": "/assets/c-B1PgnAEh2.js",
+            "durationMs": 7,
+            "transferSize": 300,
+            "decodedBodySize": 26272
+          },
+          {
+            "name": "/assets/c-BBiadynA.js",
+            "durationMs": 16,
+            "transferSize": 300,
+            "decodedBodySize": 25823
+          }
+        ]
+      }
+    },
+    "stateFeedback": {
+      "errors": [],
+      "warnings": [],
+      "unhandledRejections": [],
+      "fetches": [
+        {
+          "method": "GET",
+          "url": "http://127.0.0.1:4174/assets/zh-BSFQCIU7.json",
+          "status": 200,
+          "ok": true,
+          "durationMs": 10
+        },
+        {
+          "method": "GET",
+          "url": "http://127.0.0.1:4174/assets/DeamndAllocation-CWZp_oP6.json",
+          "status": 200,
+          "ok": true,
+          "durationMs": 57
+        },
+        {
+          "method": "GET",
+          "url": "http://127.0.0.1:4174/assets/route-785374153-CF0pVYUX.json",
+          "status": 200,
+          "ok": true,
+          "durationMs": 25
+        }
+      ],
+      "xhrs": [],
+      "resourceSummary": {
+        "count": 125,
+        "zeroTransferCount": 0,
+        "slowCount": 0,
+        "largest": [
+          {
+            "name": "/assets/elk-engine-worker-BDw1SMbx.js",
+            "durationMs": 42,
+            "transferSize": 438740,
+            "decodedBodySize": 1439622
+          },
+          {
+            "name": "/assets/baseReactFlowDisplayEdges.worker-DfvGa83e.js",
+            "durationMs": -191,
+            "transferSize": 291734,
+            "decodedBodySize": 1007268
+          },
+          {
+            "name": "/assets/c-9G8h6rhr2.js",
+            "durationMs": 41,
+            "transferSize": 56819,
+            "decodedBodySize": 198693
+          },
+          {
+            "name": "/assets/c-Vg1Y9Z8Z.js",
+            "durationMs": 38,
+            "transferSize": 44135,
+            "decodedBodySize": 137158
+          },
+          {
+            "name": "/assets/zh-BSFQCIU7.json",
+            "durationMs": 8,
+            "transferSize": 300,
+            "decodedBodySize": 136050
+          },
+          {
+            "name": "/assets/c-CQdC7Kqu.js",
+            "durationMs": 18,
+            "transferSize": 35223,
+            "decodedBodySize": 119649
+          },
+          {
+            "name": "/assets/c-Ceh08vNj.js",
+            "durationMs": 23,
+            "transferSize": 24919,
+            "decodedBodySize": 80236
+          },
+          {
+            "name": "/assets/c-DSHPFvnd2.js",
+            "durationMs": 18,
+            "transferSize": 18594,
+            "decodedBodySize": 69763
+          },
+          {
+            "name": "/assets/c-Dk6cT9zj.js",
+            "durationMs": 7,
+            "transferSize": 15525,
+            "decodedBodySize": 58063
+          },
+          {
+            "name": "/assets/c-XLmbbcyW2.js",
+            "durationMs": 22,
+            "transferSize": 15612,
+            "decodedBodySize": 50831
+          },
+          {
+            "name": "/assets/c-FcVNpg1F2.js",
+            "durationMs": 22,
+            "transferSize": 15133,
+            "decodedBodySize": 46502
+          },
+          {
+            "name": "/assets/c-B1PgnAEh2.js",
+            "durationMs": 7,
+            "transferSize": 300,
+            "decodedBodySize": 26272
+          }
+        ]
+      }
+    },
+    "recovery": {
+      "errors": [],
+      "warnings": [],
+      "unhandledRejections": [],
+      "fetches": [
+        {
+          "method": "GET",
+          "url": "http://127.0.0.1:4174/assets/zh-BSFQCIU7.json",
+          "status": 200,
+          "ok": true,
+          "durationMs": 6
+        },
+        {
+          "method": "GET",
+          "url": "http://127.0.0.1:4174/assets/DeamndAllocation-CWZp_oP6.json",
+          "status": 200,
+          "ok": true,
+          "durationMs": 68
+        },
+        {
+          "method": "GET",
+          "url": "http://127.0.0.1:4174/assets/route-785374153-CF0pVYUX.json",
+          "status": 200,
+          "ok": true,
+          "durationMs": 8
+        }
+      ],
+      "xhrs": [],
+      "resourceSummary": {
+        "count": 107,
+        "zeroTransferCount": 0,
+        "slowCount": 0,
+        "largest": [
+          {
+            "name": "/assets/baseReactFlowDisplayEdges.worker-DfvGa83e.js",
+            "durationMs": -227,
+            "transferSize": 300,
+            "decodedBodySize": 1007268
+          },
+          {
+            "name": "/assets/c-9G8h6rhr2.js",
+            "durationMs": 18,
+            "transferSize": 300,
+            "decodedBodySize": 198693
+          },
+          {
+            "name": "/assets/c-Vg1Y9Z8Z.js",
+            "durationMs": 5,
+            "transferSize": 300,
+            "decodedBodySize": 137158
+          },
+          {
+            "name": "/assets/zh-BSFQCIU7.json",
+            "durationMs": 11,
+            "transferSize": 300,
+            "decodedBodySize": 136050
+          },
+          {
+            "name": "/assets/c-nLX2YVH-2.js",
+            "durationMs": 10,
+            "transferSize": 300,
+            "decodedBodySize": 25653
+          },
+          {
+            "name": "/assets/route-785374153-CF0pVYUX.json",
+            "durationMs": 8,
+            "transferSize": 300,
+            "decodedBodySize": 22159
+          },
+          {
+            "name": "/assets/c-Dmik9ASR.js",
+            "durationMs": 32,
+            "transferSize": 300,
+            "decodedBodySize": 21519
+          },
+          {
+            "name": "/assets/c-CYw8dcmN.js",
+            "durationMs": 6,
+            "transferSize": 300,
+            "decodedBodySize": 14823
+          },
+          {
+            "name": "/assets/DeamndAllocation-CWZp_oP6.json",
+            "durationMs": 17,
+            "transferSize": 300,
+            "decodedBodySize": 11451
+          },
+          {
+            "name": "/assets/c-BV0HPSWW2.js",
+            "durationMs": 49,
+            "transferSize": 300,
+            "decodedBodySize": 8068
+          },
+          {
+            "name": "/assets/DiagramViewerRoute-CoRTnyvi.css",
+            "durationMs": 31,
+            "transferSize": 300,
+            "decodedBodySize": 6039
+          },
+          {
+            "name": "/assets/TitleGroupNode-B0O5fdXq.css",
+            "durationMs": 4,
+            "transferSize": 300,
+            "decodedBodySize": 5703
+          }
+        ]
+      }
+    },
+    "responsiveFirstVisit": {
+      "errors": [],
+      "warnings": [],
+      "unhandledRejections": [],
+      "fetches": [
+        {
+          "method": "GET",
+          "url": "http://127.0.0.1:4174/assets/zh-BSFQCIU7.json",
+          "status": 200,
+          "ok": true,
+          "durationMs": 5
+        }
+      ],
+      "xhrs": [],
+      "resourceSummary": {
+        "count": 100,
+        "zeroTransferCount": 0,
+        "slowCount": 0,
+        "largest": [
+          {
+            "name": "/assets/c-d2BC4cv6.js",
+            "durationMs": 68,
+            "transferSize": 300,
+            "decodedBodySize": 510621
+          },
+          {
+            "name": "/assets/c-D5lCzF4m.js",
+            "durationMs": 15,
+            "transferSize": 300,
+            "decodedBodySize": 305618
+          },
+          {
+            "name": "/assets/c-DGpMvAJA.js",
+            "durationMs": 11,
+            "transferSize": 300,
+            "decodedBodySize": 301307
+          },
+          {
+            "name": "/assets/c-DkaFpug-.js",
+            "durationMs": 13,
+            "transferSize": 300,
+            "decodedBodySize": 282594
+          },
+          {
+            "name": "/assets/c-B2q_WiJ7.js",
+            "durationMs": 15,
+            "transferSize": 300,
+            "decodedBodySize": 150011
+          },
+          {
+            "name": "/assets/zh-BSFQCIU7.json",
+            "durationMs": 5,
+            "transferSize": 300,
+            "decodedBodySize": 136050
+          },
+          {
+            "name": "/assets/c-rVIELD2S.js",
+            "durationMs": 17,
+            "transferSize": 300,
+            "decodedBodySize": 134491
+          },
+          {
+            "name": "/assets/c-DaEYZZ3_.js",
+            "durationMs": 20,
+            "transferSize": 300,
+            "decodedBodySize": 132006
+          },
+          {
+            "name": "/assets/c-bkxyMktT.js",
+            "durationMs": 17,
+            "transferSize": 300,
+            "decodedBodySize": 106696
+          },
+          {
+            "name": "/assets/c-CWl-oT4h.js",
+            "durationMs": 30,
+            "transferSize": 300,
+            "decodedBodySize": 103490
+          },
+          {
+            "name": "/assets/c-CUu1d3kM2.js",
+            "durationMs": 26,
+            "transferSize": 300,
+            "decodedBodySize": 86498
+          },
+          {
+            "name": "/assets/c-CsytwMGA.js",
+            "durationMs": 7,
+            "transferSize": 300,
+            "decodedBodySize": 68245
+          }
+        ]
+      }
+    },
+    "responsiveCoreFlow": {
+      "errors": [],
+      "warnings": [],
+      "unhandledRejections": [],
+      "fetches": [
+        {
+          "method": "GET",
+          "url": "http://127.0.0.1:4174/assets/zh-BSFQCIU7.json",
+          "status": 200,
+          "ok": true,
+          "durationMs": 6
+        },
+        {
+          "method": "GET",
+          "url": "http://127.0.0.1:4174/assets/DeamndAllocation-CWZp_oP6.json",
+          "status": 200,
+          "ok": true,
+          "durationMs": 68
+        },
+        {
+          "method": "GET",
+          "url": "http://127.0.0.1:4174/assets/route-785374153-CF0pVYUX.json",
+          "status": 200,
+          "ok": true,
+          "durationMs": 8
+        }
+      ],
+      "xhrs": [],
+      "resourceSummary": {
+        "count": 107,
+        "zeroTransferCount": 0,
+        "slowCount": 0,
+        "largest": [
+          {
+            "name": "/assets/baseReactFlowDisplayEdges.worker-DfvGa83e.js",
+            "durationMs": -227,
+            "transferSize": 300,
+            "decodedBodySize": 1007268
+          },
+          {
+            "name": "/assets/c-9G8h6rhr2.js",
+            "durationMs": 18,
+            "transferSize": 300,
+            "decodedBodySize": 198693
+          },
+          {
+            "name": "/assets/c-Vg1Y9Z8Z.js",
+            "durationMs": 5,
+            "transferSize": 300,
+            "decodedBodySize": 137158
+          },
+          {
+            "name": "/assets/zh-BSFQCIU7.json",
+            "durationMs": 11,
+            "transferSize": 300,
+            "decodedBodySize": 136050
+          },
+          {
+            "name": "/assets/c-nLX2YVH-2.js",
+            "durationMs": 10,
+            "transferSize": 300,
+            "decodedBodySize": 25653
+          },
+          {
+            "name": "/assets/route-785374153-CF0pVYUX.json",
+            "durationMs": 8,
+            "transferSize": 300,
+            "decodedBodySize": 22159
+          },
+          {
+            "name": "/assets/c-Dmik9ASR.js",
+            "durationMs": 32,
+            "transferSize": 300,
+            "decodedBodySize": 21519
+          },
+          {
+            "name": "/assets/c-CYw8dcmN.js",
+            "durationMs": 6,
+            "transferSize": 300,
+            "decodedBodySize": 14823
+          },
+          {
+            "name": "/assets/DeamndAllocation-CWZp_oP6.json",
+            "durationMs": 17,
+            "transferSize": 300,
+            "decodedBodySize": 11451
+          },
+          {
+            "name": "/assets/c-BV0HPSWW2.js",
+            "durationMs": 49,
+            "transferSize": 300,
+            "decodedBodySize": 8068
+          },
+          {
+            "name": "/assets/DiagramViewerRoute-CoRTnyvi.css",
+            "durationMs": 31,
+            "transferSize": 300,
+            "decodedBodySize": 6039
+          },
+          {
+            "name": "/assets/TitleGroupNode-B0O5fdXq.css",
+            "durationMs": 4,
+            "transferSize": 300,
+            "decodedBodySize": 5703
+          }
+        ]
+      }
+    }
+  },
+  "network": {
+    "failures": [],
+    "totals": {
+      "firstVisit": {
+        "fetches": 1,
+        "xhrs": 0,
+        "resources": 101,
+        "slowResources": 0
+      },
+      "coreFlow": {
+        "fetches": 3,
+        "xhrs": 0,
+        "resources": 118,
+        "slowResources": 0
+      },
+      "stateFeedback": {
+        "fetches": 3,
+        "xhrs": 0,
+        "resources": 125,
+        "slowResources": 0
+      },
+      "recovery": {
+        "fetches": 3,
+        "xhrs": 0,
+        "resources": 107,
+        "slowResources": 0
+      },
+      "responsiveFirstVisit": {
+        "fetches": 1,
+        "xhrs": 0,
+        "resources": 100,
+        "slowResources": 0
+      },
+      "responsiveCoreFlow": {
+        "fetches": 3,
+        "xhrs": 0,
+        "resources": 107,
+        "slowResources": 0
+      }
+    }
+  },
+  "resultFollowup": {
+    "activeDiagramTitle": true,
+    "followupActions": {
+      "fitView": {
+        "text": "适应 (23%)",
+        "aria": "适应 (23%)",
+        "disabled": false,
+        "visible": true,
+        "width": 23,
+        "height": 23
+      },
+      "export": {
+        "text": "导出",
+        "aria": "导出",
+        "disabled": false,
+        "visible": true,
+        "width": 23,
+        "height": 23
+      },
+      "share": {
+        "text": "分享",
+        "aria": "分享",
+        "disabled": false,
+        "visible": true,
+        "width": 64,
+        "height": 44
+      },
+      "pageAdd": {
+        "text": "新建页面",
+        "aria": "新建页面",
+        "disabled": false,
+        "visible": true,
+        "width": 52,
+        "height": 52
+      },
+      "propertyPanel": {
+        "text": "属性设置",
+        "aria": "属性设置",
+        "disabled": false,
+        "visible": true,
+        "width": 44,
+        "height": 44
+      }
+    },
+    "availableActionCount": 40
+  },
+  "recovery": {
+    "poisonedViewportSetup": {
+      "keys": [
+        "vizly:viewport:v1:wms-demand-allocation-strategy-v2%3Apage-1",
+        "vizly:viewport:v1:wms-demand-allocation-strategy-v2%3Apage-1%3Adesktop"
+      ],
+      "poisonousViewport": {
+        "x": -100000,
+        "y": -100000,
+        "zoom": 0.02
+      }
+    },
+    "recoveredViewport": {
+      "x": 57,
+      "y": -502,
+      "zoom": 0.45
+    },
+    "readableZoom": true,
+    "preservedDiagram": true,
+    "screenshot": ".common-tools\\reports\\layout-routing-audit\\experience-evidence\\screenshots\\responsive-mobile-core-flow.png"
+  },
+  "keyboard": {
+    "trace": [
+      {
+        "tag": "button",
+        "text": "页面 1",
+        "aria": "页面 1",
+        "role": "tab",
+        "className": "page-tabs__tab page-tabs__tab--active",
+        "visible": true,
+        "focusVisible": true,
+        "outlineStyle": "auto",
+        "outlineWidth": "0.555556px",
+        "boxShadow": "none",
+        "rect": {
+          "x": 91,
+          "y": 905,
+          "width": 60,
+          "height": 52
+        }
+      },
+      {
+        "tag": "button",
+        "text": "复制页面 页面 1",
+        "aria": "复制页面 页面 1",
+        "role": null,
+        "className": "page-tabs__duplicate",
+        "visible": true,
+        "focusVisible": true,
+        "outlineStyle": "auto",
+        "outlineWidth": "0.555556px",
+        "boxShadow": "none",
+        "rect": {
+          "x": 255,
+          "y": 905,
+          "width": 52,
+          "height": 52
+        }
+      },
+      {
+        "tag": "button",
+        "text": "重命名页面 页面 1",
+        "aria": "重命名页面 页面 1",
+        "role": null,
+        "className": "page-tabs__rename-action",
+        "visible": true,
+        "focusVisible": true,
+        "outlineStyle": "auto",
+        "outlineWidth": "0.555556px",
+        "boxShadow": "none",
+        "rect": {
+          "x": 307,
+          "y": 905,
+          "width": 52,
+          "height": 52
+        }
+      },
+      {
+        "tag": "button",
+        "text": "新建页面",
+        "aria": "新建页面",
+        "role": null,
+        "className": "page-tabs__add",
+        "visible": true,
+        "focusVisible": true,
+        "outlineStyle": "auto",
+        "outlineWidth": "0.555556px",
+        "boxShadow": "none",
+        "rect": {
+          "x": 359,
+          "y": 905,
+          "width": 52,
+          "height": 52
+        }
+      },
+      {
+        "tag": "button",
+        "text": "属性设置",
+        "aria": "属性设置",
+        "role": null,
+        "className": "ant-btn css-la24ln css-var-_r_1_ ant-btn-text ant-btn-color-default ant-btn-variant-text ant-btn-icon-only",
+        "visible": true,
+        "focusVisible": true,
+        "outlineStyle": "solid",
+        "outlineWidth": "2.61438px",
+        "boxShadow": "none",
+        "rect": {
+          "x": 1382,
+          "y": 69,
+          "width": 44,
+          "height": 44
+        }
+      },
+      {
+        "tag": "button",
+        "text": "AI 助手",
+        "aria": "AI 助手",
+        "role": null,
+        "className": "ant-btn css-la24ln css-var-_r_1_ ant-btn-text ant-btn-color-default ant-btn-variant-text ant-btn-icon-only",
+        "visible": true,
+        "focusVisible": true,
+        "outlineStyle": "solid",
+        "outlineWidth": "2.61438px",
+        "boxShadow": "none",
+        "rect": {
+          "x": 1382,
+          "y": 114,
+          "width": 44,
+          "height": 44
+        }
+      },
+      {
+        "tag": "button",
+        "text": "展开面板",
+        "aria": "展开面板",
+        "role": null,
+        "className": "ant-btn css-la24ln css-var-_r_1_ ant-btn-text ant-btn-color-default ant-btn-variant-text ant-btn-icon-only",
+        "visible": true,
+        "focusVisible": true,
+        "outlineStyle": "solid",
+        "outlineWidth": "2.61438px",
+        "boxShadow": "none",
+        "rect": {
+          "x": 1382,
+          "y": 173,
+          "width": 44,
+          "height": 44
+        }
+      },
+      {
+        "tag": "button",
+        "text": "最小化小地图",
+        "aria": "最小化小地图",
+        "role": null,
+        "className": "minimap-control-btn",
+        "visible": true,
+        "focusVisible": true,
+        "outlineStyle": "solid",
+        "outlineWidth": "1.66667px",
+        "boxShadow": "none",
+        "rect": {
+          "x": 220,
+          "y": 705,
+          "width": 44,
+          "height": 44
+        }
+      },
+      {
+        "tag": "div",
+        "text": "Minimap navigation",
+        "aria": "Minimap navigation",
+        "role": "application",
+        "className": "",
+        "visible": true,
+        "focusVisible": true,
+        "outlineStyle": "solid",
+        "outlineWidth": "2.77778px",
+        "boxShadow": "none",
+        "rect": {
+          "x": 26,
+          "y": 749,
+          "width": 236,
+          "height": 134
+        }
+      },
+      {
+        "tag": "body",
+        "text": "V\nVizly\n仓储需求分流与库存分配策略\n仓储需求分流与库存分配策略\nCtrl+K\n23%\n23%\n分享\n基础数据\n缺货 (Inv < Demand)\n充足\n修正需求 (Q*Rate)\nMax_Ra",
+        "aria": null,
+        "role": null,
+        "className": "",
+        "visible": true,
+        "focusVisible": false,
+        "outlineStyle": "none",
+        "outlineWidth": "2.77778px",
+        "boxShadow": "none",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 1440,
+          "height": 961
+        }
+      },
+      {
+        "tag": "a",
+        "text": "V\nVizly",
+        "aria": null,
+        "role": null,
+        "className": "flex items-center gap-2 px-1.5 py-1 rounded-[6px] hover:bg-black/5 dark:hover:bg-white/5 transition-all no-underline act",
+        "visible": true,
+        "focusVisible": true,
+        "outlineStyle": "solid",
+        "outlineWidth": "2.61438px",
+        "boxShadow": "none",
+        "rect": {
+          "x": 23,
+          "y": 18,
+          "width": 53,
+          "height": 19
+        }
+      },
+      {
+        "tag": "button",
+        "text": "仓储需求分流与库存分配策略",
+        "aria": "打开图表与模板：仓储需求分流与库存分配策略",
+        "role": null,
+        "className": "flex items-center gap-1.5 px-2.5 appearance-none border-0 bg-transparent rounded-[6px] hover:bg-black/[0.04] dark:hover:",
+        "visible": true,
+        "focusVisible": true,
+        "outlineStyle": "auto",
+        "outlineWidth": "0.653595px",
+        "boxShadow": "none",
+        "rect": {
+          "x": 88,
+          "y": 14,
+          "width": 167,
+          "height": 27
+        }
+      },
+      {
+        "tag": "button",
+        "text": "Ctrl+K",
+        "aria": "打开命令搜索",
+        "role": null,
+        "className": "flex items-center gap-2 px-2 h-[32px] appearance-none border-0 bg-transparent rounded-[6px] hover:bg-black/[0.04] dark:h",
+        "visible": true,
+        "focusVisible": true,
+        "outlineStyle": "auto",
+        "outlineWidth": "0.653595px",
+        "boxShadow": "none",
+        "rect": {
+          "x": 263,
+          "y": 14,
+          "width": 48,
+          "height": 27
+        }
+      },
+      {
+        "tag": "button",
+        "text": "撤销 (Ctrl+Z)",
+        "aria": "撤销 (Ctrl+Z)",
+        "role": null,
+        "className": "ant-btn css-la24ln css-var-_r_1_ ant-btn-text ant-btn-color-default ant-btn-variant-text ant-btn-icon-only w-8 h-8 p-0 b",
+        "visible": true,
+        "focusVisible": true,
+        "outlineStyle": "solid",
+        "outlineWidth": "2.61438px",
+        "boxShadow": "none",
+        "rect": {
+          "x": 573,
+          "y": 16,
+          "width": 23,
+          "height": 23
+        }
+      }
+    ],
+    "afterEnter": {
+      "tag": "button",
+      "text": "撤销 (Ctrl+Z)",
+      "aria": "撤销 (Ctrl+Z)",
+      "role": null,
+      "className": "ant-btn css-la24ln css-var-_r_1_ ant-btn-text ant-btn-color-default ant-btn-variant-text ant-btn-icon-only w-8 h-8 p-0 b",
+      "visible": true,
+      "focusVisible": true,
+      "outlineStyle": "solid",
+      "outlineWidth": "2.61438px",
+      "boxShadow": "none",
+      "rect": {
+        "x": 573,
+        "y": 16,
+        "width": 23,
+        "height": 23
+      }
+    }
+  },
+  "metrics": {
+    "firstVisitControls": 38,
+    "coreFlowNodes": 30,
+    "coreFlowEdges": 26,
+    "coreFlowHardClean": true,
+    "layoutCommit": {
+      "layoutTransactionStatus": "committed",
+      "layoutTransactionJobId": 2,
+      "hardClean": true,
+      "positionMismatchCount": null,
+      "maxPositionDelta": null
+    },
+    "recoveryReadableZoom": true,
+    "recoveryPreservedDiagram": true,
+    "responsiveFirstVisitOverflow": 0,
+    "responsiveCoreFlowOverflow": 0,
+    "responsiveCoreFlowNodes": 30,
+    "responsiveCoreFlowEdges": 26
+  }
+}

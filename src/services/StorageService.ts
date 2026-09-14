@@ -1,4 +1,4 @@
-import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { createS3FetchClient, type S3FetchClient } from './s3FetchClient';
 import { IStorageProvider, DiagramMetadata, SavedDiagram } from './storage/types';
 import {
     coerceS3StorageConfig,
@@ -37,7 +37,7 @@ export class S3StorageProvider implements IStorageProvider {
     id = 's3' as const;
 
     private static instance: S3StorageProvider;
-    private client: S3Client | null = null;
+    private client: S3FetchClient | null = null;
     private config: StorageConfig | null = null;
     private persistedConfigDraft: StorageConfig | null = null;
 
@@ -275,16 +275,8 @@ export class S3StorageProvider implements IStorageProvider {
         this.client = this.createClient(this.config);
     }
 
-    private createClient(config: StorageConfig): S3Client {
-        return new S3Client({
-            region: config.region,
-            endpoint: config.endpoint,
-            credentials: {
-                accessKeyId: config.accessKeyId,
-                secretAccessKey: config.secretAccessKey,
-            },
-            forcePathStyle: config.s3ForcePathStyle ?? true, // Default to true for many S3 compatible services
-        });
+    private createClient(config: StorageConfig): S3FetchClient {
+        return createS3FetchClient(config);
     }
 
     // === IStorageProvider Implementation ===
@@ -295,20 +287,15 @@ export class S3StorageProvider implements IStorageProvider {
         }
 
         try {
-            const command = new ListObjectsV2Command({
-                Bucket: this.config.bucket,
-                Prefix: ''
-            });
+            const response = await this.client.listObjects({ prefix: '' });
 
-            const response = await this.client.send(command);
-
-            return (response.Contents || [])
-                .filter(item => item.Key?.endsWith('.json'))
+            return response.contents
+                .filter(item => item.key.endsWith('.json'))
                 .map(item => ({
-                    id: item.Key!,
-                    title: item.Key!.replace('.json', ''), // Simple title derivation
-                    updatedAt: item.LastModified || new Date(),
-                    size: item.Size
+                    id: item.key,
+                    title: item.key.replace('.json', ''), // Simple title derivation
+                    updatedAt: item.lastModified || new Date(),
+                    size: item.size
                 }));
         } catch (error) {
             safeLog.error('List diagrams failed:', redactSensitiveLogValue(error));
@@ -323,18 +310,8 @@ export class S3StorageProvider implements IStorageProvider {
         }
 
         try {
-            const command = new GetObjectCommand({
-                Bucket: this.config.bucket,
-                Key: id
-            });
-
-            const response = await this.client.send(command);
-
-            if (!response.Body) {
-                throw new Error("Empty response body");
-            }
-
-            const str = await response.Body.transformToString();
+            const response = await this.client.getObject(id);
+            const str = response.bodyText;
             const fallbackTitle = id.replace(/\.json$/i, '');
             const content = parseRemoteDiagramJson(str, { id, title: fallbackTitle });
 
@@ -344,7 +321,7 @@ export class S3StorageProvider implements IStorageProvider {
                 id: id,
                 title: content.metadata?.title || content.name || fallbackTitle,
                 content: content,
-                updated_at: (response.LastModified || new Date()).toISOString(),
+                updated_at: (response.lastModified || new Date()).toISOString(),
                 user_id: 's3-user' // S3 doesn't have inherent user concept here
             };
         } catch (error) {
@@ -368,14 +345,11 @@ export class S3StorageProvider implements IStorageProvider {
         }
 
         try {
-            const command = new PutObjectCommand({
-                Bucket: this.config.bucket,
-                Key: key,
-                Body: JSON.stringify(diagram.content, null, 2), // Storing just content to remain compatible with generic S3 viewers
-                ContentType: 'application/json'
-            });
-
-            await this.client.send(command);
+            await this.client.putObject(
+                key,
+                JSON.stringify(diagram.content, null, 2), // Storing just content to remain compatible with generic S3 viewers
+                'application/json',
+            );
 
             return {
                 ...diagram,
@@ -393,11 +367,7 @@ export class S3StorageProvider implements IStorageProvider {
         }
 
         try {
-            const command = new DeleteObjectCommand({
-                Bucket: this.config.bucket,
-                Key: id
-            });
-            await this.client.send(command);
+            await this.client.deleteObject(id);
         } catch (error) {
             safeLog.error('Delete diagram failed:', redactSensitiveValue(error));
             throw error;
@@ -422,11 +392,7 @@ export class S3StorageProvider implements IStorageProvider {
         }
 
         try {
-            const command = new ListObjectsV2Command({
-                Bucket: configToTest.bucket,
-                MaxKeys: 1
-            });
-            await client.send(command, signal ? { abortSignal: signal } : undefined);
+            await client.listObjects({ maxKeys: 1, signal });
             return true;
         } catch (error) {
             safeLog.error('S3 Connection Test Failed', redactSensitiveLogValue(error));

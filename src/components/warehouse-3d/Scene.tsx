@@ -1,13 +1,15 @@
 import React, { lazy, Suspense, useCallback, useEffect, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
-import {
-    OrbitControls, PerspectiveCamera, ContactShadows, Sky,
-    AdaptiveDpr
-} from '@react-three/drei';
 import { useTranslation } from 'react-i18next';
 
 import { useWarehouse3D } from './useWarehouse3D';
 import { parseWarehouseSceneKeyboardCommand } from './warehouse3DInteraction';
+import {
+    WarehouseAdaptiveDpr,
+    WarehouseGroundShadow,
+    WarehouseOrbitControls,
+    type WarehouseOrbitControlsHandle,
+} from './WarehouseScenePrimitives';
 
 const WarehouseModel = lazy(() => import('./WarehouseModel'));
 
@@ -18,7 +20,7 @@ export interface SceneProps {
 const Scene: React.FC<SceneProps> = ({ onModelReady }) => {
     const { t } = useTranslation();
     const { autoRotate, resetViewTrigger, setAutoRotate } = useWarehouse3D();
-    const controlsRef = useRef<React.ElementRef<typeof OrbitControls>>(null);
+    const controlsRef = useRef<WarehouseOrbitControlsHandle>(null);
 
     useEffect(() => {
         if (controlsRef.current) {
@@ -79,16 +81,15 @@ const Scene: React.FC<SceneProps> = ({ onModelReady }) => {
             <Canvas
                 shadows
                 dpr={1}
+                camera={{ position: [-200, 180, 220], fov: 35 }}
                 gl={{
                     antialias: true,
                     powerPreference: 'high-performance',
                     logarithmicDepthBuffer: true, // Industry best practice for large scale scenes to prevent z-fighting
                 }}
             >
-                <PerspectiveCamera makeDefault position={[-200, 180, 220]} fov={35} />
-                <OrbitControls
+                <WarehouseOrbitControls
                     ref={controlsRef}
-                    makeDefault
                     minPolarAngle={0}
                     maxPolarAngle={Math.PI / 2.1}
                     minDistance={30}
@@ -113,10 +114,8 @@ const Scene: React.FC<SceneProps> = ({ onModelReady }) => {
                 </directionalLight>
 
                 {/* Atmospheric Effects */}
-                {/* Lift shadows purely slightly above floor (Best practice: prevent coincident geometry) */}
-                <ContactShadows position={[0, 0.02, 0]} resolution={512} scale={500} blur={2} opacity={0.55} far={20} color="#1a1a1a" frames={1} />
-                {/* <Environment preset="warehouse" /> */}
-                <Sky distance={450000} sunPosition={[0, 1, -1]} inclination={0} azimuth={0.25} />
+                {/* Lightweight ground depth cue; real shadows still come from the directional light above. */}
+                <WarehouseGroundShadow />
 
                 <fog attach="fog" args={['#d0d0d0', 100, 800]} />
 
@@ -126,7 +125,7 @@ const Scene: React.FC<SceneProps> = ({ onModelReady }) => {
                 </Suspense>
 
                 {/* Performance Adaptivity */}
-                <AdaptiveDpr pixelated />
+                <WarehouseAdaptiveDpr pixelated />
 
                 {/* Background color */}
                 <color attach="background" args={['#d0d0d0']} />

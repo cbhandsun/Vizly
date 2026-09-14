@@ -1,0 +1,1006 @@
+{
+  "version": "0.3.0",
+  "capability": "project-audit",
+  "generatedAt": "2026-09-12T17:34:38.723Z",
+  "root": "E:\\DEV\\WorkSpace\\Antigravity-WS\\Vizly",
+  "scope": {
+    "projectKind": "application",
+    "auditLevel": "standard",
+    "coverageStrategy": "representative-journeys",
+    "evidenceExpectation": "representative journey, state, viewport, and related code evidence",
+    "requiredExperienceScenarios": [
+      "first-visit",
+      "core-flow",
+      "state-feedback",
+      "responsive",
+      "keyboard"
+    ],
+    "requiresRuntimeGates": true,
+    "auditMode": "enhanced",
+    "auditDomains": [
+      "visual-interaction",
+      "engineering-delivery"
+    ],
+    "staticAnalysis": "enhanced-scoped-candidate-scan-completed",
+    "runtimeVerification": "not-verified",
+    "experienceVerification": "not-verified",
+    "visualVerification": "not-verified"
+  },
+  "reviewDomains": [
+    {
+      "id": "visual-interaction",
+      "label": "视觉、交互与无障碍",
+      "findingIds": [
+        "visual-interaction-evidence",
+        "interaction-feedback-evidence",
+        "responsive-evidence",
+        "accessibility-evidence",
+        "experience-review"
+      ]
+    },
+    {
+      "id": "engineering-delivery",
+      "label": "工程与交付",
+      "findingIds": [
+        "package-manifest",
+        "dependency-lock",
+        "automated-tests",
+        "ci-workflows",
+        "observability-evidence",
+        "operations-evidence",
+        "release-governance-evidence",
+        "runtime-gates"
+      ]
+    }
+  ],
+  "gates": {
+    "requested": false,
+    "results": []
+  },
+  "experience": {
+    "scenarios": []
+  },
+  "summary": {
+    "scannedFiles": 10000,
+    "warnings": 0,
+    "unverified": 2,
+    "passed": 12,
+    "failed": 2
+  },
+  "findings": [
+    {
+      "id": "project-profile",
+      "passed": true,
+      "severity": "info",
+      "assessment": "observed",
+      "message": "Node package profile; 4986 text source file(s) examined",
+      "evidence": [
+        {
+          "file": "package.json",
+          "line": 1,
+          "rule": "project-profile"
+        }
+      ]
+    },
+    {
+      "id": "visual-interaction-evidence",
+      "passed": true,
+      "severity": "info",
+      "assessment": "observed",
+      "message": "198 candidate component or browser interaction test detected",
+      "evidence": [
+        {
+          "file": "scripts/lib/test-ci-runner-policy.test.mjs",
+          "line": 35,
+          "rule": "visual-interaction-evidence"
+        },
+        {
+          "file": "src/app/__tests__/AntdThemeBridge.test.tsx",
+          "line": 1,
+          "rule": "visual-interaction-evidence"
+        },
+        {
+          "file": "src/app/__tests__/AppRouteError.test.tsx",
+          "line": 2,
+          "rule": "visual-interaction-evidence"
+        },
+        {
+          "file": "src/app/__tests__/AppRouteNotFound.test.tsx",
+          "line": 2,
+          "rule": "visual-interaction-evidence"
+        },
+        {
+          "file": "src/components/__tests__/DiagramViewerRegression.test.tsx",
+          "line": 1,
+          "rule": "visual-interaction-evidence"
+        },
+        {
+          "file": "src/components/__tests__/ExportTools.keyboard.test.tsx",
+          "line": 4,
+          "rule": "visual-interaction-evidence"
+        },
+        {
+          "file": "src/components/__tests__/ModernDiagramMenu.interactions.test.tsx",
+          "line": 3,
+          "rule": "visual-interaction-evidence"
+        },
+        {
+          "file": "src/components/__tests__/ShareDialog.test.tsx",
+          "line": 5,
+          "rule": "visual-interaction-evidence"
+        },
+        {
+          "file": "src/components/__tests__/useDiagramViewerSaveActions.test.tsx",
+          "line": 3,
+          "rule": "visual-interaction-evidence"
+        },
+        {
+          "file": "src/components/ai/__tests__/AIChatMessageItem.test.tsx",
+          "line": 1,
+          "rule": "visual-interaction-evidence"
+        },
+        {
+          "file": "src/components/ai/__tests__/AIChatViewLayout.interactions.test.tsx",
+          "line": 2,
+          "rule": "visual-interaction-evidence"
+        },
+        {
+          "file": "src/components/ai/__tests__/AIConfigDeletionConfirmModal.test.tsx",
+          "line": 4,
+          "rule": "visual-interaction-evidence"
+        },
+        {
+          "file": "src/components/ai/__tests__/AIConfigGlobalSettingsForm.test.tsx",
+          "line": 1,
+          "rule": "visual-interaction-evidence"
+        },
+        {
+          "file": "src/components/ai/__tests__/AIConfigNewModelForm.test.tsx",
+          "line": 2,
+          "rule": "visual-interaction-evidence"
+        },
+        {
+          "file": "src/components/ai/__tests__/AIConfigUnsavedChangesDialog.test.tsx",
+          "line": 2,
+          "rule": "visual-interaction-evidence"
+        },
+        {
+          "file": "src/components/ai/__tests__/useAIConfigCloudDraftSync.test.tsx",
+          "line": 1,
+          "rule": "visual-interaction-evidence"
+        },
+        {
+          "file": "src/components/ai/__tests__/useAIConfigDeletion.test.tsx",
+          "line": 2,
+          "rule": "visual-interaction-evidence"
+        },
+        {
+          "file": "src/components/ai/__tests__/useAIConfigModalConfig.test.tsx",
+          "line": 1,
+          "rule": "visual-interaction-evidence"
+        },
+        {
+          "file": "src/components/ai/__tests__/useAIConfigNewModelDraft.test.tsx",
+          "line": 1,
+          "rule": "visual-interaction-evidence"
+        },
+        {
+          "file": "src/components/auth/__tests__/AuthModal.authentication.test.tsx",
+          "line": 3,
+          "rule": "visual-interaction-evidence"
+        },
+        {
+          "file": "src/components/auth/__tests__/AuthModal.test.tsx",
+          "line": 3,
+          "rule": "visual-interaction-evidence"
+        },
+        {
+          "file": "src/components/auth/__tests__/AuthStatus.test.tsx",
+          "line": 4,
+          "rule": "visual-interaction-evidence"
+        },
+        {
+          "file": "src/components/auth/__tests__/SetPasswordModal.test.tsx",
+          "line": 3,
+          "rule": "visual-interaction-evidence"
+        },
+        {
+          "file": "src/components/debug/tabs/__tests__/RoutingSessionTab.test.tsx",
+          "line": 2,
+          "rule": "visual-interaction-evidence"
+        },
+        {
+          "file": "src/components/diagrams/__tests__/CloudSaveAuthRecovery.test.tsx",
+          "line": 4,
+          "rule": "visual-interaction-evidence"
+        }
+      ]
+    },
+    {
+      "id": "responsive-evidence",
+      "passed": true,
+      "severity": "info",
+      "assessment": "observed",
+      "message": "172 candidate responsive layout detected",
+      "evidence": [
+        {
+          "file": ".coverage/lcov-report/prettify.js",
+          "line": 2,
+          "rule": "responsive-evidence"
+        },
+        {
+          "file": ".coverage/prettify.js",
+          "line": 2,
+          "rule": "responsive-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-9ozz1YKu.js",
+          "line": 517,
+          "rule": "responsive-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-B0DrRx0U.js",
+          "line": 9446,
+          "rule": "responsive-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BNW6JhSV2.js",
+          "line": 156,
+          "rule": "responsive-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BsOGSdFf.js",
+          "line": 11443,
+          "rule": "responsive-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-CRatwcQb.js",
+          "line": 522,
+          "rule": "responsive-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-CXRnhWUR.js",
+          "line": 5394,
+          "rule": "responsive-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-CkH6fheN.js",
+          "line": 923,
+          "rule": "responsive-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-Cq24OMY9.js",
+          "line": 79,
+          "rule": "responsive-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-CyE2YrA_.js",
+          "line": 891,
+          "rule": "responsive-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-D8zPLXCP2.js",
+          "line": 310,
+          "rule": "responsive-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-DMnGb1RS2.js",
+          "line": 582,
+          "rule": "responsive-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-DdHWIjsk2.js",
+          "line": 1735,
+          "rule": "responsive-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-DwEwfU1k.js",
+          "line": 4379,
+          "rule": "responsive-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-b8zZDbno2.js",
+          "line": 1743,
+          "rule": "responsive-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-lJlWLAqr2.js",
+          "line": 4102,
+          "rule": "responsive-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-mSn-_Omq.js",
+          "line": 3515,
+          "rule": "responsive-evidence"
+        },
+        {
+          "file": "src/components/shared/EnhancedStyleSwitcher.tsx",
+          "line": 233,
+          "rule": "responsive-evidence"
+        },
+        {
+          "file": "src/components/ui/ConfigurationPanel.tsx",
+          "line": 272,
+          "rule": "responsive-evidence"
+        },
+        {
+          "file": "src/components/ui/DiagramSettingsPanel.tsx",
+          "line": 175,
+          "rule": "responsive-evidence"
+        },
+        {
+          "file": "src/components/ui/EnhancedThemeSelector.tsx",
+          "line": 337,
+          "rule": "responsive-evidence"
+        },
+        {
+          "file": "src/components/ui/ModernTopToolbar.tsx",
+          "line": 354,
+          "rule": "responsive-evidence"
+        },
+        {
+          "file": "src/components/ui/ThemeSelectorDialog.tsx",
+          "line": 72,
+          "rule": "responsive-evidence"
+        },
+        {
+          "file": "src/components/warehouse-3d/Warehouse3DShell.tsx",
+          "line": 43,
+          "rule": "responsive-evidence"
+        }
+      ]
+    },
+    {
+      "id": "accessibility-evidence",
+      "passed": true,
+      "severity": "info",
+      "assessment": "observed",
+      "message": "459 candidate accessibility semantic detected",
+      "evidence": [
+        {
+          "file": "dist-readable/assets/c-1UwZK3vp.js",
+          "line": 12,
+          "rule": "accessibility-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-4nwj2SuQ2.js",
+          "line": 78,
+          "rule": "accessibility-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-5mvFlz2l.js",
+          "line": 419,
+          "rule": "accessibility-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-7thB7_KO.js",
+          "line": 100,
+          "rule": "accessibility-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-B-20_Gv9.js",
+          "line": 376,
+          "rule": "accessibility-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-B-x1YyN2.js",
+          "line": 114,
+          "rule": "accessibility-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-B0DrRx0U.js",
+          "line": 15798,
+          "rule": "accessibility-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BH282amx2.js",
+          "line": 220,
+          "rule": "accessibility-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BH8MRyJ3.js",
+          "line": 104,
+          "rule": "accessibility-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BNW6JhSV2.js",
+          "line": 34,
+          "rule": "accessibility-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BRbZ6bpB.js",
+          "line": 82,
+          "rule": "accessibility-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BUgKP9Zl.js",
+          "line": 506,
+          "rule": "accessibility-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BYOvGZOZ.js",
+          "line": 942,
+          "rule": "accessibility-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BZcJLNg62.js",
+          "line": 57,
+          "rule": "accessibility-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-B_UKLKw0.js",
+          "line": 339,
+          "rule": "accessibility-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BeLGB0R3.js",
+          "line": 238,
+          "rule": "accessibility-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-Bi_pqPuq2.js",
+          "line": 116,
+          "rule": "accessibility-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BoMnok5u2.js",
+          "line": 65,
+          "rule": "accessibility-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BsOGSdFf.js",
+          "line": 2396,
+          "rule": "accessibility-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BysdlhCL2.js",
+          "line": 142,
+          "rule": "accessibility-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-C88bHaYc2.js",
+          "line": 2424,
+          "rule": "accessibility-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-C8JLLwaX.js",
+          "line": 14,
+          "rule": "accessibility-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-CGfL-aR_.js",
+          "line": 48,
+          "rule": "accessibility-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-CRatwcQb.js",
+          "line": 35,
+          "rule": "accessibility-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-CVeCEhJQ.js",
+          "line": 66,
+          "rule": "accessibility-evidence"
+        }
+      ]
+    },
+    {
+      "id": "package-manifest",
+      "passed": true,
+      "severity": "info",
+      "assessment": "observed",
+      "message": "package.json detected",
+      "evidence": [
+        {
+          "file": "package.json",
+          "line": 1,
+          "rule": "package-manifest"
+        }
+      ]
+    },
+    {
+      "id": "dependency-lock",
+      "passed": true,
+      "severity": "info",
+      "assessment": "observed",
+      "message": "lockfile detected",
+      "evidence": [
+        {
+          "file": "package-lock.json",
+          "line": 1,
+          "rule": "dependency-lock"
+        }
+      ]
+    },
+    {
+      "id": "automated-tests",
+      "passed": true,
+      "severity": "info",
+      "assessment": "observed",
+      "message": "1185 test file(s) detected",
+      "evidence": [
+        {
+          "file": "scripts/lib/architecture-boundaries.test.mjs",
+          "line": 1,
+          "rule": "automated-tests"
+        },
+        {
+          "file": "scripts/lib/bundle-static-import-graph.test.mjs",
+          "line": 1,
+          "rule": "automated-tests"
+        },
+        {
+          "file": "scripts/lib/coverage-policy.test.mjs",
+          "line": 1,
+          "rule": "automated-tests"
+        },
+        {
+          "file": "scripts/lib/display-routing-browser-capture.test.mjs",
+          "line": 1,
+          "rule": "automated-tests"
+        },
+        {
+          "file": "scripts/lib/display-routing-browser-clearance-diagnostics.test.mjs",
+          "line": 1,
+          "rule": "automated-tests"
+        },
+        {
+          "file": "scripts/lib/display-routing-browser-diagnostics.test.mjs",
+          "line": 1,
+          "rule": "automated-tests"
+        },
+        {
+          "file": "scripts/lib/display-routing-browser-export-audit.test.mjs",
+          "line": 1,
+          "rule": "automated-tests"
+        },
+        {
+          "file": "scripts/lib/display-routing-browser-geometry.test.mjs",
+          "line": 1,
+          "rule": "automated-tests"
+        },
+        {
+          "file": "scripts/lib/display-routing-browser-interaction-audit.test.mjs",
+          "line": 1,
+          "rule": "automated-tests"
+        },
+        {
+          "file": "scripts/lib/display-routing-browser-multipage-matrix.test.mjs",
+          "line": 1,
+          "rule": "automated-tests"
+        },
+        {
+          "file": "scripts/lib/display-routing-browser-node-coverage.test.mjs",
+          "line": 1,
+          "rule": "automated-tests"
+        },
+        {
+          "file": "scripts/lib/display-routing-browser-performance.test.mjs",
+          "line": 1,
+          "rule": "automated-tests"
+        },
+        {
+          "file": "scripts/lib/display-routing-browser-theme-matrix.test.mjs",
+          "line": 1,
+          "rule": "automated-tests"
+        },
+        {
+          "file": "scripts/lib/display-routing-browser-topology-matrix.test.mjs",
+          "line": 1,
+          "rule": "automated-tests"
+        },
+        {
+          "file": "scripts/lib/display-routing-browser-wait.test.mjs",
+          "line": 1,
+          "rule": "automated-tests"
+        },
+        {
+          "file": "scripts/lib/display-routing-build-identity.test.mjs",
+          "line": 1,
+          "rule": "automated-tests"
+        },
+        {
+          "file": "scripts/lib/display-routing-business-edits.test.mjs",
+          "line": 1,
+          "rule": "automated-tests"
+        },
+        {
+          "file": "scripts/lib/display-routing-canonical-preset.test.mjs",
+          "line": 1,
+          "rule": "automated-tests"
+        },
+        {
+          "file": "scripts/lib/display-routing-edit-stability.test.mjs",
+          "line": 1,
+          "rule": "automated-tests"
+        },
+        {
+          "file": "scripts/lib/display-routing-layout-diagnostics.test.mjs",
+          "line": 1,
+          "rule": "automated-tests"
+        },
+        {
+          "file": "scripts/lib/display-routing-layout-visual-settle.test.mjs",
+          "line": 1,
+          "rule": "automated-tests"
+        },
+        {
+          "file": "scripts/lib/display-routing-layout-visual-timeline.test.mjs",
+          "line": 1,
+          "rule": "automated-tests"
+        },
+        {
+          "file": "scripts/lib/display-routing-matrix-cases.test.mjs",
+          "line": 1,
+          "rule": "automated-tests"
+        },
+        {
+          "file": "scripts/lib/display-routing-matrix-final-route.test.mjs",
+          "line": 1,
+          "rule": "automated-tests"
+        },
+        {
+          "file": "scripts/lib/display-routing-matrix-presets.test.mjs",
+          "line": 1,
+          "rule": "automated-tests"
+        }
+      ]
+    },
+    {
+      "id": "ci-workflows",
+      "passed": true,
+      "severity": "info",
+      "assessment": "observed",
+      "message": "3 CI workflow file(s) detected",
+      "evidence": [
+        {
+          "file": ".github/workflows/ci.yml",
+          "line": 1,
+          "rule": "ci-workflows"
+        },
+        {
+          "file": ".github/workflows/display-routing-matrix.yml",
+          "line": 1,
+          "rule": "ci-workflows"
+        },
+        {
+          "file": ".github/workflows/routing-performance.yml",
+          "line": 1,
+          "rule": "ci-workflows"
+        }
+      ]
+    },
+    {
+      "id": "operations-evidence",
+      "passed": true,
+      "severity": "info",
+      "assessment": "observed",
+      "message": "3 deployment, health or CI evidence detected",
+      "evidence": [
+        {
+          "file": ".github/workflows/ci.yml",
+          "line": 1,
+          "rule": "operations-evidence"
+        },
+        {
+          "file": ".github/workflows/display-routing-matrix.yml",
+          "line": 1,
+          "rule": "operations-evidence"
+        },
+        {
+          "file": ".github/workflows/routing-performance.yml",
+          "line": 1,
+          "rule": "operations-evidence"
+        }
+      ]
+    },
+    {
+      "id": "interaction-feedback-evidence",
+      "passed": true,
+      "severity": "info",
+      "assessment": "observed",
+      "message": "449 candidate interaction or user-feedback implementation detected",
+      "evidence": [
+        {
+          "file": ".coverage/lcov-report/sorter.js",
+          "line": 192,
+          "rule": "interaction-feedback-evidence"
+        },
+        {
+          "file": ".coverage/sorter.js",
+          "line": 192,
+          "rule": "interaction-feedback-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-0skcFDX_2.js",
+          "line": 1505,
+          "rule": "interaction-feedback-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-1UwZK3vp.js",
+          "line": 3,
+          "rule": "interaction-feedback-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-4nwj2SuQ2.js",
+          "line": 126,
+          "rule": "interaction-feedback-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-5mvFlz2l.js",
+          "line": 24,
+          "rule": "interaction-feedback-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-7thB7_KO.js",
+          "line": 102,
+          "rule": "interaction-feedback-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-B-20_Gv9.js",
+          "line": 318,
+          "rule": "interaction-feedback-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-B0DrRx0U.js",
+          "line": 1639,
+          "rule": "interaction-feedback-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-B8v5JOwQ2.js",
+          "line": 215,
+          "rule": "interaction-feedback-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BH282amx2.js",
+          "line": 94,
+          "rule": "interaction-feedback-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BNEiqx4a2.js",
+          "line": 576,
+          "rule": "interaction-feedback-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BNW6JhSV2.js",
+          "line": 43,
+          "rule": "interaction-feedback-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BRbZ6bpB.js",
+          "line": 7,
+          "rule": "interaction-feedback-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BUgKP9Zl.js",
+          "line": 403,
+          "rule": "interaction-feedback-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BYOvGZOZ.js",
+          "line": 11,
+          "rule": "interaction-feedback-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BZcJLNg62.js",
+          "line": 37,
+          "rule": "interaction-feedback-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-B_UKLKw0.js",
+          "line": 99,
+          "rule": "interaction-feedback-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BeLGB0R3.js",
+          "line": 14,
+          "rule": "interaction-feedback-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-Bi_pqPuq2.js",
+          "line": 129,
+          "rule": "interaction-feedback-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BjzJXUq7.js",
+          "line": 211,
+          "rule": "interaction-feedback-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BoMnok5u2.js",
+          "line": 64,
+          "rule": "interaction-feedback-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BsOGSdFf.js",
+          "line": 132,
+          "rule": "interaction-feedback-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BysdlhCL2.js",
+          "line": 154,
+          "rule": "interaction-feedback-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-C6g_L8vY.js",
+          "line": 6945,
+          "rule": "interaction-feedback-evidence"
+        }
+      ]
+    },
+    {
+      "id": "observability-evidence",
+      "passed": true,
+      "severity": "info",
+      "assessment": "observed",
+      "message": "337 candidate observability, telemetry, or structured logging implementation detected",
+      "evidence": [
+        {
+          "file": ".codex-ci-install-134/package-lock.json",
+          "line": 615,
+          "rule": "observability-evidence"
+        },
+        {
+          "file": ".codex-ci-install-134/package.json",
+          "line": 37,
+          "rule": "observability-evidence"
+        },
+        {
+          "file": ".common-tools-audit/jobs/4085e7d6-63a4-449d-ba1d-0a924d0fc8d1.json",
+          "line": 77,
+          "rule": "observability-evidence"
+        },
+        {
+          "file": ".common-tools-audit/jobs/feef9723-645f-4d10-9dac-9299d03422fa.json",
+          "line": 78,
+          "rule": "observability-evidence"
+        },
+        {
+          "file": "README.md",
+          "line": 56,
+          "rule": "observability-evidence"
+        },
+        {
+          "file": "dist-readable/assets/FlowchartDesigner-CIhm7Xnz.css",
+          "line": 3824,
+          "rule": "observability-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BR-mjbWn.js",
+          "line": 2,
+          "rule": "observability-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BWnd856p2.js",
+          "line": 57,
+          "rule": "observability-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-BsoCqDTB.js",
+          "line": 78,
+          "rule": "observability-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-C17Ps98o.js",
+          "line": 167,
+          "rule": "observability-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-C1l7q8uT.js",
+          "line": 441,
+          "rule": "observability-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-C3BxR5tt.js",
+          "line": 96,
+          "rule": "observability-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-C6g_L8vY.js",
+          "line": 581,
+          "rule": "observability-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-C88bHaYc2.js",
+          "line": 1727,
+          "rule": "observability-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-CLXkDLkV2.js",
+          "line": 1478,
+          "rule": "observability-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-CXRnhWUR.js",
+          "line": 3607,
+          "rule": "observability-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-CXk6wEi6.js",
+          "line": 2095,
+          "rule": "observability-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-CdXtRHCB.js",
+          "line": 21,
+          "rule": "observability-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-CmaVO6yS2.js",
+          "line": 3,
+          "rule": "observability-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-CyE2YrA_.js",
+          "line": 5,
+          "rule": "observability-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-DgHHcKrd.js",
+          "line": 274,
+          "rule": "observability-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-DjfyUge12.js",
+          "line": 515,
+          "rule": "observability-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-Dn16hSem.js",
+          "line": 358,
+          "rule": "observability-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-DtpEjt2Y.js",
+          "line": 1650,
+          "rule": "observability-evidence"
+        },
+        {
+          "file": "dist-readable/assets/c-Dv5bqSRK2.js",
+          "line": 866,
+          "rule": "observability-evidence"
+        }
+      ]
+    },
+    {
+      "id": "release-governance-evidence",
+      "passed": true,
+      "severity": "info",
+      "assessment": "observed",
+      "message": "3 candidate release, health, rollback, smoke, artifact, or SBOM control detected",
+      "evidence": [
+        {
+          "file": ".github/workflows/ci.yml",
+          "line": 16,
+          "rule": "release-governance-evidence"
+        },
+        {
+          "file": ".github/workflows/display-routing-matrix.yml",
+          "line": 36,
+          "rule": "release-governance-evidence"
+        },
+        {
+          "file": ".github/workflows/routing-performance.yml",
+          "line": 114,
+          "rule": "release-governance-evidence"
+        }
+      ]
+    },
+    {
+      "id": "runtime-gates",
+      "passed": false,
+      "severity": "info",
+      "assessment": "not-verified",
+      "message": "runtime gates were not requested; static evidence does not prove tests, builds, SCA or production behavior",
+      "evidence": []
+    },
+    {
+      "id": "experience-review",
+      "passed": false,
+      "severity": "info",
+      "assessment": "not-verified",
+      "message": "5 required experience scenario(s) are not verified for the selected audit level",
+      "evidence": []
+    }
+  ]
+}

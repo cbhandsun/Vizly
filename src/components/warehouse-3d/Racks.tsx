@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
-import { Instances, Instance } from '@react-three/drei';
 import { WAREHOUSE } from './constants';
+import { WarehouseInstancedMesh, type WarehouseInstanceSpec } from './WarehouseInstancedMesh';
 
 // Interface for instance data
 interface InstanceData {
@@ -28,6 +28,20 @@ const deterministicUnit = (seed: number): number => {
     const value = Math.sin(seed * 12.9898) * 43758.5453;
     return value - Math.floor(value);
 };
+
+const instanceSpecsByType = (
+    data: readonly InstanceData[],
+    type: InstanceData['type'],
+    includeColor = false,
+): WarehouseInstanceSpec[] => (
+    data
+        .filter(instance => instance.type === type)
+        .map(instance => ({
+            position: instance.position,
+            scale: instance.scale,
+            ...(includeColor && instance.color ? { color: instance.color } : {}),
+        }))
+);
 
 const Racks: React.FC = () => {
 
@@ -156,49 +170,76 @@ const Racks: React.FC = () => {
         return instances;
     }, []);
 
-    // Helper to filter and render instances
-    const RenderInstances = ({ data, type, colorProp = false }: { data: InstanceData[], type: string, colorProp?: boolean }) => (
-        <>
-            {data.filter(d => d.type === type).map((d, i) => (
-                <Instance
-                    key={i}
-                    position={d.position}
-                    scale={d.scale}
-                    color={colorProp ? d.color : undefined}
-                />
-            ))}
-        </>
-    );
+    const rackInstances = useMemo(() => (
+        {
+            posts: [
+                ...instanceSpecsByType(highBayConfig, 'post'),
+                ...instanceSpecsByType(mezzanineConfig, 'post'),
+            ],
+            highBayBeams: instanceSpecsByType(highBayConfig, 'beam'),
+            mezzanineBeams: instanceSpecsByType(mezzanineConfig, 'beam'),
+            pallets: [
+                ...instanceSpecsByType(highBayConfig, 'pallet'),
+                ...instanceSpecsByType(mezzanineConfig, 'pallet'),
+            ],
+            boxes: [
+                ...instanceSpecsByType(highBayConfig, 'box', true),
+                ...instanceSpecsByType(mezzanineConfig, 'box', true),
+            ],
+        }
+    ), [highBayConfig, mezzanineConfig]);
 
     return (
         <group>
             {/* 1. POSTS */}
-            <Instances range={5000} geometry={postGeo} material={postMat} castShadow receiveShadow>
-                <RenderInstances data={highBayConfig} type="post" />
-                <RenderInstances data={mezzanineConfig} type="post" />
-            </Instances>
+            <WarehouseInstancedMesh
+                capacity={5000}
+                geometry={postGeo}
+                material={postMat}
+                instances={rackInstances.posts}
+                castShadow
+                receiveShadow
+            />
 
             {/* 2. BEAMS (High Bay) */}
-            <Instances range={2000} geometry={beamGeo} material={beamMatHP} castShadow receiveShadow>
-                <RenderInstances data={highBayConfig} type="beam" />
-            </Instances>
+            <WarehouseInstancedMesh
+                capacity={2000}
+                geometry={beamGeo}
+                material={beamMatHP}
+                instances={rackInstances.highBayBeams}
+                castShadow
+                receiveShadow
+            />
 
             {/* 3. BEAMS (Mezzanine) */}
-            <Instances range={2000} geometry={beamGeo} material={beamMatMZ} castShadow receiveShadow>
-                <RenderInstances data={mezzanineConfig} type="beam" />
-            </Instances>
+            <WarehouseInstancedMesh
+                capacity={2000}
+                geometry={beamGeo}
+                material={beamMatMZ}
+                instances={rackInstances.mezzanineBeams}
+                castShadow
+                receiveShadow
+            />
 
             {/* 4. PALLETS */}
-            <Instances range={5000} geometry={palletGeo} material={palletMat} castShadow receiveShadow>
-                <RenderInstances data={highBayConfig} type="pallet" />
-                <RenderInstances data={mezzanineConfig} type="pallet" />
-            </Instances>
+            <WarehouseInstancedMesh
+                capacity={5000}
+                geometry={palletGeo}
+                material={palletMat}
+                instances={rackInstances.pallets}
+                castShadow
+                receiveShadow
+            />
 
             {/* 5. BOXES */}
-            <Instances range={5000} geometry={boxGeo} material={boxMat} castShadow receiveShadow>
-                <RenderInstances data={highBayConfig} type="box" colorProp />
-                <RenderInstances data={mezzanineConfig} type="box" colorProp />
-            </Instances>
+            <WarehouseInstancedMesh
+                capacity={5000}
+                geometry={boxGeo}
+                material={boxMat}
+                instances={rackInstances.boxes}
+                castShadow
+                receiveShadow
+            />
         </group>
     );
 };

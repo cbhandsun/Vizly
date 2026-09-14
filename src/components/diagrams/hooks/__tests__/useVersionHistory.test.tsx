@@ -76,11 +76,15 @@ const previewNodes: Node[] = [{
     id: 'preview-node',
     position: { x: 10, y: 20 },
     data: { label: 'Preview' },
+}, {
+    id: 'preview-target',
+    position: { x: 180, y: 20 },
+    data: { label: 'Preview target' },
 }];
 const previewEdges: Edge[] = [{
     id: 'preview-edge',
     source: 'preview-node',
-    target: 'preview-node',
+    target: 'preview-target',
 }];
 
 const makeVersion = () => ({
@@ -147,16 +151,92 @@ describe('useVersionHistory', () => {
         await waitFor(() => expect(result.current.previewVersion).toBeNull());
     });
 
+    it('sanitizes version preview edges before applying a restored snapshot', async () => {
+        const unsafeEdges: Edge[] = [
+            { id: 'valid-edge', source: 'preview-node', target: 'preview-target' },
+            { id: 'duplicate-edge', source: 'preview-node', target: 'preview-target' },
+            { id: 'self-loop', source: 'preview-node', target: 'preview-node' },
+            { id: 'missing-target', source: 'preview-node', target: 'missing' },
+        ];
+        storageMocks.loadVersion.mockResolvedValueOnce({
+            ...makeVersion(),
+            snapshotData: {
+                nodes: previewNodes,
+                edges: unsafeEdges,
+            },
+        });
+        const setNodes = vi.fn();
+        const setEdges = vi.fn();
+        const { result } = renderHook(() => useVersionHistory('diagram-1'));
+
+        await waitFor(() => expect(storageMocks.listVersions).toHaveBeenCalledWith('diagram-1'));
+
+        let entered = false;
+        await act(async () => {
+            entered = await result.current.enterPreview(
+                'version-1',
+                setNodes,
+                setEdges,
+                () => originalNodes,
+                () => originalEdges,
+            );
+        });
+
+        expect(entered).toBe(true);
+        expect(setNodes).toHaveBeenCalledWith(previewNodes);
+        expect(setEdges).toHaveBeenCalledWith([
+            expect.objectContaining({ id: 'valid-edge' }),
+        ]);
+    });
+
+    it('sanitizes bridge snapshots before saving a version backup', async () => {
+        storageMocks.saveVersion.mockResolvedValue(makeVersion());
+        const bridge = {
+            id: 'diagram-1',
+            nodes: previewNodes,
+            edges: previewEdges,
+            getCanvasSnapshot: vi.fn(() => ({
+                nodes: previewNodes,
+                edges: [
+                    { id: 'valid-edge', source: 'preview-node', target: 'preview-target' },
+                    { id: 'self-loop', source: 'preview-node', target: 'preview-node' },
+                    { id: 'missing-target', source: 'preview-node', target: 'missing' },
+                ],
+            })),
+        };
+        (window as unknown as { __flowDataBridge: Record<string, typeof bridge> }).__flowDataBridge = { 'diagram-1': bridge };
+        const { result } = renderHook(() => useVersionHistory('diagram-1'));
+        await waitFor(() => expect(storageMocks.listVersions).toHaveBeenCalled());
+
+        let saved = false;
+        await act(async () => {
+            saved = await result.current.saveVersion('Sanitized snapshot');
+        });
+
+        expect(saved).toBe(true);
+        expect(storageMocks.saveVersion).toHaveBeenCalledWith(
+            'diagram-1',
+            {
+                nodes: previewNodes,
+                edges: [expect.objectContaining({ id: 'valid-edge' })],
+            },
+            'Sanitized snapshot',
+        );
+    });
+
     it('captures the latest canvas immediately before an async preview is applied', async () => {
         let resolveVersion: ((version: ReturnType<typeof makeVersion>) => void) | undefined;
         storageMocks.loadVersion.mockImplementation(() => new Promise((resolve) => {
             resolveVersion = resolve;
         }));
-        const editedNodes = [{ ...originalNodes[0], position: { x: 48, y: 72 } }];
+        const editedNodes = [
+            { ...originalNodes[0], position: { x: 48, y: 72 } },
+            { id: 'edited-target', position: { x: 160, y: 72 }, data: { label: 'Edited target' } },
+        ];
         const editedEdges: Edge[] = [{
             id: 'edited-edge',
             source: 'original-node',
-            target: 'original-node',
+            target: 'edited-target',
             label: 'Edited while loading',
         }];
         let currentNodes = originalNodes;

@@ -28,18 +28,16 @@ vi.mock('@react-three/fiber', async () => {
     };
 });
 
-vi.mock('@react-three/drei', () => ({
-    AdaptiveDpr: () => null,
-    ContactShadows: () => null,
-    OrbitControls: forwardRef((
+vi.mock('../WarehouseScenePrimitives', () => ({
+    WarehouseAdaptiveDpr: () => null,
+    WarehouseGroundShadow: () => null,
+    WarehouseOrbitControls: forwardRef((
         { onStart }: { onStart?: () => void },
         ref,
     ) => {
         useImperativeHandle(ref, () => controlsMock);
         return createElement('button', { onClick: onStart, type: 'button' }, 'manual orbit');
     }),
-    PerspectiveCamera: () => null,
-    Sky: () => null,
 }));
 
 vi.mock('../WarehouseModel', () => ({ default: () => null }));

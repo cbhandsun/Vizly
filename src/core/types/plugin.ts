@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Edge, EdgeTypes, Node, NodeTypes, ReactFlowInstance, XYPosition } from '@xyflow/react';
+import type { DiagramConnectionPolicy } from './connection';
 
 export type PluginData = Record<string, unknown>;
 
@@ -130,6 +131,9 @@ export interface DiagramTypePlugin {
   getSupportedLayouts(): string[];
   /** 返回默认布局策略名称 */
   getDefaultLayout(): string;
+
+  /** Connection policy for domain-specific graph semantics. */
+  connectionPolicy?: DiagramConnectionPolicy;
 
   // ====== 渲染 ======
   /** 注册该类型专用的自定义 NodeType */

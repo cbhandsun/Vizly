@@ -1,9 +1,9 @@
 import React, { useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { Instances, Instance } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import { WAREHOUSE } from './constants';
 import { createAsrsLayout, getAsrsDimensions, getRandomCraneTarget, type CraneTarget } from './asrsLayout';
+import { WarehouseInstancedMesh } from './WarehouseInstancedMesh';
 
 // --- Shared Geometries (Optimization) ---
 const mastGeo = new THREE.BoxGeometry(0.2, 25, 0.4);
@@ -92,17 +92,28 @@ const AsrsSystem: React.FC = () => {
             </mesh>
 
             {/* Optimized Static Infrastructure */}
-            <Instances range={50} geometry={rackGeoBase} material={rackMaterial} castShadow>
-                {rackInstances.map((d, i) => <Instance key={i} position={d.position} />)}
-            </Instances>
+            <WarehouseInstancedMesh
+                capacity={50}
+                geometry={rackGeoBase}
+                material={rackMaterial}
+                instances={rackInstances.map(d => ({ position: d.position }))}
+                castShadow
+            />
 
-            <Instances range={2000} geometry={boxGeoBase} material={boxMaterial} castShadow>
-                {boxInstances.map((d, i) => <Instance key={i} position={d.position} scale={d.scale} color={d.color} />)}
-            </Instances>
+            <WarehouseInstancedMesh
+                capacity={2000}
+                geometry={boxGeoBase}
+                material={boxMaterial}
+                instances={boxInstances.map(d => ({ position: d.position, scale: d.scale, color: d.color }))}
+                castShadow
+            />
 
-            <Instances range={12} geometry={floorGeoBase} material={floorMaterial}>
-                {floorXPositions.map((x, i) => <Instance key={i} position={[x, 0.1, 0]} />)}
-            </Instances>
+            <WarehouseInstancedMesh
+                capacity={12}
+                geometry={floorGeoBase}
+                material={floorMaterial}
+                instances={floorXPositions.map(x => ({ position: [x, 0.1, 0] }))}
+            />
 
             {/* Animated Cranes */}
             {floorXPositions.map((x, i) => (

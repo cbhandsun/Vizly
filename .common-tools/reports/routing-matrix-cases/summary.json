@@ -1,0 +1,122 @@
+[
+  {
+    "Case": "domain-compound-elk-tb",
+    "ExitCode": 0,
+    "Seconds": 16.8,
+    "Tail": "    } |   ], |   \"topologyResults\": [], |   \"multiPageResults\": [], |   \"businessEditResults\": [] | }"
+  },
+  {
+    "Case": "domain-compound-elk-bt",
+    "ExitCode": 0,
+    "Seconds": 17.7,
+    "Tail": "    } |   ], |   \"topologyResults\": [], |   \"multiPageResults\": [], |   \"businessEditResults\": [] | }"
+  },
+  {
+    "Case": "domain-compound-elk-lr",
+    "ExitCode": 1,
+    "Seconds": 16.1,
+    "Tail": "    at async auditFinalSvg (file:///E:/DEV/WorkSpace/Antigravity-WS/Vizly/scripts/verify-display-routing-matrix.mjs:186:30) |     at async file:///E:/DEV/WorkSpace/Antigravity-WS/Vizly/scripts/verify-display-routing-matrix.mjs:704:11 |     at async withPrecompiledRouteBrowser (file:///E:/DEV/WorkSpace/Antigravity-WS/Vizly/scripts/lib/precompiled-display-route-cdp.mjs:314:12) |     at async file:///E:/DEV/WorkSpace/Antigravity-WS/Vizly/scripts/verify-display-routing-matrix.mjs:753:24 |  | Node.js v22.22.3"
+  },
+  {
+    "Case": "domain-compound-elk-rl",
+    "ExitCode": 0,
+    "Seconds": 15.1,
+    "Tail": "    } |   ], |   \"topologyResults\": [], |   \"multiPageResults\": [], |   \"businessEditResults\": [] | }"
+  },
+  {
+    "Case": "domain-lanes-tb",
+    "ExitCode": 0,
+    "Seconds": 14.6,
+    "Tail": "    } |   ], |   \"topologyResults\": [], |   \"multiPageResults\": [], |   \"businessEditResults\": [] | }"
+  },
+  {
+    "Case": "domain-lanes-bt",
+    "ExitCode": 0,
+    "Seconds": 16.4,
+    "Tail": "    } |   ], |   \"topologyResults\": [], |   \"multiPageResults\": [], |   \"businessEditResults\": [] | }"
+  },
+  {
+    "Case": "domain-lanes-lr",
+    "ExitCode": 0,
+    "Seconds": 20.2,
+    "Tail": "    } |   ], |   \"topologyResults\": [], |   \"multiPageResults\": [], |   \"businessEditResults\": [] | }"
+  },
+  {
+    "Case": "domain-lanes-rl",
+    "ExitCode": 0,
+    "Seconds": 16.9,
+    "Tail": "    } |   ], |   \"topologyResults\": [], |   \"multiPageResults\": [], |   \"businessEditResults\": [] | }"
+  },
+  {
+    "Case": "domain-elk-tb",
+    "ExitCode": 0,
+    "Seconds": 21.1,
+    "Tail": "    } |   ], |   \"topologyResults\": [], |   \"multiPageResults\": [], |   \"businessEditResults\": [] | }"
+  },
+  {
+    "Case": "domain-elk-bt",
+    "ExitCode": 0,
+    "Seconds": 15.1,
+    "Tail": "    } |   ], |   \"topologyResults\": [], |   \"multiPageResults\": [], |   \"businessEditResults\": [] | }"
+  },
+  {
+    "Case": "domain-elk-lr",
+    "ExitCode": 0,
+    "Seconds": 14.7,
+    "Tail": "    } |   ], |   \"topologyResults\": [], |   \"multiPageResults\": [], |   \"businessEditResults\": [] | }"
+  },
+  {
+    "Case": "domain-elk-rl",
+    "ExitCode": 0,
+    "Seconds": 14.6,
+    "Tail": "    } |   ], |   \"topologyResults\": [], |   \"multiPageResults\": [], |   \"businessEditResults\": [] | }"
+  },
+  {
+    "Case": "tree-tb",
+    "ExitCode": 0,
+    "Seconds": 16.5,
+    "Tail": "    } |   ], |   \"topologyResults\": [], |   \"multiPageResults\": [], |   \"businessEditResults\": [] | }"
+  },
+  {
+    "Case": "tree-bt",
+    "ExitCode": 0,
+    "Seconds": 14.0,
+    "Tail": "    } |   ], |   \"topologyResults\": [], |   \"multiPageResults\": [], |   \"businessEditResults\": [] | }"
+  },
+  {
+    "Case": "tree-lr",
+    "ExitCode": 0,
+    "Seconds": 14.5,
+    "Tail": "    } |   ], |   \"topologyResults\": [], |   \"multiPageResults\": [], |   \"businessEditResults\": [] | }"
+  },
+  {
+    "Case": "tree-rl",
+    "ExitCode": 0,
+    "Seconds": 14.5,
+    "Tail": "    } |   ], |   \"topologyResults\": [], |   \"multiPageResults\": [], |   \"businessEditResults\": [] | }"
+  },
+  {
+    "Case": "topology-edit-cycle",
+    "ExitCode": 0,
+    "Seconds": 24.1,
+    "Tail": "      ] |     } |   ], |   \"multiPageResults\": [], |   \"businessEditResults\": [] | }"
+  },
+  {
+    "Case": "multi-page-roundtrip",
+    "ExitCode": 0,
+    "Seconds": 25.2,
+    "Tail": "        } |       } |     } |   ], |   \"businessEditResults\": [] | }"
+  },
+  {
+    "Case": "business-edit-stability",
+    "ExitCode": 0,
+    "Seconds": 86.5,
+    "Tail": "          } |         } |       ] |     } |   ] | }"
+  },
+  {
+    "Case": "swimlane-edit-stability",
+    "ExitCode": 0,
+    "Seconds": 93.1,
+    "Tail": "          } |         } |       ] |     } |   ] | }"
+  }
+]

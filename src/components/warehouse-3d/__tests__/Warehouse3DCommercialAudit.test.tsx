@@ -3,7 +3,9 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@react-three/drei', () => ({ Html: ({ children }: { children: ReactNode }) => children }));
+vi.mock('../WarehouseScenePrimitives', () => ({
+    WarehouseHtmlOverlay: ({ children }: { children: ReactNode }) => children,
+}));
 vi.mock('../Scene', () => ({
     default: ({
         onModelReady,

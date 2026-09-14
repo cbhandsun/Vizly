@@ -1,7 +1,13 @@
 import React, { useMemo } from 'react';
-import { Instances, Instance } from '@react-three/drei';
+import * as THREE from 'three';
 import { WAREHOUSE } from './constants';
 import { useWarehouse3D } from './useWarehouse3D';
+import { WarehouseInstancedMesh } from './WarehouseInstancedMesh';
+
+const pillarGeometry = new THREE.BoxGeometry(0.8, WAREHOUSE.HEIGHT, 0.8);
+const pillarMaterial = new THREE.MeshStandardMaterial({ color: '#7f8c8d', metalness: 0.6, roughness: 0.2 });
+const pillarBaseGeometry = new THREE.BoxGeometry(1.5, 0.4, 1.5);
+const pillarBaseMaterial = new THREE.MeshStandardMaterial({ color: '#2c3e50' });
 
 const StructuralElements: React.FC = () => {
     const { showRealism } = useWarehouse3D();
@@ -35,22 +41,23 @@ const StructuralElements: React.FC = () => {
     return (
         <group>
             {/* Structural Columns (IPE Beams) */}
-            <Instances range={pillars.length} castShadow receiveShadow>
-                <boxGeometry args={[0.8, WAREHOUSE.HEIGHT, 0.8]} />
-                <meshStandardMaterial color="#7f8c8d" metalness={0.6} roughness={0.2} />
-                {pillars.map((p, i) => (
-                    <Instance key={i} position={p.position as [number, number, number]} />
-                ))}
-            </Instances>
+            <WarehouseInstancedMesh
+                capacity={pillars.length}
+                geometry={pillarGeometry}
+                material={pillarMaterial}
+                instances={pillars.map(p => ({ position: p.position as [number, number, number] }))}
+                castShadow
+                receiveShadow
+            />
 
             {/* Pillar Bases */}
-            <Instances range={pillars.length} receiveShadow>
-                <boxGeometry args={[1.5, 0.4, 1.5]} />
-                <meshStandardMaterial color="#2c3e50" />
-                {pillars.map((p, i) => (
-                    <Instance key={i} position={[p.position[0], 0.2, p.position[2]]} />
-                ))}
-            </Instances>
+            <WarehouseInstancedMesh
+                capacity={pillars.length}
+                geometry={pillarBaseGeometry}
+                material={pillarBaseMaterial}
+                instances={pillars.map(p => ({ position: [p.position[0], 0.2, p.position[2]] }))}
+                receiveShadow
+            />
 
             {/* Ceiling Trusses (Upper Grid) */}
             <group position={[0, WAREHOUSE.HEIGHT - 2, 0]}>

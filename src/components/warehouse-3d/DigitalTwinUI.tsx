@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Html } from '@react-three/drei';
+import { WarehouseHtmlOverlay } from './WarehouseScenePrimitives';
 import { useWarehouse3D } from './useWarehouse3D';
 
 const ToggleButton: React.FC<{ label: string, active: boolean, onClick: () => void, color?: string }> = ({ label, active, onClick, color = "#3498db" }) => (
@@ -44,7 +44,7 @@ const DigitalTwinUI: React.FC = () => {
         <group>
             {/* --- Floating Control Panel --- */}
             <group position={[-140, 30, -70]}>
-                <Html center transform distanceFactor={25} zIndexRange={[1000, 0]}>
+                <WarehouseHtmlOverlay center distanceFactor={25} zIndexRange={[1000, 0]}>
                     <div style={{
                         background: 'rgba(0, 0, 0, 0.8)',
                         backdropFilter: 'blur(10px)',
@@ -65,16 +65,16 @@ const DigitalTwinUI: React.FC = () => {
                         <ToggleButton label="Package Flow (货流)" active={showFlow} onClick={() => setShowFlow(!showFlow)} color="#2ecc71" />
                         <ToggleButton label="Industrial Aesthetics (现实增强)" active={showRealism} onClick={() => setShowRealism(!showRealism)} color="#e74c3c" />
                     </div>
-                </Html>
+                </WarehouseHtmlOverlay>
             </group>
 
             {/* --- Data Cards --- */}
             {showLabels && (
                 <>
                     <group position={[-15, 40, -10]}>
-                        <Html center distanceFactor={25} zIndexRange={[1000, 0]} transform>
+                        <WarehouseHtmlOverlay center distanceFactor={25} pointerEvents="none" zIndexRange={[1000, 0]}>
                             <DataCard title="立库利用率 (Occupancy)" value={occupancy} unit="%" color="#f1c40f" />
-                        </Html>
+                        </WarehouseHtmlOverlay>
                         <mesh position={[0, -15, 0]}>
                             <cylinderGeometry args={[0.2, 0.05, 30]} />
                             <meshBasicMaterial color="#f1c40f" transparent opacity={0.6} />
@@ -82,9 +82,9 @@ const DigitalTwinUI: React.FC = () => {
                     </group>
 
                     <group position={[30, 20, 0]}>
-                        <Html center distanceFactor={25} zIndexRange={[1000, 0]} transform>
+                        <WarehouseHtmlOverlay center distanceFactor={25} pointerEvents="none" zIndexRange={[1000, 0]}>
                             <DataCard title="分拣吞吐量 (Throughput)" value={throughput} unit="pcs/h" color="#2ecc71" />
-                        </Html>
+                        </WarehouseHtmlOverlay>
                         <mesh position={[0, -10, 0]}>
                             <cylinderGeometry args={[0.2, 0.05, 20]} />
                             <meshBasicMaterial color="#2ecc71" transparent opacity={0.6} />
@@ -92,9 +92,9 @@ const DigitalTwinUI: React.FC = () => {
                     </group>
 
                     <group position={[65, 25, 10]}>
-                        <Html center distanceFactor={25} zIndexRange={[1000, 0]} transform>
+                        <WarehouseHtmlOverlay center distanceFactor={25} pointerEvents="none" zIndexRange={[1000, 0]}>
                             <DataCard title="此区域作业效率 (Efficiency)" value={pickingRate} unit="lines/h" color="#e67e22" />
-                        </Html>
+                        </WarehouseHtmlOverlay>
                         <mesh position={[0, -10, 0]}>
                             <cylinderGeometry args={[0.2, 0.05, 20]} />
                             <meshBasicMaterial color="#e67e22" transparent opacity={0.6} />

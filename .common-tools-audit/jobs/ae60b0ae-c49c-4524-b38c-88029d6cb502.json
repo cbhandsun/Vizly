@@ -1,0 +1,200 @@
+{
+  "id": "ae60b0ae-c49c-4524-b38c-88029d6cb502",
+  "capability": "project-audit",
+  "ownerId": "local-user",
+  "idempotencyKey": "1ab223e3aff86f58fc2798586e164d8d83bf9630e03b8ba995e012b4614d41d8",
+  "status": "succeeded",
+  "attempt": 1,
+  "maxAttempts": 1,
+  "createdAt": "2026-09-12T20:39:13.006Z",
+  "updatedAt": "2026-09-12T20:39:35.431Z",
+  "expiresAt": "2026-09-13T20:39:13.001Z",
+  "artifacts": [
+    {
+      "name": "project-audit-report.json",
+      "mediaType": "application/json",
+      "uri": "E:\\DEV\\WorkSpace\\Antigravity-WS\\Vizly\\.common-tools\\reports\\project-audit-layout-routing-experience-deep\\project-audit-report.json",
+      "sha256": "100bf3fef1b61e21712c3f0c17eb721a6bc55225c4c85e4270c2ef21f6a5a925"
+    },
+    {
+      "name": "project-audit-report.md",
+      "mediaType": "text/markdown",
+      "uri": "E:\\DEV\\WorkSpace\\Antigravity-WS\\Vizly\\.common-tools\\reports\\project-audit-layout-routing-experience-deep\\project-audit-report.md",
+      "sha256": "dcbf2cb6d8969a63747454ed4607bd48bf435076d33889099c7ed794a1188bc0"
+    }
+  ],
+  "project": {
+    "root": "E:\\DEV\\WorkSpace\\Antigravity-WS\\Vizly"
+  },
+  "output": {
+    "path": "E:\\DEV\\WorkSpace\\Antigravity-WS\\Vizly\\.common-tools\\reports\\project-audit-layout-routing-experience-deep"
+  },
+  "audit": {
+    "runGates": false,
+    "gateTimeoutMs": 120000,
+    "mode": "experience",
+    "level": "deep",
+    "coverageStrategy": "risk-driven-comprehensive",
+    "evidenceExpectation": "risk-driven comprehensive runtime, accessibility, security, and delivery evidence",
+    "requiredExperienceScenarios": [
+      "first-visit",
+      "core-flow",
+      "result-followup",
+      "state-feedback",
+      "recovery",
+      "responsive",
+      "keyboard",
+      "console-network"
+    ],
+    "requiresRuntimeGates": true,
+    "scopes": [
+      "visual-interaction"
+    ],
+    "experience": {
+      "schemaVersion": 1,
+      "scenarios": [
+        {
+          "id": "first-visit",
+          "status": "passed",
+          "evidence": [
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/screenshots/first-visit-desktop.png",
+              "line": 1,
+              "rule": "experience-screenshot"
+            },
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/experience-console-summary.json",
+              "line": 1,
+              "rule": "experience-console"
+            }
+          ]
+        },
+        {
+          "id": "core-flow",
+          "status": "passed",
+          "evidence": [
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/screenshots/core-flow-diagram.png",
+              "line": 1,
+              "rule": "experience-screenshot"
+            },
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/experience-console-summary.json",
+              "line": 1,
+              "rule": "experience-console"
+            }
+          ]
+        },
+        {
+          "id": "result-followup",
+          "status": "passed",
+          "evidence": [
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/screenshots/result-followup-core-actions.png",
+              "line": 1,
+              "rule": "experience-screenshot"
+            },
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/experience-console-summary.json",
+              "line": 1,
+              "rule": "experience-console"
+            }
+          ]
+        },
+        {
+          "id": "state-feedback",
+          "status": "passed",
+          "evidence": [
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/screenshots/state-feedback-after-layout.png",
+              "line": 1,
+              "rule": "experience-screenshot"
+            },
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/experience-console-summary.json",
+              "line": 1,
+              "rule": "experience-console"
+            }
+          ]
+        },
+        {
+          "id": "recovery",
+          "status": "not-verified",
+          "evidence": []
+        },
+        {
+          "id": "responsive",
+          "status": "passed",
+          "evidence": [
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/screenshots/responsive-mobile-first-visit.png",
+              "line": 1,
+              "rule": "experience-screenshot"
+            },
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/screenshots/responsive-mobile-core-flow.png",
+              "line": 1,
+              "rule": "experience-screenshot"
+            },
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/experience-console-summary.json",
+              "line": 1,
+              "rule": "experience-console"
+            }
+          ]
+        },
+        {
+          "id": "keyboard",
+          "status": "passed",
+          "evidence": [
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/experience-console-summary.json",
+              "line": 1,
+              "rule": "experience-console"
+            }
+          ]
+        },
+        {
+          "id": "console-network",
+          "status": "passed",
+          "evidence": [
+            {
+              "file": ".common-tools/reports/layout-routing-audit/experience-evidence/experience-console-summary.json",
+              "line": 1,
+              "rule": "experience-console"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "quality": {
+    "passed": false,
+    "checks": [
+      {
+        "name": "project-scanned",
+        "passed": true
+      },
+      {
+        "name": "reports-generated",
+        "passed": true
+      },
+      {
+        "name": "no-audit-warnings",
+        "passed": true
+      },
+      {
+        "name": "level-required-experience",
+        "passed": false
+      }
+    ],
+    "metrics": {
+      "scanned-files": 10000,
+      "warnings": 0,
+      "runtime-gates-executed": 0,
+      "experience-scenarios": 8,
+      "required-experience-scenarios": 8,
+      "artifacts": 2
+    }
+  }
+}

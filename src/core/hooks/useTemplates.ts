@@ -4,7 +4,6 @@
  */
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { cloneDeep } from 'lodash';
 import { DiagramTemplate, TemplateCategory, TemplateFilterOptions, SaveTemplateOptions } from '../types/Template';
 import { safeLog } from '../utils/consoleCleanup';
 import { parseStoredTemplates, serializeStoredTemplates } from '../utils/templateUtils';
@@ -14,6 +13,14 @@ const BUILT_IN_TEMPLATES: DiagramTemplate[] = [];
 
 const STORAGE_KEY = 'diagram-custom-templates';
 const MAX_CUSTOM_TEMPLATES = 50; // 限制最多50个自定义模板
+
+const cloneTemplateValue = <T>(value: T): T => {
+    if (typeof structuredClone === 'function') {
+        return structuredClone(value);
+    }
+    const cloned: unknown = JSON.parse(JSON.stringify(value));
+    return cloned as T;
+};
 
 /**
  * localStorage工具函数
@@ -101,7 +108,7 @@ export const useTemplates = () => {
         }
 
         // 深拷贝避免修改原模板
-        const clonedData = cloneDeep(template.diagramData);
+        const clonedData = cloneTemplateValue(template.diagramData);
 
         // 更新使用次数（仅自定义模板）
         if (!template.isBuiltIn) {
@@ -147,8 +154,8 @@ export const useTemplates = () => {
             tags: options.tags || [],
             icon: options.icon,
             diagramData: {
-                nodes: cloneDeep(nodes),
-                edges: cloneDeep(edges),
+                nodes: cloneTemplateValue(nodes),
+                edges: cloneTemplateValue(edges),
                 viewport: viewport ? { ...viewport } : undefined
             },
             config: config ? { ...config } : undefined,

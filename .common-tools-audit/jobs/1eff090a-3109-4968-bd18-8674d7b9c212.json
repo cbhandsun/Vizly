@@ -1,0 +1,86 @@
+{
+  "id": "1eff090a-3109-4968-bd18-8674d7b9c212",
+  "capability": "project-audit",
+  "ownerId": "local-user",
+  "idempotencyKey": "936efe875615525e8179195225808f79a7561609b37c358877449dd96eadc364",
+  "status": "succeeded",
+  "attempt": 1,
+  "maxAttempts": 1,
+  "createdAt": "2026-09-12T17:33:54.894Z",
+  "updatedAt": "2026-09-12T17:34:38.741Z",
+  "expiresAt": "2026-09-13T17:33:54.889Z",
+  "artifacts": [
+    {
+      "name": "project-audit-report.json",
+      "mediaType": "application/json",
+      "uri": "E:\\DEV\\WorkSpace\\Antigravity-WS\\Vizly\\.common-tools-audit\\layout-routing-continue\\project-audit-report.json",
+      "sha256": "e997e0dc880468ced8ba5f7570ee9ceff51a281589f4a6a3a784753e1e63bc6a"
+    },
+    {
+      "name": "project-audit-report.md",
+      "mediaType": "text/markdown",
+      "uri": "E:\\DEV\\WorkSpace\\Antigravity-WS\\Vizly\\.common-tools-audit\\layout-routing-continue\\project-audit-report.md",
+      "sha256": "b1e5253a4468bc5fadf543a946096690db857f3e522797dc4df6aa7a32e1aaa2"
+    }
+  ],
+  "project": {
+    "root": "E:\\DEV\\WorkSpace\\Antigravity-WS\\Vizly"
+  },
+  "output": {
+    "path": "E:\\DEV\\WorkSpace\\Antigravity-WS\\Vizly\\.common-tools-audit\\layout-routing-continue"
+  },
+  "audit": {
+    "runGates": false,
+    "gateTimeoutMs": 120000,
+    "mode": "enhanced",
+    "level": "standard",
+    "coverageStrategy": "representative-journeys",
+    "evidenceExpectation": "representative journey, state, viewport, and related code evidence",
+    "requiredExperienceScenarios": [
+      "first-visit",
+      "core-flow",
+      "state-feedback",
+      "responsive",
+      "keyboard"
+    ],
+    "requiresRuntimeGates": true,
+    "scopes": [
+      "visual-interaction",
+      "engineering-delivery"
+    ],
+    "experience": null
+  },
+  "quality": {
+    "passed": false,
+    "checks": [
+      {
+        "name": "project-scanned",
+        "passed": true
+      },
+      {
+        "name": "reports-generated",
+        "passed": true
+      },
+      {
+        "name": "no-audit-warnings",
+        "passed": true
+      },
+      {
+        "name": "level-required-experience",
+        "passed": false
+      },
+      {
+        "name": "level-required-runtime-gates",
+        "passed": false
+      }
+    ],
+    "metrics": {
+      "scanned-files": 10000,
+      "warnings": 0,
+      "runtime-gates-executed": 0,
+      "experience-scenarios": 0,
+      "required-experience-scenarios": 5,
+      "artifacts": 2
+    }
+  }
+}

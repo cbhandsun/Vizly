@@ -1,0 +1,3534 @@
+{
+  "generatedAt": "2026-09-12T22:16:33.858Z",
+  "baseUrl": "http://127.0.0.1:4174",
+  "presetId": "wms-demand-allocation-strategy-v2",
+  "screenshots": {
+    "firstVisit": ".common-tools\\reports\\layout-routing-audit\\experience-evidence\\screenshots\\first-visit-desktop.png",
+    "coreFlow": ".common-tools\\reports\\layout-routing-audit\\experience-evidence\\screenshots\\core-flow-diagram.png",
+    "resultFollowup": ".common-tools\\reports\\layout-routing-audit\\experience-evidence\\screenshots\\result-followup-core-actions.png",
+    "stateFeedback": ".common-tools\\reports\\layout-routing-audit\\experience-evidence\\screenshots\\state-feedback-after-layout.png",
+    "recovery": ".common-tools\\reports\\layout-routing-audit\\experience-evidence\\screenshots\\responsive-mobile-core-flow.png",
+    "responsiveFirstVisit": ".common-tools\\reports\\layout-routing-audit\\experience-evidence\\screenshots\\responsive-mobile-first-visit.png",
+    "responsiveCoreFlow": ".common-tools\\reports\\layout-routing-audit\\experience-evidence\\screenshots\\responsive-mobile-core-flow.png"
+  },
+  "scenarios": {
+    "firstVisit": {
+      "label": "first-visit-desktop",
+      "url": "http://127.0.0.1:4174/?experienceAudit=first-1789251376552",
+      "title": "Vizly — Visual Design Studio",
+      "viewport": {
+        "width": 1440,
+        "height": 960,
+        "dpr": 0.9999999801317827
+      },
+      "readyState": "complete",
+      "bodyTextSample": "V\nVizly\n工作区\n11 个文档\n新建流程图\n最近\n11\n本地\n11\n云端\n0\n共享\n0\n行业模板库\n通用模板\n最近修改\n企业架构图（标准化完整版）\n架构图\n2025/11/26\n43\n空白画布 (Blank Canvas)\n流程图\n2023/12/31\n物流架构图\n架构图\n2023/12/31\n11\n物流运输规划系统流程图\n流程图\n2023/12/31\n27\n系统交互架构图\n架构图\n2023/12/31\n11\n运输驱动架构图\n架构图\n2023/12/31\n8\nTMS运输管理系统架构图\n架构图\n2023/12/31\n17\nWMS订单-分配-任务-任务分组-作业-人效流程\n流程图\n2023/12/31\n39\n仓储需求分流与库存分配策略 (含缺货逻辑)\n架构图\n2023/10/27\n21\nWMS 全流程解决方案\n流程图\n未知时间\n17\nWMS从订单到任务流程\n流程图\n未知时间\n20",
+      "controlCount": 38,
+      "controls": [
+        {
+          "tag": "button",
+          "text": "V\nVizly",
+          "aria": "返回工作区",
+          "disabled": false,
+          "x": 24,
+          "y": 8,
+          "width": 220,
+          "height": 32
+        },
+        {
+          "tag": "input",
+          "text": "搜索工作区",
+          "aria": "搜索工作区",
+          "disabled": false,
+          "x": 607,
+          "y": 13,
+          "width": 356,
+          "height": 22
+        },
+        {
+          "tag": "button",
+          "text": "切换主题: 深色主题",
+          "aria": "切换主题: 深色主题",
+          "disabled": false,
+          "x": 1302,
+          "y": 7,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "tag": "button",
+          "text": "语言: 简体中文",
+          "aria": "语言: 简体中文",
+          "disabled": false,
+          "x": 1342,
+          "y": 7,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "tag": "button",
+          "text": "设置",
+          "aria": "设置",
+          "disabled": false,
+          "x": 1382,
+          "y": 7,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "tag": "button",
+          "text": "新建流程图",
+          "aria": null,
+          "disabled": false,
+          "x": 1227,
+          "y": 80,
+          "width": 115,
+          "height": 40
+        },
+        {
+          "tag": "button",
+          "text": "选择其他图表类型",
+          "aria": "选择其他图表类型",
+          "disabled": false,
+          "x": 1342,
+          "y": 80,
+          "width": 40,
+          "height": 40
+        },
+        {
+          "tag": "button",
+          "text": "最近\n11",
+          "aria": null,
+          "disabled": false,
+          "x": 83,
+          "y": 152,
+          "width": 84,
+          "height": 39
+        },
+        {
+          "tag": "button",
+          "text": "本地\n11",
+          "aria": null,
+          "disabled": false,
+          "x": 191,
+          "y": 152,
+          "width": 84,
+          "height": 39
+        },
+        {
+          "tag": "button",
+          "text": "云端\n0",
+          "aria": null,
+          "disabled": false,
+          "x": 298,
+          "y": 152,
+          "width": 81,
+          "height": 39
+        },
+        {
+          "tag": "button",
+          "text": "共享\n0",
+          "aria": null,
+          "disabled": false,
+          "x": 403,
+          "y": 152,
+          "width": 81,
+          "height": 39
+        },
+        {
+          "tag": "button",
+          "text": "行业模板库",
+          "aria": null,
+          "disabled": false,
+          "x": 508,
+          "y": 152,
+          "width": 92,
+          "height": 39
+        },
+        {
+          "tag": "button",
+          "text": "通用模板",
+          "aria": null,
+          "disabled": false,
+          "x": 624,
+          "y": 152,
+          "width": 78,
+          "height": 39
+        },
+        {
+          "tag": "button",
+          "text": "最近修改",
+          "aria": "图表排序: 最近修改",
+          "disabled": false,
+          "x": 1141,
+          "y": 167,
+          "width": 132,
+          "height": 34
+        },
+        {
+          "tag": "button",
+          "text": "网格视图",
+          "aria": "网格视图",
+          "disabled": false,
+          "x": 1281,
+          "y": 169,
+          "width": 32,
+          "height": 30
+        },
+        {
+          "tag": "button",
+          "text": "列表视图",
+          "aria": "列表视图",
+          "disabled": false,
+          "x": 1313,
+          "y": 169,
+          "width": 32,
+          "height": 30
+        },
+        {
+          "tag": "button",
+          "text": "打开图表 企业架构图（标准化完整版）",
+          "aria": "打开图表 企业架构图（标准化完整版）",
+          "disabled": false,
+          "x": 84,
+          "y": 240,
+          "width": 300,
+          "height": 239
+        },
+        {
+          "tag": "button",
+          "text": "企业架构图（标准化完整版） 的更多操作",
+          "aria": "企业架构图（标准化完整版） 的更多操作",
+          "disabled": false,
+          "x": 343,
+          "y": 250,
+          "width": 30,
+          "height": 30
+        },
+        {
+          "tag": "button",
+          "text": "打开图表 空白画布 (Blank Canvas)",
+          "aria": "打开图表 空白画布 (Blank Canvas)",
+          "disabled": false,
+          "x": 405,
+          "y": 240,
+          "width": 300,
+          "height": 239
+        },
+        {
+          "tag": "button",
+          "text": "空白画布 (Blank Canvas) 的更多操作",
+          "aria": "空白画布 (Blank Canvas) 的更多操作",
+          "disabled": false,
+          "x": 664,
+          "y": 250,
+          "width": 30,
+          "height": 30
+        },
+        {
+          "tag": "button",
+          "text": "打开图表 物流架构图",
+          "aria": "打开图表 物流架构图",
+          "disabled": false,
+          "x": 726,
+          "y": 240,
+          "width": 300,
+          "height": 239
+        },
+        {
+          "tag": "button",
+          "text": "物流架构图 的更多操作",
+          "aria": "物流架构图 的更多操作",
+          "disabled": false,
+          "x": 985,
+          "y": 250,
+          "width": 30,
+          "height": 30
+        },
+        {
+          "tag": "button",
+          "text": "打开图表 物流运输规划系统流程图",
+          "aria": "打开图表 物流运输规划系统流程图",
+          "disabled": false,
+          "x": 1047,
+          "y": 240,
+          "width": 300,
+          "height": 239
+        },
+        {
+          "tag": "button",
+          "text": "物流运输规划系统流程图 的更多操作",
+          "aria": "物流运输规划系统流程图 的更多操作",
+          "disabled": false,
+          "x": 1306,
+          "y": 250,
+          "width": 30,
+          "height": 30
+        },
+        {
+          "tag": "button",
+          "text": "打开图表 系统交互架构图",
+          "aria": "打开图表 系统交互架构图",
+          "disabled": false,
+          "x": 84,
+          "y": 510,
+          "width": 300,
+          "height": 239
+        },
+        {
+          "tag": "button",
+          "text": "系统交互架构图 的更多操作",
+          "aria": "系统交互架构图 的更多操作",
+          "disabled": false,
+          "x": 343,
+          "y": 520,
+          "width": 30,
+          "height": 30
+        },
+        {
+          "tag": "button",
+          "text": "打开图表 运输驱动架构图",
+          "aria": "打开图表 运输驱动架构图",
+          "disabled": false,
+          "x": 405,
+          "y": 510,
+          "width": 300,
+          "height": 239
+        },
+        {
+          "tag": "button",
+          "text": "运输驱动架构图 的更多操作",
+          "aria": "运输驱动架构图 的更多操作",
+          "disabled": false,
+          "x": 664,
+          "y": 520,
+          "width": 30,
+          "height": 30
+        },
+        {
+          "tag": "button",
+          "text": "打开图表 TMS运输管理系统架构图",
+          "aria": "打开图表 TMS运输管理系统架构图",
+          "disabled": false,
+          "x": 726,
+          "y": 510,
+          "width": 300,
+          "height": 239
+        },
+        {
+          "tag": "button",
+          "text": "TMS运输管理系统架构图 的更多操作",
+          "aria": "TMS运输管理系统架构图 的更多操作",
+          "disabled": false,
+          "x": 985,
+          "y": 520,
+          "width": 30,
+          "height": 30
+        },
+        {
+          "tag": "button",
+          "text": "打开图表 WMS订单-分配-任务-任务分组-作业-人效流程",
+          "aria": "打开图表 WMS订单-分配-任务-任务分组-作业-人效流程",
+          "disabled": false,
+          "x": 1047,
+          "y": 510,
+          "width": 300,
+          "height": 239
+        },
+        {
+          "tag": "button",
+          "text": "WMS订单-分配-任务-任务分组-作业-人效流程 的更多操作",
+          "aria": "WMS订单-分配-任务-任务分组-作业-人效流程 的更多操作",
+          "disabled": false,
+          "x": 1306,
+          "y": 520,
+          "width": 30,
+          "height": 30
+        },
+        {
+          "tag": "button",
+          "text": "打开图表 仓储需求分流与库存分配策略 (含缺货逻辑)",
+          "aria": "打开图表 仓储需求分流与库存分配策略 (含缺货逻辑)",
+          "disabled": false,
+          "x": 84,
+          "y": 780,
+          "width": 300,
+          "height": 239
+        },
+        {
+          "tag": "button",
+          "text": "仓储需求分流与库存分配策略 (含缺货逻辑) 的更多操作",
+          "aria": "仓储需求分流与库存分配策略 (含缺货逻辑) 的更多操作",
+          "disabled": false,
+          "x": 343,
+          "y": 790,
+          "width": 30,
+          "height": 30
+        },
+        {
+          "tag": "button",
+          "text": "打开图表 WMS 全流程解决方案",
+          "aria": "打开图表 WMS 全流程解决方案",
+          "disabled": false,
+          "x": 405,
+          "y": 781,
+          "width": 300,
+          "height": 239
+        },
+        {
+          "tag": "button",
+          "text": "WMS 全流程解决方案 的更多操作",
+          "aria": "WMS 全流程解决方案 的更多操作",
+          "disabled": false,
+          "x": 664,
+          "y": 791,
+          "width": 30,
+          "height": 30
+        },
+        {
+          "tag": "button",
+          "text": "打开图表 WMS从订单到任务流程",
+          "aria": "打开图表 WMS从订单到任务流程",
+          "disabled": false,
+          "x": 726,
+          "y": 781,
+          "width": 299,
+          "height": 238
+        },
+        {
+          "tag": "button",
+          "text": "WMS从订单到任务流程 的更多操作",
+          "aria": "WMS从订单到任务流程 的更多操作",
+          "disabled": false,
+          "x": 985,
+          "y": 791,
+          "width": 30,
+          "height": 30
+        }
+      ],
+      "reactFlow": {
+        "present": false,
+        "nodeDomCount": 0,
+        "edgeDomCount": 0,
+        "instanceNodeCount": null,
+        "instanceEdgeCount": null,
+        "viewport": null
+      },
+      "statusRegions": [
+        {
+          "role": "status",
+          "live": "polite",
+          "text": "",
+          "className": "workspace-visually-hidden"
+        }
+      ],
+      "horizontalOverflow": 0,
+      "rightOverflow": [],
+      "audit": {
+        "errors": [],
+        "warnings": [],
+        "unhandledRejections": [],
+        "fetches": [
+          {
+            "method": "GET",
+            "url": "http://127.0.0.1:4174/assets/zh-CQiXWnvT.json",
+            "status": 200,
+            "ok": true,
+            "durationMs": 19
+          }
+        ],
+        "xhrs": [],
+        "resourceSummary": {
+          "count": 101,
+          "zeroTransferCount": 0,
+          "slowCount": 0,
+          "largest": [
+            {
+              "name": "/assets/c-Bn_9RZA4.js",
+              "durationMs": 70,
+              "transferSize": 154952,
+              "decodedBodySize": 512233
+            },
+            {
+              "name": "/assets/c-Ch_xktz5.js",
+              "durationMs": 50,
+              "transferSize": 92441,
+              "decodedBodySize": 305618
+            },
+            {
+              "name": "/assets/c-B4U7jafg.js",
+              "durationMs": 52,
+              "transferSize": 102583,
+              "decodedBodySize": 301307
+            },
+            {
+              "name": "/assets/c-DkaFpug-.js",
+              "durationMs": 88,
+              "transferSize": 88890,
+              "decodedBodySize": 282594
+            },
+            {
+              "name": "/assets/c-DGJObqSN.js",
+              "durationMs": 21,
+              "transferSize": 32093,
+              "decodedBodySize": 150011
+            },
+            {
+              "name": "/assets/index-iV0h0dIq.css",
+              "durationMs": 76,
+              "transferSize": 23681,
+              "decodedBodySize": 145373
+            },
+            {
+              "name": "/assets/zh-CQiXWnvT.json",
+              "durationMs": 20,
+              "transferSize": 47773,
+              "decodedBodySize": 136416
+            },
+            {
+              "name": "/assets/c-rVIELD2S.js",
+              "durationMs": 41,
+              "transferSize": 42792,
+              "decodedBodySize": 134491
+            },
+            {
+              "name": "/assets/c-DaEYZZ3_.js",
+              "durationMs": 87,
+              "transferSize": 41364,
+              "decodedBodySize": 132006
+            },
+            {
+              "name": "/assets/c-B1d3Rzxq.js",
+              "durationMs": 26,
+              "transferSize": 35123,
+              "decodedBodySize": 106696
+            },
+            {
+              "name": "/assets/c-aB_NLUF-.js",
+              "durationMs": 33,
+              "transferSize": 33427,
+              "decodedBodySize": 103490
+            },
+            {
+              "name": "/assets/FlowchartDesigner-v_USiY8q.css",
+              "durationMs": 14,
+              "transferSize": 15308,
+              "decodedBodySize": 87686
+            }
+          ]
+        }
+      },
+      "routing": null
+    },
+    "coreFlow": {
+      "label": "core-flow-diagram",
+      "url": "http://127.0.0.1:4174/?canonicalPreset=wms-demand-allocation-strategy-v2&experienceAudit=core-1789251378966#/?diagram=wms-demand-allocation-strategy-v2",
+      "title": "Vizly — Visual Design Studio",
+      "viewport": {
+        "width": 1440,
+        "height": 960,
+        "dpr": 0.9999999801317827
+      },
+      "readyState": "complete",
+      "bodyTextSample": "V\nVizly\n仓储需求分流与库存分配策略\n仓储需求分流与库存分配策略\nCtrl+K\n23%\n23%\n分享\n基础数据\n缺货 (Inv < Demand)\n充足\n修正需求 (Q*Rate)\nMax_Ratio\n循环处理\nYes (未满)\nNo (溢出)\n汇聚\n汇聚\nReal_Ratio\nQuota A\n有剩余\n耗尽\n分配完\nPool B Demand\n余量传递\n用到存储\n拣选捡漏\n策略启动\n• 开始分流计算\n• 加载当前快照\n数据初始化\n• 汇总拣选/存储库存\n• 汇总所有订单需求\n库存充足性校验\n• 总库存 < 总需求?\n• 判断是否需要降级\n削减需求 (满足率)\n• 计算 Rate = Inv / Demand\n• 订单量 = 原需求 × Rate\n理论水位计算\n• 计算拣选位占比\n• 设定 Max_Ratio (如0.7)\n需求排序\n• 门店需求从小到大\n• 准备贪婪切分\n水位阈值判定\n• 累计需求 ≤ Max_Ratio?\n• 决定入池方向\n归入直拣池 (Pool A)\n• 累加直拣需求量\n• 标记为直拣订单\n归入补货池 (Pool B)\n• 剩余需求触顶溢出\n• 标记为补货订单\n实际占比修正\n• 计算 Real_Ratio\n• 修正理论偏差\n库存配额锁定\n• 锁定直拣配额 (Quota A)\n• 释放余量给补货池\n规格贪婪分配\n• 消耗 Quota A\n• 优先满足大规格整箱\n配额检查\n• Quota A 是否耗尽?\n零头轮询\n• 剩余配额逐个分配\n• 满足门店零头需求\n全量资源合并\n• 拣选余量 (Res) +\n• 存储位库存 (Store)\n混合贪婪分配\n• 优先切分拣选余量\n• 不足则切分存储位\n库位来源判断\n• 是否动用了存储位?\n直拣任务生成\n• 仅拣选作业\n• 直接发货出库\n补货任务生成\n• 存储->拣选移库\n• 单据挂起等待\n拣漏直拣任务\n• 这里无需补货\n• 转为纯拣选单\nWMS作业释放\n• 完成策略计算\n• 作业下发\n策略计算\n14\n⊖\n资源分配\n8\n⊖\n作业执行\n5\n⊖\n数据准备\n5\n⊖\n初分逻辑\n4\n⊖\n库存修正\n2\n⊖\n直拣池分配\n3\n⊖",
+      "controlCount": 54,
+      "controls": [
+        {
+          "tag": "a",
+          "text": "V\nVizly",
+          "aria": null,
+          "disabled": false,
+          "x": 23,
+          "y": 18,
+          "width": 53,
+          "height": 19
+        },
+        {
+          "tag": "button",
+          "text": "仓储需求分流与库存分配策略",
+          "aria": "打开图表与模板：仓储需求分流与库存分配策略",
+          "disabled": false,
+          "x": 88,
+          "y": 14,
+          "width": 167,
+          "height": 27
+        },
+        {
+          "tag": "button",
+          "text": "Ctrl+K",
+          "aria": "打开命令搜索",
+          "disabled": false,
+          "x": 263,
+          "y": 14,
+          "width": 48,
+          "height": 27
+        },
+        {
+          "tag": "button",
+          "text": "撤销 (Ctrl+Z)",
+          "aria": "撤销 (Ctrl+Z)",
+          "disabled": true,
+          "x": 573,
+          "y": 16,
+          "width": 23,
+          "height": 23
+        },
+        {
+          "tag": "button",
+          "text": "重做 (Ctrl+Y)",
+          "aria": "重做 (Ctrl+Y)",
+          "disabled": true,
+          "x": 598,
+          "y": 16,
+          "width": 23,
+          "height": 23
+        },
+        {
+          "tag": "button",
+          "text": "放大 (23%)",
+          "aria": "放大 (23%)",
+          "disabled": false,
+          "x": 625,
+          "y": 16,
+          "width": 23,
+          "height": 23
+        },
+        {
+          "tag": "button",
+          "text": "缩小 (23%)",
+          "aria": "缩小 (23%)",
+          "disabled": false,
+          "x": 650,
+          "y": 16,
+          "width": 23,
+          "height": 23
+        },
+        {
+          "tag": "button",
+          "text": "适应 (23%)",
+          "aria": "适应 (23%)",
+          "disabled": false,
+          "x": 674,
+          "y": 16,
+          "width": 23,
+          "height": 23
+        },
+        {
+          "tag": "button",
+          "text": "23%",
+          "aria": "重置缩放至 100% (23%)",
+          "disabled": false,
+          "x": 699,
+          "y": 16,
+          "width": 32,
+          "height": 23
+        },
+        {
+          "tag": "button",
+          "text": "自动布局：标准流程（保留域·上→下） + 自动（下次布局评估）",
+          "aria": "自动布局：标准流程（保留域·上→下） + 自动（下次布局评估）",
+          "disabled": false,
+          "x": 735,
+          "y": 16,
+          "width": 23,
+          "height": 23
+        },
+        {
+          "tag": "button",
+          "text": "自动布线 开启",
+          "aria": "自动布线 开启",
+          "disabled": false,
+          "x": 760,
+          "y": 16,
+          "width": 23,
+          "height": 23
+        },
+        {
+          "tag": "button",
+          "text": "网格吸附：开启",
+          "aria": "网格吸附：开启",
+          "disabled": false,
+          "x": 787,
+          "y": 16,
+          "width": 23,
+          "height": 23
+        },
+        {
+          "tag": "button",
+          "text": "画布设置",
+          "aria": "画布设置",
+          "disabled": false,
+          "x": 812,
+          "y": 16,
+          "width": 23,
+          "height": 23
+        },
+        {
+          "tag": "button",
+          "text": "更多操作",
+          "aria": "更多操作",
+          "disabled": false,
+          "x": 836,
+          "y": 16,
+          "width": 23,
+          "height": 23
+        },
+        {
+          "tag": "button",
+          "text": "请恰好选择两个组件以建立依赖关系",
+          "aria": "请恰好选择两个组件以建立依赖关系",
+          "disabled": true,
+          "x": 881,
+          "y": 19,
+          "width": 17,
+          "height": 17
+        },
+        {
+          "tag": "button",
+          "text": "保存选项",
+          "aria": "保存选项",
+          "disabled": false,
+          "x": 1155,
+          "y": 16,
+          "width": 23,
+          "height": 23
+        },
+        {
+          "tag": "button",
+          "text": "分享",
+          "aria": "分享",
+          "disabled": false,
+          "x": 1180,
+          "y": 5,
+          "width": 64,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "text": "文档操作",
+          "aria": "文档操作",
+          "disabled": false,
+          "x": 1245,
+          "y": 16,
+          "width": 23,
+          "height": 23
+        },
+        {
+          "tag": "button",
+          "text": "回到顶部",
+          "aria": "回到顶部",
+          "disabled": false,
+          "x": 1276,
+          "y": 16,
+          "width": 23,
+          "height": 23
+        },
+        {
+          "tag": "button",
+          "text": "适应屏幕",
+          "aria": "适应屏幕",
+          "disabled": false,
+          "x": 1301,
+          "y": 16,
+          "width": 23,
+          "height": 23
+        },
+        {
+          "tag": "button",
+          "text": "全屏",
+          "aria": "全屏",
+          "disabled": false,
+          "x": 1326,
+          "y": 16,
+          "width": 23,
+          "height": 23
+        },
+        {
+          "tag": "button",
+          "text": "导出",
+          "aria": "导出",
+          "disabled": false,
+          "x": 1353,
+          "y": 16,
+          "width": 23,
+          "height": 23
+        },
+        {
+          "tag": "button",
+          "text": "设置",
+          "aria": "设置",
+          "disabled": false,
+          "x": 1377,
+          "y": 14,
+          "width": 27,
+          "height": 27
+        },
+        {
+          "tag": "button",
+          "text": "登录",
+          "aria": "登录",
+          "disabled": false,
+          "x": 1406,
+          "y": 16,
+          "width": 23,
+          "height": 23
+        },
+        {
+          "tag": "button",
+          "text": "普通选择器 (V)",
+          "aria": "普通选择器 (V)",
+          "disabled": false,
+          "x": 652,
+          "y": 883,
+          "width": 23,
+          "height": 23
+        },
+        {
+          "tag": "button",
+          "text": "框选模式 (M)",
+          "aria": "框选模式 (M)",
+          "disabled": false,
+          "x": 678,
+          "y": 883,
+          "width": 23,
+          "height": 23
+        },
+        {
+          "tag": "button",
+          "text": "自由画笔 (P)",
+          "aria": "自由画笔 (P)",
+          "disabled": false,
+          "x": 705,
+          "y": 883,
+          "width": 23,
+          "height": 23
+        },
+        {
+          "tag": "button",
+          "text": "便签 (S)",
+          "aria": "便签 (S)",
+          "disabled": false,
+          "x": 739,
+          "y": 883,
+          "width": 23,
+          "height": 23
+        },
+        {
+          "tag": "button",
+          "text": "思维导图 (Shift+M)",
+          "aria": "思维导图 (Shift+M)",
+          "disabled": false,
+          "x": 765,
+          "y": 883,
+          "width": 23,
+          "height": 23
+        },
+        {
+          "tag": "button",
+          "text": "架构组件库",
+          "aria": "架构组件库",
+          "disabled": false,
+          "x": 14,
+          "y": 75,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "text": "架构校验",
+          "aria": "架构校验",
+          "disabled": false,
+          "x": 14,
+          "y": 123,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "text": "导航",
+          "aria": "导航",
+          "disabled": false,
+          "x": 14,
+          "y": 171,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "text": "评论反馈",
+          "aria": "评论反馈",
+          "disabled": false,
+          "x": 14,
+          "y": 218,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "text": "图层",
+          "aria": "图层",
+          "disabled": false,
+          "x": 14,
+          "y": 266,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "text": "搜索组件...",
+          "aria": "搜索组件...",
+          "disabled": false,
+          "x": 14,
+          "y": 331,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "text": "⊖",
+          "aria": "折叠子节点",
+          "disabled": false,
+          "x": 880,
+          "y": 103,
+          "width": 5,
+          "height": 5
+        },
+        {
+          "tag": "button",
+          "text": "⊖",
+          "aria": "折叠子节点",
+          "disabled": false,
+          "x": 880,
+          "y": 436,
+          "width": 5,
+          "height": 5
+        },
+        {
+          "tag": "button",
+          "text": "⊖",
+          "aria": "折叠子节点",
+          "disabled": false,
+          "x": 880,
+          "y": 644,
+          "width": 5,
+          "height": 5
+        },
+        {
+          "tag": "button",
+          "text": "⊖",
+          "aria": "折叠子节点",
+          "disabled": false,
+          "x": 641,
+          "y": 119,
+          "width": 5,
+          "height": 5
+        },
+        {
+          "tag": "button",
+          "text": "⊖",
+          "aria": "折叠子节点",
+          "disabled": false,
+          "x": 753,
+          "y": 119,
+          "width": 5,
+          "height": 5
+        },
+        {
+          "tag": "button",
+          "text": "⊖",
+          "aria": "折叠子节点",
+          "disabled": false,
+          "x": 866,
+          "y": 119,
+          "width": 5,
+          "height": 5
+        },
+        {
+          "tag": "button",
+          "text": "⊖",
+          "aria": "折叠子节点",
+          "disabled": false,
+          "x": 628,
+          "y": 451,
+          "width": 5,
+          "height": 5
+        },
+        {
+          "tag": "button",
+          "text": "⊖",
+          "aria": "折叠子节点",
+          "disabled": false,
+          "x": 732,
+          "y": 451,
+          "width": 5,
+          "height": 5
+        },
+        {
+          "tag": "button",
+          "text": "⊖",
+          "aria": "折叠子节点",
+          "disabled": false,
+          "x": 622,
+          "y": 660,
+          "width": 5,
+          "height": 5
+        },
+        {
+          "tag": "button",
+          "text": "页面 1",
+          "aria": "页面 1",
+          "disabled": false,
+          "x": 91,
+          "y": 905,
+          "width": 60,
+          "height": 52
+        },
+        {
+          "tag": "button",
+          "text": "向左移动页面 页面 1",
+          "aria": "向左移动页面 页面 1",
+          "disabled": true,
+          "x": 151,
+          "y": 905,
+          "width": 52,
+          "height": 52
+        },
+        {
+          "tag": "button",
+          "text": "向右移动页面 页面 1",
+          "aria": "向右移动页面 页面 1",
+          "disabled": true,
+          "x": 203,
+          "y": 905,
+          "width": 52,
+          "height": 52
+        },
+        {
+          "tag": "button",
+          "text": "复制页面 页面 1",
+          "aria": "复制页面 页面 1",
+          "disabled": false,
+          "x": 255,
+          "y": 905,
+          "width": 52,
+          "height": 52
+        },
+        {
+          "tag": "button",
+          "text": "重命名页面 页面 1",
+          "aria": "重命名页面 页面 1",
+          "disabled": false,
+          "x": 307,
+          "y": 905,
+          "width": 52,
+          "height": 52
+        },
+        {
+          "tag": "button",
+          "text": "新建页面",
+          "aria": "新建页面",
+          "disabled": false,
+          "x": 359,
+          "y": 905,
+          "width": 52,
+          "height": 52
+        },
+        {
+          "tag": "button",
+          "text": "属性设置",
+          "aria": "属性设置",
+          "disabled": false,
+          "x": 1382,
+          "y": 69,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "text": "AI 助手",
+          "aria": "AI 助手",
+          "disabled": false,
+          "x": 1382,
+          "y": 114,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "text": "展开面板",
+          "aria": "展开面板",
+          "disabled": false,
+          "x": 1382,
+          "y": 173,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "tag": "button",
+          "text": "最小化小地图",
+          "aria": "最小化小地图",
+          "disabled": false,
+          "x": 220,
+          "y": 705,
+          "width": 44,
+          "height": 44
+        }
+      ],
+      "reactFlow": {
+        "present": true,
+        "nodeDomCount": 30,
+        "edgeDomCount": 26,
+        "instanceNodeCount": 30,
+        "instanceEdgeCount": 26,
+        "viewport": {
+          "x": 555.443329394387,
+          "y": -202.76285672082713,
+          "zoom": 0.23074150664697193
+        }
+      },
+      "statusRegions": [
+        {
+          "role": "status",
+          "live": "polite",
+          "text": "23%",
+          "className": "sr-only"
+        },
+        {
+          "role": null,
+          "live": "assertive",
+          "text": "",
+          "className": ""
+        }
+      ],
+      "horizontalOverflow": 0,
+      "rightOverflow": [],
+      "audit": {
+        "errors": [],
+        "warnings": [],
+        "unhandledRejections": [],
+        "fetches": [
+          {
+            "method": "GET",
+            "url": "http://127.0.0.1:4174/assets/zh-CQiXWnvT.json",
+            "status": 200,
+            "ok": true,
+            "durationMs": 23
+          },
+          {
+            "method": "GET",
+            "url": "http://127.0.0.1:4174/assets/DeamndAllocation-CWZp_oP6.json",
+            "status": 200,
+            "ok": true,
+            "durationMs": 117
+          },
+          {
+            "method": "GET",
+            "url": "http://127.0.0.1:4174/assets/route-785374153-CF0pVYUX.json",
+            "status": 200,
+            "ok": true,
+            "durationMs": 8
+          }
+        ],
+        "xhrs": [],
+        "resourceSummary": {
+          "count": 119,
+          "zeroTransferCount": 0,
+          "slowCount": 0,
+          "largest": [
+            {
+              "name": "/assets/baseReactFlowDisplayEdges.worker-B1Z0ObEI.js",
+              "durationMs": -170,
+              "transferSize": 291838,
+              "decodedBodySize": 1007559
+            },
+            {
+              "name": "/assets/c-DGIk1syU2.js",
+              "durationMs": 21,
+              "transferSize": 56816,
+              "decodedBodySize": 198693
+            },
+            {
+              "name": "/assets/c-CAr7fPO4.js",
+              "durationMs": 11,
+              "transferSize": 44136,
+              "decodedBodySize": 137158
+            },
+            {
+              "name": "/assets/zh-CQiXWnvT.json",
+              "durationMs": 24,
+              "transferSize": 300,
+              "decodedBodySize": 136416
+            },
+            {
+              "name": "/assets/c-CQdC7Kqu.js",
+              "durationMs": 22,
+              "transferSize": 35223,
+              "decodedBodySize": 119649
+            },
+            {
+              "name": "/assets/c-Ceh08vNj.js",
+              "durationMs": 17,
+              "transferSize": 24919,
+              "decodedBodySize": 80236
+            },
+            {
+              "name": "/assets/c-DSHPFvnd2.js",
+              "durationMs": 21,
+              "transferSize": 18594,
+              "decodedBodySize": 69763
+            },
+            {
+              "name": "/assets/c-NJIbz8-g.js",
+              "durationMs": 7,
+              "transferSize": 15525,
+              "decodedBodySize": 58063
+            },
+            {
+              "name": "/assets/c-XLmbbcyW2.js",
+              "durationMs": 14,
+              "transferSize": 15612,
+              "decodedBodySize": 50831
+            },
+            {
+              "name": "/assets/c-FcVNpg1F2.js",
+              "durationMs": 15,
+              "transferSize": 15133,
+              "decodedBodySize": 46502
+            },
+            {
+              "name": "/assets/c-B1PgnAEh2.js",
+              "durationMs": 8,
+              "transferSize": 300,
+              "decodedBodySize": 26272
+            },
+            {
+              "name": "/assets/c-Dj1O9Kaj.js",
+              "durationMs": 1188,
+              "transferSize": 300,
+              "decodedBodySize": 25823
+            }
+          ]
+        }
+      },
+      "routing": {
+        "stage": "final-applied",
+        "renderAuthorityStatus": "accepted",
+        "layoutTransactionStatus": null,
+        "layoutTransactionJobId": null,
+        "hardClean": true,
+        "obstacleHits": 0,
+        "minimumClearanceViolations": 0,
+        "commercialClearanceViolations": 0,
+        "workerResolution": "validated-candidate",
+        "nodeCount": 30,
+        "edgeCount": 26
+      }
+    },
+    "resultFollowup": {
+      "activeDiagramTitle": true,
+      "followupActions": {
+        "fitView": {
+          "text": "适应 (23%)",
+          "aria": "适应 (23%)",
+          "disabled": false,
+          "visible": true,
+          "width": 23,
+          "height": 23
+        },
+        "export": {
+          "text": "导出",
+          "aria": "导出",
+          "disabled": false,
+          "visible": true,
+          "width": 23,
+          "height": 23
+        },
+        "share": {
+          "text": "分享",
+          "aria": "分享",
+          "disabled": false,
+          "visible": true,
+          "width": 64,
+          "height": 44
+        },
+        "pageAdd": {
+          "text": "新建页面",
+          "aria": "新建页面",
+          "disabled": false,
+          "visible": true,
+          "width": 52,
+          "height": 52
+        },
+        "propertyPanel": {
+          "text": "属性设置",
+          "aria": "属性设置",
+          "disabled": false,
+          "visible": true,
+          "width": 44,
+          "height": 44
+        }
+      },
+      "availableActionCount": 49
+    },
+    "stateFeedback": {
+      "disabledDependencyFeedback": {
+        "text": "",
+        "aria": "请恰好选择两个组件以建立依赖关系",
+        "disabled": true,
+        "ariaDisabled": null
+      },
+      "layoutCommit": {
+        "layoutTransactionStatus": "committed",
+        "layoutTransactionJobId": 2,
+        "hardClean": true,
+        "positionMismatchCount": null,
+        "maxPositionDelta": null
+      },
+      "snapshot": {
+        "label": "state-feedback-after-layout",
+        "url": "http://127.0.0.1:4174/?canonicalPreset=wms-demand-allocation-strategy-v2&experienceAudit=core-1789251378966#/?diagram=wms-demand-allocation-strategy-v2",
+        "title": "Vizly — Visual Design Studio",
+        "viewport": {
+          "width": 1440,
+          "height": 960,
+          "dpr": 0.9999999801317827
+        },
+        "readyState": "complete",
+        "bodyTextSample": "V\nVizly\n仓储需求分流与库存分配策略\n仓储需求分流与库存分配策略\nCtrl+K\n23%\n23%\n分享\n基础数据\n缺货 (Inv < Demand)\n充足\n修正需求 (Q*Rate)\nMax_Ratio\n循环处理\nYes (未满)\nNo (溢出)\n汇聚\n汇聚\nReal_Ratio\nQuota A\n有剩余\n耗尽\n分配完\nPool B Demand\n余量传递\n用到存储\n拣选捡漏\n策略计算\n14\n⊖\n数据准备\n5\n⊖\n策略启动\n• 开始分流计算\n• 加载当前快照\n数据初始化\n• 汇总拣选/存储库存\n• 汇总所有订单需求\n库存充足性校验\n• 总库存 < 总需求?\n• 判断是否需要降级\n削减需求 (满足率)\n• 计算 Rate = Inv / Demand\n• 订单量 = 原需求 × Rate\n理论水位计算\n• 计算拣选位占比\n• 设定 Max_Ratio (如0.7)\n初分逻辑\n4\n⊖\n需求排序\n• 门店需求从小到大\n• 准备贪婪切分\n水位阈值判定\n• 累计需求 ≤ Max_Ratio?\n• 决定入池方向\n归入直拣池 (Pool A)\n• 累加直拣需求量\n• 标记为直拣订单\n归入补货池 (Pool B)\n• 剩余需求触顶溢出\n• 标记为补货订单\n库存修正\n2\n⊖\n实际占比修正\n• 计算 Real_Ratio\n• 修正理论偏差\n库存配额锁定\n• 锁定直拣配额 (Quota A)\n• 释放余量给补货池\n资源分配\n8\n⊖\n直拣池分配\n3\n⊖\n规格贪婪分配\n• 消耗 Quota A\n• 优先满足大规格整箱\n配额检查\n• Quota A 是否耗尽?\n零头轮询\n• 剩余配额逐个分配\n• 满足门店零头需求\n补货池分配\n3\n⊖\n全量资源合并\n• 拣选余量 (Res) +\n• 存储位库存 (Store)\n混合贪婪分配\n• 优先切分拣选余量\n• 不足则切分存储位\n库位来源判断\n• 是否动用了存储位?\n作业执行\n5\n⊖\n作业执行\n4\n⊖\n直拣任务生成\n• 仅拣选作业\n• 直接发货出库\n补货任务生成\n• 存储->拣选移库\n• 单据挂起等待\n拣漏直拣任务\n• 这里无需补货\n• 转为纯拣选单\nWMS作",
+        "controlCount": 54,
+        "controls": [
+          {
+            "tag": "a",
+            "text": "V\nVizly",
+            "aria": null,
+            "disabled": false,
+            "x": 23,
+            "y": 18,
+            "width": 53,
+            "height": 19
+          },
+          {
+            "tag": "button",
+            "text": "仓储需求分流与库存分配策略",
+            "aria": "打开图表与模板：仓储需求分流与库存分配策略",
+            "disabled": false,
+            "x": 88,
+            "y": 14,
+            "width": 167,
+            "height": 27
+          },
+          {
+            "tag": "button",
+            "text": "Ctrl+K",
+            "aria": "打开命令搜索",
+            "disabled": false,
+            "x": 263,
+            "y": 14,
+            "width": 48,
+            "height": 27
+          },
+          {
+            "tag": "button",
+            "text": "撤销 (Ctrl+Z)",
+            "aria": "撤销 (Ctrl+Z)",
+            "disabled": false,
+            "x": 573,
+            "y": 16,
+            "width": 23,
+            "height": 23
+          },
+          {
+            "tag": "button",
+            "text": "重做 (Ctrl+Y)",
+            "aria": "重做 (Ctrl+Y)",
+            "disabled": true,
+            "x": 598,
+            "y": 16,
+            "width": 23,
+            "height": 23
+          },
+          {
+            "tag": "button",
+            "text": "放大 (23%)",
+            "aria": "放大 (23%)",
+            "disabled": false,
+            "x": 625,
+            "y": 16,
+            "width": 23,
+            "height": 23
+          },
+          {
+            "tag": "button",
+            "text": "缩小 (23%)",
+            "aria": "缩小 (23%)",
+            "disabled": false,
+            "x": 650,
+            "y": 16,
+            "width": 23,
+            "height": 23
+          },
+          {
+            "tag": "button",
+            "text": "适应 (23%)",
+            "aria": "适应 (23%)",
+            "disabled": false,
+            "x": 674,
+            "y": 16,
+            "width": 23,
+            "height": 23
+          },
+          {
+            "tag": "button",
+            "text": "23%",
+            "aria": "重置缩放至 100% (23%)",
+            "disabled": false,
+            "x": 699,
+            "y": 16,
+            "width": 32,
+            "height": 23
+          },
+          {
+            "tag": "button",
+            "text": "自动布局：复杂流程（保留域·左→右）",
+            "aria": "自动布局：复杂流程（保留域·左→右）",
+            "disabled": false,
+            "x": 735,
+            "y": 16,
+            "width": 23,
+            "height": 23
+          },
+          {
+            "tag": "button",
+            "text": "自动布线 开启",
+            "aria": "自动布线 开启",
+            "disabled": false,
+            "x": 760,
+            "y": 16,
+            "width": 23,
+            "height": 23
+          },
+          {
+            "tag": "button",
+            "text": "网格吸附：开启",
+            "aria": "网格吸附：开启",
+            "disabled": false,
+            "x": 787,
+            "y": 16,
+            "width": 23,
+            "height": 23
+          },
+          {
+            "tag": "button",
+            "text": "画布设置",
+            "aria": "画布设置",
+            "disabled": false,
+            "x": 812,
+            "y": 16,
+            "width": 23,
+            "height": 23
+          },
+          {
+            "tag": "button",
+            "text": "更多操作",
+            "aria": "更多操作",
+            "disabled": false,
+            "x": 836,
+            "y": 16,
+            "width": 23,
+            "height": 23
+          },
+          {
+            "tag": "button",
+            "text": "请恰好选择两个组件以建立依赖关系",
+            "aria": "请恰好选择两个组件以建立依赖关系",
+            "disabled": true,
+            "x": 881,
+            "y": 19,
+            "width": 17,
+            "height": 17
+          },
+          {
+            "tag": "button",
+            "text": "保存选项",
+            "aria": "保存选项",
+            "disabled": false,
+            "x": 1155,
+            "y": 16,
+            "width": 23,
+            "height": 23
+          },
+          {
+            "tag": "button",
+            "text": "分享",
+            "aria": "分享",
+            "disabled": false,
+            "x": 1180,
+            "y": 5,
+            "width": 64,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "文档操作",
+            "aria": "文档操作",
+            "disabled": false,
+            "x": 1245,
+            "y": 16,
+            "width": 23,
+            "height": 23
+          },
+          {
+            "tag": "button",
+            "text": "回到顶部",
+            "aria": "回到顶部",
+            "disabled": false,
+            "x": 1276,
+            "y": 16,
+            "width": 23,
+            "height": 23
+          },
+          {
+            "tag": "button",
+            "text": "适应屏幕",
+            "aria": "适应屏幕",
+            "disabled": false,
+            "x": 1301,
+            "y": 16,
+            "width": 23,
+            "height": 23
+          },
+          {
+            "tag": "button",
+            "text": "全屏",
+            "aria": "全屏",
+            "disabled": false,
+            "x": 1326,
+            "y": 16,
+            "width": 23,
+            "height": 23
+          },
+          {
+            "tag": "button",
+            "text": "导出",
+            "aria": "导出",
+            "disabled": false,
+            "x": 1353,
+            "y": 16,
+            "width": 23,
+            "height": 23
+          },
+          {
+            "tag": "button",
+            "text": "设置",
+            "aria": "设置",
+            "disabled": false,
+            "x": 1377,
+            "y": 14,
+            "width": 27,
+            "height": 27
+          },
+          {
+            "tag": "button",
+            "text": "登录",
+            "aria": "登录",
+            "disabled": false,
+            "x": 1406,
+            "y": 16,
+            "width": 23,
+            "height": 23
+          },
+          {
+            "tag": "button",
+            "text": "普通选择器 (V)",
+            "aria": "普通选择器 (V)",
+            "disabled": false,
+            "x": 652,
+            "y": 883,
+            "width": 23,
+            "height": 23
+          },
+          {
+            "tag": "button",
+            "text": "框选模式 (M)",
+            "aria": "框选模式 (M)",
+            "disabled": false,
+            "x": 678,
+            "y": 883,
+            "width": 23,
+            "height": 23
+          },
+          {
+            "tag": "button",
+            "text": "自由画笔 (P)",
+            "aria": "自由画笔 (P)",
+            "disabled": false,
+            "x": 705,
+            "y": 883,
+            "width": 23,
+            "height": 23
+          },
+          {
+            "tag": "button",
+            "text": "便签 (S)",
+            "aria": "便签 (S)",
+            "disabled": false,
+            "x": 739,
+            "y": 883,
+            "width": 23,
+            "height": 23
+          },
+          {
+            "tag": "button",
+            "text": "思维导图 (Shift+M)",
+            "aria": "思维导图 (Shift+M)",
+            "disabled": false,
+            "x": 765,
+            "y": 883,
+            "width": 23,
+            "height": 23
+          },
+          {
+            "tag": "button",
+            "text": "架构组件库",
+            "aria": "架构组件库",
+            "disabled": false,
+            "x": 14,
+            "y": 75,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "架构校验",
+            "aria": "架构校验",
+            "disabled": false,
+            "x": 14,
+            "y": 123,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "导航",
+            "aria": "导航",
+            "disabled": false,
+            "x": 14,
+            "y": 171,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "评论反馈",
+            "aria": "评论反馈",
+            "disabled": false,
+            "x": 14,
+            "y": 218,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "图层",
+            "aria": "图层",
+            "disabled": false,
+            "x": 14,
+            "y": 266,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "搜索组件...",
+            "aria": "搜索组件...",
+            "disabled": false,
+            "x": 14,
+            "y": 331,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "⊖",
+            "aria": "折叠子节点",
+            "disabled": false,
+            "x": 906,
+            "y": 456,
+            "width": 5,
+            "height": 5
+          },
+          {
+            "tag": "button",
+            "text": "⊖",
+            "aria": "折叠子节点",
+            "disabled": false,
+            "x": 469,
+            "y": 475,
+            "width": 5,
+            "height": 5
+          },
+          {
+            "tag": "button",
+            "text": "⊖",
+            "aria": "折叠子节点",
+            "disabled": false,
+            "x": 722,
+            "y": 490,
+            "width": 5,
+            "height": 5
+          },
+          {
+            "tag": "button",
+            "text": "⊖",
+            "aria": "折叠子节点",
+            "disabled": false,
+            "x": 895,
+            "y": 539,
+            "width": 5,
+            "height": 5
+          },
+          {
+            "tag": "button",
+            "text": "⊖",
+            "aria": "折叠子节点",
+            "disabled": false,
+            "x": 1174,
+            "y": 435,
+            "width": 5,
+            "height": 5
+          },
+          {
+            "tag": "button",
+            "text": "⊖",
+            "aria": "折叠子节点",
+            "disabled": false,
+            "x": 1164,
+            "y": 524,
+            "width": 5,
+            "height": 5
+          },
+          {
+            "tag": "button",
+            "text": "⊖",
+            "aria": "折叠子节点",
+            "disabled": false,
+            "x": 1162,
+            "y": 454,
+            "width": 5,
+            "height": 5
+          },
+          {
+            "tag": "button",
+            "text": "⊖",
+            "aria": "折叠子节点",
+            "disabled": false,
+            "x": 1351,
+            "y": 396,
+            "width": 5,
+            "height": 5
+          },
+          {
+            "tag": "button",
+            "text": "⊖",
+            "aria": "折叠子节点",
+            "disabled": false,
+            "x": 1341,
+            "y": 414,
+            "width": 5,
+            "height": 5
+          },
+          {
+            "tag": "button",
+            "text": "页面 1",
+            "aria": "页面 1",
+            "disabled": false,
+            "x": 91,
+            "y": 905,
+            "width": 60,
+            "height": 52
+          },
+          {
+            "tag": "button",
+            "text": "向左移动页面 页面 1",
+            "aria": "向左移动页面 页面 1",
+            "disabled": true,
+            "x": 151,
+            "y": 905,
+            "width": 52,
+            "height": 52
+          },
+          {
+            "tag": "button",
+            "text": "向右移动页面 页面 1",
+            "aria": "向右移动页面 页面 1",
+            "disabled": true,
+            "x": 203,
+            "y": 905,
+            "width": 52,
+            "height": 52
+          },
+          {
+            "tag": "button",
+            "text": "复制页面 页面 1",
+            "aria": "复制页面 页面 1",
+            "disabled": false,
+            "x": 255,
+            "y": 905,
+            "width": 52,
+            "height": 52
+          },
+          {
+            "tag": "button",
+            "text": "重命名页面 页面 1",
+            "aria": "重命名页面 页面 1",
+            "disabled": false,
+            "x": 307,
+            "y": 905,
+            "width": 52,
+            "height": 52
+          },
+          {
+            "tag": "button",
+            "text": "新建页面",
+            "aria": "新建页面",
+            "disabled": false,
+            "x": 359,
+            "y": 905,
+            "width": 52,
+            "height": 52
+          },
+          {
+            "tag": "button",
+            "text": "属性设置",
+            "aria": "属性设置",
+            "disabled": false,
+            "x": 1382,
+            "y": 69,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "AI 助手",
+            "aria": "AI 助手",
+            "disabled": false,
+            "x": 1382,
+            "y": 114,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "展开面板",
+            "aria": "展开面板",
+            "disabled": false,
+            "x": 1382,
+            "y": 173,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "最小化小地图",
+            "aria": "最小化小地图",
+            "disabled": false,
+            "x": 220,
+            "y": 705,
+            "width": 44,
+            "height": 44
+          }
+        ],
+        "reactFlow": {
+          "present": true,
+          "nodeDomCount": 30,
+          "edgeDomCount": 26,
+          "instanceNodeCount": 30,
+          "instanceEdgeCount": 26,
+          "viewport": {
+            "x": 77.0601513513514,
+            "y": 380.54082162162166,
+            "zoom": 0.22884324324324323
+          }
+        },
+        "statusRegions": [
+          {
+            "role": "status",
+            "live": "polite",
+            "text": "23%",
+            "className": "sr-only"
+          },
+          {
+            "role": null,
+            "live": "assertive",
+            "text": "",
+            "className": ""
+          }
+        ],
+        "horizontalOverflow": 0,
+        "rightOverflow": [],
+        "audit": {
+          "errors": [],
+          "warnings": [],
+          "unhandledRejections": [],
+          "fetches": [
+            {
+              "method": "GET",
+              "url": "http://127.0.0.1:4174/assets/zh-CQiXWnvT.json",
+              "status": 200,
+              "ok": true,
+              "durationMs": 23
+            },
+            {
+              "method": "GET",
+              "url": "http://127.0.0.1:4174/assets/DeamndAllocation-CWZp_oP6.json",
+              "status": 200,
+              "ok": true,
+              "durationMs": 117
+            },
+            {
+              "method": "GET",
+              "url": "http://127.0.0.1:4174/assets/route-785374153-CF0pVYUX.json",
+              "status": 200,
+              "ok": true,
+              "durationMs": 8
+            }
+          ],
+          "xhrs": [],
+          "resourceSummary": {
+            "count": 125,
+            "zeroTransferCount": 0,
+            "slowCount": 0,
+            "largest": [
+              {
+                "name": "/assets/elk-engine-worker-BDw1SMbx.js",
+                "durationMs": 52,
+                "transferSize": 438740,
+                "decodedBodySize": 1439622
+              },
+              {
+                "name": "/assets/baseReactFlowDisplayEdges.worker-B1Z0ObEI.js",
+                "durationMs": -170,
+                "transferSize": 291838,
+                "decodedBodySize": 1007559
+              },
+              {
+                "name": "/assets/c-DGIk1syU2.js",
+                "durationMs": 21,
+                "transferSize": 56816,
+                "decodedBodySize": 198693
+              },
+              {
+                "name": "/assets/c-CAr7fPO4.js",
+                "durationMs": 11,
+                "transferSize": 44136,
+                "decodedBodySize": 137158
+              },
+              {
+                "name": "/assets/zh-CQiXWnvT.json",
+                "durationMs": 24,
+                "transferSize": 300,
+                "decodedBodySize": 136416
+              },
+              {
+                "name": "/assets/c-CQdC7Kqu.js",
+                "durationMs": 22,
+                "transferSize": 35223,
+                "decodedBodySize": 119649
+              },
+              {
+                "name": "/assets/c-Ceh08vNj.js",
+                "durationMs": 17,
+                "transferSize": 24919,
+                "decodedBodySize": 80236
+              },
+              {
+                "name": "/assets/c-DSHPFvnd2.js",
+                "durationMs": 21,
+                "transferSize": 18594,
+                "decodedBodySize": 69763
+              },
+              {
+                "name": "/assets/c-NJIbz8-g.js",
+                "durationMs": 7,
+                "transferSize": 15525,
+                "decodedBodySize": 58063
+              },
+              {
+                "name": "/assets/c-XLmbbcyW2.js",
+                "durationMs": 14,
+                "transferSize": 15612,
+                "decodedBodySize": 50831
+              },
+              {
+                "name": "/assets/c-FcVNpg1F2.js",
+                "durationMs": 15,
+                "transferSize": 15133,
+                "decodedBodySize": 46502
+              },
+              {
+                "name": "/assets/c-B1PgnAEh2.js",
+                "durationMs": 8,
+                "transferSize": 300,
+                "decodedBodySize": 26272
+              }
+            ]
+          }
+        },
+        "routing": {
+          "stage": "final-applied",
+          "renderAuthorityStatus": "accepted",
+          "layoutTransactionStatus": "committed",
+          "layoutTransactionJobId": 2,
+          "hardClean": true,
+          "obstacleHits": null,
+          "minimumClearanceViolations": null,
+          "commercialClearanceViolations": null,
+          "workerResolution": null,
+          "nodeCount": 30,
+          "edgeCount": 26
+        }
+      },
+      "screenshot": ".common-tools\\reports\\layout-routing-audit\\experience-evidence\\screenshots\\state-feedback-after-layout.png"
+    },
+    "recovery": {
+      "poisonedViewportSetup": {
+        "keys": [
+          "vizly:viewport:v1:wms-demand-allocation-strategy-v2%3Apage-1",
+          "vizly:viewport:v1:wms-demand-allocation-strategy-v2%3Apage-1%3Adesktop"
+        ],
+        "poisonousViewport": {
+          "x": -100000,
+          "y": -100000,
+          "zoom": 0.02
+        }
+      },
+      "recoveredViewport": {
+        "x": 57,
+        "y": -502,
+        "zoom": 0.45
+      },
+      "readableZoom": true,
+      "preservedDiagram": true,
+      "screenshot": ".common-tools\\reports\\layout-routing-audit\\experience-evidence\\screenshots\\responsive-mobile-core-flow.png"
+    },
+    "responsive": {
+      "firstVisit": {
+        "label": "responsive-mobile-first-visit",
+        "url": "http://127.0.0.1:4174/?experienceAudit=mobile-1789251387780",
+        "title": "Vizly — Visual Design Studio",
+        "viewport": {
+          "width": 390,
+          "height": 844,
+          "dpr": 1.9999999602635654
+        },
+        "readyState": "complete",
+        "bodyTextSample": "V\n工作区\n11 个文档\n新建流程图\n最近\n11\n本地\n11\n云端\n0\n共享\n0\n行业模板库\n通用模板\n最近修改\n企业架构图（标准化完整版）\n架构图\n2025/11/26\n43\n空白画布 (Blank Canvas)\n流程图\n2023/12/31\n物流架构图\n架构图\n2023/12/31\n11\n物流运输规划系统流程图\n流程图\n2023/12/31\n27\n系统交互架构图\n架构图\n2023/12/31\n11\n运输驱动架构图\n架构图\n2023/12/31\n8\nTMS运输管理系统架构图\n架构图\n2023/12/31\n17\nWMS订单-分配-任务-任务分组-作业-人效流程\n流程图\n2023/12/31\n39\n仓储需求分流与库存分配策略 (含缺货逻辑)\n架构图\n2023/10/27\n21\nWMS 全流程解决方案\n流程图\n未知时间\n17\nWMS从订单到任务流程\n流程图\n未知时间\n20",
+        "controlCount": 38,
+        "controls": [
+          {
+            "tag": "button",
+            "text": "V",
+            "aria": "返回工作区",
+            "disabled": false,
+            "x": 16,
+            "y": 12,
+            "width": 206,
+            "height": 44
+          },
+          {
+            "tag": "input",
+            "text": "搜索工作区",
+            "aria": "搜索工作区",
+            "disabled": false,
+            "x": 49,
+            "y": 77,
+            "width": 314,
+            "height": 22
+          },
+          {
+            "tag": "button",
+            "text": "切换主题: 深色主题",
+            "aria": "切换主题: 深色主题",
+            "disabled": false,
+            "x": 234,
+            "y": 12,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "语言: 简体中文",
+            "aria": "语言: 简体中文",
+            "disabled": false,
+            "x": 282,
+            "y": 12,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "设置",
+            "aria": "设置",
+            "disabled": false,
+            "x": 330,
+            "y": 12,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "新建流程图",
+            "aria": null,
+            "disabled": false,
+            "x": 20,
+            "y": 193,
+            "width": 306,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "选择其他图表类型",
+            "aria": "选择其他图表类型",
+            "disabled": false,
+            "x": 326,
+            "y": 193,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "最近\n11",
+            "aria": null,
+            "disabled": false,
+            "x": 20,
+            "y": 257,
+            "width": 171,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "本地\n11",
+            "aria": null,
+            "disabled": false,
+            "x": 199,
+            "y": 257,
+            "width": 171,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "云端\n0",
+            "aria": null,
+            "disabled": false,
+            "x": 20,
+            "y": 309,
+            "width": 171,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "共享\n0",
+            "aria": null,
+            "disabled": false,
+            "x": 199,
+            "y": 309,
+            "width": 171,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "行业模板库",
+            "aria": null,
+            "disabled": false,
+            "x": 20,
+            "y": 361,
+            "width": 171,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "通用模板",
+            "aria": null,
+            "disabled": false,
+            "x": 199,
+            "y": 361,
+            "width": 171,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "最近修改",
+            "aria": "图表排序: 最近修改",
+            "disabled": false,
+            "x": 20,
+            "y": 423,
+            "width": 250,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "网格视图",
+            "aria": "网格视图",
+            "disabled": false,
+            "x": 280,
+            "y": 423,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "列表视图",
+            "aria": "列表视图",
+            "disabled": false,
+            "x": 324,
+            "y": 423,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "打开图表 企业架构图（标准化完整版）",
+            "aria": "打开图表 企业架构图（标准化完整版）",
+            "disabled": false,
+            "x": 21,
+            "y": 486,
+            "width": 349,
+            "height": 239
+          },
+          {
+            "tag": "button",
+            "text": "企业架构图（标准化完整版） 的更多操作",
+            "aria": "企业架构图（标准化完整版） 的更多操作",
+            "disabled": false,
+            "x": 317,
+            "y": 494,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "打开图表 空白画布 (Blank Canvas)",
+            "aria": "打开图表 空白画布 (Blank Canvas)",
+            "disabled": false,
+            "x": 21,
+            "y": 752,
+            "width": 349,
+            "height": 239
+          },
+          {
+            "tag": "button",
+            "text": "空白画布 (Blank Canvas) 的更多操作",
+            "aria": "空白画布 (Blank Canvas) 的更多操作",
+            "disabled": false,
+            "x": 317,
+            "y": 760,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "打开图表 物流架构图",
+            "aria": "打开图表 物流架构图",
+            "disabled": false,
+            "x": 21,
+            "y": 1018,
+            "width": 349,
+            "height": 239
+          },
+          {
+            "tag": "button",
+            "text": "物流架构图 的更多操作",
+            "aria": "物流架构图 的更多操作",
+            "disabled": false,
+            "x": 317,
+            "y": 1026,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "打开图表 物流运输规划系统流程图",
+            "aria": "打开图表 物流运输规划系统流程图",
+            "disabled": false,
+            "x": 21,
+            "y": 1284,
+            "width": 349,
+            "height": 239
+          },
+          {
+            "tag": "button",
+            "text": "物流运输规划系统流程图 的更多操作",
+            "aria": "物流运输规划系统流程图 的更多操作",
+            "disabled": false,
+            "x": 317,
+            "y": 1292,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "打开图表 系统交互架构图",
+            "aria": "打开图表 系统交互架构图",
+            "disabled": false,
+            "x": 21,
+            "y": 1550,
+            "width": 349,
+            "height": 239
+          },
+          {
+            "tag": "button",
+            "text": "系统交互架构图 的更多操作",
+            "aria": "系统交互架构图 的更多操作",
+            "disabled": false,
+            "x": 317,
+            "y": 1558,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "打开图表 运输驱动架构图",
+            "aria": "打开图表 运输驱动架构图",
+            "disabled": false,
+            "x": 21,
+            "y": 1816,
+            "width": 349,
+            "height": 239
+          },
+          {
+            "tag": "button",
+            "text": "运输驱动架构图 的更多操作",
+            "aria": "运输驱动架构图 的更多操作",
+            "disabled": false,
+            "x": 317,
+            "y": 1824,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "打开图表 TMS运输管理系统架构图",
+            "aria": "打开图表 TMS运输管理系统架构图",
+            "disabled": false,
+            "x": 21,
+            "y": 2082,
+            "width": 349,
+            "height": 239
+          },
+          {
+            "tag": "button",
+            "text": "TMS运输管理系统架构图 的更多操作",
+            "aria": "TMS运输管理系统架构图 的更多操作",
+            "disabled": false,
+            "x": 317,
+            "y": 2090,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "打开图表 WMS订单-分配-任务-任务分组-作业-人效流程",
+            "aria": "打开图表 WMS订单-分配-任务-任务分组-作业-人效流程",
+            "disabled": false,
+            "x": 21,
+            "y": 2348,
+            "width": 349,
+            "height": 239
+          },
+          {
+            "tag": "button",
+            "text": "WMS订单-分配-任务-任务分组-作业-人效流程 的更多操作",
+            "aria": "WMS订单-分配-任务-任务分组-作业-人效流程 的更多操作",
+            "disabled": false,
+            "x": 317,
+            "y": 2356,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "打开图表 仓储需求分流与库存分配策略 (含缺货逻辑)",
+            "aria": "打开图表 仓储需求分流与库存分配策略 (含缺货逻辑)",
+            "disabled": false,
+            "x": 21,
+            "y": 2614,
+            "width": 349,
+            "height": 239
+          },
+          {
+            "tag": "button",
+            "text": "仓储需求分流与库存分配策略 (含缺货逻辑) 的更多操作",
+            "aria": "仓储需求分流与库存分配策略 (含缺货逻辑) 的更多操作",
+            "disabled": false,
+            "x": 317,
+            "y": 2622,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "打开图表 WMS 全流程解决方案",
+            "aria": "打开图表 WMS 全流程解决方案",
+            "disabled": false,
+            "x": 21,
+            "y": 2880,
+            "width": 349,
+            "height": 239
+          },
+          {
+            "tag": "button",
+            "text": "WMS 全流程解决方案 的更多操作",
+            "aria": "WMS 全流程解决方案 的更多操作",
+            "disabled": false,
+            "x": 317,
+            "y": 2888,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "打开图表 WMS从订单到任务流程",
+            "aria": "打开图表 WMS从订单到任务流程",
+            "disabled": false,
+            "x": 21,
+            "y": 3146,
+            "width": 349,
+            "height": 239
+          },
+          {
+            "tag": "button",
+            "text": "WMS从订单到任务流程 的更多操作",
+            "aria": "WMS从订单到任务流程 的更多操作",
+            "disabled": false,
+            "x": 317,
+            "y": 3154,
+            "width": 44,
+            "height": 44
+          }
+        ],
+        "reactFlow": {
+          "present": false,
+          "nodeDomCount": 0,
+          "edgeDomCount": 0,
+          "instanceNodeCount": null,
+          "instanceEdgeCount": null,
+          "viewport": null
+        },
+        "statusRegions": [
+          {
+            "role": "status",
+            "live": "polite",
+            "text": "",
+            "className": "workspace-visually-hidden"
+          }
+        ],
+        "horizontalOverflow": 0,
+        "rightOverflow": [],
+        "audit": {
+          "errors": [],
+          "warnings": [],
+          "unhandledRejections": [],
+          "fetches": [
+            {
+              "method": "GET",
+              "url": "http://127.0.0.1:4174/assets/zh-CQiXWnvT.json",
+              "status": 200,
+              "ok": true,
+              "durationMs": 5
+            }
+          ],
+          "xhrs": [],
+          "resourceSummary": {
+            "count": 100,
+            "zeroTransferCount": 0,
+            "slowCount": 0,
+            "largest": [
+              {
+                "name": "/assets/c-Bn_9RZA4.js",
+                "durationMs": 54,
+                "transferSize": 300,
+                "decodedBodySize": 512233
+              },
+              {
+                "name": "/assets/c-Ch_xktz5.js",
+                "durationMs": 16,
+                "transferSize": 300,
+                "decodedBodySize": 305618
+              },
+              {
+                "name": "/assets/c-B4U7jafg.js",
+                "durationMs": 14,
+                "transferSize": 300,
+                "decodedBodySize": 301307
+              },
+              {
+                "name": "/assets/c-DkaFpug-.js",
+                "durationMs": 14,
+                "transferSize": 300,
+                "decodedBodySize": 282594
+              },
+              {
+                "name": "/assets/c-DGJObqSN.js",
+                "durationMs": 15,
+                "transferSize": 300,
+                "decodedBodySize": 150011
+              },
+              {
+                "name": "/assets/zh-CQiXWnvT.json",
+                "durationMs": 7,
+                "transferSize": 300,
+                "decodedBodySize": 136416
+              },
+              {
+                "name": "/assets/c-rVIELD2S.js",
+                "durationMs": 8,
+                "transferSize": 300,
+                "decodedBodySize": 134491
+              },
+              {
+                "name": "/assets/c-DaEYZZ3_.js",
+                "durationMs": 23,
+                "transferSize": 300,
+                "decodedBodySize": 132006
+              },
+              {
+                "name": "/assets/c-B1d3Rzxq.js",
+                "durationMs": 18,
+                "transferSize": 300,
+                "decodedBodySize": 106696
+              },
+              {
+                "name": "/assets/c-aB_NLUF-.js",
+                "durationMs": 28,
+                "transferSize": 300,
+                "decodedBodySize": 103490
+              },
+              {
+                "name": "/assets/c-CUu1d3kM2.js",
+                "durationMs": 18,
+                "transferSize": 300,
+                "decodedBodySize": 86498
+              },
+              {
+                "name": "/assets/c-ns3Anj-V.js",
+                "durationMs": 7,
+                "transferSize": 300,
+                "decodedBodySize": 68295
+              }
+            ]
+          }
+        },
+        "routing": null
+      },
+      "coreFlow": {
+        "label": "responsive-mobile-core-flow",
+        "url": "http://127.0.0.1:4174/?canonicalPreset=wms-demand-allocation-strategy-v2&experienceAudit=mobile-core-1789251390628#/?diagram=wms-demand-allocation-strategy-v2",
+        "title": "Vizly — Visual Design Studio",
+        "viewport": {
+          "width": 390,
+          "height": 844,
+          "dpr": 1.9999999602635654
+        },
+        "readyState": "complete",
+        "bodyTextSample": "仓储需求分流与库存分配策略\n仓储需求分流与库存分配策略\n45%\n45%\n基础数据\n缺货 (Inv < Demand)\n充足\n修正需求 (Q*Rate)\nMax_Ratio\n循环处理\nYes (未满)\nNo (溢出)\n汇聚\n汇聚\nReal_Ratio\nQuota A\n有剩余\n耗尽\n分配完\nPool B Demand\n余量传递\n用到存储\n拣选捡漏\n策略启动\n• 开始分流计算\n• 加载当前快照\n数据初始化\n• 汇总拣选/存储库存\n• 汇总所有订单需求\n库存充足性校验\n• 总库存 < 总需求?\n• 判断是否需要降级\n削减需求 (满足率)\n• 计算 Rate = Inv / Demand\n• 订单量 = 原需求 × Rate\n理论水位计算\n• 计算拣选位占比\n• 设定 Max_Ratio (如0.7)\n需求排序\n• 门店需求从小到大\n• 准备贪婪切分\n水位阈值判定\n• 累计需求 ≤ Max_Ratio?\n• 决定入池方向\n归入直拣池 (Pool A)\n• 累加直拣需求量\n• 标记为直拣订单\n归入补货池 (Pool B)\n• 剩余需求触顶溢出\n• 标记为补货订单\n实际占比修正\n• 计算 Real_Ratio\n• 修正理论偏差\n库存配额锁定\n• 锁定直拣配额 (Quota A)\n• 释放余量给补货池\n规格贪婪分配\n• 消耗 Quota A\n• 优先满足大规格整箱\n配额检查\n• Quota A 是否耗尽?\n零头轮询\n• 剩余配额逐个分配\n• 满足门店零头需求\n全量资源合并\n• 拣选余量 (Res) +\n• 存储位库存 (Store)\n混合贪婪分配\n• 优先切分拣选余量\n• 不足则切分存储位\n库位来源判断\n• 是否动用了存储位?\n直拣任务生成\n• 仅拣选作业\n• 直接发货出库\n补货任务生成\n• 存储->拣选移库\n• 单据挂起等待\n拣漏直拣任务\n• 这里无需补货\n• 转为纯拣选单\nWMS作业释放\n• 完成策略计算\n• 作业下发\n策略计算\n14\n⊖\n资源分配\n8\n⊖\n作业执行\n5\n⊖\n数据准备\n5\n⊖\n初分逻辑\n4\n⊖\n库存修正\n2\n⊖\n直拣池分配\n3\n⊖\n补货池分配\n3\n⊖\n作业执行\n4\n",
+        "controlCount": 41,
+        "controls": [
+          {
+            "tag": "button",
+            "text": "仓储需求分流与库存分配策略",
+            "aria": "打开图表与模板：仓储需求分流与库存分配策略",
+            "disabled": false,
+            "x": 30,
+            "y": 9,
+            "width": 80,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "放大 (45%)",
+            "aria": "放大 (45%)",
+            "disabled": false,
+            "x": 9,
+            "y": 50,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "缩小 (45%)",
+            "aria": "缩小 (45%)",
+            "disabled": false,
+            "x": 55,
+            "y": 50,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "适应 (45%)",
+            "aria": "适应 (45%)",
+            "disabled": false,
+            "x": 101,
+            "y": 50,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "45%",
+            "aria": "重置缩放至 100% (45%)",
+            "disabled": false,
+            "x": 147,
+            "y": 50,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "自动布局：标准流程（保留域·上→下） + 自动（下次布局评估）",
+            "aria": "自动布局：标准流程（保留域·上→下） + 自动（下次布局评估）",
+            "disabled": false,
+            "x": 195,
+            "y": 50,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "自动布线 开启",
+            "aria": "自动布线 开启",
+            "disabled": false,
+            "x": 240,
+            "y": 50,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "更多操作",
+            "aria": "更多操作",
+            "disabled": false,
+            "x": 288,
+            "y": 50,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "请恰好选择两个组件以建立依赖关系",
+            "aria": "请恰好选择两个组件以建立依赖关系",
+            "disabled": true,
+            "x": 354,
+            "y": 64,
+            "width": 17,
+            "height": 17
+          },
+          {
+            "tag": "button",
+            "text": "分享",
+            "aria": "分享",
+            "disabled": false,
+            "x": 194,
+            "y": 9,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "文档操作",
+            "aria": "文档操作",
+            "disabled": false,
+            "x": 240,
+            "y": 9,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "系统操作",
+            "aria": "系统操作",
+            "disabled": false,
+            "x": 291,
+            "y": 9,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "登录",
+            "aria": "登录",
+            "disabled": false,
+            "x": 337,
+            "y": 10,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "架构组件库",
+            "aria": "架构组件库",
+            "disabled": false,
+            "x": 7,
+            "y": 80,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "架构校验",
+            "aria": "架构校验",
+            "disabled": false,
+            "x": 7,
+            "y": 128,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "导航",
+            "aria": "导航",
+            "disabled": false,
+            "x": 7,
+            "y": 176,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "评论反馈",
+            "aria": "评论反馈",
+            "disabled": false,
+            "x": 7,
+            "y": 223,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "图层",
+            "aria": "图层",
+            "disabled": false,
+            "x": 7,
+            "y": 271,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "搜索组件...",
+            "aria": "搜索组件...",
+            "disabled": false,
+            "x": 7,
+            "y": 336,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "⊖",
+            "aria": "折叠子节点",
+            "disabled": false,
+            "x": 689,
+            "y": 95,
+            "width": 10,
+            "height": 10
+          },
+          {
+            "tag": "button",
+            "text": "⊖",
+            "aria": "折叠子节点",
+            "disabled": false,
+            "x": 689,
+            "y": 743,
+            "width": 10,
+            "height": 10
+          },
+          {
+            "tag": "button",
+            "text": "⊖",
+            "aria": "折叠子节点",
+            "disabled": false,
+            "x": 689,
+            "y": 1150,
+            "width": 10,
+            "height": 10
+          },
+          {
+            "tag": "button",
+            "text": "⊖",
+            "aria": "折叠子节点",
+            "disabled": false,
+            "x": 223,
+            "y": 125,
+            "width": 9,
+            "height": 9
+          },
+          {
+            "tag": "button",
+            "text": "⊖",
+            "aria": "折叠子节点",
+            "disabled": false,
+            "x": 442,
+            "y": 125,
+            "width": 9,
+            "height": 9
+          },
+          {
+            "tag": "button",
+            "text": "⊖",
+            "aria": "折叠子节点",
+            "disabled": false,
+            "x": 662,
+            "y": 125,
+            "width": 9,
+            "height": 9
+          },
+          {
+            "tag": "button",
+            "text": "⊖",
+            "aria": "折叠子节点",
+            "disabled": false,
+            "x": 199,
+            "y": 773,
+            "width": 9,
+            "height": 9
+          },
+          {
+            "tag": "button",
+            "text": "⊖",
+            "aria": "折叠子节点",
+            "disabled": false,
+            "x": 401,
+            "y": 773,
+            "width": 9,
+            "height": 9
+          },
+          {
+            "tag": "button",
+            "text": "⊖",
+            "aria": "折叠子节点",
+            "disabled": false,
+            "x": 186,
+            "y": 1180,
+            "width": 9,
+            "height": 9
+          },
+          {
+            "tag": "button",
+            "text": "页面 1",
+            "aria": "页面 1",
+            "disabled": false,
+            "x": 15,
+            "y": 647,
+            "width": 60,
+            "height": 52
+          },
+          {
+            "tag": "button",
+            "text": "向左移动页面 页面 1",
+            "aria": "向左移动页面 页面 1",
+            "disabled": true,
+            "x": 167,
+            "y": 700,
+            "width": 52,
+            "height": 52
+          },
+          {
+            "tag": "button",
+            "text": "向右移动页面 页面 1",
+            "aria": "向右移动页面 页面 1",
+            "disabled": true,
+            "x": 219,
+            "y": 700,
+            "width": 52,
+            "height": 52
+          },
+          {
+            "tag": "button",
+            "text": "复制页面 页面 1",
+            "aria": "复制页面 页面 1",
+            "disabled": false,
+            "x": 271,
+            "y": 700,
+            "width": 52,
+            "height": 52
+          },
+          {
+            "tag": "button",
+            "text": "重命名页面 页面 1",
+            "aria": "重命名页面 页面 1",
+            "disabled": false,
+            "x": 323,
+            "y": 700,
+            "width": 52,
+            "height": 52
+          },
+          {
+            "tag": "button",
+            "text": "新建页面",
+            "aria": "新建页面",
+            "disabled": false,
+            "x": 323,
+            "y": 647,
+            "width": 52,
+            "height": 52
+          },
+          {
+            "tag": "button",
+            "text": "添加组件",
+            "aria": "添加组件",
+            "disabled": false,
+            "x": 14,
+            "y": 784,
+            "width": 48,
+            "height": 48
+          },
+          {
+            "tag": "button",
+            "text": "属性",
+            "aria": "属性",
+            "disabled": false,
+            "x": 62,
+            "y": 777,
+            "width": 61,
+            "height": 61
+          },
+          {
+            "tag": "button",
+            "text": "图层",
+            "aria": "图层",
+            "disabled": false,
+            "x": 122,
+            "y": 777,
+            "width": 61,
+            "height": 61
+          },
+          {
+            "tag": "button",
+            "text": "AI",
+            "aria": "AI 助手",
+            "disabled": false,
+            "x": 183,
+            "y": 777,
+            "width": 61,
+            "height": 61
+          },
+          {
+            "tag": "button",
+            "text": "撤销 (Ctrl+Z)",
+            "aria": "撤销 (Ctrl+Z)",
+            "disabled": true,
+            "x": 243,
+            "y": 786,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "重做 (Ctrl+Y)",
+            "aria": "重做 (Ctrl+Y)",
+            "disabled": true,
+            "x": 287,
+            "y": 786,
+            "width": 44,
+            "height": 44
+          },
+          {
+            "tag": "button",
+            "text": "设置",
+            "aria": "设置",
+            "disabled": false,
+            "x": 332,
+            "y": 777,
+            "width": 44,
+            "height": 61
+          }
+        ],
+        "reactFlow": {
+          "present": true,
+          "nodeDomCount": 30,
+          "edgeDomCount": 26,
+          "instanceNodeCount": 30,
+          "instanceEdgeCount": 26,
+          "viewport": {
+            "x": 57,
+            "y": -502,
+            "zoom": 0.45
+          }
+        },
+        "statusRegions": [
+          {
+            "role": "status",
+            "live": "polite",
+            "text": "45%",
+            "className": "sr-only"
+          },
+          {
+            "role": null,
+            "live": "assertive",
+            "text": "",
+            "className": ""
+          }
+        ],
+        "horizontalOverflow": 0,
+        "rightOverflow": [
+          {
+            "tag": "g",
+            "className": "[object SVGAnimatedString]",
+            "text": "",
+            "left": 80,
+            "right": 397,
+            "width": 318
+          },
+          {
+            "tag": "circle",
+            "className": "[object SVGAnimatedString]",
+            "text": "",
+            "left": 383,
+            "right": 397,
+            "width": 14
+          },
+          {
+            "tag": "g",
+            "className": "[object SVGAnimatedString]",
+            "text": "",
+            "left": 383,
+            "right": 425,
+            "width": 42
+          },
+          {
+            "tag": "g",
+            "className": "[object SVGAnimatedString]",
+            "text": "",
+            "left": 390,
+            "right": 418,
+            "width": 27
+          },
+          {
+            "tag": "path",
+            "className": "[object SVGAnimatedString]",
+            "text": "",
+            "left": 390,
+            "right": 418,
+            "width": 27
+          },
+          {
+            "tag": "path",
+            "className": "[object SVGAnimatedString]",
+            "text": "",
+            "left": 390,
+            "right": 418,
+            "width": 27
+          },
+          {
+            "tag": "path",
+            "className": "[object SVGAnimatedString]",
+            "text": "",
+            "left": 390,
+            "right": 418,
+            "width": 27
+          },
+          {
+            "tag": "circle",
+            "className": "[object SVGAnimatedString]",
+            "text": "",
+            "left": 411,
+            "right": 425,
+            "width": 14
+          },
+          {
+            "tag": "circle",
+            "className": "[object SVGAnimatedString]",
+            "text": "",
+            "left": 383,
+            "right": 398,
+            "width": 14
+          },
+          {
+            "tag": "g",
+            "className": "[object SVGAnimatedString]",
+            "text": "",
+            "left": 296,
+            "right": 398,
+            "width": 102
+          },
+          {
+            "tag": "circle",
+            "className": "[object SVGAnimatedString]",
+            "text": "",
+            "left": 383,
+            "right": 398,
+            "width": 14
+          },
+          {
+            "tag": "circle",
+            "className": "[object SVGAnimatedString]",
+            "text": "",
+            "left": 383,
+            "right": 398,
+            "width": 14
+          },
+          {
+            "tag": "g",
+            "className": "[object SVGAnimatedString]",
+            "text": "",
+            "left": 316,
+            "right": 398,
+            "width": 81
+          },
+          {
+            "tag": "circle",
+            "className": "[object SVGAnimatedString]",
+            "text": "",
+            "left": 383,
+            "right": 398,
+            "width": 14
+          },
+          {
+            "tag": "g",
+            "className": "[object SVGAnimatedString]",
+            "text": "",
+            "left": 426,
+            "right": 617,
+            "width": 190
+          },
+          {
+            "tag": "g",
+            "className": "[object SVGAnimatedString]",
+            "text": "",
+            "left": 434,
+            "right": 610,
+            "width": 176
+          },
+          {
+            "tag": "path",
+            "className": "[object SVGAnimatedString]",
+            "text": "",
+            "left": 500,
+            "right": 610,
+            "width": 109
+          },
+          {
+            "tag": "path",
+            "className": "[object SVGAnimatedString]",
+            "text": "",
+            "left": 434,
+            "right": 500,
+            "width": 67
+          },
+          {
+            "tag": "g",
+            "className": "[object SVGAnimatedString]",
+            "text": "",
+            "left": 434,
+            "right": 610,
+            "width": 176
+          },
+          {
+            "tag": "path",
+            "className": "[object SVGAnimatedString]",
+            "text": "",
+            "left": 434,
+            "right": 610,
+            "width": 176
+          }
+        ],
+        "audit": {
+          "errors": [],
+          "warnings": [],
+          "unhandledRejections": [],
+          "fetches": [
+            {
+              "method": "GET",
+              "url": "http://127.0.0.1:4174/assets/zh-CQiXWnvT.json",
+              "status": 200,
+              "ok": true,
+              "durationMs": 7
+            },
+            {
+              "method": "GET",
+              "url": "http://127.0.0.1:4174/assets/DeamndAllocation-CWZp_oP6.json",
+              "status": 200,
+              "ok": true,
+              "durationMs": 70
+            },
+            {
+              "method": "GET",
+              "url": "http://127.0.0.1:4174/assets/route-785374153-CF0pVYUX.json",
+              "status": 200,
+              "ok": true,
+              "durationMs": 15
+            }
+          ],
+          "xhrs": [],
+          "resourceSummary": {
+            "count": 107,
+            "zeroTransferCount": 0,
+            "slowCount": 0,
+            "largest": [
+              {
+                "name": "/assets/baseReactFlowDisplayEdges.worker-B1Z0ObEI.js",
+                "durationMs": -351,
+                "transferSize": 300,
+                "decodedBodySize": 1007559
+              },
+              {
+                "name": "/assets/c-DGIk1syU2.js",
+                "durationMs": 41,
+                "transferSize": 300,
+                "decodedBodySize": 198693
+              },
+              {
+                "name": "/assets/c-CAr7fPO4.js",
+                "durationMs": 7,
+                "transferSize": 300,
+                "decodedBodySize": 137158
+              },
+              {
+                "name": "/assets/zh-CQiXWnvT.json",
+                "durationMs": 9,
+                "transferSize": 300,
+                "decodedBodySize": 136416
+              },
+              {
+                "name": "/assets/c-CdjSTDOH2.js",
+                "durationMs": 13,
+                "transferSize": 300,
+                "decodedBodySize": 25653
+              },
+              {
+                "name": "/assets/route-785374153-CF0pVYUX.json",
+                "durationMs": 9,
+                "transferSize": 300,
+                "decodedBodySize": 22159
+              },
+              {
+                "name": "/assets/c-D0ihLXS-.js",
+                "durationMs": 33,
+                "transferSize": 300,
+                "decodedBodySize": 21519
+              },
+              {
+                "name": "/assets/c-BUdxk9Or.js",
+                "durationMs": 6,
+                "transferSize": 300,
+                "decodedBodySize": 14823
+              },
+              {
+                "name": "/assets/DeamndAllocation-CWZp_oP6.json",
+                "durationMs": 5,
+                "transferSize": 300,
+                "decodedBodySize": 11451
+              },
+              {
+                "name": "/assets/c-Cgg0uxx62.js",
+                "durationMs": 49,
+                "transferSize": 300,
+                "decodedBodySize": 8068
+              },
+              {
+                "name": "/assets/DiagramViewerRoute-CoRTnyvi.css",
+                "durationMs": 27,
+                "transferSize": 300,
+                "decodedBodySize": 6039
+              },
+              {
+                "name": "/assets/TitleGroupNode-B0O5fdXq.css",
+                "durationMs": 6,
+                "transferSize": 300,
+                "decodedBodySize": 5703
+              }
+            ]
+          }
+        },
+        "routing": {
+          "stage": "final-applied",
+          "renderAuthorityStatus": "accepted",
+          "layoutTransactionStatus": null,
+          "layoutTransactionJobId": null,
+          "hardClean": true,
+          "obstacleHits": 0,
+          "minimumClearanceViolations": 0,
+          "commercialClearanceViolations": 0,
+          "workerResolution": "validated-candidate",
+          "nodeCount": 30,
+          "edgeCount": 26
+        }
+      }
+    },
+    "keyboard": {
+      "trace": [
+        {
+          "tag": "button",
+          "text": "页面 1",
+          "aria": "页面 1",
+          "role": "tab",
+          "className": "page-tabs__tab page-tabs__tab--active",
+          "visible": true,
+          "focusVisible": true,
+          "outlineStyle": "auto",
+          "outlineWidth": "0.555556px",
+          "boxShadow": "none",
+          "rect": {
+            "x": 91,
+            "y": 905,
+            "width": 60,
+            "height": 52
+          }
+        },
+        {
+          "tag": "button",
+          "text": "复制页面 页面 1",
+          "aria": "复制页面 页面 1",
+          "role": null,
+          "className": "page-tabs__duplicate",
+          "visible": true,
+          "focusVisible": true,
+          "outlineStyle": "auto",
+          "outlineWidth": "0.555556px",
+          "boxShadow": "none",
+          "rect": {
+            "x": 255,
+            "y": 905,
+            "width": 52,
+            "height": 52
+          }
+        },
+        {
+          "tag": "button",
+          "text": "重命名页面 页面 1",
+          "aria": "重命名页面 页面 1",
+          "role": null,
+          "className": "page-tabs__rename-action",
+          "visible": true,
+          "focusVisible": true,
+          "outlineStyle": "auto",
+          "outlineWidth": "0.555556px",
+          "boxShadow": "none",
+          "rect": {
+            "x": 307,
+            "y": 905,
+            "width": 52,
+            "height": 52
+          }
+        },
+        {
+          "tag": "button",
+          "text": "新建页面",
+          "aria": "新建页面",
+          "role": null,
+          "className": "page-tabs__add",
+          "visible": true,
+          "focusVisible": true,
+          "outlineStyle": "auto",
+          "outlineWidth": "0.555556px",
+          "boxShadow": "none",
+          "rect": {
+            "x": 359,
+            "y": 905,
+            "width": 52,
+            "height": 52
+          }
+        },
+        {
+          "tag": "button",
+          "text": "属性设置",
+          "aria": "属性设置",
+          "role": null,
+          "className": "ant-btn css-la24ln css-var-_r_1_ ant-btn-text ant-btn-color-default ant-btn-variant-text ant-btn-icon-only",
+          "visible": true,
+          "focusVisible": true,
+          "outlineStyle": "solid",
+          "outlineWidth": "2.61438px",
+          "boxShadow": "none",
+          "rect": {
+            "x": 1382,
+            "y": 69,
+            "width": 44,
+            "height": 44
+          }
+        },
+        {
+          "tag": "button",
+          "text": "AI 助手",
+          "aria": "AI 助手",
+          "role": null,
+          "className": "ant-btn css-la24ln css-var-_r_1_ ant-btn-text ant-btn-color-default ant-btn-variant-text ant-btn-icon-only",
+          "visible": true,
+          "focusVisible": true,
+          "outlineStyle": "solid",
+          "outlineWidth": "2.61438px",
+          "boxShadow": "none",
+          "rect": {
+            "x": 1382,
+            "y": 114,
+            "width": 44,
+            "height": 44
+          }
+        },
+        {
+          "tag": "button",
+          "text": "展开面板",
+          "aria": "展开面板",
+          "role": null,
+          "className": "ant-btn css-la24ln css-var-_r_1_ ant-btn-text ant-btn-color-default ant-btn-variant-text ant-btn-icon-only",
+          "visible": true,
+          "focusVisible": true,
+          "outlineStyle": "solid",
+          "outlineWidth": "2.61438px",
+          "boxShadow": "none",
+          "rect": {
+            "x": 1382,
+            "y": 173,
+            "width": 44,
+            "height": 44
+          }
+        },
+        {
+          "tag": "button",
+          "text": "最小化小地图",
+          "aria": "最小化小地图",
+          "role": null,
+          "className": "minimap-control-btn",
+          "visible": true,
+          "focusVisible": true,
+          "outlineStyle": "solid",
+          "outlineWidth": "1.66667px",
+          "boxShadow": "none",
+          "rect": {
+            "x": 220,
+            "y": 705,
+            "width": 44,
+            "height": 44
+          }
+        },
+        {
+          "tag": "div",
+          "text": "Minimap navigation",
+          "aria": "Minimap navigation",
+          "role": "application",
+          "className": "",
+          "visible": true,
+          "focusVisible": true,
+          "outlineStyle": "solid",
+          "outlineWidth": "2.77778px",
+          "boxShadow": "none",
+          "rect": {
+            "x": 26,
+            "y": 749,
+            "width": 236,
+            "height": 134
+          }
+        },
+        {
+          "tag": "body",
+          "text": "V\nVizly\n仓储需求分流与库存分配策略\n仓储需求分流与库存分配策略\nCtrl+K\n23%\n23%\n分享\n基础数据\n缺货 (Inv < Demand)\n充足\n修正需求 (Q*Rate)\nMax_Ra",
+          "aria": null,
+          "role": null,
+          "className": "",
+          "visible": true,
+          "focusVisible": false,
+          "outlineStyle": "none",
+          "outlineWidth": "2.77778px",
+          "boxShadow": "none",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 1440,
+            "height": 961
+          }
+        },
+        {
+          "tag": "a",
+          "text": "V\nVizly",
+          "aria": null,
+          "role": null,
+          "className": "flex items-center gap-2 px-1.5 py-1 rounded-[6px] hover:bg-black/5 dark:hover:bg-white/5 transition-all no-underline act",
+          "visible": true,
+          "focusVisible": true,
+          "outlineStyle": "solid",
+          "outlineWidth": "2.61438px",
+          "boxShadow": "none",
+          "rect": {
+            "x": 23,
+            "y": 18,
+            "width": 53,
+            "height": 19
+          }
+        },
+        {
+          "tag": "button",
+          "text": "仓储需求分流与库存分配策略",
+          "aria": "打开图表与模板：仓储需求分流与库存分配策略",
+          "role": null,
+          "className": "flex items-center gap-1.5 px-2.5 appearance-none border-0 bg-transparent rounded-[6px] hover:bg-black/[0.04] dark:hover:",
+          "visible": true,
+          "focusVisible": true,
+          "outlineStyle": "auto",
+          "outlineWidth": "0.653595px",
+          "boxShadow": "none",
+          "rect": {
+            "x": 88,
+            "y": 14,
+            "width": 167,
+            "height": 27
+          }
+        },
+        {
+          "tag": "button",
+          "text": "Ctrl+K",
+          "aria": "打开命令搜索",
+          "role": null,
+          "className": "flex items-center gap-2 px-2 h-[32px] appearance-none border-0 bg-transparent rounded-[6px] hover:bg-black/[0.04] dark:h",
+          "visible": true,
+          "focusVisible": true,
+          "outlineStyle": "auto",
+          "outlineWidth": "0.653595px",
+          "boxShadow": "none",
+          "rect": {
+            "x": 263,
+            "y": 14,
+            "width": 48,
+            "height": 27
+          }
+        },
+        {
+          "tag": "button",
+          "text": "撤销 (Ctrl+Z)",
+          "aria": "撤销 (Ctrl+Z)",
+          "role": null,
+          "className": "ant-btn css-la24ln css-var-_r_1_ ant-btn-text ant-btn-color-default ant-btn-variant-text ant-btn-icon-only w-8 h-8 p-0 b",
+          "visible": true,
+          "focusVisible": true,
+          "outlineStyle": "solid",
+          "outlineWidth": "2.61438px",
+          "boxShadow": "none",
+          "rect": {
+            "x": 573,
+            "y": 16,
+            "width": 23,
+            "height": 23
+          }
+        }
+      ],
+      "afterEnter": {
+        "tag": "button",
+        "text": "撤销 (Ctrl+Z)",
+        "aria": "撤销 (Ctrl+Z)",
+        "role": null,
+        "className": "ant-btn css-la24ln css-var-_r_1_ ant-btn-text ant-btn-color-default ant-btn-variant-text ant-btn-icon-only w-8 h-8 p-0 b",
+        "visible": true,
+        "focusVisible": true,
+        "outlineStyle": "solid",
+        "outlineWidth": "2.61438px",
+        "boxShadow": "none",
+        "rect": {
+          "x": 573,
+          "y": 16,
+          "width": 23,
+          "height": 23
+        }
+      }
+    }
+  }
+}

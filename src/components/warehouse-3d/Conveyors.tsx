@@ -1,13 +1,15 @@
 import React, { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
-import { Instances, Instance } from '@react-three/drei';
 import { WAREHOUSE } from './constants';
 import { useWarehouse3D } from './useWarehouse3D';
+import { WarehouseInstancedMesh } from './WarehouseInstancedMesh';
 
 // --- Shared Optimization Helpers ---
 const tempObject = new THREE.Object3D();
 const tempColor = new THREE.Color();
+const supportPostGeometry = new THREE.CylinderGeometry(0.3, 0.3, 6, 8);
+const supportPostMaterial = new THREE.MeshStandardMaterial({ color: '#95a5a6' });
 
 const PALETTES = {
     CARDBOARD: ["#e3a661", "#d49a5b", "#f5c491", "#ffdbb5", "#c4884d"],
@@ -417,13 +419,14 @@ const Conveyors: React.FC = () => {
                 <mesh position={[-130, 6, 62]}><boxGeometry args={[8, 4, 8]} /><meshStandardMaterial color="#2c3e50" /></mesh>
                 <ConveyorSegment position={[60, 6, 62]} size={[90, 1, 3]} transparent={true} />
                 {/* Optimized Static Supports */}
-                <Instances range={17} receiveShadow>
-                     <cylinderGeometry args={[0.3, 0.3, 6, 8]} />
-                     <meshStandardMaterial color="#95a5a6" />
-                     {[-130, -115, -100, -85, -70, -55, -40, -25, -10, 5, 20, 35, 50, 65, 80, 95, 110].map((x, i) => (
-                         <Instance key={i} position={[x, 3, 62]} />
-                     ))}
-                </Instances>
+                <WarehouseInstancedMesh
+                    capacity={17}
+                    geometry={supportPostGeometry}
+                    material={supportPostMaterial}
+                    instances={[-130, -115, -100, -85, -70, -55, -40, -25, -10, 5, 20, 35, 50, 65, 80, 95, 110]
+                        .map(x => ({ position: [x, 3, 62] }))}
+                    receiveShadow
+                />
                 
                 {/* Downward Ramp to Sorter induction */}
                 <group position={[xCenter + 7, 0, 0]}>
