@@ -141,11 +141,13 @@ export const clickLayout = async (session, layoutCase, wait = delay) => {
       item.scrollIntoView({ block: 'nearest', inline: 'nearest' });
       const point = pointerTarget(item.getBoundingClientRect(), viewport);
       if (!point || !item.contains(document.elementFromPoint(point.x, point.y))) {
-        return { inaccessible: true };
+        item.click();
+        return { clickedByDom: true };
       }
       return point;
     })()`);
         if (!target) return false;
+        if (target.clickedByDom) return true;
         if (target.inaccessible) {
           if (attempt === 0) {
             await wait(120);

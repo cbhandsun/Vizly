@@ -110,6 +110,49 @@ describe('display routing contract report', () => {
     ]));
   });
 
+  it('rejects container boundary skim evidence without leaking edge ids in summaries', () => {
+    const edges = [
+      edgeWithPath('skim-edge', [
+        { x: 100, y: 30 },
+        { x: 180, y: 30 },
+        { x: 300, y: 30 },
+      ]),
+    ];
+    const hardReport = {
+      ...getDisplayHardQualityGateReport(edges, nodes, 'polished'),
+      hardClean: true,
+      containerBoundarySkims: 128,
+      containerBoundarySkimEdgeIds: ['skim-edge'],
+    };
+
+    const report = createDisplayRoutingContractReport(edges, nodes, {
+      hardReport,
+      requireCommercialClearance: false,
+    });
+    const summary = summarizeDisplayRoutingContractReport(report);
+
+    expect(report.clean).toBe(false);
+    expect(report.violations).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'container-boundary-skim',
+        phase: 'presentation',
+        severity: 'commercial',
+        count: 128,
+        edgeIds: ['skim-edge'],
+      }),
+    ]));
+    expect(summary.violations).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'container-boundary-skim',
+        phase: 'presentation',
+        severity: 'commercial',
+        count: 128,
+      }),
+    ]));
+    expect(JSON.stringify(summary)).not.toContain('skim-edge');
+    expect(isDisplayRoutingContractSummary(summary)).toBe(true);
+  });
+
   it('summarizes final contract defects without leaking graph content', () => {
     const edges = [
       edgeWithPath('bad', [

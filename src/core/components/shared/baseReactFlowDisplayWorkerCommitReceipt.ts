@@ -50,6 +50,7 @@ export const createDisplayRoutingWorkerCommitReceipt = ({
     || !OUTPUT_ROUTE_SIGNATURE_PATTERN.test(outputRouteSignature)
     || !isDisplayWorkerBoundedCandidateReport(hardReport)
     || !hardReport.hardClean
+    || (hardReport.containerBoundarySkims ?? 0) > 0
     || !isDisplayRoutingWorkerSessionRef(sessionRef)
     || !displayRoutingIdentitiesMatch(sessionRef.identity, identity)
     || sessionRef.outputRouteSignature !== outputRouteSignature

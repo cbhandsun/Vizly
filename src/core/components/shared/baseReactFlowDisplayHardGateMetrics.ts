@@ -13,6 +13,7 @@ import {
   getDisplayNodeRect,
 } from './baseReactFlowDisplayGeometry';
 import { createDisplayObstacleHitContext } from './baseReactFlowDisplayObstacleHitCache';
+import { auditDisplayContainerBoundarySkims } from './baseReactFlowDisplayContainerBoundarySkim';
 
 export const displayObstacleEdgeSignature = (edge: Edge): string => {
   const path = getDisplayComputedPath(edge);
@@ -29,6 +30,8 @@ type DisplayHardGateMetrics = {
   quality: EdgePathQualityScore;
   obstacleHits: number;
   minimumClearanceViolationEdgeIds: string[];
+  containerBoundarySkimLength: number;
+  containerBoundarySkimEdgeIds: string[];
 };
 
 export type DisplayHardGateScanMetrics = Readonly<{
@@ -86,12 +89,18 @@ export const getDisplayHardGateMetricsEvaluation = (
     : renderNormalizedEdges.reduce((total, edge) => (
       total + obstacleContext.countRouting(getDisplayComputedPath(edge), edge)
     ), 0);
+  const containerBoundarySkimAudit = auditDisplayContainerBoundarySkims(
+    renderNormalizedEdges,
+    nodes,
+  );
   const metrics: DisplayHardGateMetrics = {
     signature,
     renderNormalizedEdges,
     quality: calculateEdgePathQualityScore(renderNormalizedEdges, qualityScanMetrics),
     obstacleHits,
     minimumClearanceViolationEdgeIds,
+    containerBoundarySkimLength: containerBoundarySkimAudit.totalLength,
+    containerBoundarySkimEdgeIds: [...containerBoundarySkimAudit.edgeIds],
   };
   const nextByNodes = byNodes ?? new WeakMap<Node[], DisplayHardGateMetrics>();
   nextByNodes.set(nodes, metrics);

@@ -53,6 +53,8 @@ export const createTestDisplayHardReport = (
   minimumClearanceViolations: 0,
   minimumClearanceViolationEdgeIds: [],
   commercialClearanceViolations: 0,
+  containerBoundarySkims: 0,
+  containerBoundarySkimEdgeIds: [],
   quality: {
     nonOrthogonalSegments: 0,
     strictCrossings: 0,

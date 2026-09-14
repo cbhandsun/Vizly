@@ -24,6 +24,8 @@ export type RoutingHardReport = Readonly<{
   minimumClearanceViolations?: number;
   minimumClearanceViolationEdgeIds?: readonly string[];
   commercialClearanceViolations?: number;
+  containerBoundarySkims?: number;
+  containerBoundarySkimEdgeIds?: readonly string[];
 }>;
 export type DisplayRoutingHardReportDigest = `hard-report-v1:${string}`;
 
@@ -60,7 +62,10 @@ export const cloneRoutingHardReport = (value: unknown): RoutingHardReport | null
     || (typeof crossingCost === 'number' && !Number.isSafeInteger(crossingCost))) return null;
   const minimumClearanceViolations = optionalMetric(value.minimumClearanceViolations);
   const commercialClearanceViolations = optionalMetric(value.commercialClearanceViolations);
-  if (minimumClearanceViolations === null || commercialClearanceViolations === null) return null;
+  const containerBoundarySkims = optionalMetric(value.containerBoundarySkims);
+  if (minimumClearanceViolations === null
+    || commercialClearanceViolations === null
+    || containerBoundarySkims === null) return null;
   const edgeIds = typeof value.minimumClearanceViolationEdgeIds === 'undefined'
     ? undefined
     : Array.isArray(value.minimumClearanceViolationEdgeIds)
@@ -72,7 +77,18 @@ export const cloneRoutingHardReport = (value: unknown): RoutingHardReport | null
       ))
       ? Object.freeze([...value.minimumClearanceViolationEdgeIds] as string[])
       : null;
-  if (edgeIds === null) return null;
+  const containerBoundarySkimEdgeIds = typeof value.containerBoundarySkimEdgeIds === 'undefined'
+    ? undefined
+    : Array.isArray(value.containerBoundarySkimEdgeIds)
+      && value.containerBoundarySkimEdgeIds.length <= MAX_REPORT_EDGE_IDS
+      && value.containerBoundarySkimEdgeIds.every(edgeId => (
+        typeof edgeId === 'string'
+        && edgeId.length > 0
+        && edgeId.length <= ROUTING_IDENTIFIER_MAX_LENGTH
+      ))
+      ? Object.freeze([...value.containerBoundarySkimEdgeIds] as string[])
+      : null;
+  if (edgeIds === null || containerBoundarySkimEdgeIds === null) return null;
   const quality = Object.freeze({
     ...Object.fromEntries(qualityEntries as Array<readonly [string, number]>),
     ...(typeof bridgedCrossings === 'number' ? { bridgedCrossings } : {}),
@@ -90,6 +106,8 @@ export const cloneRoutingHardReport = (value: unknown): RoutingHardReport | null
     ...(typeof commercialClearanceViolations === 'number'
       ? { commercialClearanceViolations }
       : {}),
+    ...(typeof containerBoundarySkims === 'number' ? { containerBoundarySkims } : {}),
+    ...(containerBoundarySkimEdgeIds ? { containerBoundarySkimEdgeIds } : {}),
   });
 };
 
@@ -122,6 +140,8 @@ export const computeDisplayRoutingHardReportDigest = (
   feed(report.minimumClearanceViolations ?? -1);
   for (const edgeId of [...(report.minimumClearanceViolationEdgeIds ?? [])].sort()) feed(edgeId);
   feed(report.commercialClearanceViolations ?? -1);
+  feed(report.containerBoundarySkims ?? -1);
+  for (const edgeId of [...(report.containerBoundarySkimEdgeIds ?? [])].sort()) feed(edgeId);
   for (const key of QUALITY_KEYS) {
     feed(key);
     feed(report.quality[key]);

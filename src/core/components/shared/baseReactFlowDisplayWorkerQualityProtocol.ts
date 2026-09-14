@@ -71,11 +71,12 @@ export const isDisplayWorkerBoundedCandidateReport = (
       && (!isBoundedMetric(quality.crossingCost) || !Number.isSafeInteger(quality.crossingCost)))
     || !isOptionalViolationCount(value.minimumClearanceViolations)
     || !isOptionalViolationCount(value.commercialClearanceViolations)
+    || !isOptionalViolationCount(value.containerBoundarySkims)
   ) return false;
   if (
     typeof value.commercialClearanceViolations === 'number'
     && value.commercialClearanceViolations > 0
-    && value.hardClean
+      && value.hardClean
   ) return false;
   const clearanceEdgeIds = value.minimumClearanceViolationEdgeIds;
   if (
@@ -84,6 +85,15 @@ export const isDisplayWorkerBoundedCandidateReport = (
       !Array.isArray(clearanceEdgeIds)
       || clearanceEdgeIds.length > 32
       || !clearanceEdgeIds.every(isBoundedIdentifier)
+    )
+  ) return false;
+  const skimEdgeIds = value.containerBoundarySkimEdgeIds;
+  if (
+    typeof skimEdgeIds !== 'undefined'
+    && (
+      !Array.isArray(skimEdgeIds)
+      || skimEdgeIds.length > 32
+      || !skimEdgeIds.every(isBoundedIdentifier)
     )
   ) return false;
   const pairs = value.unrelatedOverlapPairs;

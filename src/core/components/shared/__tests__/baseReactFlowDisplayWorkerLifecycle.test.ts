@@ -95,10 +95,12 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
     const reordered = {
       ...cleanHardReport,
       minimumClearanceViolationEdgeIds: ['edge-b', 'edge-a'],
+      containerBoundarySkimEdgeIds: ['edge-d', 'edge-c'],
     };
     const normalized = {
       ...cleanHardReport,
       minimumClearanceViolationEdgeIds: ['edge-a', 'edge-b'],
+      containerBoundarySkimEdgeIds: ['edge-c', 'edge-d'],
     };
     const digest = computeDisplayRoutingHardReportDigest(reordered);
     expect(digest).toBe(computeDisplayRoutingHardReportDigest(normalized));
@@ -106,6 +108,11 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
     expect(computeDisplayRoutingHardReportDigest({
       ...cleanHardReport,
       quality: { ...cleanHardReport.quality, strictCrossings: 1 },
+    })).not.toBe(digest);
+    expect(computeDisplayRoutingHardReportDigest({
+      ...cleanHardReport,
+      containerBoundarySkims: 120,
+      containerBoundarySkimEdgeIds: ['edge-c'],
     })).not.toBe(digest);
     expect(isDisplayRoutingHardReportDigest('hard-report-v1:unsafe')).toBe(false);
   });

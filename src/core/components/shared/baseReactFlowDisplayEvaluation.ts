@@ -69,11 +69,14 @@ export type BaseDisplayBoundedCandidateReport = {
   terminalsAttached: boolean;
   terminalsAnchored: boolean;
   quality: EdgePathQualityScore;
+
   /** Visual-risk diagnostics for unrelated business-node clearance below 16px. */
   minimumClearanceViolations?: number;
   minimumClearanceViolationEdgeIds?: readonly string[];
   /** Final-only commercial contract; internal candidate gates continue to use 16px. */
   commercialClearanceViolations?: number;
+  containerBoundarySkims?: number;
+  containerBoundarySkimEdgeIds?: readonly string[];
 };
 
 export type DisplayTerminalGateEvaluation = {
@@ -81,10 +84,7 @@ export type DisplayTerminalGateEvaluation = {
   terminalsAnchored: boolean;
 };
 
-export type DisplayTerminalGateEvaluator = (
-  edges: Edge[],
-  nodes: Node[],
-) => DisplayTerminalGateEvaluation;
+export type DisplayTerminalGateEvaluator = (edges: Edge[], nodes: Node[]) => DisplayTerminalGateEvaluation;
 
 export const displayHardQualityReportGeometryIsClean = (
   report: BaseDisplayBoundedCandidateReport,
@@ -510,7 +510,8 @@ export const getDisplayHardQualityGateReportWithMetrics = (
 }> => {
   const evaluation = getDisplayHardGateMetricsEvaluation(edges, nodes);
   const { metrics, scanMetrics } = evaluation;
-  const { quality, obstacleHits, minimumClearanceViolationEdgeIds } = metrics;
+  const { quality, obstacleHits, minimumClearanceViolationEdgeIds,
+    containerBoundarySkimLength, containerBoundarySkimEdgeIds } = metrics;
   const { terminalsAttached, terminalsAnchored } = evaluateTerminals(
     metrics.renderNormalizedEdges,
     nodes,
@@ -524,6 +525,8 @@ export const getDisplayHardQualityGateReportWithMetrics = (
     quality,
     minimumClearanceViolations: minimumClearanceViolationEdgeIds.length,
     minimumClearanceViolationEdgeIds: minimumClearanceViolationEdgeIds.slice(0, 32),
+    containerBoundarySkims: containerBoundarySkimLength,
+    containerBoundarySkimEdgeIds: containerBoundarySkimEdgeIds.slice(0, 32),
   };
   report.hardClean = displayHardQualityReportGeometryIsClean(report) && terminalsAnchored;
   return { report, scanMetrics };

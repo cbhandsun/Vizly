@@ -52,6 +52,7 @@ describe('baseReactFlowDisplayWorkerCommitReceipt', () => {
     expect(Object.isFrozen(parsed?.hardReport)).toBe(true);
     expect(Object.isFrozen(parsed?.hardReport.quality)).toBe(true);
     expect(Object.isFrozen(parsed?.hardReport.minimumClearanceViolationEdgeIds)).toBe(true);
+    expect(Object.isFrozen(parsed?.hardReport.containerBoundarySkimEdgeIds)).toBe(true);
     expect(Object.isFrozen(parsed?.sessionRef)).toBe(true);
   });
 
@@ -61,6 +62,7 @@ describe('baseReactFlowDisplayWorkerCommitReceipt', () => {
     { outputRouteSignature: 'route-v2:invalid' },
     { hardReportDigest: 'hard-report-v1:0000000000000000' },
     { hardReport: { ...hardReport, hardClean: false } },
+    { hardReport: { ...hardReport, containerBoundarySkims: 96, containerBoundarySkimEdgeIds: ['edge'] } },
     { sessionRef: { ...sessionRef, sessionId: 'display-session-v1:0' } },
     { identity: createDisplayRoutingIdentity('9999', identity.inputGeometryDigest) },
   ])('rejects malformed, stale, or internally inconsistent evidence: %j', override => {

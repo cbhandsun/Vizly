@@ -714,6 +714,8 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       minimumClearanceViolations: 0,
       minimumClearanceViolationEdgeIds: [],
       commercialClearanceViolations: 0,
+      containerBoundarySkims: 0,
+      containerBoundarySkimEdgeIds: [],
       quality: {
         nonOrthogonalSegments: 0,
         strictCrossings: 0,
@@ -738,6 +740,13 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       routeResolution: 'repair',
       workerDurationMs: 12.5,
     }, 'repair-1')).toMatchObject({ hardReport, workerDurationMs: 12.5 });
+    expect(parseDisplayEdgesWorkerResponse({
+      requestId: 'repair-1',
+      edges: validEdges,
+      hardClean: true,
+      hardReport: { ...hardReport, containerBoundarySkims: 96, containerBoundarySkimEdgeIds: ['edge'] },
+      routeResolution: 'repair',
+    }, 'repair-1')?.hardReport?.containerBoundarySkims).toBe(96);
     const timedResponse = { requestId: 'repair-1', edges: validEdges, hardClean: true,
       hardReport, routeResolution: 'repair', workerDurationMs: 12.5 };
     expect(parseDisplayEdgesWorkerResponse({ ...timedResponse,
@@ -766,36 +775,20 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
         workerDurationMs,
       }, 'repair-1')).toBeNull();
     }
-    expect(parseDisplayEdgesWorkerResponse({
-      requestId: 'repair-1',
-      edges: validEdges,
-      hardClean: true,
-      hardReport: {
-        ...hardReport,
-        minimumClearanceViolationEdgeIds: ['x'.repeat(20_001)],
-      },
-      routeResolution: 'repair',
-    }, 'repair-1')).toBeNull();
-    expect(parseDisplayEdgesWorkerResponse({
-      requestId: 'repair-1',
-      edges: validEdges,
-      hardClean: true,
-      hardReport: {
-        ...hardReport,
-        commercialClearanceViolations: 1,
-      },
-      routeResolution: 'repair',
-    }, 'repair-1')).toBeNull();
-    expect(parseDisplayEdgesWorkerResponse({
-      requestId: 'repair-1',
-      edges: validEdges,
-      hardClean: true,
-      hardReport: {
-        ...hardReport,
-        commercialClearanceViolations: Number.POSITIVE_INFINITY,
-      },
-      routeResolution: 'repair',
-    }, 'repair-1')).toBeNull();
+    for (const hardReportOverride of [
+      { minimumClearanceViolationEdgeIds: ['x'.repeat(20_001)] },
+      { commercialClearanceViolations: 1 },
+      { commercialClearanceViolations: Number.POSITIVE_INFINITY },
+      { containerBoundarySkimEdgeIds: ['x'.repeat(20_001)] },
+    ]) {
+      expect(parseDisplayEdgesWorkerResponse({
+        requestId: 'repair-1',
+        edges: validEdges,
+        hardClean: true,
+        hardReport: { ...hardReport, ...hardReportOverride },
+        routeResolution: 'repair',
+      }, 'repair-1')).toBeNull();
+    }
     expect(parseDisplayEdgesWorkerResponse({
       requestId: 'route-1',
       edges: validEdges,

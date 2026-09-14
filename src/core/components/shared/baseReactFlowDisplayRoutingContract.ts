@@ -24,6 +24,7 @@ export type DisplayRoutingContractViolationCode =
   | 'hairpin'
   | 'minimum-clearance'
   | 'commercial-clearance'
+  | 'container-boundary-skim'
   | 'render-unsafe-endpoint-stub'
   | 'endpoint-order'
   | 'passage-order';
@@ -91,6 +92,7 @@ export const DISPLAY_ROUTING_CONTRACT_VIOLATION_CODES: readonly DisplayRoutingCo
   'hairpin',
   'minimum-clearance',
   'commercial-clearance',
+  'container-boundary-skim',
   'render-unsafe-endpoint-stub',
   'endpoint-order',
   'passage-order',
@@ -210,6 +212,15 @@ export const createDisplayRoutingContractReport = (
     'commercial',
     commercialClearanceViolations,
   );
+  if ((hardReport.containerBoundarySkims ?? 0) > 0) {
+    violations.push({
+      code: 'container-boundary-skim',
+      phase: 'presentation',
+      severity: 'commercial',
+      count: hardReport.containerBoundarySkims ?? 0,
+      edgeIds: hardReport.containerBoundarySkimEdgeIds,
+    });
+  }
   appendCountViolation(
     violations,
     'render-unsafe-endpoint-stub',

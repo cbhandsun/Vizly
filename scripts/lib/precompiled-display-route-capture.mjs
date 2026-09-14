@@ -57,6 +57,7 @@ export const isPrecompiledDisplayRoutingContractSummary = value => {
     'hairpin',
     'minimum-clearance',
     'commercial-clearance',
+    'container-boundary-skim',
     'render-unsafe-endpoint-stub',
     'endpoint-order',
     'passage-order',

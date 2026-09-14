@@ -35,6 +35,7 @@ import {
 import {
   repairDisplayLoopShortcuts,
 } from './baseReactFlowDisplayLoopShortcutRepair';
+import { repairDisplayContainerBoundarySkims } from './baseReactFlowDisplayContainerBoundarySkimRepair';
 import {
   displayPathLength,
   getDisplayComputedPath,
@@ -421,7 +422,6 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
         [context.changedEdgeIndex],
         options,
         evaluation,
-        true,
       ),
     }) as T;
     const commerciallyUnsafeEdgeIds = new Set<string>();
@@ -444,10 +444,26 @@ export const repairBaseReactFlowFinalCommercialDetours = <T extends Edge[]>(
       minimumClearance: COMMERCIAL_BUSINESS_NODE_CLEARANCE,
     }) as T;
   };
+  const repairBoundarySkims = (candidateEdges: T): T => repairDisplayContainerBoundarySkims(
+    candidateEdges,
+    nodes,
+    {
+      eligibleEdgeIds: options.eligibleEdgeIds,
+      validateCandidate: (context) => {
+        if (context.candidateSkimLength >= context.baselineSkimLength) return false;
+        const candidateReport = evaluation.hardReportChanged(
+          context.baselineEdges,
+          context.candidateEdges,
+          [context.changedEdgeIndex],
+        );
+        return candidateReport.hardClean;
+      },
+    },
+  ) as T;
   const repairClearanceToBoundedFixedPoint = (candidateEdges: T): T => {
     let current = candidateEdges;
     for (let pass = 0; pass < 2; pass += 1) {
-      const next = repairClearance(current);
+      const next = repairClearance(repairBoundarySkims(current));
       if (next === current || next.every((edge, index) => edge === current[index])) return current;
       current = next;
     }

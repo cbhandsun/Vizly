@@ -84,6 +84,7 @@ import {
 } from './baseReactFlowDisplayFinalCommercialClearanceTransaction';
 import { runDisplayWorkerLayoutRepairTransaction } from './baseReactFlowDisplayWorkerLayoutTransaction';
 import { selectHardCleanDisplayParallelLaneCandidate } from './baseReactFlowDisplayParallelLaneSeparation';
+import { repairDisplayContainerBoundarySkims } from './baseReactFlowDisplayContainerBoundarySkimRepair';
 
 const finalizeContainerClearanceResponse = (
   response: DisplayEdgesWorkerResponse,
@@ -267,9 +268,7 @@ const finalizeContainerClearanceResponse = (
       },
       // Hard-clean only proves collision/crossing safety. A freshly computed
       // full route still needs the bounded commercial shortcut pass before it
-      // can become a reusable precompiled candidate. Cache hits and
-      // incremental/repair responses already passed their own bounded quality
-      // work, so keep their latency-sensitive fast path.
+      // can become a reusable precompiled candidate.
       skipLoopShortcut: (options.commercialStabilizationPass ?? 0) === 1
         || !(
           response.routeResolution === 'full-route'
@@ -342,13 +341,18 @@ const finalizeContainerClearanceResponse = (
     repairNodes,
     response,
   });
-  const finalizedRoutesChanged = Boolean(
-    finalizedResponse.edges
-    && !doBaseReactFlowDisplayRoutesMatchExactly(response.edges, finalizedResponse.edges),
-  );
-  const exactFinalizedResponse = withExactHardReport(finalizedResponse);
-  // A remaining clearance defect has its own atomic closure. Try that before
-  // replaying the complete endpoint/commercial finalizer on the same graph.
+  const boundarySkimFinalEdges = finalizedResponse.edges ? repairDisplayContainerBoundarySkims(
+    finalizedResponse.edges, repairNodes, { eligibleEdgeIds: options.eligibleEdgeIds,
+      validateCandidate: context => context.candidateSkimLength < context.baselineSkimLength
+        && finalEvaluation.hardReport(context.candidateEdges).hardClean },
+  ) : null;
+  const boundarySkimFinalizedResponse = boundarySkimFinalEdges
+    && !doBaseReactFlowDisplayRoutesMatchExactly(finalizedResponse.edges ?? [], boundarySkimFinalEdges)
+    ? { ...finalizedResponse, edges: boundarySkimFinalEdges }
+    : finalizedResponse;
+  const finalizedRoutesChanged = Boolean(boundarySkimFinalizedResponse.edges
+    && !doBaseReactFlowDisplayRoutesMatchExactly(response.edges, boundarySkimFinalizedResponse.edges));
+  const exactFinalizedResponse = withExactHardReport(boundarySkimFinalizedResponse);
   if ((options.commercialStabilizationPass ?? 0) === 0
     && isCommercialClearanceOnlyFailure(exactFinalizedResponse)) {
     const clearanceClosed = finalizeExactCommercialResponse(exactFinalizedResponse);
@@ -529,9 +533,11 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
       routeResolution: 'validated-candidate',
       phaseTrace,
     };
-    const candidateCommercialQualityIsClean = candidateSource === 'precompiled'
-      ? baseReactFlowDisplayCommercialQualityIsClean(candidateEdges)
-      : baseReactFlowDisplayCandidateCommercialQualityIsClean(candidateEdges);
+    const candidateCommercialQualityIsClean = (
+      candidateSource === 'precompiled'
+        ? baseReactFlowDisplayCommercialQualityIsClean(candidateEdges)
+        : baseReactFlowDisplayCandidateCommercialQualityIsClean(candidateEdges)
+    ) && (candidateHardReport.containerBoundarySkims ?? 0) === 0;
     if (!candidateCommercialQualityIsClean) {
       const exactValidatedCandidateResponse = withExactDisplayHardReport(
         validatedCandidateResponse,
@@ -542,12 +548,6 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
           onBoundedCandidate?.(exactValidatedCandidateResponse.hardReport);
         }
       } else {
-        // Exact hard safety and structural commercial quality are independent
-        // promotion contracts. Give a hard-clean candidate the same bounded
-        // commercial closure used by final responses before discarding it and
-        // recomputing the complete route. The provisional repaired resolution
-        // deliberately bypasses the validated-candidate idempotence shortcut,
-        // which is only sound after commercial quality has already passed.
         candidateTimer.finish('fallback');
         candidateValidationFinished = true;
         const commerciallyFinalizedResponse = finalizeContainerClearanceResponse({
@@ -566,6 +566,7 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
           exactCommerciallyFinalizedResponse.edges
           && exactCommerciallyFinalizedResponse.hardClean === true
           && baseReactFlowDisplayCommercialQualityIsClean(exactCommerciallyFinalizedResponse.edges)
+          && (exactCommerciallyFinalizedResponse.hardReport?.containerBoundarySkims ?? 0) === 0
         ) return completeResponse(exactCommerciallyFinalizedResponse);
       }
     } else {

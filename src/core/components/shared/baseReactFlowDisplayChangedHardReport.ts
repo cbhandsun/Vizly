@@ -13,6 +13,7 @@ import {
   type BaseDisplayBoundedCandidateReport,
   type DisplayObstacleEvaluationInitializationMetrics,
 } from './baseReactFlowDisplayEvaluation';
+import { auditDisplayContainerBoundarySkims } from './baseReactFlowDisplayContainerBoundarySkim';
 import { compactDisplayEdgePaths, getDisplayComputedPath } from './baseReactFlowDisplayGeometry';
 import { createDisplayObstacleHitContext } from './baseReactFlowDisplayObstacleHitCache';
 import { evaluateDisplayTerminalHardGates } from './baseReactFlowDisplayQualityGates';
@@ -164,6 +165,10 @@ export const createBaseReactFlowChangedHardReportEvaluation = (
       const minimumClearanceViolationEdgeIds = normalizedCandidate.flatMap((edge, index) => (
         clearanceViolations[index] ? [edge.id] : []
       ));
+      const containerBoundarySkimAudit = auditDisplayContainerBoundarySkims(
+        normalizedCandidate,
+        nodes,
+      );
       const { terminalsAttached, terminalsAnchored } = evaluateDisplayTerminalHardGates(
         normalizedCandidate,
         nodes,
@@ -178,6 +183,8 @@ export const createBaseReactFlowChangedHardReportEvaluation = (
         quality: candidateQuality,
         minimumClearanceViolations: minimumClearanceViolationEdgeIds.length,
         minimumClearanceViolationEdgeIds: minimumClearanceViolationEdgeIds.slice(0, 32),
+        containerBoundarySkims: containerBoundarySkimAudit.totalLength,
+        containerBoundarySkimEdgeIds: containerBoundarySkimAudit.edgeIds.slice(0, 32),
       };
       report.hardClean = displayHardQualityReportGeometryIsClean(report) && terminalsAnchored;
       const qualityAfter = qualityContext?.readMetrics?.();
