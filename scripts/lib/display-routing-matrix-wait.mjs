@@ -4,7 +4,12 @@ import {
   summarizeDisplayRoutingWaitState,
 } from './display-routing-matrix-wait-state.mjs';
 
-export const createDisplayRoutingMatrixWaiter = timeoutMs => async (session, expression, label) => {
+export const createDisplayRoutingMatrixWaiter = timeoutMs => async (
+  session,
+  expression,
+  label,
+  waitOptions = {},
+) => {
   const readState = () => session.evaluate(`(() => {
     const summarize = ${summarizeDisplayRoutingWaitState.toString()};
     return summarize(
@@ -19,7 +24,7 @@ export const createDisplayRoutingMatrixWaiter = timeoutMs => async (session, exp
     const value = await session.evaluate(expression);
     if (value) return value;
     const state = await readState();
-    if (displayRoutingWaitStateHasTerminalFailure(state)) {
+    if (displayRoutingWaitStateHasTerminalFailure(state, waitOptions)) {
       throw new Error(`Routing failed while waiting for ${label}:\n${JSON.stringify(state, null, 2)}`);
     }
     await delay(100);

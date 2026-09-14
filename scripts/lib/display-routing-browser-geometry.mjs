@@ -151,6 +151,7 @@ export const summarizeDisplayRoutingGeometryFailure = ({
   commercialAudit,
   hardAudit,
   visualAudit,
+  geometrySnapshot,
   renderAuthorityStatus,
 }) => {
   const responseEdges = Array.isArray(route?.response?.edges) ? route.response.edges : [];
@@ -184,6 +185,11 @@ export const summarizeDisplayRoutingGeometryFailure = ({
     rejectedRenderAuthorityCount: visualAudit?.rejectedRenderAuthorityCount,
     acceptedRenderAttachmentCount: visualAudit?.acceptedRenderAttachmentCount,
     rejectedRenderAttachmentCount: visualAudit?.rejectedRenderAttachmentCount,
+    canonicalGeometrySnapshotStatus: geometrySnapshot?.status,
+    canonicalGeometrySnapshotCoverage: geometrySnapshot?.nodeCoverage,
+    canonicalGeometrySnapshotEdgeCoverage: geometrySnapshot?.edgeCoverage,
+    canonicalGeometrySnapshotBounds: geometrySnapshot?.bounds,
+    laneRankDecision: geometrySnapshot?.laneRankDecision,
     renderAuthorityStatus,
     shortEndpointStubPathCount: hardAudit?.shortEndpointStubEdgeIds?.length,
     tinyInteriorDoglegPathCount: hardAudit?.tinyInteriorDoglegEdgeIds?.length,
@@ -606,6 +612,8 @@ export const readDisplayRoutingNodeGeometryParity = rawNodes => {
     maxSizeDelta: Math.round(maxSizeDelta * 100) / 100,
   };
 };
+
+export { readDisplayRoutingCanonicalGeometrySnapshot } from './display-routing-browser-canonical-geometry.mjs';
 
 export { readDisplayRoutingVisualScaleAudit } from './display-routing-browser-visual-scale.mjs';
 import { readDisplayRoutingViewportSnapshot } from './display-routing-browser-viewport.mjs';

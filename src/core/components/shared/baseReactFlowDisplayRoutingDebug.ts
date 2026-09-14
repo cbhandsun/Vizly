@@ -2,6 +2,7 @@ import type { DisplayGeometryBarrierResolution } from './baseReactFlowDisplayGeo
 import type { LayoutGeometryReport } from '../../algorithms/layoutGeometryConstraints';
 import type { DisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
+import type { LaneRankDecision } from '../../types/domainLaneRank';
 import type {
   DisplayEdgesWorkerResponse,
   DisplayEdgesWorkerRouteResolution,
@@ -70,6 +71,7 @@ export type DisplayRoutingDebugState = {
   layoutTransactionAttemptCount?: number;
   layoutTransactionErrorCode?: DisplayLayoutTransactionErrorCode;
   layoutPhaseTrace?: DisplayLayoutPhaseTrace[];
+  laneRankDecision?: LaneRankDecision;
 };
 
 export type DisplayLayoutPhase =

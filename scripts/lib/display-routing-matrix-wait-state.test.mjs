@@ -20,6 +20,47 @@ describe('matrix waiter', () => {
     expect(values).toHaveLength(0);
   });
 
+  it('ignores an older terminal failure while a newer layout job is still pending', async () => {
+    const states = [
+      null,
+      {
+        routing: {
+          stage: 'final-quality-rejected',
+          requestId: 'layout:5',
+          layoutTransactionJobId: 5,
+          layoutTransactionStatus: 'failed',
+        },
+      },
+      { ready: true },
+    ];
+    const result = await createDisplayRoutingMatrixWaiter(1000)({
+      evaluate: async () => states.shift(),
+    }, 'ready', 'layout', {
+      expectedRequestPrefix: 'layout:',
+      minimumExclusiveLayoutJobId: 5,
+    });
+    expect(result).toEqual({ ready: true });
+  });
+
+  it('fails for a terminal failure owned by the requested fresh layout job', async () => {
+    const values = [
+      null,
+      {
+        routing: {
+          stage: 'worker-timeout',
+          requestId: 'layout:6',
+          layoutTransactionJobId: 6,
+        },
+      },
+    ];
+    await expect(createDisplayRoutingMatrixWaiter(1000)({
+      evaluate: async () => values.shift(),
+    }, 'ready', 'layout', {
+      expectedRequestPrefix: 'layout:',
+      minimumExclusiveLayoutJobId: 5,
+    })).rejects.toThrow('Routing failed while waiting for layout');
+  });
+
   it('reports diagnostics when the deadline is reached', async () => {
     await expect(createDisplayRoutingMatrixWaiter(0)({
       evaluate: async () => ({ routing: { stage: 'worker-start' } }),
@@ -83,6 +124,30 @@ describe('display routing matrix wait-state summary', () => {
       layoutTransactionJobId: 7,
       layoutTransactionStatus: 'running',
       layoutTransactionAttemptCount: 1,
+      laneRankDecision: {
+        version: 1,
+        policyVersion: 1,
+        requested: 'auto',
+        applied: 'compact',
+        reason: 'compact-benefit',
+        direction: 'LR',
+        connectedInputFingerprint: 'lane-v1-abcd-1234-88',
+        metrics: {
+          global: {
+            flowLength: 1200,
+            whitespaceRatio: 0.4,
+            backwardTravel: 10,
+            backwardEdgeCount: 1,
+          },
+          compact: {
+            flowLength: 700,
+            whitespaceRatio: 0.2,
+            backwardTravel: 12,
+            backwardEdgeCount: 1,
+          },
+        },
+        privateNodeId: 'private-node',
+      },
       workerStartCount: 1,
       userLabel: 'private node name',
       phaseProgressTrace: [{
@@ -163,6 +228,29 @@ describe('display routing matrix wait-state summary', () => {
         layoutTransactionJobId: 7,
         layoutTransactionStatus: 'running',
         layoutTransactionAttemptCount: 1,
+        laneRankDecision: {
+          version: 1,
+          policyVersion: 1,
+          requested: 'auto',
+          applied: 'compact',
+          reason: 'compact-benefit',
+          direction: 'LR',
+          connectedInputFingerprint: 'lane-v1-abcd-1234-88',
+          metrics: {
+            global: {
+              flowLength: 1200,
+              whitespaceRatio: 0.4,
+              backwardTravel: 10,
+              backwardEdgeCount: 1,
+            },
+            compact: {
+              flowLength: 700,
+              whitespaceRatio: 0.2,
+              backwardTravel: 12,
+              backwardEdgeCount: 1,
+            },
+          },
+        },
         workerStartCount: 1,
         phaseProgressTrace: [{ phase: 'quality', durationMs: 18, workItemCount: 3 }],
       },
@@ -313,5 +401,26 @@ describe('display routing matrix wait-state summary', () => {
       routing: { stage: 'final-applied', layoutTransactionStatus: 'committed' },
     })).toBe(false);
     expect(displayRoutingWaitStateHasTerminalFailure({})).toBe(false);
+    expect(displayRoutingWaitStateHasTerminalFailure({
+      routing: {
+        stage: 'worker-timeout',
+        requestId: 'layout:7',
+        layoutTransactionJobId: 7,
+      },
+    }, { expectedRequestPrefix: 'layout:', minimumExclusiveLayoutJobId: 7 })).toBe(false);
+    expect(displayRoutingWaitStateHasTerminalFailure({
+      routing: {
+        stage: 'worker-timeout',
+        requestId: 'display:8',
+        layoutTransactionJobId: 8,
+      },
+    }, { expectedRequestPrefix: 'layout:', minimumExclusiveLayoutJobId: 7 })).toBe(false);
+    expect(displayRoutingWaitStateHasTerminalFailure({
+      routing: {
+        stage: 'worker-timeout',
+        requestId: 'layout:8',
+        layoutTransactionJobId: 8,
+      },
+    }, { expectedRequestPrefix: 'layout:', minimumExclusiveLayoutJobId: 7 })).toBe(true);
   });
 });

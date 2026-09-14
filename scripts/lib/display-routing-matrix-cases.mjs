@@ -128,10 +128,17 @@ export const findDisplayRoutingMenuElementByKey = (elements, rawKey) => {
     return null;
   }
   const suffix = `-${rawKey}`;
-  return [...elements].find(element => (
+  const matches = [...elements].filter(element => (
     typeof element?.getAttribute === 'function'
     && String(element.getAttribute('data-menu-id') || '').endsWith(suffix)
-  )) ?? null;
+  ));
+  const visible = matches.find(element => {
+    const rect = element?.getBoundingClientRect?.();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return false;
+    const style = typeof getComputedStyle === 'function' ? getComputedStyle(element) : null;
+    return !style || (style.display !== 'none' && style.visibility !== 'hidden');
+  });
+  return visible ?? matches[0] ?? null;
 };
 
 export const resolveDisplayRoutingConnectedDragDelta = (

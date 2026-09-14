@@ -9,6 +9,7 @@ import {
 } from './lib/display-routing-browser-performance.mjs';
 import {
   displayRoutingFinalSvgGeometryIsClean,
+  readDisplayRoutingCanonicalGeometrySnapshot,
   readDisplayRoutingNodeGeometryParity,
   readDisplayRoutingVisualScaleAudit,
   readRenderedDisplayEdgeNodeIntersections,
@@ -200,6 +201,9 @@ const auditFinalSvg = async (session, route, label) => {
   const visualAudit = await session.evaluate(
     `(${readDisplayRoutingVisualScaleAudit.toString()})()`,
   );
+  const geometrySnapshot = await session.evaluate(
+    `(${readDisplayRoutingCanonicalGeometrySnapshot.toString()})(${JSON.stringify(route.request?.nodes)}, ${JSON.stringify(route.response.edges)}, window.__vizlyBaseReactFlowDisplayRouting || {})`,
+  );
   if (!displayRoutingFinalSvgGeometryIsClean({
     audit,
     commercialAudit,
@@ -216,9 +220,13 @@ const auditFinalSvg = async (session, route, label) => {
         commercialAudit,
         hardAudit,
         visualAudit,
+        geometrySnapshot,
         renderAuthorityStatus,
       }),
     )}`);
+  }
+  if (geometrySnapshot?.status !== 'passed') {
+    throw new Error(`Final canonical geometry snapshot incomplete for ${label}: ${JSON.stringify(geometrySnapshot)}`);
   }
   assertDisplayRoutingVisualScaleAudit({
     name: label,
@@ -232,6 +240,7 @@ const auditFinalSvg = async (session, route, label) => {
     minimumClearanceRisks: audit.clearanceRisks.length,
     commercialClearanceRisks: commercialAudit.clearanceRisks.length,
     hardGeometryAudit: hardAudit,
+    geometrySnapshot,
     nodeGeometryParity,
     visualAudit,
   };
@@ -405,6 +414,7 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
       session,
       readFinalRouteExpression('layout:', previousLayoutJobId),
       `${layoutCase.id} layout route`,
+      { expectedRequestPrefix: 'layout:', minimumExclusiveLayoutJobId: previousLayoutJobId },
     );
   } finally {
     cpuProfile = await stopDisplayRoutingCpuProfile(session, cpuProfileStarted);
@@ -573,6 +583,7 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
       session,
       readFinalRouteExpression('layout:', previousWarmLayoutJobId),
       `${layoutCase.id} to ${warmLayoutCase.id} warm layout route`,
+      { expectedRequestPrefix: 'layout:', minimumExclusiveLayoutJobId: previousWarmLayoutJobId },
     );
     const warmVisualSettle = await waitForStableDisplayRoutingLayoutVisual({
       session,

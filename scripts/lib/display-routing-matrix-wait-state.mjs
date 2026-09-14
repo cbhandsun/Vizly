@@ -151,6 +151,60 @@ export const summarizeDisplayRoutingWaitState = (
       resolution: token(trace.resolution),
     };
   };
+  const laneRankMetric = value => {
+    const metricValue = record(value);
+    return {
+      flowLength: finite(metricValue.flowLength),
+      whitespaceRatio: finite(metricValue.whitespaceRatio),
+      backwardTravel: finite(metricValue.backwardTravel),
+      backwardEdgeCount: integer(metricValue.backwardEdgeCount),
+    };
+  };
+  const laneRankDecision = value => {
+    const decision = record(value);
+    const metrics = record(decision.metrics);
+    const projectedMetrics = Object.fromEntries(
+      ['global', 'compact'].flatMap(key => (
+        Object.prototype.hasOwnProperty.call(metrics, key)
+          ? [[key, laneRankMetric(metrics[key])]]
+          : []
+      )),
+    );
+    const connectedInputFingerprint = typeof decision.connectedInputFingerprint === 'string'
+      && /^lane-v1-[0-9a-f]+-[0-9a-f]+-\d{1,8}$/i.test(decision.connectedInputFingerprint)
+      ? decision.connectedInputFingerprint
+      : undefined;
+    const requested = ['auto', 'global', 'compact'].includes(decision.requested)
+      ? decision.requested
+      : undefined;
+    const applied = ['global', 'compact'].includes(decision.applied)
+      ? decision.applied
+      : undefined;
+    const reason = token(decision.reason);
+    const direction = ['TB', 'BT', 'LR', 'RL'].includes(decision.direction)
+      ? decision.direction
+      : undefined;
+    if (!requested && !applied && !reason && !direction && !connectedInputFingerprint) {
+      return undefined;
+    }
+    return {
+      version: decision.version === 1 ? 1 : undefined,
+      policyVersion: decision.policyVersion === 1 ? 1 : undefined,
+      requested,
+      applied,
+      reason,
+      direction,
+      connectedInputFingerprint,
+      metrics: projectedMetrics,
+      additionalBacktrackTravel: finite(decision.additionalBacktrackTravel),
+      score: finite(decision.score),
+      margin: finite(decision.margin),
+      previousApplied: ['global', 'compact'].includes(decision.previousApplied)
+        ? decision.previousApplied
+        : undefined,
+    };
+  };
+  const projectedLaneRankDecision = laneRankDecision(routing.laneRankDecision);
   return {
     routing: {
       stage: token(routing.stage),
@@ -193,6 +247,7 @@ export const summarizeDisplayRoutingWaitState = (
       layoutTransactionStatus: token(routing.layoutTransactionStatus),
       layoutTransactionAttemptCount: integer(routing.layoutTransactionAttemptCount),
       layoutTransactionErrorCode: token(routing.layoutTransactionErrorCode),
+      laneRankDecision: projectedLaneRankDecision,
       phaseProgressTrace: progressTraces.map(projectTrace),
     },
     responseCount: responses.length,
@@ -293,7 +348,35 @@ const TERMINAL_FAILURE_STAGES = new Set([
   'worker-timeout',
 ]);
 
-export const displayRoutingWaitStateHasTerminalFailure = state => (
-  TERMINAL_FAILURE_STAGES.has(state?.routing?.stage)
-  || state?.routing?.layoutTransactionStatus === 'failed'
+const matchesExpectedPrefix = (requestId, expectedRequestPrefix) => (
+  typeof expectedRequestPrefix !== 'string'
+  || expectedRequestPrefix.length === 0
+  || (
+    typeof requestId === 'string'
+    && requestId.startsWith(expectedRequestPrefix)
+  )
 );
+
+const isFreshLayoutJob = (jobId, minimumExclusiveLayoutJobId) => (
+  !Number.isSafeInteger(minimumExclusiveLayoutJobId)
+  || (
+    Number.isSafeInteger(jobId)
+    && jobId > minimumExclusiveLayoutJobId
+  )
+);
+
+export const displayRoutingWaitStateHasTerminalFailure = (
+  state,
+  {
+    expectedRequestPrefix = '',
+    minimumExclusiveLayoutJobId,
+  } = {},
+) => {
+  const routing = state?.routing;
+  if (!routing) return false;
+  const freshJob = isFreshLayoutJob(routing.layoutTransactionJobId, minimumExclusiveLayoutJobId);
+  const expectedRequest = matchesExpectedPrefix(routing.requestId, expectedRequestPrefix);
+  if (!freshJob || !expectedRequest) return false;
+  return TERMINAL_FAILURE_STAGES.has(routing.stage)
+    || routing.layoutTransactionStatus === 'failed';
+};

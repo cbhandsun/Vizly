@@ -1,10 +1,7 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { useReactFlow } from '@xyflow/react';
-import {
-  coerceDiagramSidebarOffset,
-  MIN_DIAGRAM_FULL_FIT_ZOOM,
-} from './diagramControlFit';
-import { computeDiagramNodeBounds } from './diagramNodeBounds';
+import { MIN_DIAGRAM_FULL_FIT_ZOOM } from './diagramControlFit';
+import { computeDiagramReadingViewport } from './diagramReadingFit';
 import { logDiagramControlBridgeFailure } from './diagramControlLogging';
 import {
   claimLayoutCommitFitRequest,
@@ -147,33 +144,28 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
             return;
           }
 
-          const bounds = computeDiagramNodeBounds(rf.getNodes());
-          if (!bounds) {
-            rf.fitView({ padding: 0.1, includeHiddenNodes: false, duration: 400, minZoom: 0.45, maxZoom: 1.15 });
-            return;
-          }
-
           const viewportEl = (
             container.querySelector('.react-flow__renderer')
             ?? container.querySelector('.react-flow')
             ?? container
           ) as HTMLElement;
-          const padding = 8;
           const rootStyle = getComputedStyle(document.documentElement);
-          const safeLeft = coerceDiagramSidebarOffset(
-            rootStyle.getPropertyValue('--left-sidebar-offset'),
-            76,
-          );
-          const safeRight = coerceDiagramSidebarOffset(
-            rootStyle.getPropertyValue('--right-sidebar-offset'),
-          );
-          const safeWidth = Math.max(1, viewportEl.clientWidth - safeLeft - safeRight - padding * 2);
-          const zoom = Math.max(0.45, Math.min(1, safeWidth / bounds.width));
-          const extraCenterX = Math.max(0, (safeWidth - bounds.width * zoom) / 2);
-          const x = safeLeft + padding + extraCenterX - bounds.minX * zoom;
-          const y = 84 + padding - bounds.minY * zoom;
+          const nodes = rf.getNodes();
+          const viewport = computeDiagramReadingViewport({
+            nodes,
+            edges: rf.getEdges(),
+            selectedNodeIds: nodes.filter(node => node.selected).map(node => node.id),
+            viewportSize: { width: viewportEl.clientWidth, height: viewportEl.clientHeight },
+            leftSidebarOffset: rootStyle.getPropertyValue('--left-sidebar-offset'),
+            rightSidebarOffset: rootStyle.getPropertyValue('--right-sidebar-offset'),
+          });
 
-          rf.setViewport({ x, y, zoom });
+          if (!viewport) {
+            rf.fitView({ padding: 0.1, includeHiddenNodes: false, duration: 400, minZoom: 0.45, maxZoom: 1.15 });
+            return;
+          }
+
+          rf.setViewport({ x: viewport.x, y: viewport.y, zoom: viewport.zoom });
         } catch (error) {
           logDiagramControlBridgeFailure('top', error);
           rf.fitView({ padding: 0.1, includeHiddenNodes: false, duration: 400, minZoom: 0.45, maxZoom: 1.15 });

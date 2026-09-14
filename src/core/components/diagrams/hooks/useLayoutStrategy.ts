@@ -15,7 +15,10 @@ import {
 import { clearBaseReactFlowLayoutEdgeRoutingData } from '../../shared/baseReactFlowLayoutEdgeRoutingData';
 import type { BaseReactFlowRoutingSessionRuntime } from '../../shared/baseReactFlowRoutingSessionRuntime';
 import { createLayoutRoutingTransactionDiagnostics } from './layoutRoutingTransactionDiagnostics';
-import type { DisplayLayoutTransactionErrorCode } from '../../shared/baseReactFlowDisplayRoutingDebug';
+import {
+    updateDisplayRoutingDebugState,
+    type DisplayLayoutTransactionErrorCode,
+} from '../../shared/baseReactFlowDisplayRoutingDebug';
 import { reportLayoutFailure } from './layoutFailureFeedback';
 import { normalizeLayoutVisibilityNodes } from './layoutVisibilityNodes';
 import { isDirectedForestLayoutGraph } from './treeLayoutTopology';
@@ -230,10 +233,13 @@ export function useLayoutStrategy({
                     appliedLaneDomainOrder,
                     transactionDiagnostics,
                     commitLayout,
-                    commitSelection: () => commitLayoutSelection({ version: 2,
-                        strategy: appliedStrategyName, direction: appliedDirection,
-                        nodeLayout: appliedNodeLayout && !isGlobalFullGraphLayoutStrategy(appliedStrategyName)
-                            ? appliedNodeLayout : lastNodeLayout, laneRankPreference, laneRankDecision }),
+                    commitSelection: () => {
+                        updateDisplayRoutingDebugState({ laneRankDecision });
+                        commitLayoutSelection({ version: 2,
+                            strategy: appliedStrategyName, direction: appliedDirection,
+                            nodeLayout: appliedNodeLayout && !isGlobalFullGraphLayoutStrategy(appliedStrategyName)
+                                ? appliedNodeLayout : lastNodeLayout, laneRankPreference, laneRankDecision });
+                    },
                 });
             };
 

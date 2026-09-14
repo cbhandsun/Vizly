@@ -5,6 +5,7 @@ import {
   readDisplayRoutingNodeDragTarget,
   readDisplayRoutingNodePanGesture,
   readDisplayRoutingNodeGeometryParity,
+  readDisplayRoutingCanonicalGeometrySnapshot,
   readDisplayRoutingViewportZoom,
   readDisplayRoutingVisualScaleAudit,
   readRenderedDisplayEdgeNodeIntersections,
@@ -421,6 +422,65 @@ describe('display routing browser geometry', () => {
       maxPositionDelta: 0,
       maxSizeDelta: 0,
     });
+  });
+
+  it('builds a canonical geometry snapshot without defaulting missing measurements to zero', () => {
+    const snapshot = readDisplayRoutingCanonicalGeometrySnapshot([
+      { id: 'lane', type: 'titleGroup', position: { x: 10, y: 20 }, width: 500, height: 300 },
+      { id: 'child', parentId: 'lane', position: { x: 40, y: 50 }, measured: { width: 80, height: 30 } },
+      { id: 'missing-size', position: { x: 0, y: 0 } },
+    ], [{
+      id: 'edge',
+      source: 'child',
+      target: 'missing-size',
+      data: { computedPath: [{ x: 90, y: 85 }, { x: 180, y: 85 }] },
+    }], {
+      laneRankDecision: {
+        requested: 'auto',
+        applied: 'compact',
+        reason: 'compact-benefit',
+        direction: 'LR',
+        connectedInputFingerprint: 'lane-v1-abcd-1234-10',
+      },
+    });
+
+    expect(snapshot).toMatchObject({
+      version: 1,
+      status: 'incomplete',
+      nodeCoverage: {
+        inputNodeCount: 3,
+        leafNodeCount: 1,
+        containerNodeCount: 1,
+        incompleteNodeCount: 1,
+        incompleteNodeIds: ['missing-size'],
+      },
+      edgeCoverage: {
+        inputEdgeCount: 1,
+        edgePathPointCount: 2,
+        incompleteEdgePathCount: 0,
+      },
+      bounds: {
+        leaf: { minX: 50, minY: 70, maxX: 130, maxY: 100, width: 80, height: 30 },
+        containers: { minX: 10, minY: 20, maxX: 510, maxY: 320, width: 500, height: 300 },
+        edges: { minX: 90, minY: 85, maxX: 180, maxY: 85, width: 90, height: 0 },
+      },
+      laneRankDecision: {
+        requested: 'auto',
+        applied: 'compact',
+        reason: 'compact-benefit',
+        direction: 'LR',
+      },
+    });
+  });
+
+  it('marks cyclic parent geometry incomplete instead of accumulating forever', () => {
+    const snapshot = readDisplayRoutingCanonicalGeometrySnapshot([
+      { id: 'a', parentId: 'b', position: { x: 1, y: 2 }, width: 10, height: 10 },
+      { id: 'b', parentId: 'a', position: { x: 3, y: 4 }, width: 10, height: 10 },
+    ], [], {});
+    expect(snapshot.status).toBe('incomplete');
+    expect(snapshot.nodeCoverage.incompleteNodeCount).toBe(2);
+    expect(snapshot.bounds.leaf).toBeNull();
   });
 
   it('rejects duplicate interaction paths and unresolved marker contrast at the final SVG gate', () => {

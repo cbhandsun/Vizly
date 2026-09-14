@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { assertRequestedLayoutSelected, clickLayout } from './display-routing-matrix-layout-command.mjs';
+import {
+  assertRequestedLayoutSelected,
+  clickLayout,
+  readDisplayRoutingLayoutMenuDiagnostics,
+} from './display-routing-matrix-layout-command.mjs';
 import {
   parseSavedDisplayRoutingMode,
   readSavedDisplayRoutingState,
@@ -202,6 +206,21 @@ describe('display routing matrix cases', () => {
     }
   });
 
+  it('prefers a visible menu item when rc-menu keeps hidden clones with the same key', () => {
+    const hidden = {
+      getAttribute: name => name === 'data-menu-id' ? 'rc-menu-uuid-domain-elk-bt' : null,
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 0, height: 0 }),
+    };
+    const visible = {
+      getAttribute: name => name === 'data-menu-id' ? 'rc-menu-uuid-domain-elk-bt' : null,
+      getBoundingClientRect: () => ({ left: 10, top: 20, width: 100, height: 30 }),
+    };
+    vi.stubGlobal('getComputedStyle', element => ({
+      display: element === hidden ? 'none' : 'block',
+      visibility: 'visible',
+    }));
+    expect(findDisplayRoutingMenuElementByKey([hidden, visible], 'domain-elk-bt')).toBe(visible);
+  });
   it('rejects hidden, clipped, covered and invalid pointer targets', () => {
     const viewport = { width: 1280, height: 720 };
     const rect = { left: 780, top: 100, width: 240, height: 44 };
@@ -239,7 +258,7 @@ describe('display routing matrix cases', () => {
     expect(scrollSettled.send).toHaveBeenCalledTimes(3);
   });
 
-  it('scrolls the more-layouts action into view before opening its submenu', async () => {
+  it('clicks the more-layouts action before selecting a hidden submenu item', async () => {
     const session = {
       evaluate: vi.fn()
         .mockResolvedValueOnce(true)
@@ -258,6 +277,30 @@ describe('display routing matrix cases', () => {
       'mouseReleased',
     ]);
     expect(session.evaluate.mock.calls[2][0]).toContain("item.scrollIntoView({ block: 'nearest'");
+  });
+
+  it('falls back to clicking the more-layouts action when hover does not mount its submenu', async () => {
+    const session = {
+      evaluate: vi.fn()
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ x: 180, y: 640 })
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ x: 180, y: 640 })
+        .mockResolvedValueOnce({ x: 420, y: 640, clickedAt: 987 }),
+      send: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await expect(clickLayout(session, { id: 'domain-compound-elk-bt' })).resolves.toBe(987);
+    expect(session.send.mock.calls.map(call => call[1].type)).toEqual([
+      'mouseMoved',
+      'mouseMoved',
+      'mousePressed',
+      'mouseReleased',
+      'mouseMoved',
+      'mousePressed',
+      'mouseReleased',
+    ]);
   });
   it('checks the applied layout in the live-session assertion', async () => {
     const correct = { evaluate: async () => ({
@@ -349,6 +392,71 @@ describe('display routing matrix cases', () => {
   it('fails the command when no toolbar trigger exists', async () => {
     await expect(clickLayout({ evaluate: async () => false }, { id: 'domain-lanes-tb' }))
       .rejects.toThrow('trigger was not found');
+  });
+
+  it('adds bounded menu diagnostics when a layout item is missing', async () => {
+    const session = {
+      evaluate: vi.fn()
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce({
+          caseId: 'domain-lanes-tb',
+          menuItemCount: 2,
+          target: null,
+          more: { menuId: 'x-more-layout-engines', text: { length: 12 } },
+          knownMenuIds: ['x-more-layout-engines'],
+        }),
+    };
+
+    await expect(clickLayout(session, {
+      id: 'domain-lanes-tb',
+      label: 'private label should not matter',
+    })).rejects.toThrow(/"menuItemCount":2/);
+    expect(session.evaluate).toHaveBeenCalledTimes(5);
+  });
+
+  it('summarizes menu state without returning raw labels', () => {
+    const target = {
+      tagName: 'DIV',
+      textContent: 'secret menu label',
+      getAttribute: name => name === 'data-menu-id' ? 'root-domain-lanes-tb' : null,
+      getBoundingClientRect: () => ({ left: 10, top: 20, width: 100, height: 30 }),
+    };
+    const button = {
+      tagName: 'BUTTON',
+      textContent: 'secret trigger',
+      getAttribute: name => name === 'aria-label' ? 'layout secret' : null,
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 50, height: 20 }),
+    };
+    const root = { tagName: 'DIV', getAttribute: () => null, getBoundingClientRect: () => ({ left: 0, top: 0, width: 1, height: 1 }) };
+    vi.stubGlobal('getComputedStyle', () => ({ display: 'block', visibility: 'visible' }));
+    vi.stubGlobal('document', {
+      querySelectorAll: selector => (
+        selector === 'button'
+          ? [button]
+          : selector === '.flowchart-layout-menu'
+            ? [root]
+            : [target]
+      ),
+      elementFromPoint: () => target,
+    });
+
+    const diagnostics = readDisplayRoutingLayoutMenuDiagnostics('domain-lanes-tb');
+    expect(diagnostics).toMatchObject({
+      menuRootCount: 1,
+      menuItemCount: 1,
+      target: {
+        menuId: 'root-domain-lanes-tb',
+        text: { length: 17 },
+      },
+      hitAtTargetCenter: {
+        menuId: 'root-domain-lanes-tb',
+      },
+    });
+    expect(JSON.stringify(diagnostics)).not.toContain('secret menu label');
+    expect(JSON.stringify(diagnostics)).not.toContain('secret trigger');
   });
 
   it('rejects silent compound fallback even when its routes committed cleanly', () => {

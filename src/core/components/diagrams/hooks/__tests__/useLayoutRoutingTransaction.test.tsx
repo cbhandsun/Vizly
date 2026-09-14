@@ -277,6 +277,7 @@ describe('useLayoutRoutingTransaction shared routing runtime', () => {
       version: 2, strategy: 'domain-lanes', direction: 'TB', nodeLayout: 'dagre',
       laneRankPreference: 'auto', laneRankDecision: compactDecision,
     });
+    expect(readDisplayRoutingDebugState()?.laneRankDecision).toBe(compactDecision);
     expect(options.setNodes).toHaveBeenCalledOnce();
     expect(options.setEdges).toHaveBeenCalledOnce();
     mocks.stageLayoutRouting.mockRejectedValueOnce(new Error('layout-routing-hard-quality-rejected'));
