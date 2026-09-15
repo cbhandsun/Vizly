@@ -57,9 +57,15 @@ describe('baseReactFlowDisplayEndpointTrunkClearance WMS regression', () => {
     const risk = (items: typeof baseline) => items.reduce((total, edge) => (
       total + clearance.score(getDisplayComputedPath(edge), edge, 48)
     ), 0);
+    const passageBaseline = repairBaseReactFlowDisplayEndpointPassageClearance(baseline, nodes);
     const diagnostics = JSON.stringify({
       candidateCount: candidates.length,
       baselineRisk: risk(baseline),
+      baselineHardReport: getDisplayHardQualityGateReport(baseline, nodes, 'polished'),
+      passageRisk: risk(passageBaseline),
+      passageChangedEdgeIds: passageBaseline.flatMap((edge, index) => (
+        edge === baseline[index] ? [] : [edge.id]
+      )),
       candidateRisk: candidate ? risk(candidate) : null,
       changedEdgeIds: candidate?.flatMap((edge, index) => (
         edge === baseline[index] ? [] : [edge.id]
@@ -67,14 +73,19 @@ describe('baseReactFlowDisplayEndpointTrunkClearance WMS regression', () => {
       hardReport: candidate ? getDisplayHardQualityGateReport(candidate, nodes, 'polished') : null,
     }, null, 2);
 
-    // The balanced router can close all 48px passage risks upstream. Exercise
-    // the no-op contract explicitly; synthetic candidate tests retain the
-    // original nested-pair repair cases when residual risk is present.
+    // The trunk transaction has nothing to change when the remaining risk is
+    // on a separate single edge. Keep that no-op explicit and require the
+    // following passage transaction to close the real 48px risk instead.
     if (candidates.length === 0) {
-      expect(risk(baseline), diagnostics).toBe(0);
+      expect(risk(baseline), diagnostics).toBe(16);
       expect(getDisplayHardQualityGateReport(baseline, nodes, 'polished').hardClean).toBe(true);
       expect(countRenderUnsafeEndpointStubs(baseline)).toBe(0);
-      expect(repairBaseReactFlowDisplayEndpointPassageClearance(baseline, nodes)).toBe(baseline);
+      expect(passageBaseline.flatMap((edge, index) => (
+        edge === baseline[index] ? [] : [edge.id]
+      )), diagnostics).toEqual(['e_inv_replen']);
+      expect(risk(passageBaseline), diagnostics).toBe(0);
+      expect(getDisplayHardQualityGateReport(passageBaseline, nodes, 'polished').hardClean)
+        .toBe(true);
       return;
     }
     expect(candidate, diagnostics).toBeDefined();

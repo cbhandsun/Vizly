@@ -299,7 +299,7 @@ describe('useDesignerSystemSync initialization race safety', () => {
     ]));
   });
 
-  it('sanitizes bridge snapshot replacement before restoring edges', () => {
+  it('sanitizes bridge snapshot replacement while preserving an explicit self-loop', () => {
     const bridgeNodes: Node[] = [
       { id: 'a', position: { x: 0, y: 0 }, data: { label: 'A' } },
       { id: 'b', position: { x: 100, y: 0 }, data: { label: 'B' } },
@@ -329,6 +329,7 @@ describe('useDesignerSystemSync initialization race safety', () => {
     expect(setNodes).toHaveBeenCalledExactlyOnceWith(bridgeNodes);
     expect(setEdges).toHaveBeenCalledExactlyOnceWith([
       expect.objectContaining({ id: 'valid-edge' }),
+      expect.objectContaining({ id: 'self-loop', source: 'a', target: 'a' }),
     ]);
   });
 

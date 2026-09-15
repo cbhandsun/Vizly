@@ -39,7 +39,13 @@ vi.hoisted(() => {
 
 describe('ordered Logistics swimlane routing', () => {
   it('repairs the exact browser TB candidate', async () => {
-    const request = parseDisplayEdgesWorkerRequest(browserRequest);
+    const request = parseDisplayEdgesWorkerRequest({
+      ...browserRequest,
+      inputIdentity: createDisplayRoutingIdentity(
+        browserRequest.inputIdentity.inputSignature,
+        browserRequest.inputIdentity.inputGeometryDigest,
+      ),
+    });
     if (!request) throw new Error('Invalid browser regression fixture');
     const geometry = structuredClone(request.nodes);
     const repaired = await prepareDomainDagreEdges({

@@ -138,6 +138,50 @@ describe('domainDagreTopLevelLayout', () => {
     expect(secondChild.position.y - secondDomain.position.y).toBe(30);
   });
 
+  it('keeps dependency ranks when explicit semantic order conflicts with topology', () => {
+    const firstDomain = domain('domain-first', 'first', 0, 0);
+    const middleDomain = domain('domain-middle', 'middle', 0, 0);
+    const infrastructureDomain = domain('domain-infrastructure', 'infrastructure', 0, 0);
+    const firstChild = leaf('first-child', 'first', 20, 30);
+    const middleChild = leaf('middle-child', 'middle', 20, 30);
+    const infrastructureChild = leaf('infrastructure-child', 'infrastructure', 20, 30);
+    const nodes = [
+      firstDomain,
+      middleDomain,
+      infrastructureDomain,
+      firstChild,
+      middleChild,
+      infrastructureChild,
+    ];
+
+    runDomainDagreTopLevelLayout({
+      nodes,
+      edges: [
+        { id: 'first-middle', source: 'first-child', target: 'middle-child' },
+        { id: 'infrastructure-middle', source: 'infrastructure-child', target: 'middle-child' },
+      ],
+      domains: [firstDomain, middleDomain, infrastructureDomain],
+      leafNodes: [firstChild, middleChild, infrastructureChild],
+      nodeById: new Map(nodes.map(node => [node.id, node])),
+      nodeToSubGroup: new Map(),
+      domainOrder: ['first', 'middle', 'infrastructure'],
+      domainOrderIndex: new Map([
+        ['first', 0],
+        ['middle', 1],
+        ['infrastructure', 2],
+      ]),
+      isHorizontal: true,
+      domainGap: 50,
+      getNodeDimensions: dimensions,
+    });
+
+    expect(firstDomain.position.x).toBeLessThan(middleDomain.position.x);
+    expect(infrastructureDomain.position.x).toBeLessThan(middleDomain.position.x);
+    expect(infrastructureDomain.position.y).not.toBe(firstDomain.position.y);
+    expect(infrastructureChild.position.x - infrastructureDomain.position.x).toBe(20);
+    expect(infrastructureChild.position.y - infrastructureDomain.position.y).toBe(30);
+  });
+
   it('packs cyclic domains into stable lanes without changing child offsets', () => {
     const firstDomain = domain('domain-a', 'a', 300, 200);
     const secondDomain = domain('domain-b', 'b', 20, 40);

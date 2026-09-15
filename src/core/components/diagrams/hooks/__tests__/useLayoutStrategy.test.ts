@@ -472,7 +472,7 @@ describe('prepareLayeredLayoutEdges', () => {
     });
   });
 
-  it('promotes a freshly calculated locked route to a hidden Worker candidate', () => {
+  it('promotes a freshly calculated locked route over a stale hidden Worker candidate', () => {
     const computedPath = [
       { x: 200, y: 40 },
       { x: 300, y: 40 },
@@ -485,6 +485,8 @@ describe('prepareLayeredLayoutEdges', () => {
       target: 'below',
       type: 'stablePath',
       data: {
+        elkPath: [{ x: 40, y: 40 }, { x: 40, y: 180 }],
+        layoutRoutingCandidate: true,
         computedPath,
         layoutPathLocked: true,
         algorithm: 'domain-dagre-full',

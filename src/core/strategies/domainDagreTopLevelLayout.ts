@@ -183,7 +183,12 @@ export const runDomainDagreTopLevelLayout = (
       node.position = { x: position.x, y: position.y };
     }
   }
-  reorderDomainDagreDomains(context);
+  // An explicit semantic order is a deterministic ordering hint for topology
+  // layouts, not permission to discard dependency ranks. Dagre already sees
+  // domains in that order. Repacking every connected domain onto one axis
+  // turns feedback and infrastructure links into graph-wide reverse routes.
+  // Only a dependency-free set needs the explicit fallback pack.
+  if (crossDomainEdges.length === 0) reorderDomainDagreDomains(context);
 };
 
 /**

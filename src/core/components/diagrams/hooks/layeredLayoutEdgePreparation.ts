@@ -265,7 +265,11 @@ export const prepareLayeredLayoutEdges = (
             )
             ? readLayoutRoute(edge.data?.computedPath)
             : null;
-        const layoutRoute = explicitLayoutRoute ?? currentLockedRoute;
+        // A layout switch can preserve the previously committed hidden candidate
+        // on the edge while the selected engine calculates a new locked route.
+        // The freshly calculated route belongs to resultNodes and must win over
+        // the stale candidate, which was calculated against the old geometry.
+        const layoutRoute = currentLockedRoute ?? explicitLayoutRoute;
         const handles = sourceNode && targetNode && layoutRoute
             ? {
                 sourceHandle: resolveLayoutRouteTerminalHandle(

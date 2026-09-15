@@ -283,7 +283,7 @@ describe('standardDataToCanvas', () => {
         });
     });
 
-    it('sanitizes imported canvas edges before they reach layout or state', async () => {
+    it('sanitizes imported canvas edges while preserving an explicit self-loop', async () => {
         const diagram = makeDiagram();
         diagram.edges = [
             { id: 'valid-edge', source: 'valid', target: 'invalid', type: 'main', label: 'primary' },
@@ -295,12 +295,20 @@ describe('standardDataToCanvas', () => {
 
         const result = await standardDataToCanvas(diagram);
 
-        expect(result.edges.map(edge => edge.id)).toEqual(['valid-edge', 'semantic-parallel']);
+        expect(result.edges.map(edge => edge.id)).toEqual([
+            'valid-edge',
+            'semantic-parallel',
+            'self-loop',
+        ]);
         expect(result.edges.find(edge => edge.id === 'semantic-parallel')).toMatchObject({
             source: 'valid',
             target: 'invalid',
             type: 'dependency',
             label: 'secondary',
+        });
+        expect(result.edges.find(edge => edge.id === 'self-loop')).toMatchObject({
+            source: 'valid',
+            target: 'valid',
         });
     });
 

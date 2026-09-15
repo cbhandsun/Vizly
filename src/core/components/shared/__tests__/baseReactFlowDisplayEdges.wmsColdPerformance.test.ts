@@ -238,6 +238,6 @@ describe('baseReactFlowDisplayEdges WMS cold performance', () => {
     ]);
     // Unified trunk precision and passage orientation change the deterministic
     // geometry. All quality, work and 25-second ceilings above remain unchanged.
-    expect(finalOutputRouteSignature).toBe('route-v2:44:159:648c58ff6f51a751');
+    expect(finalOutputRouteSignature).toBe('route-v2:44:159:e50c6b8941b6e797');
   }, 60_000);
 });

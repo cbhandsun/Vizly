@@ -6,7 +6,11 @@ import wmsProcess from '../../../data/standardized/WmsProcessFlowStandardData.js
 import demandAllocation from '../../../data/standardized/DeamndAllocation.json';
 import enterpriseArchitecture from '../../../data/standardized/ArchitectureStandardData.json';
 import { DomainDagreLayoutStrategy } from '../DomainDagreLayoutStrategy';
-import { resolveLayoutCommandGroupOptions, resolveLayoutStrategyGeneratedGroupOptions } from '../../components/diagrams/hooks/layoutStrategyInputBoundary';
+import {
+  resolveLayoutCommandGroupOptions,
+  resolveLayoutStrategyGeneratedGroupOptions,
+  stripHiddenGeneratedLayoutNodes,
+} from '../../components/diagrams/hooks/layoutStrategyInputBoundary';
 import { resolveLayoutStrategyGeometryConstraints } from '../../components/diagrams/hooks/layoutStrategyGeometryConstraints';
 import { evaluateLayoutGeometry } from '../../algorithms/layoutGeometryConstraints';
 import { measureRoutedLayoutQuality } from '../../components/shared/__tests__/routedLayoutQuality';
@@ -24,7 +28,10 @@ import { auditFinalSameSideEndpointOrder } from '../shared/edgeFinalSameSideEndp
 import { getNodeDimensions } from '../DomainDagreLayoutHelpers';
 import { projectBaseReactFlowDisplayWorkerInput } from '../../components/shared/baseReactFlowDisplayWorkerProjection';
 import { LayoutOptimizer } from '../../components/layout/LayoutOptimizer';
-import { resolveDomainLaneSpacing } from '../../components/diagrams/flowchartLayoutStrategyMode';
+import {
+  resolveDomainLaneSpacing,
+  shouldPromoteDomainDagreRouteCandidate,
+} from '../../components/diagrams/flowchartLayoutStrategyMode';
 import { auditBaseReactFlowDisplayCommercialQuality } from '../../components/shared/baseReactFlowDisplayCommercialQuality';
 import { scoreNodeClearanceRisk } from '../shared/edgeWaypointCandidateRepair';
 import { COMMERCIAL_BUSINESS_NODE_CLEARANCE } from '../shared/edgeBusinessNodeClearanceRepair';
@@ -81,22 +88,41 @@ describe('shared process ranks with local branch separation', () => {
     'real-time-board': [134,73], 'uph-calc': [174,73], 'path-heatmap': [186,60], 'exception-alert': [190,73],
     'labor-schedule-feedback': [202,60],
   };
+  const enterpriseDimensions: Record<string, [number, number]> = {
+    'ch-offline': [243,96], 'ch-private': [282,96], 'ch-public': [257,96],
+    'fe-store': [282,96], 'fe-mall': [282,96], 'fe-op': [306,96],
+    'mid-trade': [250,96], 'mid-pay': [224,96], 'mid-oms': [234,96],
+    'mid-product': [234,96], 'mid-price': [234,96], 'mid-member': [218,96],
+    'mid-risk': [243,96], 'mid-mkt': [231,96], 'mid-rule': [211,96], 'mid-stock': [225,96],
+    'be-scm-plan': [290,96], 'be-scm-source': [227,96], 'be-scm-make': [211,96],
+    'be-scm-deliver': [211,96], 'be-scm-return': [227,96], 'be-scm-enable': [236,96],
+    'be-logistics-dispatch': [243,96], 'be-logistics-warehouse': [225,96],
+    'be-logistics-transport': [211,96], 'be-logistics-customs': [211,96],
+    'be-logistics-billing': [227,96], 'be-corp-finance': [250,96], 'be-corp-hr': [211,96],
+    'be-corp-legal': [211,96], 'be-corp-admin': [227,96], 'data-collect': [252,96],
+    'data-stream': [281,96], 'data-warehouse': [266,96], 'data-cdp': [267,96],
+    'data-app': [302,96], 'data-mdm': [234,96], 'infra-cloud': [240,96],
+    'infra-paas': [233,96], 'infra-integration': [230,96], 'infra-event': [243,96],
+    'infra-devops': [255,96], 'infra-security': [252,96],
+  };
   const cases = [
-    ...(['TB', 'LR', 'BT', 'RL'] as const).map(direction => ({ name: 'logistics', preset: logistics, direction, productionGeometry: false, preserveSubDomain: false })),
-    ...(['TB', 'LR'] as const).map(direction => ({ name: 'wms-process', preset: wmsProcess, direction, productionGeometry: false, preserveSubDomain: false })),
-    ...(['TB', 'LR'] as const).map(direction => ({ name: 'wms-production', preset: wmsProcess, direction, productionGeometry: true, preserveSubDomain: false })),
-    ...(['TB', 'LR'] as const).map(direction => ({ name: 'demand-allocation', preset: demandAllocation, direction, productionGeometry: false, preserveSubDomain: true })),
-    ...(['TB', 'LR'] as const).map(direction => ({ name: 'enterprise', preset: enterpriseArchitecture, direction, productionGeometry: false, preserveSubDomain: true })),
+    ...(['TB', 'LR', 'BT', 'RL'] as const).map(direction => ({ name: 'logistics', preset: logistics, direction, productionGeometry: false, preserveSubDomain: false, layoutMode: 'lanes' as const })),
+    ...(['TB', 'LR'] as const).map(direction => ({ name: 'wms-process', preset: wmsProcess, direction, productionGeometry: false, preserveSubDomain: false, layoutMode: 'lanes' as const })),
+    ...(['TB', 'LR'] as const).map(direction => ({ name: 'wms-production', preset: wmsProcess, direction, productionGeometry: true, preserveSubDomain: false, layoutMode: 'lanes' as const })),
+    ...(['TB', 'LR'] as const).map(direction => ({ name: 'demand-allocation', preset: demandAllocation, direction, productionGeometry: false, preserveSubDomain: true, layoutMode: 'lanes' as const })),
+    ...(['TB', 'LR'] as const).map(direction => ({ name: 'enterprise', preset: enterpriseArchitecture, direction, productionGeometry: false, preserveSubDomain: true, layoutMode: 'lanes' as const })),
+    { name: 'enterprise', preset: enterpriseArchitecture, direction: 'LR' as const, productionGeometry: true, preserveSubDomain: true, layoutMode: 'standard' as const },
   ];
-  it.each(cases)('preserves business order and full routing quality in $name $direction', async ({ name, preset, direction, productionGeometry, preserveSubDomain }) => {
-    const dimensionsByDescription = new Map(preset.nodes.map(node => [node.description.trim(), wmsDimensions[node.id]]));
+  it.each(cases)('preserves business order and full routing quality in $name $direction $layoutMode', async ({ name, preset, direction, productionGeometry, preserveSubDomain, layoutMode }) => {
+    const productionDimensions = name === 'enterprise' ? enterpriseDimensions : wmsDimensions;
+    const dimensionsByDescription = new Map(preset.nodes.map(node => [node.description.trim(), productionDimensions[node.id]]));
     const widthSpy = productionGeometry ? vi.spyOn(LayoutOptimizer.getInstance(), 'calculateNodeWidth')
       .mockImplementation(description => dimensionsByDescription.get(description)?.[0] ?? 240) : undefined;
     const heightSpy = productionGeometry ? vi.spyOn(LayoutOptimizer.getInstance(), 'calculateNodeHeight')
       .mockImplementation(description => dimensionsByDescription.get(description)?.[1] ?? 96) : undefined;
     const sizes = [[210,73],[259,118],[282,118],[298,118],[282,118],[282,96],[243,118],[250,118],[211,118],[296,118],[219,73]];
     const nodes: Node[] = preset.nodes.map((node, index) => {
-      const dimensions = productionGeometry ? wmsDimensions[node.id] : sizes[index];
+      const dimensions = productionGeometry ? productionDimensions[node.id] : sizes[index];
       const width = dimensions?.[0] ?? 240;
       const height = dimensions?.[1] ?? 96;
       return {
@@ -109,9 +135,14 @@ describe('shared process ranks with local branch separation', () => {
     const edges: Edge[] = preset.edges.map(({ id, source, target }) => ({ id, source, target, data: {} }));
     const options = {
       type: LayoutType.DAGRE, direction, nodeLayout: LayoutType.DAGRE,
-      spacing: resolveDomainLaneSpacing(direction), padding: { top: 40, right: 20, bottom: 20, left: 20 },
+      spacing: layoutMode === 'standard' ? { horizontal: 80, vertical: 60 } : resolveDomainLaneSpacing(direction),
+      padding: { top: 40, right: 20, bottom: 20, left: 20 },
       generateDomainGroups: true, generateSubDomainGroups: true, fitDomainContent: true,
-      domainPlacement: 'ordered-lanes' as const, edgeRoutingQuality: 'interactive' as const,
+      domainPlacement: layoutMode === 'standard' ? 'topology' as const : 'ordered-lanes' as const,
+      edgeRoutingQuality: layoutMode === 'standard' ? undefined : 'interactive' as const,
+      domainOrder: name === 'enterprise' && layoutMode === 'standard'
+        ? [...enterpriseArchitecture.layout.domainOrder]
+        : undefined,
       domainSubGroupDirection: direction, subDomainNodeDirection: direction,
     };
     let original: Awaited<ReturnType<DomainDagreLayoutStrategy['calculateLayout']>>;
@@ -121,7 +152,13 @@ describe('shared process ranks with local branch separation', () => {
       widthSpy?.mockRestore();
       heightSpy?.mockRestore();
     }
-    const absolute = withDisplayAbsolutePositions(original.nodes, new Map(original.nodes.map(node => [node.id, node])))
+    const strategyName = layoutMode === 'standard' ? 'domain-dagre' : 'domain-lanes';
+    const generatedGroupOptions = resolveLayoutCommandGroupOptions(
+      strategyName,
+      resolveLayoutStrategyGeneratedGroupOptions(preset, nodes),
+    );
+    const finalNodes = stripHiddenGeneratedLayoutNodes(original.nodes, generatedGroupOptions);
+    const absolute = withDisplayAbsolutePositions(finalNodes, new Map(finalNodes.map(node => [node.id, node])))
       .map((node: Node & { positionAbsolute?: Node['position'] }) => {
         const { positionAbsolute, ...rest } = node;
         return { ...rest, parentId: undefined, extent: undefined, position: positionAbsolute ?? node.position };
@@ -143,7 +180,7 @@ describe('shared process ranks with local branch separation', () => {
       const source = byId.get(chain[index - 1]);
       const target = byId.get(chain[index]);
       if (!source || !target) throw new Error('Missing semantic chain node');
-      if (source.data.domain === target.data.domain) {
+      if (layoutMode === 'standard' || source.data.domain === target.data.domain) {
         expect((target.position[flow] - source.position[flow]) * sign).toBeGreaterThan(0);
       } else {
         const sourceSize = getNodeDimensions(source)[horizontal ? 'height' : 'width'];
@@ -158,7 +195,7 @@ describe('shared process ranks with local branch separation', () => {
       expect(arranged.filter(node => node.type === 'titleGroup').toSorted((a,b) => a.position[cross] - b.position[cross])
         .map(node => node.data.domain)).toEqual(['external', 'logistics', 'data']);
     }
-    if (productionGeometry) {
+    if (productionGeometry && layoutMode === 'lanes') {
       const flowDimension = horizontal ? 'width' : 'height';
       const laneExtents = arranged
         .filter(node => node.type === 'titleGroup')
@@ -166,8 +203,8 @@ describe('shared process ranks with local branch separation', () => {
       expect(new Set(laneExtents).size).toBe(1);
       expect(Math.max(...laneExtents)).toBeLessThan(horizontal ? 4_500 : 2_500);
     }
-    const hierarchical = new Map(original.nodes.map(node => [node.id, node]));
-    for (const node of original.nodes) {
+    const hierarchical = new Map(finalNodes.map(node => [node.id, node]));
+    for (const node of finalNodes) {
       if (!node.parentId) continue;
       const parent = hierarchical.get(node.parentId);
       if (!parent) throw new Error('Missing semantic container');
@@ -178,13 +215,15 @@ describe('shared process ranks with local branch separation', () => {
       expect(node.position.x + size.width).toBeLessThanOrEqual(parentSize.width + 0.5);
       expect(node.position.y + size.height).toBeLessThanOrEqual(parentSize.height + 0.5);
     }
-    const sourceEdges = prepareLayeredLayoutEdges(original.nodes, original.edges, direction, { promoteLockedComputedPath: true });
+    const sourceEdges = prepareLayeredLayoutEdges(finalNodes, original.edges, direction, {
+      promoteLockedComputedPath: shouldPromoteDomainDagreRouteCandidate(strategyName),
+    });
     const unseeded = sourceEdges.map(edge => ({ ...edge, data: clearBaseReactFlowLayoutEdgeRoutingData(edge.data) }));
-    const projected = projectBaseReactFlowDisplayWorkerInput({ nodes: original.nodes, edges: unseeded });
-    const seed = seedBaseReactFlowStagedLayoutEdges({ sourceEdges, sourceNodes: original.nodes });
-    const fallback = seedBaseReactFlowStagedLayoutEdges({ sourceEdges: unseeded, sourceNodes: original.nodes });
-    const projectedSeed = projectBaseReactFlowDisplayWorkerInput({ nodes: original.nodes, edges: seed });
-    const projectedFallback = projectBaseReactFlowDisplayWorkerInput({ nodes: original.nodes, edges: fallback });
+    const projected = projectBaseReactFlowDisplayWorkerInput({ nodes: finalNodes, edges: unseeded });
+    const seed = seedBaseReactFlowStagedLayoutEdges({ sourceEdges, sourceNodes: finalNodes });
+    const fallback = seedBaseReactFlowStagedLayoutEdges({ sourceEdges: unseeded, sourceNodes: finalNodes });
+    const projectedSeed = projectBaseReactFlowDisplayWorkerInput({ nodes: finalNodes, edges: seed });
+    const projectedFallback = projectBaseReactFlowDisplayWorkerInput({ nodes: finalNodes, edges: fallback });
     const candidatePatches = createBaseReactFlowDisplayEdgePatches(projected.edges, projectedSeed.edges);
     const fallbackCandidatePatches = createBaseReactFlowDisplayEdgePatches(projected.edges, projectedFallback.edges);
     if (!candidatePatches || !fallbackCandidatePatches) throw new Error('Invalid lane candidate patches');
@@ -214,7 +253,7 @@ describe('shared process ranks with local branch separation', () => {
       quality: { nonOrthogonalSegments: 0, strictCrossings: 0, reverseOverlap: 0, unrelatedOverlap: 0 },
     });
     if (!response.edges) throw new Error('Missing full-route response edges');
-    if (productionGeometry) {
+    if (name === 'wms-production') {
       // Real routed baselines: a smaller lane envelope alone previously let
       // LR crossings grow from 12 to 29 while every hard-quality check passed.
       // Keep readability independent of the routing safety assertions below.

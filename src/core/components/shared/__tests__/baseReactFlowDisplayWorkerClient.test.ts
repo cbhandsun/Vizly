@@ -216,6 +216,25 @@ describe('baseReactFlowDisplayWorkerClient', () => {
       requestId: 'repair-1',
       boundedCandidate: {
         ...boundedCandidate,
+        containerBoundarySkims: 17_030,
+        containerBoundarySkimEdgeIds: ['edge'],
+      },
+    }, 'repair-1')?.boundedCandidate?.containerBoundarySkims).toBe(17_030);
+    for (const containerBoundarySkims of [
+      -1,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      1_000_000_000_000_001,
+    ]) {
+      expect(parseDisplayEdgesWorkerResponse({
+        requestId: 'repair-1',
+        boundedCandidate: { ...boundedCandidate, containerBoundarySkims },
+      }, 'repair-1')).toBeNull();
+    }
+    expect(parseDisplayEdgesWorkerResponse({
+      requestId: 'repair-1',
+      boundedCandidate: {
+        ...boundedCandidate,
         quality: { ...quality, totalLength: Number.NaN },
       },
     }, 'repair-1')).toBeNull();

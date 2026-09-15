@@ -48,6 +48,10 @@ const isOptionalViolationCount = (value: unknown): boolean => (
   )
 );
 
+const isOptionalLengthMetric = (value: unknown): boolean => (
+  typeof value === 'undefined' || isBoundedMetric(value)
+);
+
 export const isDisplayWorkerBoundedCandidateReport = (
   value: unknown,
 ): value is BaseDisplayBoundedCandidateReport => {
@@ -71,7 +75,9 @@ export const isDisplayWorkerBoundedCandidateReport = (
       && (!isBoundedMetric(quality.crossingCost) || !Number.isSafeInteger(quality.crossingCost)))
     || !isOptionalViolationCount(value.minimumClearanceViolations)
     || !isOptionalViolationCount(value.commercialClearanceViolations)
-    || !isOptionalViolationCount(value.containerBoundarySkims)
+    // This is the summed skim length, not the number of matching edges. Large
+    // canvases can legitimately exceed the graph-item cardinality limit.
+    || !isOptionalLengthMetric(value.containerBoundarySkims)
   ) return false;
   if (
     typeof value.commercialClearanceViolations === 'number'
