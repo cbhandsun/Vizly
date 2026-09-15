@@ -137,9 +137,7 @@ describe('finalizeFailClosedDisplayTransaction', () => {
     expect(calculateEdgePathQualityScore(result).tinyInteriorDoglegs).toBe(0);
     expect(getDisplayComputedPath(result[0])).toEqual([
       { x: 100, y: 50 },
-      { x: 148, y: 50 },
-      { x: 148, y: 122 },
-      { x: 252, y: 122 },
+      { x: 252, y: 50 },
       { x: 252, y: 250 },
       { x: 300, y: 250 },
     ]);

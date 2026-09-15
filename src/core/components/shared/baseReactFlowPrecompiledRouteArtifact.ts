@@ -35,6 +35,7 @@ const ROUTING_INTENT_KEYS = [
   'sharedTrunkSynthesized',
   'isTreeBus',
   'overextendedTargetTrunkCorridorReclaimed',
+  'commercialClearanceConstrainedStaircase',
 ] as const;
 const ROUTING_DATA_KEYS = new Set<string>(ROUTING_PATCH_DATA_KEYS);
 const TREE_ROUTING_KEYS = new Set(['effectiveSourceHandle', 'effectiveTargetHandle', 'points']);

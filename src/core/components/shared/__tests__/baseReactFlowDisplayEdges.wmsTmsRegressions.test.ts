@@ -1,3 +1,5 @@
+import '../../../../test/setup';
+
 import warmBtRequestJson from './fixtures/wmsWarmBtWorkerRequest.json';
 import { tmsCrossedCostSpinePaths } from './fixtures/tmsResidualStrictPaths';
 import { finalSameSideTrueTrunksDoNotRegress } from '../baseReactFlowDisplayTrueTrunkContract';

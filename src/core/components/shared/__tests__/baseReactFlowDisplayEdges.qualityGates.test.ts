@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import '../../../../test/setup';
+
 import { describe, it } from 'vitest';
 
 import logisticsPlanningStandardData from '../../../../data/standardized/LogisticsPlanningStandardData.json';

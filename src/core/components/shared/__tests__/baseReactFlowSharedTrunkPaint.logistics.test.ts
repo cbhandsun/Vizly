@@ -1,3 +1,5 @@
+import '../../../../test/setup';
+
 import { MarkerType, type Edge, type Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 

@@ -84,7 +84,7 @@ import {
 } from './baseReactFlowDisplayFinalCommercialClearanceTransaction';
 import { runDisplayWorkerLayoutRepairTransaction } from './baseReactFlowDisplayWorkerLayoutTransaction';
 import { selectHardCleanDisplayParallelLaneCandidate } from './baseReactFlowDisplayParallelLaneSeparation';
-import { repairDisplayContainerBoundarySkims } from './baseReactFlowDisplayContainerBoundarySkimRepair';
+import { polishDisplayWorkerFinalRoutes } from './baseReactFlowDisplayWorkerFinalPolish';
 
 const finalizeContainerClearanceResponse = (
   response: DisplayEdgesWorkerResponse,
@@ -341,18 +341,16 @@ const finalizeContainerClearanceResponse = (
     repairNodes,
     response,
   });
-  const boundarySkimFinalEdges = finalizedResponse.edges ? repairDisplayContainerBoundarySkims(
-    finalizedResponse.edges, repairNodes, { eligibleEdgeIds: options.eligibleEdgeIds,
-      validateCandidate: context => context.candidateSkimLength < context.baselineSkimLength
-        && finalEvaluation.hardReport(context.candidateEdges).hardClean },
-  ) : null;
-  const boundarySkimFinalizedResponse = boundarySkimFinalEdges
-    && !doBaseReactFlowDisplayRoutesMatchExactly(finalizedResponse.edges ?? [], boundarySkimFinalEdges)
-    ? { ...finalizedResponse, edges: boundarySkimFinalEdges }
-    : finalizedResponse;
-  const finalizedRoutesChanged = Boolean(boundarySkimFinalizedResponse.edges
-    && !doBaseReactFlowDisplayRoutesMatchExactly(response.edges, boundarySkimFinalizedResponse.edges));
-  const exactFinalizedResponse = withExactHardReport(boundarySkimFinalizedResponse);
+  const {
+    response: polishedFinalizedResponse,
+    routesChanged: finalizedRoutesChanged,
+  } = polishDisplayWorkerFinalRoutes({
+    eligibleEdgeIds: options.eligibleEdgeIds,
+    evaluation: finalEvaluation,
+    repairNodes,
+    response: finalizedResponse,
+  });
+  const exactFinalizedResponse = withExactHardReport(polishedFinalizedResponse);
   if ((options.commercialStabilizationPass ?? 0) === 0
     && isCommercialClearanceOnlyFailure(exactFinalizedResponse)) {
     const clearanceClosed = finalizeExactCommercialResponse(exactFinalizedResponse);

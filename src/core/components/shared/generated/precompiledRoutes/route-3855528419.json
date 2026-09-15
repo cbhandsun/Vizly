@@ -1,17 +1,24 @@
 {
   "schema": "vizly-precompiled-display-route-v1",
-  "routingVersion": "21",
-  "routingSourceHash": "source-v1:2d21e74fc3a35803ca1379e61233328c6987ef3f8215d129ce9c655c37d0eb8a",
+  "routingVersion": "22",
+  "routingSourceHash": "source-v1:f3dc8f100fcdc67fd14cafe481a9f41fda4947e6bc46b5ca5608fa06453ccc5e",
   "sourceHash": "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
-  "inputSignature": "1902262462",
-  "inputGeometryDigest": "geometry-v1:25fffd342dc29dc0a02dee32faca612c",
-  "outputRouteSignature": "route-v2:44:166:f91e06ff5880dd29",
+  "inputSignature": "3855528419",
+  "inputGeometryDigest": "geometry-v1:612749c16bbbcd21e376e63dbf5cc4d5",
+  "outputRouteSignature": "route-v2:44:166:9133adf48d958382",
   "hardClean": true,
   "routingContract": {
-    "clean": true,
+    "clean": false,
     "hardClean": true,
-    "violationCount": 0,
-    "violations": []
+    "violationCount": 1,
+    "violations": [
+      {
+        "code": "render-unsafe-endpoint-stub",
+        "phase": "presentation",
+        "severity": "presentation",
+        "count": 1
+      }
+    ]
   },
   "patches": [
     {
@@ -277,16 +284,16 @@
             "y": 2121
           },
           {
-            "x": 4972,
+            "x": 1843,
             "y": 2121
           },
           {
-            "x": 4972,
-            "y": 2071
+            "x": 1843,
+            "y": 2079
           },
           {
             "x": 1182.8,
-            "y": 2071
+            "y": 2079
           },
           {
             "x": 1182.8,
@@ -307,15 +314,15 @@
       "data": {
         "computedPath": [
           {
-            "x": 6144.849999999999,
+            "x": 6145,
             "y": 1582
           },
           {
-            "x": 6088.849999999999,
+            "x": 6089,
             "y": 1582
           },
           {
-            "x": 6088.849999999999,
+            "x": 6089,
             "y": 1149
           },
           {
@@ -859,11 +866,11 @@
             "y": 1809
           },
           {
-            "x": 5538,
+            "x": 5562,
             "y": 1809
           },
           {
-            "x": 5538,
+            "x": 5562,
             "y": 1582
           },
           {

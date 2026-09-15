@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import '../../../../test/setup';
+
 import type { Edge } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 

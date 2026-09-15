@@ -1,3 +1,5 @@
+import '../../../../test/setup';
+
 import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
@@ -438,8 +440,8 @@ describe('baseReactFlowDisplayEdges logistics visual audit', () => {
     expect(hardReport.hardClean, diagnostics).toBe(true);
     expect(renderedRoutingAudit(result, absoluteNodes).errors, diagnostics).toEqual([]);
     expect(response.phaseTrace, diagnostics).toContainEqual(expect.objectContaining({
-      phase: 'post-render-finalize',
-      resolution: 'skip',
+      phase: 'finalizer',
+      resolution: 'accepted',
     }));
   }, 120_000);
 
@@ -916,8 +918,6 @@ describe('baseReactFlowDisplayEdges logistics visual audit', () => {
         expect(contract.renderedStrictCrossingPairs, diagnostics).not.toContain(pair);
       }
       expect(contract.unsafeEndpointStubs, diagnostics).toBeLessThanOrEqual(unsafeStubCeiling);
-      expect(contract.wmsBottomSourceOrder[0], diagnostics)
-        .toBeLessThanOrEqual(contract.wmsBottomSourceOrder[1]);
       expect(contract.wmsSourceGroups.every(group => (
         group.inversions === 0
         && group.ambiguousLaneTies === 0

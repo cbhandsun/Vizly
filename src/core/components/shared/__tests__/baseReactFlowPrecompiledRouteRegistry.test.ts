@@ -138,6 +138,7 @@ describe('baseReactFlowPrecompiledRouteRegistry', () => {
         sharedTrunkAware: true,
         sharedTrunkSynthesized: true,
         isTreeBus: true,
+        commercialClearanceConstrainedStaircase: true,
       },
     }));
     const signature = computeBaseReactFlowDisplayOutputRouteSignature(routedEdges);
@@ -151,7 +152,7 @@ describe('baseReactFlowPrecompiledRouteRegistry', () => {
     expect(computeBaseReactFlowDisplayOutputRouteSignature(merged ?? [])).toBe(signature);
     expect(merged?.[0].label).toBe('Preserved semantic label');
     expect(merged?.[0].data?.userNote).toBe('Preserved business data');
-    for (const key of ['h', 'elkPath', 'treeRouting', 'sharedTrunkAware', 'sharedTrunkSynthesized', 'isTreeBus']) {
+    for (const key of ['h', 'elkPath', 'treeRouting', 'sharedTrunkAware', 'sharedTrunkSynthesized', 'isTreeBus', 'commercialClearanceConstrainedStaircase']) {
       expect(merged?.[0].data).not.toHaveProperty(key);
       expect(source[0].data).toHaveProperty(key);
     }
@@ -386,6 +387,7 @@ describe('baseReactFlowPrecompiledRouteRegistry', () => {
         sharedTrunkAware: true,
         sharedTrunkSynthesized: false,
         overextendedTargetTrunkCorridorReclaimed: true,
+        commercialClearanceConstrainedStaircase: true,
       },
     }];
     const intentArtifact = {

@@ -130,6 +130,7 @@ const ROUTING_DATA_KEYS = new Set([
   'sharedTrunkAware',
   'sharedTrunkSynthesized',
   'overextendedTargetTrunkCorridorReclaimed',
+  'commercialClearanceConstrainedStaircase',
   'useElkRouting',
   'layoutRoutingCandidate',
   'h',

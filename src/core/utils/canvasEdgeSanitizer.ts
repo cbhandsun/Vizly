@@ -37,7 +37,6 @@ export const sanitizeCanvasEdgesForNodes = (
             || edgeIds.has(edge.id)
             || !nodeIds.has(edge.source)
             || !nodeIds.has(edge.target)
-            || edge.source === edge.target
         ) {
             continue;
         }

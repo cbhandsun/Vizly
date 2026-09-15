@@ -186,6 +186,7 @@ describe('useVersionHistory', () => {
         expect(setNodes).toHaveBeenCalledWith(previewNodes);
         expect(setEdges).toHaveBeenCalledWith([
             expect.objectContaining({ id: 'valid-edge' }),
+            expect.objectContaining({ id: 'self-loop' }),
         ]);
     });
 
@@ -218,7 +219,10 @@ describe('useVersionHistory', () => {
             'diagram-1',
             {
                 nodes: previewNodes,
-                edges: [expect.objectContaining({ id: 'valid-edge' })],
+                edges: [
+                    expect.objectContaining({ id: 'valid-edge' }),
+                    expect.objectContaining({ id: 'self-loop' }),
+                ],
             },
             'Sanitized snapshot',
         );

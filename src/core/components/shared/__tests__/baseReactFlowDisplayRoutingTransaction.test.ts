@@ -22,7 +22,8 @@ describe('baseReactFlowDisplayRoutingTransaction', () => {
       elkPath: [{ x: 0, y: 0 }, { x: 200, y: 0 }],
       h: [{ x: 50, y: 0 }], treeRouting: { effectiveSourceHandle: 'bottom' },
       sharedTrunkAware: true, sharedTrunkSynthesized: true, isTreeBus: true,
-      overextendedTargetTrunkCorridorReclaimed: true, userNote: 'preserve',
+      overextendedTargetTrunkCorridorReclaimed: true,
+      commercialClearanceConstrainedStaircase: true, userNote: 'preserve',
     } }];
     const routed: Edge[] = [{ id: 'edge', source: 's', target: 't', data: {
       computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
@@ -178,6 +179,9 @@ describe('baseReactFlowDisplayRoutingTransaction', () => {
 
     expect(computeBaseReactFlowDisplayOutputRouteSignature(merged)).toBeNull();
     expect(doBaseReactFlowDisplayRoutesMatchExactly(routes, merged)).toBe(true);
+    expect(doBaseReactFlowDisplayRoutesMatchExactly(routes, merged.map((edge, index) => (index === 0
+      ? { ...edge, data: { ...(edge.data || {}), commercialClearanceConstrainedStaircase: true } }
+      : edge)))).toBe(false);
     merged[300] = {
       ...merged[300],
       data: {
@@ -612,6 +616,7 @@ describe('baseReactFlowDisplayRoutingTransaction', () => {
         sharedTrunkAware: false,
         sharedTrunkSynthesized: false,
         isTreeBus: false,
+        commercialClearanceConstrainedStaircase: false,
       },
     }];
     const workerEdges: Edge[] = [{
@@ -630,6 +635,7 @@ describe('baseReactFlowDisplayRoutingTransaction', () => {
         sharedTrunkAware: true,
         sharedTrunkSynthesized: true,
         isTreeBus: true,
+        commercialClearanceConstrainedStaircase: true,
         treeRouting: {
           type: 'tree-out',
           trunkId: 'worker-trunk',
@@ -664,6 +670,7 @@ describe('baseReactFlowDisplayRoutingTransaction', () => {
       sharedTrunkAware: true,
       sharedTrunkSynthesized: true,
       isTreeBus: true,
+      commercialClearanceConstrainedStaircase: true,
     });
     expect(Object.prototype.hasOwnProperty.call(merged!.displayPatches[0].data, 'elkPath')).toBe(true);
 
@@ -678,6 +685,7 @@ describe('baseReactFlowDisplayRoutingTransaction', () => {
     expect((replayed?.[0].data as any).sharedTrunkAware).toBe(true);
     expect((replayed?.[0].data as any).sharedTrunkSynthesized).toBe(true);
     expect((replayed?.[0].data as any).isTreeBus).toBe(true);
+    expect((replayed?.[0].data as any).commercialClearanceConstrainedStaircase).toBe(true);
   });
 
   it('fails closed for malformed trusted line-hop routing carriers', () => {
@@ -834,6 +842,7 @@ describe('baseReactFlowDisplayRoutingTransaction', () => {
         sharedTrunkAware: false,
         sharedTrunkSynthesized: false,
         isTreeBus: false,
+        commercialClearanceConstrainedStaircase: false,
       },
     }];
     const expected: Edge[] = [{
@@ -864,6 +873,7 @@ describe('baseReactFlowDisplayRoutingTransaction', () => {
         sharedTrunkAware: true,
         sharedTrunkSynthesized: true,
         isTreeBus: true,
+        commercialClearanceConstrainedStaircase: true,
         treeRouting: {
           type: 'tree-out',
           trunkId: 'forged-trunk',
@@ -887,6 +897,7 @@ describe('baseReactFlowDisplayRoutingTransaction', () => {
     expect((merged?.[0].data as any).sharedTrunkAware).toBe(false);
     expect((merged?.[0].data as any).sharedTrunkSynthesized).toBe(false);
     expect((merged?.[0].data as any).isTreeBus).toBe(false);
+    expect((merged?.[0].data as any).commercialClearanceConstrainedStaircase).toBe(false);
     expect((merged?.[0].data as any).treeRouting).toBeUndefined();
     expect(mergeTrustedBaseReactFlowDisplayCacheEntry(source, {
       edges: [{ ...maliciousPatch, type: 'attacker-renderer' }],

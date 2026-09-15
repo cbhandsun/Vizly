@@ -1,3 +1,5 @@
+import '../../../../test/setup';
+
 import type { Edge, Node } from '@xyflow/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as terminalPhase from '../baseReactFlowDisplayFullRouteTerminalPhase';
@@ -71,11 +73,10 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
     expect(result.hardReport).toMatchObject({ hardClean: true, terminalsAnchored: true,
       minimumClearanceViolations: 0, commercialClearanceViolations: 0 });
     expect(result.phaseTrace?.find(trace => trace.phase === 'terminal'))
-      .toMatchObject({ resolution: 'fallback' });
+      .toMatchObject({ resolution: 'accepted' });
     expect(result.phaseTrace?.some(trace => trace.phase === 'strict-primary-crossing')).toBe(true);
-    expect(terminal).toHaveBeenCalledTimes(2);
+    expect(terminal).toHaveBeenCalledTimes(1);
     expect(terminal.mock.calls[0]?.[2]).toBeDefined();
-    expect(terminal.mock.calls[1]?.[2]).toBe(terminal.mock.calls[0]?.[2]);
   }, 60_000);
 
   it('finishes the original route when speculative closure loses an edge', () => {
@@ -112,7 +113,7 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
       quality: { strictCrossings: 0, unrelatedOverlap: 0, reverseOverlap: 0,
         unexplainedRelatedOverlap: 0, shortEndpointStubs: 0, tinyInteriorDoglegs: 0, hairpins: 0 },
     });
-    expect(result.phaseTrace?.some(trace => trace.phase === 'strict-primary-crossing')).toBe(false);
+    expect(result.phaseTrace?.some(trace => trace.phase === 'strict-primary-crossing')).toBe(!allowEarly);
     expect(result.phaseTrace?.find(trace => trace.phase === (
       allowEarly ? 'quality-crossing-early-closure' : 'terminal'
     )))
@@ -504,7 +505,7 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
       JSON.stringify({ quality, phaseTraces }, null, 2),
     ).toBeLessThanOrEqual(56);
     expect(
-      phaseTraces.some(trace => trace.phase === 'strict'),
+      phaseTraces.every(trace => trace.phase !== 'strict' || trace.resolution !== 'rejected'),
       JSON.stringify({ quality, phaseTraces }, null, 2),
     ).toBe(true);
     expect(

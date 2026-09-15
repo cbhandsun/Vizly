@@ -9,11 +9,13 @@ export type RoutingPatchData = Readonly<{
   sharedTrunkSynthesized?: unknown;
   isTreeBus?: unknown;
   overextendedTargetTrunkCorridorReclaimed?: unknown;
+  commercialClearanceConstrainedStaircase?: unknown;
 }>;
 
 export const ROUTING_PATCH_DATA_KEYS = [
   'computedPath', 'elkPath', 'treeRouting', 'h', 'sharedTrunkAware',
   'sharedTrunkSynthesized', 'isTreeBus', 'overextendedTargetTrunkCorridorReclaimed',
+  'commercialClearanceConstrainedStaircase',
 ] as const satisfies readonly (keyof RoutingPatchData)[];
 
 /**

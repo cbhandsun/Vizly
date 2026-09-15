@@ -558,7 +558,7 @@ describe('baseReactFlowDisplayTerminalPortRepair', () => {
       tinyInteriorDoglegs: baselineQuality.tinyInteriorDoglegs,
     }).toEqual({
       reverseOverlap: 96,
-      unexplainedRelatedOverlap: 181,
+      unexplainedRelatedOverlap: 96,
       tinyInteriorDoglegs: 3,
     });
     expect([1, 2].map(index => {

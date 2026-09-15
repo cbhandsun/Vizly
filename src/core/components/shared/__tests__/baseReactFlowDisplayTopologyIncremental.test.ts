@@ -363,6 +363,7 @@ describe('base React Flow topology incremental projection', () => {
         layoutPathLocked: true,
         runtimeHandleLock: { source: true },
         sharedTrunkAware: true,
+        commercialClearanceConstrainedStaircase: true,
         __baseDisplayFinalizedSignature: 'stale',
       },
     };
@@ -394,6 +395,7 @@ describe('base React Flow topology incremental projection', () => {
       'layoutPathLocked',
       'runtimeHandleLock',
       'sharedTrunkAware',
+      'commercialClearanceConstrainedStaircase',
       '__baseDisplayFinalizedSignature',
     ]) {
       expect(addedSeed?.data).not.toHaveProperty(key);

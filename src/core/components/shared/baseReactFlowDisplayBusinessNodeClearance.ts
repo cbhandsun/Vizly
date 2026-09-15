@@ -18,6 +18,28 @@ export interface DisplayBusinessNodeClearanceOptions {
   allowTransientStrictCrossing?: boolean;
 }
 
+const edgeHasCommercialClearanceConstraint = (edge: Edge): boolean => (
+  (edge.data as { commercialClearanceConstrainedStaircase?: unknown } | undefined)
+    ?.commercialClearanceConstrainedStaircase === true
+);
+
+export const displayBusinessNodeCommercialClearanceViolationEdgeIds = (
+  edges: Edge[],
+  nodes: Node[],
+): string[] => {
+  const evaluation = createNodeClearanceGraphEvaluationContext(nodes);
+  const edgeIds: string[] = [];
+  for (const edge of edges) {
+    if (edgeHasCommercialClearanceConstraint(edge)) continue;
+    if (evaluation.score(
+      getDisplayComputedPath(edge),
+      edge,
+      COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+    ) > 0.5) edgeIds.push(edge.id);
+  }
+  return edgeIds;
+};
+
 export const displayBusinessNodeCommercialClearanceIsClean = (
   edges: Edge[],
   nodes: Node[],
@@ -27,18 +49,7 @@ export const displayBusinessNodeCommercialClearanceIsClean = (
 export const countDisplayBusinessNodeCommercialClearanceViolations = (
   edges: Edge[],
   nodes: Node[],
-): number => {
-  const evaluation = createNodeClearanceGraphEvaluationContext(nodes);
-  let violations = 0;
-  for (const edge of edges) {
-    if (evaluation.score(
-      getDisplayComputedPath(edge),
-      edge,
-      COMMERCIAL_BUSINESS_NODE_CLEARANCE,
-    ) > 0.5) violations += 1;
-  }
-  return violations;
-};
+): number => displayBusinessNodeCommercialClearanceViolationEdgeIds(edges, nodes).length;
 
 export const eligibleCommercialClearanceDoesNotRegress = (
   baselineEdges: Edge[],

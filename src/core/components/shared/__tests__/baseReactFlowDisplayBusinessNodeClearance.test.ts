@@ -43,6 +43,32 @@ describe('final display business-node clearance', () => {
     ]));
   });
 
+  it('treats constrained commercial staircases as audited commercial exceptions', () => {
+    const constrainedEdges: Edge[] = [{
+      id: 'edge',
+      source: 'source',
+      target: 'target',
+      data: {
+        commercialClearanceConstrainedStaircase: true,
+        computedPath: [{ x: 80, y: 30 }, { x: 300, y: 30 }],
+      },
+    }];
+
+    expect(countDisplayBusinessNodeCommercialClearanceViolations(
+      constrainedEdges,
+      nodes,
+    )).toBe(0);
+    expect(displayBusinessNodeCommercialClearanceIsClean(constrainedEdges, nodes)).toBe(true);
+
+    const response = withExactDisplayHardReport({
+      requestId: 'commercial-final-constrained-gate',
+      edges: constrainedEdges,
+      hardClean: true,
+      routeResolution: 'full-route',
+    }, nodes);
+    expect(response.hardReport?.commercialClearanceViolations).toBe(0);
+  });
+
   it('accepts empty and commercially clear final geometry', () => {
     const clearEdges: Edge[] = [{
       id: 'edge',

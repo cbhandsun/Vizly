@@ -9,9 +9,12 @@ let nextOversizedLineHopToken = 1;
 
 const edgeRoutingQualityIntentFlags = (edge: Edge): string => {
   const data = edge.data ?? {};
-  return `${data.sharedTrunkSynthesized === true ? 1 : 0}${
+  const legacyFlags = `${data.sharedTrunkSynthesized === true ? 1 : 0}${
     data.sharedTrunkAware === true ? 1 : 0
   }${data.isTreeBus === true ? 1 : 0}${data.treeRouting ? 1 : 0}`;
+  return data.commercialClearanceConstrainedStaircase === true
+    ? `${legacyFlags}c1`
+    : legacyFlags;
 };
 
 const edgeRoutingLineHops = (edge: Edge): string => {

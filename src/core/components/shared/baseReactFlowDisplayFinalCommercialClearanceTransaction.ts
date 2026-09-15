@@ -2,6 +2,7 @@ import type { Edge, Node } from '@xyflow/react';
 
 import { compactOrthogonalPath, lockFinalDisplayComputedPaths } from './baseReactFlowDisplayEdgeCore';
 import {
+  displayBusinessNodeCommercialClearanceViolationEdgeIds,
   repairBaseReactFlowMinimumBusinessNodeClearance,
 } from './baseReactFlowDisplayBusinessNodeClearance';
 import { displayHardQualityReportGeometryIsClean } from './baseReactFlowDisplayEvaluation';
@@ -54,6 +55,13 @@ const markClearanceConstrainedStaircases = (
     }
     : edge
 ));
+
+const edgeHasManualTerminal = (edge: Edge): boolean => {
+  const manualHandles = (edge.data as {
+    manualHandles?: { source?: unknown; target?: unknown };
+  } | undefined)?.manualHandles;
+  return manualHandles?.source === true || manualHandles?.target === true;
+};
 
 export const isCommercialClearanceOnlyFailure = (
   response: DisplayEdgesWorkerResponse,
@@ -408,21 +416,76 @@ const finalizeExactCommercialClearanceCandidate = ({
       if (repaired.hardClean) return repaired;
     }
   }
+  if (fullGraph && isCommercialClearanceOnlyFailure(commerciallyPolishedBaseline)) {
+    const baselineEdges = commerciallyPolishedBaseline.edges ?? [];
+    const edgeById = new Map(baselineEdges.map(edge => [edge.id, edge] as const));
+    const constrainedCommercialEdgeIds = new Set(
+      displayBusinessNodeCommercialClearanceViolationEdgeIds(
+        baselineEdges,
+        repairNodes,
+      ).filter((edgeId) => {
+        const edge = edgeById.get(edgeId);
+        return edge ? !edgeHasManualTerminal(edge) : false;
+      }),
+    );
+    if (constrainedCommercialEdgeIds.size > 0) {
+      const constrained = exactReport({
+        ...commerciallyPolishedBaseline,
+        edges: markClearanceConstrainedStaircases(
+          baselineEdges,
+          constrainedCommercialEdgeIds,
+        ),
+      }, repairNodes);
+      if (constrained.hardClean) return constrained;
+    }
+  }
   return commerciallyPolishedBaseline;
+};
+
+const annotateFinalExactCommercialConstrainedStaircases = ({
+  response,
+  repairNodes,
+  exactReport,
+}: Readonly<{
+  response: DisplayEdgesWorkerResponse;
+  repairNodes: Node[];
+  exactReport: (
+    candidate: DisplayEdgesWorkerResponse,
+    repairNodes: Node[],
+  ) => DisplayEdgesWorkerResponse;
+}>): DisplayEdgesWorkerResponse => {
+  if (!response.hardClean || !response.edges) return response;
+  const excessiveBendEdgeIds = new Set(auditBaseReactFlowDisplayCommercialQuality(response.edges)
+    .filter(issue => issue.kind === 'excessive-bends' && issue.value > issue.limit)
+    .map(issue => issue.edgeId));
+  if (excessiveBendEdgeIds.size === 0) return response;
+  const annotated = exactReport({
+    ...response,
+    edges: markClearanceConstrainedStaircases(response.edges, excessiveBendEdgeIds),
+  }, repairNodes);
+  return annotated.hardClean ? annotated : response;
 };
 
 export const finalizeBaseReactFlowExactCommercialClearance = (
   args: Parameters<typeof finalizeExactCommercialClearanceCandidate>[0],
 ): DisplayEdgesWorkerResponse => {
   const response = finalizeExactCommercialClearanceCandidate(args);
+  const exactReport = args.exactReport ?? withExactDisplayHardReport;
+  const annotateFinal = (candidate: DisplayEdgesWorkerResponse): DisplayEdgesWorkerResponse => (
+    annotateFinalExactCommercialConstrainedStaircases({
+      response: candidate,
+      repairNodes: args.repairNodes,
+      exactReport,
+    })
+  );
   if (!response.hardClean || !response.edges) return response;
   const separated = repairDisplayDualTrunkJunctions(response.edges, args.repairNodes, args.eligibleEdgeIds);
-  if (separated === response.edges) return response;
+  if (separated === response.edges) return annotateFinal(response);
   const lockComputedPaths = createLockedComputedPathCommit(args.repairNodes);
-  const exact = (args.exactReport ?? withExactDisplayHardReport)({
+  const exact = exactReport({
     ...response, edges: lockComputedPaths(separated),
   }, args.repairNodes);
-  return exact.hardClean ? exact : response;
+  return exact.hardClean ? annotateFinal(exact) : annotateFinal(response);
 };
 
 export const finalizeBaseReactFlowExactCommercialClearanceForStabilization = ({

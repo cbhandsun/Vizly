@@ -1,4 +1,4 @@
-import type { Edge } from '@xyflow/react';
+import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 
 import {
   createDisplayMicroCleanupDiagnostics,
@@ -49,6 +49,238 @@ import {
 import { computeBaseReactFlowDisplayOutputRouteSignature } from './baseReactFlowDisplayCache';
 import { repairTerminalEndpointStrictCrossingStubs } from './baseReactFlowDisplayStrictTerminalRepair';
 import type { BaseReactFlowFullRouteContext } from './baseReactFlowDisplayFullRouteTypes';
+
+type PostRenderPoint = { x: number; y: number };
+
+type PostRenderSegment = {
+  edgeIndex: number;
+  segmentIndex: number;
+  a: PostRenderPoint;
+  b: PostRenderPoint;
+  horizontal: boolean;
+  vertical: boolean;
+};
+
+const POST_RENDER_EPS = 1;
+const POST_RENDER_NEAR_PARALLEL_EPS = 2;
+const POST_RENDER_PARALLEL_OVERLAP_MIN = 24;
+const POST_RENDER_LANE_OFFSETS = [24, -24, 40, -40] as const;
+const POST_RENDER_NEAR_ORTHOGONAL_EPS = 4;
+
+const readPostRenderPath = (edge: Edge): PostRenderPoint[] => {
+  const path = (edge.data as { computedPath?: unknown } | undefined)?.computedPath;
+  if (!Array.isArray(path)) return [];
+  return path.flatMap(point => {
+    if (!point || typeof point !== 'object') return [];
+    const candidate = point as { x?: unknown; y?: unknown };
+    return typeof candidate.x === 'number' && Number.isFinite(candidate.x)
+      && typeof candidate.y === 'number' && Number.isFinite(candidate.y)
+      ? [{ x: candidate.x, y: candidate.y }]
+      : [];
+  });
+};
+
+const compactPostRenderPath = (path: PostRenderPoint[]): PostRenderPoint[] => {
+  const compacted: PostRenderPoint[] = [];
+  for (const point of path) {
+    const previous = compacted.at(-1);
+    if (previous && Math.abs(previous.x - point.x) <= POST_RENDER_EPS
+      && Math.abs(previous.y - point.y) <= POST_RENDER_EPS) continue;
+    compacted.push(point);
+  }
+  return compacted;
+};
+
+const withPostRenderPath = (edge: Edge, path: PostRenderPoint[]): Edge => ({
+  ...edge,
+  data: {
+    ...(edge.data || {}),
+    computedPath: compactPostRenderPath(path),
+  },
+});
+
+const postRenderSegments = (edges: Edge[]): PostRenderSegment[] => edges.flatMap((edge, edgeIndex) => {
+  const path = readPostRenderPath(edge);
+  const segments: PostRenderSegment[] = [];
+  for (let segmentIndex = 0; segmentIndex < path.length - 1; segmentIndex += 1) {
+    const a = path[segmentIndex];
+    const b = path[segmentIndex + 1];
+    const horizontal = Math.abs(a.y - b.y) <= POST_RENDER_EPS
+      && Math.abs(a.x - b.x) > POST_RENDER_EPS;
+    const vertical = Math.abs(a.x - b.x) <= POST_RENDER_EPS
+      && Math.abs(a.y - b.y) > POST_RENDER_EPS;
+    if (horizontal || vertical) {
+      segments.push({ edgeIndex, segmentIndex, a, b, horizontal, vertical });
+    }
+  }
+  return segments;
+});
+
+const postRenderParallelOverlapLength = (
+  first: PostRenderSegment,
+  second: PostRenderSegment,
+): number => {
+  if (first.horizontal !== second.horizontal || first.vertical !== second.vertical) return 0;
+  if (first.horizontal && Math.abs(first.a.y - second.a.y) > POST_RENDER_NEAR_PARALLEL_EPS) return 0;
+  if (first.vertical && Math.abs(first.a.x - second.a.x) > POST_RENDER_NEAR_PARALLEL_EPS) return 0;
+  return first.horizontal
+    ? Math.min(Math.max(first.a.x, first.b.x), Math.max(second.a.x, second.b.x))
+      - Math.max(Math.min(first.a.x, first.b.x), Math.min(second.a.x, second.b.x))
+    : Math.min(Math.max(first.a.y, first.b.y), Math.max(second.a.y, second.b.y))
+      - Math.max(Math.min(first.a.y, first.b.y), Math.min(second.a.y, second.b.y));
+};
+
+const pointsAlmostEqual = (first: PostRenderPoint, second: PostRenderPoint): boolean => (
+  Math.abs(first.x - second.x) <= POST_RENDER_EPS
+  && Math.abs(first.y - second.y) <= POST_RENDER_EPS
+);
+
+const isProtectedPostRenderSharedStem = (
+  edges: Edge[],
+  first: PostRenderSegment,
+  second: PostRenderSegment,
+): boolean => {
+  const firstEdge = edges[first.edgeIndex];
+  const secondEdge = edges[second.edgeIndex];
+  if (!firstEdge || !secondEdge) return false;
+  if (firstEdge.source === secondEdge.source && first.segmentIndex === 0 && second.segmentIndex === 0) {
+    return pointsAlmostEqual(first.a, second.a)
+      && postRenderParallelOverlapLength(first, second) > 0;
+  }
+  const firstPath = readPostRenderPath(firstEdge);
+  const secondPath = readPostRenderPath(secondEdge);
+  if (
+    firstEdge.target === secondEdge.target
+    && first.segmentIndex === firstPath.length - 2
+    && second.segmentIndex === secondPath.length - 2
+  ) {
+    return pointsAlmostEqual(first.b, second.b)
+      && postRenderParallelOverlapLength(first, second) > 0;
+  }
+  return false;
+};
+
+const postRenderNearParallelOverlapScore = (edges: Edge[]): number => {
+  const segments = postRenderSegments(edges);
+  let score = 0;
+  for (let firstIndex = 0; firstIndex < segments.length; firstIndex += 1) {
+    for (let secondIndex = firstIndex + 1; secondIndex < segments.length; secondIndex += 1) {
+      const first = segments[firstIndex];
+      const second = segments[secondIndex];
+      if (first.edgeIndex === second.edgeIndex) continue;
+      const overlap = postRenderParallelOverlapLength(first, second);
+      if (
+        overlap >= POST_RENDER_PARALLEL_OVERLAP_MIN
+        && !isProtectedPostRenderSharedStem(edges, first, second)
+      ) {
+        score += overlap;
+      }
+    }
+  }
+  return score;
+};
+
+const shiftPostRenderSegmentLane = (
+  edge: Edge,
+  segmentIndex: number,
+  horizontal: boolean,
+  offset: number,
+): Edge | null => {
+  const path = readPostRenderPath(edge);
+  if (segmentIndex < 0 || segmentIndex >= path.length - 1) return null;
+  const nextPath = path.map(point => ({ ...point }));
+  if (horizontal) {
+    nextPath[segmentIndex].y += offset;
+    nextPath[segmentIndex + 1].y += offset;
+  } else {
+    nextPath[segmentIndex].x += offset;
+    nextPath[segmentIndex + 1].x += offset;
+  }
+  return withPostRenderPath(edge, nextPath);
+};
+
+export const repairPostRenderEndpointOrthogonalPaths = (
+  edges: Edge[],
+  _nodes: readonly ReactFlowNode[],
+  _isHardClean: (candidate: Edge[]) => boolean,
+): Edge[] => {
+  const candidate = edges.map(edge => {
+    const path = readPostRenderPath(edge);
+    if (path.length < 2) return edge;
+    let changed = false;
+    const nextPath = path.map(point => ({ ...point }));
+    for (let index = 0; index < nextPath.length - 1; index += 1) {
+      const current = nextPath[index];
+      const next = nextPath[index + 1];
+      const dx = Math.abs(current.x - next.x);
+      const dy = Math.abs(current.y - next.y);
+      if (
+        dx > 0
+        && dx <= POST_RENDER_NEAR_ORTHOGONAL_EPS
+        && dy > POST_RENDER_NEAR_ORTHOGONAL_EPS
+      ) {
+        next.x = current.x;
+        changed = true;
+      } else if (
+        dy > 0
+        && dy <= POST_RENDER_NEAR_ORTHOGONAL_EPS
+        && dx > POST_RENDER_NEAR_ORTHOGONAL_EPS
+      ) {
+        next.y = current.y;
+        changed = true;
+      }
+    }
+    return changed ? withPostRenderPath(edge, nextPath) : edge;
+  });
+  return computeBaseReactFlowDisplayOutputRouteSignature(candidate)
+      === computeBaseReactFlowDisplayOutputRouteSignature(edges)
+    ? edges
+    : candidate;
+};
+
+export const repairPostRenderNearParallelOverlaps = (
+  edges: Edge[],
+  isHardClean: (candidate: Edge[]) => boolean,
+): Edge[] => {
+  let bestEdges = edges;
+  let bestScore = postRenderNearParallelOverlapScore(edges);
+  if (bestScore < POST_RENDER_PARALLEL_OVERLAP_MIN) return edges;
+  const segments = postRenderSegments(edges);
+  for (let firstIndex = 0; firstIndex < segments.length; firstIndex += 1) {
+    for (let secondIndex = firstIndex + 1; secondIndex < segments.length; secondIndex += 1) {
+      const first = segments[firstIndex];
+      const second = segments[secondIndex];
+      if (first.edgeIndex === second.edgeIndex) continue;
+      const overlap = postRenderParallelOverlapLength(first, second);
+      if (
+        overlap < POST_RENDER_PARALLEL_OVERLAP_MIN
+        || isProtectedPostRenderSharedStem(edges, first, second)
+      ) continue;
+      for (const moved of [second, first]) {
+        for (const offset of POST_RENDER_LANE_OFFSETS) {
+          const movedEdge = shiftPostRenderSegmentLane(
+            edges[moved.edgeIndex],
+            moved.segmentIndex,
+            moved.horizontal,
+            offset,
+          );
+          if (!movedEdge) continue;
+          const candidate = edges.map((edge, index) => (
+            index === moved.edgeIndex ? movedEdge : edge
+          ));
+          if (!isHardClean(candidate)) continue;
+          const score = postRenderNearParallelOverlapScore(candidate);
+          if (score < bestScore) {
+            bestEdges = candidate;
+            bestScore = score;
+            if (bestScore < POST_RENDER_PARALLEL_OVERLAP_MIN) return bestEdges;
+          }
+        }
+      }
+    }
+  }
+  return bestEdges;
+};
 
 export type BaseReactFlowFullRoutePostRenderResult =
   | { kind: 'finalized'; edges: Edge[] }
@@ -112,13 +344,25 @@ export const runBaseReactFlowFullRoutePostRenderPhase = (
       inputSignature,
       nodes: renderNodes,
     });
-    directCommitTimer.finish('accepted', committedEdges.length);
+    const orthogonalCommittedEdges = repairPostRenderEndpointOrthogonalPaths(
+      committedEdges,
+      renderNodes,
+      candidate => context.evaluationSession.hardReport(candidate).hardClean,
+    );
+    const visuallySeparatedEdges = repairPostRenderNearParallelOverlaps(
+      orthogonalCommittedEdges,
+      candidate => context.evaluationSession.hardReport(candidate).hardClean,
+    );
+    directCommitTimer.finish(
+      visuallySeparatedEdges === committedEdges ? 'skip' : 'accepted',
+      visuallySeparatedEdges === committedEdges ? 0 : visuallySeparatedEdges.length,
+    );
     startDisplayRoutingPhaseTrace({
       phase: 'post-render-soft-closure',
       candidateCount: committedEdges.length,
       onTrace: onPhaseTrace,
     }).finish('skip');
-    return { kind: 'finalized', edges: committedEdges };
+    return { kind: 'finalized', edges: visuallySeparatedEdges };
   }
   const finalizeTimer = startDisplayRoutingPhaseTrace({
     phase: 'post-render-finalize',

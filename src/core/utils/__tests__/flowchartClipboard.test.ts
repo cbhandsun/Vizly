@@ -232,7 +232,7 @@ describe('flowchartClipboard', () => {
         ]);
     });
 
-    it('sanitizes clipboard edges that would reintroduce invalid topology', () => {
+    it('sanitizes clipboard edges while preserving valid self-loop topology', () => {
         const result = coerceClipboardData({
             nodes: [
                 { id: 'a', position: { x: 0, y: 0 } },
@@ -247,7 +247,7 @@ describe('flowchartClipboard', () => {
             ],
         });
 
-        expect(result?.edges.map(edge => edge.id)).toEqual(['valid', 'duplicate-id']);
+        expect(result?.edges.map(edge => edge.id)).toEqual(['valid', 'duplicate-id', 'self-loop']);
     });
 
     it('parses JSON safely without throwing on malformed input', () => {

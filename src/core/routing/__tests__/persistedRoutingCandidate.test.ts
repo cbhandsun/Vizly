@@ -32,6 +32,7 @@ const candidate = () => createPersistedRoutingCandidate({
       sharedTrunkSynthesized: false,
       isTreeBus: true,
       overextendedTargetTrunkCorridorReclaimed: false,
+      commercialClearanceConstrainedStaircase: false,
     },
   }],
 });
@@ -100,6 +101,16 @@ describe('routing-only document snapshot', () => {
         }],
       },
     })).toBeNull();
+    expect(parseRoutingOnlyDocumentSnapshot({
+      ...snapshot,
+      candidate: {
+        ...current,
+        patches: [{
+          ...current.patches[0],
+          data: { ...current.patches[0].data, commercialClearanceConstrainedStaircase: 'true' },
+        }],
+      },
+    })).toBeNull();
   });
 
   it('fails closed for oversized, overdeep, and signature-conflicting document input', () => {
@@ -157,6 +168,7 @@ describe('routing-only document snapshot', () => {
         computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
         h: ';50,0;',
         layoutPathLocked: true,
+        commercialClearanceConstrainedStaircase: true,
         autoSource: true,
         autoTarget: true,
         manualHandleSides: ['source'],

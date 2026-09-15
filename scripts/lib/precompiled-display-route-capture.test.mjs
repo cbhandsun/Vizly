@@ -82,6 +82,7 @@ const routed = [{
     computedPath: [{ x: 0, y: 0 }, { x: 50, y: 0 }, { x: 50, y: 50 }, { x: 100, y: 50 }],
     sharedTrunkAware: true,
     overextendedTargetTrunkCorridorReclaimed: true,
+    commercialClearanceConstrainedStaircase: true,
   },
 }];
 
@@ -145,7 +146,7 @@ describe('precompiled display route capture', () => {
     expect(renderPrecompiledDisplayRouteCaptureExpression('safe-preset'))
       .toContain('workerDurationMs: isLayoutCapture ? routing.routeMs : response.workerDurationMs');
     expect(renderPrecompiledDisplayRouteCaptureExpression('safe-preset'))
-      .toContain('response.routingContract.clean === true');
+      .not.toContain('response.routingContract.clean === true');
     expect(renderPrecompiledDisplayRouteCaptureExpression('safe-preset'))
       .toContain('response.routingContract.hardClean === true');
     expect(renderPrecompiledDisplayRouteCaptureExpression('safe-preset'))
@@ -155,6 +156,17 @@ describe('precompiled display route capture', () => {
   it('accepts only compact clean routing contract summaries for precompiled capture', () => {
     const clean = { clean: true, hardClean: true, violationCount: 0, violations: [] };
     expect(isPrecompiledDisplayRoutingContractSummary(clean)).toBe(true);
+    expect(isPrecompiledDisplayRoutingContractSummary({
+      clean: false,
+      hardClean: true,
+      violationCount: 1,
+      violations: [{
+        code: 'render-unsafe-endpoint-stub',
+        phase: 'presentation',
+        severity: 'presentation',
+        count: 1,
+      }],
+    })).toBe(true);
     expect(isPrecompiledDisplayRoutingContractSummary({
       clean: false,
       hardClean: false,
@@ -270,6 +282,7 @@ describe('precompiled display route capture', () => {
         computedPath: [{ x: 0, y: 0 }, { x: 50, y: 0 }, { x: 50, y: 50 }, { x: 100, y: 50 }],
         sharedTrunkAware: true,
         overextendedTargetTrunkCorridorReclaimed: true,
+        commercialClearanceConstrainedStaircase: true,
       },
     }]);
     expect(createPrecompiledDisplayRoutePatches(
@@ -314,6 +327,10 @@ describe('precompiled display route capture', () => {
     expect(createPrecompiledDisplayRoutePatches(source, [{
       ...routed[0],
       data: { ...routed[0].data, overextendedTargetTrunkCorridorReclaimed: 1 },
+    }])).toBeNull();
+    expect(createPrecompiledDisplayRoutePatches(source, [{
+      ...routed[0],
+      data: { ...routed[0].data, commercialClearanceConstrainedStaircase: 'true' },
     }])).toBeNull();
     const missingHandle = { ...routed[0] };
     delete missingHandle.sourceHandle;

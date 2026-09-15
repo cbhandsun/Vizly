@@ -38,6 +38,7 @@ describe('baseReactFlowDocumentRouteCandidate', () => {
         sharedTrunkAware: true,
         sharedTrunkSynthesized: true,
         isTreeBus: true,
+        commercialClearanceConstrainedStaircase: true,
       },
     }];
     const patches = createBaseReactFlowDisplayEdgePatches(sourceEdges, routedEdges);
@@ -72,6 +73,7 @@ describe('baseReactFlowDocumentRouteCandidate', () => {
         sharedTrunkAware: true,
         sharedTrunkSynthesized: true,
         isTreeBus: true,
+        commercialClearanceConstrainedStaircase: true,
       },
     });
     expect(loadBaseReactFlowDocumentRouteCandidate({

@@ -358,8 +358,8 @@ export const commitBaseReactFlowDisplaySnapshot = (
       inputSignature: options.inputSignature,
       inputGeometryDigest: options.inputGeometryDigest,
       outputRouteSignature: snapshot.outputRouteSignature,
-      sourceEdges: options.sourceEdges,
-      displayPatches: options.displayPatches,
+      sourceEdges: snapshot.sourceEdges,
+      displayPatches: snapshot.displayPatches,
     });
   }
   if (options.precompiledLayoutCapture) {
@@ -368,8 +368,8 @@ export const commitBaseReactFlowDisplaySnapshot = (
       inputSignature: options.inputSignature,
       inputGeometryDigest: options.inputGeometryDigest,
       outputRouteSignature: snapshot.outputRouteSignature,
-      sourceEdges: options.sourceEdges,
-      displayPatches: options.displayPatches,
+      sourceEdges: snapshot.sourceEdges,
+      displayPatches: snapshot.displayPatches,
     });
   }
   return snapshot;

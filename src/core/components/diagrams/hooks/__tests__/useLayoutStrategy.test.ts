@@ -437,6 +437,7 @@ describe('prepareLayeredLayoutEdges', () => {
         isTreeBus: true,
         sharedTrunkAware: true,
         sharedTrunkSynthesized: true,
+        commercialClearanceConstrainedStaircase: true,
         useElkRouting: true,
         h: [';1,2;'],
         pathOptions: 'invalid',
@@ -458,6 +459,7 @@ describe('prepareLayeredLayoutEdges', () => {
     expect(data.isTreeBus).toBeUndefined();
     expect(data.sharedTrunkAware).toBeUndefined();
     expect(data.sharedTrunkSynthesized).toBeUndefined();
+    expect(data.commercialClearanceConstrainedStaircase).toBeUndefined();
     expect(data.useElkRouting).toBeUndefined();
     expect(data.h).toBeUndefined();
     expect(data.businessMarker).toBe('preserved');

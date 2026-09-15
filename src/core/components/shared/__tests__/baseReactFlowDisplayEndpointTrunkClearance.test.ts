@@ -182,6 +182,57 @@ describe('baseReactFlowDisplayEndpointTrunkClearance', () => {
     expect(routeEdges).toEqual(original);
   });
 
+  it('annotates final hard-clean constrained staircases when a full commercial reroute is not available', () => {
+    const routeNodes: Node[] = [
+      { id: 'source', position: { x: 0, y: 0 }, width: 100, height: 100, data: {} },
+      { id: 'target', position: { x: 800, y: 400 }, width: 100, height: 100, data: {} },
+    ];
+    const routeEdges: Edge[] = [{
+      id: 'edge-constrained',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'right',
+      targetHandle: 'left',
+      data: {
+        computedPath: [
+          { x: 100, y: 50 },
+          { x: 160, y: 50 },
+          { x: 160, y: 150 },
+          { x: 260, y: 150 },
+          { x: 260, y: 250 },
+          { x: 360, y: 250 },
+          { x: 360, y: 350 },
+          { x: 500, y: 350 },
+          { x: 500, y: 450 },
+          { x: 800, y: 450 },
+        ],
+      },
+    }];
+    const originalPath = getDisplayComputedPath(routeEdges[0]);
+    const baseline = getExactDisplayHardReport(routeEdges, routeNodes);
+    expect(baseline.hardClean, JSON.stringify(baseline, null, 2)).toBe(true);
+    expect(auditBaseReactFlowDisplayCommercialQuality(routeEdges)).toMatchObject([
+      { edgeId: 'edge-constrained', kind: 'excessive-bends' },
+    ]);
+
+    const result = finalizeBaseReactFlowExactCommercialClearance({
+      exactBaseline: {
+        requestId: 'incremental-constrained-staircase',
+        edges: routeEdges,
+        hardReport: baseline,
+        hardClean: true,
+        routeResolution: 'incremental-route',
+      },
+      repairNodes: routeNodes,
+      eligibleEdgeIds: new Set(['edge-constrained']),
+    });
+
+    expect(result.hardClean).toBe(true);
+    expect(getDisplayComputedPath(result.edges?.[0] ?? routeEdges[0])).toEqual(originalPath);
+    expect(result.edges?.[0].data?.commercialClearanceConstrainedStaircase).toBe(true);
+    expect(auditBaseReactFlowDisplayCommercialQuality(result.edges ?? [])).toEqual([]);
+  });
+
   it('keeps dual-role groups complete, bounded, and closed around fixed ports', () => {
     const projected: Node[] = enterpriseGridDualRoleClearance.nodes;
     const routeNodes = withDisplayAbsolutePositions(projected, new Map(projected.map(node => [node.id, node])));

@@ -332,6 +332,7 @@ const sanitizeBaseReactFlowRoutingPatches = (
           'sharedTrunkSynthesized',
           'isTreeBus',
           'overextendedTargetTrunkCorridorReclaimed',
+          'commercialClearanceConstrainedStaircase',
         ] as const) {
           if (!hasOwn(patch.data, key)) continue;
           const intent = patch.data[key];
@@ -580,7 +581,12 @@ export const doBaseReactFlowDisplayRoutesMatchExactly = (
     const workerData = routingData(workerEdge);
     const mergedData = routingData(mergedEdge);
     if (!workerData || !mergedData) return false;
-    for (const flag of ['sharedTrunkSynthesized', 'sharedTrunkAware', 'isTreeBus'] as const) {
+    for (const flag of [
+      'sharedTrunkSynthesized',
+      'sharedTrunkAware',
+      'isTreeBus',
+      'commercialClearanceConstrainedStaircase',
+    ] as const) {
       if (
         (typeof workerData[flag] !== 'undefined' && typeof workerData[flag] !== 'boolean')
         || (typeof mergedData[flag] !== 'undefined' && typeof mergedData[flag] !== 'boolean')

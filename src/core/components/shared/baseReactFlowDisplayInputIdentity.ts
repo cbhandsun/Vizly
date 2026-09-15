@@ -180,6 +180,7 @@ export const visitBaseReactFlowDisplayInputIdentity = (
     feed(data.isTreeBus);
     feed(data.sharedTrunkAware);
     feed(data.sharedTrunkSynthesized);
+    feed(data.commercialClearanceConstrainedStaircase);
     const treeRouting = (data.treeRouting && typeof data.treeRouting === 'object')
       ? data.treeRouting as Record<string, unknown>
       : {};

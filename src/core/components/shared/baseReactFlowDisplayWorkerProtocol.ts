@@ -257,6 +257,7 @@ const hasSafeDisplayEdgePaths = (
     'sharedTrunkAware',
     'isTreeBus',
     'overextendedTargetTrunkCorridorReclaimed',
+    'commercialClearanceConstrainedStaircase',
   ] as const) {
     if (typeof value[flag] !== 'undefined' && typeof value[flag] !== 'boolean') return false;
   }

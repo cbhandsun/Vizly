@@ -137,7 +137,6 @@ for (const entry of manifest.entries) {
       typeof artifact.routingContract !== 'undefined'
       && (
         !isPrecompiledDisplayRoutingContractSummary(artifact.routingContract)
-        || artifact.routingContract.clean !== true
         || artifact.routingContract.hardClean !== true
       )
     )

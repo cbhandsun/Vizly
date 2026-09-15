@@ -28,6 +28,7 @@ const ROUTING_INTENT_KEYS = [
   'sharedTrunkSynthesized',
   'isTreeBus',
   'overextendedTargetTrunkCorridorReclaimed',
+  'commercialClearanceConstrainedStaircase',
 ] as const;
 const DATA_KEYS = new Set([
   'computedPath',

@@ -34,6 +34,10 @@ import { repairBoundedReverseParallelOverlaps } from './baseReactFlowDisplayReve
 import { commitDisplayEdgesForRenderMode } from './baseReactFlowDisplayRenderPipeline';
 import { startDisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
 import type { BaseReactFlowDisplayEdgesArgs } from './baseReactFlowDisplayFullRouteTypes';
+import {
+  repairPostRenderEndpointOrthogonalPaths,
+  repairPostRenderNearParallelOverlaps,
+} from './baseReactFlowDisplayFullRoutePostRenderPhase';
 
 /**
  * Closes the final display contract after the full-route seed has completed.
@@ -183,7 +187,7 @@ export const closeBaseReactFlowFinalDisplayRoute = ({
         skipLoopShortcut: true,
       },
     );
-  const committedRenderCandidate = commitDisplayEdgesForRenderMode({
+  const committedRenderEdges = commitDisplayEdgesForRenderMode({
     finalQualityEdges: postSafetyCommercialEdges,
     rawEdges: args.edges,
     enableSmartEdges: args.enableSmartEdges,
@@ -192,6 +196,15 @@ export const closeBaseReactFlowFinalDisplayRoute = ({
     inputSignature,
     nodes: repairNodes,
   });
+  const orthogonalCommittedRenderEdges = repairPostRenderEndpointOrthogonalPaths(
+    committedRenderEdges,
+    repairNodes,
+    candidate => evaluationSession.hardReport(candidate).hardClean,
+  );
+  const committedRenderCandidate = repairPostRenderNearParallelOverlaps(
+    orthogonalCommittedRenderEdges,
+    candidate => evaluationSession.hardReport(candidate).hardClean,
+  );
   const committedRenderReport = evaluationSession.hardReport(committedRenderCandidate);
   const committedRenderUnsafeStubs = evaluationSession.unsafeEndpointStubs(
     committedRenderCandidate,

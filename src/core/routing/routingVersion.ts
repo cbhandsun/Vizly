@@ -1,6 +1,6 @@
-// Reevaluate generated route groups after joint seed selection replaces
-// unconditional acceptance of independent clearance reconstruction.
-export const EDGE_ROUTING_CACHE_VERSION = '21';
+// Reevaluate generated route groups after final constrained-staircase intent
+// becomes part of commit-capable routing metadata.
+export const EDGE_ROUTING_CACHE_VERSION = '22';
 
 /**
  * Version of the renderer-facing commercial quality contract. Keep this

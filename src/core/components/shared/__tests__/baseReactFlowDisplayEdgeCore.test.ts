@@ -927,7 +927,7 @@ describe('baseReactFlowDisplayEdgeCore', () => {
       ...valid[0],
       sourceHandle: { unsafe: true } as unknown as string,
     }])).toBeNull();
-    for (const intent of ['sharedTrunkSynthesized', 'sharedTrunkAware', 'isTreeBus'] as const) {
+    for (const intent of ['sharedTrunkSynthesized', 'sharedTrunkAware', 'isTreeBus', 'commercialClearanceConstrainedStaircase'] as const) {
       expect(computeBaseReactFlowDisplayOutputRouteSignature([{
         ...valid[0],
         data: { ...(valid[0].data || {}), [intent]: true },

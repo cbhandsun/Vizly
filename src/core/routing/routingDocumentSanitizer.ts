@@ -18,6 +18,7 @@ const ROUTING_OWNED_EDGE_DATA_KEYS = [
   'sharedTrunkSynthesized',
   'isTreeBus',
   'overextendedTargetTrunkCorridorReclaimed',
+  'commercialClearanceConstrainedStaircase',
   '__baseDisplayFinalizedSignature',
 ] as const;
 

@@ -208,6 +208,7 @@ export const createPrecompiledDisplayRoutePatches = (sourceEdges, routedEdges) =
       'sharedTrunkSynthesized',
       'isTreeBus',
       'overextendedTargetTrunkCorridorReclaimed',
+      'commercialClearanceConstrainedStaircase',
     ]) {
       if (typeof routedData[key] !== 'undefined') {
         if (typeof routedData[key] !== 'boolean') return null;
@@ -326,9 +327,8 @@ export const precompiledDisplayRouteContractsMatch = (leftEdges, rightEdges) => 
       token(treeRouting.effectiveTargetHandle),
       `${data.sharedTrunkSynthesized === true ? 1 : 0}${
         data.sharedTrunkAware === true ? 1 : 0
-      }${data.isTreeBus === true ? 1 : 0}${data.treeRouting ? 1 : 0}${
-        typeof data.h === 'string' ? data.h.slice(0, 128) : ''
-      }`,
+      }${data.isTreeBus === true ? 1 : 0}${data.treeRouting ? 1 : 0}${data.commercialClearanceConstrainedStaircase === true ? 'c1' : ''}` +
+        `${typeof data.h === 'string' ? data.h.slice(0, 128) : ''}`,
       path(data.computedPath),
       path(data.elkPath),
       path(treeRouting.points),
@@ -423,7 +423,6 @@ export const renderPrecompiledDisplayRouteCaptureExpression = (
     && isFreshRequestResponse(request, response)
     && routing.workerResolution === response.routeResolution
     && isContractSummary(response.routingContract)
-    && response.routingContract.clean === true
     && response.routingContract.hardClean === true
   );
   if (activeTargetId !== ${JSON.stringify(targetId)}

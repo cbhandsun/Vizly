@@ -24,6 +24,7 @@ export const clearBaseReactFlowLayoutEdgeRoutingData = (
   sharedTrunkAware: undefined,
   sharedTrunkSynthesized: undefined,
   overextendedTargetTrunkCorridorReclaimed: undefined,
+  commercialClearanceConstrainedStaircase: undefined,
   useElkRouting: undefined,
   layoutRoutingCandidate: undefined,
   h: undefined,

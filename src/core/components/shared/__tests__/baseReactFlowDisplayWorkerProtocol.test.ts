@@ -59,7 +59,9 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
   it('keeps document router intent through the Worker boundary without widening browser cache authority', () => {
     const candidate = { ...validRepairRequest.edges[0], data: {
       computedPath: [{ x: 100, y: 30 }, { x: 300, y: 30 }],
-      sharedTrunkSynthesized: true, businessMetadata: 'untrusted',
+      sharedTrunkSynthesized: true,
+      commercialClearanceConstrainedStaircase: true,
+      businessMetadata: 'untrusted',
     } };
     for (const candidateSource of ['document', 'persistent']) {
       const parsed = parseDisplayEdgesWorkerRequest({
@@ -73,10 +75,12 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       expect(resolved.source).toBe(candidateSource);
       expect(resolved.edges?.[0].data?.computedPath).toEqual(candidate.data.computedPath);
       expect(resolved.edges?.[0].data?.sharedTrunkSynthesized).toBe(candidateSource === 'document' ? true : undefined);
+      expect(resolved.edges?.[0].data?.commercialClearanceConstrainedStaircase).toBe(candidateSource === 'document' ? true : undefined);
       expect(resolved.edges?.[0].data).not.toHaveProperty('businessMetadata');
       if (parsed.operation === 'validate-or-route') {
         for (const candidatePatches of [[], [{ ...candidate, source: 'other' }],
           [{ ...candidate, data: { sharedTrunkSynthesized: 'true' } }],
+          [{ ...candidate, data: { commercialClearanceConstrainedStaircase: 'true' } }],
           [{ ...candidate, data: { computedPath: [{ x: Infinity, y: 0 }] } }]]) {
           const rejected = resolveDisplayWorkerCandidate({ ...parsed, candidatePatches });
           if (candidateSource === 'document') expect(rejected.edges).toBeNull();

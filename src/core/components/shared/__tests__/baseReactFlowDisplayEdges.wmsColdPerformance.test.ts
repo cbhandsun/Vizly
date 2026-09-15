@@ -233,11 +233,11 @@ describe('baseReactFlowDisplayEdges WMS cold performance', () => {
     // commercial clearance, deterministic work and time ceilings above pass
     // before the route fingerprint is compared.
     expect(paths.find(route => route.id === 'e-op-heat')?.path).toEqual([
-      { x: 3664, y: 850 }, { x: 3664, y: 1987 }, { x: 4326, y: 1987 },
-      { x: 4326, y: 1809 }, { x: 4433.4, y: 1809 },
+      { x: 3603.6, y: 849.5 }, { x: 3603.6, y: 1722.5 },
+      { x: 4498.4, y: 1722.5 }, { x: 4498.4, y: 1778.5 },
     ]);
     // Unified trunk precision and passage orientation change the deterministic
     // geometry. All quality, work and 25-second ceilings above remain unchanged.
-    expect(finalOutputRouteSignature).toBe('route-v2:44:199:ea0daec1edfc1d0f');
+    expect(finalOutputRouteSignature).toBe('route-v2:44:159:648c58ff6f51a751');
   }, 60_000);
 });
