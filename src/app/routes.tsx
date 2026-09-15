@@ -44,8 +44,24 @@ const UnifiedDesignerTestPage = import.meta.env.DEV
   ? withAntdRoute(() => import('@/pages/UnifiedDesignerTestPage'))
   : null;
 
+const RouteLoadingFallback: React.FC<{ label: string }> = ({ label }) => (
+  <div
+    role="status"
+    aria-live="polite"
+    className="flex flex-col items-center justify-center w-full h-full min-h-[280px] gap-3 text-slate-500 dark:text-slate-400 select-none"
+  >
+    <div
+      className="w-7 h-7 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin"
+      style={{ borderTopColor: 'transparent' }}
+    />
+    <span className="text-xs font-medium tracking-wider text-slate-400 dark:text-slate-500">
+      {label}
+    </span>
+  </div>
+);
+
 const renderRoute = (fallback: React.ReactNode, RouteComponent: React.ComponentType) => (
-  <Suspense fallback={typeof fallback === 'string' ? <div style={{ padding: 16 }}>{fallback}</div> : fallback}>
+  <Suspense fallback={typeof fallback === 'string' ? <RouteLoadingFallback label={fallback} /> : fallback}>
     <RouteComponent />
   </Suspense>
 );

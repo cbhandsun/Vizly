@@ -22,6 +22,7 @@ describe('resolveAppRouteTarget', () => {
     ['/docs', 'docs'],
     ['/docs/keyboard', 'docs'],
     ['/warehouse-3d', 'warehouse-3d'],
+    ['/3d', 'warehouse-3d'],
     ['/storage-config', 'storage-config'],
     ['/shared/token', 'shared'],
     ['/diagram', 'diagram'],

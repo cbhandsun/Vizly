@@ -30,7 +30,7 @@ export const resolveAppRouteTarget = ({
   if (enableDevRoutes && testMode === 'colors') return 'theme-colors';
   if (enableDevRoutes && testMode === 'sidebyside') return 'theme-side-by-side';
   if (matchesRouteSegment(path, '/docs') || testMode === 'docs') return 'docs';
-  if (matchesRouteSegment(path, '/warehouse-3d') || testMode === '3d') return 'warehouse-3d';
+  if (matchesRouteSegment(path, '/warehouse-3d') || matchesRouteSegment(path, '/3d') || testMode === '3d') return 'warehouse-3d';
   if (matchesRouteSegment(path, '/storage-config')) return 'storage-config';
   if (matchesRouteSegment(path, '/shared')) return 'shared';
 

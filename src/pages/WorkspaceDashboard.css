@@ -66,6 +66,7 @@ html[data-theme='dark'] .workspace-dashboard {
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--vz-border);
   z-index: 100;
+  position: relative;
 }
 
 .workspace-header-brand {
@@ -96,10 +97,13 @@ html[data-theme='dark'] .workspace-dashboard {
 }
 
 .workspace-header-search-container {
-  flex: 1;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 440px;
   display: flex;
   justify-content: center;
-  max-width: 400px;
 }
 
 /* Spotlight-style Search Restyled */
@@ -600,7 +604,7 @@ html[data-theme='dark'] .view-toggle-btn.active {
   cursor: pointer;
   overflow: hidden;
   position: relative;
-  animation: cardBlurIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation: cardBlurIn 0.38s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
 .diagram-card-primary-action,
@@ -640,8 +644,8 @@ html[data-theme='dark'] .view-toggle-btn.active {
 @keyframes cardBlurIn {
   from {
     opacity: 0;
-    transform: translateY(16px) scale(0.97);
-    filter: blur(6px);
+    transform: translateY(10px) scale(0.98);
+    filter: blur(3px);
   }
   to {
     opacity: 1;
@@ -697,8 +701,8 @@ html[data-theme='dark'] .diagram-card:hover {
 
 .local-diagram-cover-image {
   object-fit: contain;
-  padding: 8px;
-  background: color-mix(in srgb, var(--vz-surface-solid) 94%, var(--vz-brand-from));
+  padding: 6px;
+  background: #ffffff;
 }
 
 .local-diagram-cover-empty {
