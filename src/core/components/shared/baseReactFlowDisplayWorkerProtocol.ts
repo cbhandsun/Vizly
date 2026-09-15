@@ -60,7 +60,7 @@ const MAX_TOTAL_DATA_VALUES = 1_000_000;
 const MAX_STRING_LENGTH = 20_000;
 const INPUT_SIGNATURE_PATTERN = /^\d{1,10}$/;
 const GEOMETRY_DIGEST_PATTERN = /^geometry-v1:[0-9a-f]{32}$/;
-const OUTPUT_ROUTE_SIGNATURE_PATTERN = /^route-v2:\d{1,3}:\d{1,6}:[0-9a-f]{16}$/;
+export const OUTPUT_ROUTE_SIGNATURE_PATTERN = /^route-v2:\d{1,3}:\d{1,6}:[0-9a-f]{16}$/;
 
 const DISPLAY_EDGE_KEYS = new Set([
   'id',
@@ -174,7 +174,7 @@ export type DisplayEdgesWorkerValidatedRequest =
   | DisplayEdgesWorkerValidatedIncrementalRequest
   | DisplayEdgesWorkerValidatedRepairRequest;
 
-const isRecord = (value: unknown): value is Record<string, unknown> => {
+export const isRecord = (value: unknown): value is Record<string, unknown> => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const prototype = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
@@ -523,7 +523,7 @@ export const parseDisplayEdgesWorkerRequest = (
   return { ...routeRequest, operation: 'route' };
 };
 
-const hasFinalDisplayWorkerResponseMetadata = (value: Record<string, unknown>): boolean => (
+export const hasFinalDisplayWorkerResponseMetadata = (value: Record<string, unknown>): boolean => (
   typeof value.hardClean !== 'undefined'
   || typeof value.hardReport !== 'undefined'
   || typeof value.routingContract !== 'undefined'
@@ -666,6 +666,7 @@ export const parseDisplayEdgesWorkerResponse = (
     ...workerTiming,
   };
 };
+
 
 /**
  * Main-thread commit boundary. Progress, error, and rejected final responses

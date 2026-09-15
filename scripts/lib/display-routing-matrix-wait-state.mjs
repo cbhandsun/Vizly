@@ -247,6 +247,7 @@ export const summarizeDisplayRoutingWaitState = (
       layoutTransactionStatus: token(routing.layoutTransactionStatus),
       layoutTransactionAttemptCount: integer(routing.layoutTransactionAttemptCount),
       layoutTransactionErrorCode: token(routing.layoutTransactionErrorCode),
+      workerInvalidResponseReason: token(routing.workerInvalidResponseReason),
       laneRankDecision: projectedLaneRankDecision,
       phaseProgressTrace: progressTraces.map(projectTrace),
     },

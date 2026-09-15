@@ -27,4 +27,12 @@ export const DISPLAY_ROUTING_MATRIX_PRESET_TARGETS = Object.freeze([
       'tms-delivery', 'performance-analysis', 'bi-report',
     ])]),
   }),
+  Object.freeze({
+    presetId: 'enterprise-architecture-v2',
+    sourcePath: 'src/data/standardized/ArchitectureStandardData.json',
+    semanticChains: Object.freeze([Object.freeze([
+      'ch-offline', 'fe-store', 'mid-trade', 'mid-pay', 'mid-oms', 'be-logistics-dispatch',
+      'be-logistics-warehouse', 'be-logistics-transport',
+    ])]),
+  }),
 ]);

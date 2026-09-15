@@ -628,7 +628,7 @@ export function useLayoutStrategy({
                             legacyFallback.isLayoutRoutingHardQualityRejection(error),
                         );
                         const canRetryWithDomainCompoundElk = shouldRetryRejectedDomainLayoutWithCompoundElk({
-                            preserveOrderedLanes: isDomainLane || preserveRequestedStandardLayout,
+                            preserveOrderedLanes: isDomainLane,
                             usedDomainElk,
                             usedDomainCompoundElk,
                             canUseFlatElkFallback,

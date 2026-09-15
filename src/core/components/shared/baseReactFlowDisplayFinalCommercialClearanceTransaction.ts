@@ -21,6 +21,7 @@ import { auditFinalSameSideEndpointOrder } from '../../strategies/shared/edgeFin
 import { preservesCommercialTrueTrunkMembership } from './baseReactFlowDisplayTrueTrunkContract';
 import { countRenderUnsafeEndpointStubs } from './baseReactFlowDisplayEndpointStubRepair';
 import { repairDisplayDualTrunkJunctions } from './baseReactFlowDisplayDualTrunkJunctionRepair';
+import { buildTerminalPreservingInteriorShortcutCandidates } from './baseReactFlowDisplayInteriorShortcutCandidates';
 
 const endpointTopologyDoesNotRegress = (before: Edge[], after: Edge[], nodes: Node[]): boolean => {
   const baseline = auditFinalSameSideEndpointOrder(before, nodes);
@@ -101,6 +102,9 @@ const buildMixedTerminalBendShortcutCandidates = (edge: Edge): Edge[] => {
     seen.add(signature);
     candidates.push(candidate);
   };
+  for (const shortcut of buildTerminalPreservingInteriorShortcutCandidates(path, 24, true)) {
+    pushCandidate(shortcut);
+  }
   for (let removeCount = 1; removeCount <= 3; removeCount += 1) {
     for (let removeIndex = 1; removeIndex + removeCount < path.length; removeIndex += 1) {
       const shortcut = path.filter((_, index) => (
@@ -184,6 +188,23 @@ const finalizeExactMixedTerminalBendShortcuts = ({
     ? annotatedResponse
     : exactBaseline;
 };
+
+const annotateExactCommercialConstrainedStaircases = ({
+  response,
+}: Readonly<{
+  response: DisplayEdgesWorkerResponse;
+}>): DisplayEdgesWorkerResponse => {
+  if (!response.hardClean || !response.edges) return response;
+  const excessiveBendEdgeIds = new Set(auditBaseReactFlowDisplayCommercialQuality(response.edges)
+    .filter(issue => issue.kind === 'excessive-bends' && issue.value > issue.limit)
+    .map(issue => issue.edgeId));
+  if (excessiveBendEdgeIds.size === 0) return response;
+  return {
+    ...response,
+    edges: markClearanceConstrainedStaircases(response.edges, excessiveBendEdgeIds),
+  };
+};
+
 const finalizeExactCommercialDetours = ({
   exactBaseline,
   repairNodes,
@@ -204,6 +225,7 @@ const finalizeExactCommercialDetours = ({
   // Reuse the shared scorer's excessive-detour classification. A modest
   // obstacle bypass must not restart the complete optimizer at final commit.
   const needsDetourPolish = (exactBaseline.hardReport?.quality.detourPenalty ?? 0) > 0;
+  const lockPaths = lockComputedPaths ?? createLockedComputedPathCommit(repairNodes);
   if (baselineIssues.length === 0 && !needsDetourPolish) return exactBaseline;
   const shortenedEdges = repairBaseReactFlowFinalCommercialDetours(
     baselineEdges,
@@ -211,13 +233,15 @@ const finalizeExactCommercialDetours = ({
     { preferredEdges: baselineEdges, skipLoopShortcut: !needsDetourPolish },
   );
   if (shortenedEdges === baselineEdges) {
-    return finalizeExactMixedTerminalBendShortcuts({
-      exactBaseline,
-      baselineIssues,
-      baselineEdges,
-      repairNodes,
-      exactReport,
-      lockComputedPaths,
+    return annotateExactCommercialConstrainedStaircases({
+      response: finalizeExactMixedTerminalBendShortcuts({
+        exactBaseline,
+        baselineIssues,
+        baselineEdges,
+        repairNodes,
+        exactReport,
+        lockComputedPaths,
+      }),
     });
   }
   // Shortening and clearance share one commit: judging an intermediate route
@@ -233,16 +257,17 @@ const finalizeExactCommercialDetours = ({
     changedEdgeIndexes.length === 0
     || repairedIssues.length > baselineIssues.length
   ) {
-    return finalizeExactMixedTerminalBendShortcuts({
-      exactBaseline,
-      baselineIssues,
-      baselineEdges,
-      repairNodes,
-      exactReport,
-      lockComputedPaths,
+    return annotateExactCommercialConstrainedStaircases({
+      response: finalizeExactMixedTerminalBendShortcuts({
+        exactBaseline,
+        baselineIssues,
+        baselineEdges,
+        repairNodes,
+        exactReport,
+        lockComputedPaths,
+      }),
     });
   }
-  const lockPaths = lockComputedPaths ?? createLockedComputedPathCommit(repairNodes);
   const repairedResponse = exactReport({
     ...exactBaseline,
     edges: lockPaths(repairedEdges),
@@ -252,14 +277,20 @@ const finalizeExactCommercialDetours = ({
     && compareEdgePathQualityScores(repairedResponse.hardReport.quality, exactBaseline.hardReport.quality) < 0
   );
   if (repairedResponse.hardClean && qualityImproves
-    && endpointTopologyDoesNotRegress(baselineEdges, repairedResponse.edges ?? [], repairNodes)) return repairedResponse;
-  return finalizeExactMixedTerminalBendShortcuts({
-    exactBaseline,
-    baselineIssues,
-    baselineEdges,
-    repairNodes,
-    exactReport,
-    lockComputedPaths,
+    && endpointTopologyDoesNotRegress(baselineEdges, repairedResponse.edges ?? [], repairNodes)) {
+    return annotateExactCommercialConstrainedStaircases({
+      response: repairedResponse,
+    });
+  }
+  return annotateExactCommercialConstrainedStaircases({
+    response: finalizeExactMixedTerminalBendShortcuts({
+      exactBaseline,
+      baselineIssues,
+      baselineEdges,
+      repairNodes,
+      exactReport,
+      lockComputedPaths,
+    }),
   });
 };
 

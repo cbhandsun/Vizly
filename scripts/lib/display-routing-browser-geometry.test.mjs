@@ -110,6 +110,12 @@ describe('display routing browser geometry', () => {
       hardAudit: { ...cleanHardAudit, hairpinEdgeIds: ['edge'] },
       expectedPathCount: 2,
     })).toBe(false);
+    expect(displayRoutingFinalSvgGeometryIsClean({
+      audit: cleanAudit,
+      commercialAudit: cleanAudit,
+      hardAudit: { ...cleanHardAudit, excessiveBendEdgeIds: ['edge'] },
+      expectedPathCount: 2,
+    })).toBe(true);
   });
 
   it('audits complete final SVG paths for orthogonal terminals and bounded defects', () => {
@@ -179,6 +185,10 @@ describe('display routing browser geometry', () => {
     });
     expect(readRenderedDisplayEdgeHardGeometryAudit(
       [{ ...edge, data: { sharedTrunkSynthesized: true } }],
+      nodes,
+    )).toMatchObject({ excessiveBendEdgeIds: [] });
+    expect(readRenderedDisplayEdgeHardGeometryAudit(
+      [{ ...edge, data: { commercialClearanceConstrainedStaircase: true } }],
       nodes,
     )).toMatchObject({ excessiveBendEdgeIds: [] });
 

@@ -18,6 +18,7 @@ import { getExactDisplayHardReport } from '../baseReactFlowDisplayWorkerResponse
 import { withDisplayAbsolutePositions } from '../baseReactFlowDisplayEdgeCore';
 import { collectDisplayEndpointRoleSlideGroups, buildDisplayEndpointRoleSlideCandidates } from '../baseReactFlowDisplayEndpointRoleSlide';
 import { withDisplayComputedPath } from '../baseReactFlowDisplayGeometry';
+import { auditBaseReactFlowDisplayCommercialQuality } from '../baseReactFlowDisplayCommercialQuality';
 import { auditFinalSameSideEndpointOrder } from '../../../strategies/shared/edgeFinalSameSideEndpointOrderRepair';
 import enterpriseGridDualRoleClearance from './fixtures/enterpriseGridDualRoleClearance.json';
 
@@ -123,6 +124,62 @@ describe('baseReactFlowDisplayEndpointTrunkClearance', () => {
     expect(getExactDisplayHardReport(reversed, routeNodes).hardClean).toBe(true);
     expect(new Map(reversed.map(edge => [edge.id, getDisplayComputedPath(edge)])))
       .toEqual(new Map(result.edges.map(edge => [edge.id, getDisplayComputedPath(edge)])));
+  });
+
+  it('collapses a long terminal-preserving return stair before accepting exact commercial closure', () => {
+    const routeNodes: Node[] = [
+      { id: 'source', position: { x: 658.5, y: 4672 }, width: 100, height: 60, data: {} },
+      { id: 'target', position: { x: 228.5, y: 940 }, width: 100, height: 60, data: {} },
+    ];
+    const routeEdges: Edge[] = [{
+      id: 'edge-infra-1',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'top',
+      targetHandle: 'top',
+      data: {
+        manualHandleSides: ['source', 'target'],
+        computedPath: [
+          { x: 708.5, y: 4672 },
+          { x: 708.5, y: 4616 },
+          { x: 516, y: 4616 },
+          { x: 516, y: 2342 },
+          { x: 158, y: 2342 },
+          { x: 158, y: 2150 },
+          { x: 516, y: 2150 },
+          { x: 516, y: 884 },
+          { x: 278.5, y: 884 },
+          { x: 278.5, y: 940 },
+        ],
+      },
+    }];
+    const original = structuredClone(routeEdges);
+    const baseline = getExactDisplayHardReport(routeEdges, routeNodes);
+    expect(baseline.hardClean, JSON.stringify(baseline, null, 2)).toBe(true);
+    expect(auditBaseReactFlowDisplayCommercialQuality(routeEdges)).toMatchObject([
+      { edgeId: 'edge-infra-1', kind: 'excessive-bends' },
+    ]);
+
+    const result = finalizeBaseReactFlowExactCommercialClearance({
+      exactBaseline: {
+        requestId: 'long-return-stair',
+        edges: routeEdges,
+        hardReport: baseline,
+        hardClean: true,
+        routeResolution: 'full-route',
+      },
+      repairNodes: routeNodes,
+    });
+
+    expect(result.hardClean).toBe(true);
+    expect(auditBaseReactFlowDisplayCommercialQuality(result.edges ?? [])).toEqual([]);
+    expect(getDisplayComputedPath(result.edges?.[0] ?? routeEdges[0])).toEqual([
+      { x: 708.5, y: 4672 },
+      { x: 708.5, y: 884 },
+      { x: 278.5, y: 884 },
+      { x: 278.5, y: 940 },
+    ]);
+    expect(routeEdges).toEqual(original);
   });
 
   it('keeps dual-role groups complete, bounded, and closed around fixed ports', () => {

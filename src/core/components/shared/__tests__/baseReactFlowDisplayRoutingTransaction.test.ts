@@ -37,6 +37,41 @@ describe('baseReactFlowDisplayRoutingTransaction', () => {
     expect(source[0].data?.isTreeBus).toBe(true);
   });
 
+  it('creates trusted patches by stable edge identity when routed edges are reordered', () => {
+    const source: Edge[] = [
+      { id: 'edge-a', source: 'a', target: 'b', data: { computedPath: [{ x: 0, y: 0 }, { x: 10, y: 0 }] } },
+      { id: 'edge-b', source: 'b', target: 'c', data: { computedPath: [{ x: 0, y: 10 }, { x: 10, y: 10 }] } },
+    ];
+    const routed: Edge[] = [
+      { ...source[1], data: { computedPath: [{ x: 0, y: 20 }, { x: 40, y: 20 }] } },
+      { ...source[0], data: { computedPath: [{ x: 0, y: 0 }, { x: 40, y: 0 }] } },
+    ];
+
+    const patches = createBaseReactFlowDisplayEdgePatches(source, routed);
+    const replayed = patches ? mergeBaseReactFlowDisplayEdgePatches(source, patches) : null;
+
+    expect(patches?.map(patch => patch.id)).toEqual(['edge-a', 'edge-b']);
+    expect(replayed).toEqual([routed[1], routed[0]]);
+    expect(computeBaseReactFlowDisplayOutputRouteSignature(replayed ?? []))
+      .toBe(computeBaseReactFlowDisplayOutputRouteSignature([routed[1], routed[0]]));
+  });
+
+  it('rejects reordered routed edges when stable identities are duplicated or retargeted', () => {
+    const source: Edge[] = [
+      { id: 'edge-a', source: 'a', target: 'b' },
+      { id: 'edge-b', source: 'b', target: 'c' },
+    ];
+
+    expect(createBaseReactFlowDisplayEdgePatches(source, [
+      { id: 'edge-a', source: 'a', target: 'b' },
+      { id: 'edge-a', source: 'a', target: 'b' },
+    ])).toBeNull();
+    expect(createBaseReactFlowDisplayEdgePatches(source, [
+      { id: 'edge-b', source: 'b', target: 'changed' },
+      { id: 'edge-a', source: 'a', target: 'b' },
+    ])).toBeNull();
+  });
+
   it('uses projected route and repair baselines without overwriting latest metadata', () => {
     const longLabel = `latest-${'x'.repeat(25_000)}`;
     const deeplyNestedMetadata = {

@@ -77,12 +77,19 @@ export const createBaseReactFlowDisplayEdgePatches = (
   routedEdges: Edge[],
 ): RoutingPatch[] | null => {
   if (sourceEdges.length !== routedEdges.length) return null;
+  const routedById = new Map<string, Edge>();
+  for (const routedEdge of routedEdges) {
+    if (typeof routedEdge?.id !== 'string' || routedById.has(routedEdge.id)) return null;
+    routedById.set(routedEdge.id, routedEdge);
+  }
   const patches: RoutingPatch[] = [];
-  for (let index = 0; index < routedEdges.length; index += 1) {
-    const routedEdge = routedEdges[index];
-    const sourceEdge = sourceEdges[index];
+  const seenSourceIds = new Set<string>();
+  for (const sourceEdge of sourceEdges) {
+    if (typeof sourceEdge?.id !== 'string' || seenSourceIds.has(sourceEdge.id)) return null;
+    seenSourceIds.add(sourceEdge.id);
+    const routedEdge = routedById.get(sourceEdge.id);
     if (
-      routedEdge?.id !== sourceEdge?.id
+      !routedEdge
       || routedEdge.source !== sourceEdge.source
       || routedEdge.target !== sourceEdge.target
     ) return null;

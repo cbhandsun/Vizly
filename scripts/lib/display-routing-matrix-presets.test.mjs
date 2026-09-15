@@ -26,12 +26,13 @@ describe('display routing matrix presets', () => {
     expect(() => assertDisplayRoutingLaneDimensions('LR', lanes)).toThrow();
   });
 
-  it('includes Logistics alongside both WMS fixtures and TMS', () => {
+  it('includes Logistics, WMS, TMS, and the enterprise architecture large standard fixture', () => {
     expect(DISPLAY_ROUTING_MATRIX_PRESET_TARGETS.map(target => target.presetId)).toEqual([
       'logistics-architecture-v1',
       'wms-demand-allocation-strategy-v2',
       'wms-process-flow-v1',
       'tms-architecture-v1',
+      'enterprise-architecture-v2',
     ]);
   });
 

@@ -1,9 +1,9 @@
 import type { Edge, Node } from '@xyflow/react';
-import { beginRoutingRequestObservation } from './baseReactFlowRoutingObservation';
 import type { MutableRefObject } from 'react';
 import type { RoutingPatch } from '../../routing/routingPatch';
+import { beginRoutingRequestObservation } from './baseReactFlowRoutingObservation';
 import {
-  parseDisplayEdgesWorkerCommitResponse,
+  parseDisplayEdgesWorkerResponse,
   readDisplayEdgesWorkerRequestId,
   type DisplayEdgesWorkerResponse,
   type DisplayEdgesWorkerRequest,
@@ -12,12 +12,9 @@ import {
   type DisplayRoutingFallbackLevel,
   type DisplayQualityMode,
 } from './baseReactFlowDisplayWorkerProtocol';
+import { diagnoseDisplayEdgesWorkerResponseProtocolFailure } from './baseReactFlowDisplayWorkerProtocolDiagnostics';
 import type { DisplayRoutingPhaseTrace } from './baseReactFlowDisplayRoutingTrace';
-import {
-  createDisplayRoutingIdentity,
-  type RoutingIdentity,
-  type RoutingWorkerSessionRef,
-} from './baseReactFlowDisplayRoutingSession';
+import { createDisplayRoutingIdentity, type RoutingIdentity, type RoutingWorkerSessionRef } from './baseReactFlowDisplayRoutingSession';
 import { rememberDisplayWorkerSession } from './baseReactFlowDisplayWorkerSessionClient';
 import {
   appendDisplayRoutingBoundedCandidate,
@@ -360,13 +357,22 @@ export const requestBaseReactFlowDisplayEdgesWorker = ({
     const handleMessage = (event: MessageEvent<unknown>) => {
       const responseRequestId = readDisplayEdgesWorkerRequestId(event.data);
       if (responseRequestId !== request.requestId) return;
-      const response = parseDisplayEdgesWorkerCommitResponse(event.data, request.requestId);
+      const parsedResponse = parseDisplayEdgesWorkerResponse(event.data, request.requestId);
+      const response = parsedResponse && (
+        parsedResponse.hardClean !== true || parsedResponse.commitReceipt
+      )
+        ? parsedResponse
+        : null;
       if (!response) {
+        const protocolReason = parsedResponse
+          ? 'hard-clean-missing-commit-receipt'
+          : diagnoseDisplayEdgesWorkerResponseProtocolFailure(event.data, request.requestId);
         finish(() => {
           updateDisplayRoutingDebugState({
             stage: 'worker-response-error',
             requestId: request.requestId,
             error: 'display-edge-worker-invalid-response',
+            workerInvalidResponseReason: protocolReason ?? 'unclassified-invalid-response',
           });
           reject(new Error('display-edge-worker-invalid-response'));
         }, true);

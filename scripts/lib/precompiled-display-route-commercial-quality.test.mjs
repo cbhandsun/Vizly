@@ -26,6 +26,12 @@ describe('precompiled display route commercial quality', () => {
         { x: 1558, y: 2081 }, { x: 1350, y: 2081 }, { x: 1350, y: 1498 },
         { x: 1286, y: 1498 },
       ], { sharedTrunkSynthesized: true }),
+      patch('clearance-constrained-staircase', [
+        { x: 708.5, y: 4672 }, { x: 708.5, y: 4616 }, { x: 516, y: 4616 },
+        { x: 516, y: 2342 }, { x: 158, y: 2342 }, { x: 158, y: 2150 },
+        { x: 516, y: 2150 }, { x: 516, y: 884 }, { x: 278.5, y: 884 },
+        { x: 278.5, y: 940 },
+      ], { commercialClearanceConstrainedStaircase: true }),
     ])).toBe(true);
   });
 
@@ -56,5 +62,20 @@ describe('precompiled display route commercial quality', () => {
       'bends:excessive-bends',
       'bends:tiny-interior-segment',
     ]));
+    expect(precompiledDisplayRouteCommercialQualityIsClean([
+      patch('bends-only', [
+        { x: 0, y: 0 }, { x: 0, y: 40 }, { x: 40, y: 40 }, { x: 40, y: 80 },
+        { x: 80, y: 80 }, { x: 80, y: 120 }, { x: 120, y: 120 }, { x: 120, y: 160 },
+        { x: 160, y: 160 },
+      ]),
+    ])).toBe(true);
+    expect(precompiledDisplayRouteCommercialQualityIsClean([
+      patch('terminal-retreat', [
+        { x: 1336, y: 1700 }, { x: 1336, y: 1588 }, { x: 1372, y: 1588 },
+        { x: 1372, y: 1396 }, { x: 88, y: 1396 }, { x: 88, y: 2164 },
+        { x: 58, y: 2164 }, { x: 58, y: 2612 }, { x: 88, y: 2612 },
+        { x: 88, y: 2828 }, { x: 216, y: 2828 }, { x: 216, y: 2884 },
+      ]),
+    ])).toBe(false);
   });
 });

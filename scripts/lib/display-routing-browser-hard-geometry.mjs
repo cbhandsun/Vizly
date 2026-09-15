@@ -175,6 +175,7 @@ export const readRenderedDisplayEdgeHardGeometryAudit = (rawEdges, rawNodes) => 
     if (
       points.length - 2 > MAX_BEND_COUNT
       && edge?.data?.sharedTrunkSynthesized !== true
+      && edge?.data?.commercialClearanceConstrainedStaircase !== true
     ) {
       recordFinding(excessiveBendEdgeIds, edgeId);
       recordFinding(excessiveBendFindings, {

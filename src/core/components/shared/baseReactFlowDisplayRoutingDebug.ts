@@ -27,6 +27,7 @@ export type DisplayRoutingDebugState = {
   workerStartCount?: number;
   workerAbortCount?: number;
   error?: string;
+  workerInvalidResponseReason?: string;
   boundedCandidate?: DisplayEdgesWorkerResponse['boundedCandidate'];
   boundedCandidateTrace?: NonNullable<DisplayEdgesWorkerResponse['boundedCandidate']>[];
   inputGeometryDigest?: string;

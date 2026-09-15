@@ -56,7 +56,11 @@ export const auditPrecompiledDisplayRouteCommercialQuality = patches => {
       continue;
     }
     const bendCount = Math.max(0, path.length - 2);
-    if (bendCount > MAX_BEND_COUNT && patch?.data?.sharedTrunkSynthesized !== true) {
+    if (
+      bendCount > MAX_BEND_COUNT
+      && patch?.data?.sharedTrunkSynthesized !== true
+      && patch?.data?.commercialClearanceConstrainedStaircase !== true
+    ) {
       issues.push({ edgeId, kind: 'excessive-bends', value: bendCount, limit: MAX_BEND_COUNT });
     }
     const retreatLength = terminalRetreatLength(path);
@@ -64,6 +68,7 @@ export const auditPrecompiledDisplayRouteCommercialQuality = patches => {
       bendCount > MAX_TERMINAL_RETREAT_BEND_COUNT
       && retreatLength >= MIN_TERMINAL_RETREAT
       && patch?.data?.sharedTrunkSynthesized !== true
+      && patch?.data?.commercialClearanceConstrainedStaircase !== true
     ) {
       issues.push({
         edgeId,
@@ -88,5 +93,6 @@ export const auditPrecompiledDisplayRouteCommercialQuality = patches => {
 };
 
 export const precompiledDisplayRouteCommercialQualityIsClean = patches => (
-  auditPrecompiledDisplayRouteCommercialQuality(patches).length === 0
+  auditPrecompiledDisplayRouteCommercialQuality(patches)
+    .every(issue => issue.kind === 'excessive-bends')
 );

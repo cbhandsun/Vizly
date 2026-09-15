@@ -62,7 +62,6 @@ describe('baseReactFlowDisplayWorkerCommitReceipt', () => {
     { outputRouteSignature: 'route-v2:invalid' },
     { hardReportDigest: 'hard-report-v1:0000000000000000' },
     { hardReport: { ...hardReport, hardClean: false } },
-    { hardReport: { ...hardReport, containerBoundarySkims: 96, containerBoundarySkimEdgeIds: ['edge'] } },
     { sessionRef: { ...sessionRef, sessionId: 'display-session-v1:0' } },
     { identity: createDisplayRoutingIdentity('9999', identity.inputGeometryDigest) },
   ])('rejects malformed, stale, or internally inconsistent evidence: %j', override => {
@@ -70,6 +69,31 @@ describe('baseReactFlowDisplayWorkerCommitReceipt', () => {
       ...receipt,
       ...override,
     })).toBeNull();
+  });
+
+  it('keeps commit receipt validation aligned with the hard-clean quality report contract', () => {
+    const hardCleanReportWithBoundarySkims = {
+      ...hardReport,
+      containerBoundarySkims: 96,
+      containerBoundarySkimEdgeIds: ['edge'],
+    };
+    const receiptWithBoundarySkims = createDisplayRoutingWorkerCommitReceipt({
+      identity,
+      outputRouteSignature,
+      hardReport: hardCleanReportWithBoundarySkims,
+      sessionRef,
+    });
+
+    expect(receiptWithBoundarySkims).toMatchObject({
+      hardReport: {
+        hardClean: true,
+        containerBoundarySkims: 96,
+        containerBoundarySkimEdgeIds: ['edge'],
+      },
+    });
+    expect(parseDisplayRoutingWorkerCommitReceipt(receiptWithBoundarySkims)).toMatchObject({
+      hardReportDigest: receiptWithBoundarySkims?.hardReportDigest,
+    });
   });
 
   it('requires a receipt only for a hard-clean final response at the commit boundary', () => {
@@ -138,6 +162,42 @@ describe('baseReactFlowDisplayWorkerCommitReceipt', () => {
         hardReportDigest: receipt.hardReportDigest,
       },
     });
+  });
+
+  it('completes a hard-clean worker response when the quality layer reports bounded container skims', () => {
+    const edges = committedEdges;
+    const hardCleanReportWithBoundarySkims = {
+      ...hardReport,
+      containerBoundarySkims: 8,
+      containerBoundarySkimEdgeIds: ['edge'],
+    };
+    const response = completeDisplayWorkerResponse({
+      request: {
+        operation: 'repair',
+        requestId: 'repair-skims-1',
+        edges,
+        nodes: [],
+        inputIdentity: identity,
+        repairMode: 'bounded',
+      },
+      response: {
+        requestId: 'repair-skims-1',
+        edges,
+        hardClean: true,
+        hardReport: hardCleanReportWithBoundarySkims,
+        routeResolution: 'repair',
+      },
+      phaseTrace: [],
+    });
+
+    expect(response.commitReceipt).toMatchObject({
+      identity,
+      hardReport: {
+        hardClean: true,
+        containerBoundarySkims: 8,
+      },
+    });
+    expect(parseDisplayEdgesWorkerCommitResponse(response, 'repair-skims-1')).not.toBeNull();
   });
 
   it('binds an internally valid receipt to the submitted identity and exact replayed route', () => {
