@@ -200,6 +200,55 @@ describe('baseReactFlowDisplayWorkerCommitReceipt', () => {
     expect(parseDisplayEdgesWorkerCommitResponse(response, 'repair-skims-1')).not.toBeNull();
   });
 
+  it('rebuilds exact hard evidence before committing a hard-clean response with stale report shape', () => {
+    const routeNodes = [
+      { id: 'source', position: { x: 0, y: 0 }, width: 100, height: 100, data: {} },
+      { id: 'target', position: { x: 200, y: 0 }, width: 100, height: 100, data: {} },
+    ];
+    const routeEdges = [{
+      id: 'edge',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'right',
+      targetHandle: 'left',
+      data: { computedPath: [{ x: 100, y: 50 }, { x: 200, y: 50 }] },
+    }];
+    const response = completeDisplayWorkerResponse({
+      request: {
+        operation: 'route',
+        requestId: 'route-stale-report-1',
+        edges: routeEdges,
+        nodes: routeNodes,
+        enableSmartEdges: true,
+        smartEdgePadding: 20,
+        isLargeGraph: false,
+        displayEdgeEpoch: 1,
+        qualityMode: 'full',
+        inputIdentity: identity,
+      },
+      response: {
+        requestId: 'route-stale-report-1',
+        edges: routeEdges,
+        hardClean: true,
+        hardReport: { ...hardReport, quality: {} } as typeof hardReport,
+        routeResolution: 'full-route',
+      },
+      phaseTrace: [],
+    });
+
+    expect(response.commitReceipt).toMatchObject({
+      identity,
+      hardReport: {
+        hardClean: true,
+        quality: {
+          nonOrthogonalSegments: 0,
+          strictCrossings: 0,
+        },
+      },
+    });
+    expect(parseDisplayEdgesWorkerCommitResponse(response, 'route-stale-report-1')).not.toBeNull();
+  });
+
   it('binds an internally valid receipt to the submitted identity and exact replayed route', () => {
     const edges = committedEdges;
     const request = {

@@ -17,6 +17,7 @@ import type {
   BaseDisplayBoundedCandidateReport,
 } from './baseReactFlowDisplayEvaluation';
 import { createBaseReactFlowIncrementalDisplayEdges } from './baseReactFlowDisplayIncrementalRoute';
+import { withExactDisplayHardReport } from './baseReactFlowDisplayWorkerResponse';
 import type {
   DisplayEdgesWorkerIncrementalRouteRequest,
   DisplayEdgesWorkerRequest,
@@ -113,10 +114,15 @@ export const completeDisplayWorkerResponse = ({
       ? { ...value, phaseTrace: finalizeDisplayRoutingPhaseTrace(phaseTrace) }
       : value
   );
-  if (response.hardClean !== true || !response.edges) return withFinalTrace(response);
+  const exactResponse = response.hardClean === true
+    && response.edges
+    && !isDisplayWorkerBoundedCandidateReport(response.hardReport)
+    ? withExactDisplayHardReport(response, request.nodes)
+    : response;
+  if (exactResponse.hardClean !== true || !exactResponse.edges) return withFinalTrace(exactResponse);
   const sessionTimer = startDisplayRoutingPhaseTrace({
     phase: 'session-commit',
-    candidateCount: response.edges.length,
+    candidateCount: exactResponse.edges.length,
     onTrace: trace => appendDisplayRoutingPhaseTrace(phaseTrace, trace),
   });
   const nextIdentity = request.operation === 'incremental-route'
@@ -124,23 +130,23 @@ export const completeDisplayWorkerResponse = ({
     : request.inputIdentity;
   if (!nextIdentity) {
     sessionTimer.finish('skip');
-    return withFinalTrace(response);
+    return withFinalTrace(exactResponse);
   }
   const outputRouteSignature = computeBaseReactFlowDisplayOutputRouteSignature(
-    response.edges,
+    exactResponse.edges,
   );
   const displayPatches = createBaseReactFlowDisplayEdgePatches(
     request.edges,
-    response.edges,
+    exactResponse.edges,
   );
   if (
     !outputRouteSignature
     || !displayPatches
-    || !isDisplayWorkerBoundedCandidateReport(response.hardReport)
-    || !response.hardReport.hardClean
+    || !isDisplayWorkerBoundedCandidateReport(exactResponse.hardReport)
+    || !exactResponse.hardReport.hardClean
   ) {
     sessionTimer.finish('rejected');
-    return withFinalTrace(response);
+    return withFinalTrace(exactResponse);
   }
   const sessionRef = writeDisplayRoutingWorkerSession({
     identity: nextIdentity,
@@ -148,22 +154,22 @@ export const completeDisplayWorkerResponse = ({
     nodes: request.nodes,
     sourceEdges: request.edges,
     displayPatches,
-    finalEdges: response.edges,
-    hardReport: response.hardReport,
+    finalEdges: exactResponse.edges,
+    hardReport: exactResponse.hardReport,
   });
   const commitReceipt = createDisplayRoutingWorkerCommitReceipt({
     identity: nextIdentity,
     outputRouteSignature,
-    hardReport: response.hardReport,
+    hardReport: exactResponse.hardReport,
     sessionRef,
   });
   if (!commitReceipt) {
     sessionTimer.finish('rejected');
-    return withFinalTrace(response);
+    return withFinalTrace(exactResponse);
   }
   sessionTimer.finish('accepted', displayPatches.length);
   return withFinalTrace({
-    ...response,
+    ...exactResponse,
     nextIdentity,
     outputRouteSignature,
     sessionRef,

@@ -1,6 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 
-import { lockFinalDisplayComputedPaths } from './baseReactFlowDisplayEdgeCore';
+import { compactOrthogonalPath, lockFinalDisplayComputedPaths } from './baseReactFlowDisplayEdgeCore';
 import {
   repairBaseReactFlowMinimumBusinessNodeClearance,
 } from './baseReactFlowDisplayBusinessNodeClearance';
@@ -74,16 +74,30 @@ const buildMixedTerminalBendShortcutCandidates = (edge: Edge): Edge[] => {
   const target = path[path.length - 1];
   const sourceAxis = displayAxisOf(source, sourceStub);
   const targetAxis = displayAxisOf(targetStub, target);
-  if (!sourceAxis || !targetAxis || sourceAxis === targetAxis) return [];
+  if (!sourceAxis || !targetAxis) return [];
   const baselineLength = displayPathLength(path);
   const removedInteriorPoints = Math.max(0, path.length - 5);
-  const laneValues = sourceAxis === 'h'
+  const mixedLaneValues = sourceAxis === 'h'
     ? [sourceStub.x, ...path.slice(2, -2).map(point => point.x), targetStub.x]
     : [sourceStub.y, ...path.slice(2, -2).map(point => point.y), targetStub.y];
-  const lanes = [...new Set(laneValues
+  const mixedLanes = [...new Set(mixedLaneValues
     .filter(value => Number.isFinite(value) && Math.abs(value) <= 1_000_000))]
     .sort((a, b) => Math.abs(a - (sourceAxis === 'h' ? sourceStub.x : sourceStub.y))
       - Math.abs(b - (sourceAxis === 'h' ? sourceStub.x : sourceStub.y)) || a - b);
+  const sameAxisLaneValues = sourceAxis === 'h'
+    ? [sourceStub.y, ...path.slice(2, -2).map(point => point.y), targetStub.y]
+    : [sourceStub.x, ...path.slice(2, -2).map(point => point.x), targetStub.x];
+  const sameAxisLanes = [...new Set(sameAxisLaneValues
+    .filter(value => Number.isFinite(value) && Math.abs(value) <= 1_000_000))]
+    .sort((a, b) => {
+      const sourceLane = sourceAxis === 'h' ? sourceStub.y : sourceStub.x;
+      const targetLane = sourceAxis === 'h' ? targetStub.y : targetStub.x;
+      const firstBetween = a > Math.min(sourceLane, targetLane) && a < Math.max(sourceLane, targetLane);
+      const secondBetween = b > Math.min(sourceLane, targetLane) && b < Math.max(sourceLane, targetLane);
+      return Number(secondBetween) - Number(firstBetween)
+        || Math.abs(a - sourceLane) - Math.abs(b - sourceLane)
+        || a - b;
+    });
   const candidates: Edge[] = [];
   const seen = new Set<string>();
   const pushCandidate = (shortcut: typeof path): void => {
@@ -122,7 +136,29 @@ const buildMixedTerminalBendShortcutCandidates = (edge: Edge): Edge[] => {
       : { x: targetStub.x, y: next.y };
     pushCandidate([...path.slice(0, pivotIndex + 2), bridge, targetStub, target]);
   }
-  for (const lane of lanes) {
+  if (sourceAxis === targetAxis) {
+    for (const lane of sameAxisLanes) {
+      pushCandidate(compactOrthogonalPath(sourceAxis === 'h'
+        ? [
+          source,
+          sourceStub,
+          { x: sourceStub.x, y: lane },
+          { x: targetStub.x, y: lane },
+          targetStub,
+          target,
+        ]
+        : [
+          source,
+          sourceStub,
+          { x: lane, y: sourceStub.y },
+          { x: lane, y: targetStub.y },
+          targetStub,
+          target,
+        ]));
+    }
+    return candidates;
+  }
+  for (const lane of mixedLanes) {
     const sourceLaneStub = sourceAxis === 'h'
       ? { x: lane, y: source.y }
       : { x: source.x, y: lane };
