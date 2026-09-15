@@ -82,8 +82,6 @@ const VISUAL_PARALLEL_LANE_TOLERANCE = 4;
 // Nearby parallel lanes are a defect; only rounding-scale drift describes one
 // shared trunk. Match the rendered audit's one-pixel identity tolerance.
 const SHARED_TRUNK_COORDINATE_EPS = 1;
-const SHORT_ENDPOINT_STUB = 32;
-const HAIRPIN_BRIDGE = 140;
 
 export function getEdgePath(edge: Edge): Point[] {
   const treeRouting = asRecord(edge.data?.treeRouting);
@@ -480,4 +478,3 @@ export function calculateEdgePairQuality(
 export function hasPairContribution(score: PairQualityContribution): boolean {
   return (score.bridgedCrossings ?? 0) !== 0 || PAIR_SCORE_KEYS.some(key => score[key] !== 0);
 }
-import { TINY_INTERIOR_SEGMENT } from './edgePathReadabilityThresholds';

@@ -6,7 +6,6 @@ import {
   isDisplayContainerNode,
   segmentDisplayLength,
   type DisplayPoint,
-  type DisplayRect,
 } from './baseReactFlowDisplayGeometry';
 
 export const DISPLAY_CONTAINER_BOUNDARY_SKIM_TOLERANCE = 14;

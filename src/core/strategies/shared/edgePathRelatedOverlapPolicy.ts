@@ -230,17 +230,45 @@ const endpointPointsShareAxisCoordinate = (
       && Math.abs(firstPoint.x - secondPoint.x) <= VISUAL_PARALLEL_LANE_TOLERANCE;
 };
 
+const segmentHasEndpointSideOrthogonalLeg = (
+  segment: Segment,
+  segments: readonly Segment[],
+  atTarget: boolean,
+): boolean => {
+  const adjacent = adjacentSegment(segments, segment, atTarget ? 1 : -1);
+  return Boolean(
+    adjacent
+    && adjacent.axis !== segment.axis
+    && (atTarget
+      ? segment.segmentIndex < segment.segmentCount - 1
+      : segment.segmentIndex > 0),
+  );
+};
+
+const overlapFormsSameHandleInternalTrunk = (
+  firstSegment: Segment,
+  secondSegment: Segment,
+  firstSegments: readonly Segment[],
+  secondSegments: readonly Segment[],
+  atTarget: boolean,
+): boolean => segmentPointsShareAxisLine(firstSegment, secondSegment)
+  && segmentHasEndpointSideOrthogonalLeg(firstSegment, firstSegments, atTarget)
+  && segmentHasEndpointSideOrthogonalLeg(secondSegment, secondSegments, atTarget);
+
 /**
  * The overlap scanner intentionally treats lines within a few pixels as the
  * same visual lane. When two related edges enter or leave the exact same
- * endpoint handle on that lane, classify the near-pixel fan-in/fan-out as an
- * explained terminal trunk instead of a hard geometry failure.
+ * endpoint handle on that lane, classify the near-pixel fan-in/fan-out or the
+ * immediately adjacent internal bus trunk as an explained terminal trunk
+ * instead of a hard geometry failure.
  */
 const overlapFormsSameHandleTerminalTrunk = (
   first: Edge,
   second: Edge,
   firstSegment: Segment,
   secondSegment: Segment,
+  firstSegments: readonly Segment[],
+  secondSegments: readonly Segment[],
 ): boolean => {
   if (
     firstSegment.direction === 0
@@ -252,11 +280,29 @@ const overlapFormsSameHandleTerminalTrunk = (
   return (
     first.source === second.source
     && sharedEndpointHandle(first, second, false) !== null
-    && endpointPointsShareAxisCoordinate(firstSegment, secondSegment, false)
+    && (
+      endpointPointsShareAxisCoordinate(firstSegment, secondSegment, false)
+      || overlapFormsSameHandleInternalTrunk(
+        firstSegment,
+        secondSegment,
+        firstSegments,
+        secondSegments,
+        false,
+      )
+    )
   ) || (
     first.target === second.target
     && sharedEndpointHandle(first, second, true) !== null
-    && endpointPointsShareAxisCoordinate(firstSegment, secondSegment, true)
+    && (
+      endpointPointsShareAxisCoordinate(firstSegment, secondSegment, true)
+      || overlapFormsSameHandleInternalTrunk(
+        firstSegment,
+        secondSegment,
+        firstSegments,
+        secondSegments,
+        true,
+      )
+    )
   );
 };
 
@@ -299,5 +345,7 @@ export const isPermittedRelatedOverlap = (
     second,
     firstSegment,
     secondSegment,
+    firstSegments,
+    secondSegments,
   );
 };

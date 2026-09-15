@@ -267,6 +267,37 @@ export const readRenderedDisplayEdgeHardGeometryAudit = (rawEdges, rawNodes) => 
     const after = adjacent(segments, contained, 1);
     return Boolean(before && after && before.axis !== contained.axis && after.axis !== contained.axis);
   };
+  const sharedEndpointHandle = (first, second, target) => {
+    const firstHandle = target ? first.targetHandle : first.sourceHandle;
+    const secondHandle = target ? second.targetHandle : second.sourceHandle;
+    return typeof firstHandle === 'string'
+      && firstHandle.length > 0
+      && firstHandle === secondHandle;
+  };
+  const sameAxisLine = (firstSegment, secondSegment) => {
+    if (firstSegment.axis !== secondSegment.axis) return false;
+    return firstSegment.axis === 'h'
+      ? Math.abs(firstSegment.a.y - secondSegment.a.y) <= SHARED_TRUNK_EPS
+      : Math.abs(firstSegment.a.x - secondSegment.a.x) <= SHARED_TRUNK_EPS;
+  };
+  const endpointSideOrthogonalLeg = (segment, segments, target) => {
+    const next = adjacent(segments, segment, target ? 1 : -1);
+    return Boolean(next && next.axis !== segment.axis && (
+      target
+        ? segment.segmentIndex < segment.segmentCount - 1
+        : segment.segmentIndex > 0
+    ));
+  };
+  const sameHandleInternalTrunk = (first, second, firstSegment, secondSegment, firstSegments, secondSegments, target) => {
+    if (
+      !sameAxisLine(firstSegment, secondSegment)
+      || !endpointSideOrthogonalLeg(firstSegment, firstSegments, target)
+      || !endpointSideOrthogonalLeg(secondSegment, secondSegments, target)
+    ) return false;
+    return target
+      ? first.target === second.target && sharedEndpointHandle(first, second, true)
+      : first.source === second.source && sharedEndpointHandle(first, second, false);
+  };
   const permittedRelatedOverlap = (first, second, firstSegment, secondSegment, firstSegments, secondSegments, overlap) => {
     if (firstSegment.direction !== 0 && secondSegment.direction !== 0
       && firstSegment.direction !== secondSegment.direction) return false;
@@ -276,6 +307,10 @@ export const readRenderedDisplayEdgeHardGeometryAudit = (rawEdges, rawNodes) => 
       firstSegment, secondSegment, firstSegments, secondSegments, true,
     ));
     if (endpointTrunk) return true;
+    if (
+      sameHandleInternalTrunk(first, second, firstSegment, secondSegment, firstSegments, secondSegments, false)
+      || sameHandleInternalTrunk(first, second, firstSegment, secondSegment, firstSegments, secondSegments, true)
+    ) return true;
     if (!distinctSharedEndpointPorts(first, second)) return false;
     return internalContained(firstSegment, secondSegment, firstSegments, overlap)
       || internalContained(secondSegment, firstSegment, secondSegments, overlap);

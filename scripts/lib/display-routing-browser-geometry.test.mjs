@@ -254,6 +254,19 @@ describe('display routing browser geometry', () => {
       illegalOverlaps: [],
     });
 
+    const internalBusPaths = new Map([
+      ['a', 'M 40 20 L 100 20 L 100 220 L 240 220'],
+      ['b', 'M 40 44 L 100 44 L 100 320 L 240 320'],
+    ]);
+    const internalBusWrappers = sharedEdges.map(edge => ({
+      getAttribute: name => name === 'data-testid' ? `rf__edge-${edge.id}` : null,
+      querySelector: () => ({ getAttribute: name => name === 'd' ? internalBusPaths.get(edge.id) : null }),
+    }));
+    document.querySelectorAll = () => internalBusWrappers;
+    expect(readRenderedDisplayEdgeHardGeometryAudit(sharedEdges, sharedNodes)).toMatchObject({
+      illegalOverlaps: [],
+    });
+
     const unrelatedEdges = sharedEdges.map((edge, index) => ({
       ...edge,
       id: `unrelated-${index}`,

@@ -245,14 +245,14 @@ describe('baseReactFlow layout routing candidate sequence', () => {
   });
 
   it.each([
-    ['observed horizontal flat ELK seed', 44, true, false, 0, 0, true],
+    ['observed horizontal flat ELK seed', 44, true, false, 0, 0, false],
     ['empty graph', 0, true, false, 0, 0, false],
     ['detached terminal', 44, false, false, 0, 0, false],
     ['anchored terminal', 44, true, true, 0, 0, false],
     ['obstacle-dirty seed', 44, true, false, 1, 0, false],
     ['crossing-dirty seed', 44, true, false, 0, 1, false],
   ] as const)(
-    'classifies the unanchored flat ELK bypass boundary: %s',
+    'keeps the unanchored flat ELK bypass disabled for recoverable seeds: %s',
     (_label, edgeCount, terminalsAttached, terminalsAnchored, obstacleHits, strictCrossings, expected) => {
       expect(shouldBypassBaseReactFlowUnanchoredFlatElkCandidate(edgeCount, {
         terminalsAttached,
@@ -262,6 +262,39 @@ describe('baseReactFlow layout routing candidate sequence', () => {
       })).toBe(expected);
     },
   );
+
+  it('routes a clean unanchored flat ELK seed instead of forcing a layout fallback', async () => {
+    const seedAuditSpy = vi.spyOn(
+      layoutCandidateSeedAudit,
+      'auditBaseReactFlowLayoutCandidateSeed',
+    ).mockReturnValue({
+      terminalsAttached: true,
+      terminalsAnchored: false,
+      obstacleHits: 0,
+      strictCrossings: 0,
+    });
+    workerMocks.repair.mockImplementation(async (request: {
+      edges: Edge[];
+      inputSignature: string;
+      inputGeometryDigest: string;
+    }) => successfulResult(request.edges, request));
+    workerMocks.compute.mockImplementation(successfulCanonicalResult);
+
+    await stageBaseReactFlowLayoutRouting({
+      workerRef: { current: null },
+      requestId: 'layout:clean-unanchored-flat-elk',
+      sourceEdges: edges,
+      sourceNodes: nodes,
+      isLargeGraph: false,
+      rejectUnanchoredFlatElkCandidate: true,
+      candidateRepairPolicy: 'skip-exact-clean',
+    });
+
+    expect(seedAuditSpy).toHaveBeenCalled();
+    expect(workerMocks.repair).toHaveBeenCalledOnce();
+    expect(workerMocks.compute).toHaveBeenCalledOnce();
+    seedAuditSpy.mockRestore();
+  });
 
   it.each([
     ['observed dense WMS demand seed', 26, 22, 8, true, true, true],
