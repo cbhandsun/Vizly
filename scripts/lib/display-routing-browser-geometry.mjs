@@ -69,11 +69,34 @@ export const selectDisplayRoutingAuditRoute = (
   return null;
 };
 
+export const partitionDisplayRoutingCommercialClearanceRisks = (rawRisks, rawEdges) => {
+  const risks = Array.isArray(rawRisks) ? rawRisks.slice(0, 20_000) : [];
+  const edges = Array.isArray(rawEdges) ? rawEdges.slice(0, 5_000) : [];
+  const constrainedEdgeIds = new Set(edges.flatMap(edge => (
+    typeof edge?.id === 'string'
+      && edge.id.length > 0
+      && edge.id.length <= 500
+      && edge?.data?.commercialClearanceConstrainedStaircase === true
+      ? [edge.id]
+      : []
+  )));
+  const accepted = [];
+  const rejected = [];
+  for (const risk of risks) {
+    const edgeId = typeof risk?.edgeId === 'string' && risk.edgeId.length <= 500
+      ? risk.edgeId
+      : '';
+    (edgeId && constrainedEdgeIds.has(edgeId) ? accepted : rejected).push(risk);
+  }
+  return { accepted, rejected };
+};
+
 export const displayRoutingFinalSvgGeometryIsClean = ({
   audit,
   commercialAudit,
   hardAudit,
   expectedPathCount,
+  responseEdges,
 }) => Boolean(
   audit
   && commercialAudit
@@ -89,13 +112,20 @@ export const displayRoutingFinalSvgGeometryIsClean = ({
   && audit.intersections.length === 0
   && Array.isArray(audit.clearanceRisks)
   && audit.clearanceRisks.length === 0
+  && Array.isArray(audit.visualClearanceRisks)
+  && audit.visualClearanceRisks.length === 0
   && commercialAudit.auditedPathCount === expectedPathCount
   && Array.isArray(commercialAudit.invalidEdgeIds)
   && commercialAudit.invalidEdgeIds.length === 0
   && Array.isArray(commercialAudit.intersections)
   && commercialAudit.intersections.length === 0
   && Array.isArray(commercialAudit.clearanceRisks)
-  && commercialAudit.clearanceRisks.length === 0
+  && partitionDisplayRoutingCommercialClearanceRisks(
+    commercialAudit.clearanceRisks,
+    responseEdges,
+  ).rejected.length === 0
+  && Array.isArray(commercialAudit.visualClearanceRisks)
+  && commercialAudit.visualClearanceRisks.length === 0
   && hardAudit.auditedPathCount === expectedPathCount
   && Array.isArray(hardAudit.invalidEdgeIds)
   && hardAudit.invalidEdgeIds.length === 0
@@ -115,9 +145,14 @@ export const displayRoutingFinalSvgGeometryIsClean = ({
   && hardAudit.illegalOverlaps.length === 0
 );
 
-const summarizeClearanceRisk = (risk, edgeById) => {
+const summarizeClearanceRisk = (risk, edgeById, nodeById) => {
   const edgeId = typeof risk?.edgeId === 'string' ? risk.edgeId : null;
   const edge = edgeId ? edgeById.get(edgeId) : null;
+  const nodeId = typeof risk?.nodeId === 'string' ? risk.nodeId : null;
+  const node = nodeId ? nodeById.get(nodeId) : null;
+  const points = Array.isArray(edge?.data?.computedPath)
+    ? edge.data.computedPath.slice(0, 24).map(point => ({ x: point?.x, y: point?.y }))
+    : [];
   return {
     edgeId,
     edgeIndex: edge?.edgeIndex,
@@ -125,7 +160,13 @@ const summarizeClearanceRisk = (risk, edgeById) => {
     target: typeof edge?.target === 'string' ? edge.target : undefined,
     sourceHandle: typeof edge?.sourceHandle === 'string' ? edge.sourceHandle : undefined,
     targetHandle: typeof edge?.targetHandle === 'string' ? edge.targetHandle : undefined,
-    nodeId: typeof risk?.nodeId === 'string' ? risk.nodeId : null,
+    nodeId,
+    nodeRect: node ? {
+      x: node.positionAbsolute?.x ?? node.position?.x,
+      y: node.positionAbsolute?.y ?? node.position?.y,
+      width: node.measured?.width ?? node.width ?? node.style?.width,
+      height: node.measured?.height ?? node.height ?? node.style?.height,
+    } : undefined,
     clearance: Number.isFinite(risk?.clearance) ? Math.round(risk.clearance * 10) / 10 : null,
     requiredClearance: Number.isFinite(risk?.requiredClearance) ? risk.requiredClearance : null,
     screenClearance: Number.isFinite(risk?.screenClearance)
@@ -134,12 +175,15 @@ const summarizeClearanceRisk = (risk, edgeById) => {
     requiredScreenClearance: Number.isFinite(risk?.requiredScreenClearance)
       ? risk.requiredScreenClearance
       : undefined,
+    commercialClearanceConstrainedStaircase:
+      edge?.data?.commercialClearanceConstrainedStaircase === true,
+    points,
   };
 };
 
-const summarizeClearanceRisks = (risks, edgeById, limit = 12) => (
+const summarizeClearanceRisks = (risks, edgeById, nodeById, limit = 12) => (
   Array.isArray(risks)
-    ? risks.slice(0, limit).map(risk => summarizeClearanceRisk(risk, edgeById))
+    ? risks.slice(0, limit).map(risk => summarizeClearanceRisk(risk, edgeById, nodeById))
     : []
 );
 
@@ -157,19 +201,42 @@ export const summarizeDisplayRoutingGeometryFailure = ({
     typeof edge?.id === 'string' ? edge.id : '',
     { ...edge, edgeIndex },
   ]).filter(([edgeId]) => edgeId.length > 0));
+  const requestNodes = Array.isArray(route?.request?.nodes) ? route.request.nodes : [];
+  const nodeById = new Map(requestNodes.flatMap(node => (
+    typeof node?.id === 'string' ? [[node.id, node]] : []
+  )));
+  const summarizeEdge = edgeId => {
+    const edge = typeof edgeId === 'string' ? edgeById.get(edgeId) : null;
+    const points = Array.isArray(edge?.data?.computedPath)
+      ? edge.data.computedPath.slice(0, 16).map(point => ({ x: point?.x, y: point?.y }))
+      : [];
+    return edge ? {
+      edgeId,
+      edgeIndex: edge.edgeIndex,
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: edge.sourceHandle,
+      targetHandle: edge.targetHandle,
+      points,
+    } : { edgeId };
+  };
   return {
     expectedPathCount: responseEdges.length,
     auditedPathCount: audit?.auditedPathCount,
     invalidPathCount: audit?.invalidEdgeIds?.length,
     obstacleHitCount: audit?.intersections?.length,
     minimumClearanceRiskCount: audit?.clearanceRisks?.length,
-    minimumClearanceRiskSamples: summarizeClearanceRisks(audit?.clearanceRisks, edgeById),
+    minimumClearanceRiskSamples: summarizeClearanceRisks(audit?.clearanceRisks, edgeById, nodeById),
     minimumVisualClearanceRiskCount: audit?.visualClearanceRisks?.length,
-    minimumVisualClearanceRiskSamples: summarizeClearanceRisks(audit?.visualClearanceRisks, edgeById),
+    minimumVisualClearanceRiskSamples: summarizeClearanceRisks(audit?.visualClearanceRisks, edgeById, nodeById),
     commercialClearanceRiskCount: commercialAudit?.clearanceRisks?.length,
-    commercialClearanceRiskSamples: summarizeClearanceRisks(commercialAudit?.clearanceRisks, edgeById),
+    commercialClearanceRiskSamples: summarizeClearanceRisks(commercialAudit?.clearanceRisks, edgeById, nodeById),
     commercialVisualClearanceRiskCount: commercialAudit?.visualClearanceRisks?.length,
-    commercialVisualClearanceRiskSamples: summarizeClearanceRisks(commercialAudit?.visualClearanceRisks, edgeById),
+    commercialVisualClearanceRiskSamples: summarizeClearanceRisks(
+      commercialAudit?.visualClearanceRisks,
+      edgeById,
+      nodeById,
+    ),
     nonOrthogonalPathCount: hardAudit?.nonOrthogonalEdgeIds?.length,
     detachedTerminalPathCount: hardAudit?.detachedTerminalEdgeIds?.length,
     detachedTerminalPathIndexes: hardAudit?.detachedTerminalEdgeIds?.map(edgeId => (
@@ -200,7 +267,23 @@ export const summarizeDisplayRoutingGeometryFailure = ({
     )),
     hairpinPathCount: hardAudit?.hairpinEdgeIds?.length,
     strictCrossingCount: hardAudit?.strictCrossings?.length,
+    strictCrossingSamples: Array.isArray(hardAudit?.strictCrossings)
+      ? hardAudit.strictCrossings.slice(0, 12)
+      : [],
+    strictCrossingEdgeSamples: Array.isArray(hardAudit?.strictCrossings)
+      ? hardAudit.strictCrossings.slice(0, 12).map(pair => ({
+        edgeA: summarizeEdge(pair?.edgeA),
+        edgeB: summarizeEdge(pair?.edgeB),
+      }))
+      : [],
     illegalOverlapCount: hardAudit?.illegalOverlaps?.length,
+    illegalOverlapSamples: Array.isArray(hardAudit?.illegalOverlaps)
+      ? hardAudit.illegalOverlaps.slice(0, 12)
+      : [],
+    workerMinimumClearanceViolationCount: route?.response?.hardReport?.minimumClearanceViolations,
+    workerMinimumClearanceViolationEdgeIds:
+      route?.response?.hardReport?.minimumClearanceViolationEdgeIds?.slice?.(0, 32) ?? [],
+    workerCommercialClearanceViolationCount: route?.response?.hardReport?.commercialClearanceViolations,
   };
 };
 

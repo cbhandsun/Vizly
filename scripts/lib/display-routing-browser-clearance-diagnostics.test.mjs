@@ -37,6 +37,13 @@ afterEach(() => {
 describe('display routing browser clearance diagnostics', () => {
   it('summarizes bounded clearance evidence for failed final SVG geometry', () => {
     const route = {
+      request: {
+        nodes: [{
+          id: 'node-0',
+          positionAbsolute: { x: 10, y: 20 },
+          measured: { width: 80, height: 60 },
+        }],
+      },
       response: {
         edges: [
           {
@@ -45,6 +52,7 @@ describe('display routing browser clearance diagnostics', () => {
             target: 'target-a',
             sourceHandle: 'right',
             targetHandle: 'left',
+            data: { computedPath: [{ x: 1, y: 2 }, { x: 3, y: 4 }] },
           },
         ],
         routeResolution: 'repaired-candidate',
@@ -124,6 +132,9 @@ describe('display routing browser clearance diagnostics', () => {
       sourceHandle: 'right',
       targetHandle: 'left',
       nodeId: 'node-0',
+      nodeRect: { x: 10, y: 20, width: 80, height: 60 },
+      commercialClearanceConstrainedStaircase: false,
+      points: [{ x: 1, y: 2 }, { x: 3, y: 4 }],
       clearance: 15,
       requiredClearance: 16,
       screenClearance: undefined,

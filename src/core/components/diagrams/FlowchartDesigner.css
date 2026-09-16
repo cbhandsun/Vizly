@@ -1666,6 +1666,14 @@ circle.custom-edge-updater {
 /* Edge conditions stay visible at the initial overview scale. Their shared
    measurement and arrangement handle readability without requiring hover. */
 
+/* At a far overview, readability scaling can make unresolved detail labels
+   obscure the structure they describe. Keep successfully packed, primary,
+   and actively traced labels visible; restore every detail on zoom-in. */
+.diagram-zoomed-far-out .stable-path-edge-label[data-edge-label-placement="unresolved"][data-edge-label-priority="detail"]:not(.stable-path-edge-label--trace-active),
+.diagram-zoomed-far-out .stable-path-edge-label-leader[data-edge-label-placement="unresolved"][data-edge-label-priority="detail"]:not([data-edge-trace-state="active"]) {
+    display: none !important;
+}
+
 /* ============================================
    GAP-11: Responsive Support (Phase 1)
    ============================================ */

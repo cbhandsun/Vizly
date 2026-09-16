@@ -128,6 +128,28 @@ it('distinguishes a bounded follow-up route from a duplicate Worker instance', (
   })).toBe(false);
 });
 
+it('accepts a trusted committed-cache hit without inventing a Worker request identity', () => {
+  const before = {
+    request: { __browserWorkerInstanceId: 'worker-1' },
+    routing: { workerStartCount: 2 },
+  };
+  const after = {
+    request: { source: 'runtime-committed-cache' },
+    response: { source: 'runtime-committed-cache' },
+    routing: { workerStartCount: 2, cacheTrustLevel: 'runtime-committed' },
+  };
+
+  expect(isDisplayRoutingWorkerSessionContinuous(before, after)).toBe(true);
+  expect(isDisplayRoutingWorkerSessionContinuous(before, {
+    ...after,
+    routing: { ...after.routing, workerStartCount: 3 },
+  })).toBe(false);
+  expect(isDisplayRoutingWorkerSessionContinuous(before, {
+    ...after,
+    routing: { ...after.routing, cacheTrustLevel: 'document-seed' },
+  })).toBe(false);
+});
+
 it('accepts a hard-clean Worker response for the expected layout request', () => {
   const response = {
     requestId: 'layout:7',

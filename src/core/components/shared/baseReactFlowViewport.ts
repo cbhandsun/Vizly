@@ -13,17 +13,24 @@ export const isBaseReactFlowZoomedOut = (viewport: Viewport): boolean => (
   Number.isFinite(viewport.zoom) && viewport.zoom < 0.4
 );
 
+export const isBaseReactFlowFarZoomedOut = (viewport: Viewport): boolean => (
+  Number.isFinite(viewport.zoom) && viewport.zoom < 0.12
+);
+
 export const resolveBaseReactFlowContainerClassName = ({
   baseClassName,
   isLayoutStable,
   zoomedOut,
+  farZoomedOut = false,
 }: {
   baseClassName: string;
   isLayoutStable: boolean;
   zoomedOut: boolean;
+  farZoomedOut?: boolean;
 }): string => [
   baseClassName,
   zoomedOut ? 'diagram-zoomed-out' : '',
+  farZoomedOut ? 'diagram-zoomed-far-out' : '',
   isLayoutStable ? '' : 'vizly-layout-committing',
 ].filter(Boolean).join(' ');
 
@@ -33,10 +40,12 @@ export const syncBaseReactFlowZoomClass = ({
   container,
   viewport,
   zoomedOutClassName = 'diagram-zoomed-out',
+  farZoomedOutClassName = 'diagram-zoomed-far-out',
 }: {
   container: HTMLElement | null;
   viewport: Viewport;
   zoomedOutClassName?: string;
+  farZoomedOutClassName?: string;
 }): void => {
   if (!container) return;
 
@@ -44,6 +53,8 @@ export const syncBaseReactFlowZoomClass = ({
     '--diagram-edge-label-scale',
     resolveBaseReactFlowEdgeLabelScale(viewport.zoom).toFixed(3),
   );
+
+  container.classList.toggle(farZoomedOutClassName, isBaseReactFlowFarZoomedOut(viewport));
 
   if (isBaseReactFlowZoomedOut(viewport)) {
     if (!container.classList.contains(zoomedOutClassName)) {

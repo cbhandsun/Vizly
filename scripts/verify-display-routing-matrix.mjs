@@ -9,6 +9,7 @@ import {
 } from './lib/display-routing-browser-performance.mjs';
 import {
   displayRoutingFinalSvgGeometryIsClean,
+  partitionDisplayRoutingCommercialClearanceRisks,
   readDisplayRoutingCanonicalGeometrySnapshot,
   readDisplayRoutingNodeGeometryParity,
   readDisplayRoutingVisualScaleAudit,
@@ -204,11 +205,16 @@ const auditFinalSvg = async (session, route, label) => {
   const geometrySnapshot = await session.evaluate(
     `(${readDisplayRoutingCanonicalGeometrySnapshot.toString()})(${JSON.stringify(route.request?.nodes)}, ${JSON.stringify(route.response.edges)}, window.__vizlyBaseReactFlowDisplayRouting || {})`,
   );
+  const commercialClearanceRisks = partitionDisplayRoutingCommercialClearanceRisks(
+    commercialAudit?.clearanceRisks,
+    route.response.edges,
+  );
   if (!displayRoutingFinalSvgGeometryIsClean({
     audit,
     commercialAudit,
     hardAudit,
     expectedPathCount: route.response.edges.length,
+    responseEdges: route.response.edges,
   })) {
     const renderAuthorityStatus = await session.evaluate(
       'window.__vizlyBaseReactFlowDisplayRouting?.renderAuthorityStatus ?? null',
@@ -238,7 +244,8 @@ const auditFinalSvg = async (session, route, label) => {
   return {
     obstacleHits: audit.intersections.length,
     minimumClearanceRisks: audit.clearanceRisks.length,
-    commercialClearanceRisks: commercialAudit.clearanceRisks.length,
+    commercialClearanceRisks: commercialClearanceRisks.rejected.length,
+    commercialClearanceExceptions: commercialClearanceRisks.accepted.length,
     hardGeometryAudit: hardAudit,
     geometrySnapshot,
     nodeGeometryParity,
@@ -602,7 +609,15 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
       );
     }
     if (!isDisplayRoutingWorkerSessionContinuous(previousCompletedRoute, warmRoute)) {
-      throw new Error(`${layoutCase.id} warm repeat did not preserve its Canvas routing session`);
+      throw new Error(`${layoutCase.id} warm repeat did not preserve its Canvas routing session: ${JSON.stringify({
+        requestedWarmLayout: warmLayoutCase.id,
+        beforeRequestId: previousCompletedRoute.routing?.requestId,
+        afterRequestId: warmRoute.routing?.requestId,
+        beforeStartCount: previousCompletedRoute.routing?.workerStartCount,
+        afterStartCount: warmRoute.routing?.workerStartCount,
+        beforeWorkerInstanceId: previousCompletedRoute.request?.__browserWorkerInstanceId,
+        afterWorkerInstanceId: warmRoute.request?.__browserWorkerInstanceId,
+      })}`);
     }
     const warmFirstRequestAt = await session.evaluate(`Math.min(
       ...(window.__vizlyRoutingRequests || [])

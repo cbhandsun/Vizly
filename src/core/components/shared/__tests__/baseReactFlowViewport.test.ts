@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   bindBaseReactFlowExportBackgroundVisibility,
   createBaseReactFlowExportStateHandlers,
+  isBaseReactFlowFarZoomedOut,
   isUsableBaseReactFlowViewport,
   resolveBaseReactFlowContainerClassName,
   resolveBaseReactFlowInitialFitMode,
@@ -25,7 +26,22 @@ describe('baseReactFlowViewport', () => {
   it('bounds scale for positive underflow instead of producing infinite rectangles', () => {
     expect(resolveBaseReactFlowEdgeLabelScale(Number.MIN_VALUE)).toBe(14.4);
   });
+  it.each([
+    [0.05, true],
+    [0.1199, true],
+    [0.12, false],
+    [0.3, false],
+    [Number.NaN, false],
+  ])('classifies far overview zoom %s as %s', (zoom, expected) => {
+    expect(isBaseReactFlowFarZoomedOut({ x: 0, y: 0, zoom })).toBe(expected);
+  });
   it('preserves semantic zoom when the layout committing class is released', () => {
+    expect(resolveBaseReactFlowContainerClassName({
+      baseClassName: 'diagram-preview-root',
+      isLayoutStable: true,
+      zoomedOut: true,
+      farZoomedOut: true,
+    })).toBe('diagram-preview-root diagram-zoomed-out diagram-zoomed-far-out');
     expect(resolveBaseReactFlowContainerClassName({
       baseClassName: 'diagram-preview-root',
       isLayoutStable: true,
@@ -46,13 +62,22 @@ describe('baseReactFlowViewport', () => {
       viewport: { x: 0, y: 0, zoom: 0.3 },
     });
     expect(container.classList.contains('diagram-zoomed-out')).toBe(true);
+    expect(container.classList.contains('diagram-zoomed-far-out')).toBe(false);
     expect(container.style.getPropertyValue('--diagram-edge-label-scale')).toBe('2.400');
+
+    syncBaseReactFlowZoomClass({
+      container,
+      viewport: { x: 0, y: 0, zoom: 0.06 },
+    });
+    expect(container.classList.contains('diagram-zoomed-out')).toBe(true);
+    expect(container.classList.contains('diagram-zoomed-far-out')).toBe(true);
 
     syncBaseReactFlowZoomClass({
       container,
       viewport: { x: 0, y: 0, zoom: 0.8 },
     });
     expect(container.classList.contains('diagram-zoomed-out')).toBe(false);
+    expect(container.classList.contains('diagram-zoomed-far-out')).toBe(false);
     expect(container.style.getPropertyValue('--diagram-edge-label-scale')).toBe('1.000');
   });
 
@@ -66,6 +91,7 @@ describe('baseReactFlowViewport', () => {
 
     expect(container.style.getPropertyValue('--diagram-edge-label-scale')).toBe('1.000');
     expect(container.classList.contains('diagram-zoomed-out')).toBe(false);
+    expect(container.classList.contains('diagram-zoomed-far-out')).toBe(false);
   });
 
   it('restores the last viewport only when fitMode is none', () => {

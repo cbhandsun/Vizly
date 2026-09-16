@@ -373,7 +373,7 @@ export const readRenderedDisplayEdgeHardGeometryAudit = (rawEdges, rawNodes) => 
     return [firstSegment, secondSegment].every(segment => (
       length(segment.a, point) >= MIN_INTERIOR_SEGMENT
       && length(segment.b, point) >= MIN_INTERIOR_SEGMENT
-    )) && paintedBridges.some(bridge => Math.abs(bridge.y - y) < EPS
+    )) && paintedBridges.some(bridge => Math.abs(bridge.y - y) <= EPS
       && x >= bridge.min + 3 && x <= bridge.max - 3);
   };
   const strictCrossings = [];

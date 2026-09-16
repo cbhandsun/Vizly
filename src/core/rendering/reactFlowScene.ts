@@ -1,6 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 import {
-  collectLineJumpIntersections,
+  collectPaintedLineJumpIntersections,
   injectLineJumps,
   JUMP_RADIUS,
   type IntersectionInfo,
@@ -360,8 +360,8 @@ const expandSharedTrunkRenderEdge = (
       ),
     0,
   );
-  const fragments = createSharedTrunkPaintFragments(pointsValue, plan);
-  const backboneFragments = createSharedTrunkBackboneFragments(pointsValue, plan);
+  const fragments = createSharedTrunkPaintFragments(pointsValue, plan, jumps, JUMP_RADIUS);
+  const backboneFragments = createSharedTrunkBackboneFragments(pointsValue, plan, jumps, JUMP_RADIUS);
   const junctionFragments = createSharedTrunkJunctionFragments(pointsValue, plan);
 
   const fragmentLengths = fragments.map(fragment => fragment.points.reduce(
@@ -566,14 +566,16 @@ export const buildRenderSceneFromReactFlow = (
   const nodesById = new Map(renderNodes.map(node => [node.id, node]));
   const displayEdges = applySharedTrunkPaintPlan(edges);
   const jumpsByEdge = new Map<string, IntersectionInfo[]>();
-  collectLineJumpIntersections(displayEdges.flatMap(edge => {
+  const lineJumpPaths = displayEdges.flatMap(edge => {
     const points = edgePointsFromData(edge);
     return points.length >= 2 ? [{
       edgeId: String(edge.id),
       points,
       endpointInfo: { source: String(edge.source), target: String(edge.target) },
+      paintOwnership: readSharedTrunkPaintPlan(edge.data),
     }] : [];
-  })).forEach(jump => {
+  });
+  collectPaintedLineJumpIntersections(lineJumpPaths).forEach(jump => {
     const existing = jumpsByEdge.get(jump.horizontalEdgeId) ?? [];
     existing.push(jump);
     jumpsByEdge.set(jump.horizontalEdgeId, existing);

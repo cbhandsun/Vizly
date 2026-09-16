@@ -41,15 +41,20 @@ export const isDisplayRoutingWorkerSessionContinuous = (
   const afterInstanceId = afterRoute?.request?.__browserWorkerInstanceId;
   const beforeStartCount = beforeRoute?.routing?.workerStartCount;
   const afterStartCount = afterRoute?.routing?.workerStartCount;
-  return typeof beforeInstanceId === 'string'
-    && beforeInstanceId.length > 0
-    && beforeInstanceId === afterInstanceId
-    && Number.isSafeInteger(beforeStartCount)
+  const boundedStartCount = Number.isSafeInteger(beforeStartCount)
     && Number.isSafeInteger(afterStartCount)
     && Number.isSafeInteger(maxAdditionalRoutingStarts)
     && maxAdditionalRoutingStarts >= 0
     && afterStartCount >= beforeStartCount
     && afterStartCount <= beforeStartCount + maxAdditionalRoutingStarts;
+  const trustedCommittedCacheHit = afterRoute?.request?.source === 'runtime-committed-cache'
+    && afterRoute?.response?.source === 'runtime-committed-cache'
+    && afterRoute?.routing?.cacheTrustLevel === 'runtime-committed'
+    && afterStartCount === beforeStartCount;
+  return typeof beforeInstanceId === 'string'
+    && beforeInstanceId.length > 0
+    && boundedStartCount
+    && (beforeInstanceId === afterInstanceId || trustedCommittedCacheHit);
 };
 
 export const resolveDisplayRoutingFinalRouteSnapshot = ({

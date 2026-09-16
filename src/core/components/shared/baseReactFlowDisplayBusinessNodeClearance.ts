@@ -4,6 +4,7 @@ import {
   COMMERCIAL_BUSINESS_NODE_CLEARANCE,
   MINIMUM_BUSINESS_NODE_CLEARANCE,
   repairBusinessNodeClearanceRisks,
+  type BusinessNodeClearanceCandidateValidation,
 } from '../../strategies/shared/edgeBusinessNodeClearanceRepair';
 import { createBusinessNodeClearanceGeometryContext } from '../../strategies/shared/edgeBusinessNodeClearanceGeometryContext';
 import {
@@ -16,6 +17,7 @@ import { getDisplayComputedPath } from './baseReactFlowDisplayGeometry';
 export interface DisplayBusinessNodeClearanceOptions {
   eligibleEdgeIds?: ReadonlySet<string>;
   allowTransientStrictCrossing?: boolean;
+  validateCandidate?: (context: BusinessNodeClearanceCandidateValidation) => boolean;
 }
 
 const edgeHasCommercialClearanceConstraint = (edge: Edge): boolean => (
@@ -100,18 +102,24 @@ export const repairBaseReactFlowDisplayBusinessNodeClearance = (
   nodes: Node[],
   options: DisplayBusinessNodeClearanceOptions = {},
 ): Edge[] => {
-  if (displayBusinessNodeCommercialClearanceIsClean(edges, nodes)) return edges;
+  const commercialClearanceIsClean = displayBusinessNodeCommercialClearanceIsClean(edges, nodes);
+  const hasConstrainedCommercialEdge = edges.some(edgeHasCommercialClearanceConstraint);
+  if (commercialClearanceIsClean
+    && !hasConstrainedCommercialEdge
+    && eligibleMinimumClearanceIsClean(edges, nodes, options.eligibleEdgeIds)) return edges;
   const geometryContext = createBusinessNodeClearanceGeometryContext(nodes);
   const minimumEdges = repairBusinessNodeClearanceRisks(edges, nodes, {
     ...options,
     geometryContext,
     minimumClearance: MINIMUM_BUSINESS_NODE_CLEARANCE,
   });
-  const commercialEdges = repairBusinessNodeClearanceRisks(minimumEdges, nodes, {
-    ...options,
-    geometryContext,
-    minimumClearance: COMMERCIAL_BUSINESS_NODE_CLEARANCE,
-  });
+  const commercialEdges = commercialClearanceIsClean && !hasConstrainedCommercialEdge
+    ? minimumEdges
+    : repairBusinessNodeClearanceRisks(minimumEdges, nodes, {
+      ...options,
+      geometryContext,
+      minimumClearance: COMMERCIAL_BUSINESS_NODE_CLEARANCE,
+    });
   const commercialMinimumClosedEdges = repairBusinessNodeClearanceRisks(
     commercialEdges,
     nodes,
@@ -124,6 +132,24 @@ export const repairBaseReactFlowDisplayBusinessNodeClearance = (
   )
     ? commercialMinimumClosedEdges
     : minimumEdges;
+};
+
+/**
+ * Closes only the non-negotiable 16px floor. Commercial promotion is a
+ * separate transaction because a graph-wide 48px attempt can legitimately be
+ * constrained and must never roll back an otherwise safe minimum detour.
+ */
+export const repairBaseReactFlowMinimumBusinessNodeClearanceFloor = (
+  edges: Edge[],
+  nodes: Node[],
+  options: DisplayBusinessNodeClearanceOptions = {},
+): Edge[] => {
+  if (eligibleMinimumClearanceIsClean(edges, nodes, options.eligibleEdgeIds)) return edges;
+  return repairBusinessNodeClearanceRisks(edges, nodes, {
+    ...options,
+    geometryContext: createBusinessNodeClearanceGeometryContext(nodes),
+    minimumClearance: MINIMUM_BUSINESS_NODE_CLEARANCE,
+  });
 };
 
 /** Worker transaction wrapper: a temporary peer crossing must be closed before commit. */

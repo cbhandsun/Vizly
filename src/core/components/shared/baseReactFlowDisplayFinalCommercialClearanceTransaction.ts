@@ -4,6 +4,7 @@ import { compactOrthogonalPath, lockFinalDisplayComputedPaths } from './baseReac
 import {
   displayBusinessNodeCommercialClearanceViolationEdgeIds,
   repairBaseReactFlowMinimumBusinessNodeClearance,
+  repairBaseReactFlowMinimumBusinessNodeClearanceFloor,
 } from './baseReactFlowDisplayBusinessNodeClearance';
 import { displayHardQualityReportGeometryIsClean } from './baseReactFlowDisplayEvaluation';
 import { repairBaseReactFlowFinalCommercialDetours } from './baseReactFlowDisplayCommercialDetourRepair';
@@ -39,6 +40,59 @@ const createLockedComputedPathCommit = (repairNodes: Node[]): ((edges: Edge[]) =
     nodeById ??= new Map(repairNodes.map(node => [node.id, node]));
     return lockFinalDisplayComputedPaths(edges, repairNodes, nodeById);
   };
+};
+
+const closeExactMinimumBusinessNodeClearance = ({
+  response,
+  repairNodes,
+  eligibleEdgeIds,
+  exactReport,
+  lockComputedPaths,
+}: Readonly<{
+  response: DisplayEdgesWorkerResponse;
+  repairNodes: Node[];
+  eligibleEdgeIds?: ReadonlySet<string>;
+  exactReport: (
+    candidate: DisplayEdgesWorkerResponse,
+    repairNodes: Node[],
+  ) => DisplayEdgesWorkerResponse;
+  lockComputedPaths: (edges: Edge[]) => Edge[];
+}>): DisplayEdgesWorkerResponse => {
+  const baselineEdges = response.edges;
+  if (!baselineEdges || (response.hardReport?.minimumClearanceViolations ?? 0) === 0) {
+    return response;
+  }
+  const repairedEdges = repairBaseReactFlowMinimumBusinessNodeClearanceFloor(
+    baselineEdges,
+    repairNodes,
+    {
+      eligibleEdgeIds,
+      allowTransientStrictCrossing: false,
+      validateCandidate: ({ candidateEdges }) => {
+        const exactCandidate = exactReport({
+          ...response,
+          edges: lockComputedPaths(candidateEdges),
+        }, repairNodes);
+        return Boolean(
+          exactCandidate.hardReport
+          && displayHardQualityReportGeometryIsClean(exactCandidate.hardReport)
+          && exactCandidate.hardReport.terminalsAnchored,
+        );
+      },
+    },
+  );
+  if (repairedEdges === baselineEdges
+    || repairedEdges.every((edge, index) => edge === baselineEdges[index])) return response;
+  const repaired = exactReport({
+    ...response,
+    edges: lockComputedPaths(repairedEdges),
+  }, repairNodes);
+  return repaired.hardReport
+    && displayHardQualityReportGeometryIsClean(repaired.hardReport)
+    && repaired.hardReport.terminalsAnchored
+    && (repaired.hardReport.minimumClearanceViolations ?? 0) === 0
+    ? repaired
+    : response;
 };
 
 const markClearanceConstrainedStaircases = (
@@ -368,16 +422,32 @@ const finalizeExactCommercialClearanceCandidate = ({
       lockComputedPaths,
     })
     : exactBaseline;
-  if (commerciallyPolishedBaseline.hardClean) return commerciallyPolishedBaseline;
-  const fullGraph = !eligibleEdgeIds && commerciallyPolishedBaseline.routeResolution !== 'incremental-route';
-  if (isCommercialClearanceOnlyFailure(commerciallyPolishedBaseline)) {
-    const baselineEdges = commerciallyPolishedBaseline.edges ?? [];
+  const minimumClosedBaseline = closeExactMinimumBusinessNodeClearance({
+    response: commerciallyPolishedBaseline,
+    repairNodes,
+    eligibleEdgeIds,
+    exactReport,
+    lockComputedPaths,
+  });
+  const minimumSafeBaseline = (minimumClosedBaseline.hardReport
+    && displayHardQualityReportGeometryIsClean(minimumClosedBaseline.hardReport)
+    && minimumClosedBaseline.hardReport.terminalsAnchored
+    && (minimumClosedBaseline.hardReport.minimumClearanceViolations ?? 0) === 0)
+    ? minimumClosedBaseline
+    : commerciallyPolishedBaseline;
+  if (minimumSafeBaseline.hardClean
+    && (minimumSafeBaseline.hardReport?.minimumClearanceViolations ?? 0) === 0) {
+    return minimumSafeBaseline;
+  }
+  const fullGraph = !eligibleEdgeIds && minimumSafeBaseline.routeResolution !== 'incremental-route';
+  if (isCommercialClearanceOnlyFailure(minimumSafeBaseline)) {
+    const baselineEdges = minimumSafeBaseline.edges ?? [];
     const sharedCandidate = repairBaseReactFlowDisplayEndpointTrunkClearance(
       baselineEdges, repairNodes, { eligibleEdgeIds },
     );
     if (sharedCandidate !== baselineEdges) {
       const repaired = exactReport({
-        ...commerciallyPolishedBaseline,
+        ...minimumSafeBaseline,
         edges: lockComputedPaths(sharedCandidate),
       }, repairNodes);
       if (repaired.hardClean) return repaired;
@@ -392,7 +462,7 @@ const finalizeExactCommercialClearanceCandidate = ({
         clearance, repairNodes, { eligibleEdgeIds },
       );
       const repaired = exactReport({
-        ...commerciallyPolishedBaseline,
+        ...minimumSafeBaseline,
         edges: lockComputedPaths(closed),
       }, repairNodes);
       if (repaired.hardClean
@@ -403,21 +473,21 @@ const finalizeExactCommercialClearanceCandidate = ({
   // A full layout can be trapped by existing local trunks. Only full-graph
   // transactions may use this bounded geometric closure; incremental frozen
   // boundaries and source-authored terminal constraints remain untouched.
-  if (fullGraph && commerciallyPolishedBaseline.edges) {
+  if (fullGraph && minimumSafeBaseline.edges) {
     const closed = repairBaseReactFlowDisplayPerimeterClosure(
-      commerciallyPolishedBaseline.edges,
+      minimumSafeBaseline.edges,
       repairNodes,
     );
-    if (closed !== commerciallyPolishedBaseline.edges) {
+    if (closed !== minimumSafeBaseline.edges) {
       const repaired = exactReport({
-        ...commerciallyPolishedBaseline,
+        ...minimumSafeBaseline,
         edges: lockComputedPaths(closed),
       }, repairNodes);
       if (repaired.hardClean) return repaired;
     }
   }
-  if (fullGraph && isCommercialClearanceOnlyFailure(commerciallyPolishedBaseline)) {
-    const baselineEdges = commerciallyPolishedBaseline.edges ?? [];
+  if (fullGraph && isCommercialClearanceOnlyFailure(minimumSafeBaseline)) {
+    const baselineEdges = minimumSafeBaseline.edges ?? [];
     const edgeById = new Map(baselineEdges.map(edge => [edge.id, edge] as const));
     const constrainedCommercialEdgeIds = new Set(
       displayBusinessNodeCommercialClearanceViolationEdgeIds(
@@ -430,7 +500,7 @@ const finalizeExactCommercialClearanceCandidate = ({
     );
     if (constrainedCommercialEdgeIds.size > 0) {
       const constrained = exactReport({
-        ...commerciallyPolishedBaseline,
+        ...minimumSafeBaseline,
         edges: markClearanceConstrainedStaircases(
           baselineEdges,
           constrainedCommercialEdgeIds,
@@ -439,7 +509,7 @@ const finalizeExactCommercialClearanceCandidate = ({
       if (constrained.hardClean) return constrained;
     }
   }
-  return commerciallyPolishedBaseline;
+  return minimumSafeBaseline;
 };
 
 const annotateFinalExactCommercialConstrainedStaircases = ({
@@ -503,7 +573,13 @@ export const finalizeBaseReactFlowExactCommercialClearanceForStabilization = ({
 }>): DisplayEdgesWorkerResponse => {
   if (
     (commercialStabilizationPass ?? 0) > 0
-    && (!exactCandidate.edges || baseReactFlowDisplayCommercialQualityIsClean(exactCandidate.edges))
+    && (
+      !exactCandidate.edges
+      || (
+        baseReactFlowDisplayCommercialQualityIsClean(exactCandidate.edges)
+        && (exactCandidate.hardReport?.minimumClearanceViolations ?? 0) === 0
+      )
+    )
   ) return exactCandidate;
   return finalizeBaseReactFlowExactCommercialClearance({
     exactBaseline: exactCandidate,

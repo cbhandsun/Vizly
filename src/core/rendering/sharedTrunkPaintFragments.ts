@@ -9,6 +9,7 @@ import {
   pointAtSharedTrunkDistance,
   readFiniteSharedTrunkNumber,
   sameSharedTrunkPoint,
+  SHARED_TRUNK_COORDINATE_TOLERANCE,
   SHARED_TRUNK_LENGTH_TOLERANCE,
   sharedTrunkPathLength,
   sharedTrunkPointDistance,
@@ -45,6 +46,51 @@ const extractInterval = (
   return extracted;
 };
 
+const horizontalPointDistance = (
+  points: readonly SharedTrunkPaintPoint[],
+  point: SharedTrunkPaintPoint,
+): number | undefined => {
+  let travelled = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    const first = points[index - 1];
+    const second = points[index];
+    const segmentLength = sharedTrunkPointDistance(first, second);
+    const horizontal = Math.abs(first.y - second.y) <= SHARED_TRUNK_COORDINATE_TOLERANCE;
+    const onSegment = horizontal
+      && Math.abs(point.y - first.y) <= SHARED_TRUNK_COORDINATE_TOLERANCE
+      && point.x >= Math.min(first.x, second.x) - SHARED_TRUNK_COORDINATE_TOLERANCE
+      && point.x <= Math.max(first.x, second.x) + SHARED_TRUNK_COORDINATE_TOLERANCE;
+    if (onSegment) return travelled + Math.abs(point.x - first.x);
+    travelled += segmentLength;
+  }
+  return undefined;
+};
+
+const expandIntervalForLineJumps = (
+  points: readonly SharedTrunkPaintPoint[],
+  range: { from: number; to: number },
+  lineJumps: readonly { point: SharedTrunkPaintPoint }[],
+  lineJumpRadius: number,
+): { from: number; to: number } => {
+  if (!Number.isFinite(lineJumpRadius) || lineJumpRadius <= 0 || lineJumps.length === 0) {
+    return range;
+  }
+  const total = sharedTrunkPathLength(points);
+  const padding = lineJumpRadius + SHARED_TRUNK_COORDINATE_TOLERANCE;
+  let from = range.from;
+  let to = range.to;
+  for (const jump of lineJumps) {
+    if (!Number.isFinite(jump.point.x) || !Number.isFinite(jump.point.y)) continue;
+    const distance = horizontalPointDistance(points, jump.point);
+    if (distance === undefined
+      || distance < range.from - SHARED_TRUNK_LENGTH_TOLERANCE
+      || distance > range.to + SHARED_TRUNK_LENGTH_TOLERANCE) continue;
+    from = Math.min(from, Math.max(0, distance - padding));
+    to = Math.max(to, Math.min(total, distance + padding));
+  }
+  return { from, to };
+};
+
 const equalStrings = (first: readonly string[], second: readonly string[]): boolean => (
   first.length === second.length && first.every((value, index) => value === second[index])
 );
@@ -52,6 +98,8 @@ const equalStrings = (first: readonly string[], second: readonly string[]): bool
 export const createSharedTrunkBackboneFragments = (
   pointsValue: unknown,
   plan: SharedTrunkPaintPlan | null,
+  lineJumps: readonly { point: SharedTrunkPaintPoint }[] = [],
+  lineJumpRadius = 0,
 ): SharedTrunkBackboneFragment[] => {
   const points = normalizeSharedTrunkPaintPoints(pointsValue);
   if (!points || !plan?.backboneRanges.length) return [];
@@ -111,10 +159,13 @@ export const createSharedTrunkBackboneFragments = (
     }
   }
 
-  return intervals.map(interval => ({
-    ...interval,
-    points: extractInterval(points, interval.from, interval.to),
-  }));
+  return intervals.map(interval => {
+    const paintInterval = expandIntervalForLineJumps(points, interval, lineJumps, lineJumpRadius);
+    return {
+      ...interval,
+      points: extractInterval(points, paintInterval.from, paintInterval.to),
+    };
+  });
 };
 
 export const createSharedTrunkJunctionFragments = (
@@ -194,6 +245,8 @@ export const createSharedTrunkHiddenFragments = (
 export const createSharedTrunkPaintFragments = (
   pointsValue: unknown,
   plan: SharedTrunkPaintPlan | null,
+  lineJumps: readonly { point: SharedTrunkPaintPoint }[] = [],
+  lineJumpRadius = 0,
 ): SharedTrunkPaintFragment[] => {
   const points = normalizeSharedTrunkPaintPoints(pointsValue);
   if (!points) return [];
@@ -223,11 +276,14 @@ export const createSharedTrunkPaintFragments = (
   }
   if (cursor < total - SHARED_TRUNK_LENGTH_TOLERANCE) visible.push({ from: cursor, to: total });
 
-  return visible.map(range => ({
-    points: extractInterval(points, range.from, range.to),
-    startsAtSource: range.from <= SHARED_TRUNK_LENGTH_TOLERANCE,
-    endsAtTarget: range.to >= total - SHARED_TRUNK_LENGTH_TOLERANCE,
-  }));
+  return visible.map(range => {
+    const paintInterval = expandIntervalForLineJumps(points, range, lineJumps, lineJumpRadius);
+    return {
+      points: extractInterval(points, paintInterval.from, paintInterval.to),
+      startsAtSource: range.from <= SHARED_TRUNK_LENGTH_TOLERANCE,
+      endsAtTarget: range.to >= total - SHARED_TRUNK_LENGTH_TOLERANCE,
+    };
+  });
 };
 
 export const sharedTrunkPointsToPath = (points: readonly SharedTrunkPaintPoint[]): string => (

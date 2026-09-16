@@ -1,6 +1,12 @@
 import { collapseCollinearBacktracks } from '../algorithms/smartEdgeUtils';
 import { LINE_JUMP_RADIUS } from '../routing/orthogonalCrossingPolicy';
 import { createVerticalSegmentIndex, queryVerticalSegments } from './lineJumpSpatialIndex';
+import {
+    resolveLineJumpPaintOwnership,
+    type LineJumpPaintOwnership,
+} from './lineJumpPaintOwnership';
+
+export type { LineJumpPaintOwnership } from './lineJumpPaintOwnership';
 
 /**
  * LineJumpEngine — 交叉跳线弧引擎
@@ -36,6 +42,7 @@ export interface LineJumpEdgePath {
     edgeId: string;
     points: Point[];
     endpointInfo?: EdgeEndpointInfo;
+    paintOwnership?: LineJumpPaintOwnership | null;
 }
 
 export interface IntersectionInfo {
@@ -155,6 +162,13 @@ export function collectLineJumpIntersections(edgePaths: readonly LineJumpEdgePat
     return findIntersections(segments, endpointInfo);
 }
 
+/** Collect crossings and assign each bridge to the edge that paints its geometry. */
+export function collectPaintedLineJumpIntersections(
+    edgePaths: readonly LineJumpEdgePath[],
+): IntersectionInfo[] {
+    return resolveLineJumpPaintOwnership(collectLineJumpIntersections(edgePaths), edgePaths);
+}
+
 /**
  * LineJumpEngine 单例
  * 
@@ -171,6 +185,8 @@ class LineJumpEngine {
     private edgePoints: Map<string, Point[]> = new Map();
     /** Edge endpoint ids, used to keep O2M/M2O buddy junctions intact. */
     private edgeEndpointInfo: Map<string, EdgeEndpointInfo> = new Map();
+    /** Shared-trunk visibility metadata used to assign bridge paint to its owner. */
+    private edgePaintOwnership: Map<string, LineJumpPaintOwnership> = new Map();
     /** 缓存的全局交叉点 */
     private intersectionsCache: IntersectionInfo[] | null = null;
     /** 版本号（每次注册/注销递增，供外部检测变化） */
@@ -192,14 +208,20 @@ class LineJumpEngine {
     }
 
     /** 注册一条边的路径点 */
-    registerEdge(edgeId: string, points: Point[], endpointInfo?: EdgeEndpointInfo): void {
+    registerEdge(
+        edgeId: string,
+        points: Point[],
+        endpointInfo?: EdgeEndpointInfo,
+        paintOwnership?: LineJumpPaintOwnership | null,
+    ): void {
         const existing = this.edgePoints.get(edgeId);
         const existingInfo = this.edgeEndpointInfo.get(edgeId);
         const sameInfo =
             (existingInfo?.source ?? null) === (endpointInfo?.source ?? null) &&
             (existingInfo?.target ?? null) === (endpointInfo?.target ?? null);
+        const samePaintOwnership = this.edgePaintOwnership.get(edgeId) === (paintOwnership ?? undefined);
         // 浅比较避免无效刷新
-        if (existing && existing.length === points.length && sameInfo) {
+        if (existing && existing.length === points.length && sameInfo && samePaintOwnership) {
             let same = true;
             for (let i = 0; i < points.length; i++) {
                 if (Math.abs(existing[i].x - points[i].x) > 0.5 || 
@@ -216,6 +238,11 @@ class LineJumpEngine {
         } else {
             this.edgeEndpointInfo.delete(edgeId);
         }
+        if (paintOwnership) {
+            this.edgePaintOwnership.set(edgeId, paintOwnership);
+        } else {
+            this.edgePaintOwnership.delete(edgeId);
+        }
         this.invalidateCache();
     }
 
@@ -223,7 +250,8 @@ class LineJumpEngine {
     unregisterEdge(edgeId: string): void {
         const removedPath = this.edgePoints.delete(edgeId);
         const removedInfo = this.edgeEndpointInfo.delete(edgeId);
-        if (removedPath || removedInfo) {
+        const removedPaintOwnership = this.edgePaintOwnership.delete(edgeId);
+        if (removedPath || removedInfo || removedPaintOwnership) {
             this.invalidateCache();
         }
     }
@@ -276,6 +304,7 @@ class LineJumpEngine {
     cleanup(): void {
         this.edgePoints.clear();
         this.edgeEndpointInfo.clear();
+        this.edgePaintOwnership.clear();
         this.invalidateCache();
         LineJumpEngine.instance = null;
     }
@@ -307,8 +336,9 @@ class LineJumpEngine {
             edgeId,
             points,
             endpointInfo: this.edgeEndpointInfo.get(edgeId),
+            paintOwnership: this.edgePaintOwnership.get(edgeId),
         }));
-        this.intersectionsCache = collectLineJumpIntersections(edgePaths);
+        this.intersectionsCache = collectPaintedLineJumpIntersections(edgePaths);
         return this.intersectionsCache;
     }
 }

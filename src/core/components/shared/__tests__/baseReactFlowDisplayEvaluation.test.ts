@@ -859,7 +859,7 @@ describe('baseReactFlowDisplayEvaluation', () => {
     expect(strict.quality).toBe(permissive.quality);
   });
 
-  it('reports unrelated business-node clearance below 16px without misclassifying it as a hard error', () => {
+  it('reports unrelated business-node clearance below 16px for final clearance repair', () => {
     const nodes: Node[] = [
       {
         id: 'source',

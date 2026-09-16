@@ -254,6 +254,7 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
         targetId: props.target,
         points: renderPath,
         cornerRadius: 0,
+        paintOwnership: sharedTrunkPlan,
     });
     const renderFragmentPath = (points: readonly Point[]): string => (
         injectLineJumps([...points], jumps, JUMP_RADIUS, 0)
@@ -261,10 +262,17 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
     );
     const renderedEdgePath = jumpPath || edgePath;
     const { paintFragments, backboneFragments, junctionFragments } = useMemo(() => ({
-        paintFragments: createSharedTrunkPaintFragments(renderPath, sharedTrunkPlan),
-        backboneFragments: createSharedTrunkBackboneFragments(renderPath, sharedTrunkPlan),
+        // A shared-trunk split can land inside a bridge window. Extend only the
+        // fragment that owns the crossing far enough to render the complete arc.
+        paintFragments: createSharedTrunkPaintFragments(renderPath, sharedTrunkPlan, jumps, JUMP_RADIUS),
+        backboneFragments: createSharedTrunkBackboneFragments(
+            renderPath,
+            sharedTrunkPlan,
+            jumps,
+            JUMP_RADIUS,
+        ),
         junctionFragments: createSharedTrunkJunctionFragments(renderPath, sharedTrunkPlan),
-    }), [renderPath, sharedTrunkPlan]);
+    }), [jumps, renderPath, sharedTrunkPlan]);
     const hasSharedTrunk = Boolean(sharedTrunkPlan && (
         sharedTrunkPlan.hiddenRanges.length
         || sharedTrunkPlan.backboneRanges.length
@@ -568,6 +576,7 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
                     <g
                         className="stable-path-edge-label-leader"
                         data-edge-label-leader={id}
+                        data-edge-label-placement={labelPlacement.status}
                         data-edge-label-priority={isPrimaryLabel ? 'primary' : 'detail'}
                         data-edge-trace-state={isTraceActive ? 'active' : 'idle'}
                         aria-hidden="true"

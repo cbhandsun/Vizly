@@ -104,6 +104,20 @@ describe('flowchart visual polish stylesheet', () => {
         }
     });
 
+    it('declutters only unresolved detail labels at the far overview level', () => {
+        const stylesheet = readRelativeFile('../FlowchartDesigner.css');
+
+        expect(stylesheet).toContain(
+            '.diagram-zoomed-far-out .stable-path-edge-label[data-edge-label-placement="unresolved"][data-edge-label-priority="detail"]:not(.stable-path-edge-label--trace-active)',
+        );
+        expect(stylesheet).toContain(
+            '.diagram-zoomed-far-out .stable-path-edge-label-leader[data-edge-label-placement="unresolved"][data-edge-label-priority="detail"]:not([data-edge-trace-state="active"])',
+        );
+        expect(stylesheet).not.toMatch(
+            /\.diagram-zoomed-far-out\s+\.stable-path-edge-label(?:\s|,|\{)/,
+        );
+    });
+
     it('keeps endpoint-driven fallback labels visible while a node is dragged', () => {
         const legacyStylesheet = readRelativeFile('../FlowchartDesigner.css');
 

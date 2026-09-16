@@ -68,6 +68,7 @@ describe('display routing browser geometry', () => {
       invalidEdgeIds: [],
       intersections: [],
       clearanceRisks: [],
+      visualClearanceRisks: [],
     };
     const cleanHardAudit = {
       auditedPathCount: 2,
@@ -236,6 +237,13 @@ describe('display routing browser geometry', () => {
     expect(readRenderedDisplayEdgeHardGeometryAudit(edges, nodes)).toMatchObject({
       strictCrossings: [], geometricCrossingCount: 1, bridgedCrossingCount: 1,
       bridgedCrossings: [{ edgeA: 'horizontal', edgeB: 'vertical' }],
+    });
+    const halfPixelPaint = { getAttribute: name => name === 'd'
+      ? 'M 40 100.5 L 134 100.5 A 6 6 0 0 1 146 100.5 L 240 100.5' : null };
+    document.querySelectorAll = selector => selector.includes('.stable-path-edge-graphics')
+      ? [halfPixelPaint] : wrappers;
+    expect(readRenderedDisplayEdgeHardGeometryAudit(edges, nodes)).toMatchObject({
+      strictCrossings: [], geometricCrossingCount: 1, bridgedCrossingCount: 1,
     });
     document.querySelectorAll = () => wrappers;
     expect(readRenderedDisplayEdgeHardGeometryAudit(edges.map(edge => ({

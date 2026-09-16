@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { LineJumpEngine, injectLineJumps } from '../../../services/LineJumpEngine';
 import type { Point, IntersectionInfo } from '../../../services/LineJumpEngine';
+import type { LineJumpPaintOwnership } from '../../../services/LineJumpEngine';
 // [FIX-FILLET] Updated to pass cornerRadius for unified jump+fillet path rendering
 
 interface UseLineJumpsOptions {
@@ -15,6 +16,8 @@ interface UseLineJumpsOptions {
     renderJumps?: boolean;
     /** 圆角半径（默认16），用于在跳线路径中保持圆角效果 */
     cornerRadius?: number;
+    /** Shared-trunk hidden ranges that determine which edge owns bridge paint. */
+    paintOwnership?: LineJumpPaintOwnership | null;
 }
 
 interface UseLineJumpsResult {
@@ -24,7 +27,7 @@ interface UseLineJumpsResult {
     jumpPath: string | null;
 }
 
-export function useLineJumps({ edgeId, sourceId, targetId, points, enabled = true, renderJumps = enabled, cornerRadius = 16 }: UseLineJumpsOptions): UseLineJumpsResult {
+export function useLineJumps({ edgeId, sourceId, targetId, points, enabled = true, renderJumps = enabled, cornerRadius = 16, paintOwnership }: UseLineJumpsOptions): UseLineJumpsResult {
     const subscribe = useCallback((callback: () => void) => {
         if (!enabled) return () => undefined;
         return LineJumpEngine.getInstance().subscribe(callback);
@@ -43,12 +46,12 @@ export function useLineJumps({ edgeId, sourceId, targetId, points, enabled = tru
     useEffect(() => {
         if (!enabled || !points || points.length < 2) return undefined;
         const engine = LineJumpEngine.getInstance();
-        engine.registerEdge(edgeId, points, { source: sourceId, target: targetId });
+        engine.registerEdge(edgeId, points, { source: sourceId, target: targetId }, paintOwnership);
 
         return () => {
             engine.unregisterEdge(edgeId);
         };
-    }, [edgeId, sourceId, targetId, points, enabled]);
+    }, [edgeId, sourceId, targetId, points, enabled, paintOwnership]);
 
     // 查询交叉点
     const result = useMemo(() => {
