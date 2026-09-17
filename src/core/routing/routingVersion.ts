@@ -1,6 +1,6 @@
-// Reevaluate generated route groups after final constrained-staircase intent
-// becomes part of commit-capable routing metadata.
-export const EDGE_ROUTING_CACHE_VERSION = '22';
+// Reevaluate generated and persisted routes after strongly aligned reverse
+// edges stop inheriting the generic outer return-lane terminal preference.
+export const EDGE_ROUTING_CACHE_VERSION = '23';
 
 /**
  * Version of the renderer-facing commercial quality contract. Keep this

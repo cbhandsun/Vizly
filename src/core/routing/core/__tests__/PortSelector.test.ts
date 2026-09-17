@@ -105,6 +105,37 @@ describe('PortSelector', () => {
             expect(result.autoTarget).toBe(true);
         });
 
+        it('keeps a strongly vertical stacked pair on facing ports in a reverse layout', () => {
+            const source: NodeGeometry = {
+                id: 'stacked-source',
+                position: { x: 0, y: 0 },
+                dimensions: { width: 200, height: 96 }
+            };
+            const target: NodeGeometry = {
+                id: 'stacked-target',
+                position: { x: 80, y: 220 },
+                dimensions: { width: 200, height: 96 }
+            };
+
+            const result = portSelector.selectOptimalPorts(
+                source,
+                target,
+                {
+                    ...defaultConfig,
+                    layoutDirection: 'BT',
+                    directionalHandlePolicy: 'force'
+                },
+                defaultWeights
+            );
+
+            expect(result).toMatchObject({
+                sourceHandle: 'b',
+                targetHandle: 't',
+                autoSource: true,
+                autoTarget: true
+            });
+        });
+
         it('should fallback to default ports if no candidates match (stubbing candidates to empty)', () => {
             const originalGenerate = (portSelector as any).generateCandidates;
             (portSelector as any).generateCandidates = () => [];

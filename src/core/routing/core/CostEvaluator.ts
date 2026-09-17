@@ -349,8 +349,13 @@ export class CostEvaluator {
                 if (sDir === 'l' || sDir === 'r') penalty -= PREFERRED_AXIS_BONUS;
             } else {
                 // 垂直主导 -> 鼓励垂直端口 (t/b)
-                if (!isBackwards) {
-                    // 标准垂直流
+                if (!isBackwards || verticalDominates) {
+                    // A strongly vertical geometric relationship is already an
+                    // unambiguous terminal-side signal.  Treat it like the
+                    // normal vertical flow even when the declared layout axis
+                    // classifies the edge as backwards; otherwise the generic
+                    // return-lane reward below can turn an adjacent stacked
+                    // pair into a long side-to-side loop.
                     if (sDir === 'l' || sDir === 'r') penalty += WRONG_AXIS_PENALTY;
                     if (tDir === 'l' || tDir === 'r') penalty += WRONG_AXIS_PENALTY;
                 }
@@ -373,7 +378,7 @@ export class CostEvaluator {
         }
 
         // 4. 反向边特殊处理 (Backwards Edge)
-        if (isBackwards && (isTB || isBT)) {
+        if (isBackwards && (isTB || isBT) && !verticalDominates) {
             // 鼓励 Cross-Side 或 Same-Side 回路
             // Cross-Side: r -> l
             if ((sDir === 'r' && tDir === 'l') || (sDir === 'l' && tDir === 'r')) {
