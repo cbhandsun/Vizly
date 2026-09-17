@@ -138,6 +138,34 @@ describe('domainDagreTopLevelLayout', () => {
     expect(secondChild.position.y - secondDomain.position.y).toBe(30);
   });
 
+  it.each([
+    { direction: 'BT' as const, axis: 'y' as const },
+    { direction: 'RL' as const, axis: 'x' as const },
+  ])('keeps cross-domain dependencies in $direction order', ({ direction, axis }) => {
+    const firstDomain = domain('domain-a', 'a', 0, 0);
+    const secondDomain = domain('domain-b', 'b', 0, 0);
+    const firstChild = leaf('a1', 'a', 20, 30);
+    const secondChild = leaf('b1', 'b', 20, 30);
+    const nodes = [firstDomain, secondDomain, firstChild, secondChild];
+
+    runDomainDagreTopLevelLayout({
+      nodes,
+      edges: [{ id: 'cross', source: 'a1', target: 'b1' }],
+      domains: [firstDomain, secondDomain],
+      leafNodes: [firstChild, secondChild],
+      nodeById: new Map(nodes.map(node => [node.id, node])),
+      nodeToSubGroup: new Map(),
+      domainOrder: ['a', 'b'],
+      domainOrderIndex: new Map([['a', 0], ['b', 1]]),
+      isHorizontal: direction === 'RL',
+      direction,
+      domainGap: 50,
+      getNodeDimensions: dimensions,
+    });
+
+    expect(firstDomain.position[axis]).toBeGreaterThan(secondDomain.position[axis]);
+  });
+
   it('keeps dependency ranks when explicit semantic order conflicts with topology', () => {
     const firstDomain = domain('domain-first', 'first', 0, 0);
     const middleDomain = domain('domain-middle', 'middle', 0, 0);

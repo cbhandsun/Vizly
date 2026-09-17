@@ -2,13 +2,14 @@ import type { Edge, Node } from '@xyflow/react';
 import { arrangeDomainDagreChildren, type DomainDagreNodeArrangement } from './domainDagreChildArrangement';
 import { domainDagreDomainOf, isDomainDagreGroupNode, isDomainDagreNodeHidden } from './domainDagreHierarchy';
 import type { DomainDagreComponentIndex } from './domainDagrePeerComponents';
+import type { DomainDagreDirection } from './domainDagreLayoutBoundary';
 
 /** Direct children are one content block, so subgroup packing cannot split or
  * overlap their grid. The temporary block never enters the returned graph.
  */
 export function createDomainDagreDirectContent(
   nodes: readonly Node[], edges: readonly Edge[], arrangement: DomainDagreNodeArrangement,
-  horizontal: boolean, gapH: number, gapV: number,
+  direction: boolean | DomainDagreDirection, gapH: number, gapV: number,
   dimensions: (node: Node) => { width: number; height: number },
   occupiedIds: ReadonlySet<string>, packComponents: boolean,
   globalComponentByNodeId?: DomainDagreComponentIndex,
@@ -18,7 +19,7 @@ export function createDomainDagreDirectContent(
   while (occupiedIds.has(id)) id += ':';
   const ids = new Set(nodes.map(node => node.id));
   const positions = arrangeDomainDagreChildren(nodes, edges.filter(edge => ids.has(edge.source) && ids.has(edge.target)),
-    arrangement, horizontal, gapH, gapV, dimensions, packComponents, undefined, globalComponentByNodeId);
+    arrangement, direction, gapH, gapV, dimensions, packComponents, undefined, globalComponentByNodeId);
   const byId = new Map(nodes.map(node => [node.id, node]));
   const width = Math.max(...positions.map(position => position.x + dimensions(byId.get(position.id) ?? nodes[0]).width));
   const height = Math.max(...positions.map(position => position.y + dimensions(byId.get(position.id) ?? nodes[0]).height));

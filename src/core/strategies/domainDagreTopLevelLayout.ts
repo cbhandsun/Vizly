@@ -4,6 +4,7 @@ import {
   domainDagreDomainOf,
   isDomainDagreNodeHidden,
 } from './domainDagreHierarchy';
+import type { DomainDagreDirection } from './domainDagreLayoutBoundary';
 
 type NodeDimensions = (node: Node) => { width: number; height: number };
 
@@ -17,6 +18,7 @@ export interface DomainDagreTopLevelLayoutContext {
   domainOrder: string[];
   domainOrderIndex: Map<string, number>;
   isHorizontal: boolean;
+  direction?: DomainDagreDirection;
   domainGap: number;
   getNodeDimensions: NodeDimensions;
 }
@@ -165,7 +167,7 @@ export const runDomainDagreTopLevelLayout = (
   const positions = layoutWithDagre(
     layoutNodes,
     crossDomainEdges,
-    context.isHorizontal ? 'LR' : 'TB',
+    context.direction ?? (context.isHorizontal ? 'LR' : 'TB'),
     context.domainGap,
     context.domainGap,
     context.getNodeDimensions,

@@ -313,7 +313,10 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                     ? domain.position.x + dPadHEffective
                     : domain.position.y + dTitleH + titleSafe + dPadV;
 
-                for (const sg of domainSubGroups) {
+                const orderedSubGroups = domainSubGroupDirection === 'RL'
+                    ? domainSubGroups.toReversed()
+                    : domainSubGroups;
+                for (const sg of orderedSubGroups) {
                     const nextX = domainSubGroupIsHorizontal ? cursor : targetX;
                     const nextY = domainSubGroupIsHorizontal ? targetY : cursor;
                     const deltaX = nextX - num(sg.position.x, nextX);
@@ -351,7 +354,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                     sgChildren,
                     sgEdges,
                     nodeArrangement,
-                    subDomainNodeIsHorizontal,
+                    subDomainNodeDirection,
                     nodeGapH,
                     nodeGapV,
                     getNodeDimensions,
@@ -398,8 +401,10 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             nodeToSubGroup,
             subDomainOrder: subDomainOrderOpt,
             subDomainNodeIsHorizontal,
+            subDomainNodeDirection,
             nodeArrangement,
             domainSubGroupIsHorizontal,
+            domainSubGroupDirection,
             packVerticalSubDomains: domainPlacement === 'ordered-lanes',
             packDisconnectedComponents: domainPlacement !== 'ordered-lanes',
             globalComponentByNodeId,
@@ -439,6 +444,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             domainOrder: domainOrderArr ?? [],
             domainOrderIndex,
             isHorizontal,
+            direction,
             domainGap,
             getNodeDimensions,
         };

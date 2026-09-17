@@ -69,6 +69,25 @@ describe('arrangeDomainDagreChildren', () => {
     expect(arranged.every(position => Number.isFinite(position.x) && Number.isFinite(position.y))).toBe(true);
   });
 
+  it.each([
+    { direction: 'TB' as const, axis: 'y' as const, sign: 1 },
+    { direction: 'BT' as const, axis: 'y' as const, sign: -1 },
+    { direction: 'LR' as const, axis: 'x' as const, sign: 1 },
+    { direction: 'RL' as const, axis: 'x' as const, sign: -1 },
+  ])('preserves the full $direction rank direction for connected children', ({ direction, axis, sign }) => {
+    const arranged = arrangeDomainDagreChildren(
+      nodes,
+      [{ id: 'a-b', source: 'a', target: 'b' }],
+      'dagre',
+      direction,
+      40,
+      30,
+      dimensions,
+    );
+    const byId = new Map(arranged.map(position => [position.id, position]));
+    expect(((byId.get('b')?.[axis] ?? 0) - (byId.get('a')?.[axis] ?? 0)) * sign).toBeGreaterThan(0);
+  });
+
   it.each(['grid', 'flow'] as const)('preserves externally connected process geometry in %s', arrangement => {
     const links = nodes.map(node => ({ id: node.id, source: node.id, target: 'remote' }));
     const componentIndex = domainDagrePeerComponentIndex([...nodes.map(node => node.id), 'remote'], links);

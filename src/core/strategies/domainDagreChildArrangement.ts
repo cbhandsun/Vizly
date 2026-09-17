@@ -4,6 +4,7 @@ import { layoutWithDagre } from './DomainDagreLayoutHelpers';
 import { packDisconnectedDagreComponents } from './domainDagreComponentPacking';
 import { validDomainDagreContentBudget, type DomainDagreContentBudget } from './domainDagreContentBudget';
 import { domainDagreComponentIndexCovers, type DomainDagreComponentIndex } from './domainDagrePeerComponents';
+import type { DomainDagreDirection } from './domainDagreLayoutBoundary';
 
 export type DomainDagreNodeArrangement =
   | 'dagre'
@@ -117,7 +118,7 @@ export const arrangeDomainDagreChildren = (
   nodes: readonly Node[],
   edges: readonly Edge[],
   arrangement: DomainDagreNodeArrangement,
-  dagreIsHorizontal: boolean,
+  dagreDirection: boolean | DomainDagreDirection,
   horizontalGap: number,
   verticalGap: number,
   getNodeDimensions: NodeDimensions,
@@ -126,6 +127,10 @@ export const arrangeDomainDagreChildren = (
   globalComponentByNodeId?: DomainDagreComponentIndex,
 ): ArrangedPosition[] => {
   if (nodes.length === 0) return [];
+  const resolvedDirection: DomainDagreDirection = typeof dagreDirection === 'boolean'
+    ? (dagreDirection ? 'LR' : 'TB')
+    : dagreDirection;
+  const dagreIsHorizontal = resolvedDirection === 'LR' || resolvedDirection === 'RL';
   const ids = new Set(nodes.map(node => node.id));
   const componentSizes = new Map<number, number>();
   if (globalComponentByNodeId) for (const component of globalComponentByNodeId.values()) {
@@ -149,7 +154,7 @@ export const arrangeDomainDagreChildren = (
     const positions = layoutWithDagre(
       [...nodes],
       [...edges],
-      dagreIsHorizontal ? 'LR' : 'TB',
+      resolvedDirection,
       dagreIsHorizontal ? verticalGap : horizontalGap,
       dagreIsHorizontal ? horizontalGap : verticalGap,
       getNodeDimensions,

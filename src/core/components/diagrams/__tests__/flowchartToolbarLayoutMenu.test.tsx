@@ -185,7 +185,9 @@ describe('flowchartToolbarLayoutMenu', () => {
     const elkRl = items.find(item => item.key === 'domain-elk-rl');
     const globalGroup = items.find(item => item.key === 'group-tree');
     const domainGroup = items.find(item => item.key === 'group-domain');
+    const standardDagreBt = items.find(item => item.key === 'domain-dagre-bt');
     const standardDagreLr = items.find(item => item.key === 'domain-dagre-lr');
+    const standardDagreRl = items.find(item => item.key === 'domain-dagre-rl');
 
     expect(elkTb).toBeDefined();
     expect(elkBt).toBeDefined();
@@ -203,7 +205,9 @@ describe('flowchartToolbarLayoutMenu', () => {
       'domain-elk-rl',
     ]);
     expect(collectItems(domainGroup?.children).map(item => item.key)).not.toContain('domain-elk-tb');
+    expect(standardDagreBt).toBeDefined();
     expect(standardDagreLr).toBeDefined();
+    expect(standardDagreRl).toBeDefined();
     expect(model.selectedKeys).toContain('domain-elk-lr');
     expect(model.selectedKeys).not.toContain('node-elk');
     expect(model.statusText).not.toContain(' + ');
@@ -219,8 +223,12 @@ describe('flowchartToolbarLayoutMenu', () => {
     if (typeof elkRl?.onClick === 'function') elkRl.onClick();
     expect(onStrategyLayout).toHaveBeenCalledWith('domain-elk', 'elk-layered', 'BT');
     expect(onStrategyLayout).toHaveBeenCalledWith('domain-elk', 'elk-layered', 'RL');
+    if (typeof standardDagreBt?.onClick === 'function') standardDagreBt.onClick();
     if (typeof standardDagreLr?.onClick === 'function') standardDagreLr.onClick();
+    if (typeof standardDagreRl?.onClick === 'function') standardDagreRl.onClick();
+    expect(onStrategyLayout).toHaveBeenCalledWith('domain-dagre', undefined, 'BT');
     expect(onStrategyLayout).toHaveBeenCalledWith('domain-dagre', undefined, 'LR');
+    expect(onStrategyLayout).toHaveBeenCalledWith('domain-dagre', undefined, 'RL');
     const treeBt = items.find(item => item.key === 'tree-bt');
     const treeRl = items.find(item => item.key === 'tree-rl');
     if (typeof treeBt?.onClick === 'function') treeBt.onClick();

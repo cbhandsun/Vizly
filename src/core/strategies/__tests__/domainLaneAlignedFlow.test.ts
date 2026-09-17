@@ -111,7 +111,9 @@ describe('shared process ranks with local branch separation', () => {
     ...(['TB', 'LR'] as const).map(direction => ({ name: 'wms-production', preset: wmsProcess, direction, productionGeometry: true, preserveSubDomain: false, layoutMode: 'lanes' as const })),
     ...(['TB', 'LR'] as const).map(direction => ({ name: 'demand-allocation', preset: demandAllocation, direction, productionGeometry: false, preserveSubDomain: true, layoutMode: 'lanes' as const })),
     ...(['TB', 'LR'] as const).map(direction => ({ name: 'enterprise', preset: enterpriseArchitecture, direction, productionGeometry: false, preserveSubDomain: true, layoutMode: 'lanes' as const })),
+    { name: 'enterprise', preset: enterpriseArchitecture, direction: 'BT' as const, productionGeometry: false, preserveSubDomain: true, layoutMode: 'standard' as const },
     { name: 'enterprise', preset: enterpriseArchitecture, direction: 'LR' as const, productionGeometry: true, preserveSubDomain: true, layoutMode: 'standard' as const },
+    { name: 'enterprise', preset: enterpriseArchitecture, direction: 'RL' as const, productionGeometry: false, preserveSubDomain: true, layoutMode: 'standard' as const },
   ];
   it.each(cases)('preserves business order and full routing quality in $name $direction $layoutMode', async ({ name, preset, direction, productionGeometry, preserveSubDomain, layoutMode }) => {
     const productionDimensions = name === 'enterprise' ? enterpriseDimensions : wmsDimensions;

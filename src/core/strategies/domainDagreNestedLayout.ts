@@ -8,7 +8,7 @@ import {
   domainDagreDomainOf,
   sortDomainDagreSubGroups,
 } from './domainDagreHierarchy';
-import type { DomainDagreSubDomainOrder } from './domainDagreLayoutBoundary';
+import type { DomainDagreDirection, DomainDagreSubDomainOrder } from './domainDagreLayoutBoundary';
 import { packDisconnectedDagreComponents } from './domainDagreComponentPacking';
 import type { DomainDagreContentBudget } from './domainDagreContentBudget';
 import { createDomainDagreDirectContent } from './domainDagreDirectContent';
@@ -30,8 +30,10 @@ export interface DomainDagreNestedLayoutContext {
   nodeToSubGroup: Map<string, string>;
   subDomainOrder?: DomainDagreSubDomainOrder;
   subDomainNodeIsHorizontal: boolean;
+  subDomainNodeDirection?: DomainDagreDirection;
   nodeArrangement: DomainDagreNodeArrangement;
   domainSubGroupIsHorizontal: boolean;
+  domainSubGroupDirection?: DomainDagreDirection;
   packVerticalSubDomains: boolean;
   packDisconnectedComponents?: boolean;
   globalComponentByNodeId?: DomainDagreComponentIndex;
@@ -97,7 +99,7 @@ const layoutSubGroupChildren = (
     children,
     edgesWithin(context.edges, children),
     context.nodeArrangement,
-    context.subDomainNodeIsHorizontal,
+    context.subDomainNodeDirection ?? (context.subDomainNodeIsHorizontal ? 'LR' : 'TB'),
     context.nodeGapH,
     context.nodeGapV,
     context.getNodeDimensions,
@@ -147,7 +149,7 @@ export const runDomainDagreNestedLayout = (
     }
 
     const direct = createDomainDagreDirectContent(freeNodes, context.edges, context.nodeArrangement,
-      context.subDomainNodeIsHorizontal, context.nodeGapH, context.nodeGapV,
+      context.subDomainNodeDirection ?? (context.subDomainNodeIsHorizontal ? 'LR' : 'TB'), context.nodeGapH, context.nodeGapV,
       context.getNodeDimensions, new Set(context.nodeById.keys()), context.packDisconnectedComponents === true,
       context.globalComponentByNodeId);
     const domainChildren = [...domainSubGroups, ...(direct ? [direct.block] : [])];
@@ -167,7 +169,7 @@ export const runDomainDagreNestedLayout = (
     const dagrePositions = layoutWithDagre(
       domainChildren,
       mapEdgesToContainers(domainEdges, containers),
-      context.domainSubGroupIsHorizontal ? 'LR' : 'TB',
+      context.domainSubGroupDirection ?? (context.domainSubGroupIsHorizontal ? 'LR' : 'TB'),
       context.domainSubGroupIsHorizontal ? context.nodeGapV : context.nodeGapH,
       context.domainSubGroupIsHorizontal ? context.nodeGapH : context.nodeGapV,
       context.getNodeDimensions,
@@ -197,7 +199,10 @@ export const runDomainDagreNestedLayout = (
     if (!direct && context.domainSubGroupIsHorizontal && domainSubGroups.length > 1) {
       const rowY = Math.min(...domainSubGroups.map(subGroup => subGroup.position.y));
       let cursorX = context.domainPaddingH;
-      for (const subGroup of domainSubGroups) {
+      const orderedSubGroups = context.domainSubGroupDirection === 'RL'
+        ? domainSubGroups.toReversed()
+        : domainSubGroups;
+      for (const subGroup of orderedSubGroups) {
         const deltaX = cursorX - subGroup.position.x;
         const deltaY = rowY - subGroup.position.y;
         if (Math.abs(deltaX) > 0.5 || Math.abs(deltaY) > 0.5) {
