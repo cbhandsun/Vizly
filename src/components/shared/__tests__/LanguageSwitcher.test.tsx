@@ -53,7 +53,7 @@ interface MockDropdownProps {
   }>;
   onOpenChange?: (open: boolean, info: { source: 'trigger' | 'menu' }) => void;
   open?: boolean;
-  overlayClassName?: string;
+  classNames?: { root?: string };
   menu: {
     id?: string;
     'aria-label'?: string;
@@ -64,7 +64,7 @@ interface MockDropdownProps {
 }
 
 vi.mock('antd', () => ({
-  Dropdown: ({ children, menu, onOpenChange, open = false, overlayClassName }: MockDropdownProps) => {
+  Dropdown: ({ children, menu, onOpenChange, open = false, classNames }: MockDropdownProps) => {
     const trigger = cloneElement(children, {
       onClick: event => {
         children.props.onClick?.(event);
@@ -76,7 +76,7 @@ vi.mock('antd', () => ({
       <div>
         {trigger}
         {open ? (
-          <div className={overlayClassName}>
+          <div className={classNames?.root}>
             <ul
               id={menu.id}
               role="menu"

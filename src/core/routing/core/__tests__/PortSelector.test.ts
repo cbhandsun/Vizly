@@ -136,6 +136,45 @@ describe('PortSelector', () => {
             });
         });
 
+        it('keeps side ports when a reverse pair is only diagonally offset', () => {
+            // Same shape as the EdgeRouter regression: the centre offset is
+            // strongly vertical (dy = -1000 versus dx = 498), so
+            // `verticalDominates` is true, but the two nodes do not overlap
+            // horizontally ([0,246] versus [519,723]).
+            // Scale-free vertical dominance alone must not force a non-stacked
+            // pair onto facing ports: doing so turns a pair that is actually
+            // offset sideways into a long top-to-bottom detour and drops the
+            // side-to-side return lane the reverse-edge logic exists to pick.
+            const source: NodeGeometry = {
+                id: 'diagonal-source',
+                position: { x: 0, y: 1000 },
+                dimensions: { width: 246, height: 96 }
+            };
+            const target: NodeGeometry = {
+                id: 'diagonal-target',
+                position: { x: 519, y: 0 },
+                dimensions: { width: 204, height: 96 }
+            };
+
+            const result = portSelector.selectOptimalPorts(
+                source,
+                target,
+                {
+                    ...defaultConfig,
+                    layoutDirection: 'TB',
+                    directionalHandlePolicy: 'force'
+                },
+                defaultWeights
+            );
+
+            expect(result).toMatchObject({
+                sourceHandle: 'r',
+                targetHandle: 'l',
+                autoSource: true,
+                autoTarget: true
+            });
+        });
+
         it('should fallback to default ports if no candidates match (stubbing candidates to empty)', () => {
             const originalGenerate = (portSelector as any).generateCandidates;
             (portSelector as any).generateCandidates = () => [];

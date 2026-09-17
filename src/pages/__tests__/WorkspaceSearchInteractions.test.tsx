@@ -132,4 +132,34 @@ describe('workspace search interactions', () => {
     expect(input).toHaveValue('');
     expect(input).toHaveFocus();
   });
+
+  it('focuses the search field when the visible panel padding is pressed', () => {
+    render(<SearchHarness />);
+    const input = screen.getByRole('searchbox', { name: 'Search workspace' });
+    const panel = input.closest('.workspace-search');
+    if (!panel) throw new Error('Expected the search panel to wrap the input');
+
+    (document.activeElement as HTMLElement | null)?.blur();
+    expect(document.activeElement).not.toBe(input);
+
+    // The panel is the 44px touch target; the padding around the input must
+    // behave like the input instead of dropping focus on the page body.
+    fireEvent.mouseDown(panel, { target: panel });
+
+    expect(input).toHaveFocus();
+  });
+
+  it('leaves presses on the clear control to that control', () => {
+    render(<SearchHarness />);
+    const input = screen.getByRole('searchbox', { name: 'Search workspace' });
+    fireEvent.change(input, { target: { value: 'roadmap' } });
+    const clearButton = screen.getByRole('button', { name: 'Clear search' });
+
+    (document.activeElement as HTMLElement | null)?.blur();
+    fireEvent.mouseDown(clearButton);
+
+    // Hijacking this press would move focus off the clear button and double
+    // handle the clear action.
+    expect(input).not.toHaveFocus();
+  });
 });

@@ -528,7 +528,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                         trigger={['click']}
                         open={layoutDropdown.open}
                         onOpenChange={layoutDropdown.handleOpenChange}
-                        overlayClassName="flowchart-layout-menu"
+                        classNames={{ root: 'flowchart-layout-menu' }}
                         disabled={layoutBusy}
                     >
                         <DropdownMenuTriggerButton
@@ -615,7 +615,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                         trigger={['click']}
                         open={moreDropdown.open}
                         onOpenChange={moreDropdown.handleOpenChange}
-                        overlayClassName="flowchart-more-menu"
+                        classNames={{ root: 'flowchart-more-menu' }}
                     >
                         <DropdownMenuTriggerButton
                             ref={moreDropdown.triggerRef}
@@ -639,7 +639,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                     trigger={['click']}
                     autoAdjustOverflow
                     getPopupContainer={(triggerNode) => triggerNode.ownerDocument.body}
-                    overlayClassName="flowchart-mobile-more-menu"
+                    classNames={{ root: 'flowchart-mobile-more-menu' }}
                     open={moreDropdown.open}
                     onOpenChange={moreDropdown.handleOpenChange}
                 >

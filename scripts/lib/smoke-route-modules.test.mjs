@@ -581,11 +581,17 @@ describe('smoke route modules', () => {
       hasRoot: true,
       activeTab: 'Industry templates0',
       body: 'Industry templates0 General templates0 No diagrams yet',
+      cardCount: 0,
+      skeletonCount: 0,
+      emptyStateVisible: true,
     })).toBe(true);
     expect(isManagementTemplatesReady({
       hasRoot: true,
       activeTab: '行业模板库0',
       body: '行业模板库0 通用模板库0 暂无图表',
+      cardCount: 0,
+      skeletonCount: 0,
+      emptyStateVisible: true,
     })).toBe(true);
   });
 
@@ -594,24 +600,91 @@ describe('smoke route modules', () => {
       hasRoot: false,
       activeTab: 'Industry templates0',
       body: 'No diagrams yet',
+      cardCount: 16,
+      skeletonCount: 0,
+      emptyStateVisible: false,
     })).toBe(false);
     expect(isManagementTemplatesReady({
       hasRoot: true,
       activeTab: 'Industry templates0',
       body: '加载应用 No diagrams yet',
+      cardCount: 16,
+      skeletonCount: 0,
+      emptyStateVisible: false,
     })).toBe(false);
     expect(isManagementTemplatesReady({
       hasRoot: true,
       activeTab: 'Industry templates0',
       body: '页面出现错误 No diagrams yet',
+      cardCount: 16,
+      skeletonCount: 0,
+      emptyStateVisible: false,
     })).toBe(false);
     expect(isManagementTemplatesReady({
       hasRoot: true,
       activeTab: null,
       body: 'No diagrams yet',
+      cardCount: 16,
+      skeletonCount: 0,
+      emptyStateVisible: false,
     })).toBe(false);
   });
 
+  it('keeps the skeleton grid and the un-settled catalog from counting as ready', () => {
+    const loadingShell = {
+      hasRoot: true,
+      activeTab: '行业模板库40',
+      body: 'Vizly工作区 行业模板库 通用模板 最近修改',
+    };
+
+    // Regression: the observed loading frame (0 cards, 40 skeleton tiles) used
+    // to satisfy the localized-copy check and be captured as a settled page.
+    expect(isManagementTemplatesReady({
+      ...loadingShell,
+      cardCount: 0,
+      skeletonCount: 40,
+      emptyStateVisible: false,
+    })).toBe(false);
+
+    expect(isManagementTemplatesReady({
+      ...loadingShell,
+      cardCount: 0,
+      skeletonCount: 0,
+      emptyStateVisible: false,
+    })).toBe(false);
+
+    expect(isManagementTemplatesReady({
+      ...loadingShell,
+      cardCount: 0,
+      skeletonCount: undefined,
+      emptyStateVisible: undefined,
+    })).toBe(false);
+
+    expect(isManagementTemplatesReady({
+      ...loadingShell,
+      cardCount: 16,
+      skeletonCount: 0,
+      emptyStateVisible: false,
+    })).toBe(true);
+  });
+
+  it('serializes the template readiness predicate without outer references', () => {
+    const settledCatalog = {
+      hasRoot: true,
+      activeTab: 'Industry templates16',
+      body: 'Industry templates16 General templates3',
+      cardCount: 16,
+      skeletonCount: 0,
+      emptyStateVisible: false,
+    };
+    const expression = [
+      '('   + isManagementTemplatesReady.toString() + ')',
+      '(' + JSON.stringify(settledCatalog) + ')',
+    ].join('');
+
+    // The probe runs inside the page, so module-scope helpers are unavailable.
+    expect(runInNewContext(expression, {})).toBe(true);
+  });
   it('filters allowlisted warnings but never suppresses errors', () => {
     const logs = [
       { level: 'warn', message: 'known transient warning' },

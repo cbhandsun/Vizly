@@ -422,7 +422,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                     trigger={['click']}
                     open={saveMenuOpen}
                     onOpenChange={handleSaveMenuOpenChange}
-                    overlayClassName={SAVE_MENU_OVERLAY_CLASS}
+                    classNames={{ root: SAVE_MENU_OVERLAY_CLASS }}
                 >
                     <DropdownMenuTriggerButton
                         ref={saveMenuButtonRef}

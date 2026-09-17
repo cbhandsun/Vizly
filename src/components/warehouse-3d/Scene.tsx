@@ -78,8 +78,12 @@ const Scene: React.FC<SceneProps> = ({ onModelReady }) => {
             role="region"
             tabIndex={0}
         >
+            {/* Three deprecates PCFSoftShadowMap and silently downgrades it to
+                PCFShadowMap at render time, logging a warning on every scene
+                boot. Selecting the PCF map directly produces the same shadows
+                the renderer already falls back to, without the console noise. */}
             <Canvas
-                shadows
+                shadows="percentage"
                 dpr={1}
                 camera={{ position: [-200, 180, 220], fov: 35 }}
                 gl={{

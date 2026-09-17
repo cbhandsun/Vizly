@@ -112,7 +112,7 @@ export const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({ variant = 's
                 trigger={['click']}
                 open={open}
                 onOpenChange={handleOpenChange}
-                overlayClassName={overlayClassName}
+                classNames={{ root: overlayClassName }}
                 getPopupContainer={(triggerNode) => (document.fullscreenElement as HTMLElement) || triggerNode.parentNode || document.body}
             >
                 <button

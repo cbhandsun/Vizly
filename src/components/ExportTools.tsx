@@ -586,7 +586,7 @@ ${mermaid}
           trigger={['click']}
           open={exportMenuOpen}
           onOpenChange={handleExportMenuOpenChange}
-          overlayClassName={EXPORT_MENU_OVERLAY_CLASS}
+          classNames={{ root: EXPORT_MENU_OVERLAY_CLASS }}
           placement="bottomRight"
           getPopupContainer={() => resolveExportPopupContainer(document)}
         >

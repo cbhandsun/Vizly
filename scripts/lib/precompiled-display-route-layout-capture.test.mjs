@@ -1,12 +1,33 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { clickPrecompiledDisplayRouteLayoutVariant } from './precompiled-display-route-layout-capture.mjs';
+import {
+  clickPrecompiledDisplayRouteLayoutVariant,
+  precompiledLayoutCommandSurfaceReady,
+} from './precompiled-display-route-layout-capture.mjs';
 import {
   PRECOMPILED_DISPLAY_ROUTE_GENERATION_TARGETS,
   PRECOMPILED_DISPLAY_ROUTE_LAYOUT_TARGETS,
 } from './precompiled-display-route-targets.mjs';
 
 describe('precompiled display route layout capture', () => {
+  it('allows an explicit layout command after any bounded initial routing terminal state', () => {
+    const base = {
+      readyState: 'complete',
+      hasLayoutTrigger: true,
+      hasStableLayoutSelection: true,
+    };
+    for (const routingStage of [
+      'final-applied', 'final-quality-rejected', 'final-safety-rejected', 'final-routing-failed',
+      'worker-error', 'worker-message-error', 'worker-cancelled', 'worker-timeout', 'worker-bounded-fallback',
+    ]) expect(precompiledLayoutCommandSurfaceReady({ ...base, routingStage })).toBe(true);
+    for (const value of [undefined, null, {}, { ...base, routingStage: 'routing' },
+      { ...base, readyState: 'loading', routingStage: 'worker-timeout' },
+      { ...base, hasLayoutTrigger: false, routingStage: 'worker-timeout' },
+      { ...base, hasStableLayoutSelection: false, routingStage: 'worker-timeout' }]) {
+      expect(precompiledLayoutCommandSurfaceReady(value)).toBe(false);
+    }
+  });
+
   it('keeps only exact replayable layout targets without replacing initial targets', () => {
     expect(PRECOMPILED_DISPLAY_ROUTE_LAYOUT_TARGETS).toEqual([{
       presetId: 'wms-process-flow-v1',

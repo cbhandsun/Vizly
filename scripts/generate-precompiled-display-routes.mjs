@@ -4,7 +4,10 @@ import { waitForDisplayRoutingBrowserValue } from './lib/display-routing-browser
 import { PRECOMPILED_DISPLAY_ROUTE_BROWSER_CAPTURE_SCRIPT } from './lib/precompiled-display-route-browser-capture.mjs';
 
 import { withPrecompiledRouteBrowser } from './lib/precompiled-display-route-cdp.mjs';
-import { clickPrecompiledDisplayRouteLayoutVariant } from './lib/precompiled-display-route-layout-capture.mjs';
+import {
+  clickPrecompiledDisplayRouteLayoutVariant,
+  precompiledLayoutCommandSurfaceReady,
+} from './lib/precompiled-display-route-layout-capture.mjs';
 import {
   isFreshFullRouteResolution,
   renderPrecompiledDisplayRouteCaptureExpression,
@@ -106,18 +109,19 @@ const captureTarget = async (session, target, source, routingVersion, routingSou
     // issue a concrete layout command. Some presets can reject their initial
     // automatic route before that command runs, so readiness here is the
     // bounded UI command surface rather than a successful initial route.
-    await waitForDisplayRoutingBrowserValue(session, `(() => (
-      document.readyState === 'complete'
-      && ['final-applied', 'final-quality-rejected', 'final-safety-rejected'].includes(
-        window.__vizlyBaseReactFlowDisplayRouting?.stage,
-      )
-      && Array.from(document.querySelectorAll('button')).some(
-        button => /自动布局|layout/i.test(button.getAttribute('aria-label') || ''),
-      )
-      && Array.from(document.querySelectorAll('button')).some(
-        button => button.hasAttribute('data-flowchart-layout-selection'),
-      )
-    ))()`, Math.max(0, deadline - Date.now()));
+    await waitForDisplayRoutingBrowserValue(session, `(() => {
+      const ready = ${precompiledLayoutCommandSurfaceReady.toString()};
+      return ready({
+        readyState: document.readyState,
+        routingStage: window.__vizlyBaseReactFlowDisplayRouting?.stage,
+        hasLayoutTrigger: Array.from(document.querySelectorAll('button')).some(
+          button => /自动布局|layout/i.test(button.getAttribute('aria-label') || ''),
+        ),
+        hasStableLayoutSelection: Array.from(document.querySelectorAll('button')).some(
+          button => button.hasAttribute('data-flowchart-layout-selection'),
+        ),
+      });
+    })()`, Math.max(0, deadline - Date.now()));
     await clickPrecompiledDisplayRouteLayoutVariant(session, variantId);
   }
   const captured = await waitForDisplayRoutingBrowserValue(session,

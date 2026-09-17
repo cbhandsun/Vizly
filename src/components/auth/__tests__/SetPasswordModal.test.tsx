@@ -130,4 +130,21 @@ describe('SetPasswordModal', () => {
         await waitFor(() => expect(updatePasswordMock).toHaveBeenCalledOnce());
         expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
     });
+
+    it('does not touch the form instance while the modal stays closed', async () => {
+        // AuthStatus keeps this modal mounted for the whole session, so any
+        // form call made while closed reaches an unmounted instance and makes
+        // antd log "useForm is not connected to any Form element" on every route.
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        render(<SetPasswordModal open={false} onCancel={vi.fn()} />);
+        await act(async () => {
+            await new Promise((resolve) => { setTimeout(resolve, 50); });
+        });
+
+        const unhookedWarnings = errorSpy.mock.calls
+            .map((args) => String(args[0] ?? ''))
+            .filter((text) => text.includes('useForm'));
+        expect(unhookedWarnings).toEqual([]);
+        errorSpy.mockRestore();
+    });
 });

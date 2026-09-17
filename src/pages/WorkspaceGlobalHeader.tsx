@@ -2,7 +2,13 @@ import type { MenuProps } from 'antd/es/menu';
 import Avatar from 'antd/es/avatar';
 import Dropdown from 'antd/es/dropdown';
 import { Palette, Search, Settings, User, X } from 'lucide-react';
-import { useRef, useState, type KeyboardEvent, type RefObject } from 'react';
+import {
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+  type RefObject,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { LanguageSwitcher } from '@/components/shared/LanguageSwitcher';
@@ -94,6 +100,19 @@ export const WorkspaceGlobalHeader = ({
     if (event.key === 'Escape') restoreSettingsFocusRef.current = true;
   };
 
+  // The panel paints a 44px touch target but only the 22px input used to be
+  // clickable, so presses on the padding dropped focus on the page body.
+  // Claim those presses for the input instead of shrinking the visual size.
+  // Presses that land on the clear button stay with that button.
+  const handleSearchPanelPointerDown = (event: MouseEvent<HTMLDivElement>) => {
+    const input = searchInputRef.current;
+    if (!input) return;
+    const target = event.target;
+    if (target instanceof Element && target.closest('button, a, input')) return;
+    event.preventDefault();
+    input.focus({ preventScroll: true });
+  };
+
   return (
   <header className="workspace-global-header">
     <button
@@ -121,7 +140,7 @@ export const WorkspaceGlobalHeader = ({
     </button>
 
     <div className="workspace-header-search-container">
-      <div className="workspace-search">
+      <div className="workspace-search" onMouseDown={handleSearchPanelPointerDown}>
         <Search size={16} strokeWidth={2} style={{ color: 'var(--vz-brand-from)', opacity: 0.7 }} />
         <input
           ref={searchInputRef}

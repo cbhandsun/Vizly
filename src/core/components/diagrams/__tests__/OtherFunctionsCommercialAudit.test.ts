@@ -76,7 +76,7 @@ describe('other-function commercial interaction safeguards', () => {
         expect(mobileCss).toMatch(/\.action-btn-glass[\s\S]*?width: 44px;[\s\S]*?height: 44px;/);
         expect(toolbarSource).toContain('autoAdjustOverflow');
         expect(toolbarSource).not.toContain('autoAdjustOverflow={false}');
-        expect(toolbarSource).toContain('overlayClassName="flowchart-mobile-more-menu"');
+        expect(toolbarSource).toContain("classNames={{ root: 'flowchart-mobile-more-menu' }}");
         expect(flowchartCss).toMatch(/\.flowchart-mobile-more-menu[\s\S]*?max-height: calc\(100vh - 112px\)[\s\S]*?overflow-y: auto/);
     });
 

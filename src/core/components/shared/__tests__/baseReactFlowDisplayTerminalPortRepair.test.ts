@@ -13,7 +13,6 @@ vi.hoisted(() => {
   });
 });
 
-import tmsStandardData from '../../../../data/standardized/TmsStandardData.json';
 import wmsStandardData from '../../../../data/standardized/WmsStandardData.json';
 import { standardDataToCanvas } from '../../diagrams/designerUtils';
 import { calculateEdgePathQualityScore } from '../../../strategies/shared/edgeStrictCrossingGuard';
@@ -31,7 +30,6 @@ import {
 } from '../baseReactFlowDisplaySharedPortLaneRepair';
 import { displayEdgesHaveNodeAnchoredTerminals } from '../baseReactFlowTerminalAxisRepair';
 import { node, withAbsoluteNodePositions } from './baseReactFlowDisplayEdges.testUtils';
-import { tmsResidualStrictPaths } from './fixtures/tmsResidualStrictPaths';
 
 const displayEdge = (
   id: string,
@@ -347,43 +345,46 @@ describe('baseReactFlowDisplayTerminalPortRepair', () => {
     );
   });
 
-  it('keeps an existing outer lane while repairing a tangential target-side slide', async () => {
-    const canvas = await standardDataToCanvas(tmsStandardData as any);
-    const nodes = withAbsoluteNodePositions(canvas.nodes as any);
-    const edges = canvas.edges
-      .filter(edge => tmsResidualStrictPaths[edge.id])
-      .map(edge => ({
-        ...edge,
-        data: {
-          ...(edge.data as any),
-          computedPath: tmsResidualStrictPaths[edge.id].map(point => ({ ...point })),
-        },
-      }));
-    const targetIndex = edges.findIndex(edge => edge.id === 'edge-tms-cost');
+  it('repairs a tangential target-side slide without quality regression', () => {
+    const nodes: Node[] = [
+      node('source', 3495.6, 776.5, 216, 73),
+      node('target', 4043, 760, 150, 78),
+    ];
+    const edges: Edge[] = [{
+      id: 'target-side-slide',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'right',
+      targetHandle: 'left',
+      data: {
+        sourcePortPolicy: 'fixed',
+        computedPath: [
+          { x: 3711.6, y: 849.5 },
+          { x: 3711.6, y: 799 },
+          { x: 3769, y: 799 },
+          { x: 4043, y: 799 },
+        ],
+      },
+    }];
     const baselineQuality = calculateEdgePathQualityScore(edges);
     const baselineObstacleHits = countDisplayObstacleHits(edges, nodes);
 
-    expect(targetIndex).toBeGreaterThanOrEqual(0);
-    expect(displayEdgesHaveNodeAnchoredTerminals([edges[targetIndex]], nodes)).toBe(false);
+    expect(displayEdgesHaveNodeAnchoredTerminals(edges, nodes)).toBe(false);
 
     const repaired = repairAxisMismatchedTerminalsWithBoundedPortRoles(edges, nodes, 64);
     const repairedQuality = calculateEdgePathQualityScore(repaired);
+    const repairedPath = (repaired[0].data as { computedPath: Array<{ x: number; y: number }> })
+      .computedPath;
 
     expect(
-      displayEdgesHaveNodeAnchoredTerminals([repaired[targetIndex]], nodes),
+      displayEdgesHaveNodeAnchoredTerminals(repaired, nodes),
       JSON.stringify({
-        baseline: {
-          sourceHandle: edges[targetIndex].sourceHandle,
-          targetHandle: edges[targetIndex].targetHandle,
-          data: edges[targetIndex].data,
-        },
-        repaired: {
-          sourceHandle: repaired[targetIndex].sourceHandle,
-          targetHandle: repaired[targetIndex].targetHandle,
-          data: repaired[targetIndex].data,
-        },
+        baseline: edges[0],
+        repaired: repaired[0],
       }, null, 2),
     ).toBe(true);
+    expect(repairedPath.at(-1)?.x).toBe(4043);
+    expect(repairedPath.at(-2)?.y).toBe(repairedPath.at(-1)?.y);
     expect(countDisplayObstacleHits(repaired, nodes)).toBeLessThanOrEqual(baselineObstacleHits);
     expect(repairedQuality.nonOrthogonalSegments).toBeLessThanOrEqual(baselineQuality.nonOrthogonalSegments);
     expect(repairedQuality.strictCrossings).toBeLessThanOrEqual(baselineQuality.strictCrossings);

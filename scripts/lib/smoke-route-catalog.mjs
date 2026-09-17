@@ -3,21 +3,46 @@ import {
   isFinalWmsDisplayRoutingReady,
 } from '../smokeRouteBudgetUtils.mjs';
 
-export const isManagementTemplatesReady = ({ hasRoot, activeTab, body }) => {
+/**
+ * The template catalog is only ready once it has actually settled: either real
+ * template cards are mounted, or the view legitimately reports an empty state.
+ * Matching localized tab/body copy alone used to pass while the grid was still
+ * an 8-card skeleton placeholder, which made every downstream evidence capture
+ * describe a loading frame as a settled catalog.
+ *
+ * This function is serialized with `Function.prototype.toString` into the CDP
+ * probe, so it must stay self-contained: no outer references, and every value it
+ * reads has to arrive through the argument object.
+ */
+export const isManagementTemplatesReady = ({
+  hasRoot,
+  activeTab,
+  body,
+  cardCount,
+  skeletonCount,
+  emptyStateVisible,
+}) => {
   if (!hasRoot || typeof activeTab !== 'string' || typeof body !== 'string') return false;
   const hasExpectedTab = (
     activeTab.includes('行业模板库')
     || activeTab.includes('Industry templates')
   );
-  return hasExpectedTab
-    && !body.includes('加载应用')
-    && !body.includes('加载图表管理')
-    && !body.includes('页面出现错误')
-    && (
-      body.includes('行业模板库')
-      || body.includes('Industry templates')
-      || body.includes('No diagrams')
-    );
+  if (!hasExpectedTab) return false;
+  if (
+    body.includes('加载应用')
+    || body.includes('加载图表管理')
+    || body.includes('页面出现错误')
+  ) {
+    return false;
+  }
+
+  const positive = (value) => (typeof value === 'number' && Number.isFinite(value) && value > 0);
+  if (positive(skeletonCount)) return false;
+  if (positive(cardCount)) return true;
+
+  // A settled catalog may legitimately be empty, but only when the workspace
+  // renders its empty state instead of placeholder cards.
+  return Boolean(emptyStateVisible);
 };
 
 const DEV_ONLY_ROUTE_NAMES = new Set([
@@ -68,18 +93,31 @@ export const createSmokeRouteCatalog = (BASE_URL, { includeDevRoutes = false } =
         const body = document.body?.textContent || '';
         const activeTab = document.querySelector('.filter-tab.active')?.textContent || '';
         const hasRoot = Boolean(document.getElementById('root'));
+        const cardCount = document.querySelectorAll('.diagram-card').length;
+        const skeletonCount = document.querySelectorAll('.skeleton-card').length;
+        const emptyStateVisible = Boolean(document.querySelector('.workspace-empty-state'));
         return {
           href: location.href,
           title: document.title,
           readyState: document.readyState,
           hasRoot,
           activeTab,
+          cardCount,
+          skeletonCount,
+          emptyStateVisible,
           appFallback: body.includes('加载应用'),
           pageFallback: body.includes('加载图表管理') || body.includes('加载图表'),
           errorBoundary: body.includes('页面出现错误'),
           bodyText: body.slice(0, 240),
           rootText: (document.getElementById('root')?.textContent || '').slice(0, 240),
-          ready: (${isManagementTemplatesReady.toString()})({ hasRoot, activeTab, body }),
+          ready: (${isManagementTemplatesReady.toString()})({
+            hasRoot,
+            activeTab,
+            body,
+            cardCount,
+            skeletonCount,
+            emptyStateVisible,
+          }),
         };
       })()`,
     },

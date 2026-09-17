@@ -341,6 +341,20 @@ export class CostEvaluator {
         const horizontalDominates = absDx > effectiveDy * DOMINANCE_RATIO && absDx > MIN_DOMINANT_DISTANCE;
         const verticalDominates = absDy > effectiveDx * DOMINANCE_RATIO && absDy > MIN_DOMINANT_DISTANCE;
 
+        // 堆叠判定 (Stacked Test)
+        // 中心点偏移的"垂直主导"是无量纲的：一对水平错开 498px 的节点仍然满足
+        // verticalDominates，但它的端子明明应该走左右两侧。只有当两个节点在水平
+        // 方向上确实共享投影时，"垂直主导"才意味着这是一个上下堆叠、应当使用朝向
+        // 相对端口的配对。
+        const sLeft = context.sNode.position.x;
+        const tLeft = context.tNode.position.x;
+        const sRight = sLeft + context.sNode.dimensions.width;
+        const tRight = tLeft + context.tNode.dimensions.width;
+        const horizontallyStacked = Math.min(sRight, tRight) > Math.max(sLeft, tLeft);
+
+        // 反向边只有在真正上下堆叠时才按朝向端口处理，否则保持侧向回路
+        const verticalFacing = verticalDominates && horizontallyStacked;
+
         // 3. 布局方向 vs 几何 (Tie-breaking)
         if (isTB || isBT) {
             if (horizontalDominates) {
@@ -349,7 +363,7 @@ export class CostEvaluator {
                 if (sDir === 'l' || sDir === 'r') penalty -= PREFERRED_AXIS_BONUS;
             } else {
                 // 垂直主导 -> 鼓励垂直端口 (t/b)
-                if (!isBackwards || verticalDominates) {
+                if (!isBackwards || verticalFacing) {
                     // A strongly vertical geometric relationship is already an
                     // unambiguous terminal-side signal.  Treat it like the
                     // normal vertical flow even when the declared layout axis
@@ -378,7 +392,7 @@ export class CostEvaluator {
         }
 
         // 4. 反向边特殊处理 (Backwards Edge)
-        if (isBackwards && (isTB || isBT) && !verticalDominates) {
+        if (isBackwards && (isTB || isBT) && !verticalFacing) {
             // 鼓励 Cross-Side 或 Same-Side 回路
             // Cross-Side: r -> l
             if ((sDir === 'r' && tDir === 'l') || (sDir === 'l' && tDir === 'r')) {

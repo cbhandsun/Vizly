@@ -12,6 +12,25 @@ const resolveLayoutCase = variantId => DISPLAY_ROUTING_LAYOUT_CASES.find(
   layoutCase => layoutCase.id === variantId,
 ) ?? null;
 
+export const precompiledLayoutCommandSurfaceReady = value => {
+  if (!value || typeof value !== 'object') return false;
+  const terminalRoutingStages = [
+    'final-applied',
+    'final-quality-rejected',
+    'final-safety-rejected',
+    'final-routing-failed',
+    'worker-error',
+    'worker-message-error',
+    'worker-cancelled',
+    'worker-timeout',
+    'worker-bounded-fallback',
+  ];
+  return value.readyState === 'complete'
+    && terminalRoutingStages.includes(value.routingStage)
+    && value.hasLayoutTrigger === true
+    && value.hasStableLayoutSelection === true;
+};
+
 export const clickPrecompiledDisplayRouteLayoutVariant = async (
   session,
   variantId,

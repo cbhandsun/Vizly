@@ -26,9 +26,19 @@ export const SetPasswordModal: React.FC<SetPasswordModalProps> = ({ open, onCanc
 
     useLayoutEffect(() => {
         if (!open) {
-            form.resetFields();
+            // The modal is mounted for the whole session, but `destroyOnHidden`
+            // leaves the form instance unhooked while it is closed. Resetting a
+            // form that has no mounted Form element makes antd log
+            // "useForm is not connected to any Form element" on every route.
+            // Clearing happens while the form is still mounted instead: on open
+            // and in `handleClose`.
             invalidateOperation();
+            return;
         }
+
+        // Runs in the same commit that mounts the modal content, so the Form
+        // element is already registered with this instance.
+        form.resetFields();
     }, [form, invalidateOperation, open]);
 
     const handleClose = () => {
@@ -59,7 +69,7 @@ export const SetPasswordModal: React.FC<SetPasswordModalProps> = ({ open, onCanc
             onCancel={handleClose}
             afterOpenChange={(nextOpen) => {
                 if (!nextOpen) {
-                    form.resetFields();
+                    // Content is destroyed by then, so only drop pending work.
                     operation.invalidate();
                 }
             }}

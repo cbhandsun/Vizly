@@ -1416,8 +1416,21 @@ html[data-theme='dark'] .diagram-context-menu {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .diagram-card,
+  .diagram-list-row,
+  .skeleton-card,
+  .diagram-context-menu,
   .diagram-open-pending svg,
-  .workspace-create-spinner { animation: none; }
+  .workspace-create-spinner {
+    animation: none;
+  }
+
+  .skeleton-cover::after,
+  .skeleton-title::after,
+  .skeleton-meta::after,
+  .workspace-empty-art {
+    animation: none;
+  }
 }
 
 .workspace-empty-state.is-recoverable-result {
