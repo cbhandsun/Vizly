@@ -71,7 +71,12 @@ describe('flowchartToolbarLayoutMenu', () => {
     expect(rtl.leftTop.points).toEqual(ltr.rightTop.points);
     expect(rtl.leftBottom.points).toEqual(ltr.rightBottom.points);
     for (const candidate of [...Object.values(ltr), ...Object.values(rtl)]) {
-      expect(candidate.overflow).toEqual({ adjustX: true, adjustY: true, shiftY: true });
+      expect(candidate.overflow).toEqual({
+        adjustX: true,
+        adjustY: true,
+        shiftX: true,
+        shiftY: true,
+      });
     }
   });
 
@@ -398,15 +403,30 @@ describe('flowchartToolbarLayoutMenu', () => {
     const moreEngines = rootItems.find(item => item.key === 'more-layout-engines') ?? {};
 
     expect(recommended.key).toBe('group-recommended');
+    expect(rootItems.find(item => item.key === 'group-standard-process')?.popupClassName)
+      .toBe('flowchart-layout-submenu-popup');
+    expect(rootItems.find(item => item.key === 'group-complex-process')?.popupClassName)
+      .toBe('flowchart-layout-submenu-popup');
     expect(collectItems(recommended.children).map(item => item.key)).toEqual([
       'smart-recommendation',
+      'group-standard-process',
       'domain-dagre-tb',
+      'domain-dagre-bt',
       'domain-dagre-lr',
+      'domain-dagre-rl',
+      'group-complex-process',
+      'domain-compound-elk-tb',
+      'domain-compound-elk-bt',
       'domain-compound-elk-lr',
+      'domain-compound-elk-rl',
+      'group-swimlane-process',
       'domain-lanes-tb',
+      'domain-lanes-bt',
       'domain-lanes-lr',
+      'domain-lanes-rl',
     ]);
     expect(customCombination.key).toBe('group-custom-combination');
+    expect(customCombination.popupClassName).toBe('flowchart-layout-submenu-popup');
     expect(collectItems(customCombination.children).map(item => item.key)).toEqual([
       'custom-domain-direction',
       'custom-domain-tb',
@@ -420,7 +440,7 @@ describe('flowchartToolbarLayoutMenu', () => {
     ]);
     expect(moreEngines.key).toBe('more-layout-engines');
     expect(collectItems(moreEngines.children).map(item => item.key)).toContain('domain-elk-lr');
-    expect(collectItems(moreEngines.children).map(item => item.key)).toContain('domain-dagre-rl');
+    expect(collectItems(moreEngines.children).map(item => item.key)).not.toContain('domain-dagre-rl');
 
     const smart = collectItems(recommended.children)
       .find(item => item.key === 'smart-recommendation');
@@ -541,18 +561,31 @@ describe('flowchartToolbarLayoutMenu', () => {
     expect(items.find(item => item.key === 'custom-domain-direction')?.disabled).toBe(true);
     expect(items.find(item => item.key === 'custom-node-arrangement')?.disabled).toBe(true);
     expect(items.find(item => item.key === 'domain-compound-elk-lr')?.disabled).not.toBe(true);
-    expect(rootItems.find(item => item.key === 'group-custom-combination')?.label).toContain('当前图含合流或循环');
+    expect(rootItems.find(item => item.key === 'group-custom-combination')?.label).toBe('布局组合');
+    expect(rootItems.find(item => item.key === 'group-custom-combination')?.title)
+      .toBe('当前图含合流或循环，请使用常用场景');
+    expect(items.find(item => item.key === 'custom-domain-direction')?.title)
+      .toBe('当前图含合流或循环，请使用常用场景');
     expect(recommended.map(item => item.key)).toEqual([
+      'group-standard-process',
       'domain-dagre-tb',
+      'domain-dagre-bt',
       'domain-dagre-lr',
+      'domain-dagre-rl',
+      'group-complex-process',
+      'domain-compound-elk-tb',
+      'domain-compound-elk-bt',
       'domain-compound-elk-lr',
+      'domain-compound-elk-rl',
+      'group-swimlane-process',
       'domain-lanes-tb',
+      'domain-lanes-bt',
       'domain-lanes-lr',
+      'domain-lanes-rl',
     ]);
     expect(moreEngines.map(item => item.key)).toEqual(expect.arrayContaining([
-      'domain-dagre-bt',
-      'domain-dagre-rl',
-      'domain-compound-elk-tb',
+      'compact-groups-lr',
+      'domain-elk-lr',
     ]));
 
     const topBottom = recommended.find(item => item.key === 'domain-dagre-tb');

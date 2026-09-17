@@ -47,6 +47,10 @@ export { MIN_RENDER_SAFE_ENDPOINT_STUB, countRenderUnsafeEndpointStubs } from '.
 const MAX_FINAL_ENDPOINT_STUB_REPAIR_EVALUATIONS = 8;
 const MAX_GLOBAL_STRICT_STUB_FALLBACK_EDGES = 36;
 const COMMERCIAL_CLEARANCE_RISK_EPSILON = 1e-6;
+const EXTENDED_RENDER_SAFE_ENDPOINT_STUB_CANDIDATE_LENGTHS = [
+  MIN_RENDER_SAFE_ENDPOINT_STUB + 16,
+  MIN_RENDER_SAFE_ENDPOINT_STUB + 32,
+];
 
 export const commercialClearanceRiskIsGloballyMinimal = (risk: number): boolean => (
   Number.isFinite(risk)
@@ -163,7 +167,10 @@ export const repairFinalShortEndpointStubs = <T extends Edge[]>(edges: T, nodes:
   return bestEdges;
 };
 
-const buildRenderSafeEndpointStubPaths = (path: DisplayPoint[]): DisplayPoint[][] => {
+const buildRenderSafeEndpointStubPaths = (
+  path: DisplayPoint[],
+  candidateLengths: readonly number[] = [MIN_RENDER_SAFE_ENDPOINT_STUB],
+): DisplayPoint[][] => {
   if (path.length < 3) return [];
   const sourceLength = segmentDisplayLength(path[0], path[1]);
   const targetLength = segmentDisplayLength(path[path.length - 2], path[path.length - 1]);
@@ -171,38 +178,38 @@ const buildRenderSafeEndpointStubPaths = (path: DisplayPoint[]): DisplayPoint[][
   const targetNeedsRepair = targetLength < MIN_RENDER_SAFE_ENDPOINT_STUB;
   if (!sourceNeedsRepair && !targetNeedsRepair) return [];
 
-  const extendSource = (candidate: DisplayPoint[]): boolean => {
+  const extendSource = (candidate: DisplayPoint[], length: number): boolean => {
     const axis = displayAxisOf(candidate[0], candidate[1]);
     if (!axis || candidate.length < 3) return false;
     if (axis === 'h') {
       const direction = Math.sign(candidate[1].x - candidate[0].x);
       if (direction === 0) return false;
-      const coordinate = candidate[0].x + direction * MIN_RENDER_SAFE_ENDPOINT_STUB;
+      const coordinate = candidate[0].x + direction * length;
       candidate[1].x = coordinate;
       candidate[2].x = coordinate;
     } else {
       const direction = Math.sign(candidate[1].y - candidate[0].y);
       if (direction === 0) return false;
-      const coordinate = candidate[0].y + direction * MIN_RENDER_SAFE_ENDPOINT_STUB;
+      const coordinate = candidate[0].y + direction * length;
       candidate[1].y = coordinate;
       candidate[2].y = coordinate;
     }
     return true;
   };
-  const extendTarget = (candidate: DisplayPoint[]): boolean => {
+  const extendTarget = (candidate: DisplayPoint[], length: number): boolean => {
     const lastIndex = candidate.length - 1;
     const axis = displayAxisOf(candidate[lastIndex - 1], candidate[lastIndex]);
     if (!axis || candidate.length < 3) return false;
     if (axis === 'h') {
       const direction = Math.sign(candidate[lastIndex - 1].x - candidate[lastIndex].x);
       if (direction === 0) return false;
-      const coordinate = candidate[lastIndex].x + direction * MIN_RENDER_SAFE_ENDPOINT_STUB;
+      const coordinate = candidate[lastIndex].x + direction * length;
       candidate[lastIndex - 1].x = coordinate;
       candidate[lastIndex - 2].x = coordinate;
     } else {
       const direction = Math.sign(candidate[lastIndex - 1].y - candidate[lastIndex].y);
       if (direction === 0) return false;
-      const coordinate = candidate[lastIndex].y + direction * MIN_RENDER_SAFE_ENDPOINT_STUB;
+      const coordinate = candidate[lastIndex].y + direction * length;
       candidate[lastIndex - 1].y = coordinate;
       candidate[lastIndex - 2].y = coordinate;
     }
@@ -211,20 +218,123 @@ const buildRenderSafeEndpointStubPaths = (path: DisplayPoint[]): DisplayPoint[][
 
   const candidates: DisplayPoint[][] = buildElbowEndpointStubPaths(path, MIN_RENDER_SAFE_ENDPOINT_STUB);
   if (sourceNeedsRepair) {
-    const candidate = path.map(point => ({ ...point }));
-    if (extendSource(candidate)) candidates.push(compactOrthogonalPath(candidate));
+    for (const length of candidateLengths) {
+      const candidate = path.map(point => ({ ...point }));
+      if (extendSource(candidate, length)) pushUniqueRenderSafeStubPath(candidates, candidate);
+    }
   }
   if (targetNeedsRepair) {
-    const candidate = path.map(point => ({ ...point }));
-    if (extendTarget(candidate)) candidates.push(compactOrthogonalPath(candidate));
+    for (const length of candidateLengths) {
+      const candidate = path.map(point => ({ ...point }));
+      if (extendTarget(candidate, length)) pushUniqueRenderSafeStubPath(candidates, candidate);
+    }
   }
   if (sourceNeedsRepair && targetNeedsRepair) {
     const candidate = path.map(point => ({ ...point }));
-    if (extendSource(candidate) && extendTarget(candidate)) {
+    if (
+      extendSource(candidate, MIN_RENDER_SAFE_ENDPOINT_STUB)
+      && extendTarget(candidate, MIN_RENDER_SAFE_ENDPOINT_STUB)
+    ) {
       candidates.unshift(compactOrthogonalPath(candidate));
     }
   }
   return candidates;
+};
+
+const displayPointsAlmostEqual = (first: DisplayPoint, second: DisplayPoint): boolean => (
+  Math.abs(first.x - second.x) <= 1e-6
+  && Math.abs(first.y - second.y) <= 1e-6
+);
+
+const pushUniqueRenderSafeStubPath = (
+  paths: DisplayPoint[][],
+  candidate: DisplayPoint[],
+): void => {
+  const compacted = compactOrthogonalPath(candidate);
+  const key = JSON.stringify(compacted);
+  if (!paths.some(path => JSON.stringify(path) === key)) paths.push(compacted);
+};
+
+const buildSharedEndpointRenderSafeStubPaths = (
+  edges: readonly Edge[],
+  edgeIndex: number,
+): DisplayPoint[][] => {
+  const edge = edges[edgeIndex];
+  const path = edge ? getDisplayComputedPath(edge) : [];
+  if (!edge || path.length < 3) return [];
+  const paths: DisplayPoint[][] = [];
+  const sourceNeedsRepair = segmentDisplayLength(path[0], path[1]) < MIN_RENDER_SAFE_ENDPOINT_STUB;
+  const targetNeedsRepair = segmentDisplayLength(path[path.length - 2], path[path.length - 1])
+    < MIN_RENDER_SAFE_ENDPOINT_STUB;
+
+  for (let otherIndex = 0; otherIndex < edges.length; otherIndex += 1) {
+    if (otherIndex === edgeIndex) continue;
+    const other = edges[otherIndex];
+    const otherPath = other ? getDisplayComputedPath(other) : [];
+    if (!other || otherPath.length < 3) continue;
+
+    if (
+      sourceNeedsRepair
+      && other.source === edge.source
+      && other.sourceHandle === edge.sourceHandle
+      && displayPointsAlmostEqual(otherPath[0], path[0])
+    ) {
+      const axis = displayAxisOf(path[0], path[1]);
+      const otherAxis = displayAxisOf(otherPath[0], otherPath[1]);
+      if (axis && axis === otherAxis) {
+        const candidate = path.map(point => ({ ...point }));
+        if (axis === 'h') {
+          const laneX = otherPath[1].x;
+          candidate[1].x = laneX;
+          if (candidate.length > 2 && Math.abs(candidate[2].x - path[1].x) <= 1e-6) {
+            candidate[2].x = laneX;
+          }
+        } else {
+          const laneY = otherPath[1].y;
+          candidate[1].y = laneY;
+          if (candidate.length > 2 && Math.abs(candidate[2].y - path[1].y) <= 1e-6) {
+            candidate[2].y = laneY;
+          }
+        }
+        if (segmentDisplayLength(candidate[0], candidate[1]) >= MIN_RENDER_SAFE_ENDPOINT_STUB) {
+          pushUniqueRenderSafeStubPath(paths, candidate);
+        }
+      }
+    }
+
+    if (
+      targetNeedsRepair
+      && other.target === edge.target
+      && other.targetHandle === edge.targetHandle
+      && displayPointsAlmostEqual(otherPath[otherPath.length - 1], path[path.length - 1])
+    ) {
+      const lastIndex = path.length - 1;
+      const otherLastIndex = otherPath.length - 1;
+      const axis = displayAxisOf(path[lastIndex - 1], path[lastIndex]);
+      const otherAxis = displayAxisOf(otherPath[otherLastIndex - 1], otherPath[otherLastIndex]);
+      if (axis && axis === otherAxis) {
+        const candidate = path.map(point => ({ ...point }));
+        if (axis === 'h') {
+          const laneX = otherPath[otherLastIndex - 1].x;
+          candidate[lastIndex - 1].x = laneX;
+          if (lastIndex > 1 && Math.abs(candidate[lastIndex - 2].x - path[lastIndex - 1].x) <= 1e-6) {
+            candidate[lastIndex - 2].x = laneX;
+          }
+        } else {
+          const laneY = otherPath[otherLastIndex - 1].y;
+          candidate[lastIndex - 1].y = laneY;
+          if (lastIndex > 1 && Math.abs(candidate[lastIndex - 2].y - path[lastIndex - 1].y) <= 1e-6) {
+            candidate[lastIndex - 2].y = laneY;
+          }
+        }
+        if (segmentDisplayLength(candidate[lastIndex - 1], candidate[lastIndex]) >= MIN_RENDER_SAFE_ENDPOINT_STUB) {
+          pushUniqueRenderSafeStubPath(paths, candidate);
+        }
+      }
+    }
+  }
+
+  return paths;
 };
 
 export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
@@ -293,23 +403,23 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
     let acceptedQualityState: ReturnType<typeof qualityContext.evaluateStateChanged> | null = null;
     let acceptedCommercialRiskDelta = Number.POSITIVE_INFINITY;
     let needsTrunkPreservingPortAlternative = false;
-    function* candidateEdges(): Generator<Edge> {
-      const paths = prioritizeNonCrossingEndpointStubCandidates(
-        buildRenderSafeEndpointStubPaths(getDisplayComputedPath(current[edgeIndex])),
-        edgeIndex,
-        current,
-      );
+    const prioritizePaths = (paths: DisplayPoint[][]): DisplayPoint[][] => (
+      prioritizeNonCrossingEndpointStubCandidates(paths, edgeIndex, current)
+    );
+    function* renderSafeStubCandidateEdges(lengths: readonly number[]): Generator<Edge> {
+      const path = getDisplayComputedPath(current[edgeIndex]);
+      const paths = prioritizePaths([
+        ...(lengths[0] === MIN_RENDER_SAFE_ENDPOINT_STUB
+          ? buildSharedEndpointRenderSafeStubPaths(current, edgeIndex)
+          : []),
+        ...buildRenderSafeEndpointStubPaths(path, lengths),
+      ]);
       for (const candidatePath of paths) {
         yield withDisplayComputedPath(current[edgeIndex], candidatePath);
       }
-      // The loop stops on acceptance, so port changes are only considered when
-      // the existing fixed-port extensions failed within the same work budget.
-      if (needsTrunkPreservingPortAlternative) {
-        yield* buildPerpendicularTerminalStubCandidates(current[edgeIndex], nodes, MIN_RENDER_SAFE_ENDPOINT_STUB);
-      }
     }
-    for (const candidateEdge of candidateEdges()) {
-      if (evaluations >= maxEvaluations) break;
+    const considerCandidateEdge = (candidateEdge: Edge): void => {
+      if (evaluations >= maxEvaluations) return;
       const candidate = current.map((edge, index) => (
         index === edgeIndex ? candidateEdge : edge
       )) as T;
@@ -481,7 +591,27 @@ export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
       ) {
         considerVariant(repairFinalResidualStrictCrossings(candidate, nodes, strictDiagnostics));
       }
-      if (accepted) break;
+      if (accepted) return;
+    };
+    for (const candidateEdge of renderSafeStubCandidateEdges([MIN_RENDER_SAFE_ENDPOINT_STUB])) {
+      considerCandidateEdge(candidateEdge);
+      if (accepted || evaluations >= maxEvaluations) break;
+    }
+    if (!accepted && trunkPolicy === 'clearance-margin') {
+      for (const candidateEdge of renderSafeStubCandidateEdges(EXTENDED_RENDER_SAFE_ENDPOINT_STUB_CANDIDATE_LENGTHS)) {
+        considerCandidateEdge(candidateEdge);
+        if (accepted || evaluations >= maxEvaluations) break;
+      }
+    }
+    if (!accepted && needsTrunkPreservingPortAlternative) {
+      for (const candidateEdge of buildPerpendicularTerminalStubCandidates(
+        current[edgeIndex],
+        nodes,
+        MIN_RENDER_SAFE_ENDPOINT_STUB,
+      )) {
+        considerCandidateEdge(candidateEdge);
+        if (accepted || evaluations >= maxEvaluations) break;
+      }
     }
     if (!accepted) {
       skippedEdgeIds.add(current[edgeIndex].id);

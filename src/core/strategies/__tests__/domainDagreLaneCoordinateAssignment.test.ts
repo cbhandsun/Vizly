@@ -4,6 +4,7 @@ import type { Node } from '@xyflow/react';
 import {
   assignDomainDagreLaneCoordinates,
   LANE_LEADING_INSET,
+  tightenDomainDagreLaneFlowEnvelope,
   tightenDomainDagreSubGroupFlowBounds,
 } from '../domainDagreLaneCoordinateAssignment';
 
@@ -170,10 +171,54 @@ describe('final swimlane coordinate assignment', () => {
     // Horizontal lanes retain their larger title insets.
     expect(replacements.get('domain')?.[crossSize]).toBe(horizontal ? 1440 : 1384);
     for (const value of chain) expect(replacements.get(value.id)?.position[flow]).toBe(value.position.y);
-    // The tighter leading inset fits one more isolated card row in the same extent.
-    expect(new Set(isolated.map(value => replacements.get(value.id)?.position[flow])).size).toBe(5);
+    // Automatic mode balances measured cards instead of consuming the whole
+    // available lane as one long linear fill.
+    expect(new Set(isolated.map(value => replacements.get(value.id)?.position[flow])).size).toBe(horizontal ? 4 : 5);
     expect(new Set(isolated.map(value => replacements.get(value.id)?.position[cross])).size).toBe(3);
     expect(input).toEqual(before);
+  });
+
+  it.each([false, true])('balances unconstrained isolated cards in both axes, horizontal=%s', horizontal => {
+    const cards = Array.from({ length: 6 }, (_, index) => node(`i${index}`, 0, 200, 180 + index * 7, 72 + index * 3));
+    const input = [{ ...node('domain', 0, 0, 3600, 1200), type: 'titleGroup' }, ...cards]
+      .map(value => horizontal ? { ...value, position: { x: value.position.y, y: value.position.x },
+        width: value.height, height: value.width, measured: { width: value.height, height: value.width } } : value);
+    const before = structuredClone(input);
+    const replacements = new Map(input.map(value => [value.id, value]));
+    assignDomainDagreLaneCoordinates(replacements, [{ domainId: 'domain', buckets: [{ id: 'domain',
+      nodeIds: cards.map(value => value.id) }] }], [], horizontal, 120, 96);
+    const flow = horizontal ? 'x' : 'y', cross = horizontal ? 'y' : 'x';
+    expect(new Set(cards.map(value => replacements.get(value.id)?.position[flow])).size).toBeGreaterThan(1);
+    expect(new Set(cards.map(value => replacements.get(value.id)?.position[cross])).size)
+      .toBe(horizontal ? 2 : 1);
+    expect(input).toEqual(before);
+  });
+
+  it.each([false, true])('shrinks every lane to the shared packed-content envelope, horizontal=%s', horizontal => {
+    const transpose = (value: Node): Node => horizontal ? { ...value,
+      position: { x: value.position.y, y: value.position.x }, width: value.height, height: value.width,
+      measured: { width: Number(value.height), height: Number(value.width) } } : value;
+    const input = [
+      { ...node('domain-a', 0, 0, 900, 1200), type: 'titleGroup', data: { domain: 'a' } },
+      { ...node('group-a', 40, 96, 360, 420), type: 'subGroup', data: { domain: 'a' } },
+      { ...node('a', 80, 160, 240, 120), data: { domain: 'a' } },
+      { ...node('domain-b', 1100, 0, 900, 1200), type: 'titleGroup', data: { domain: 'b' } },
+      { ...node('b', 1180, 160, 240, 220), data: { domain: 'b' } },
+    ].map(transpose);
+    const before = structuredClone(input);
+    const result = tightenDomainDagreLaneFlowEnvelope(input, horizontal, { leading: 96, trailing: 40 });
+    const flowSize = horizontal ? 'width' : 'height';
+    expect(result.filter(value => value.type === 'titleGroup').map(value => value[flowSize])).toEqual([556, 556]);
+    expect(result.filter(value => value.type !== 'titleGroup').map(value => value.position))
+      .toEqual(before.filter(value => value.type !== 'titleGroup').map(value => value.position));
+    expect(input).toEqual(before);
+  });
+
+  it('fails closed when packed content escapes its lane envelope', () => {
+    const domain = { ...node('domain', 0, 0, 600, 600), type: 'titleGroup', data: { domain: 'a' } };
+    const child = { ...node('child', 100, 700), data: { domain: 'a' } };
+    expect(tightenDomainDagreLaneFlowEnvelope([domain, child], false,
+      { leading: 96, trailing: 40 })).toEqual([domain, child]);
   });
 
   it('reuses columns after connected peers have received their final flow offsets', () => {

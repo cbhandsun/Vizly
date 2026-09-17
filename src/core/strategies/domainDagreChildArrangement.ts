@@ -132,13 +132,13 @@ export const arrangeDomainDagreChildren = (
     : dagreDirection;
   const dagreIsHorizontal = resolvedDirection === 'LR' || resolvedDirection === 'RL';
   const ids = new Set(nodes.map(node => node.id));
+  const localEdges = edges.filter(edge => (
+    edge.source !== edge.target && ids.has(edge.source) && ids.has(edge.target)
+  ));
   const componentSizes = new Map<number, number>();
   if (globalComponentByNodeId) for (const component of globalComponentByNodeId.values()) {
     componentSizes.set(component, (componentSizes.get(component) ?? 0) + 1);
   }
-  // A missing projection is compatible with local callers. An explicitly
-  // incomplete projection cannot prove independence, so retain local Dagre
-  // geometry and let the packer reject the incomplete constraint set.
   const hasGlobalDependencies = globalComponentByNodeId !== undefined && (
     !domainDagreComponentIndexCovers(ids, globalComponentByNodeId)
     || nodes.some(node => {
@@ -146,21 +146,42 @@ export const arrangeDomainDagreChildren = (
       return component !== undefined && (componentSizes.get(component) ?? 0) > 1;
     })
   );
-  const hasDependencies = hasGlobalDependencies
-    || edges.some(edge => edge.source !== edge.target && ids.has(edge.source) && ids.has(edge.target));
+  const hasDependencies = hasGlobalDependencies || localEdges.length > 0;
+  // With neither local nor cross-container dependencies there is no rank to
+  // preserve, so automatic Dagre uses the measured Flow packer directly.
+  // Boundary-connected peers remain rigid below so their routing corridors
+  // and cross-container stage alignment are not silently discarded.
+  if (arrangement === 'dagre' && !hasDependencies && packComponents) {
+    const columns = chooseGridColumns(nodes, horizontalGap, verticalGap, getNodeDimensions, false, parentBudget);
+    return gridPositions(nodes, columns, horizontalGap, verticalGap, getNodeDimensions, false);
+  }
   // A connected process is a rigid content block; grid/flow may arrange its
   // independent companions but never discard directed process ranks.
   if (arrangement === 'dagre' || ((arrangement === 'flow' || arrangement === 'grid') && hasDependencies)) {
     const positions = layoutWithDagre(
       [...nodes],
-      [...edges],
+      localEdges,
       resolvedDirection,
       dagreIsHorizontal ? verticalGap : horizontalGap,
       dagreIsHorizontal ? horizontalGap : verticalGap,
       getNodeDimensions,
     );
+    let packingBudget = parentBudget;
+    if (!packingBudget && arrangement === 'dagre' && packComponents && localEdges.length === 0) {
+      const columns = chooseGridColumns(nodes, horizontalGap, verticalGap, getNodeDimensions, false);
+      const balanced = gridPositions(nodes, columns, horizontalGap, verticalGap, getNodeDimensions, false);
+      const balancedById = new Map(balanced.map(position => [position.id, position]));
+      packingBudget = {
+        maxWidth: Math.max(...nodes.map(node => (balancedById.get(node.id)?.x ?? 0) + getNodeDimensions(node).width)),
+        maxHeight: Math.max(...nodes.map(node => (balancedById.get(node.id)?.y ?? 0) + getNodeDimensions(node).height)),
+        // The synthetic envelope is a target for shortening Dagre's flow
+        // strip, not an already occupied parent cross-axis. Optimise the flow
+        // dimension so independent cards actually use both axes.
+        objective: dagreIsHorizontal ? 'width' : 'height',
+      };
+    }
     return packComponents || arrangement !== 'dagre' ? [...packDisconnectedDagreComponents(
-      positions, nodes, edges, horizontalGap, verticalGap, getNodeDimensions, parentBudget, globalComponentByNodeId,
+      positions, nodes, localEdges, horizontalGap, verticalGap, getNodeDimensions, packingBudget, globalComponentByNodeId,
     )] : positions;
   }
   if (arrangement === 'horizontal') {

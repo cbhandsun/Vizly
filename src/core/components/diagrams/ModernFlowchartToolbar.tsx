@@ -21,9 +21,7 @@ import { resolveFlowchartToolbarHistoryCount } from './flowchartToolbarHistoryPr
 import { DropdownMenuTriggerButton } from './DropdownMenuTriggerButton';
 import { useFlowchartLayoutMenu } from './hooks/useFlowchartLayoutMenu';
 import { getFlowchartLayoutMenuPlacements } from './flowchartLayoutMenuPlacement';
-import type { FlowchartLayoutDirection } from './flowchartLayoutStrategyMode';
-import type { LaneRankDecision, LaneRankPreference } from '../../types/domainLaneRank';
-import type { LayoutScopeRequest } from './hooks/layoutScopeBoundary';
+import type { FlowchartToolbarProps } from './ModernFlowchartToolbar.types';
 import { buildToolModeMenuItems, resolveActiveToolModeKey } from './flowchartToolbarToolModeMenu';
 import { getFlowchartZoomControlState } from './flowchartZoomControlState';
 import { useKeyboardAccessibleDropdown } from './hooks/useKeyboardAccessibleDropdown';
@@ -35,95 +33,6 @@ import {
     COMMERCIAL_VIEWPORT_MODAL_Z_INDEX,
     getViewportOverlayContainer,
 } from '../ui/viewportOverlayPortal';
-interface FlowchartToolbarProps {
-    customDomainLayoutAvailable?: boolean;
-    canUndo: boolean;
-    canRedo: boolean;
-    onUndo: () => void;
-    onRedo: () => void;
-    onZoomIn: () => void;
-    onZoomOut: () => void;
-    onResetZoom?: () => void;
-    onFitView: () => void;
-    autoRouting: boolean;
-    toggleAutoRouting: () => void;
-    showGrid: boolean;
-    gridVariant?: BackgroundVariant;
-    toggleGrid: () => void;
-    onShowShortcuts: () => void;
-    onShowCanvasSearch?: () => void;
-    /** 域感知策略布局回调（统一入口） */
-    onStrategyLayout?: (
-        strategyName: string,
-        nodeLayout?: string,
-        direction?: FlowchartLayoutDirection,
-        laneRankPreference?: LaneRankPreference,
-        layoutScope?: LayoutScopeRequest,
-    ) => void;
-    /** 根据当前图结构选择低风险布局预设 */
-    onSmartLayout?: () => void | Promise<void>;
-    /** 当前选中的域布局策略 */
-    lastDomainStrategy?: string;
-    /** 当前选中的域布局方向 */
-    lastDomainDirection?: FlowchartLayoutDirection;
-    /** 当前选中的域内节点排布 */
-    lastNodeLayout?: string;
-    /** Requested swimlane ranking mode from the last committed selection. */
-    laneRankPreference?: LaneRankPreference;
-    /** Applied mode from the last successful layout transaction. */
-    laneRankDecision?: LaneRankDecision;
-    layoutBusy?: boolean;
-    showRuler: boolean;
-    toggleRuler: () => void;
-    showMinimap?: boolean;
-    toggleMinimap?: () => void;
-    onToggleAI?: () => void;
-    aiChatActive?: boolean;
-    showAiCrown?: boolean;
-    // --- 底部状态信息（合并自 DiagramStatusBar）---
-    nodeCount?: number;
-    edgeCount?: number;
-    selectedNodesCount?: number;
-    selectedEdgesCount?: number;
-    zoomPercent?: number;
-    snapToGrid?: boolean;
-    onToggleSnap?: () => void;
-    /** 主链路高亮 */
-    highlightMainFlow?: boolean;
-    onToggleHighlightMainFlow?: () => void;
-    /** 仅显示主链路 */
-    showOnlyMainFlow?: boolean;
-    onToggleShowOnlyMainFlow?: () => void;
-    children?: React.ReactNode;
-    hideZoomControls?: boolean;
-    hideLayoutControls?: boolean;
-    hideGridControls?: boolean;
-    hideFlowFocusControls?: boolean;
-    hideUndoRedoControls?: boolean;
-    // --- 文件操作 (File IO) ---
-    onImportClick?: () => void;
-    onExport?: () => void;
-    
-    // --- 创造工具 (Drawing & Creation Tools) ---
-    isDrawingMode?: boolean;
-    isMarqueeActive?: boolean;
-    toggleSelectionMode?: () => void;
-    onToggleDrawingMode?: () => void;
-    onActivatePointer?: () => void;
-    onAddStickyNote?: () => void;
-    onAddMindMap?: () => void;
-
-    // --- Phase 11: Comments ---
-    isCommentMode?: boolean;
-    setIsCommentMode?: (v: boolean) => void;
-    // --- Phase 1.4: History Panel ---
-    onShowHistory?: () => void;
-    historyCount?: number;
-
-    // --- Alignment & Distribution ---
-    onAlign?: (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void;
-    onDistribute?: (type: 'horizontal' | 'vertical') => void;
-}
 
 const COMMERCIAL_MOBILE_TOUCH_STYLE: React.CSSProperties = {
     minWidth: 'var(--commercial-touch-target, 44px)',
@@ -522,6 +431,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                             selectedKeys: layoutMenuModel.selectedKeys,
                             selectable: true,
                             builtinPlacements: getFlowchartLayoutMenuPlacements(direction),
+                            getPopupContainer: (triggerNode) => triggerNode.ownerDocument.body,
                             onKeyDown: layoutDropdown.handleMenuKeyDown,
                         }}
                         placement="bottom"

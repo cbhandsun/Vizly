@@ -101,6 +101,17 @@ describe('content-sized domain component packing', () => {
     }
   });
 
+  it('prefers a fitting two-dimensional candidate when the baseline exceeds the parent envelope', () => {
+    const row = Array.from({ length: 6 }, (_, index) => ({ id: String(index), x: index * 320, y: 0 }));
+    const cards = row.map(position => ({ id: position.id, position, data: {} }));
+    const result = packDisconnectedDagreComponents(row, cards, [], 120, 40, dimensions,
+      { maxWidth: 840, maxHeight: 380, objective: 'height' });
+    expect(Math.max(...result.map(position => position.x + 200))).toBeLessThanOrEqual(840);
+    expect(Math.max(...result.map(position => position.y + 100))).toBeLessThanOrEqual(380);
+    expect(new Set(result.map(position => position.x)).size).toBeGreaterThan(1);
+    expect(new Set(result.map(position => position.y)).size).toBeGreaterThan(1);
+  });
+
   it('leaves connected graphs, cycles and singleton components with Dagre', () => {
     const chain = nodes.slice(1).map((node, index) => ({ id: String(index), source: nodes[index].id, target: node.id }));
     expect(packDisconnectedDagreComponents(positions, nodes, [...chain, { id: 'cycle', source: 'three', target: 'start' }], 120, 40, dimensions)).toBe(positions);

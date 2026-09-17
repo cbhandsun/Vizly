@@ -103,6 +103,12 @@ export const isPrecompiledDisplayRoutingContractSummary = value => {
   return total === value.violationCount && value.clean === (value.violations.length === 0);
 };
 
+export const precompiledDisplayRoutingContractIsAccepted = value => (
+  isPrecompiledDisplayRoutingContractSummary(value)
+  && value.clean === true
+  && value.hardClean === true
+);
+
 export const createPrecompiledDisplayRoutePatches = (sourceEdges, routedEdges) => {
   let totalPathPoints = 0;
   const isRecord = value => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -400,6 +406,11 @@ export const renderPrecompiledDisplayRouteCaptureExpression = (
   const replayTrustedPatches = ${replayTrustedDisplayRoutePatches.toString()};
   const routeContractsMatch = ${precompiledDisplayRouteContractsMatch.toString()};
   const isContractSummary = ${isPrecompiledDisplayRoutingContractSummary.toString()};
+  const contractIsAccepted = value => (
+    isContractSummary(value)
+    && value.clean === true
+    && value.hardClean === true
+  );
   const projectTimings = ${projectPrecompiledDisplayRouteTimings.toString()};
   const measureWorkerExecution = ${measurePrecompiledWorkerExecution.toString()};
   const hashQueryIndex = window.location.hash.indexOf('?');
@@ -422,8 +433,7 @@ export const renderPrecompiledDisplayRouteCaptureExpression = (
     && isMatchingResponse(request, response)
     && isFreshRequestResponse(request, response)
     && routing.workerResolution === response.routeResolution
-    && isContractSummary(response.routingContract)
-    && response.routingContract.hardClean === true
+    && contractIsAccepted(response.routingContract)
   );
   if (activeTargetId !== ${JSON.stringify(targetId)}
     || routing.stage !== 'final-applied'

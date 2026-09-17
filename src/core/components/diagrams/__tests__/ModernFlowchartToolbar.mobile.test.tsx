@@ -56,27 +56,40 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
             'getPopupContainer={(triggerNode) => triggerNode.ownerDocument.body}',
         );
         expect(toolbarSource).toContain('builtinPlacements: getFlowchartLayoutMenuPlacements(direction)');
+        expect(toolbarSource).toContain('getPopupContainer: (triggerNode) => triggerNode.ownerDocument.body');
         expect(toolbarSource).toContain('React.useContext(ConfigProvider.ConfigContext)');
         expect(toolbarCss).toMatch(
-            /body \.flowchart-mobile-more-menu\s*\{[\s\S]*?--flowchart-mobile-menu-top-clearance: 80px;[\s\S]*?--flowchart-mobile-dock-clearance: calc\(88px \+ env\(safe-area-inset-bottom, 0px\)\);[\s\S]*?inset: var\(--flowchart-mobile-menu-top-clearance\) auto var\(--flowchart-mobile-dock-clearance\) 8px !important;[\s\S]*?width: min\(304px, calc\(100vw - 16px\)\);[\s\S]*?max-height: none;[\s\S]*?overflow-y: auto;/,
+            /body \.flowchart-mobile-more-menu\s*\{[\s\S]*?--flowchart-mobile-menu-surface: color-mix\(in srgb, var\(--ant-color-bg-elevated, Canvas\) 98%, transparent\);[\s\S]*?--flowchart-mobile-menu-top-clearance: 80px;[\s\S]*?--flowchart-mobile-dock-clearance: calc\(88px \+ env\(safe-area-inset-bottom, 0px\)\);[\s\S]*?inset: var\(--flowchart-mobile-menu-top-clearance\) auto var\(--flowchart-mobile-dock-clearance\) 8px !important;[\s\S]*?width: min\(304px, calc\(100vw - 16px\)\);[\s\S]*?max-height: none;[\s\S]*?overflow-y: auto;/,
         );
         expect(toolbarCss).toMatch(
-            /body \.flowchart-mobile-more-menu \.ant-dropdown-menu\s*\{[\s\S]*?background-color: rgba\(255, 255, 255, 0\.98\) !important;/,
+            /body \.flowchart-mobile-more-menu \.ant-dropdown-menu\s*\{[\s\S]*?background-color: var\(--flowchart-mobile-menu-surface\) !important;/,
         );
         expect(toolbarCss).toMatch(
-            /html\[data-theme='dark'\] body \.flowchart-mobile-more-menu \.ant-dropdown-menu\s*\{[\s\S]*?background-color: rgba\(28, 28, 41, 0\.98\) !important;/,
+            /html\[data-theme='dark'\] body \.flowchart-mobile-more-menu \.ant-dropdown-menu\s*\{[\s\S]*?background-color: var\(--flowchart-mobile-menu-surface\) !important;/,
         );
         expect(toolbarCss).toMatch(
-            /body \.flowchart-layout-menu \.ant-dropdown-menu\s*\{[\s\S]*?min-width: min\(304px, calc\(100vw - 16px\)\);[\s\S]*?background-color: rgba\(255, 255, 255, 0\.98\) !important;/,
+            /body \.flowchart-layout-menu \.ant-dropdown-menu\s*\{[\s\S]*?min-width: min\(304px, calc\(100vw - 16px\)\);[\s\S]*?background-color: transparent !important;/,
         );
         expect(toolbarCss).toMatch(
-            /html\[data-theme='dark'\] body \.flowchart-layout-menu \.ant-dropdown-menu\s*\{[\s\S]*?background-color: rgba\(28, 28, 41, 0\.98\) !important;/,
+            /body \.flowchart-layout-menu\s*\{[\s\S]*?--flowchart-layout-menu-surface: var\(--ant-color-bg-elevated, Canvas\);[\s\S]*?overflow: visible;[\s\S]*?overscroll-behavior: contain;[\s\S]*?background-color: var\(--flowchart-layout-menu-surface\) !important;[\s\S]*?border: 1px solid rgba\(148, 163, 184, 0\.28\) !important;/,
         );
         expect(toolbarCss).toMatch(
-            /body \.flowchart-layout-menu > \.ant-dropdown-menu\s*\{\s*overflow: visible;/,
+            /body \.flowchart-layout-menu > \.ant-dropdown-menu\s*\{[\s\S]*?border: none !important;[\s\S]*?box-shadow: none !important;[\s\S]*?max-height: calc\(100dvh - 16px\);[\s\S]*?min-height: 100%;[\s\S]*?overflow-x: hidden;[\s\S]*?overflow-y: auto;[\s\S]*?overscroll-behavior: contain;[\s\S]*?scrollbar-gutter: stable;/,
         );
         expect(toolbarCss).toMatch(
-            /body \.flowchart-layout-menu \.ant-dropdown-menu-submenu-popup\s*\{[\s\S]*?position: absolute;[\s\S]*?max-width: calc\(100vw - 16px\);[\s\S]*?max-height: calc\(100dvh - 16px\);[\s\S]*?overflow-y: auto;/,
+            /html\[data-theme='dark'\] body \.flowchart-layout-menu \.ant-dropdown-menu\s*\{[\s\S]*?background-color: transparent !important;/,
+        );
+        expect(toolbarCss).toMatch(
+            /html\.dark body \.flowchart-layout-menu\s*,[\s\S]*?html\[data-theme='dark'\] body \.flowchart-layout-menu\s*\{[\s\S]*?--flowchart-layout-menu-surface: var\(--ant-color-bg-elevated, Canvas\);/,
+        );
+        expect(toolbarCss).toMatch(
+            /body \.flowchart-layout-menu \.ant-dropdown-menu-submenu-popup\s*,[\s\S]*?body \.flowchart-layout-submenu-popup\s*\{[\s\S]*?--flowchart-layout-menu-surface: var\(--ant-color-bg-elevated, Canvas\);[\s\S]*?position: absolute;[\s\S]*?max-width: calc\(100vw - 16px\);[\s\S]*?max-height: calc\(100dvh - 16px\);[\s\S]*?overflow-y: auto;[\s\S]*?background-color: var\(--flowchart-layout-menu-surface\) !important;[\s\S]*?border: 1px solid rgba\(148, 163, 184, 0\.28\) !important;/,
+        );
+        expect(toolbarCss).toMatch(
+            /body \.flowchart-layout-menu \.ant-dropdown-menu-submenu-popup > \.ant-dropdown-menu\s*,[\s\S]*?body \.flowchart-layout-submenu-popup > \.ant-dropdown-menu\s*\{[\s\S]*?background-color: transparent !important;[\s\S]*?border: none !important;[\s\S]*?box-shadow: none !important;/,
+        );
+        expect(toolbarCss).toMatch(
+            /html\.dark body \.flowchart-layout-menu \.ant-dropdown-menu-submenu-popup\s*,[\s\S]*?html\[data-theme='dark'\] body \.flowchart-layout-menu \.ant-dropdown-menu-submenu-popup\s*,[\s\S]*?html\.dark body \.flowchart-layout-submenu-popup\s*,[\s\S]*?html\[data-theme='dark'\] body \.flowchart-layout-submenu-popup\s*\{[\s\S]*?--flowchart-layout-menu-surface: var\(--ant-color-bg-elevated, Canvas\);/,
         );
     });
 
@@ -551,7 +564,8 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         });
     });
 
-    it('opens the automatic-layout menu by click and runs the selected strategy', async () => {
+    it('opens the automatic-layout menu by click and runs the quick recommendation action', async () => {
+        const onSmartLayout = vi.fn();
         const onStrategyLayout = vi.fn();
 
         render(
@@ -570,6 +584,7 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
                 onShowShortcuts={vi.fn()}
                 showRuler={false}
                 toggleRuler={vi.fn()}
+                onSmartLayout={onSmartLayout}
                 onStrategyLayout={onStrategyLayout}
             />,
         );
@@ -581,8 +596,9 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         fireEvent.click(layoutButton);
 
         expect(layoutButton.getAttribute('aria-expanded')).toBe('true');
-        fireEvent.click(await screen.findByRole('menuitemradio', { name: /标准流程.*上→下/ }));
-        expect(onStrategyLayout).toHaveBeenCalledWith('domain-dagre', undefined, 'TB');
+        fireEvent.click(await screen.findByRole('menuitem', { name: /智能推荐/ }));
+        expect(onSmartLayout).toHaveBeenCalledOnce();
+        expect(onStrategyLayout).not.toHaveBeenCalled();
     });
 
     it('disables the automatic-layout menu while another layout is running', async () => {
@@ -650,23 +666,18 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         expect(trigger.getAttribute('data-flowchart-lane-rank-applied')).toBe('unknown');
         fireEvent.click(trigger);
 
-        const domainLayout = await screen.findByRole('menuitemradio', {
-            name: /标准流程.*上→下/,
-        });
-        const inactiveLayout = screen.getByRole('menuitemradio', {
-            name: /泳道.*域上下堆叠.*域内左→右/,
-        });
-
-        expect(domainLayout.getAttribute('aria-checked')).toBe('true');
-        expect(inactiveLayout.getAttribute('aria-checked')).toBe('false');
-        expect(domainLayout.className).toContain('ant-dropdown-menu-item-selected');
-        expect(screen.getByText(/^布局组合$/)).toBeDefined();
-        expect(screen.getByRole('menuitem', { name: /域排列方向/ })).toBeDefined();
-        expect(screen.getByRole('menuitem', { name: /域／子域内节点排布/ })).toBeDefined();
+        expect(await screen.findByRole('menuitem', { name: /标准流程/ })).toBeDefined();
+        expect(screen.getByRole('menuitem', { name: /复杂流程/ })).toBeDefined();
+        expect(screen.getByRole('menuitem', { name: /泳道布局/ })).toBeDefined();
+        expect(screen.getByRole('menuitem', { name: /局部布局/ })).toBeDefined();
+        expect(screen.getByRole('menuitem', { name: /泳道阶段/ })).toBeDefined();
+        expect(screen.getByRole('menuitem', { name: /布局组合/ })).toBeDefined();
         expect(screen.getByRole('menuitem', { name: /更多布局引擎/ })).toBeDefined();
     });
 
     it('opens the automatic-layout menu with ArrowDown and focuses its first action', async () => {
+        const onSmartLayout = vi.fn();
+
         render(
             <ModernFlowchartToolbar
                 canUndo={false}
@@ -683,6 +694,7 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
                 onShowShortcuts={vi.fn()}
                 showRuler={false}
                 toggleRuler={vi.fn()}
+                onSmartLayout={onSmartLayout}
                 onStrategyLayout={vi.fn()}
             />,
         );
@@ -690,7 +702,7 @@ describe('ModernFlowchartToolbar mobile file actions', () => {
         const trigger = await screen.findByRole('button', { name: /layout\.tooltip|自动布局/i });
         fireEvent.keyDown(trigger, { key: 'ArrowDown' });
 
-        const firstItem = await screen.findByRole('menuitemradio', { name: /标准流程.*上→下/ });
+        const firstItem = await screen.findByRole('menuitem', { name: /智能推荐/ });
         await waitFor(() => expect(document.activeElement).toBe(firstItem));
         expect(trigger.getAttribute('aria-expanded')).toBe('true');
     });

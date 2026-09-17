@@ -1,38 +1,83 @@
 body .flowchart-layout-menu .ant-dropdown-menu {
     min-width: min(304px, calc(100vw - 16px));
     max-width: calc(100vw - 16px);
-    background-color: rgba(255, 255, 255, 0.98) !important;
+    background-color: transparent !important;
     border: 1px solid rgba(148, 163, 184, 0.28) !important;
     box-shadow: 0 18px 48px rgba(15, 23, 42, 0.24) !important;
-    backdrop-filter: blur(28px) saturate(180%) !important;
-    -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+}
+
+body .flowchart-layout-menu {
+    --flowchart-layout-menu-surface: var(--ant-color-bg-elevated, Canvas);
+    overflow: visible;
+    overscroll-behavior: contain;
+    background-color: var(--flowchart-layout-menu-surface) !important;
+    border: 1px solid rgba(148, 163, 184, 0.28) !important;
+    border-radius: 8px;
+    box-shadow: 0 18px 48px rgba(15, 23, 42, 0.24) !important;
 }
 
 /* Nested engine menus are positioned outside the root menu box. Ant's menu
    surface clips overflow by default, which makes the submenu accessible to
    the DOM while rendering none of it on screen. */
 body .flowchart-layout-menu > .ant-dropdown-menu {
-    overflow: visible;
+    border: none !important;
+    box-shadow: none !important;
+    max-height: calc(100dvh - 16px);
+    min-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
 }
 
 /* Keep the popup out of root-menu flow so it does not create a tall blank
    scroll surface, while allowing Ant's left/right collision placement. */
-body .flowchart-layout-menu .ant-dropdown-menu-submenu-popup {
+body .flowchart-layout-menu .ant-dropdown-menu-submenu-popup,
+body .flowchart-layout-submenu-popup {
+    --flowchart-layout-menu-surface: var(--ant-color-bg-elevated, Canvas);
     position: absolute;
     max-width: calc(100vw - 16px);
     max-height: calc(100dvh - 16px);
     overflow-y: auto;
     overscroll-behavior: contain;
+    background-color: var(--flowchart-layout-menu-surface) !important;
+    border: 1px solid rgba(148, 163, 184, 0.28) !important;
+    border-radius: 8px;
+    box-shadow: 0 18px 48px rgba(15, 23, 42, 0.24) !important;
+}
+
+body .flowchart-layout-menu .ant-dropdown-menu-submenu-popup > .ant-dropdown-menu,
+body .flowchart-layout-submenu-popup > .ant-dropdown-menu {
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 
 html.dark body .flowchart-layout-menu .ant-dropdown-menu,
 html[data-theme='dark'] body .flowchart-layout-menu .ant-dropdown-menu {
-    background-color: rgba(28, 28, 41, 0.98) !important;
+    background-color: transparent !important;
+    border-color: rgba(148, 163, 184, 0.22) !important;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.44) !important;
+}
+
+html.dark body .flowchart-layout-menu,
+html[data-theme='dark'] body .flowchart-layout-menu {
+    --flowchart-layout-menu-surface: var(--ant-color-bg-elevated, Canvas);
+    border-color: rgba(148, 163, 184, 0.22) !important;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.44) !important;
+}
+
+html.dark body .flowchart-layout-menu .ant-dropdown-menu-submenu-popup,
+html[data-theme='dark'] body .flowchart-layout-menu .ant-dropdown-menu-submenu-popup,
+html.dark body .flowchart-layout-submenu-popup,
+html[data-theme='dark'] body .flowchart-layout-submenu-popup {
+    --flowchart-layout-menu-surface: var(--ant-color-bg-elevated, Canvas);
     border-color: rgba(148, 163, 184, 0.22) !important;
     box-shadow: 0 18px 48px rgba(0, 0, 0, 0.44) !important;
 }
 
 body .flowchart-mobile-more-menu {
+    --flowchart-mobile-menu-surface: color-mix(in srgb, var(--ant-color-bg-elevated, Canvas) 98%, transparent);
     --flowchart-mobile-menu-top-clearance: 80px;
     --flowchart-mobile-dock-clearance: calc(88px + env(safe-area-inset-bottom, 0px));
     position: fixed !important;
@@ -51,7 +96,7 @@ body .flowchart-mobile-more-menu .ant-dropdown-menu {
     width: 100%;
     max-height: inherit;
     overflow-y: auto;
-    background-color: rgba(255, 255, 255, 0.98) !important;
+    background-color: var(--flowchart-mobile-menu-surface) !important;
     border: 1px solid rgba(148, 163, 184, 0.28);
     box-shadow: 0 18px 48px rgba(15, 23, 42, 0.24);
     backdrop-filter: blur(28px) saturate(180%) !important;
@@ -60,7 +105,7 @@ body .flowchart-mobile-more-menu .ant-dropdown-menu {
 
 html.dark body .flowchart-mobile-more-menu .ant-dropdown-menu,
 html[data-theme='dark'] body .flowchart-mobile-more-menu .ant-dropdown-menu {
-    background-color: rgba(28, 28, 41, 0.98) !important;
+    background-color: var(--flowchart-mobile-menu-surface) !important;
     border-color: rgba(148, 163, 184, 0.22);
     box-shadow: 0 18px 48px rgba(0, 0, 0, 0.44);
 }

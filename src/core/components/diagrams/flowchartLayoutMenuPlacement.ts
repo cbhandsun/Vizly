@@ -1,13 +1,13 @@
 type LayoutMenuPlacement = {
     points: [string, string];
-    overflow: { adjustX: true; adjustY: true; shiftY: true };
+    overflow: { adjustX: true; adjustY: true; shiftX: true; shiftY: true };
 };
 
 const placement = (points: [string, string]): LayoutMenuPlacement => ({
     points,
-    // Flipping a tall submenu above its trigger can still leave its first
-    // items outside the viewport. Shift it vertically after collision flips.
-    overflow: { adjustX: true, adjustY: true, shiftY: true },
+    // Flipping a tall submenu can still leave its first items outside the
+    // viewport. Shift it back into view after collision flips.
+    overflow: { adjustX: true, adjustY: true, shiftX: true, shiftY: true },
 });
 
 const ltrPlacements = {

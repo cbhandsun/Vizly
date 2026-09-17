@@ -59,9 +59,16 @@ export function packDisconnectedDagreComponents(
     .sort((a, b) => b.height - a.height || b.width - a.width);
   const original = bounds(positions);
   const budget = validDomainDagreContentBudget(parentBudget) ? parentBudget : undefined;
-  let bestObjective = budget ? original[budget.objective] : Infinity;
-  let bestArea = original.width * original.height;
-  let bestSpan = Math.max(original.width, original.height);
+  const originalFitsBudget = !budget || (
+    original.width <= budget.maxWidth + 0.5 && original.height <= budget.maxHeight + 0.5
+  );
+  // A parent envelope is a hard admissibility boundary. If Dagre's baseline
+  // already exceeds it, compare fitting candidates with each other instead of
+  // requiring them to beat the out-of-budget strip on its artificially short
+  // cross axis.
+  let bestObjective = budget && originalFitsBudget ? original[budget.objective] : Infinity;
+  let bestArea = originalFitsBudget ? original.width * original.height : Infinity;
+  let bestSpan = originalFitsBudget ? Math.max(original.width, original.height) : Infinity;
   let best: readonly Position[] = positions;
   // Try both row shelves and column shelves: short components can then fill
   // the empty space beside a tall connected flow, or below a wide one.

@@ -1,24 +1,17 @@
 {
   "schema": "vizly-precompiled-display-route-v1",
   "routingVersion": "23",
-  "routingSourceHash": "source-v1:b5a7e9b684fd1d3d1b79aebe95e3ce912d9673b0ae3dce4aba8eb9ff60901519",
+  "routingSourceHash": "source-v1:784bb483eb65d4fd514820cbfa58b6e405b915c7397e0cb3eed134c8659e5e18",
   "sourceHash": "source-v1:2a580f110590a416ff1aeb9fb5a3cd21536428e26368841fd160f87243cc25d3",
   "inputSignature": "3556224724",
   "inputGeometryDigest": "geometry-v1:2c9f3da0fbf46dd006efb86cf10ddc74",
-  "outputRouteSignature": "route-v2:44:166:9133adf48d958382",
+  "outputRouteSignature": "route-v2:44:166:c28f2c86f84e6e20",
   "hardClean": true,
   "routingContract": {
-    "clean": false,
+    "clean": true,
     "hardClean": true,
-    "violationCount": 1,
-    "violations": [
-      {
-        "code": "render-unsafe-endpoint-stub",
-        "phase": "presentation",
-        "severity": "presentation",
-        "count": 1
-      }
-    ]
+    "violationCount": 0,
+    "violations": []
   },
   "patches": [
     {
@@ -351,11 +344,11 @@
             "y": 850
           },
           {
-            "x": 4373,
+            "x": 4420,
             "y": 850
           },
           {
-            "x": 4373,
+            "x": 4420,
             "y": 2035
           },
           {
@@ -473,11 +466,11 @@
             "y": 850
           },
           {
-            "x": 4373,
+            "x": 4588.65,
             "y": 850
           },
           {
-            "x": 4373,
+            "x": 4588.65,
             "y": 1809
           },
           {
@@ -614,11 +607,11 @@
             "y": 850
           },
           {
-            "x": 4373,
+            "x": 4596,
             "y": 850
           },
           {
-            "x": 4373,
+            "x": 4596,
             "y": 587
           },
           {
@@ -643,11 +636,11 @@
             "y": 850
           },
           {
-            "x": 4373,
+            "x": 4396,
             "y": 850
           },
           {
-            "x": 4373,
+            "x": 4396,
             "y": 1582
           },
           {
@@ -673,11 +666,11 @@
             "y": 850
           },
           {
-            "x": 4373,
+            "x": 4396,
             "y": 850
           },
           {
-            "x": 4373,
+            "x": 4396,
             "y": 1480
           },
           {
@@ -866,11 +859,11 @@
             "y": 1809
           },
           {
-            "x": 5562,
+            "x": 5538,
             "y": 1809
           },
           {
-            "x": 5562,
+            "x": 5538,
             "y": 1582
           },
           {

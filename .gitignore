@@ -35,6 +35,8 @@ artifacts/routing-performance/
 
 # Local workspace artifacts
 .codex/
+.common-tools/
+.common-tools-audit/
 .gemini
 docs/*
 !docs/edge-routing-session-plan.md

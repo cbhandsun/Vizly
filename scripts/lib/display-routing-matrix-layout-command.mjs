@@ -6,7 +6,15 @@ import {
   resolveDisplayRoutingMenuPointerTarget,
 } from './display-routing-matrix-cases.mjs';
 
-export const readDisplayRoutingLayoutMenuDiagnostics = (caseId) => {
+export const displayRoutingLayoutParentMenuKey = caseId => {
+  if (typeof caseId !== 'string') return undefined;
+  if (/^domain-dagre-(?:tb|bt|lr|rl)$/.test(caseId)) return 'group-standard-process';
+  if (/^domain-compound-elk-(?:tb|bt|lr|rl)$/.test(caseId)) return 'group-complex-process';
+  if (/^domain-lanes-(?:tb|bt|lr|rl)$/.test(caseId)) return 'group-swimlane-process';
+  return undefined;
+};
+
+export const readDisplayRoutingLayoutMenuDiagnostics = (caseId, parentMenuKey) => {
   const boundedText = value => (
     typeof value === 'string'
       ? { length: Math.min(value.length, 10_000) }
@@ -47,8 +55,11 @@ export const readDisplayRoutingLayoutMenuDiagnostics = (caseId) => {
     };
   };
   const findByKey = findDisplayRoutingMenuElementByKey;
-  const menuItems = [...document.querySelectorAll('.flowchart-layout-menu [data-menu-id]')];
+  const menuItems = [...document.querySelectorAll(
+    '.flowchart-layout-menu [data-menu-id], .flowchart-layout-submenu-popup [data-menu-id]',
+  )];
   const target = findByKey(menuItems, caseId);
+  const parent = typeof parentMenuKey === 'string' ? findByKey(menuItems, parentMenuKey) : null;
   const more = findByKey(menuItems, 'more-layout-engines');
   const targetRect = rect(target);
   let hit = null;
@@ -61,9 +72,12 @@ export const readDisplayRoutingLayoutMenuDiagnostics = (caseId) => {
     caseId: typeof caseId === 'string' && caseId.length <= 128 ? caseId : '<invalid>',
     trigger: describe([...document.querySelectorAll('button')]
       .find(button => /自动布局|layout/i.test(button.getAttribute('aria-label') || ''))),
-    menuRootCount: document.querySelectorAll('.flowchart-layout-menu').length,
+    menuRootCount: document.querySelectorAll(
+      '.flowchart-layout-menu, .flowchart-layout-submenu-popup',
+    ).length,
     menuItemCount: menuItems.length,
     target: describe(target),
+    parent: describe(parent),
     more: describe(more),
     hitAtTargetCenter: hit,
     knownMenuIds: menuItems
@@ -76,10 +90,14 @@ export const readDisplayRoutingLayoutMenuDiagnostics = (caseId) => {
 const readLayoutMenuDiagnostics = async (session, layoutCase) => session.evaluate(`(() => {
   const findDisplayRoutingMenuElementByKey = ${findDisplayRoutingMenuElementByKey.toString()};
   const reader = ${readDisplayRoutingLayoutMenuDiagnostics.toString()};
-  return reader(${JSON.stringify(layoutCase.id)});
+  return reader(
+    ${JSON.stringify(layoutCase.id)},
+    ${JSON.stringify(displayRoutingLayoutParentMenuKey(layoutCase.id))},
+  );
 })()`);
 
 export const clickLayout = async (session, layoutCase, wait = delay) => {
+  const parentMenuKey = displayRoutingLayoutParentMenuKey(layoutCase.id);
   const opened = await session.evaluate(`(() => {
     const trigger = Array.from(document.querySelectorAll('button'))
       .find(button => /自动布局|layout/i.test(button.getAttribute('aria-label') || ''));
@@ -94,7 +112,9 @@ export const clickLayout = async (session, layoutCase, wait = delay) => {
     const findByKey = ${findDisplayRoutingMenuElementByKey.toString()};
     const pointerTarget = ${resolveDisplayRoutingMenuPointerTarget.toString()};
     const item = findByKey(
-      document.querySelectorAll('.flowchart-layout-menu [data-menu-id]'),
+      document.querySelectorAll(
+        '.flowchart-layout-menu [data-menu-id], .flowchart-layout-submenu-popup [data-menu-id]',
+      ),
       ${JSON.stringify(layoutCase.id)},
     );
     const rect = item?.getBoundingClientRect?.();
@@ -126,14 +146,16 @@ export const clickLayout = async (session, layoutCase, wait = delay) => {
   };
   let clicked = await clickVisibleItem();
   if (!clicked) {
-    const revealMoreLayouts = async (mode) => {
+    const revealMenu = async (menuItemKey, mode) => {
       for (let attempt = 0; attempt < 2; attempt += 1) {
         const target = await session.evaluate(`(() => {
       const findByKey = ${findDisplayRoutingMenuElementByKey.toString()};
       const pointerTarget = ${resolveDisplayRoutingMenuPointerTarget.toString()};
       const item = findByKey(
-        document.querySelectorAll('.flowchart-layout-menu [data-menu-id]'),
-        'more-layout-engines',
+        document.querySelectorAll(
+          '.flowchart-layout-menu [data-menu-id], .flowchart-layout-submenu-popup [data-menu-id]',
+        ),
+        ${JSON.stringify(menuItemKey)},
       );
       const rect = item?.getBoundingClientRect?.();
       if (!item || !rect || rect.width === 0 || rect.height === 0) return null;
@@ -153,7 +175,7 @@ export const clickLayout = async (session, layoutCase, wait = delay) => {
             await wait(120);
             continue;
           }
-          throw new Error('More layouts menu item is outside the viewport or covered');
+          throw new Error(`${menuItemKey} menu item is outside the viewport or covered`);
         }
         const events = mode === 'click'
           ? ['mouseMoved', 'mousePressed', 'mouseReleased']
@@ -170,13 +192,32 @@ export const clickLayout = async (session, layoutCase, wait = delay) => {
       }
       return false;
     };
-    if (await revealMoreLayouts('hover')) {
-      await wait(500);
+    const revealAndSelect = async menuItemKey => {
+      if (await revealMenu(menuItemKey, 'hover')) {
+        await wait(500);
+        clicked = await clickVisibleItem();
+      }
+      if (!clicked && await revealMenu(menuItemKey, 'click')) {
+        await wait(500);
+        clicked = await clickVisibleItem();
+      }
+    };
+    if (parentMenuKey) await revealAndSelect(parentMenuKey);
+    if (!clicked && parentMenuKey) {
+      for (const type of ['keyDown', 'keyUp']) {
+        await session.send('Input.dispatchKeyEvent', {
+          type,
+          key: 'ArrowRight',
+          code: 'ArrowRight',
+          windowsVirtualKeyCode: 39,
+          nativeVirtualKeyCode: 39,
+        });
+      }
+      await wait(300);
       clicked = await clickVisibleItem();
     }
-    if (!clicked && await revealMoreLayouts('click')) {
-      await wait(500);
-      clicked = await clickVisibleItem();
+    if (!clicked && parentMenuKey !== 'more-layout-engines') {
+      await revealAndSelect('more-layout-engines');
     }
   }
   if (!clicked) {

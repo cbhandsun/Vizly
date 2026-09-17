@@ -3,7 +3,6 @@ import type { Node } from '@xyflow/react';
 
 import { arrangeDomainDagreChildren } from '../domainDagreChildArrangement';
 import { createDomainDagreDirectContent } from '../domainDagreDirectContent';
-import { domainDagrePeerComponentIndex } from '../domainDagrePeerComponents';
 
 const node = (id: string, width: number, height: number): Node => ({
   id,
@@ -88,38 +87,23 @@ describe('arrangeDomainDagreChildren', () => {
     expect(((byId.get('b')?.[axis] ?? 0) - (byId.get('a')?.[axis] ?? 0)) * sign).toBeGreaterThan(0);
   });
 
-  it.each(['grid', 'flow'] as const)('preserves externally connected process geometry in %s', arrangement => {
+  it('treats boundary-only connections as parent constraints and balances automatic content locally', () => {
     const links = nodes.map(node => ({ id: node.id, source: node.id, target: 'remote' }));
-    const componentIndex = domainDagrePeerComponentIndex([...nodes.map(node => node.id), 'remote'], links);
-    const dagre = arrangeDomainDagreChildren(nodes, [], 'dagre', false, 40, 30, dimensions);
-    expect(arrangeDomainDagreChildren(nodes, [], arrangement, false, 40, 30, dimensions,
-      true, undefined, componentIndex)).toEqual(dagre);
-    expect(arrangeDomainDagreChildren(nodes, [], arrangement, false, 40, 30, dimensions)).not.toEqual(dagre);
-    const direct = createDomainDagreDirectContent(nodes, links, arrangement, false, 40, 30,
-      dimensions, new Set([...nodes.map(node => node.id), 'remote']), true, componentIndex);
-    expect(direct?.positions).toEqual(dagre);
+    const automatic = arrangeDomainDagreChildren(nodes, links, 'dagre', false, 40, 30, dimensions, true);
+    const flow = arrangeDomainDagreChildren(nodes, [], 'flow', false, 40, 30, dimensions);
+    expect(automatic).toEqual(flow);
+    expect(new Set(automatic.map(position => position.x)).size).toBeGreaterThan(1);
+    expect(new Set(automatic.map(position => position.y)).size).toBeGreaterThan(1);
+    const direct = createDomainDagreDirectContent(nodes, links, 'dagre', false, 40, 30,
+      dimensions, new Set([...nodes.map(node => node.id), 'remote']), true);
+    expect(direct?.positions).toEqual(automatic);
     expect(direct?.positions.map(position => position.id)).toEqual(nodes.map(node => node.id));
   });
 
-  it.each(['grid', 'flow'] as const)('recognizes a single boundary-connected member while retaining independent %s layouts', arrangement => {
-    const links = [{ source: 'a', target: 'remote' }];
-    const componentIndex = domainDagrePeerComponentIndex([...nodes.map(node => node.id), 'remote'], links);
-    const dagre = arrangeDomainDagreChildren(nodes, [], 'dagre', false, 40, 30, dimensions);
-    expect(arrangeDomainDagreChildren(nodes, [], arrangement, false, 40, 30, dimensions,
-      true, undefined, componentIndex)).toEqual(dagre);
-    // A missing external endpoint is dangling, so it cannot prove a dependency.
-    const independent = domainDagrePeerComponentIndex(nodes.map(node => node.id), links);
-    expect(arrangeDomainDagreChildren(nodes, [], arrangement, false, 40, 30, dimensions,
-      true, undefined, independent)).toEqual(arrangeDomainDagreChildren(nodes, [], arrangement, false, 40, 30, dimensions));
-  });
-
-  it.each(['grid', 'flow'] as const)('fails closed to Dagre when the explicit %s component map is invalid', arrangement => {
-    const dagre = arrangeDomainDagreChildren(nodes, [], 'dagre', false, 40, 30, dimensions);
-    for (const componentIndex of [new Map<string, number>(), new Map([['a', 0], ['b', 0]]),
-      new Map([['a', 0], ['b', 0], ['c', NaN]])]) {
-      expect(arrangeDomainDagreChildren(nodes, [], arrangement, false, 40, 30, dimensions,
-        true, undefined, componentIndex)).toEqual(dagre);
-    }
+  it.each(['grid', 'flow'] as const)('keeps explicit %s layouts when members only have boundary edges', arrangement => {
+    const links = [{ id: 'a-remote', source: 'a', target: 'remote' }];
+    expect(arrangeDomainDagreChildren(nodes, links, arrangement, false, 40, 30, dimensions, true))
+      .toEqual(arrangeDomainDagreChildren(nodes, [], arrangement, false, 40, 30, dimensions));
   });
 
   it.each(['grid', 'flow'] as const)('fits measured card proportions in %s without forcing square node counts', arrangement => {

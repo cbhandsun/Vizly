@@ -8,6 +8,10 @@ import {
     usesSelectableDomainNodeArrangement,
     type FlowchartLayoutDirection,
 } from './flowchartLayoutStrategyMode';
+import {
+    buildDomainPreservingScenarioItems,
+    layoutSubmenuPopupClassName,
+} from './flowchartToolbarLayoutScenarios';
 import type { LaneRankDecision, LaneRankPreference } from '../../types/domainLaneRank';
 import type { LayoutScopeRequest } from './hooks/layoutScopeBoundary';
 
@@ -172,6 +176,9 @@ export const buildFlowchartLayoutMenuModel = ({
     const labels = {
         recommendedGroup: translate('designer.flowchart.layout.recommendedGroup', '常用场景'),
         smart: translate('designer.flowchart.layout.smartRecommendation', '智能推荐'),
+        standardProcessGroup: translate('designer.flowchart.layout.standardProcessGroup', '标准流程'),
+        complexProcessGroup: translate('designer.flowchart.layout.complexProcessGroup', '复杂流程'),
+        swimlaneProcessGroup: translate('designer.flowchart.layout.swimlaneProcessGroup', '泳道布局'),
         customCombination: translate('designer.flowchart.layout.customCombination', '布局组合'),
         customCombinationGroup: translate(
             'designer.flowchart.layout.customCombinationGroup',
@@ -447,12 +454,11 @@ export const buildFlowchartLayoutMenuModel = ({
         ),
     ];
 
-    const primaryTopBottomItem = domainItem(
-        'domain-dagre-tb',
-        labels.domainDagreTb,
-        () => onStrategyLayout?.('domain-dagre', undefined, 'TB'),
-        <FaRegObjectGroup />,
-    );
+    const domainPreservingScenarioItems = buildDomainPreservingScenarioItems({
+        labels,
+        domainItem,
+        onStrategyLayout,
+    });
 
     const moreEngineItems: NonNullable<MenuProps['items']> = [
         ...(onStrategyLayout ? [{
@@ -474,48 +480,6 @@ export const buildFlowchartLayoutMenuModel = ({
                         <FaRegObjectGroup />,
                     ),
                 ] : []),
-                domainItem(
-                    'domain-dagre-bt',
-                    labels.domainDagreBt,
-                    () => onStrategyLayout('domain-dagre', undefined, 'BT'),
-                    <FaRegObjectGroup style={{ transform: 'rotate(180deg)' }} />,
-                ),
-                domainItem(
-                    'domain-dagre-rl',
-                    labels.domainDagreRl,
-                    () => onStrategyLayout('domain-dagre', undefined, 'RL'),
-                    <FaRegObjectGroup style={{ transform: 'rotate(90deg)' }} />,
-                ),
-                domainItem(
-                    'domain-compound-elk-tb',
-                    labels.domainCompoundElkTb,
-                    () => onStrategyLayout('domain-compound-elk', undefined, 'TB'),
-                    <FaObjectGroup />,
-                ),
-                domainItem(
-                    'domain-compound-elk-bt',
-                    labels.domainCompoundElkBt,
-                    () => onStrategyLayout('domain-compound-elk', undefined, 'BT'),
-                    <FaObjectGroup style={{ transform: 'rotate(180deg)' }} />,
-                ),
-                domainItem(
-                    'domain-compound-elk-rl',
-                    labels.domainCompoundElkRl,
-                    () => onStrategyLayout('domain-compound-elk', undefined, 'RL'),
-                    <FaObjectGroup style={{ transform: 'rotate(90deg)' }} />,
-                ),
-                domainItem(
-                    'domain-lanes-bt',
-                    labels.domainLanesBt,
-                    () => onStrategyLayout('domain-lanes', 'dagre', 'BT'),
-                    <FaRegObjectGroup style={{ transform: 'rotate(180deg)' }} />,
-                ),
-                domainItem(
-                    'domain-lanes-rl',
-                    labels.domainLanesRl,
-                    () => onStrategyLayout('domain-lanes', 'dagre', 'RL'),
-                    <FaRegObjectGroup style={{ transform: 'rotate(90deg)' }} />,
-                ),
             ],
         }, { type: 'divider' as const }] : []),
         {
@@ -588,58 +552,40 @@ export const buildFlowchartLayoutMenuModel = ({
                     icon: <FaMagic />,
                     onClick: () => { void onSmartLayout(); },
                 }] : []),
-                primaryTopBottomItem,
-                domainItem(
-                    'domain-dagre-lr',
-                    labels.domainDagreLr,
-                    () => onStrategyLayout?.('domain-dagre', undefined, 'LR'),
-                    <FaRegObjectGroup style={{ transform: 'rotate(-90deg)' }} />,
-                ),
-                domainItem(
-                    'domain-compound-elk-lr',
-                    labels.domainCompoundElkLr,
-                    () => onStrategyLayout?.('domain-compound-elk', undefined, 'LR'),
-                    <FaObjectGroup style={{ transform: 'rotate(-90deg)' }} />,
-                ),
-                domainItem(
-                    'domain-lanes-tb',
-                    labels.domainLanesTb,
-                    () => onStrategyLayout?.('domain-lanes', 'dagre', 'TB'),
-                    <FaRegObjectGroup />,
-                ),
-                domainItem(
-                    'domain-lanes-lr',
-                    labels.domainLanesLr,
-                    () => onStrategyLayout?.('domain-lanes', 'dagre', 'LR'),
-                    <FaRegObjectGroup style={{ transform: 'rotate(-90deg)' }} />,
-                ),
+                ...domainPreservingScenarioItems,
             ],
         },
         { type: 'divider' as const },
         ...(onStrategyLayout ? [{
             key: 'group-scoped-layout',
             label: labels.scopedGroup,
-            type: 'group' as const,
+            icon: <FaRegObjectGroup />,
+            popupClassName: layoutSubmenuPopupClassName,
             children: scopedLayoutItems,
         }, { type: 'divider' as const }] : []),
         ...(supportsLaneRank ? [{
             key: 'group-lane-rank',
             label: labels.laneRankGroup,
-            type: 'group' as const,
+            icon: <FaSitemap />,
+            popupClassName: layoutSubmenuPopupClassName,
             children: laneRankItems,
         }, { type: 'divider' as const }] : []),
         {
             key: 'group-custom-combination',
-            label: customDomainLayoutAvailable || lastDomainStrategy === 'domain-lanes'
-                ? labels.customCombinationGroup
-                : `${labels.customCombinationGroup} · ${labels.customUnavailable}`,
-            type: 'group' as const,
+            label: labels.customCombinationGroup,
+            icon: <FaSlidersH />,
+            popupClassName: layoutSubmenuPopupClassName,
+            title: customDomainLayoutAvailable || lastDomainStrategy === 'domain-lanes'
+                ? undefined
+                : labels.customUnavailable,
             children: [
                 {
                     key: 'custom-domain-direction',
                     label: labels.domainDirectionGroup,
                     icon: <FaObjectGroup />,
                     disabled: !customDomainLayoutAvailable,
+                    title: customDomainLayoutAvailable ? undefined : labels.customUnavailable,
+                    popupClassName: layoutSubmenuPopupClassName,
                     children: customDirectionItems,
                 },
                 {
@@ -647,6 +593,10 @@ export const buildFlowchartLayoutMenuModel = ({
                     label: labels.nodeGroup,
                     icon: <FaSlidersH />,
                     disabled: !customDomainLayoutAvailable && lastDomainStrategy !== 'domain-lanes',
+                    title: customDomainLayoutAvailable || lastDomainStrategy === 'domain-lanes'
+                        ? undefined
+                        : labels.customUnavailable,
+                    popupClassName: layoutSubmenuPopupClassName,
                     children: customNodeItems,
                 },
             ],
@@ -656,6 +606,7 @@ export const buildFlowchartLayoutMenuModel = ({
             key: 'more-layout-engines',
             label: labels.moreEngines,
             icon: <FaSitemap />,
+            popupClassName: layoutSubmenuPopupClassName,
             children: moreEngineItems,
         },
     ];

@@ -686,6 +686,27 @@ describe('baseReactFlowPrecompiledRouteRegistry', () => {
         ...artifact,
         routingContract: {
           ...routingContract,
+          clean: false,
+          violationCount: 1,
+          violations: [{
+            code: 'render-unsafe-endpoint-stub',
+            phase: 'presentation',
+            severity: 'presentation',
+            count: 1,
+          }],
+        },
+      },
+      {
+        inputSignature,
+        inputGeometryDigest,
+        sourceHash: SOURCE_HASH,
+      },
+    )).toBeNull();
+    expect(parseBaseReactFlowPrecompiledRouteArtifact(
+      {
+        ...artifact,
+        routingContract: {
+          ...routingContract,
           hardClean: false,
         },
       },

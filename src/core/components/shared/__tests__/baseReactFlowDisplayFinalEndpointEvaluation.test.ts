@@ -10,7 +10,10 @@ import { createBaseReactFlowFinalEndpointResidualRepair } from '../baseReactFlow
 import { commercialEdgeDetoursDoNotRegress } from '../baseReactFlowDisplayCommercialDetourGuard';
 import { isExactSingleImmutableEdgeReplacement } from '../baseReactFlowDisplayFinalEndpointGate';
 import { createDisplayWorkerFinalEvaluation } from '../baseReactFlowDisplayWorkerFinalEvaluation';
-import { repairRenderSafeEndpointStubs } from '../baseReactFlowDisplayEndpointStubRepair';
+import {
+  countRenderUnsafeEndpointStubs,
+  repairRenderSafeEndpointStubs,
+} from '../baseReactFlowDisplayEndpointStubRepair';
 import { repairBaseReactFlowFinalCommercialDetours } from '../baseReactFlowDisplayCommercialDetourRepair';
 import { repairTerminalPreservingOuterStairs } from '../baseReactFlowDisplayCommercialOuterStairRepair';
 import { finalSafetyCandidateIsAccepted } from '../baseReactFlowDisplayFinalSafetyEvaluation';
@@ -383,6 +386,58 @@ describe('createBaseReactFlowFinalEndpointEvaluation', () => {
     expect(evaluation.endpointOrder(marginCandidate).legalSharedTrunks[0].commonStemLength).toBe(294);
     expect(evaluation.repairRenderSafeEndpointStubs(route)).toBe(route);
     expect(evaluation.endpointOrder(route).legalSharedTrunks).toEqual(trunks);
+  });
+
+  it('extends a short target stub by reusing a clean same-target trunk lane', () => {
+    const routeNodes: Node[] = [
+      { id: 'heat', position: { x: 5102, y: 1779 }, width: 186, height: 60, data: {} },
+      { id: 'alert', position: { x: 5100, y: 1962.5 }, width: 190, height: 73, data: {} },
+      { id: 'labor', position: { x: 5610, y: 1534 }, width: 215, height: 96, data: {} },
+    ];
+    const route: Edge[] = [
+      {
+        id: 'safe',
+        source: 'alert',
+        target: 'labor',
+        sourceHandle: 'right',
+        targetHandle: 'left',
+        data: {
+          computedPath: [
+            { x: 5290, y: 1999 },
+            { x: 5538, y: 1999 },
+            { x: 5538, y: 1582 },
+            { x: 5610, y: 1582 },
+          ],
+        },
+      },
+      {
+        id: 'short',
+        source: 'heat',
+        target: 'labor',
+        sourceHandle: 'right',
+        targetHandle: 'left',
+        data: {
+          computedPath: [
+            { x: 5288, y: 1809 },
+            { x: 5562, y: 1809 },
+            { x: 5562, y: 1582 },
+            { x: 5610, y: 1582 },
+          ],
+        },
+      },
+    ];
+
+    expect(countRenderUnsafeEndpointStubs(route)).toBe(1);
+    const repaired = repairRenderSafeEndpointStubs(route, routeNodes);
+    const shortPath = getDisplayComputedPath(repaired[1]);
+
+    expect(countRenderUnsafeEndpointStubs(repaired)).toBe(0);
+    expect(shortPath).toEqual([
+      { x: 5288, y: 1809 },
+      { x: 5538, y: 1809 },
+      { x: 5538, y: 1582 },
+      { x: 5610, y: 1582 },
+    ]);
   });
 
   it('leaves compound stub searches to endpoint closure during commercial shortening', () => {

@@ -111,6 +111,7 @@ describe('shared process ranks with local branch separation', () => {
     ...(['TB', 'LR'] as const).map(direction => ({ name: 'wms-production', preset: wmsProcess, direction, productionGeometry: true, preserveSubDomain: false, layoutMode: 'lanes' as const })),
     ...(['TB', 'LR'] as const).map(direction => ({ name: 'demand-allocation', preset: demandAllocation, direction, productionGeometry: false, preserveSubDomain: true, layoutMode: 'lanes' as const })),
     ...(['TB', 'LR'] as const).map(direction => ({ name: 'enterprise', preset: enterpriseArchitecture, direction, productionGeometry: false, preserveSubDomain: true, layoutMode: 'lanes' as const })),
+    { name: 'enterprise', preset: enterpriseArchitecture, direction: 'TB' as const, productionGeometry: false, preserveSubDomain: true, layoutMode: 'standard' as const },
     { name: 'enterprise', preset: enterpriseArchitecture, direction: 'BT' as const, productionGeometry: false, preserveSubDomain: true, layoutMode: 'standard' as const },
     { name: 'enterprise', preset: enterpriseArchitecture, direction: 'LR' as const, productionGeometry: true, preserveSubDomain: true, layoutMode: 'standard' as const },
     { name: 'enterprise', preset: enterpriseArchitecture, direction: 'RL' as const, productionGeometry: false, preserveSubDomain: true, layoutMode: 'standard' as const },
@@ -204,6 +205,41 @@ describe('shared process ranks with local branch separation', () => {
         .map(node => getNodeDimensions(node)[flowDimension]);
       expect(new Set(laneExtents).size).toBe(1);
       expect(Math.max(...laneExtents)).toBeLessThan(horizontal ? 4_500 : 2_500);
+    }
+    if (name === 'enterprise' && layoutMode === 'lanes') {
+      const backendSubGroups = arranged.filter(node => (
+        node.type === 'subGroup' && node.data.domain === '后端域'
+      ));
+      if (direction === 'LR') {
+        const backend = arranged.find(node => node.type === 'titleGroup' && node.data.domain === '后端域');
+        const scm = arranged.filter(node => node.data.subDomain === 'SCM 供应链' && node.type !== 'subGroup');
+        if (!backend) throw new Error('Missing enterprise backend domain');
+        expect(new Set(scm.map(node => node.position.x)).size).toBeLessThan(scm.length);
+        expect(new Set(scm.map(node => node.position.y)).size).toBeGreaterThan(1);
+        expect(getNodeDimensions(backend).width).toBeLessThan(3_800);
+      }
+      const independent = backendSubGroups.find(node => node.data.subDomain === '业财客');
+      if (!independent) throw new Error('Missing independent enterprise subgroup');
+      const independentSize = getNodeDimensions(independent);
+      const sharesCrossBandWithProcessSubGroup = backendSubGroups.some(node => {
+        if (node.id === independent.id) return false;
+        const size = getNodeDimensions(node);
+        const crossOverlap = Math.min(
+          independent.position[cross] + independentSize[horizontal ? 'height' : 'width'],
+          node.position[cross] + size[horizontal ? 'height' : 'width'],
+        ) - Math.max(independent.position[cross], node.position[cross]);
+        const flowGap = Math.max(
+          independent.position[flow] - node.position[flow] - size[horizontal ? 'width' : 'height'],
+          node.position[flow] - independent.position[flow] - independentSize[horizontal ? 'width' : 'height'],
+        );
+        return crossOverlap > 0 && flowGap > 0;
+      });
+      expect(sharesCrossBandWithProcessSubGroup).toBe(true);
+    }
+    if (name === 'enterprise' && layoutMode === 'standard') {
+      const scm = arranged.filter(node => node.data.subDomain === 'SCM 供应链' && node.type !== 'subGroup');
+      expect(new Set(scm.map(node => node.position.x)).size).toBeLessThan(scm.length);
+      expect(new Set(scm.map(node => node.position.y)).size).toBeGreaterThan(1);
     }
     const hierarchical = new Map(finalNodes.map(node => [node.id, node]));
     for (const node of finalNodes) {

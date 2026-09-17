@@ -2,7 +2,10 @@ import type { Edge, Node } from '@xyflow/react';
 import { getNodeDimensions } from './DomainDagreLayoutHelpers';
 import { compactDomainDagreLaneCrossAxis } from './domainDagreLaneCrossCompaction';
 import { arrangeDomainDagreChildren } from './domainDagreChildArrangement';
-import { isDomainDagreNodeHidden } from './domainDagreHierarchy';
+import {
+  domainDagreDomainOf,
+  isDomainDagreNodeHidden,
+} from './domainDagreHierarchy';
 import { COMMERCIAL_BUSINESS_NODE_CLEARANCE } from './shared/edgeBusinessNodeClearanceRepair';
 
 /** Leading flow inset inside a lane band. Part of the lane envelope model:
@@ -54,7 +57,7 @@ export function assignDomainDagreLaneCoordinates(
     return node && !connected.has(id) ? [node] : [];
   });
   const arrangeIndependentCards = (nodes: Node[], availableFlow?: number) => arrangeDomainDagreChildren(
-    nodes, [], independentArrangement ?? 'grid', horizontal, horizontal ? flowGap : crossGap, horizontal ? crossGap : flowGap,
+    nodes, [], independentArrangement ?? 'flow', horizontal, horizontal ? flowGap : crossGap, horizontal ? crossGap : flowGap,
     getNodeDimensions, false, availableFlow === undefined ? undefined : {
       maxWidth: horizontal ? availableFlow : 1_000_000,
       maxHeight: horizontal ? 1_000_000 : availableFlow,
@@ -152,30 +155,42 @@ export function assignDomainDagreLaneCoordinates(
           occupiedWidth = Math.max(occupiedWidth, node.position[cross] - bucketCross - inset + crossSize(node));
         }
       }
-      // Explicit Grid/Flow uses the bounded card packer; automatic keeps its
-      // linear fill inside the same common lane envelope.
+      // Explicit Grid/Flow fills the available envelope. Automatic horizontal
+      // Dagre has no row/column constraint, so balance isolated cards from
+      // measured geometry instead of stretching them across a long lane.
       let column = process.length ? occupiedWidth + crossGap : 0;
-      let columnWidth = 0;
-      let cursor = LANE_LEADING_INSET;
       const availableEnd = Math.max(LANE_LEADING_INSET, domain.position[flow] + flowSize(domain) - 32);
-      if (independentArrangement) {
+      if (!independentArrangement && !horizontal) {
+        let columnWidth = 0;
+        let cursor = LANE_LEADING_INSET;
+        for (const node of isolated) {
+          if (cursor > LANE_LEADING_INSET && cursor + flowSize(node) > availableEnd + 0.5) {
+            column += columnWidth + crossGap;
+            columnWidth = 0;
+            cursor = LANE_LEADING_INSET;
+          }
+          replacements.set(node.id, { ...node, position: at(bucketCross + inset + column, cursor) });
+          columnWidth = Math.max(columnWidth, crossSize(node));
+          occupiedWidth = Math.max(occupiedWidth, column + crossSize(node));
+          cursor += flowSize(node) + flowGap;
+        }
+      } else {
         const byId = new Map(isolated.map(node => [node.id, node]));
-        for (const position of arrangeIndependentCards(isolated, Math.max(1, availableEnd - LANE_LEADING_INSET))) {
+        const maximumAvailableFlow = Math.max(1, availableEnd - LANE_LEADING_INSET);
+        const unbounded = arrangeIndependentCards(isolated);
+        const unboundedFlowEnd = Math.max(0, ...unbounded.map(position => {
+          const node = byId.get(position.id);
+          return node ? position[flow] + flowSize(node) : 0;
+        }));
+        const positions = independentArrangement || unboundedFlowEnd > maximumAvailableFlow + 0.5
+          ? arrangeIndependentCards(isolated, maximumAvailableFlow)
+          : unbounded;
+        for (const position of positions) {
           const node = byId.get(position.id);
           if (!node) continue;
           replacements.set(node.id, { ...node, position: at(bucketCross + inset + column + position[cross], LANE_LEADING_INSET + position[flow]) });
           occupiedWidth = Math.max(occupiedWidth, column + position[cross] + crossSize(node));
         }
-      } else for (const node of isolated) {
-        if (cursor > LANE_LEADING_INSET && cursor + flowSize(node) > availableEnd + 0.5) {
-          column += columnWidth + crossGap;
-          columnWidth = 0;
-          cursor = LANE_LEADING_INSET;
-        }
-        replacements.set(node.id, { ...node, position: at(bucketCross + inset + column, cursor) });
-        columnWidth = Math.max(columnWidth, crossSize(node));
-        occupiedWidth = Math.max(occupiedWidth, column + crossSize(node));
-        cursor += flowSize(node) + flowGap;
       }
       const width = occupiedWidth + inset + (bucket.id === scope.domainId ? 0 : 32);
       const group = replacements.get(bucket.id);
@@ -186,6 +201,54 @@ export function assignDomainDagreLaneCoordinates(
     replacements.set(scope.domainId, resize(domain, domainCross, width));
     domainCross += width + crossGap;
   }
+}
+
+/** Shrink the common lane envelope after local content packing. Every lane
+ * keeps the same flow-axis extent; invalid or escaping geometry fails closed. */
+export function tightenDomainDagreLaneFlowEnvelope(
+  nodes: readonly Node[], horizontal: boolean,
+  insets: Readonly<{ leading: number; trailing: number }>,
+): Node[] {
+  if (![insets.leading, insets.trailing].every(value => Number.isFinite(value)
+    && value >= 0 && value <= 10_000)) return nodes.slice();
+  const flow = horizontal ? 'x' : 'y';
+  const flowDimension = horizontal ? 'width' : 'height';
+  const domains = nodes.filter(node => node.type === 'titleGroup' && !isDomainDagreNodeHidden(node));
+  if (!domains.length) return nodes.slice();
+  const requiredSizes: number[] = [];
+  for (const domain of domains) {
+    const domainKey = domainDagreDomainOf(domain);
+    const domainStart = domain.position[flow];
+    const currentSize = getNodeDimensions(domain)[flowDimension];
+    if (!domainKey || !Number.isFinite(domainStart) || !Number.isFinite(currentSize) || currentSize <= 0) {
+      return nodes.slice();
+    }
+    const content = nodes.filter(node => node.id !== domain.id
+      && !isDomainDagreNodeHidden(node)
+      && domainDagreDomainOf(node) === domainKey);
+    if (!content.length) return nodes.slice();
+    let contentEnd = domainStart;
+    for (const node of content) {
+      const start = node.position[flow];
+      const size = getNodeDimensions(node)[flowDimension];
+      const end = start + size;
+      if (![start, size, end].every(Number.isFinite) || size <= 0
+        || start < domainStart - 0.5 || end > domainStart + currentSize + 0.5) return nodes.slice();
+      contentEnd = Math.max(contentEnd, end);
+    }
+    requiredSizes.push(Math.max(insets.leading + insets.trailing + 1,
+      contentEnd - domainStart + insets.trailing));
+  }
+  const targetSize = Math.max(...requiredSizes);
+  if (!Number.isFinite(targetSize)
+    || domains.some(domain => targetSize > getNodeDimensions(domain)[flowDimension] + 0.5)) return nodes.slice();
+  return nodes.map(node => {
+    if (node.type !== 'titleGroup' || isDomainDagreNodeHidden(node)) return node;
+    const currentSize = getNodeDimensions(node)[flowDimension];
+    if (targetSize >= currentSize - 0.5) return node;
+    const dimensions = { ...getNodeDimensions(node), [flowDimension]: targetSize };
+    return { ...node, ...dimensions, measured: dimensions, style: { ...node.style, ...dimensions } };
+  });
 }
 
 type DomainDagreFlowInsets = Readonly<{ leading: number; trailing: number }>;

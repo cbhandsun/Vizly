@@ -35,7 +35,7 @@ const assertGeometry = (nodes: Node[], domainPlacement: string, direction: 'TB' 
     overlappingPairs: 0, outsideParent: 0, laneViolations: 0, budgetExceeded: false });
 };
 describe('domain content mode contracts', () => {
-  it.each([LayoutType.FLOW, LayoutType.GRID, LayoutType.VERTICAL])('retains %s geometry for direct and subgroup children in both placements', async nodeLayout => {
+  it.each([LayoutType.FLOW, LayoutType.GRID, LayoutType.HORIZONTAL, LayoutType.VERTICAL])('retains %s geometry for direct and subgroup children in both placements', async nodeLayout => {
     for (const direction of ['TB', 'LR', 'BT', 'RL'] as const)
     for (const domainPlacement of ['topology', 'ordered-lanes'] as const) for (const grouped of [false, true]) {
       const nodes = Array.from({ length: 6 }, (_, index) => card(`n${index}`, grouped ? 'nested' : ''));
@@ -48,7 +48,8 @@ describe('domain content mode contracts', () => {
       const leaves = result.nodes.filter(node => ids.has(node.id));
       const columns = new Set(leaves.map(node => absolute(node, result.nodes).x)).size;
       const rows = new Set(leaves.map(node => absolute(node, result.nodes).y)).size;
-      if (nodeLayout === LayoutType.VERTICAL) { expect(columns).toBe(1); expect(rows).toBe(6); }
+      if (nodeLayout === LayoutType.HORIZONTAL) { expect(columns).toBe(6); expect(rows).toBe(1); }
+      else if (nodeLayout === LayoutType.VERTICAL) { expect(columns).toBe(1); expect(rows).toBe(6); }
       else { expect(columns).toBeGreaterThan(1); expect(rows).toBeGreaterThan(1); }
       assertSeparated(result.nodes, leaves);
       assertGeometry(result.nodes, domainPlacement, direction);
@@ -62,6 +63,31 @@ describe('domain content mode contracts', () => {
       }
       expect(nodes).toEqual(before);
     }
+  });
+
+  it.each([
+    ['TB', false], ['LR', false], ['TB', true], ['LR', true],
+  ] as const)('balances automatic cards around a boundary anchor, direction=%s grouped=%s', async (direction, grouped) => {
+      const local = Array.from({ length: 6 }, (_, index) => card(`n${index}`, grouped ? 'nested' : ''));
+      const remote = { ...card('remote'), data: { domain: 'two', subDomain: '', label: 'remote' } };
+      const input = [...local, remote];
+      const edges = [{ id: 'boundary-anchor', source: local[0].id, target: remote.id }];
+      const before = structuredClone({ input, edges });
+      const result = await new DomainDagreLayoutStrategy().calculateLayout(input, edges, {
+        type: LayoutType.DAGRE,
+        direction,
+        nodeLayout: LayoutType.DAGRE,
+        domainPlacement: 'topology',
+        generateDomainGroups: true,
+        generateSubDomainGroups: grouped,
+        edgeRoutingQuality: 'interactive',
+      });
+      const leaves = result.nodes.filter(node => local.some(source => source.id === node.id));
+      expect(new Set(leaves.map(node => absolute(node, result.nodes).x)).size).toBeGreaterThan(1);
+      expect(new Set(leaves.map(node => absolute(node, result.nodes).y)).size).toBeGreaterThan(1);
+      assertSeparated(result.nodes, leaves);
+      assertGeometry(result.nodes, 'topology', direction);
+      expect({ input, edges }).toEqual(before);
   });
 
   it.each(['topology', 'ordered-lanes'] as const)('keeps mixed direct cards and ordered subgroups disjoint in %s', async domainPlacement => {

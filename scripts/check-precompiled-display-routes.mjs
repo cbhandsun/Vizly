@@ -13,7 +13,10 @@ import {
 import { hashPrecompiledDisplayRouteSource } from './lib/precompiled-display-route-source-hash.mjs';
 import { computePrecompiledDisplayRoutingSourceHash } from './lib/precompiled-display-route-source-set.mjs';
 import { auditPrecompiledDisplayRouteCommercialQuality } from './lib/precompiled-display-route-commercial-quality.mjs';
-import { isPrecompiledDisplayRoutingContractSummary } from './lib/precompiled-display-route-capture.mjs';
+import {
+  isPrecompiledDisplayRoutingContractSummary,
+  precompiledDisplayRoutingContractIsAccepted,
+} from './lib/precompiled-display-route-capture.mjs';
 
 const ROOT = resolve(process.cwd());
 const GENERATED_DIR = resolve(ROOT, 'src/core/components/shared/generated');
@@ -137,7 +140,7 @@ for (const entry of manifest.entries) {
       typeof artifact.routingContract !== 'undefined'
       && (
         !isPrecompiledDisplayRoutingContractSummary(artifact.routingContract)
-        || artifact.routingContract.hardClean !== true
+        || !precompiledDisplayRoutingContractIsAccepted(artifact.routingContract)
       )
     )
     || !Array.isArray(artifact.patches)

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import {
   assertRequestedLayoutSelected,
   clickLayout,
+  displayRoutingLayoutParentMenuKey,
   readDisplayRoutingLayoutMenuDiagnostics,
 } from './display-routing-matrix-layout-command.mjs';
 import {
@@ -243,6 +244,7 @@ describe('display routing matrix cases', () => {
     await expect(clickLayout(session, { id: 'domain-compound-elk-bt' })).resolves.toBe(123);
     expect(session.send.mock.calls.map(call => call[1].type)).toEqual(['mouseMoved', 'mousePressed', 'mouseReleased']);
     expect(session.evaluate.mock.calls[1][0]).not.toContain('item?.click()');
+    expect(session.evaluate.mock.calls[1][0]).toContain('.flowchart-layout-submenu-popup [data-menu-id]');
     const covered = { evaluate: vi.fn()
       .mockResolvedValueOnce(true)
       .mockResolvedValueOnce({ inaccessible: true })
@@ -258,7 +260,7 @@ describe('display routing matrix cases', () => {
     expect(scrollSettled.send).toHaveBeenCalledTimes(3);
   });
 
-  it('clicks the more-layouts action before selecting a hidden submenu item', async () => {
+  it('reveals the grouped swimlane menu before selecting its hidden item', async () => {
     const session = {
       evaluate: vi.fn()
         .mockResolvedValueOnce(true)
@@ -279,7 +281,16 @@ describe('display routing matrix cases', () => {
     expect(session.evaluate.mock.calls[2][0]).toContain("item.scrollIntoView({ block: 'nearest'");
   });
 
-  it('falls back to clicking the more-layouts action when hover does not mount its submenu', async () => {
+  it('maps only the primary domain scenarios to their grouped menu parents', () => {
+    expect(displayRoutingLayoutParentMenuKey('domain-dagre-tb')).toBe('group-standard-process');
+    expect(displayRoutingLayoutParentMenuKey('domain-compound-elk-rl')).toBe('group-complex-process');
+    expect(displayRoutingLayoutParentMenuKey('domain-lanes-lr')).toBe('group-swimlane-process');
+    expect(displayRoutingLayoutParentMenuKey('domain-dagre-sub-horizontal-tb')).toBeUndefined();
+    expect(displayRoutingLayoutParentMenuKey('tree-tb')).toBeUndefined();
+    expect(displayRoutingLayoutParentMenuKey(undefined)).toBeUndefined();
+  });
+
+  it('falls back to clicking a grouped menu when hover does not mount its submenu', async () => {
     const session = {
       evaluate: vi.fn()
         .mockResolvedValueOnce(true)
@@ -300,6 +311,26 @@ describe('display routing matrix cases', () => {
       'mouseMoved',
       'mousePressed',
       'mouseReleased',
+    ]);
+  });
+
+  it('uses keyboard expansion when a clicked grouped menu still has not mounted its submenu', async () => {
+    const session = {
+      evaluate: vi.fn()
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ x: 180, y: 190 })
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ x: 180, y: 190 })
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ x: 420, y: 190, clickedAt: 654 }),
+      send: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await expect(clickLayout(session, { id: 'domain-lanes-lr' })).resolves.toBe(654);
+    expect(session.send.mock.calls.filter(call => call[0] === 'Input.dispatchKeyEvent').map(call => call[1])).toMatchObject([
+      { type: 'keyDown', key: 'ArrowRight' },
+      { type: 'keyUp', key: 'ArrowRight' },
     ]);
   });
   it('checks the applied layout in the live-session assertion', async () => {
@@ -401,6 +432,9 @@ describe('display routing matrix cases', () => {
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(false)
         .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(false)
         .mockResolvedValueOnce({
           caseId: 'domain-lanes-tb',
           menuItemCount: 2,
@@ -408,13 +442,14 @@ describe('display routing matrix cases', () => {
           more: { menuId: 'x-more-layout-engines', text: { length: 12 } },
           knownMenuIds: ['x-more-layout-engines'],
         }),
+      send: vi.fn().mockResolvedValue(undefined),
     };
 
     await expect(clickLayout(session, {
       id: 'domain-lanes-tb',
       label: 'private label should not matter',
     })).rejects.toThrow(/"menuItemCount":2/);
-    expect(session.evaluate).toHaveBeenCalledTimes(5);
+    expect(session.evaluate).toHaveBeenCalledTimes(8);
   });
 
   it('summarizes menu state without returning raw labels', () => {
@@ -436,7 +471,7 @@ describe('display routing matrix cases', () => {
       querySelectorAll: selector => (
         selector === 'button'
           ? [button]
-          : selector === '.flowchart-layout-menu'
+          : selector === '.flowchart-layout-menu, .flowchart-layout-submenu-popup'
             ? [root]
             : [target]
       ),

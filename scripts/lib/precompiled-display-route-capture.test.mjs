@@ -59,6 +59,7 @@ import {
   isFreshFullRouteRequestResponse,
   isMatchingHardCleanDisplayWorkerResponse,
   isPrecompiledDisplayRoutingContractSummary,
+  precompiledDisplayRoutingContractIsAccepted,
   precompiledDisplayRouteContractsMatch,
   replayPrecompiledDisplayRoutePatches,
   replayTrustedDisplayRoutePatches,
@@ -146,17 +147,18 @@ describe('precompiled display route capture', () => {
     expect(renderPrecompiledDisplayRouteCaptureExpression('safe-preset'))
       .toContain('workerDurationMs: isLayoutCapture ? routing.routeMs : response.workerDurationMs');
     expect(renderPrecompiledDisplayRouteCaptureExpression('safe-preset'))
-      .not.toContain('response.routingContract.clean === true');
+      .toContain('value.clean === true');
     expect(renderPrecompiledDisplayRouteCaptureExpression('safe-preset'))
-      .toContain('response.routingContract.hardClean === true');
+      .toContain('value.hardClean === true');
     expect(renderPrecompiledDisplayRouteCaptureExpression('safe-preset'))
       .toContain('routingContract: isLayoutCapture ? null : response.routingContract');
   });
 
-  it('accepts only compact clean routing contract summaries for precompiled capture', () => {
+  it('validates compact routing contract summaries and accepts only fully clean capture contracts', () => {
     const clean = { clean: true, hardClean: true, violationCount: 0, violations: [] };
     expect(isPrecompiledDisplayRoutingContractSummary(clean)).toBe(true);
-    expect(isPrecompiledDisplayRoutingContractSummary({
+    expect(precompiledDisplayRoutingContractIsAccepted(clean)).toBe(true);
+    const presentationDirty = {
       clean: false,
       hardClean: true,
       violationCount: 1,
@@ -166,8 +168,10 @@ describe('precompiled display route capture', () => {
         severity: 'presentation',
         count: 1,
       }],
-    })).toBe(true);
-    expect(isPrecompiledDisplayRoutingContractSummary({
+    };
+    expect(isPrecompiledDisplayRoutingContractSummary(presentationDirty)).toBe(true);
+    expect(precompiledDisplayRoutingContractIsAccepted(presentationDirty)).toBe(false);
+    const hardDirty = {
       clean: false,
       hardClean: false,
       violationCount: 1,
@@ -177,7 +181,9 @@ describe('precompiled display route capture', () => {
         severity: 'commercial',
         count: 1,
       }],
-    })).toBe(true);
+    };
+    expect(isPrecompiledDisplayRoutingContractSummary(hardDirty)).toBe(true);
+    expect(precompiledDisplayRoutingContractIsAccepted(hardDirty)).toBe(false);
     expect(isPrecompiledDisplayRoutingContractSummary({
       ...clean,
       privatePath: [{ x: 0, y: 0 }],

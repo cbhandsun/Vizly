@@ -42,7 +42,11 @@ import { runDomainDagreNestedLayout } from './domainDagreNestedLayout';
 import { arrangeDomainDagreChildren } from './domainDagreChildArrangement';
 import { centerDomainDagreSubGroups } from './domainDagreDirectContent';
 import { domainDagrePeerComponentIndex } from './domainDagrePeerComponents';
-import { tightenDomainDagreSubGroupFlowBounds } from './domainDagreLaneCoordinateAssignment';
+import {
+    tightenDomainDagreLaneFlowEnvelope,
+    tightenDomainDagreSubGroupFlowBounds,
+} from './domainDagreLaneCoordinateAssignment';
+import { packIndependentDomainDagreSubGroups } from './domainDagreIndependentSubGroupPacking';
 import {
     unifyContainerHeightsByMaximum,
     unifyContainerWidthsByMaximum,
@@ -531,6 +535,39 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                         trailing: sdPadV + bottomSafe,
                     },
             );
+            updatedNodes = packIndependentDomainDagreSubGroups(
+                updatedNodes,
+                edges,
+                nodeToSubGroup,
+                {
+                    horizontal: isHorizontal,
+                    flowGap: isHorizontal ? nodeGapH : nodeGapV,
+                    crossGap: isHorizontal ? Math.max(120, nodeGapV) : Math.max(120, nodeGapH),
+                    domainGap: isHorizontal ? Math.max(120, nodeGapV) : Math.max(120, nodeGapH),
+                    flowInsets: isHorizontal
+                        ? { leading: dPadHEffective, trailing: dPadHEffective }
+                        : {
+                            leading: dTitleH + titleSafe + dPadV,
+                            trailing: dPadV + bottomSafe + bottomSafeGap,
+                        },
+                    crossInsets: isHorizontal
+                        ? {
+                            leading: dTitleH + titleSafe + dPadV,
+                            trailing: dPadV + bottomSafe + bottomSafeGap,
+                        }
+                        : { leading: dPadHEffective, trailing: dPadHEffective },
+                },
+            );
+            // Horizontal lanes are the principal wide-canvas failure mode. A
+            // vertical common-envelope reduction can remove routing corridors,
+            // so retain it until the routed-candidate selector can arbitrate it.
+            if (isHorizontal) {
+                updatedNodes = tightenDomainDagreLaneFlowEnvelope(
+                    updatedNodes,
+                    true,
+                    { leading: dPadHEffective, trailing: dPadHEffective },
+                );
+            }
             laneRankDecision = selected.decision;
         }
 
