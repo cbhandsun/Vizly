@@ -32,6 +32,7 @@ declare module 'svg2pdf.js/dist/svg2pdf.es.min.js' {
 interface ImportMetaEnv {
     readonly VITE_SUPABASE_URL: string
     readonly VITE_SUPABASE_ANON_KEY: string
+    readonly VITE_AI_GATEWAY_MODE?: 'auto' | 'off' | 'required'
 }
 
 interface ImportMeta {

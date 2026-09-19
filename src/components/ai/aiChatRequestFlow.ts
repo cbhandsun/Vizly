@@ -1,4 +1,5 @@
 import type { Message } from '@/services/ai/AIConversationService';
+import type { AIValidatedCommand } from './aiCommandExtraction';
 
 export interface AIChatRequestMessage {
     role: 'system' | 'user' | 'assistant';
@@ -15,11 +16,13 @@ export interface BuildAIChatRequestMessagesOptions {
 export interface AIChatStreamDelta {
     content?: string;
     reasoningContent?: string;
+    toolCalls?: AIValidatedCommand[];
 }
 
 export interface AIChatStreamState {
     content: string;
     reasoningContent: string;
+    toolCalls: AIValidatedCommand[];
 }
 
 export interface ConsumeAIChatStreamOptions {
@@ -61,6 +64,7 @@ export const consumeAIChatStream = async ({
     let buffer = '';
     let content = '';
     let reasoningContent = '';
+    const toolCalls: AIValidatedCommand[] = [];
 
     const applySseLine = (line: string) => {
         const trimmedLine = line.trim();
@@ -78,10 +82,14 @@ export const consumeAIChatStream = async ({
         if (delta.content) {
             content += delta.content;
         }
+        if (delta.toolCalls?.length) {
+            toolCalls.push(...delta.toolCalls.slice(0, Math.max(0, 10 - toolCalls.length)));
+        }
 
         onDelta?.({
             content,
             reasoningContent,
+            toolCalls: [...toolCalls],
         });
     };
 
@@ -116,6 +124,7 @@ export const consumeAIChatStream = async ({
         return {
             content,
             reasoningContent,
+            toolCalls,
         };
     } finally {
         signal.removeEventListener('abort', onAbortReader);

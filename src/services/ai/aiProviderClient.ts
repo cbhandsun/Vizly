@@ -4,6 +4,7 @@ import { sanitizeAIProviderError } from './errorSecurity';
 export type AIProviderRequestPath = '/chat/completions' | '/models';
 
 export interface AIProviderRequestConfig {
+    id?: string;
     name?: string;
     baseUrl: string;
     apiKey?: string;

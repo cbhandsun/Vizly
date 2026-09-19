@@ -65,6 +65,7 @@ describe('aiChatRequestFlow', () => {
         expect(state).toEqual({
             content: 'Hello world',
             reasoningContent: 'Think',
+            toolCalls: [],
         });
         expect(onDelta).toHaveBeenCalledTimes(2);
     });
@@ -98,6 +99,33 @@ describe('aiChatRequestFlow', () => {
         });
 
         expect(state.content).toBe('AB');
+        expect(state.toolCalls).toEqual([]);
+    });
+
+    it('collects at most ten structured tool calls without adding them to visible content', async () => {
+        const reader = {
+            read: vi.fn()
+                .mockResolvedValueOnce({
+                    done: false,
+                    value: encodeLines(...Array.from({ length: 12 }, (_, index) => (
+                        `data: {"tool":${index}}`
+                    ))),
+                })
+                .mockResolvedValueOnce({ done: true, value: undefined }),
+        } as unknown as ReadableStreamDefaultReader<Uint8Array>;
+
+        const state = await consumeAIChatStream({
+            reader,
+            signal: new AbortController().signal,
+            parseDelta: (data) => ({
+                toolCalls: [{ action: 'layout', strategy: `s${JSON.parse(data).tool}` }],
+            }),
+            onAbortReader: vi.fn(),
+        });
+
+        expect(state.content).toBe('');
+        expect(state.toolCalls).toHaveLength(10);
+        expect(state.toolCalls[9]).toEqual({ action: 'layout', strategy: 's9' });
     });
 
     it('throws abort reason and invokes reader cancellation callback', async () => {

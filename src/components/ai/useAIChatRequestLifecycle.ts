@@ -15,9 +15,9 @@ import {
 } from '@/services/ai/diagramPrompts';
 import {
     formatAIProviderRequestError,
-    requestAIChatCompletion,
     resolveAIProviderEndpoint,
 } from '@/services/ai/aiProviderClient';
+import { requestAIChatCompletionRouted } from '@/services/ai/aiRequestRouter';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { getAIConfig, persistAIConfig } from './aiConfigStorage';
 import { createAIChatMessageId } from './aiChatConversationModel';
@@ -35,6 +35,7 @@ import {
     consumeAIChatStream,
 } from './aiChatRequestFlow';
 import { parseAIStreamDelta } from './aiStreamParsing';
+import type { AIValidatedCommand } from './aiCommandExtraction';
 import {
     logAIChatCancelFailure,
     logAIChatEndpointValidationFailure,
@@ -138,6 +139,7 @@ export function useAIChatRequestLifecycle({
         activeRequestControllerRef.current = requestController;
         let accumulatedContent = '';
         let accumulatedReasoning = '';
+        let structuredToolCalls: AIValidatedCommand[] = [];
 
         try {
             const systemPrompt = pluginId === 'mindmap'
@@ -157,7 +159,7 @@ export function useAIChatRequestLifecycle({
                             : buildAnalysisContext(diagramNodes, diagramEdges))
                         : ''),
             });
-            const response = await requestAIChatCompletion(validation.provider, {
+            const response = await requestAIChatCompletionRouted(validation.provider, {
                 model: validation.model.id,
                 messages: requestMessages,
                 stream: true,
@@ -176,6 +178,7 @@ export function useAIChatRequestLifecycle({
                     onDelta: (state) => {
                         accumulatedContent = state.content;
                         accumulatedReasoning = state.reasoningContent;
+                        structuredToolCalls = state.toolCalls;
                         if (!activeId || Date.now() - lastUpdateTimestamp <= 60) return;
 
                         const current = [...aiConversationService.getConversations()];
@@ -194,9 +197,17 @@ export function useAIChatRequestLifecycle({
                 });
                 accumulatedContent = streamState.content;
                 accumulatedReasoning = streamState.reasoningContent;
+                structuredToolCalls = streamState.toolCalls;
             }
 
-            await processCommands(accumulatedContent);
+            const structuredCommandContent = structuredToolCalls
+                .map(command => `[COMMAND: ${JSON.stringify(command)}]`)
+                .join('\n');
+            await processCommands(
+                structuredCommandContent
+                    ? `${accumulatedContent}\n${structuredCommandContent}`
+                    : accumulatedContent,
+            );
             if (activeId) {
                 setConversations(persistAIChatAssistantSnapshot(
                     aiConversationService,
