@@ -32,9 +32,7 @@ import { getGeneratedPrecompiledRouteArtifactForTest } from './fixtures/generate
 const SOURCE_HASH = `source-v1:${'a'.repeat(64)}`;
 const ROUTING_SOURCE_HASH = `source-v1:${'b'.repeat(64)}`;
 const TEST_PRESET_ID = 'test-preset';
-const generatedDemandAllocationArtifact = getGeneratedPrecompiledRouteArtifactForTest(
-  'wms-demand-allocation-strategy-v2',
-) as {
+type GeneratedPrecompiledRouteArtifactForTest = {
   schema: typeof BASE_REACT_FLOW_PRECOMPILED_ROUTE_SCHEMA;
   routingVersion: string;
   routingSourceHash: string;
@@ -45,6 +43,9 @@ const generatedDemandAllocationArtifact = getGeneratedPrecompiledRouteArtifactFo
   hardClean: true;
   patches: Edge[];
 };
+const generatedDemandAllocationArtifact = getGeneratedPrecompiledRouteArtifactForTest(
+  'wms-demand-allocation-strategy-v2',
+) as GeneratedPrecompiledRouteArtifactForTest;
 
 type NodeWithResolvedPosition = Node & {
   positionAbsolute: { x: number; y: number };
@@ -183,10 +184,13 @@ describe('baseReactFlowPrecompiledRouteRegistry', () => {
 
   it('lazy-loads an exact signature and digest hit into the current source graph', async () => {
     const load = vi.fn(async () => artifact);
+    const diagnostics = vi.fn();
     await expect(loadBaseReactFlowPrecompiledRouteCandidateFromRegistry(
-      { ...identityInput, inputSignature },
+      { ...identityInput, inputSignature, onDiagnostic: diagnostics },
       {
         [inputSignature]: {
+          presetId: TEST_PRESET_ID,
+          variantId: 'initial',
           sourceHash: SOURCE_HASH,
           geometryDigest: inputGeometryDigest,
           load,
@@ -194,6 +198,76 @@ describe('baseReactFlowPrecompiledRouteRegistry', () => {
       },
     )).resolves.toEqual(routedEdges);
     expect(load).toHaveBeenCalledOnce();
+    expect(diagnostics).toHaveBeenCalledWith({
+      reason: 'hit',
+      inputSignature,
+      inputGeometryDigest,
+      presetId: TEST_PRESET_ID,
+      variantId: 'initial',
+    });
+  });
+
+  it('reports bounded precompiled miss and rejection reasons without loading graph content', async () => {
+    const diagnostics = vi.fn();
+    await expect(loadBaseReactFlowPrecompiledRouteCandidateFromRegistry(
+      { ...identityInput, inputSignature, inputGeometryDigest: 'invalid', onDiagnostic: diagnostics },
+      {},
+    )).resolves.toBeNull();
+    await expect(loadBaseReactFlowPrecompiledRouteCandidateFromRegistry(
+      { ...identityInput, inputSignature, inputGeometryDigest, onDiagnostic: diagnostics },
+      {},
+    )).resolves.toBeNull();
+    await expect(loadBaseReactFlowPrecompiledRouteCandidateFromRegistry(
+      { ...identityInput, inputSignature, inputGeometryDigest, onDiagnostic: diagnostics },
+      {
+        [inputSignature]: {
+          sourceHash: SOURCE_HASH,
+          geometryDigest: inputGeometryDigest,
+          load: vi.fn(async () => ({ ...artifact, routingVersion: 'old-routing-version' })),
+        },
+      },
+    )).resolves.toBeNull();
+    await expect(loadBaseReactFlowPrecompiledRouteCandidateFromRegistry(
+      { ...identityInput, inputSignature, inputGeometryDigest, onDiagnostic: diagnostics },
+      {
+        [inputSignature]: {
+          sourceHash: SOURCE_HASH,
+          geometryDigest: inputGeometryDigest,
+          load: vi.fn(async () => ({ ...artifact, routingSourceHash: `source-v1:${'c'.repeat(64)}` })),
+          routingSourceHash: ROUTING_SOURCE_HASH,
+        },
+      },
+    )).resolves.toBeNull();
+    await expect(loadBaseReactFlowPrecompiledRouteCandidateFromRegistry(
+      { ...identityInput, inputSignature, inputGeometryDigest, onDiagnostic: diagnostics },
+      {
+        [inputSignature]: {
+          sourceHash: SOURCE_HASH,
+          geometryDigest: inputGeometryDigest,
+          load: vi.fn(async () => ({
+            ...artifact,
+            routingContract: {
+              clean: false,
+              hardClean: true,
+              violationCount: 1,
+              violations: [{
+                code: 'render-unsafe-endpoint-stub',
+                phase: 'presentation',
+                severity: 'presentation',
+                count: 1,
+              }],
+            },
+          })),
+        },
+      },
+    )).resolves.toBeNull();
+    expect(diagnostics.mock.calls.map(call => call[0].reason)).toEqual([
+      'miss:invalid-geometry-digest',
+      'miss:no-descriptor',
+      'reject:routing-version',
+      'reject:routing-source-hash',
+      'reject:contract-dirty',
+    ]);
   });
 
   it('selects an exact geometry digest from a colliding signature bucket', async () => {
@@ -822,6 +896,7 @@ describe('baseReactFlowPrecompiledRouteRegistry', () => {
       routingSourceHash: descriptor.routingSourceHash,
     })).not.toBeNull();
   });
+
 });
 
 describe('precompiled route asset boundary', () => {

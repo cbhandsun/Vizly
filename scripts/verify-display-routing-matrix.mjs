@@ -1,4 +1,3 @@
-import { setTimeout as delay } from 'node:timers/promises';
 import { readFile } from 'node:fs/promises';
 import { clickLayout, assertRequestedLayoutSelected } from './lib/display-routing-matrix-layout-command.mjs';
 
@@ -11,7 +10,6 @@ import {
   displayRoutingFinalSvgGeometryIsClean,
   partitionDisplayRoutingCommercialClearanceRisks,
   readDisplayRoutingCanonicalGeometrySnapshot,
-  readDisplayRoutingNodeGeometryParity,
   readDisplayRoutingVisualScaleAudit,
   readRenderedDisplayEdgeNodeIntersections,
   summarizeDisplayRoutingGeometryFailure,
@@ -67,6 +65,11 @@ import {
   startDisplayRoutingCpuProfile,
   stopDisplayRoutingCpuProfile,
 } from './lib/display-routing-cpu-profile.mjs';
+import {
+  assertPrecompiledLayoutRouteUsed,
+  verifyDisplayRoutingMatrixPrecompiledCoverage,
+} from './lib/display-routing-precompiled-layout-assertion.mjs';
+import { waitForDisplayRoutingNodeGeometryParity } from './lib/display-routing-node-geometry-parity.mjs';
 
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '').trim().replace(/\/$/, '');
 const WAIT_TIMEOUT_MS = parseDisplayRoutingMatrixTimeoutMs(
@@ -166,26 +169,8 @@ const readLatestCompletedRouteExpression = `(() => {
     : null;
 })()`;
 
-const waitForNodeGeometryParity = async (session, rawNodes, label) => {
-  const expression = `(${readDisplayRoutingNodeGeometryParity.toString()})(${JSON.stringify(rawNodes)})`;
-  const deadline = Date.now() + 5_000;
-  let latest = null;
-  while (Date.now() < deadline) {
-    latest = await session.evaluate(expression);
-    if (
-      latest
-      && latest.nodeScanComplete === true
-      && latest.comparedNodeCount > 0
-      && latest.positionMismatchCount === 0
-      && latest.sizeMismatchCount === 0
-    ) return latest;
-    await delay(100);
-  }
-  throw new Error(`Worker/DOM node geometry parity failed for ${label}: ${JSON.stringify(latest)}`);
-};
-
 const auditFinalSvg = async (session, route, label) => {
-  const nodeGeometryParity = await waitForNodeGeometryParity(
+  const nodeGeometryParity = await waitForDisplayRoutingNodeGeometryParity(
     session,
     route.request?.nodes,
     label,
@@ -379,10 +364,14 @@ const verifyPreset = target => withPrecompiledRouteBrowser(async session => {
   };
 });
 
-
-const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => {
+const verifyLayout = (
+  layoutCase,
+  {
+    presetId = LAYOUT_PRESET_ID,
+    expectedPrecompiledLayoutTarget = null,
+  } = {},
+) => withPrecompiledRouteBrowser(async session => {
   await prepareSession(session);
-  const presetId = LAYOUT_PRESET_ID;
   const target = DISPLAY_ROUTING_MATRIX_PRESET_TARGETS.find(candidate => candidate.presetId === presetId);
   if (!target) throw new Error(`Canonical layout preset target is missing: ${presetId}`);
   const identity = parseCanonicalPresetIdentity(
@@ -573,6 +562,13 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
     mountedEdges: mounted.edges,
   });
   const layoutAudit = await auditFinalSvg(session, route, layoutCase.id);
+  const precompiledLayoutRoute = expectedPrecompiledLayoutTarget
+    ? await assertPrecompiledLayoutRouteUsed({
+      route,
+      target: expectedPrecompiledLayoutTarget,
+      layoutCase,
+    })
+    : null;
   const semanticAudit = await auditDisplayRoutingLayoutSemantics(session, layoutCase, target.semanticChains);
   const warmLayoutSwitches = [];
   let previousCompletedRoute = route;
@@ -757,6 +753,7 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
     ...layoutTiming,
     slowestPhases: summarizeSlowestDisplayRoutingPhases(route.response.phaseTrace),
     canonicalMount,
+    precompiledLayoutRoute,
     warmLayoutSwitch,
     warmLayoutSwitches,
     savedRoundtrip,
@@ -767,18 +764,17 @@ const verifyLayout = layoutCase => withPrecompiledRouteBrowser(async session => 
 });
 
 await assertDisplayRoutingProductionPreview(BASE_URL);
-const presetResults = [];
-for (const target of PRECOMPILED_DISPLAY_ROUTE_TARGETS) {
-  if (!REQUESTED_CASE || REQUESTED_CASE === target.presetId) {
-    presetResults.push(await verifyPreset(target));
-  }
-}
-const layoutResults = [];
-for (const layoutCase of DISPLAY_ROUTING_LAYOUT_CASES) {
-  if (!REQUESTED_CASE || REQUESTED_CASE === layoutCase.id) {
-    layoutResults.push(await verifyLayout(layoutCase));
-  }
-}
+const {
+  presetResults,
+  layoutResults,
+  precompiledLayoutResults,
+} = await verifyDisplayRoutingMatrixPrecompiledCoverage({
+  requestedCase: REQUESTED_CASE,
+  presetTargets: PRECOMPILED_DISPLAY_ROUTE_TARGETS,
+  layoutCases: DISPLAY_ROUTING_LAYOUT_CASES,
+  verifyPreset,
+  verifyLayout,
+});
 const { topologyResults, multiPageResults, businessEditResults } = await verifyDisplayRoutingBrowserCases({
   requestedCase: REQUESTED_CASE, baseUrl: BASE_URL, prepareSession, waitForValue,
   readFinalRouteExpression, auditFinalSvg,
@@ -788,6 +784,7 @@ console.log(JSON.stringify({
   viewport: MATRIX_VIEWPORT,
   presetResults,
   layoutResults,
+  precompiledLayoutResults,
   topologyResults,
   multiPageResults,
   businessEditResults,

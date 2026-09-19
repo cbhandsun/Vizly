@@ -2,6 +2,7 @@ import type { Edge } from '@xyflow/react';
 import { ROUTING_PATCH_DATA_KEYS, type RoutingPatch } from '../../routing/routingPatch';
 
 import {
+  BASE_DISPLAY_ROUTING_VERSION,
   baseReactFlowDisplayOutputRouteSignatureMatches,
   type BaseReactFlowDisplayEdgesCacheEntry,
 } from './baseReactFlowDisplayCache';
@@ -13,6 +14,7 @@ import {
   isBaseReactFlowDisplayGeometryDigest,
   type BaseReactFlowDisplayInputIdentity,
 } from './baseReactFlowDisplayInputIdentity';
+import { baseReactFlowDisplayCommercialQualityIsClean } from './baseReactFlowDisplayCommercialQuality';
 import {
   parseBaseReactFlowPrecompiledRouteArtifact,
   sanitizeBaseReactFlowPrecompiledRoutePatches,
@@ -26,7 +28,32 @@ export type BaseReactFlowPrecompiledRouteLookupInput = BaseReactFlowDisplayInput
   inputSignature: string;
   /** Trusted runtime memo; callers outside the routing hook should omit it. */
   inputGeometryDigest?: string;
+  /** Debug-only aggregate status; never include graph content or artifact payloads. */
+  onDiagnostic?: (diagnostic: BaseReactFlowPrecompiledRouteDiagnostic) => void;
 };
+
+export type BaseReactFlowPrecompiledRouteDiagnosticReason =
+  | 'hit'
+  | 'miss:invalid-geometry-digest'
+  | 'miss:no-descriptor'
+  | 'miss:geometry-digest'
+  | 'reject:load-error'
+  | 'reject:artifact-schema'
+  | 'reject:routing-version'
+  | 'reject:routing-source-hash'
+  | 'reject:source-hash'
+  | 'reject:input-identity'
+  | 'reject:contract-dirty'
+  | 'reject:commercial-quality'
+  | 'reject:patch-merge';
+
+export type BaseReactFlowPrecompiledRouteDiagnostic = Readonly<{
+  reason: BaseReactFlowPrecompiledRouteDiagnosticReason;
+  inputSignature: string;
+  inputGeometryDigest?: string;
+  presetId?: string;
+  variantId?: string;
+}>;
 
 type BaseReactFlowPrecompiledRouteLoaderBucket =
   | GeneratedBaseReactFlowPrecompiledRouteDescriptor
@@ -48,6 +75,55 @@ const findExactPrecompiledRouteDescriptor = (
   return descriptors.find(descriptor => (
     descriptor?.geometryDigest === inputGeometryDigest
   )) ?? null;
+};
+
+const emitPrecompiledRouteDiagnostic = (
+  input: BaseReactFlowPrecompiledRouteLookupInput,
+  diagnostic: Omit<BaseReactFlowPrecompiledRouteDiagnostic, 'inputSignature'>,
+): void => {
+  input.onDiagnostic?.({
+    inputSignature: input.inputSignature,
+    ...diagnostic,
+  });
+};
+
+const classifyPrecompiledRouteArtifactRejection = (
+  artifact: unknown,
+  expectation: {
+    inputSignature: string;
+    inputGeometryDigest: string;
+    sourceHash: string;
+    routingSourceHash?: string;
+  },
+): BaseReactFlowPrecompiledRouteDiagnosticReason => {
+  if (!artifact || typeof artifact !== 'object' || Array.isArray(artifact)) {
+    return 'reject:artifact-schema';
+  }
+  const record = artifact as Record<string, unknown>;
+  if (record.routingVersion !== BASE_DISPLAY_ROUTING_VERSION) return 'reject:routing-version';
+  if (
+    typeof expectation.routingSourceHash !== 'undefined'
+    && record.routingSourceHash !== expectation.routingSourceHash
+  ) return 'reject:routing-source-hash';
+  if (record.sourceHash !== expectation.sourceHash) return 'reject:source-hash';
+  if (
+    record.inputSignature !== expectation.inputSignature
+    || record.inputGeometryDigest !== expectation.inputGeometryDigest
+  ) return 'reject:input-identity';
+  const contract = record.routingContract;
+  if (
+    contract
+    && typeof contract === 'object'
+    && !Array.isArray(contract)
+    && (
+      (contract as { clean?: unknown }).clean !== true
+      || (contract as { hardClean?: unknown }).hardClean !== true
+    )
+  ) return 'reject:contract-dirty';
+  if (Array.isArray(record.patches) && !baseReactFlowDisplayCommercialQualityIsClean(record.patches as RoutingPatch[])) {
+    return 'reject:commercial-quality';
+  }
+  return 'reject:artifact-schema';
 };
 
 export const hasBaseReactFlowPrecompiledRouteCandidateInRegistry = (
@@ -132,24 +208,57 @@ export const loadBaseReactFlowPrecompiledRouteCandidateFromRegistry = async (
     : (isBaseReactFlowDisplayGeometryDigest(input.inputGeometryDigest)
       ? input.inputGeometryDigest
       : null);
-  if (!inputGeometryDigest) return null;
+  if (!inputGeometryDigest) {
+    emitPrecompiledRouteDiagnostic(input, { reason: 'miss:invalid-geometry-digest' });
+    return null;
+  }
   const descriptor = findExactPrecompiledRouteDescriptor(
     input.inputSignature,
     inputGeometryDigest,
     registry,
   );
-  if (!descriptor) return null;
+  if (!descriptor) {
+    emitPrecompiledRouteDiagnostic(input, {
+      reason: Object.prototype.hasOwnProperty.call(registry, input.inputSignature)
+        ? 'miss:geometry-digest'
+        : 'miss:no-descriptor',
+      inputGeometryDigest,
+    });
+    return null;
+  }
   try {
     const artifact = await descriptor.load();
-    const entry = parseBaseReactFlowPrecompiledRouteArtifact(artifact, {
+    const expectation = {
       inputSignature: input.inputSignature,
       inputGeometryDigest,
       sourceHash: descriptor.sourceHash,
       routingSourceHash: descriptor.routingSourceHash,
+    };
+    const entry = parseBaseReactFlowPrecompiledRouteArtifact(artifact, expectation);
+    if (!entry) {
+      emitPrecompiledRouteDiagnostic(input, {
+        reason: classifyPrecompiledRouteArtifactRejection(artifact, expectation),
+        inputGeometryDigest,
+        presetId: descriptor.presetId,
+        variantId: descriptor.variantId,
+      });
+      return null;
+    }
+    const merged = mergeTrustedBaseReactFlowPrecompiledRouteArtifact(input.edges, entry);
+    emitPrecompiledRouteDiagnostic(input, {
+      reason: merged ? 'hit' : 'reject:patch-merge',
+      inputGeometryDigest,
+      presetId: descriptor.presetId,
+      variantId: descriptor.variantId,
     });
-    if (!entry) return null;
-    return mergeTrustedBaseReactFlowPrecompiledRouteArtifact(input.edges, entry);
+    return merged;
   } catch {
+    emitPrecompiledRouteDiagnostic(input, {
+      reason: 'reject:load-error',
+      inputGeometryDigest,
+      presetId: descriptor.presetId,
+      variantId: descriptor.variantId,
+    });
     return null;
   }
 };

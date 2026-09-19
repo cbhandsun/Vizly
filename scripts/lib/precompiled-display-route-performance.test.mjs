@@ -78,6 +78,7 @@ import {
   parsePrecompiledDisplayRouteBenchmarkPresetIds,
   parsePrecompiledDisplayRouteSampleCount,
   parsePrecompiledDisplayRoutePerformanceResult,
+  recommendPrecompiledDisplayRouteTargets,
   selectPrecompiledDisplayRouteCaptureTargets,
   summarizePrecompiledDisplayRoutePerformance,
 } from './precompiled-display-route-performance.mjs';
@@ -444,6 +445,14 @@ describe('precompiled display route cold performance', () => {
     expect(summary.presets['logistics-architecture-v1'].phases.quality).toMatchObject({
       sampleCount: 30,
     });
+    expect(summary.precompiledTargetRecommendations['logistics-architecture-v1']).toMatchObject({
+      recommendation: 'keep',
+      routeP95Ms: 678,
+      budgetMs: 1100,
+      budgetUtilization: 0.616,
+    });
+    expect(summary.precompiledTargetRecommendations['wms-process-flow-v1'].reasons)
+      .toContain('route-p95-above-threshold');
     expect(assertPrecompiledDisplayRoutePerformanceBudget(summary)).toBe(true);
     const focusedSamples = samples.map(result => ({
       presets: result.presets.filter(item => item.presetId === 'logistics-architecture-v1'),
@@ -476,5 +485,27 @@ describe('precompiled display route cold performance', () => {
     expect(() => assertPrecompiledDisplayRoutePerformanceBudget(overBudget)).toThrow(/workerDeliveryOverheadP95Ms/);
     expect(() => assertPrecompiledDisplayRoutePerformanceBudget(overBudget)).not.toThrow(/secret/);
     expect(() => summarizePrecompiledDisplayRoutePerformance(samples.slice(1), 30)).toThrow(/missing/);
+  });
+
+  it('marks low-cost precompiled targets for review without changing target lists', () => {
+    const summary = summarizePrecompiledDisplayRoutePerformance(
+      Array.from({ length: 30 }, () => buildPrecompiledDisplayRoutePerformanceResult([
+        capture('wms-demand-allocation-strategy-v2', 200),
+      ])),
+      30,
+      ['wms-demand-allocation-strategy-v2'],
+    );
+    expect(recommendPrecompiledDisplayRouteTargets(summary)).toEqual({
+      'wms-demand-allocation-strategy-v2': {
+        recommendation: 'review',
+        routeP95Ms: 200,
+        workerComputeP95Ms: 160,
+        budgetMs: 3000,
+        budgetUtilization: 0.067,
+        workerComputeShare: 0.8,
+        reasons: ['below-threshold'],
+      },
+    });
+    expect(() => recommendPrecompiledDisplayRouteTargets(null)).toThrow(/malformed/);
   });
 });

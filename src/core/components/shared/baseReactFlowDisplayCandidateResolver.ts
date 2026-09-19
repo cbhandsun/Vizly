@@ -4,6 +4,7 @@ import {
   loadBaseReactFlowPrecompiledRouteCandidate,
   type BaseReactFlowPrecompiledRouteLookupInput,
 } from './baseReactFlowPrecompiledRouteRegistry';
+import { recordDisplayRoutingPrecompiledRouteDiagnostic } from './baseReactFlowDisplayRoutingDebug';
 
 export type BaseReactFlowDisplayCandidateResolution = Readonly<{
   candidateEdges: Edge[] | null;
@@ -63,7 +64,10 @@ export const resolveBaseReactFlowDisplayCandidate = async ({
     | { kind: 'timeout' }
     | { kind: 'aborted' };
   const loadOutcome = Promise.resolve()
-    .then(() => loadPrecompiledCandidate(input))
+    .then(() => loadPrecompiledCandidate({
+      ...input,
+      onDiagnostic: recordDisplayRoutingPrecompiledRouteDiagnostic,
+    }))
     .then<LoadOutcome, LoadOutcome>(
       candidateEdges => ({ kind: 'loaded', candidateEdges }),
       () => ({ kind: 'loaded', candidateEdges: null }),

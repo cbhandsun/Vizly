@@ -35,7 +35,10 @@ import { recordBaseReactFlowRejectedDisplayDiagnostics } from './baseReactFlowDi
 import { repairAxisMismatchedTerminalsWithBoundedPortRoles } from './baseReactFlowDisplayTerminalPortRepair';
 import { repairResidualHairpinBridges } from '../../strategies/shared/edgeHairpinBridgeWidenRepair';
 import { clearBaseReactFlowLayoutEdgeRoutingData } from './baseReactFlowLayoutEdgeRoutingData';
-import { updateDisplayRoutingDebugState } from './baseReactFlowDisplayRoutingDebug';
+import {
+  recordDisplayRoutingPrecompiledRouteDiagnostic,
+  updateDisplayRoutingDebugState,
+} from './baseReactFlowDisplayRoutingDebug';
 import {
   auditBaseReactFlowLayoutCandidateSeed,
   shouldBypassBaseReactFlowObstacleDirtyLaneCandidate,
@@ -515,6 +518,7 @@ export const stageBaseReactFlowLayoutRouting = async ({
       enableSmartEdges,
       smartEdgePadding,
       isLargeGraph,
+      onDiagnostic: recordDisplayRoutingPrecompiledRouteDiagnostic,
     });
   if (signal?.aborted) throw new Error('layout-routing-cancelled');
   const stagedSeedEdges = precompiledCandidateEdges

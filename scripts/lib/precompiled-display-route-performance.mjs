@@ -222,6 +222,55 @@ export const parsePrecompiledDisplayRouteBenchmarkPresetIds = value => {
   return [presetId];
 };
 
+const PRECOMPILED_ROUTE_RECOMMENDATION_THRESHOLDS = Object.freeze({
+  routeP95Ms: 750,
+  workerComputeP95Ms: 500,
+  budgetUtilization: 0.5,
+});
+
+const roundedRatio = value => (Number.isFinite(value) ? Number(value.toFixed(3)) : null);
+
+export const recommendPrecompiledDisplayRouteTargets = summary => {
+  const presets = summary?.presets;
+  if (!isRecord(presets)) throw new Error('Cold-route target recommendation summary is malformed');
+  return Object.fromEntries(Object.entries(presets).map(([presetId, preset]) => {
+    const routeP95Ms = p95Of(preset?.route);
+    const workerComputeP95Ms = p95Of(preset?.workerCompute);
+    const budgetMs = PRECOMPILED_DISPLAY_ROUTE_P95_BUDGET_MS[presetId] ?? null;
+    const budgetUtilization = Number.isFinite(routeP95Ms) && Number.isFinite(budgetMs) && budgetMs > 0
+      ? roundedRatio(routeP95Ms / budgetMs)
+      : null;
+    const workerComputeShare = Number.isFinite(routeP95Ms) && routeP95Ms > 0 && Number.isFinite(workerComputeP95Ms)
+      ? roundedRatio(workerComputeP95Ms / routeP95Ms)
+      : null;
+    const reasons = [];
+    if (Number.isFinite(routeP95Ms) && routeP95Ms >= PRECOMPILED_ROUTE_RECOMMENDATION_THRESHOLDS.routeP95Ms) {
+      reasons.push('route-p95-above-threshold');
+    }
+    if (
+      Number.isFinite(workerComputeP95Ms)
+      && workerComputeP95Ms >= PRECOMPILED_ROUTE_RECOMMENDATION_THRESHOLDS.workerComputeP95Ms
+    ) {
+      reasons.push('worker-compute-p95-above-threshold');
+    }
+    if (
+      Number.isFinite(budgetUtilization)
+      && budgetUtilization >= PRECOMPILED_ROUTE_RECOMMENDATION_THRESHOLDS.budgetUtilization
+    ) {
+      reasons.push('budget-utilization-above-threshold');
+    }
+    return [presetId, {
+      recommendation: reasons.length > 0 ? 'keep' : 'review',
+      routeP95Ms,
+      workerComputeP95Ms,
+      budgetMs,
+      budgetUtilization,
+      workerComputeShare,
+      reasons: reasons.length > 0 ? reasons : ['below-threshold'],
+    }];
+  }));
+};
+
 export const summarizePrecompiledDisplayRoutePerformance = (
   samples,
   expectedSampleCount,
@@ -298,7 +347,11 @@ export const summarizePrecompiledDisplayRoutePerformance = (
         .slice(0, 20)),
     };
   }
-  return { sampleCount: expectedSampleCount, presets };
+  const summary = { sampleCount: expectedSampleCount, presets };
+  return {
+    ...summary,
+    precompiledTargetRecommendations: recommendPrecompiledDisplayRouteTargets(summary),
+  };
 };
 
 const p95Of = value => (Number.isFinite(value?.p95Ms) ? value.p95Ms : null);

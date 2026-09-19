@@ -8,6 +8,15 @@ import type {
   DisplayEdgesWorkerRouteResolution,
   DisplayRoutingFallbackLevel,
 } from './baseReactFlowDisplayWorkerProtocol';
+import type { BaseReactFlowPrecompiledRouteDiagnostic } from './baseReactFlowPrecompiledRouteRegistry';
+
+export type DisplayRoutingPrecompiledRouteDiagnosticSummary = Readonly<{
+  totalCount: number;
+  hitCount: number;
+  missCount: number;
+  rejectCount: number;
+  reasonCounts: Partial<Record<BaseReactFlowPrecompiledRouteDiagnostic['reason'], number>>;
+}>;
 
 export type DisplayRoutingDebugState = {
   stage?: string;
@@ -35,6 +44,9 @@ export type DisplayRoutingDebugState = {
   routingVersion?: string;
   workerResolution?: DisplayEdgesWorkerRouteResolution;
   cacheTrustLevel?: 'runtime-committed' | 'external-candidate' | 'miss';
+  precompiledRouteDiagnostic?: BaseReactFlowPrecompiledRouteDiagnostic;
+  precompiledRouteDiagnosticTrace?: BaseReactFlowPrecompiledRouteDiagnostic[];
+  precompiledRouteDiagnosticSummary?: DisplayRoutingPrecompiledRouteDiagnosticSummary;
   terminalDiagnostics?: unknown;
   phaseTrace?: DisplayRoutingPhaseTrace[];
   lastPhaseTrace?: DisplayRoutingPhaseTrace;
@@ -186,6 +198,35 @@ export const classifyDisplayLayoutTransactionError = (
     return 'hard-quality-rejected';
   }
   return 'strategy-failed';
+};
+
+export const recordDisplayRoutingPrecompiledRouteDiagnostic = (
+  diagnostic: BaseReactFlowPrecompiledRouteDiagnostic,
+): void => {
+  const currentState = readDisplayRoutingDebugState();
+  const currentTrace = currentState?.precompiledRouteDiagnosticTrace;
+  const currentSummary = currentState?.precompiledRouteDiagnosticSummary;
+  const reasonCount = currentSummary?.reasonCounts[diagnostic.reason] ?? 0;
+  const hitCount = currentSummary?.hitCount ?? 0;
+  const missCount = currentSummary?.missCount ?? 0;
+  const rejectCount = currentSummary?.rejectCount ?? 0;
+  updateDisplayRoutingDebugState({
+    precompiledRouteDiagnostic: diagnostic,
+    precompiledRouteDiagnosticTrace: [
+      ...(Array.isArray(currentTrace) ? currentTrace : []),
+      diagnostic,
+    ].slice(-16),
+    precompiledRouteDiagnosticSummary: {
+      totalCount: (currentSummary?.totalCount ?? 0) + 1,
+      hitCount: diagnostic.reason === 'hit' ? hitCount + 1 : hitCount,
+      missCount: diagnostic.reason.startsWith('miss:') ? missCount + 1 : missCount,
+      rejectCount: diagnostic.reason.startsWith('reject:') ? rejectCount + 1 : rejectCount,
+      reasonCounts: {
+        ...(currentSummary?.reasonCounts ?? {}),
+        [diagnostic.reason]: reasonCount + 1,
+      },
+    },
+  });
 };
 
 export const updateDisplayRoutingFinalAppliedState = (

@@ -154,6 +154,9 @@ describe('baseReactFlow layout routing candidate sequence', () => {
     clearBaseReactFlowDisplayCommittedSnapshots();
     workerMocks.compute.mockReset();
     workerMocks.repair.mockReset();
+    delete (window as Window & {
+      __vizlyBaseReactFlowDisplayRouting?: unknown;
+    }).__vizlyBaseReactFlowDisplayRouting;
     (window as Window & { __vizlyDisplayRoutingDiagnosticsEnabled?: boolean })
       .__vizlyDisplayRoutingDiagnosticsEnabled = false;
   });
@@ -388,7 +391,16 @@ describe('baseReactFlow layout routing candidate sequence', () => {
       sourceEdges: edges,
       sourceNodes: nodes,
     });
-    const loadPrecompiledCandidate = vi.fn().mockResolvedValue(precompiledCandidate);
+    const loadPrecompiledCandidate = vi.fn(async (input) => {
+      input.onDiagnostic?.({
+        inputSignature: input.inputSignature,
+        inputGeometryDigest: input.inputGeometryDigest,
+        reason: 'hit',
+        presetId: 'wms-process-flow-v1',
+        variantId: 'domain-lanes-lr',
+      });
+      return precompiledCandidate;
+    });
     workerMocks.compute.mockImplementation(successfulCanonicalResult);
 
     await stageBaseReactFlowLayoutRouting({
@@ -408,6 +420,78 @@ describe('baseReactFlow layout routing candidate sequence', () => {
       cachedCandidateEdges: precompiledCandidate,
       candidateSource: 'precompiled',
       qualityMode: 'full',
+    });
+    expect(readDisplayRoutingDebugState()?.precompiledRouteDiagnostic).toMatchObject({
+      reason: 'hit',
+      presetId: 'wms-process-flow-v1',
+      variantId: 'domain-lanes-lr',
+    });
+    expect(readDisplayRoutingDebugState()?.precompiledRouteDiagnosticTrace).toContainEqual(
+      expect.objectContaining({
+        reason: 'hit',
+        presetId: 'wms-process-flow-v1',
+        variantId: 'domain-lanes-lr',
+      }),
+    );
+    expect(readDisplayRoutingDebugState()?.precompiledRouteDiagnosticSummary).toMatchObject({
+      totalCount: 1,
+      hitCount: 1,
+      missCount: 0,
+      rejectCount: 0,
+      reasonCounts: { hit: 1 },
+    });
+  });
+
+  it('continues through the Worker layout route when a precompiled layout candidate misses', async () => {
+    const loadPrecompiledCandidate = vi.fn(async (input) => {
+      input.onDiagnostic?.({
+        inputSignature: input.inputSignature,
+        inputGeometryDigest: input.inputGeometryDigest,
+        reason: 'miss:no-descriptor',
+      });
+      return null;
+    });
+    workerMocks.repair.mockImplementation(async (request: {
+      edges: Edge[];
+      inputSignature: string;
+      inputGeometryDigest: string;
+    }) => successfulResult(request.edges, request));
+    workerMocks.compute.mockImplementation(successfulCanonicalResult);
+
+    await stageBaseReactFlowLayoutRouting({
+      workerRef: { current: null },
+      requestId: 'layout:precompiled-miss-fallback',
+      sourceEdges: edges,
+      sourceNodes: nodes,
+      isLargeGraph: false,
+      loadPrecompiledCandidate,
+    });
+
+    expect(loadPrecompiledCandidate).toHaveBeenCalledOnce();
+    expect(workerMocks.repair).toHaveBeenCalledOnce();
+    expect(workerMocks.compute).toHaveBeenCalledOnce();
+    expect(workerMocks.compute.mock.calls[0][0]).toMatchObject({
+      requestId: 'layout:precompiled-miss-fallback',
+      candidateSource: 'persistent',
+      qualityMode: 'full',
+    });
+    expect(workerMocks.compute.mock.calls[0][0].cachedCandidateEdges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'stablePath',
+          data: expect.objectContaining({ algorithm: 'display-stable-fallback' }),
+        }),
+      ]),
+    );
+    expect(readDisplayRoutingDebugState()?.precompiledRouteDiagnostic).toMatchObject({
+      reason: 'miss:no-descriptor',
+    });
+    expect(readDisplayRoutingDebugState()?.precompiledRouteDiagnosticSummary).toMatchObject({
+      totalCount: 1,
+      hitCount: 0,
+      missCount: 1,
+      rejectCount: 0,
+      reasonCounts: { 'miss:no-descriptor': 1 },
     });
   });
 

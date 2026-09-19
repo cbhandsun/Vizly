@@ -29,6 +29,12 @@ import {
   PRECOMPILED_DISPLAY_ROUTE_RESULT_PREFIX,
   selectPrecompiledDisplayRouteCaptureTargets,
 } from './lib/precompiled-display-route-performance.mjs';
+import {
+  mapPrecompiledManifestEntriesByTarget,
+  precompiledManifestArtifactFileSetIsFresh,
+  precompiledDisplayRouteTargetKey,
+  selectChangedPrecompiledDisplayRouteTargets,
+} from './lib/precompiled-display-route-changed-targets.mjs';
 
 const ROOT = resolve(process.cwd());
 const BASE_URL = String(process.env.PRECOMPILED_ROUTE_BASE_URL || '').trim().replace(/\/$/, '');
@@ -37,6 +43,7 @@ const TRACE_ALL = process.argv.includes('--trace-all');
 const MACHINE_MODE = process.argv.includes('--machine');
 const MEASURE_ONLY = process.argv.includes('--measure-only');
 const INCLUDE_LAYOUT_VARIANTS = process.argv.includes('--include-layout-variants');
+const CHANGED_ONLY = process.argv.includes('--changed-only');
 const GENERATED_DIR = resolve(ROOT, 'src/core/components/shared/generated');
 const ARTIFACT_DIR = resolve(GENERATED_DIR, 'precompiledRoutes');
 const MANIFEST_PATH = resolve(GENERATED_DIR, 'baseReactFlowPrecompiledRouteManifest.json');
@@ -311,25 +318,78 @@ const assertFileContents = async (path, expected, label) => {
   if (actual !== expected) throw new Error(`${label} is not reproducible from the production preview`);
 };
 
+const readExistingManifest = async () => {
+  try {
+    return JSON.parse(await readFile(MANIFEST_PATH, 'utf8'));
+  } catch {
+    return null;
+  }
+};
+
 const main = async () => {
+  if (CHANGED_ONLY && (CHECK_MODE || MEASURE_ONLY)) {
+    throw new Error('--changed-only can only be used for artifact generation');
+  }
   const availableTargets = MEASURE_ONLY
     ? PRECOMPILED_DISPLAY_ROUTE_TARGETS
     : (INCLUDE_LAYOUT_VARIANTS
       ? PRECOMPILED_DISPLAY_ROUTE_GENERATION_TARGETS
       : PRECOMPILED_DISPLAY_ROUTE_TARGETS);
-  const captureTargets = selectPrecompiledDisplayRouteCaptureTargets({
+  let captureTargets = selectPrecompiledDisplayRouteCaptureTargets({
     measureOnly: MEASURE_ONLY,
     checkMode: CHECK_MODE,
     presetId: process.env.PRECOMPILED_ROUTE_PRESET_ID,
     targets: availableTargets,
   });
-  await assertProductionPreview();
   const routingVersion = await readRoutingVersion();
   const routingSourceHash = await computePrecompiledDisplayRoutingSourceHash(ROOT);
-  const sources = await Promise.all(captureTargets.map(async target => ({
+  const identitySourceHash = hashPrecompiledDisplayRouteSource(await readFile(INPUT_IDENTITY_PATH, 'utf8'));
+  const targetSources = await Promise.all(availableTargets.map(async target => ({
     target,
     source: await readFile(resolve(ROOT, target.sourcePath), 'utf8'),
   })));
+  const sourceByTargetKey = new Map(targetSources.map(item => [
+    precompiledDisplayRouteTargetKey(item.target),
+    item.source,
+  ]));
+  const sourceHashes = new Map(targetSources.map(item => [
+    item.target.sourcePath,
+    hashPrecompiledDisplayRouteSource(item.source),
+  ]));
+  const existingManifest = await readExistingManifest();
+  if (CHANGED_ONLY) {
+    captureTargets = selectChangedPrecompiledDisplayRouteTargets({
+      targets: captureTargets,
+      manifest: existingManifest,
+      routingVersion,
+      identitySourceHash,
+      routingSourceHash,
+      sourceHashes,
+    });
+    if (captureTargets.length === 0) {
+      const existingArtifactFiles = await listGeneratedArtifactFiles();
+      if (precompiledManifestArtifactFileSetIsFresh({
+        manifest: existingManifest,
+        artifactFiles: existingArtifactFiles,
+      })) {
+        console.log('No changed precompiled route target detected; existing artifacts were left untouched.');
+        return;
+      }
+      captureTargets = availableTargets;
+      console.log('Precompiled route artifact file set is stale; regenerating all targets.');
+    }
+    console.log(`Changed precompiled route target(s): ${
+      captureTargets.map(target => `${target.presetId}:${target.variantId}`).join(', ')
+    }.`);
+  }
+  await assertProductionPreview();
+  const sources = captureTargets.map(target => ({
+    target,
+    source: sourceByTargetKey.get(precompiledDisplayRouteTargetKey(target)),
+  }));
+  if (sources.some(item => typeof item.source !== 'string')) {
+    throw new Error('Precompiled route source selection failed');
+  }
   const captures = await withPrecompiledRouteBrowser(async session => {
     await session.send('Page.addScriptToEvaluateOnNewDocument', { source: PRECOMPILED_DISPLAY_ROUTE_BROWSER_CAPTURE_SCRIPT });
     const generated = [];
@@ -363,13 +423,25 @@ const main = async () => {
     }
     return;
   }
-  const identitySourceHash = hashPrecompiledDisplayRouteSource(await readFile(INPUT_IDENTITY_PATH, 'utf8'));
   await mkdir(ARTIFACT_DIR, { recursive: true });
   const entries = [];
   const artifactContents = new Map();
   const exactIdentities = new Set();
   const variants = new Set();
   const signatureCounts = new Map();
+  const capturedTargetKeys = new Set(captureTargets.map(precompiledDisplayRouteTargetKey));
+  const existingEntriesByTarget = mapPrecompiledManifestEntriesByTarget(existingManifest);
+  if (CHANGED_ONLY && existingManifest) {
+    for (const target of availableTargets) {
+      if (capturedTargetKeys.has(precompiledDisplayRouteTargetKey(target))) continue;
+      const existingEntry = existingEntriesByTarget.get(precompiledDisplayRouteTargetKey(target));
+      if (!existingEntry) continue;
+      signatureCounts.set(
+        existingEntry.inputSignature,
+        (signatureCounts.get(existingEntry.inputSignature) ?? 0) + 1,
+      );
+    }
+  }
   for (const capture of captures) {
     const signature = capture.artifact.inputSignature;
     signatureCounts.set(signature, (signatureCounts.get(signature) ?? 0) + 1);
@@ -407,6 +479,27 @@ const main = async () => {
       inputGeometryDigest: artifact.inputGeometryDigest,
       outputRouteSignature: artifact.outputRouteSignature,
     });
+  }
+  if (CHANGED_ONLY && existingManifest) {
+    for (const target of availableTargets) {
+      if (capturedTargetKeys.has(precompiledDisplayRouteTargetKey(target))) continue;
+      const entry = existingEntriesByTarget.get(precompiledDisplayRouteTargetKey(target));
+      if (!entry) continue;
+      if (exactIdentities.has(`${entry.inputSignature}\u0000${entry.inputGeometryDigest}`)) {
+        throw new Error(`Duplicate precompiled route identity ${entry.inputSignature}`);
+      }
+      const variantKey = `${entry.presetId}\u0000${entry.variantId}`;
+      if (variants.has(variantKey)) {
+        throw new Error(`Duplicate precompiled route variant ${entry.presetId}:${entry.variantId}`);
+      }
+      exactIdentities.add(`${entry.inputSignature}\u0000${entry.inputGeometryDigest}`);
+      variants.add(variantKey);
+      entries.push(entry);
+      artifactContents.set(
+        entry.artifactFile,
+        await readFile(resolveGeneratedArtifactPath(entry.artifactFile), 'utf8'),
+      );
+    }
   }
   entries.sort((first, second) => (
     first.inputSignature.localeCompare(second.inputSignature)
