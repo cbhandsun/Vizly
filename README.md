@@ -2,7 +2,7 @@
 
 This repository contains the open application layer for Vizly. The proprietary editor implementation is consumed through exact-version public npm packages: `@vizly/contracts@0.1.0-alpha.0`, `@vizly/core@0.1.0-alpha.0`, `@vizly/react@0.1.0-alpha.0`.
 
-The packages are installable anonymously from npm. The MIT license for this application does not cover the proprietary `@vizly/core` package; commercial production deployment of Core requires separate authorization.
+Once released, the packages are installable anonymously from npm. The MIT license for this application does not cover the proprietary `@vizly/core` package; commercial production deployment of Core requires separate authorization.
 
 ## Development
 

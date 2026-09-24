@@ -6,6 +6,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { '@': resolve(import.meta.dirname, 'src') } },
+  ssr: { noExternal: ['@vizly/core', '@vizly/react', '@vizly/contracts'] },
   worker: { format: 'es' },
   test: {
     globals: true,
