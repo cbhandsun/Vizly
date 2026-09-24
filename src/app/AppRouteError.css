@@ -1,0 +1,137 @@
+.app-route-error {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  color: #172033;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(22, 119, 255, 0.12), transparent 34%),
+    #f5f7fb;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.app-route-error__card {
+  width: min(100%, 560px);
+  padding: 48px;
+  border: 1px solid #d9e2f2;
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 20px 60px rgba(28, 45, 78, 0.14);
+  text-align: center;
+}
+
+.app-route-error__icon {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 20px;
+  border-radius: 16px;
+  color: #0958d9;
+  background: #e6f4ff;
+  font-size: 28px;
+}
+
+.app-route-error__eyebrow {
+  margin: 0 0 8px;
+  color: #0958d9;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.app-route-error h1 {
+  margin: 0;
+  color: #172033;
+  font-size: clamp(28px, 4vw, 36px);
+  line-height: 1.2;
+}
+
+.app-route-error__description {
+  max-width: 440px;
+  margin: 16px auto 0;
+  color: #4e5d78;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.app-route-error__actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.app-route-error__button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 18px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.app-route-error__button:focus-visible {
+  outline: 3px solid rgba(22, 119, 255, 0.28);
+  outline-offset: 3px;
+}
+
+.app-route-error__button--primary {
+  color: #ffffff;
+  background: #1677ff;
+}
+
+.app-route-error__button--primary:hover {
+  background: #0958d9;
+}
+
+.app-route-error__button--secondary {
+  color: #172033;
+  border-color: #c9d4e6;
+  background: #ffffff;
+}
+
+.app-route-error__button--secondary:hover {
+  border-color: #1677ff;
+  color: #0958d9;
+  background: #f0f7ff;
+}
+
+.app-route-error__hint {
+  margin: 24px 0 0;
+  color: #697791;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+@media (max-width: 560px) {
+  .app-route-error {
+    padding: 20px;
+  }
+
+  .app-route-error__card {
+    padding: 36px 24px;
+    border-radius: 16px;
+  }
+
+  .app-route-error__actions {
+    flex-direction: column;
+  }
+
+  .app-route-error__button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-route-error__button {
+    transition: none;
+  }
+}

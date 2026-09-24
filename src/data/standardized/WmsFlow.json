@@ -1,0 +1,517 @@
+{
+  "id": "wms-standard-flow",
+  "name": "标准 WMS 核心作业全景流程",
+  "version": "1.0.0",
+  "type": "architecture",
+  "layout": {
+    "autoDirection": true,
+    "fitDomainContent": true,
+    "spacing": {
+      "horizontal": 50,
+      "vertical": 60
+    },
+    "padding": {
+      "horizontal": 20,
+      "vertical": 20
+    },
+    "domainOrder": [
+      "外部协同域",
+      "WMS 核心作业域",
+      "支撑与分析域"
+    ],
+    "subDomainOrder": {
+      "WMS 核心作业域": [
+        "入库管理",
+        "库内管理",
+        "出库管理",
+        "增值服务"
+      ],
+      "支撑与分析域": [
+        "基础数据",
+        "计费与劳效",
+        "数据分析"
+      ]
+    }
+  },
+  "metadata": {
+    "title": "标准 WMS 核心作业全景流程",
+    "description": "展示从订单到交付的WMS核心业务流程，涵盖入库、库存、出库三大环节及与外部系统的协同。",
+    "tags": [
+      "仓储"
+    ]
+  },
+  "theme": {
+    "name": "light",
+    "domains": {}
+  },
+  "nodes": [
+    {
+      "id": "n-erp",
+      "description": "<b>ERP 系统</b><br>• 采购订单<br>• 销售订单<br>• 货主/商品主数据",
+      "domain": "外部协同域",
+      "domainClass": "external",
+      "type": "custom",
+      "metadata": {
+        "sequence": "1"
+      }
+    },
+    {
+      "id": "n-supplier",
+      "description": "<b>供应商/工厂</b><br>• 发送 ASN<br>• 预约送货",
+      "domain": "外部协同域",
+      "domainClass": "external",
+      "type": "custom",
+      "metadata": {
+        "sequence": "2"
+      }
+    },
+    {
+      "id": "n-tms",
+      "description": "<b>TMS 系统</b><br>• 承运商指派<br>• 运输状态跟踪",
+      "domain": "外部协同域",
+      "domainClass": "external",
+      "type": "custom",
+      "metadata": {
+        "sequence": "3"
+      }
+    },
+    {
+      "id": "n-carrier",
+      "description": "<b>承运商</b><br>• 提货/派送",
+      "domain": "外部协同域",
+      "domainClass": "external",
+      "type": "custom",
+      "metadata": {
+        "sequence": "4"
+      }
+    },
+    {
+      "id": "n-in-asn",
+      "description": "<b>到货通知 (ASN)</b><br>• 接收预期到货<br>• 来货预约管理",
+      "domain": "WMS 核心作业域",
+      "subDomain": "入库管理",
+      "domainClass": "wms",
+      "type": "custom",
+      "metadata": {
+        "sequence": "1.1"
+      }
+    },
+    {
+      "id": "n-in-gate",
+      "description": "<b>门岗与月台</b><br>• 车辆登记<br>• 月台调度与指派",
+      "domain": "WMS 核心作业域",
+      "subDomain": "入库管理",
+      "domainClass": "wms",
+      "type": "custom",
+      "metadata": {
+        "sequence": "1.2"
+      }
+    },
+    {
+      "id": "n-in-receive",
+      "description": "<b>收货与验收</b><br>• 扫码清点<br>• 差异/残损处理<br>• 生成收货单",
+      "domain": "WMS 核心作业域",
+      "subDomain": "入库管理",
+      "domainClass": "wms",
+      "type": "custom",
+      "metadata": {
+        "sequence": "1.3"
+      }
+    },
+    {
+      "id": "n-in-qc",
+      "description": "<b>质检管理</b><br>• 质检任务触发<br>• 抽样与检验<br>• 等级评定",
+      "domain": "WMS 核心作业域",
+      "subDomain": "入库管理",
+      "domainClass": "wms",
+      "type": "custom",
+      "metadata": {
+        "sequence": "1.4"
+      }
+    },
+    {
+      "id": "n-in-putaway",
+      "description": "<b>上架与入库</b><br>• 上架策略计算<br>• 生成上架任务<br>• 确认货位库存",
+      "domain": "WMS 核心作业域",
+      "subDomain": "入库管理",
+      "domainClass": "wms",
+      "type": "custom",
+      "metadata": {
+        "sequence": "1.5"
+      }
+    },
+    {
+      "id": "n-internal-view",
+      "description": "<b>全局库存视图</b><br>• 实时库存查询<br>• 可用量/占用量<br>• 库龄分析",
+      "domain": "WMS 核心作业域",
+      "subDomain": "库内管理",
+      "domainClass": "wms",
+      "type": "custom",
+      "metadata": {
+        "sequence": "2.1"
+      }
+    },
+    {
+      "id": "n-internal-move",
+      "description": "<b>库内移动</b><br>• 货位整理<br>• 越库/交叉转运",
+      "domain": "WMS 核心作业域",
+      "subDomain": "库内管理",
+      "domainClass": "wms",
+      "type": "custom",
+      "metadata": {
+        "sequence": "2.2"
+      }
+    },
+    {
+      "id": "n-internal-count",
+      "description": "<b>盘点管理</b><br>• 循环盘点<br>• 动态/抽盘<br>• 盘盈盘亏调整",
+      "domain": "WMS 核心作业域",
+      "subDomain": "库内管理",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "metadata": {
+        "sequence": "2.3"
+      }
+    },
+    {
+      "id": "n-internal-replenish",
+      "description": "<b>补货策略</b><br>• 安全库存预警<br>• 拣选位补货<br>• 生成补货任务",
+      "domain": "WMS 核心作业域",
+      "subDomain": "库内管理",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "metadata": {
+        "sequence": "2.4"
+      }
+    },
+    {
+      "id": "n-out-order",
+      "description": "<b>订单接收处理</b><br>• 接收销售订单<br>• 订单预处理<br>• 库存预占",
+      "domain": "WMS 核心作业域",
+      "subDomain": "出库管理",
+      "domainClass": "wms",
+      "type": "custom",
+      "metadata": {
+        "sequence": "3.1"
+      }
+    },
+    {
+      "id": "n-out-wave",
+      "description": "<b>波次与分配</b><br>• 创建波次策略<br>• 订单汇总与分配<br>• 生成拣货任务",
+      "domain": "WMS 核心作业域",
+      "subDomain": "出库管理",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "metadata": {
+        "sequence": "3.2"
+      }
+    },
+    {
+      "id": "n-out-pick",
+      "description": "<b>拣货执行</b><br>• 路径优化<br>• RF/语音/灯光拣选<br>• 确认拣货完成",
+      "domain": "WMS 核心作业域",
+      "subDomain": "出库管理",
+      "domainClass": "wms",
+      "type": "custom",
+      "metadata": {
+        "sequence": "3.3"
+      }
+    },
+    {
+      "id": "n-out-pack",
+      "description": "<b>复核与打包</b><br>• 拣货复核<br>• 称重与打包<br>• 打印箱唛/面单",
+      "domain": "WMS 核心作业域",
+      "subDomain": "出库管理",
+      "domainClass": "wms",
+      "type": "custom",
+      "metadata": {
+        "sequence": "3.4"
+      }
+    },
+    {
+      "id": "n-out-ship",
+      "description": "<b>装箱与发运</b><br>• 调度车辆至月台<br>• 集货与装车<br>• 发运交接",
+      "domain": "WMS 核心作业域",
+      "subDomain": "出库管理",
+      "domainClass": "wms",
+      "type": "custom",
+      "metadata": {
+        "sequence": "3.5"
+      }
+    },
+    {
+      "id": "n-vas",
+      "description": "<b>增值服务 (VAS)</b><br>• 组套/拆卸<br>• 贴标/换包装<br>• 预处理",
+      "domain": "WMS 核心作业域",
+      "subDomain": "增值服务",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "metadata": {
+        "sequence": "4.1"
+      }
+    },
+    {
+      "id": "n-support-master",
+      "description": "<b>基础数据管理</b><br>• 库位/物料/策略<br>• 用户/权限",
+      "domain": "支撑与分析域",
+      "subDomain": "基础数据",
+      "domainClass": "wms",
+      "type": "custom",
+      "metadata": {
+        "sequence": "5.1"
+      }
+    },
+    {
+      "id": "n-support-billing",
+      "description": "<b>计费引擎</b><br>• 计费规则配置<br>• 作业量计费<br>• 仓租费计算",
+      "domain": "支撑与分析域",
+      "subDomain": "计费与劳效",
+      "domainClass": "be-corp",
+      "type": "custom",
+      "metadata": {
+        "sequence": "5.2"
+      }
+    },
+    {
+      "id": "n-support-labor",
+      "description": "<b>劳动力管理 (LMS)</b><br>• 任务工时标准<br>• 员工作业绩效<br>• 激励模型",
+      "domain": "支撑与分析域",
+      "subDomain": "计费与劳效",
+      "domainClass": "wms",
+      "type": "custom",
+      "metadata": {
+        "sequence": "5.3"
+      }
+    },
+    {
+      "id": "n-support-bi",
+      "description": "<b>BI 与报表</b><br>• 运营仪表盘<br>• KPI 指标分析<br>• 自定义报表",
+      "domain": "支撑与分析域",
+      "subDomain": "数据分析",
+      "domainClass": "analytics",
+      "type": "custom",
+      "metadata": {
+        "sequence": "5.4"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-erp-asn",
+      "source": "n-erp",
+      "target": "n-in-asn",
+      "type": "main",
+      "label": "同步采购单"
+    },
+    {
+      "id": "e-supplier-asn",
+      "source": "n-supplier",
+      "target": "n-in-asn",
+      "type": "main",
+      "label": "发送 ASN"
+    },
+    {
+      "id": "e-asn-gate",
+      "source": "n-in-asn",
+      "target": "n-in-gate",
+      "type": "main",
+      "label": "预约到货"
+    },
+    {
+      "id": "e-gate-receive",
+      "source": "n-in-gate",
+      "target": "n-in-receive",
+      "type": "main",
+      "label": "引导至月台"
+    },
+    {
+      "id": "e-receive-qc",
+      "source": "n-in-receive",
+      "target": "n-in-qc",
+      "type": "main",
+      "label": "触发质检"
+    },
+    {
+      "id": "e-receive-putaway",
+      "source": "n-in-receive",
+      "target": "n-in-putaway",
+      "type": "main",
+      "label": "合格品上架"
+    },
+    {
+      "id": "e-qc-putaway",
+      "source": "n-in-qc",
+      "target": "n-in-putaway",
+      "type": "main",
+      "label": "质检后上架"
+    },
+    {
+      "id": "e-putaway-inv",
+      "source": "n-in-putaway",
+      "target": "n-internal-view",
+      "type": "data",
+      "label": "更新库存"
+    },
+    {
+      "id": "e-erp-inv",
+      "source": "n-internal-view",
+      "target": "n-erp",
+      "type": "data",
+      "label": "同步库存"
+    },
+    {
+      "id": "e-move-inv",
+      "source": "n-internal-move",
+      "target": "n-internal-view",
+      "type": "data",
+      "label": "更新库存"
+    },
+    {
+      "id": "e-count-inv",
+      "source": "n-internal-count",
+      "target": "n-internal-view",
+      "type": "data",
+      "label": "更新库存"
+    },
+    {
+      "id": "e-replenish-inv",
+      "source": "n-internal-replenish",
+      "target": "n-internal-view",
+      "type": "data",
+      "label": "更新库存"
+    },
+    {
+      "id": "e-erp-order",
+      "source": "n-erp",
+      "target": "n-out-order",
+      "type": "main",
+      "label": "同步销售单"
+    },
+    {
+      "id": "e-order-wave",
+      "source": "n-out-order",
+      "target": "n-out-wave",
+      "type": "main",
+      "label": "进入波次池"
+    },
+    {
+      "id": "e-wave-pick",
+      "source": "n-out-wave",
+      "target": "n-out-pick",
+      "type": "main",
+      "label": "下发拣货任务"
+    },
+    {
+      "id": "e-pick-pack",
+      "source": "n-out-pick",
+      "target": "n-out-pack",
+      "type": "main",
+      "label": "提交复核打包"
+    },
+    {
+      "id": "e-pack-ship",
+      "source": "n-out-pack",
+      "target": "n-out-ship",
+      "type": "main",
+      "label": "集货待运"
+    },
+    {
+      "id": "e-ship-tms",
+      "source": "n-out-ship",
+      "target": "n-tms",
+      "type": "dependency",
+      "label": "请求运力"
+    },
+    {
+      "id": "e-tms-carrier",
+      "source": "n-tms",
+      "target": "n-carrier",
+      "type": "main",
+      "label": "指派提货"
+    },
+    {
+      "id": "e-ship-carrier",
+      "source": "n-out-ship",
+      "target": "n-carrier",
+      "type": "dependency",
+      "label": "司机交接"
+    },
+    {
+      "id": "e-ship-erp",
+      "source": "n-out-ship",
+      "target": "n-erp",
+      "type": "feedback",
+      "label": "发货回传"
+    },
+    {
+      "id": "e-receive-vas",
+      "source": "n-in-receive",
+      "target": "n-vas",
+      "type": "dependency",
+      "label": "收货后加工"
+    },
+    {
+      "id": "e-pick-vas",
+      "source": "n-out-pick",
+      "target": "n-vas",
+      "type": "dependency",
+      "label": "拣货后加工"
+    },
+    {
+      "id": "e-vas-putaway",
+      "source": "n-vas",
+      "target": "n-in-putaway",
+      "type": "dependency",
+      "label": "加工后入库"
+    },
+    {
+      "id": "e-vas-pack",
+      "source": "n-vas",
+      "target": "n-out-pack",
+      "type": "dependency",
+      "label": "加工后打包"
+    },
+    {
+      "id": "e-all-master",
+      "source": "n-support-master",
+      "target": "n-internal-view",
+      "type": "support",
+      "label": "提供主数据"
+    },
+    {
+      "id": "e-all-labor",
+      "source": "n-support-labor",
+      "target": "n-out-pick",
+      "type": "support",
+      "label": "记录拣货绩效"
+    },
+    {
+      "id": "e-all-billing",
+      "source": "n-support-billing",
+      "target": "n-out-ship",
+      "type": "support",
+      "label": "计费出库操作"
+    },
+    {
+      "id": "e-all-billing-inv",
+      "source": "n-support-billing",
+      "target": "n-internal-view",
+      "type": "support",
+      "label": "计算仓租"
+    },
+    {
+      "id": "e-all-bi",
+      "source": "n-support-bi",
+      "target": "n-internal-view",
+      "type": "data",
+      "label": "分析库存数据"
+    },
+    {
+      "id": "e-all-bi-out",
+      "source": "n-support-bi",
+      "target": "n-out-ship",
+      "type": "data",
+      "label": "分析出库时效"
+    }
+  ]
+}

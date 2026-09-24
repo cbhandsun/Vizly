@@ -1,0 +1,1646 @@
+{
+  "id": "enterprise-architecture-v2",
+  "name": "企业架构图（标准化完整版）",
+  "type": "architecture",
+  "version": "2.0.0",
+  "nodes": [
+    {
+      "id": "ch-offline",
+      "description": "<b>线下渠道</b><br/>• 智慧门店POS/导购PAD<br/>• 户外广告/智能货架",
+      "domain": "渠道触点域",
+      "domainClass": "ch",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "ch-private",
+      "description": "<b>私域渠道</b><br/>• 微信小程序/公众号/企业微信<br/>• 自有APP/直播电商/电话",
+      "domain": "渠道触点域",
+      "domainClass": "ch",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "ch-public",
+      "description": "<b>公域 & 分销</b><br/>• 天猫/京东/抖音/快手<br/>• B2B分销平台/经销商门户",
+      "domain": "渠道触点域",
+      "domainClass": "ch",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "fe-store",
+      "description": "<b>S端赋能前台</b><br/>• 导购App/门店助理<br/>• 导购开单/会员服务/任务管理",
+      "domain": "数字化前台域",
+      "domainClass": "fe",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "fe-mall",
+      "description": "<b>C端用户前台</b><br/>• 商城/官网/小程序/APP<br/>• 商品搜索/交易下单/用户中心",
+      "domain": "数字化前台域",
+      "domainClass": "fe",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "fe-op",
+      "description": "<b>B端运营前台</b><br/>• ERP/运营管理后台<br/>• CMS/PIM/店铺装修/客服工作台",
+      "domain": "数字化前台域",
+      "domainClass": "fe",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "mid-trade",
+      "description": "<b>交易中心 (TDC)</b><br/>• 正逆向订单/购物车/结算<br/>• 交易状态机/交易履约",
+      "domain": "业务中台域",
+      "domainClass": "mid",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "mid-pay",
+      "description": "<b>支付网关 (PG)</b><br/>• 多PSP聚合/渠道分流<br/>• 统一对账/会计凭证",
+      "domain": "业务中台域",
+      "domainClass": "mid",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "mid-oms",
+      "description": "<b>履约中心 (OMS)</b><br/>• 订单编排/智能寻源<br/>• 拆合单/波次/库存预占",
+      "domain": "业务中台域",
+      "domainClass": "mid",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "mid-product",
+      "description": "<b>商品中心 (PIM)</b><br/>• SPU/SKU/类目/属性<br/>• 商品发布/上下架/审核",
+      "domain": "业务中台域",
+      "domainClass": "mid",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "mid-price",
+      "description": "<b>价格中心 (Pricing)</b><br/>• 基础价/会员价/渠道价<br/>• 促销/优惠券/满减规则",
+      "domain": "业务中台域",
+      "domainClass": "mid",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "mid-member",
+      "description": "<b>会员中心 (CRM)</b><br/>• 会员等级/积分/权益<br/>• 生命周期/标签/画像",
+      "domain": "业务中台域",
+      "domainClass": "mid",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "mid-risk",
+      "description": "<b>风控中心 (Risk)</b><br/>• 反欺诈/限流/黑白名单<br/>• 实时决策引擎/规则配置",
+      "domain": "业务中台域",
+      "domainClass": "mid",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "mid-mkt",
+      "description": "<b>营销中心 (Campaign)</b><br/>• 活动/券/积分/推荐<br/>• A/B测试/效果分析",
+      "domain": "业务中台域",
+      "domainClass": "mid",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "mid-rule",
+      "description": "<b>规则引擎 (Rules)</b><br/>• 业务规则/决策表<br/>• 动态配置/版本管理",
+      "domain": "业务中台域",
+      "domainClass": "mid",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "mid-stock",
+      "description": "<b>库存中心 (Stock)</b><br/>• 可用/锁定/预占/调拨<br/>• 安全库存/补货策略",
+      "domain": "业务中台域",
+      "domainClass": "mid",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "be-scm-plan",
+      "description": "<b>计划 (Plan)</b><br/>• S&OP/需求预测/主生产计划<br/>• 物料需求计划(MRP)/产能规划",
+      "domain": "后端域",
+      "domainClass": "be-scm",
+      "subDomain": "SCM 供应链",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "be-scm-source",
+      "description": "<b>采购 (Source)</b><br/>• 供应商管理/采购订单<br/>• 合同管理/供应商协同",
+      "domain": "后端域",
+      "domainClass": "be-scm",
+      "subDomain": "SCM 供应链",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "be-scm-make",
+      "description": "<b>制造 (Make)</b><br/>• 生产订单/工艺路线<br/>• 车间调度/质量管控",
+      "domain": "后端域",
+      "domainClass": "be-scm",
+      "subDomain": "SCM 供应链",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "be-scm-deliver",
+      "description": "<b>交付 (Deliver)</b><br/>• 销售订单/发货计划<br/>• 客户服务/订单履约",
+      "domain": "后端域",
+      "domainClass": "be-scm",
+      "subDomain": "SCM 供应链",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "be-scm-return",
+      "description": "<b>退货 (Return)</b><br/>• 退货处理/逆向物流<br/>• 质量分析/供应商退货",
+      "domain": "后端域",
+      "domainClass": "be-scm",
+      "subDomain": "SCM 供应链",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "be-scm-enable",
+      "description": "<b>使能 (Enable)</b><br/>• 供应链可视化/KPI监控<br/>• 风险管理/合规管控",
+      "domain": "后端域",
+      "domainClass": "be-scm",
+      "subDomain": "SCM 供应链",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "be-logistics-dispatch",
+      "description": "<b>调度中心 (Dispatch)</b><br/>• 订单调度/资源协调<br/>• 全链路可视化/异常预警",
+      "domain": "后端域",
+      "domainClass": "be-logistics",
+      "subDomain": "物流",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "be-logistics-warehouse",
+      "description": "<b>仓储管理 (WMS)</b><br/>• 入库/上架/拣选/出库<br/>• 库存管理/盘点/移库",
+      "domain": "后端域",
+      "domainClass": "be-logistics",
+      "subDomain": "物流",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "be-logistics-transport",
+      "description": "<b>运输管理 (TMS)</b><br/>• 运力管理/路径规划<br/>• 在途跟踪/配送管理",
+      "domain": "后端域",
+      "domainClass": "be-logistics",
+      "subDomain": "物流",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "be-logistics-customs",
+      "description": "<b>关务管理 (GTS)</b><br/>• 报关报检/贸易合规<br/>• 关务文件/税费计算",
+      "domain": "后端域",
+      "domainClass": "be-logistics",
+      "subDomain": "物流",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "be-logistics-billing",
+      "description": "<b>计费结算 (BMS)</b><br/>• 费用计算/账单生成<br/>• 应收应付/对账与结算",
+      "domain": "后端域",
+      "domainClass": "be-logistics",
+      "subDomain": "物流",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "be-corp-finance",
+      "description": "<b>财务管理 (Finance)</b><br/>• 总账/应收应付/成本核算<br/>• 预算管理/财务报表/税务",
+      "domain": "后端域",
+      "domainClass": "be-corp",
+      "subDomain": "业财客",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "be-corp-hr",
+      "description": "<b>人力资源 (HR)</b><br/>• 组织架构/薪酬绩效<br/>• 招聘培训/员工服务",
+      "domain": "后端域",
+      "domainClass": "be-corp",
+      "subDomain": "业财客",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "be-corp-legal",
+      "description": "<b>法务合规 (Legal)</b><br/>• 合同管理/法律风险<br/>• 知识产权/合规审查",
+      "domain": "后端域",
+      "domainClass": "be-corp",
+      "subDomain": "业财客",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "be-corp-admin",
+      "description": "<b>行政管理 (Admin)</b><br/>• 办公管理/资产管理<br/>• 采购管理/供应商管理",
+      "domain": "后端域",
+      "domainClass": "be-corp",
+      "subDomain": "业财客",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "data-collect",
+      "description": "<b>数据集成</b><br/>• 实时采集/CDC/埋点/API<br/>• 数据交换(Hub)/ETL/ELT",
+      "domain": "数据域",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "data-stream",
+      "description": "<b>流批一体与特征库</b><br/>• Kafka/Flink 流处理<br/>• Feature Store/实时特征服务",
+      "domain": "数据域",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "data-warehouse",
+      "description": "<b>统一数仓</b><br/>• ODS/DWD/DWS/ADS<br/>• 数据湖/湖仓一体/数据治理",
+      "domain": "数据域",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "data-cdp",
+      "description": "<b>客户数据平台 (CDP)</b><br/>• OneID/标签画像/生命周期<br/>• 客群洞察/营销圈选",
+      "domain": "数据域",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "data-app",
+      "description": "<b>数据应用</b><br/>• BI/self-service analysis/report<br/>• 推荐/预测等AI服务",
+      "domain": "数据域",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "data-mdm",
+      "description": "<b>主数据管理 (MDM)</b><br/>• 物料/客户/组织主数据<br/>• 编码/血缘/质量管控",
+      "domain": "数据域",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "infra-cloud",
+      "description": "<b>基础设施 (IaaS)</b><br/>• 混合/多云管理(CMP)<br/>• 网络/存储/容器化(K8s)",
+      "domain": "技术基础设施域",
+      "domainClass": "infra",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "infra-paas",
+      "description": "<b>技术平台 (PaaS)</b><br/>• 微服务/分布式事务<br/>• API网关/MQ/缓存/ES",
+      "domain": "技术基础设施域",
+      "domainClass": "infra",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "infra-integration",
+      "description": "<b>集成平台 (iPaaS/ESB)</b><br/>• 适配器/编排/监控<br/>• 异构系统集成与治理",
+      "domain": "技术基础设施域",
+      "domainClass": "infra",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "infra-event",
+      "description": "<b>事件总线 (Event Mesh)</b><br/>• 主题/订阅/回溯<br/>• 事件溯源与解耦",
+      "domain": "技术基础设施域",
+      "domainClass": "infra",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "infra-devops",
+      "description": "<b>研发效能与治理</b><br/>• CI/CD/GitOps/IDE插件<br/>• 可观测性/APM/成本优化",
+      "domain": "技术基础设施域",
+      "domainClass": "infra",
+      "type": "custom",
+      "zIndex": 10
+    },
+    {
+      "id": "infra-security",
+      "description": "<b>信息安全</b><br/>• 身份认证(IAM)/零信任<br/>• 数据安全(DLP)/安全审计",
+      "domain": "技术基础设施域",
+      "domainClass": "infra",
+      "type": "custom",
+      "zIndex": 10
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-dep-back-4",
+      "source": "be-logistics-dispatch",
+      "target": "be-logistics-transport",
+      "type": "dependency",
+      "label": "运输指令"
+    },
+    {
+      "id": "edge-dep-back-3",
+      "source": "be-logistics-dispatch",
+      "target": "be-logistics-warehouse",
+      "type": "dependency",
+      "label": "仓储指令"
+    },
+    {
+      "id": "edge-data-3",
+      "source": "be-logistics-dispatch",
+      "target": "data-collect",
+      "type": "data",
+      "label": "履约数据"
+    },
+    {
+      "id": "edge-dep-back-2",
+      "source": "be-logistics-warehouse",
+      "target": "be-logistics-transport",
+      "type": "dependency",
+      "label": "出库指令"
+    },
+    {
+      "id": "edge-dep-back-1",
+      "source": "be-scm-plan",
+      "target": "be-logistics-warehouse",
+      "type": "dependency",
+      "label": "供应计划"
+    },
+    {
+      "id": "edge-ch-fe-1",
+      "source": "ch-offline",
+      "target": "fe-store",
+      "type": "main",
+      "label": "线下订单"
+    },
+    {
+      "id": "edge-ch-fe-2",
+      "source": "ch-private",
+      "target": "fe-mall",
+      "type": "main",
+      "label": "私域流量"
+    },
+    {
+      "id": "edge-ch-fe-3",
+      "source": "ch-public",
+      "target": "fe-op",
+      "type": "main",
+      "label": "公域流量"
+    },
+    {
+      "id": "edge-data-4",
+      "source": "data-collect",
+      "target": "data-stream",
+      "type": "data",
+      "label": "实时流"
+    },
+    {
+      "id": "edge-mdm-2",
+      "source": "data-mdm",
+      "target": "mid-member",
+      "type": "dependency",
+      "label": "客户主数据"
+    },
+    {
+      "id": "edge-mdm-1",
+      "source": "data-mdm",
+      "target": "mid-product",
+      "type": "dependency",
+      "label": "商品主数据"
+    },
+    {
+      "id": "edge-data-5",
+      "source": "data-stream",
+      "target": "data-warehouse",
+      "type": "data",
+      "label": "数据入仓"
+    },
+    {
+      "id": "edge-data-6",
+      "source": "data-warehouse",
+      "target": "data-app",
+      "type": "data",
+      "label": "数据应用"
+    },
+    {
+      "id": "edge-fe-mid-2",
+      "source": "fe-mall",
+      "target": "mid-trade",
+      "type": "main",
+      "label": "交易请求"
+    },
+    {
+      "id": "edge-fe-mid-3",
+      "source": "fe-op",
+      "target": "mid-trade",
+      "type": "main",
+      "label": "交易请求"
+    },
+    {
+      "id": "edge-fe-mid-1",
+      "source": "fe-store",
+      "target": "mid-trade",
+      "type": "main",
+      "label": "交易请求"
+    },
+    {
+      "id": "edge-infra-6",
+      "source": "infra-event",
+      "target": "data-stream",
+      "type": "support",
+      "label": "事件流"
+    },
+    {
+      "id": "edge-infra-5",
+      "source": "infra-event",
+      "target": "mid-trade",
+      "type": "support",
+      "label": "事件通知"
+    },
+    {
+      "id": "edge-infra-4",
+      "source": "infra-integration",
+      "target": "be-logistics-transport",
+      "type": "support",
+      "label": "数据集成"
+    },
+    {
+      "id": "edge-infra-3",
+      "source": "infra-integration",
+      "target": "be-logistics-warehouse",
+      "type": "support",
+      "label": "数据集成"
+    },
+    {
+      "id": "edge-infra-2",
+      "source": "infra-paas",
+      "target": "mid-pay",
+      "type": "support",
+      "label": "平台服务"
+    },
+    {
+      "id": "edge-infra-1",
+      "source": "infra-paas",
+      "target": "mid-trade",
+      "type": "support",
+      "label": "平台服务"
+    },
+    {
+      "id": "edge-infra-8",
+      "source": "infra-security",
+      "target": "fe-mall",
+      "type": "support",
+      "label": "安全防护"
+    },
+    {
+      "id": "edge-infra-7",
+      "source": "infra-security",
+      "target": "fe-store",
+      "type": "support",
+      "label": "安全防护"
+    },
+    {
+      "id": "edge-dep-mid-2",
+      "source": "mid-member",
+      "target": "data-cdp",
+      "type": "dependency",
+      "label": "客户数据"
+    },
+    {
+      "id": "edge-mid-backend-1",
+      "source": "mid-oms",
+      "target": "be-logistics-dispatch",
+      "type": "main",
+      "label": "履约指令"
+    },
+    {
+      "id": "edge-dep-mid-7",
+      "source": "mid-oms",
+      "target": "mid-stock",
+      "type": "dependency",
+      "label": "库存分配"
+    },
+    {
+      "id": "edge-data-2",
+      "source": "mid-pay",
+      "target": "data-collect",
+      "type": "data",
+      "label": "支付数据"
+    },
+    {
+      "id": "edge-mid-main-2",
+      "source": "mid-pay",
+      "target": "mid-oms",
+      "type": "main",
+      "label": "订单创建"
+    },
+    {
+      "id": "edge-dep-mid-1",
+      "source": "mid-product",
+      "target": "be-scm-plan",
+      "type": "dependency",
+      "label": "商品信息"
+    },
+    {
+      "id": "edge-dep-mid-3",
+      "source": "mid-stock",
+      "target": "be-logistics-warehouse",
+      "type": "dependency",
+      "label": "库存查询"
+    },
+    {
+      "id": "edge-data-1",
+      "source": "mid-trade",
+      "target": "data-collect",
+      "type": "data",
+      "label": "交易数据"
+    },
+    {
+      "id": "edge-dep-mid-5",
+      "source": "mid-trade",
+      "target": "mid-member",
+      "type": "dependency",
+      "label": "会员验证"
+    },
+    {
+      "id": "edge-mid-main-1",
+      "source": "mid-trade",
+      "target": "mid-pay",
+      "type": "main",
+      "label": "支付请求"
+    },
+    {
+      "id": "edge-dep-mid-4",
+      "source": "mid-trade",
+      "target": "mid-product",
+      "type": "dependency",
+      "label": "商品查询"
+    },
+    {
+      "id": "edge-dep-mid-6",
+      "source": "mid-trade",
+      "target": "mid-stock",
+      "type": "dependency",
+      "label": "库存检查"
+    }
+  ],
+  "layout": {
+    "direction": "TB",
+    "spacing": {
+      "horizontal": 80,
+      "vertical": 60
+    },
+    "padding": {
+      "horizontal": 24,
+      "vertical": 16
+    },
+    "groupPadding": 36,
+    "constraints": {
+      "minWidth": 120,
+      "minHeight": 60
+    },
+    "generateDomainGroups": true,
+    "generateSubDomainGroups": true,
+    "domainOrder": [
+      "渠道触点域",
+      "数字化前台域",
+      "业务中台域",
+      "后端域",
+      "数据域",
+      "技术基础设施域"
+    ],
+    "subDomainOrder": [
+      "SCM 供应链",
+      "物流",
+      "业财客"
+    ]
+  },
+  "theme": {
+    "name": "enterprise",
+    "displayName": "企业主题",
+    "domains": {
+      "backend": {
+        "border": "#5C6BC0",
+        "main": "#5C6BC0",
+        "light": "#C5CAE9",
+        "text": "#FFFFFF",
+        "background": "#F5F5F5"
+      },
+      "ch": {
+        "border": "#E91E63",
+        "main": "#E91E63",
+        "light": "#F8BBD9",
+        "text": "#FFFFFF",
+        "background": "#F5F5F5"
+      },
+      "fe": {
+        "border": "#2196F3",
+        "main": "#2196F3",
+        "light": "#BBDEFB",
+        "text": "#FFFFFF",
+        "background": "#F5F5F5"
+      },
+      "mid": {
+        "border": "#4CAF50",
+        "main": "#4CAF50",
+        "light": "#C8E6C9",
+        "text": "#FFFFFF",
+        "background": "#F5F5F5"
+      },
+      "be-scm": {
+        "border": "#FF9800",
+        "main": "#FF9800",
+        "light": "#FFE0B2",
+        "text": "#FFFFFF",
+        "background": "#F5F5F5"
+      },
+      "be-logistics": {
+        "border": "#795548",
+        "main": "#795548",
+        "light": "#D7CCC8",
+        "text": "#FFFFFF",
+        "background": "#F5F5F5"
+      },
+      "be-corp": {
+        "border": "#9C27B0",
+        "main": "#9C27B0",
+        "light": "#E1BEE7",
+        "text": "#FFFFFF",
+        "background": "#F5F5F5"
+      },
+      "data": {
+        "border": "#607D8B",
+        "main": "#607D8B",
+        "light": "#CFD8DC",
+        "text": "#FFFFFF",
+        "background": "#F5F5F5"
+      },
+      "infra": {
+        "border": "#424242",
+        "main": "#424242",
+        "light": "#E0E0E0",
+        "text": "#FFFFFF",
+        "background": "#F5F5F5"
+      }
+    },
+    "isCustom": false
+  },
+  "config": {
+    "NODE_WIDTH": 160,
+    "NODE_HEIGHT": 80,
+    "NODE_PADDING": {
+      "horizontal": 20,
+      "vertical": 14
+    },
+    "SPACING": {
+      "H": 80,
+      "V": 60
+    }
+  },
+  "metadata": {
+    "description": "企业级系统架构图（完整标准化），覆盖渠道前台/中台/后端子域/数据/基础设施，支持编排器生成域容器与严格包含布局",
+    "author": "Architecture Team",
+    "createdAt": "2024-01-01T00:00:00Z",
+    "updatedAt": "2025-11-27T00:00:00Z",
+    "tags": [
+      "架构",
+      "CloudNativeArch",
+      "Enterprise"
+    ],
+    "canvasPresetSeed": {
+      "version": 1,
+      "groups": [
+        [
+          "titlegroup-渠道触点域",
+          "t",
+          "渠道触点域",
+          "渠道触点域",
+          "ch",
+          null,
+          37.675,
+          0,
+          1524.55,
+          268,
+          -1
+        ],
+        [
+          "titlegroup-数字化前台域",
+          "t",
+          "数字化前台域",
+          "数字化前台域",
+          "fe",
+          null,
+          0,
+          428,
+          1619.9,
+          268,
+          -1
+        ],
+        [
+          "titlegroup-业务中台域",
+          "t",
+          "业务中台域",
+          "业务中台域",
+          "mid",
+          null,
+          280.646,
+          856,
+          1984.45,
+          1036,
+          -1
+        ],
+        [
+          "titlegroup-后端域",
+          "t",
+          "后端域",
+          "后端域",
+          "be-scm",
+          null,
+          1255.538,
+          2052,
+          2373.782,
+          1734,
+          -1
+        ],
+        [
+          "titlegroup-数据域",
+          "t",
+          "数据域",
+          "数据域",
+          "data",
+          null,
+          2322.325,
+          3904,
+          1517.1,
+          1036,
+          -1
+        ],
+        [
+          "titlegroup-技术基础设施域",
+          "t",
+          "技术基础设施域",
+          "技术基础设施域",
+          "infra",
+          null,
+          2111.921,
+          0,
+          3154.8,
+          268,
+          -1
+        ],
+        [
+          "subgroup-后端域-SCM 供应链",
+          "s",
+          "SCM 供应链",
+          "后端域",
+          "be-scm",
+          "SCM 供应链",
+          141.625,
+          84,
+          927.05,
+          722,
+          3
+        ],
+        [
+          "subgroup-后端域-物流",
+          "s",
+          "物流",
+          "后端域",
+          "be-logistics",
+          "物流",
+          99,
+          924,
+          1012.3,
+          722,
+          3
+        ],
+        [
+          "subgroup-后端域-业财客",
+          "s",
+          "业财客",
+          "后端域",
+          "be-corp",
+          "业财客",
+          1388.675,
+          212,
+          887.05,
+          466,
+          3
+        ]
+      ],
+      "nodes": [
+        [
+          32,
+          84,
+          243,
+          96,
+          0
+        ],
+        [
+          595,
+          84,
+          282,
+          96,
+          0
+        ],
+        [
+          1197,
+          84,
+          257,
+          96,
+          0
+        ],
+        [
+          32,
+          84,
+          282,
+          96,
+          1
+        ],
+        [
+          634,
+          84,
+          282,
+          96,
+          1
+        ],
+        [
+          1236,
+          84,
+          306,
+          96,
+          1
+        ],
+        [
+          153.5,
+          84,
+          250,
+          96,
+          2
+        ],
+        [
+          1124,
+          340,
+          224,
+          96,
+          2
+        ],
+        [
+          1119,
+          596,
+          234,
+          96,
+          2
+        ],
+        [
+          32,
+          340,
+          234,
+          96,
+          2
+        ],
+        [
+          1673,
+          340,
+          234,
+          96,
+          2
+        ],
+        [
+          586,
+          340,
+          218,
+          96,
+          2
+        ],
+        [
+          1673,
+          84,
+          243,
+          96,
+          2
+        ],
+        [
+          1673,
+          596,
+          231,
+          96,
+          2
+        ],
+        [
+          1673,
+          852,
+          211,
+          96,
+          2
+        ],
+        [
+          166,
+          852,
+          225,
+          96,
+          2
+        ],
+        [
+          28,
+          62,
+          290,
+          96,
+          6
+        ],
+        [
+          28,
+          574,
+          227,
+          96,
+          6
+        ],
+        [
+          638,
+          318,
+          211,
+          96,
+          6
+        ],
+        [
+          638,
+          574,
+          211,
+          96,
+          6
+        ],
+        [
+          638,
+          62,
+          227,
+          96,
+          6
+        ],
+        [
+          28,
+          318,
+          236,
+          96,
+          6
+        ],
+        [
+          28,
+          62,
+          243,
+          96,
+          7
+        ],
+        [
+          178.25,
+          318,
+          225,
+          96,
+          7
+        ],
+        [
+          44,
+          574,
+          211,
+          96,
+          7
+        ],
+        [
+          723.25,
+          318,
+          211,
+          96,
+          7
+        ],
+        [
+          723.25,
+          62,
+          227,
+          96,
+          7
+        ],
+        [
+          28,
+          62,
+          250,
+          96,
+          8
+        ],
+        [
+          598,
+          62,
+          211,
+          96,
+          8
+        ],
+        [
+          28,
+          318,
+          211,
+          96,
+          8
+        ],
+        [
+          598,
+          318,
+          227,
+          96,
+          8
+        ],
+        [
+          57,
+          84,
+          252,
+          96,
+          4
+        ],
+        [
+          42.5,
+          340,
+          281,
+          96,
+          4
+        ],
+        [
+          50,
+          596,
+          266,
+          96,
+          4
+        ],
+        [
+          629,
+          84,
+          267,
+          96,
+          4
+        ],
+        [
+          32,
+          852,
+          302,
+          96,
+          4
+        ],
+        [
+          1216,
+          84,
+          234,
+          96,
+          4
+        ],
+        [
+          32,
+          84,
+          240,
+          96,
+          5
+        ],
+        [
+          592,
+          84,
+          233,
+          96,
+          5
+        ],
+        [
+          1145,
+          84,
+          230,
+          96,
+          5
+        ],
+        [
+          1695,
+          84,
+          243,
+          96,
+          5
+        ],
+        [
+          2258,
+          84,
+          255,
+          96,
+          5
+        ],
+        [
+          2833,
+          84,
+          252,
+          96,
+          5
+        ]
+      ],
+      "edges": [
+        [
+          3,
+          3,
+          [
+            1383,
+            3110,
+            1327,
+            3110,
+            1327,
+            3598,
+            1399,
+            3598
+          ]
+        ],
+        [
+          2,
+          0,
+          [
+            1504.038,
+            3134,
+            1504.038,
+            3238,
+            1645.288,
+            3238,
+            1645.288,
+            3294
+          ]
+        ],
+        [
+          1,
+          3,
+          [
+            1625.538,
+            3086,
+            1905.646,
+            3086,
+            1905.646,
+            4036,
+            2379.325,
+            4036
+          ]
+        ],
+        [
+          2,
+          0,
+          [
+            1645.288,
+            3390,
+            1645.288,
+            3494,
+            1504.038,
+            3494,
+            1504.038,
+            3550
+          ]
+        ],
+        [
+          1,
+          1,
+          [
+            1715.163,
+            2246,
+            1813.788,
+            2246,
+            1813.788,
+            3342,
+            1757.788,
+            3342
+          ]
+        ],
+        [
+          2,
+          0,
+          [
+            173,
+            180,
+            173,
+            512
+          ]
+        ],
+        [
+          2,
+          0,
+          [
+            775,
+            180,
+            775,
+            512
+          ]
+        ],
+        [
+          2,
+          0,
+          [
+            1363,
+            180,
+            1363,
+            360,
+            1389,
+            360,
+            1389,
+            512
+          ]
+        ],
+        [
+          2,
+          0,
+          [
+            2505.325,
+            4084,
+            2505.325,
+            4244
+          ]
+        ],
+        [
+          3,
+          2,
+          [
+            3538.325,
+            4036,
+            3482.325,
+            4036,
+            3482.325,
+            2726,
+            3551.213,
+            2726,
+            3551.213,
+            1348,
+            975.646,
+            1348,
+            975.646,
+            1292
+          ]
+        ],
+        [
+          0,
+          2,
+          [
+            3655.325,
+            3988,
+            3655.325,
+            1348,
+            429.646,
+            1348,
+            429.646,
+            1292
+          ]
+        ],
+        [
+          2,
+          0,
+          [
+            2505.325,
+            4340,
+            2505.325,
+            4500
+          ]
+        ],
+        [
+          2,
+          0,
+          [
+            2505.325,
+            4596,
+            2505.325,
+            4756
+          ]
+        ],
+        [
+          3,
+          0,
+          [
+            634,
+            560,
+            559.146,
+            560,
+            559.146,
+            940
+          ]
+        ],
+        [
+          2,
+          1,
+          [
+            1389,
+            608,
+            1389,
+            988,
+            684.146,
+            988
+          ]
+        ],
+        [
+          1,
+          0,
+          [
+            314,
+            560,
+            559.146,
+            560,
+            559.146,
+            940
+          ]
+        ],
+        [
+          2,
+          1,
+          [
+            3928.421,
+            180,
+            3928.421,
+            4292,
+            2645.825,
+            4292
+          ]
+        ],
+        [
+          2,
+          0,
+          [
+            3928.421,
+            180,
+            3928.421,
+            884,
+            559.146,
+            884,
+            559.146,
+            940
+          ]
+        ],
+        [
+          3,
+          1,
+          [
+            3256.921,
+            132,
+            3194.213,
+            132,
+            3194.213,
+            3598,
+            1609.538,
+            3598
+          ]
+        ],
+        [
+          3,
+          0,
+          [
+            3256.921,
+            132,
+            3170.213,
+            132,
+            3170.213,
+            3238,
+            1645.288,
+            3238,
+            1645.288,
+            3294
+          ]
+        ],
+        [
+          2,
+          0,
+          [
+            2820.421,
+            180,
+            2820.421,
+            1140,
+            1516.646,
+            1140,
+            1516.646,
+            1196
+          ]
+        ],
+        [
+          2,
+          0,
+          [
+            2820.421,
+            180,
+            2820.421,
+            884,
+            559.146,
+            884,
+            559.146,
+            940
+          ]
+        ],
+        [
+          2,
+          0,
+          [
+            5070.921,
+            180,
+            5070.921,
+            456,
+            775,
+            456,
+            775,
+            512
+          ]
+        ],
+        [
+          2,
+          0,
+          [
+            5070.921,
+            180,
+            5070.921,
+            448,
+            173,
+            448,
+            173,
+            512
+          ]
+        ],
+        [
+          1,
+          0,
+          [
+            1085,
+            1244,
+            1141,
+            1244,
+            1141,
+            3932,
+            3085,
+            3932,
+            3085,
+            3988
+          ]
+        ],
+        [
+          3,
+          3,
+          [
+            1400,
+            1500,
+            1327,
+            1500,
+            1327,
+            3086,
+            1383,
+            3086
+          ]
+        ],
+        [
+          3,
+          0,
+          [
+            1399.646,
+            1500,
+            559.146,
+            1500,
+            559.146,
+            1708
+          ]
+        ],
+        [
+          1,
+          3,
+          [
+            1628.646,
+            1244,
+            1905.646,
+            1244,
+            1905.646,
+            4036,
+            2379.325,
+            4036
+          ]
+        ],
+        [
+          2,
+          0,
+          [
+            1516.646,
+            1292,
+            1516.646,
+            1452
+          ]
+        ],
+        [
+          1,
+          3,
+          [
+            546.646,
+            1244,
+            788,
+            1244,
+            788,
+            2246,
+            1425.163,
+            2246
+          ]
+        ],
+        [
+          2,
+          3,
+          [
+            559.146,
+            1804,
+            559.146,
+            3342,
+            1532.788,
+            3342
+          ]
+        ],
+        [
+          1,
+          3,
+          [
+            684.15,
+            1012,
+            740.15,
+            1012,
+            740.15,
+            4036,
+            2379.325,
+            4036
+          ]
+        ],
+        [
+          1,
+          0,
+          [
+            684.15,
+            1012,
+            975.65,
+            1012,
+            975.65,
+            1196
+          ]
+        ],
+        [
+          1,
+          0,
+          [
+            684.15,
+            1012,
+            1516.65,
+            1012,
+            1516.65,
+            1196
+          ]
+        ],
+        [
+          2,
+          0,
+          [
+            559.146,
+            1036,
+            559.146,
+            1140,
+            429.646,
+            1140,
+            429.646,
+            1196
+          ]
+        ],
+        [
+          1,
+          1,
+          [
+            684.15,
+            1012,
+            740.15,
+            1012,
+            740.15,
+            1756,
+            671.65,
+            1756
+          ]
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,237 @@
+{
+  "id": "transport-driven-v1",
+  "name": "运输驱动架构图",
+  "type": "transport-driven",
+  "version": "1.0.0",
+  "nodes": [
+    {
+      "id": "upstream-systems",
+      "description": "<b>上游系统</b><br/>销售 OMS / ERP / SCM",
+      "domain": "external",
+      "domainClass": "ch",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "logistics-oms",
+      "description": "<b>物流订单中心（Orchestrator）</b><br/>订单聚合与校验<br/>履约网络编排（跨仓/跨渠道）<br/>全程状态监控",
+      "domain": "oms",
+      "domainClass": "be-logistics",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "wms-inbound",
+      "description": "<b>WMS - 收货与存储</b><br/>ASN 预约 / 收货上架<br/>库内补货 / 移库",
+      "domain": "wms",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "wms-outbound",
+      "description": "<b>WMS - 履行与出库</b><br/><b style=\"color:#43A047;\">接收运输波次计划</b><br/>创建拣货 / 打包任务<br/>按计划引导至月台集货",
+      "domain": "wms",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "tms-planning",
+      "description": "<b>TMS - 计划与调度</b><br/>线路 / 车辆 / 在途时效规划<br/><b style=\"color:#039BE5;\">生成驱动仓库的作业波次</b><br/>月台资源协同",
+      "domain": "tms",
+      "domainClass": "be-logistics",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "tms-execution",
+      "description": "<b>TMS - 在途与交付</b><br/>运单跟踪 / 异常管理<br/>POD 回传 / 客户交付",
+      "domain": "tms",
+      "domainClass": "be-logistics",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "master-data",
+      "description": "<b>统一主数据</b><br/>商品 / 库位 / 车辆 / 承运商 / 地址",
+      "domain": "data",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "carrier-portal",
+      "description": "<b>承运商协同门户</b><br/>任务接收 / 状态反馈 / 账单",
+      "domain": "external",
+      "domainClass": "ch",
+      "type": "custom",
+      "zIndex": 1
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-upstream-oms",
+      "source": "upstream-systems",
+      "target": "logistics-oms",
+      "type": "main",
+      "label": "订单下发"
+    },
+    {
+      "id": "edge-oms-wms-inbound",
+      "source": "logistics-oms",
+      "target": "wms-inbound",
+      "type": "main",
+      "label": "入库指令"
+    },
+    {
+      "id": "edge-wms-inbound-outbound",
+      "source": "wms-inbound",
+      "target": "wms-outbound",
+      "type": "dependency",
+      "label": "库存流转"
+    },
+    {
+      "id": "edge-oms-tms-planning",
+      "source": "logistics-oms",
+      "target": "tms-planning",
+      "type": "main",
+      "label": "运输需求"
+    },
+    {
+      "id": "edge-tms-wms-wave",
+      "source": "tms-planning",
+      "target": "wms-outbound",
+      "type": "main",
+      "label": "波次计划驱动"
+    },
+    {
+      "id": "edge-tms-planning-execution",
+      "source": "tms-planning",
+      "target": "tms-execution",
+      "type": "main",
+      "label": "执行计划"
+    },
+    {
+      "id": "edge-master-data-oms",
+      "source": "master-data",
+      "target": "logistics-oms",
+      "type": "support",
+      "label": "主数据"
+    },
+    {
+      "id": "edge-master-data-wms",
+      "source": "master-data",
+      "target": "wms-inbound",
+      "type": "support",
+      "label": "主数据"
+    },
+    {
+      "id": "edge-master-data-tms",
+      "source": "master-data",
+      "target": "tms-planning",
+      "type": "support",
+      "label": "主数据"
+    },
+    {
+      "id": "edge-tms-carrier",
+      "source": "tms-execution",
+      "target": "carrier-portal",
+      "type": "dependency",
+      "label": "承运商协同"
+    },
+    {
+      "id": "edge-wms-oms-status",
+      "source": "wms-outbound",
+      "target": "logistics-oms",
+      "type": "feedback",
+      "label": "出库状态"
+    },
+    {
+      "id": "edge-tms-oms-status",
+      "source": "tms-execution",
+      "target": "logistics-oms",
+      "type": "feedback",
+      "label": "运输状态"
+    }
+  ],
+  "layout": {
+    "direction": "TB",
+    "spacing": {
+      "horizontal": 140,
+      "vertical": 100
+    },
+    "padding": {
+      "horizontal": 40,
+      "vertical": 50
+    },
+    "constraints": {
+      "minWidth": 280,
+      "minHeight": 120
+    }
+  },
+  "theme": {
+    "name": "transport-driven",
+    "displayName": "运输驱动主题",
+    "domains": {
+      "external": {
+        "border": "#546E7A",
+        "main": "#546E7A",
+        "light": "#ECEFF1",
+        "text": "#333333",
+        "background": "#ffffff"
+      },
+      "oms": {
+        "border": "#7E57C2",
+        "main": "#7E57C2",
+        "light": "#F3E5F5",
+        "text": "#333333",
+        "background": "#ffffff"
+      },
+      "wms": {
+        "border": "#039BE5",
+        "main": "#039BE5",
+        "light": "#E1F5FE",
+        "text": "#333333",
+        "background": "#ffffff"
+      },
+      "tms": {
+        "border": "#43A047",
+        "main": "#43A047",
+        "light": "#E8F5E8",
+        "text": "#333333",
+        "background": "#ffffff"
+      },
+      "data": {
+        "border": "#F57C00",
+        "main": "#F57C00",
+        "light": "#FFF3E0",
+        "text": "#333333",
+        "background": "#ffffff"
+      }
+    },
+    "isCustom": false
+  },
+  "config": {
+    "NODE_WIDTH": 280,
+    "NODE_HEIGHT": 120,
+    "NODE_PADDING": {
+      "horizontal": 40,
+      "vertical": 50
+    },
+    "SPACING": {
+      "H": 140,
+      "V": 100
+    }
+  },
+  "metadata": {
+    "title": "运输驱动架构图",
+    "description": "运输驱动架构图，展示了TMS如何驱动WMS作业波次的协同模式",
+    "author": "Transport Team",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-01T00:00:00.000Z",
+    "tags": [
+      "运输"
+    ]
+  }
+}

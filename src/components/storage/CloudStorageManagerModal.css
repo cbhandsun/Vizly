@@ -1,0 +1,135 @@
+.cloud-storage-manager-modal .ant-modal-body {
+    max-height: min(72dvh, 720px);
+    overflow: hidden;
+    padding: 0 var(--glass-padding-lg, 32px) var(--glass-padding-lg, 32px);
+}
+
+.cloud-storage-manager-modal .ant-modal-close,
+.cloud-storage-manager-modal .ant-tabs-tab,
+.cloud-storage-manager-modal .ant-btn,
+.cloud-storage-manager-modal .ant-input-affix-wrapper,
+.cloud-storage-manager-modal .ant-select-selector {
+    min-height: var(--commercial-touch-target, 44px);
+}
+
+.cloud-storage-manager-modal .ant-modal-close,
+.cloud-storage-manager-refresh {
+    min-width: var(--commercial-touch-target, 44px);
+}
+
+.cloud-storage-manager-title {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-right: 36px;
+}
+
+.cloud-storage-manager-title-actions {
+    min-width: 0;
+}
+
+.cloud-storage-manager-provider {
+    width: 150px;
+}
+
+.cloud-storage-manager-search {
+    margin: 16px 0 12px;
+}
+
+.cloud-storage-manager-list {
+    max-height: 55dvh;
+    overflow-y: auto;
+    padding: 8px 4px;
+}
+
+.cloud-storage-manager-recovery-alert {
+    margin-bottom: 12px;
+}
+
+.cloud-storage-manager-recovery-alert .ant-alert-action .ant-btn {
+    min-height: var(--commercial-touch-target, 44px);
+}
+
+.cloud-storage-manager-batch-bar {
+    display: flex;
+    min-height: var(--commercial-touch-target, 44px);
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.cloud-storage-manager-checkbox {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    z-index: 10;
+    display: inline-flex;
+    width: var(--commercial-touch-target, 44px);
+    height: var(--commercial-touch-target, 44px);
+    align-items: center;
+    justify-content: center;
+}
+
+.cloud-storage-manager-modal .ant-card-actions > li > span,
+.cloud-storage-manager-modal .ant-card-actions .ant-btn {
+    min-height: var(--commercial-touch-target, 44px);
+}
+
+.cloud-storage-manager-modal .ant-card[role='button']:focus-visible {
+    outline: 2px solid var(--color-primary-500, #6366f1);
+    outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+    .cloud-storage-manager-modal .ant-modal {
+        top: 8px;
+        margin-bottom: 8px;
+    }
+
+    .cloud-storage-manager-modal .ant-modal-body {
+        max-height: calc(100dvh - 112px);
+        padding-right: 16px;
+        padding-left: 16px;
+        overflow-y: auto;
+    }
+
+    .cloud-storage-manager-title {
+        align-items: flex-start;
+        flex-direction: column;
+        padding-right: 32px;
+    }
+
+    .cloud-storage-manager-title-actions,
+    .cloud-storage-manager-provider {
+        width: 100%;
+    }
+
+    .cloud-storage-manager-title-actions {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) var(--commercial-touch-target, 44px);
+    }
+
+    .cloud-storage-manager-list {
+        max-height: none;
+        overflow: visible;
+    }
+
+    .cloud-storage-manager-batch-bar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .cloud-storage-manager-batch-actions,
+    .cloud-storage-manager-batch-actions .ant-space-item,
+    .cloud-storage-manager-batch-actions .ant-btn {
+        width: 100%;
+    }
+
+    .cloud-storage-manager-modal .ant-card-meta-title {
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+}

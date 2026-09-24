@@ -1,0 +1,579 @@
+{
+  "id": "logistics-planning-v1",
+  "name": "物流运输规划系统流程图",
+  "type": "logistics-planning",
+  "version": "1.0.0",
+  "nodes": [
+    {
+      "id": "atomic-order-pool",
+      "description": "<b>原子订单池</b><br/>销售, 调拨, 退货多种来源<br/><i>GWT/CBM, 时间窗, 温层, 服务等级</i>",
+      "domain": "input-constraints",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "rules-resource-library",
+      "description": "<b>规则与资源库</b><br/>约束条件、策略与资源的管理中心",
+      "domain": "input-constraints",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "capacity-resource-pool",
+      "description": "<b>运力资源池</b><br/>自有/合同/临时车辆, 司机, 线路<br/><i>可用状态、成本模型</i>",
+      "domain": "input-constraints",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "hard-constraints",
+      "description": "<b>硬约束</b><br/>载重, 容积, 法规, 道路限行<br/><i>不可违反的物理与法规限制</i>",
+      "domain": "input-constraints",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "soft-constraints",
+      "description": "<b>软约束</b><br/>成本, 时效, 客户满意度, 负载均衡<br/><i>用于多目标优化的业务偏好</i>",
+      "domain": "input-constraints",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "data-quality-assessment",
+      "description": "<b>数据质量评估</b><br/>完整性, 准确性, 一致性校验<br/><i>识别并标记异常数据</i>",
+      "domain": "data-preprocessing",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "address-service",
+      "description": "<b>地址服务 (LBS)</b><br/>地理编码, 逆地址解析, 电子围栏",
+      "domain": "data-preprocessing",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "distance-eta-engine",
+      "description": "<b>里程与ETA引擎</b><br/>预计算或实时查询点点间距离与时长",
+      "domain": "data-preprocessing",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "order-normalization",
+      "description": "<b>订单标准化</b><br/>字段映射, 单位统一, 异常数据清洗",
+      "domain": "data-preprocessing",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "time-window-standardization",
+      "description": "<b>时间窗归一化</b><br/>统一为标准化格式, 处理跨日/节假日",
+      "domain": "data-preprocessing",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "ai-planning-engine",
+      "description": "<b>AI Planning Engine</b><br/>智能运输规划核心引擎<br/><i>支持多种优化算法</i>",
+      "domain": "ai-planning-core",
+      "domainClass": "mid",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "order-clustering",
+      "description": "<b>1. 订单智能聚类</b><br/>基于时空邻近度、服务等级等维度分组",
+      "domain": "ai-planning-core",
+      "domainClass": "mid",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "multimodal-planning",
+      "description": "<b>2. 多式联运规划</b><br/>结合空/海/陆运进行路径选择<br/><i>成本与时效权衡</i>",
+      "domain": "ai-planning-core",
+      "domainClass": "mid",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "vrp-solver",
+      "description": "<b>3. 车辆路径规划 (VRP)</b><br/>经典VRP, VRPTW, CVRPTW等变种求解器",
+      "domain": "ai-planning-core",
+      "domainClass": "mid",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "capacity-matching",
+      "description": "<b>4. 运力智能匹配</b><br/>匹配最佳承运商/车辆/司机组合",
+      "domain": "ai-planning-core",
+      "domainClass": "mid",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "cost-optimization",
+      "description": "<b>5. 成本与时效优化</b><br/>多目标权衡, 动态调价, 负载均衡",
+      "domain": "ai-planning-core",
+      "domainClass": "mid",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "feasibility-assessment",
+      "description": "<b>6. 方案可行性评估</b><br/>全方位验证方案的合理性与风险",
+      "domain": "ai-planning-core",
+      "domainClass": "mid",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "dispatch-workbench",
+      "description": "<b>调度工作台 (GIS)</b><br/>在地图上可视化展示系统推荐方案",
+      "domain": "human-machine-collaboration",
+      "domainClass": "ch",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "scenario-comparison",
+      "description": "<b>方案对比与打分</b><br/>多方案KPI对比, 差异分析, 优劣评估",
+      "domain": "human-machine-collaboration",
+      "domainClass": "ch",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "what-if-simulation",
+      "description": "<b>假设分析 (What-if)</b><br/>通过调整约束与参数进行仿真推演",
+      "domain": "human-machine-collaboration",
+      "domainClass": "ch",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "manual-review",
+      "description": "<b>人工审核与调整</b><br/>合并/拆分/换车/调整路径? <i>保留专家经验</i>",
+      "domain": "human-machine-collaboration",
+      "domainClass": "ch",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "real-time-monitoring-alerting",
+      "description": "<b>实时监控与告警</b><br/>跟踪在途车辆, 异常事件告警<br/><i>ETA动态更新</i>",
+      "domain": "human-machine-collaboration",
+      "domainClass": "ch",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "lock-publish-plan",
+      "description": "<b>锁定并发布方案</b><br/>确认最终执行计划, 防止变更",
+      "domain": "human-machine-collaboration",
+      "domainClass": "ch",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "publish-plan",
+      "description": "<b>发布执行计划</b><br/>冻结计划版本, 通知所有相关方",
+      "domain": "final-output",
+      "domainClass": "be-logistics",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "generate-waybill",
+      "description": "<b>生成正式运单</b><br/>唯一ID, 详细路径, 精准ETA, 关联订单, 预估费用",
+      "domain": "final-output",
+      "domainClass": "be-logistics",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "cost-allocation-billing",
+      "description": "<b>成本分摊与计费</b><br/>按订单/部门/客户分摊运输成本<br/><i>生成计费依据</i>",
+      "domain": "final-output",
+      "domainClass": "be-logistics",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "export-to-tms",
+      "description": "<b>推送至TMS/WMS</b><br/>计划下发, 执行状态双向同步",
+      "domain": "final-output",
+      "domainClass": "be-logistics",
+      "type": "custom",
+      "zIndex": 1
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1",
+      "source": "atomic-order-pool",
+      "target": "order-normalization",
+      "type": "main",
+      "label": "原始订单",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-2",
+      "source": "rules-resource-library",
+      "target": "hard-constraints",
+      "type": "data",
+      "label": "物理/法规约束",
+      "zIndex": 10
+    },
+    {
+      "id": "edge-3",
+      "source": "rules-resource-library",
+      "target": "soft-constraints",
+      "type": "data",
+      "label": "业务偏好",
+      "zIndex": 10
+    },
+    {
+      "id": "edge-4",
+      "source": "capacity-resource-pool",
+      "target": "capacity-matching",
+      "type": "dependency",
+      "label": "可用运力",
+      "zIndex": 5
+    },
+    {
+      "id": "edge-5",
+      "source": "atomic-order-pool",
+      "target": "data-quality-assessment",
+      "type": "main",
+      "label": "待评估数据",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-6",
+      "source": "data-quality-assessment",
+      "target": "address-service",
+      "type": "main",
+      "label": "地址数据",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-7",
+      "source": "data-quality-assessment",
+      "target": "order-normalization",
+      "type": "main",
+      "label": "质量合格数据",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-8",
+      "source": "order-normalization",
+      "target": "time-window-standardization",
+      "type": "main",
+      "label": "标准化订单",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-9",
+      "source": "address-service",
+      "target": "distance-eta-engine",
+      "type": "main",
+      "label": "地理位置",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-10",
+      "source": "distance-eta-engine",
+      "target": "ai-planning-engine",
+      "type": "main",
+      "label": "里程/ETA",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-11",
+      "source": "order-normalization",
+      "target": "ai-planning-engine",
+      "type": "main",
+      "label": "洁净订单",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-12",
+      "source": "time-window-standardization",
+      "target": "ai-planning-engine",
+      "type": "main",
+      "label": "标准时间窗",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-13",
+      "source": "hard-constraints",
+      "target": "ai-planning-engine",
+      "type": "dependency",
+      "label": "硬约束",
+      "zIndex": 5
+    },
+    {
+      "id": "edge-14",
+      "source": "soft-constraints",
+      "target": "ai-planning-engine",
+      "type": "dependency",
+      "label": "软约束",
+      "zIndex": 5
+    },
+    {
+      "id": "edge-15",
+      "source": "ai-planning-engine",
+      "target": "order-clustering",
+      "type": "main",
+      "label": "启动规划",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-16",
+      "source": "order-clustering",
+      "target": "multimodal-planning",
+      "type": "main",
+      "label": "订单簇",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-17",
+      "source": "multimodal-planning",
+      "target": "vrp-solver",
+      "type": "main",
+      "label": "运输模式",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-18",
+      "source": "vrp-solver",
+      "target": "capacity-matching",
+      "type": "main",
+      "label": "初步路径",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-19",
+      "source": "capacity-matching",
+      "target": "cost-optimization",
+      "type": "main",
+      "label": "匹配运力",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-20",
+      "source": "cost-optimization",
+      "target": "feasibility-assessment",
+      "type": "main",
+      "label": "优化成本",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-21",
+      "source": "feasibility-assessment",
+      "target": "dispatch-workbench",
+      "type": "main",
+      "label": "方案可行",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-22",
+      "source": "feasibility-assessment",
+      "target": "order-clustering",
+      "type": "反馈",
+      "label": "重新迭代",
+      "zIndex": 5
+    },
+    {
+      "id": "edge-23",
+      "source": "dispatch-workbench",
+      "target": "scenario-comparison",
+      "type": "main",
+      "label": "推荐方案",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-24",
+      "source": "dispatch-workbench",
+      "target": "what-if-simulation",
+      "type": "main",
+      "label": "仿真参数",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-25",
+      "source": "scenario-comparison",
+      "target": "manual-review",
+      "type": "main",
+      "label": "对比结果",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-26",
+      "source": "what-if-simulation",
+      "target": "manual-review",
+      "type": "main",
+      "label": "仿真结果",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-27",
+      "source": "manual-review",
+      "target": "lock-publish-plan",
+      "type": "main",
+      "label": "人工调整",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-28",
+      "source": "dispatch-workbench",
+      "target": "real-time-monitoring-alerting",
+      "type": "dependency",
+      "label": "在途监控",
+      "zIndex": 5
+    },
+    {
+      "id": "edge-29",
+      "source": "lock-publish-plan",
+      "target": "publish-plan",
+      "type": "main",
+      "label": "锁定计划",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-30",
+      "source": "publish-plan",
+      "target": "generate-waybill",
+      "type": "main",
+      "label": "发布计划",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-31",
+      "source": "generate-waybill",
+      "target": "cost-allocation-billing",
+      "type": "main",
+      "label": "正式运单",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-32",
+      "source": "cost-allocation-billing",
+      "target": "export-to-tms",
+      "type": "main",
+      "label": "计费数据",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-33",
+      "source": "real-time-monitoring-alerting",
+      "target": "export-to-tms",
+      "type": "feedback",
+      "label": "状态同步",
+      "zIndex": 5
+    }
+  ],
+  "layout": {
+    "direction": "TB",
+    "autoDirection": true,
+    "spacing": {
+      "horizontal": 50,
+      "vertical": 80
+    },
+    "padding": {
+      "horizontal": 20,
+      "vertical": 14
+    },
+    "constraints": {
+      "minWidth": 140,
+      "minHeight": 80
+    },
+    "generateDomainGroups": true,
+    "generateSubDomainGroups": true,
+    "groupPadding": 36
+  },
+  "theme": {
+    "name": "logistics-planning",
+    "displayName": "物流规划主题",
+    "domains": {
+      "input-constraints": {
+        "border": "#FF5722",
+        "main": "#FF5722",
+        "light": "#FFEBEE",
+        "text": "#333333",
+        "background": "#ffffff"
+      },
+      "data-preprocessing": {
+        "border": "#2196F3",
+        "main": "#2196F3",
+        "light": "#E3F2FD",
+        "text": "#333333",
+        "background": "#ffffff"
+      },
+      "ai-planning-core": {
+        "border": "#4CAF50",
+        "main": "#4CAF50",
+        "light": "#E8F5E8",
+        "text": "#333333",
+        "background": "#ffffff"
+      },
+      "human-machine-collaboration": {
+        "border": "#FF9800",
+        "main": "#FF9800",
+        "light": "#FFF3E0",
+        "text": "#333333",
+        "background": "#ffffff"
+      },
+      "final-output": {
+        "border": "#9C27B0",
+        "main": "#9C27B0",
+        "light": "#F3E5F5",
+        "text": "#333333",
+        "background": "#ffffff"
+      }
+    },
+    "isCustom": false
+  },
+  "config": {
+    "NODE_WIDTH": 140,
+    "NODE_HEIGHT": 80,
+    "NODE_PADDING": {
+      "horizontal": 20,
+      "vertical": 14
+    },
+    "SPACING": {
+      "H": 50,
+      "V": 80
+    },
+    "Z_EDGE": {
+      "MAIN": 20,
+      "FEEDBACK": 5,
+      "DEPENDENCY": 5,
+      "DATA": 10
+    }
+  },
+  "metadata": {
+    "title": "物流运输规划系统流程图",
+    "description": "物流运输规划系统流程图，展示了从订单输入到执行计划输出的完整智能规划流程",
+    "author": "Logistics Planning Team",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-01T00:00:00.000Z",
+    "tags": [
+      "计划"
+    ]
+  }
+}

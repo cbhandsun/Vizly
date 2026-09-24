@@ -1,0 +1,427 @@
+{
+  "metadata": {
+    "title": "供应链到货预约与收货流程图",
+    "description": "展示从供应商预约到仓库收货、质检、暂存与上架的端到端流程",
+    "author": "Logistics Team",
+    "tags": [
+      "仓储"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "supplier-portal-login",
+      "domain": "supplier",
+      "domainClass": "ch",
+      "subDomain": "预约门户",
+      "type": "actor",
+      "role": "external_actor",
+      "description": "<b>供应商预约门户登录</b><br/>• 账号认证与权限校验<br/>• 支持多租户/多语言<br/>• 安全会话与入口管理"
+    },
+    {
+      "id": "supplier-create-asn",
+      "domain": "supplier",
+      "domainClass": "ch",
+      "subDomain": "预约门户",
+      "type": "process",
+      "role": "task",
+      "details": "供应商填写入库货物的详细信息，即预先发货通知 (Advanced Shipping Notice)。",
+      "description": "<b>创建/上传 ASN</b><br/>• 录入货品/数量/批次<br/>• 模板/CSV 导入支持<br/>• 自动校验必填项与格式"
+    },
+    {
+      "id": "supplier-submit-appointment",
+      "domain": "supplier",
+      "domainClass": "ch",
+      "subDomain": "预约门户",
+      "type": "process",
+      "role": "task",
+      "details": "选择期望的到货时间窗口，并提交预约。",
+      "description": "<b>提交预约申请</b><br/>• 选择时间窗口与月台需求<br/>• 指定车辆与载具信息<br/>• 提交后生成预约号"
+    },
+    {
+      "id": "supplier-receive-confirmation",
+      "domain": "supplier",
+      "domainClass": "ch",
+      "subDomain": "预约门户",
+      "type": "notification",
+      "role": "status",
+      "details": "系统通过邮件或门户通知供应商预约结果。",
+      "description": "<b>接收预约确认/驳回</b><br/>• 邮件/门户消息通知<br/>• 提供改约与取消入口<br/>• 同步预约状态与原因"
+    },
+    {
+      "id": "wms-receive-request",
+      "domain": "wms",
+      "domainClass": "be-scm",
+      "subDomain": "预约管理",
+      "type": "system",
+      "role": "entry_point",
+      "metadata": {
+        "subDomain": "预约管理"
+      },
+      "description": "<b>接收预约请求</b><br/>• 入站消息与单据创建<br/>• 记录预约主数据<br/>• 触发校验与排程流程"
+    },
+    {
+      "id": "wms-validate-asn",
+      "domain": "wms",
+      "domainClass": "be-scm",
+      "subDomain": "预约管理",
+      "type": "process",
+      "role": "validation",
+      "details": "检查ASN的完整性、准确性，例如SKU是否存在、数量是否合规。",
+      "metadata": {
+        "subDomain": "预约管理"
+      },
+      "description": "<b>校验 ASN 数据</b><br/>• 主数据一致性校验<br/>• SKU/数量/计量单位检查<br/>• 禁运/业务规则审核"
+    },
+    {
+      "id": "wms-check-capacity",
+      "domain": "wms",
+      "domainClass": "be-scm",
+      "subDomain": "预约管理",
+      "type": "process",
+      "role": "decision",
+      "details": "根据请求的时间，评估月台、人力和存储空间的可用性。",
+      "metadata": {
+        "subDomain": "预约管理"
+      },
+      "description": "<b>检查仓库容量与资源</b><br/>• 月台/人力/库位评估<br/>• 高峰负载与拥堵预测<br/>• 资源约束判断"
+    },
+    {
+      "id": "wms-allocate-resources",
+      "domain": "wms",
+      "domainClass": "be-scm",
+      "subDomain": "预约管理",
+      "type": "process",
+      "role": "scheduling",
+      "metadata": {
+        "subDomain": "预约管理"
+      },
+      "description": "<b>分配月台与时间窗口</b><br/>• 自动/人工调度策略<br/>• 避冲突与拥堵约束<br/>• 输出作业计划与指令"
+    },
+    {
+      "id": "wms-confirm-appointment",
+      "domain": "wms",
+      "domainClass": "be-scm",
+      "subDomain": "预约管理",
+      "type": "system",
+      "role": "exit_point",
+      "metadata": {
+        "subDomain": "预约管理"
+      },
+      "description": "<b>确认/驳回预约</b><br/>• 返回预约结果与原因<br/>• 生成入场凭证/二维码<br/>• 支持改约与取消"
+    },
+    {
+      "id": "tms-sync-appointment",
+      "domain": "场地管理",
+      "domainClass": "be-logistics",
+      "subDomain": "运输协同",
+      "type": "system",
+      "role": "data_sync",
+      "details": "WMS确认预约后，信息同步至TMS，用于运输计划和在途跟踪。",
+      "description": "<b>同步预约信息</b><br/>• 推送至 TMS 系统<br/>• 关联运输计划与派车<br/>• 预置在途跟踪数据"
+    },
+    {
+      "id": "gate-vehicle-arrival",
+      "domain": "场地管理",
+      "domainClass": "be-logistics",
+      "subDomain": "车辆入场",
+      "type": "actor",
+      "role": "task",
+      "metadata": {
+        "subDomain": "车辆入场"
+      },
+      "description": "<b>司机到达，门岗登记</b><br/>• 验证车牌与预约号<br/>• 证件/安全检查<br/>• 生成入场记录"
+    },
+    {
+      "id": "gate-verify-appointment",
+      "domain": "场地管理",
+      "domainClass": "be-logistics",
+      "subDomain": "车辆入场",
+      "type": "process",
+      "role": "validation",
+      "details": "门卫通过车牌号或预约号在系统中核实预约。",
+      "metadata": {
+        "subDomain": "车辆入场"
+      },
+      "description": "<b>核实预约信息</b><br/>• ASN/预约数据匹配<br/>• 时间窗口核验<br/>• 异常流程触发"
+    },
+    {
+      "id": "gate-assign-dock",
+      "domain": "场地管理",
+      "domainClass": "be-logistics",
+      "subDomain": "车辆入场",
+      "type": "process",
+      "role": "guidance",
+      "metadata": {
+        "subDomain": "车辆入场"
+      },
+      "description": "<b>指引车辆至指定月台</b><br/>• 分配月台编号<br/>• 路线与等待区指引<br/>• 安全注意事项说明"
+    },
+    {
+      "id": "dock-vehicle-docking",
+      "domain": "场地管理",
+      "domainClass": "be-logistics",
+      "subDomain": "月台作业",
+      "type": "process",
+      "role": "physical_movement",
+      "description": "<b>车辆停靠月台</b><br/>• 靠台定位与防护<br/>• 卸货准备检查<br/>• 记录到达与开始时间"
+    },
+    {
+      "id": "dock-unload-goods",
+      "domain": "场地管理",
+      "domainClass": "be-logistics",
+      "subDomain": "月台作业",
+      "type": "process",
+      "role": "physical_task",
+      "description": "<b>卸货并初步清点</b><br/>• 卸货/分拣作业<br/>• 件数/托数核对<br/>• 异常短缺记录"
+    },
+    {
+      "id": "dock-scan-and-qc",
+      "domain": "场地管理",
+      "domainClass": "be-logistics",
+      "subDomain": "月台作业",
+      "type": "process",
+      "role": "task",
+      "details": "使用RF设备扫描商品条码，系统记录收货；同时进行质量抽检。",
+      "description": "<b>扫描收货与质检</b><br/>• 条码/批次扫描记录<br/>• 质量抽检与拍照留存<br/>• 自动生成收货数据"
+    },
+    {
+      "id": "wms-update-grn",
+      "domain": "仓库管理",
+      "domainClass": "be-scm",
+      "subDomain": "收货暂存",
+      "type": "system",
+      "role": "data_update",
+      "details": "Goods Received Note，收货通知单。",
+      "description": "<b>WMS 更新收货记录 (GRN)</b><br/>• 生成 GRN 单据<br/>• 关联 ASN/预约信息<br/>• 状态变更为已收"
+    },
+    {
+      "id": "staging-move-goods",
+      "domain": "仓库管理",
+      "domainClass": "be-scm",
+      "subDomain": "收货暂存",
+      "type": "process",
+      "role": "physical_movement",
+      "description": "<b>货物移至暂存区</b><br/>• 按策略移位至暂存<br/>• 建立暂存标识<br/>• 等待上架处理"
+    },
+    {
+      "id": "staging-sort-and-label",
+      "domain": "仓库管理",
+      "domainClass": "be-scm",
+      "subDomain": "收货暂存",
+      "type": "process",
+      "role": "task",
+      "details": "根据上架策略对货物进行分类，并打印上架标签。",
+      "description": "<b>分类、贴标</b><br/>• 按上架策略分类<br/>• 打印并粘贴标签<br/>• 异常标识与预处理"
+    },
+    {
+      "id": "wms-generate-putaway-task",
+      "domain": "仓库管理",
+      "domainClass": "be-scm",
+      "subDomain": "库存上架",
+      "type": "system",
+      "role": "task_generation",
+      "description": "<b>WMS 生成上架任务</b><br/>• 库位分配计算<br/>• 任务拆分与派发<br/>• 与 RF 设备协同"
+    },
+    {
+      "id": "inventory-putaway-execution",
+      "domain": "仓库管理",
+      "domainClass": "be-scm",
+      "subDomain": "库存上架",
+      "type": "process",
+      "role": "physical_task",
+      "details": "叉车司机根据RF指令将货物运送到指定库位。",
+      "description": "<b>执行上架</b><br/>• 按 RF 指令作业<br/>• 托盘/库位扫描<br/>• 到位确认"
+    },
+    {
+      "id": "wms-confirm-putaway",
+      "domain": "仓库管理",
+      "domainClass": "be-scm",
+      "subDomain": "库存上架",
+      "type": "system",
+      "role": "data_update",
+      "description": "<b>WMS 确认上架完成</b><br/>• 更新任务与库存状态<br/>• 写入库存变更事件<br/>• 触发后续流程"
+    },
+    {
+      "id": "inventory-update-stock",
+      "domain": "仓库管理",
+      "domainClass": "be-scm",
+      "subDomain": "库存上架",
+      "type": "database",
+      "role": "final_state",
+      "details": "货物进入可销售或可用库存。",
+      "description": "<b>库存状态更新</b><br/>• 可售/可用状态变更<br/>• 批次/序列记录维护<br/>• 支持库存事件与追踪"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "supplier-portal-login",
+      "target": "supplier-create-asn",
+      "type": "main"
+    },
+    {
+      "id": "e2",
+      "source": "supplier-create-asn",
+      "target": "supplier-submit-appointment",
+      "type": "main"
+    },
+    {
+      "id": "e3",
+      "source": "supplier-submit-appointment",
+      "target": "wms-receive-request",
+      "label": "预约数据",
+      "type": "data"
+    },
+    {
+      "id": "e4",
+      "source": "wms-receive-request",
+      "target": "wms-validate-asn",
+      "type": "main"
+    },
+    {
+      "id": "e5",
+      "source": "wms-validate-asn",
+      "target": "wms-check-capacity",
+      "label": "数据有效",
+      "type": "main"
+    },
+    {
+      "id": "e6",
+      "source": "wms-validate-asn",
+      "target": "wms-confirm-appointment",
+      "label": "数据无效",
+      "type": "main"
+    },
+    {
+      "id": "e7",
+      "source": "wms-check-capacity",
+      "target": "wms-allocate-resources",
+      "label": "资源充足",
+      "type": "main"
+    },
+    {
+      "id": "e8",
+      "source": "wms-check-capacity",
+      "target": "wms-confirm-appointment",
+      "label": "资源不足",
+      "type": "main"
+    },
+    {
+      "id": "e9",
+      "source": "wms-allocate-resources",
+      "target": "wms-confirm-appointment",
+      "type": "main"
+    },
+    {
+      "id": "e10",
+      "source": "wms-confirm-appointment",
+      "target": "supplier-receive-confirmation",
+      "label": "确认/驳回",
+      "type": "data"
+    },
+    {
+      "id": "e11",
+      "source": "wms-confirm-appointment",
+      "target": "tms-sync-appointment",
+      "label": "同步预约",
+      "type": "dependency"
+    },
+    {
+      "id": "e13",
+      "source": "gate-vehicle-arrival",
+      "target": "gate-verify-appointment",
+      "type": "main"
+    },
+    {
+      "id": "e14",
+      "source": "gate-verify-appointment",
+      "target": "gate-assign-dock",
+      "label": "核实成功",
+      "type": "main"
+    },
+    {
+      "id": "e15",
+      "source": "gate-assign-dock",
+      "target": "dock-vehicle-docking",
+      "type": "main"
+    },
+    {
+      "id": "e16",
+      "source": "dock-vehicle-docking",
+      "target": "dock-unload-goods",
+      "type": "main"
+    },
+    {
+      "id": "e17",
+      "source": "dock-unload-goods",
+      "target": "dock-scan-and-qc",
+      "type": "main"
+    },
+    {
+      "id": "e18",
+      "source": "dock-scan-and-qc",
+      "target": "wms-update-grn",
+      "label": "收货数据",
+      "type": "data"
+    },
+    {
+      "id": "e19",
+      "source": "wms-update-grn",
+      "target": "staging-move-goods",
+      "type": "main"
+    },
+    {
+      "id": "e20",
+      "source": "staging-move-goods",
+      "target": "staging-sort-and-label",
+      "type": "main"
+    },
+    {
+      "id": "e21",
+      "source": "staging-sort-and-label",
+      "target": "wms-generate-putaway-task",
+      "type": "dependency"
+    },
+    {
+      "id": "e22",
+      "source": "wms-generate-putaway-task",
+      "target": "inventory-putaway-execution",
+      "label": "上架任务",
+      "type": "main"
+    },
+    {
+      "id": "e23",
+      "source": "inventory-putaway-execution",
+      "target": "wms-confirm-putaway",
+      "label": "完成确认",
+      "type": "data"
+    },
+    {
+      "id": "e24",
+      "source": "wms-confirm-putaway",
+      "target": "inventory-update-stock",
+      "type": "main"
+    },
+    {
+      "id": "e25",
+      "source": "tms-sync-appointment",
+      "target": "gate-vehicle-arrival",
+      "label": "运输协同→到场",
+      "type": "dependency"
+    }
+  ],
+  "layout": {
+    "spacing": {
+      "horizontal": 200,
+      "vertical": 150
+    },
+    "padding": {
+      "horizontal": 24,
+      "vertical": 16
+    },
+    "groupPadding": 50,
+    "generateDomainGroups": true,
+    "fitDomainContent": true,
+    "generateSubDomainGroups": true
+  }
+}

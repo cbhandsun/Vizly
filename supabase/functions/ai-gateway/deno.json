@@ -1,0 +1,13 @@
+{
+  "imports": {
+    "ai": "npm:ai@7.0.107",
+    "@ai-sdk/openai-compatible": "npm:@ai-sdk/openai-compatible@3.0.53",
+    "@ai-sdk/openai": "npm:@ai-sdk/openai@4.0.71",
+    "@ai-sdk/anthropic": "npm:@ai-sdk/anthropic@4.0.58",
+    "@ai-sdk/google": "npm:@ai-sdk/google@4.0.76",
+    "@supabase/server": "npm:@supabase/server@1.7.0",
+    "@supabase/server/core": "npm:@supabase/server@1.7.0/core",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.111.0",
+    "zod": "npm:zod@4.3.6"
+  }
+}

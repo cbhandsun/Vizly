@@ -1,0 +1,38 @@
+.auth-account-menu-trigger {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    min-height: 32px;
+    padding: 4px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.auth-account-menu-trigger:hover,
+.auth-account-menu-trigger[aria-expanded='true'] {
+    background: color-mix(in srgb, var(--vz-brand-from, #6366f1) 10%, transparent);
+}
+
+.auth-account-menu-trigger:focus-visible {
+    outline: 2px solid var(--vz-brand-from, #6366f1);
+    outline-offset: 2px;
+}
+
+.auth-account-menu-trigger--commercial {
+    width: var(--commercial-touch-target, 44px);
+    min-width: var(--commercial-touch-target, 44px);
+    height: var(--commercial-touch-target, 44px);
+    min-height: var(--commercial-touch-target, 44px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .auth-account-menu-trigger {
+        transition: none;
+    }
+}

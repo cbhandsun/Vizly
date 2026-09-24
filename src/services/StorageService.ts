@@ -1,0 +1,404 @@
+import { createS3FetchClient, type S3FetchClient } from './s3FetchClient';
+import { IStorageProvider, DiagramMetadata, SavedDiagram } from './storage/types';
+import {
+    coerceS3StorageConfig,
+    coercePersistedS3StorageConfigDraft,
+    hasPersistedS3SecretField,
+    redactSensitiveValue,
+    type ValidatedS3StorageConfig,
+} from './storageSecurity';
+import { parseRemoteDiagramJson } from './remoteDiagramContent';
+import { safeLog } from '@vizly/core/logging';
+import { redactSensitiveLogValue } from '@vizly/core/logging';
+import { logUiStorageReadFailure, logUiStorageWriteFailure } from '@vizly/core/logging';
+import { safeJsonParseWithLimit } from '@vizly/core/input';
+
+export type StorageConfig = ValidatedS3StorageConfig;
+
+export interface StorageItem {
+    key: string;
+    lastModified?: Date;
+    size?: number;
+    data?: unknown;
+}
+
+const STORAGE_CONFIG_KEY = 'diagram_storage_config';
+const STORAGE_SECRET_SESSION_KEY = `${STORAGE_CONFIG_KEY}_secret`;
+const MAX_S3_STORAGE_CONFIG_JSON_CHARS = 2 * 1024 * 1024;
+
+const stripSecret = (config: StorageConfig): StorageConfig => ({
+    ...config,
+    secretAccessKey: '',
+});
+
+
+export class S3StorageProvider implements IStorageProvider {
+    name = 'S3 Compatible Storage';
+    id = 's3' as const;
+
+    private static instance: S3StorageProvider;
+    private client: S3FetchClient | null = null;
+    private config: StorageConfig | null = null;
+    private persistedConfigDraft: StorageConfig | null = null;
+
+    private constructor() {
+        this.loadConfig();
+    }
+
+    static getInstance(): S3StorageProvider {
+        if (!S3StorageProvider.instance) {
+            S3StorageProvider.instance = new S3StorageProvider();
+        }
+        return S3StorageProvider.instance;
+    }
+
+    // === Configuration ===
+
+    isConfigured(): boolean {
+        return !!this.client && !!this.config;
+    }
+
+    private readPersistedConfig(): string | null {
+        try {
+            return localStorage.getItem(STORAGE_CONFIG_KEY);
+        } catch (error) {
+            logUiStorageReadFailure('S3StorageProvider.loadConfig', STORAGE_CONFIG_KEY, error);
+            throw error;
+        }
+    }
+
+    private readPersistedSessionSecret(): string {
+        try {
+            return sessionStorage.getItem(STORAGE_SECRET_SESSION_KEY) || '';
+        } catch (error) {
+            logUiStorageReadFailure('S3StorageProvider.readSessionSecret', STORAGE_SECRET_SESSION_KEY, error);
+            return '';
+        }
+    }
+
+    private persistSessionSecret(secretAccessKey: string, source: string): boolean {
+        try {
+            sessionStorage.setItem(STORAGE_SECRET_SESSION_KEY, secretAccessKey);
+            return true;
+        } catch (error) {
+            logUiStorageWriteFailure(source, STORAGE_SECRET_SESSION_KEY, error);
+            return false;
+        }
+    }
+
+    private persistSanitizedConfig(config: StorageConfig, source: string): boolean {
+        try {
+            localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(stripSecret(config)));
+            return true;
+        } catch (error) {
+            logUiStorageWriteFailure(source, STORAGE_CONFIG_KEY, error);
+            return false;
+        }
+    }
+
+    private restoreSessionSecret(secretAccessKey: string, source: string): void {
+        try {
+            if (secretAccessKey) {
+                sessionStorage.setItem(STORAGE_SECRET_SESSION_KEY, secretAccessKey);
+            } else {
+                sessionStorage.removeItem(STORAGE_SECRET_SESSION_KEY);
+            }
+        } catch (error) {
+            logUiStorageWriteFailure(source, STORAGE_SECRET_SESSION_KEY, error);
+        }
+    }
+
+    private restorePersistedValue(
+        storage: Storage,
+        key: string,
+        value: string | null,
+        source: string,
+    ): void {
+        try {
+            if (value === null) {
+                storage.removeItem(key);
+            } else {
+                storage.setItem(key, value);
+            }
+        } catch (error) {
+            logUiStorageWriteFailure(source, key, error);
+        }
+    }
+
+    private clearPersistedConfig(): void {
+        try {
+            localStorage.removeItem(STORAGE_CONFIG_KEY);
+        } catch (error) {
+            logUiStorageWriteFailure('S3StorageProvider.clearPersistedConfig', STORAGE_CONFIG_KEY, error);
+        }
+
+        try {
+            sessionStorage.removeItem(STORAGE_SECRET_SESSION_KEY);
+        } catch (error) {
+            logUiStorageWriteFailure('S3StorageProvider.clearPersistedConfig', STORAGE_SECRET_SESSION_KEY, error);
+        }
+    }
+
+    private clearCachedSessionSecret(): void {
+        try {
+            sessionStorage.removeItem(STORAGE_SECRET_SESSION_KEY);
+        } catch (error) {
+            logUiStorageWriteFailure('S3StorageProvider.clearPersistedConfig', STORAGE_SECRET_SESSION_KEY, error);
+        }
+    }
+
+    private loadConfig() {
+        try {
+            const stored = this.readPersistedConfig();
+            if (stored) {
+                let readFailure: unknown = null;
+                const parsed = safeJsonParseWithLimit<unknown>(stored, null, {
+                    maxLength: MAX_S3_STORAGE_CONFIG_JSON_CHARS,
+                    onFailure: (error) => {
+                        readFailure = error;
+                        logUiStorageReadFailure('S3StorageProvider.loadConfig', STORAGE_CONFIG_KEY, error);
+                    },
+                    buildOversizeError: () => new Error('S3 storage config JSON is too large.'),
+                });
+                if (!parsed) {
+                    this.clearPersistedConfig();
+                    if (readFailure) {
+                        safeLog.error('Failed to load storage config', redactSensitiveLogValue(readFailure));
+                    }
+                    return;
+                }
+                const persistedDraft = coercePersistedS3StorageConfigDraft(parsed);
+                if (!persistedDraft) {
+                    this.clearPersistedConfig();
+                    return;
+                }
+
+                this.persistedConfigDraft = persistedDraft;
+                const sessionSecret = this.readPersistedSessionSecret();
+                const safeConfig = coerceS3StorageConfig(parsed, sessionSecret);
+                if (!safeConfig) {
+                    this.clearCachedSessionSecret();
+                    return;
+                }
+
+                if (safeConfig.secretAccessKey && !sessionSecret) {
+                    this.persistSessionSecret(safeConfig.secretAccessKey, 'S3StorageProvider.loadConfig');
+                }
+
+                this.config = safeConfig;
+                if (hasPersistedS3SecretField(parsed)) {
+                    this.persistSanitizedConfig(safeConfig, 'S3StorageProvider.loadConfig');
+                }
+                this.initializeClient();
+            }
+        } catch (e) {
+            logUiStorageReadFailure('S3StorageProvider.loadConfig', STORAGE_CONFIG_KEY, e);
+            this.clearPersistedConfig();
+            safeLog.error('Failed to load storage config', redactSensitiveLogValue(e));
+        }
+    }
+
+    saveConfig(config: StorageConfig) {
+        const existingSecret = this.readPersistedSessionSecret();
+        const safeConfig = coerceS3StorageConfig(config, config.secretAccessKey || existingSecret);
+        if (!safeConfig) {
+            throw new Error('S3 configuration is invalid. Endpoint must use HTTPS or local HTTP, and bucket, region, access key, and secret are required.');
+        }
+
+        if (!this.persistSessionSecret(safeConfig.secretAccessKey, 'S3StorageProvider.saveConfig')) {
+            throw new Error('Unable to save S3 configuration in browser session storage.');
+        }
+        if (!this.persistSanitizedConfig(safeConfig, 'S3StorageProvider.saveConfig')) {
+            this.restoreSessionSecret(existingSecret, 'S3StorageProvider.saveConfig.rollback');
+            throw new Error('Unable to save S3 configuration in browser local storage.');
+        }
+
+        this.config = safeConfig;
+        this.persistedConfigDraft = stripSecret(safeConfig);
+        this.initializeClient();
+    }
+
+    clearConfig(): void {
+        let persistedConfig: string | null;
+        let persistedSecret: string | null;
+
+        try {
+            persistedConfig = localStorage.getItem(STORAGE_CONFIG_KEY);
+            persistedSecret = sessionStorage.getItem(STORAGE_SECRET_SESSION_KEY);
+        } catch (error) {
+            logUiStorageReadFailure('S3StorageProvider.clearConfig', STORAGE_CONFIG_KEY, error);
+            throw new Error('Unable to read the current S3 configuration before clearing it.', { cause: error });
+        }
+
+        let activeKey = STORAGE_CONFIG_KEY;
+        try {
+            localStorage.removeItem(STORAGE_CONFIG_KEY);
+            activeKey = STORAGE_SECRET_SESSION_KEY;
+            sessionStorage.removeItem(STORAGE_SECRET_SESSION_KEY);
+        } catch (error) {
+            logUiStorageWriteFailure('S3StorageProvider.clearConfig', activeKey, error);
+            this.restorePersistedValue(
+                localStorage,
+                STORAGE_CONFIG_KEY,
+                persistedConfig,
+                'S3StorageProvider.clearConfig.rollback',
+            );
+            this.restorePersistedValue(
+                sessionStorage,
+                STORAGE_SECRET_SESSION_KEY,
+                persistedSecret,
+                'S3StorageProvider.clearConfig.rollback',
+            );
+            throw new Error('Unable to clear the S3 configuration from browser storage.', { cause: error });
+        }
+
+        this.client = null;
+        this.config = null;
+        this.persistedConfigDraft = null;
+    }
+
+    getConfig(): StorageConfig | null {
+        return this.config;
+    }
+
+    getPersistedConfigDraft(): StorageConfig | null {
+        return this.persistedConfigDraft;
+    }
+
+    private initializeClient() {
+        if (!this.config) return;
+        if (!this.config.secretAccessKey) {
+            this.client = null;
+            return;
+        }
+
+        this.client = this.createClient(this.config);
+    }
+
+    private createClient(config: StorageConfig): S3FetchClient {
+        return createS3FetchClient(config);
+    }
+
+    // === IStorageProvider Implementation ===
+
+    async listDiagrams(): Promise<DiagramMetadata[]> {
+        if (!this.client || !this.config) {
+            throw new Error("Storage not configured");
+        }
+
+        try {
+            const response = await this.client.listObjects({ prefix: '' });
+
+            return response.contents
+                .filter(item => item.key.endsWith('.json'))
+                .map(item => ({
+                    id: item.key,
+                    title: item.key.replace('.json', ''), // Simple title derivation
+                    updatedAt: item.lastModified || new Date(),
+                    size: item.size
+                }));
+        } catch (error) {
+            safeLog.error('List diagrams failed:', redactSensitiveLogValue(error));
+            throw error;
+        }
+    }
+
+
+    async loadDiagram(id: string): Promise<SavedDiagram> {
+        if (!this.client || !this.config) {
+            throw new Error("Storage not configured");
+        }
+
+        try {
+            const response = await this.client.getObject(id);
+            const str = response.bodyText;
+            const fallbackTitle = id.replace(/\.json$/i, '');
+            const content = parseRemoteDiagramJson(str, { id, title: fallbackTitle });
+
+            // Adapt to SavedDiagram
+            // Use metadata from content if available, else standard fallback
+            return {
+                id: id,
+                title: content.metadata?.title || content.name || fallbackTitle,
+                content: content,
+                updated_at: (response.lastModified || new Date()).toISOString(),
+                user_id: 's3-user' // S3 doesn't have inherent user concept here
+            };
+        } catch (error) {
+            safeLog.error('Load diagram failed:', redactSensitiveLogValue(error));
+            throw error;
+        }
+    }
+
+    async saveDiagram(diagram: SavedDiagram): Promise<SavedDiagram> {
+        if (!this.client || !this.config) {
+            throw new Error("Storage not configured");
+        }
+
+        // Ensure filename ends with .json
+        // Use title as filename if ID is not a filename, or just use ID
+        let key = diagram.id;
+        if (!key.endsWith('.json')) {
+            // If ID is a UUID (Supabase style), we might want to store it as such, or use title?
+            // For S3, let's stick to using the ID as the key for consistency.
+            key = `${key}.json`;
+        }
+
+        try {
+            await this.client.putObject(
+                key,
+                JSON.stringify(diagram.content, null, 2), // Storing just content to remain compatible with generic S3 viewers
+                'application/json',
+            );
+
+            return {
+                ...diagram,
+                id: key
+            };
+        } catch (error) {
+            safeLog.error('Save diagram failed:', redactSensitiveLogValue(error));
+            throw error;
+        }
+    }
+
+    async deleteDiagram(id: string): Promise<void> {
+        if (!this.client || !this.config) {
+            throw new Error("Storage not configured");
+        }
+
+        try {
+            await this.client.deleteObject(id);
+        } catch (error) {
+            safeLog.error('Delete diagram failed:', redactSensitiveValue(error));
+            throw error;
+        }
+    }
+
+    // === Operations (Legacy / specific) ===
+
+    async testConnection(config?: StorageConfig, signal?: AbortSignal): Promise<boolean> {
+        const existingSecret = this.readPersistedSessionSecret();
+        const configToTest = config
+            ? coerceS3StorageConfig(config, config.secretAccessKey || existingSecret)
+            : this.config;
+
+        if (!configToTest) {
+            throw new Error('S3 configuration is invalid. Endpoint must use HTTPS or local HTTP, and bucket, region, access key, and secret are required.');
+        }
+
+        const client = config ? this.createClient(configToTest) : this.client;
+        if (!client) {
+            throw new Error("Storage not configured");
+        }
+
+        try {
+            await client.listObjects({ maxKeys: 1, signal });
+            return true;
+        } catch (error) {
+            safeLog.error('S3 Connection Test Failed', redactSensitiveLogValue(error));
+            throw error;
+        }
+    }
+}
+
+export const s3Storage = S3StorageProvider.getInstance();

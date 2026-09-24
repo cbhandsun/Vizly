@@ -1,0 +1,104 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const safeLogState = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  log: vi.fn(),
+}));
+
+vi.mock('@vizly/core/logging', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@vizly/core/logging')>();
+  return {
+    ...actual,
+    safeLog: safeLogState,
+    logUiStorageReadFailure: (source: string, key: string, error: unknown) => {
+      safeLogState.warn(
+        `[${source}] Failed to read "${key}":`,
+        actual.redactSensitiveLogValue(error),
+      );
+    },
+    logUiStorageWriteFailure: (source: string, key: string, error: unknown) => {
+      safeLogState.warn(
+        `[${source}] Failed to write "${key}":`,
+        actual.redactSensitiveLogValue(error),
+      );
+    },
+  };
+});
+
+vi.mock('yjs', () => ({}));
+vi.mock('y-websocket', () => ({
+  WebsocketProvider: class {},
+}));
+vi.mock('@xyflow/react', () => ({
+  useReactFlow: () => ({}),
+}));
+
+import {
+  STORAGE_KEY_COLOR,
+  STORAGE_KEY_NAME,
+  persistCollaboratorIdentity,
+  parseCollaboratorIdentity,
+  readStoredCollaboratorIdentity,
+} from '../YjsProviderHooks';
+
+describe('YjsProviderHooks storage helpers', () => {
+  it('parses and bounds awareness identities', () => {
+    expect(parseCollaboratorIdentity({ name: ' Alice ', color: ' #123456 ' })).toEqual({
+      name: 'Alice',
+      color: '#123456',
+    });
+    expect(parseCollaboratorIdentity({ name: 'a'.repeat(120), color: '#fff' })?.name).toHaveLength(100);
+  });
+
+  it('rejects malformed awareness identities', () => {
+    expect(parseCollaboratorIdentity(null)).toBeUndefined();
+    expect(parseCollaboratorIdentity({ name: 42, color: '#fff' })).toBeUndefined();
+    expect(parseCollaboratorIdentity({ name: 'Alice', color: '' })).toBeUndefined();
+  });
+
+  beforeEach(() => {
+    Object.values(safeLogState).forEach(mock => mock.mockReset());
+    sessionStorage.clear();
+  });
+
+  it('reads stored collaborator identity when both fields exist', () => {
+    sessionStorage.setItem(STORAGE_KEY_NAME, 'Guest 1');
+    sessionStorage.setItem(STORAGE_KEY_COLOR, '#0ea5e9');
+
+    expect(readStoredCollaboratorIdentity()).toEqual({
+      name: 'Guest 1',
+      color: '#0ea5e9',
+    });
+  });
+
+  it('logs and falls back to null when session storage read fails', () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('token=secret-read');
+    });
+
+    expect(readStoredCollaboratorIdentity()).toBeNull();
+    expect(safeLogState.warn).toHaveBeenCalledWith(
+      '[YjsProviderHooks.readStoredCollaboratorIdentity] Failed to read "vizly_collaborator_name":',
+      expect.anything()
+    );
+    expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).toContain('[redacted]');
+    expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).not.toContain('secret-read');
+  });
+
+  it('logs and keeps going when session storage write fails', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('Authorization: Bearer secret-write');
+    });
+
+    expect(() => persistCollaboratorIdentity({ name: 'Guest 2', color: '#10b981' })).not.toThrow();
+    expect(safeLogState.warn).toHaveBeenCalledWith(
+      '[YjsProviderHooks.persistCollaboratorIdentity] Failed to write "vizly_collaborator_name":',
+      expect.anything()
+    );
+    expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).toContain('[redacted]');
+    expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).not.toContain('secret-write');
+  });
+});

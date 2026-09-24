@@ -1,0 +1,34 @@
+.startup-recovery {
+  box-sizing: border-box;
+  width: min(38rem, calc(100% - 2rem));
+  margin: 12vh auto;
+  padding: 2rem;
+  color: #172033;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 1rem;
+  font: 1rem/1.6 system-ui, sans-serif;
+}
+
+.startup-recovery h1 { font-size: 1.5rem; }
+.startup-recovery button {
+  margin: 1rem 0;
+  padding: .6rem 1rem;
+  border: 1px solid #3730a3;
+  border-radius: .4rem;
+  color: #fff;
+  background: #4338ca;
+  cursor: pointer;
+}
+.startup-recovery textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  padding: .75rem;
+  color: #172033;
+  background: #f8fafc;
+  border: 1px solid #94a3b8;
+  border-radius: .4rem;
+  font: .8rem/1.5 monospace;
+}
+.startup-recovery :focus-visible { outline: 3px solid #6366f1; outline-offset: 3px; }

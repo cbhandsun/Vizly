@@ -1,0 +1,48 @@
+/// <reference types="vite/client" />
+
+// Vite Worker type declarations
+declare module '*?worker&inline' {
+    const workerConstructor: {
+        new (): Worker;
+    };
+    export default workerConstructor;
+}
+
+declare module '*?worker' {
+    const workerConstructor: {
+        new (): Worker;
+    };
+    export default workerConstructor;
+}
+
+declare module 'virtual:vizly-elk-engine-worker-url' {
+    const workerUrl: string;
+    export default workerUrl;
+}
+
+declare module 'virtual:vizly-pdf-font-url' {
+    const fontUrl: string;
+    export default fontUrl;
+}
+
+declare module 'svg2pdf.js/dist/svg2pdf.es.min.js' {
+    export { svg2pdf } from 'svg2pdf.js';
+}
+
+interface ImportMetaEnv {
+    readonly VITE_SUPABASE_URL: string
+    readonly VITE_SUPABASE_ANON_KEY: string
+    readonly VITE_AI_GATEWAY_MODE?: 'auto' | 'off' | 'required'
+}
+
+interface ImportMeta {
+    readonly env: ImportMetaEnv
+}
+
+interface Window {
+    __currentUserId?: string | null;
+    __vizlyDisplayRoutingDiagnosticsEnabled?: boolean;
+    __flowDesignerOpenCloud?: (
+        data: import('@vizly/core/types').StandardDiagramData,
+    ) => void | Promise<void>;
+}

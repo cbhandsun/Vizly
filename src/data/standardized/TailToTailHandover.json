@@ -1,0 +1,303 @@
+{
+  "metadata": {
+    "title": "水产供应链车尾交接与门店交付全流程（含质检）",
+    "description": "该流程图详细阐述了从订单驱动的运输计划到最终门店交接的完整水产物流作业模式。它强化了来货质检环节，确保只有合格品才能进入后续的车尾交接、在途监控(TMS)、门店收货验收(POD)及信息系统闭环，体现了现代冷链物流对品质与效率的双重精细化管理要求。",
+    "author": "AI Assistant (融合行业解决方案)"
+  },
+  "nodes": [
+    {
+      "id": "entry-order-system",
+      "domain": "外部协同",
+      "domainClass": "ch",
+      "subDomain": "上游协同",
+      "type": "system",
+      "role": "entry_point",
+      "description": "<b>客户订单系统</b><br/>• 汇集门店要货需求<br/>• 指定交付时间窗口"
+    },
+    {
+      "id": "actor-supplier",
+      "domain": "外部协同",
+      "domainClass": "ch",
+      "subDomain": "上游协同",
+      "type": "actor",
+      "role": "external_actor",
+      "description": "<b>供应商</b><br/>• 根据采购订单<br/>• 将水产货物送至物流中心"
+    },
+    {
+      "id": "planning-vrp",
+      "domain": "计划域",
+      "domainClass": "be-scm",
+      "subDomain": "运输计划",
+      "type": "process",
+      "role": "scheduling",
+      "description": "<b>路径与装载规划 (VRP)</b><br/>• <b>输入</b>: 订单、车辆、路况<br/>• <b>输出</b>: 优化的配送路线、<br/>车辆配载计划、预计到场时间(ETA)"
+    },
+    {
+      "id": "op-quality-inspection",
+      "domain": "作业域",
+      "domainClass": "be-logistics",
+      "subDomain": "入场与收货",
+      "type": "process",
+      "role": "validation",
+      "description": "<b>来货质检 (QC)</b><br/>• 温控抽检 (核心指标)<br/>• 外观与新鲜度检验<br/>• 规格与包装核对"
+    },
+    {
+      "id": "op-receiving-dock",
+      "domain": "作业域",
+      "domainClass": "be-logistics",
+      "subDomain": "入场与收货",
+      "type": "process",
+      "role": "physical_task",
+      "description": "<b>车尾收货与分货</b><br/>• 质检合格品直达月台<br/>• 作业人员使用RF设备扫码<br/>• 系统按车校验并收货"
+    },
+    {
+      "id": "system-wms-sort",
+      "domain": "系统域",
+      "domainClass": "be-scm",
+      "subDomain": "系统交互",
+      "type": "system",
+      "role": "task_generation",
+      "description": "<b>WMS生成分播任务</b><br/>• 收货完成，库存与车辆绑定<br/>• 系统生成按门店/站点的分播指令"
+    },
+    {
+      "id": "actor-driver-sort",
+      "domain": "作业域",
+      "domainClass": "be-logistics",
+      "subDomain": "场内作业",
+      "type": "actor",
+      "role": "physical_task",
+      "description": "<b>司机按指令分播</b><br/>• 根据PDA/电子标签指引<br/>• 将商品放置到各门店的集货位"
+    },
+    {
+      "id": "op-loading",
+      "domain": "作业域",
+      "domainClass": "be-logistics",
+      "subDomain": "场内作业",
+      "type": "process",
+      "role": "physical_movement",
+      "description": "<b>商品装载与复核</b><br/>• 将各集货位的商品装车<br/>• 进行二次扫描复核，防止错装"
+    },
+    {
+      "id": "op-dispatch",
+      "domain": "作业域",
+      "domainClass": "be-logistics",
+      "subDomain": "发运离场",
+      "type": "process",
+      "role": "exit_point",
+      "description": "<b>车辆发运</b><br/>• 系统确认装载完成<br/>• 司机领取随货单据，车辆离场"
+    },
+    {
+      "id": "system-tms-tracking",
+      "domain": "系统域",
+      "domainClass": "be-scm",
+      "subDomain": "在途监控",
+      "type": "system",
+      "role": "guidance",
+      "description": "<b>TMS在途监控</b><br/>• 实时GPS定位与温度监控<br/>• 动态更新预计到达时间(ETA)"
+    },
+    {
+      "id": "notification-store-eta",
+      "domain": "系统域",
+      "domainClass": "be-scm",
+      "subDomain": "门店协同",
+      "type": "notification",
+      "role": "guidance",
+      "description": "<b>到货前置通知</b><br/>• 系统自动向门店发送ETA<br/>• 提醒门店准备收货人力与场地"
+    },
+    {
+      "id": "actor-store-staff",
+      "domain": "系统域",
+      "domainClass": "ch",
+      "subDomain": "门店协同",
+      "type": "actor",
+      "role": "external_actor",
+      "description": "<b>门店人员</b><br/>• 接收到货通知<br/>• 准备执行交接与验收"
+    },
+    {
+      "id": "op-unload-handover",
+      "domain": "作业域",
+      "domainClass": "be-logistics",
+      "subDomain": "门店交接",
+      "type": "process",
+      "role": "physical_task",
+      "description": "<b>卸货与实物交接</b><br/>• 司机按单卸货<br/>• 与门店人员共同清点"
+    },
+    {
+      "id": "op-pod-validation",
+      "domain": "作业域",
+      "domainClass": "be-logistics",
+      "subDomain": "门店交接",
+      "type": "process",
+      "role": "validation",
+      "description": "<b>收货验收 (POD)</b><br/>• <b>数量</b>: 清点核对<br/>• <b>质量</b>: 温控、外观检查<br/>• <b>动作</b>: 电子签收或上报异常"
+    },
+    {
+      "id": "system-delivery-confirm",
+      "domain": "系统域",
+      "domainClass": "be-scm",
+      "subDomain": "门店协同",
+      "type": "system",
+      "role": "data_update",
+      "description": "<b>系统确认妥投</b><br/>• POD信息实时回传WMS/TMS<br/>• 订单状态更新为“已送达”"
+    },
+    {
+      "id": "final-store-inventory",
+      "domain": "作业域",
+      "domainClass": "be-logistics",
+      "subDomain": "门店交接",
+      "type": "process",
+      "role": "final_state",
+      "description": "<b>商品入库上架</b><br/>• 货物进入门店后台库存<br/>• 准备前端销售"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-1",
+      "source": "entry-order-system",
+      "target": "planning-vrp",
+      "type": "data",
+      "label": "订单需求"
+    },
+    {
+      "id": "e-2",
+      "source": "planning-vrp",
+      "target": "op-receiving-dock",
+      "type": "dependency",
+      "label": "车辆配载计划"
+    },
+    {
+      "id": "e-3",
+      "source": "actor-supplier",
+      "target": "op-quality-inspection",
+      "type": "main",
+      "label": "货物送达"
+    },
+    {
+      "id": "e-4",
+      "source": "op-quality-inspection",
+      "target": "op-receiving-dock",
+      "type": "main",
+      "label": "质检合格"
+    },
+    {
+      "id": "e-5",
+      "source": "op-receiving-dock",
+      "target": "system-wms-sort",
+      "type": "main",
+      "label": "收货数据上传"
+    },
+    {
+      "id": "e-6",
+      "source": "system-wms-sort",
+      "target": "actor-driver-sort",
+      "type": "dependency",
+      "label": "下发分播指令"
+    },
+    {
+      "id": "e-7",
+      "source": "actor-driver-sort",
+      "target": "op-loading",
+      "type": "main",
+      "label": "分播完成"
+    },
+    {
+      "id": "e-8",
+      "source": "op-loading",
+      "target": "op-dispatch",
+      "type": "main",
+      "label": "装载复核完成"
+    },
+    {
+      "id": "e-9",
+      "source": "op-dispatch",
+      "target": "system-tms-tracking",
+      "type": "main",
+      "label": "开始在途运输"
+    },
+    {
+      "id": "e-10",
+      "source": "system-tms-tracking",
+      "target": "notification-store-eta",
+      "type": "data",
+      "label": "ETA数据"
+    },
+    {
+      "id": "e-11",
+      "source": "notification-store-eta",
+      "target": "actor-store-staff",
+      "type": "dependency",
+      "label": "通知门店"
+    },
+    {
+      "id": "e-12",
+      "source": "system-tms-tracking",
+      "target": "op-unload-handover",
+      "type": "main",
+      "label": "车辆到店"
+    },
+    {
+      "id": "e-13",
+      "source": "op-unload-handover",
+      "target": "op-pod-validation",
+      "type": "main",
+      "label": "提交验收"
+    },
+    {
+      "id": "e-14",
+      "source": "op-pod-validation",
+      "target": "system-delivery-confirm",
+      "type": "data",
+      "label": "回传POD"
+    },
+    {
+      "id": "e-15",
+      "source": "system-delivery-confirm",
+      "target": "final-store-inventory",
+      "type": "main",
+      "label": "确认入库"
+    }
+  ],
+  "layout": {
+    "spacing": {
+      "horizontal": 180,
+      "vertical": 120
+    },
+    "padding": {
+      "horizontal": 30,
+      "vertical": 20
+    },
+    "groupPadding": 40,
+    "generateDomainGroups": true,
+    "fitDomainContent": true,
+    "generateSubDomainGroups": true,
+    "domainOrder": [
+      "外部协同",
+      "计划域",
+      "作业域",
+      "系统域"
+    ],
+    "subDomainOrder": {
+      "作业域": [
+        "入场与收货",
+        "场内作业",
+        "发运离场",
+        "门店交接"
+      ]
+    },
+    "subDomainWhitelist": [
+      "上游协同",
+      "运输计划",
+      "入场与收货",
+      "系统交互",
+      "场内作业",
+      "发运离场",
+      "在途监控",
+      "门店协同",
+      "门店交接"
+    ],
+    "tags": [
+      "仓储",
+      "运输"
+    ]
+  }
+}
