@@ -12,6 +12,7 @@ import {
   Copy,
   Database,
   Ellipsis,
+  ExternalLink,
   Laptop,
   LayoutGrid,
   LoaderCircle,
@@ -233,7 +234,7 @@ export const WorkspaceDiagramCollection = ({
       return [{ key: 'apply_template', label: t('workspace.applyTemplate'), icon: <Copy size={16} strokeWidth={2} /> }];
     }
     const items: MenuProps['items'] = [
-      { key: 'open_new', label: t('workspace.openInNewTab'), icon: <Share2 size={16} strokeWidth={2} /> },
+      { key: 'open_new', label: t('workspace.openInNewTab'), icon: <ExternalLink size={16} strokeWidth={2} /> },
     ];
     if (item.role === 'owner') {
       items.push({ type: 'divider' });
