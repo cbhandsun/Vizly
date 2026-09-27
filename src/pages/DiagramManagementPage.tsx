@@ -306,7 +306,7 @@ const WorkspaceDashboardPage: React.FC = () => {
     const handleDeleteDiagram = (
         e: { stopPropagation: () => void },
         item: UnifiedDiagramItem,
-        returnFocusTarget: HTMLElement | null = document.activeElement instanceof HTMLElement
+        returnFocusTarget: HTMLElement | null = (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement)
             ? document.activeElement
             : null,
     ) => {
