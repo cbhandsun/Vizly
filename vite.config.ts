@@ -1,3 +1,4 @@
+
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { resolve } from 'node:path';
@@ -5,7 +6,10 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  resolve: { alias: { '@': resolve(import.meta.dirname, 'src') } },
+  resolve: {
+    alias: { '@': resolve(import.meta.dirname, 'src') },
+    dedupe: ['yjs', 'react', 'react-dom'],
+  },
   ssr: { noExternal: ['@vizly/core', '@vizly/react', '@vizly/contracts'] },
   worker: { format: 'es' },
   test: {
@@ -15,3 +19,4 @@ export default defineConfig({
     pool: 'threads',
   },
 });
+
