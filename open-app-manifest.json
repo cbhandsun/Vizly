@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "policySha256": "e09de1cb47ee0389b3dc2b1d19b802cb7647f67a0dcca4168d7ae057ec44b9fd",
   "sdkPackages": {
-    "@vizly/contracts": "0.1.0-alpha.0",
-    "@vizly/core": "0.1.0-alpha.0",
-    "@vizly/react": "0.1.0-alpha.0"
+    "@vizly/contracts": "0.1.0-alpha.2",
+    "@vizly/core": "0.1.0-alpha.2",
+    "@vizly/react": "0.1.0-alpha.2"
   },
   "files": [
     {

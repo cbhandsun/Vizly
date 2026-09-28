@@ -1,6 +1,6 @@
 {
   "name": "@vizly/react",
-  "version": "0.1.0-alpha.0",
+  "version": "0.1.0-alpha.2",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -25,8 +25,8 @@
     "pack:check": "npm pack --dry-run"
   },
   "dependencies": {
-    "@vizly/contracts": "0.1.0-alpha.0",
-    "@vizly/core": "0.1.0-alpha.0"
+    "@vizly/contracts": "0.1.0-alpha.2",
+    "@vizly/core": "0.1.0-alpha.2"
   },
   "peerDependencies": {
     "i18next": "^26.3.6",
