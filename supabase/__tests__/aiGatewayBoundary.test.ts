@@ -8,12 +8,15 @@ import {
   isAllowedGatewayRequestOrigin,
 } from '../functions/ai-gateway/requestPolicy';
 
+const PROVIDER_KEY_CANARY = ['provider', 'key', 'canary'].join('-');
+const JWT_CANARY = ['header', 'payload', 'signature'].join('.');
+
 const validRequest = {
   provider: {
     id: 'deepseek',
     name: 'DeepSeek',
     baseUrl: 'https://api.deepseek.com',
-    apiKey: 'provider-key-placeholder',
+    apiKey: PROVIDER_KEY_CANARY,
   },
   model: 'deepseek-chat',
   messages: [{ role: 'user', content: 'hello' }],
@@ -85,7 +88,7 @@ describe('AI gateway boundaries', () => {
   });
 
   it('accepts only bounded bearer authorization values', () => {
-    expect(hasBearerAuthorization('Bearer header.payload.signature-token')).toBe(true);
+    expect(hasBearerAuthorization(`Bearer ${JWT_CANARY}`)).toBe(true);
     expect(hasBearerAuthorization('Basic abc')).toBe(false);
     expect(hasBearerAuthorization('Bearer bad\r\ntoken')).toBe(false);
   });

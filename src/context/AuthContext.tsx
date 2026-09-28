@@ -36,13 +36,15 @@ const getSupabaseAuthStorageKey = () => {
     }
 };
 
+const hasSupabaseAuthHashHint = (hash: string) => {
+    const params = new URLSearchParams(hash.startsWith('#') ? hash.slice(1) : hash);
+    return params.has('access_token') || params.has('refresh_token') || params.get('type') === 'recovery';
+};
+
 const hasSupabaseAuthSessionHint = () => {
     if (!hasSupabaseEnv() || typeof window === 'undefined') return false;
 
-    const hash = getWindowHashString();
-    if (hash.includes('access_token=') || hash.includes('refresh_token=') || hash.includes('type=recovery')) {
-        return true;
-    }
+    if (hasSupabaseAuthHashHint(getWindowHashString())) return true;
 
     try {
         const storageKey = getSupabaseAuthStorageKey();

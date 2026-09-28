@@ -23,6 +23,14 @@ import {
     type AIConfigState,
 } from '../aiConfigStorage';
 
+const LOGGED_IN_API_KEY_CANARY = ['sk', 'live-user', 'canary'].join('-');
+const ANONYMOUS_API_KEY_CANARY = ['sk', 'anonymous', 'canary'].join('-');
+const LEGACY_API_KEY_CANARY = ['legacy', 'api-key', 'canary'].join('-');
+const RUNTIME_API_KEY_CANARY = ['sk', 'runtime', 'canary'].join('-');
+const WRITE_FAILURE_CANARY = ['ai-config', 'write', 'canary'].join('-');
+const SCOPED_READ_FAILURE_CANARY = ['scoped', 'ai-config', 'canary'].join('-');
+const LEGACY_READ_FAILURE_CANARY = ['legacy', 'ai-config', 'canary'].join('-');
+
 const makeConfig = (apiKey: string, systemPrompt = 'private prompt'): AIConfigState => ({
     activeModelKey: 'openai:gpt-4o',
     systemPrompt,
@@ -64,11 +72,11 @@ describe('AI config storage isolation', () => {
     });
 
     it('strips logged-in API keys from localStorage while keeping runtime access', () => {
-        persistAIConfig('user-a', makeConfig('sk-live-user-secret'));
+        persistAIConfig('user-a', makeConfig(LOGGED_IN_API_KEY_CANARY));
 
         const persisted = JSON.parse(localStorage.getItem(`${AI_CONFIG_KEY}_user-a`) || '{}');
         expect(persisted.providers[0].apiKey).toBe('');
-        expect(getAIConfig('user-a').providers[0].apiKey).toBe('sk-live-user-secret');
+        expect(getAIConfig('user-a').providers[0].apiKey).toBe(LOGGED_IN_API_KEY_CANARY);
     });
 
     it('coerces malformed stored providers before returning config', () => {
@@ -111,15 +119,15 @@ describe('AI config storage isolation', () => {
 
     it('normalizes anonymous persisted config while preserving local API keys', () => {
         persistAIConfig(null, {
-            ...makeConfig('sk-anonymous'),
+            ...makeConfig(ANONYMOUS_API_KEY_CANARY),
             providers: [{
-                ...makeConfig('sk-anonymous').providers[0],
+                ...makeConfig(ANONYMOUS_API_KEY_CANARY).providers[0],
                 baseUrl: 'https://api.openai.com/v1/',
             }],
         });
 
         const persisted = JSON.parse(localStorage.getItem(getAIConfigKey()) || '{}');
-        expect(persisted.providers[0].apiKey).toBe('sk-anonymous');
+        expect(persisted.providers[0].apiKey).toBe(ANONYMOUS_API_KEY_CANARY);
         expect(persisted.providers[0].baseUrl).toBe('https://api.openai.com/v1');
     });
 
@@ -135,14 +143,14 @@ describe('AI config storage isolation', () => {
         localStorage.setItem(getAIConfigKey('user-a'), '{broken');
         localStorage.setItem('DiagramView.AIConfig', JSON.stringify({
             baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/',
-            apiKey: 'legacy-secret',
+            apiKey: LEGACY_API_KEY_CANARY,
         }));
 
         const config = getAIConfig('user-a');
         const gemini = config.providers.find(provider => provider.id === 'gemini');
 
         expect(config.activeModelKey).toBe('gemini:gemini-2.0-flash-exp');
-        expect(gemini?.apiKey).toBe('legacy-secret');
+        expect(gemini?.apiKey).toBe(LEGACY_API_KEY_CANARY);
     });
 
     it('ignores malformed or oversized legacy config and returns defaults', () => {
@@ -155,23 +163,23 @@ describe('AI config storage isolation', () => {
 
     it('logs and keeps runtime config when persisting AI config fails', () => {
         vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-            throw new Error('Authorization: Bearer ai-config-write-secret');
+            throw new Error(`Authorization: Bearer ${WRITE_FAILURE_CANARY}`);
         });
 
-        expect(() => persistAIConfig('user-a', makeConfig('sk-runtime-secret'))).not.toThrow();
-        expect(getAIConfig('user-a').providers[0].apiKey).toBe('sk-runtime-secret');
+        expect(() => persistAIConfig('user-a', makeConfig(RUNTIME_API_KEY_CANARY))).not.toThrow();
+        expect(getAIConfig('user-a').providers[0].apiKey).toBe(RUNTIME_API_KEY_CANARY);
         expect(safeLogState.warn).toHaveBeenCalledWith(
             '[aiConfigStorage] persistAIConfig failed:',
             expect.anything()
         );
         expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).toContain('[redacted]');
-        expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).not.toContain('ai-config-write-secret');
+        expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).not.toContain(WRITE_FAILURE_CANARY);
     });
 
     it('logs and falls back when scoped AI config storage read throws', () => {
         vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => {
             if (key === getAIConfigKey('user-a')) {
-                throw new Error('token=scoped-ai-config-secret');
+                throw new Error(`token=${SCOPED_READ_FAILURE_CANARY}`);
             }
             return null;
         });
@@ -184,7 +192,7 @@ describe('AI config storage isolation', () => {
             expect.anything()
         );
         expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).toContain('[redacted]');
-        expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).not.toContain('scoped-ai-config-secret');
+        expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).not.toContain(SCOPED_READ_FAILURE_CANARY);
     });
 
     it('logs and falls back when legacy AI config storage read throws', () => {
@@ -193,7 +201,7 @@ describe('AI config storage isolation', () => {
                 return null;
             }
             if (key === 'DiagramView.AIConfig') {
-                throw new Error('cookie=legacy-ai-config-secret');
+                throw new Error(`cookie=${LEGACY_READ_FAILURE_CANARY}`);
             }
             return null;
         });
@@ -206,6 +214,6 @@ describe('AI config storage isolation', () => {
             expect.anything()
         );
         expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).toContain('[redacted]');
-        expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).not.toContain('legacy-ai-config-secret');
+        expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).not.toContain(LEGACY_READ_FAILURE_CANARY);
     });
 });

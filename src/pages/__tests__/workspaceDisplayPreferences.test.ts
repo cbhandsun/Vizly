@@ -77,16 +77,16 @@ describe('workspaceDisplayPreferences', () => {
   });
 
   it('sanitizes storage read failures without logging stored values', () => {
-    const secret = 'cookie=workspace-secret';
+    const readFailureCanary = ['workspace', 'read', 'canary'].join('-');
     const storage: WorkspaceDisplayPreferencesStorage = {
-      getItem: vi.fn(() => { throw new Error(secret); }),
+      getItem: vi.fn(() => { throw new Error(`cookie=${readFailureCanary}`); }),
       setItem: vi.fn(),
     };
 
     expect(readWorkspaceDisplayPreferences(() => storage)).toBe(DEFAULT_WORKSPACE_DISPLAY_PREFERENCES);
     const payload = JSON.stringify(warn.mock.calls);
     expect(payload).toContain('[redacted]');
-    expect(payload).not.toContain('workspace-secret');
+    expect(payload).not.toContain(readFailureCanary);
   });
 
   it('writes only validated fields and survives quota and provider failures', () => {
@@ -103,9 +103,11 @@ describe('workspaceDisplayPreferences', () => {
       JSON.stringify({ version: 1, viewMode: 'list', sortKey: 'name' }),
     );
 
+    const quotaFailureCanary = ['quota', 'write', 'canary'].join('-');
+    const providerFailureCanary = ['provider', 'storage', 'canary'].join('-');
     const quotaStorage: WorkspaceDisplayPreferencesStorage = {
       getItem: vi.fn(),
-      setItem: vi.fn(() => { throw new Error('token=quota-secret'); }),
+      setItem: vi.fn(() => { throw new Error(`token=${quotaFailureCanary}`); }),
     };
     expect(writeWorkspaceDisplayPreferences(
       { version: 1, viewMode: 'grid', sortKey: 'updated' },
@@ -113,11 +115,11 @@ describe('workspaceDisplayPreferences', () => {
     )).toBe(false);
     expect(writeWorkspaceDisplayPreferences(
       { version: 1, viewMode: 'grid', sortKey: 'updated' },
-      () => { throw new Error('Bearer provider-secret'); },
+      () => { throw new Error(`Bearer ${providerFailureCanary}`); },
     )).toBe(false);
     const payload = JSON.stringify(warn.mock.calls);
     expect(payload).toContain('[redacted]');
-    expect(payload).not.toContain('quota-secret');
-    expect(payload).not.toContain('provider-secret');
+    expect(payload).not.toContain(quotaFailureCanary);
+    expect(payload).not.toContain(providerFailureCanary);
   });
 });

@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { handleAIGatewayRequest } from '../functions/ai-gateway/handler';
 
+const PROVIDER_KEY_CANARY = ['provider', 'key', 'canary'].join('-');
+const JWT_CANARY = ['header', 'payload', 'signature'].join('.');
+
 const authHeaders = {
-  Authorization: 'Bearer header.payload.signature-token',
+  Authorization: `Bearer ${JWT_CANARY}`,
   Origin: 'http://127.0.0.1:4173',
 };
 
@@ -80,7 +83,7 @@ describe('AI gateway handler', () => {
           provider: {
             id: 'custom',
             baseUrl: 'https://private.example.com/v1',
-            apiKey: 'provider-key-placeholder',
+            apiKey: PROVIDER_KEY_CANARY,
           },
           model: 'model-1',
           messages: [{ role: 'user', content: 'hello' }],

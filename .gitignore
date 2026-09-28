@@ -1,6 +1,8 @@
 node_modules/
 dist/
 coverage/
+.common-tools/
+.common-tools-audit/
 .env*
 !.env.example
 .npmrc

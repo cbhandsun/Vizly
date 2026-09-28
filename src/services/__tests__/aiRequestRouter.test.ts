@@ -6,12 +6,15 @@ import {
   requestAIChatCompletionRouted,
 } from '../ai/aiRequestRouter';
 
+const PROVIDER_KEY_CANARY = ['provider', 'key', 'canary'].join('-');
+const JWT_CANARY = ['header', 'payload', 'signature'].join('.');
+
 const body = { model: 'model-1', messages: [{ role: 'user', content: 'hello' }] };
 const remoteProvider = {
   id: 'custom',
   name: 'Remote',
   baseUrl: 'https://models.example.com/v1',
-  apiKey: 'provider-key',
+  apiKey: PROVIDER_KEY_CANARY,
 };
 
 describe('aiRequestRouter', () => {
@@ -59,7 +62,7 @@ describe('aiRequestRouter', () => {
     await expect(requestAIChatCompletionRouted(remoteProvider, body, { timeoutMs: 90_000 }, {
       mode: 'auto',
       supabaseUrl: 'https://project.supabase.co',
-      getAccessToken: async () => 'header.payload.signature-token',
+      getAccessToken: async () => JWT_CANARY,
       directRequest,
       gatewayRequest,
       probe,
@@ -78,7 +81,7 @@ describe('aiRequestRouter', () => {
     await expect(requestAIChatCompletionRouted(remoteProvider, body, {}, {
       mode: 'auto',
       supabaseUrl: 'https://project.supabase.co',
-      getAccessToken: async () => 'header.payload.signature-token',
+      getAccessToken: async () => JWT_CANARY,
       directRequest,
       gatewayRequest,
       probe: async () => false,

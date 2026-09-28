@@ -48,6 +48,10 @@ vi.mock('react-i18next', () => ({
     useTranslation: () => ({ t: (key: string) => key }),
 }));
 
+const VALID_PASSPHRASE = 'valid test passphrase';
+const MISMATCHED_PASSPHRASE = 'different test passphrase';
+const PROVIDER_FAILURE_CANARY = ['provider', 'auth', 'canary'].join('-');
+
 describe('SetPasswordModal', () => {
     beforeEach(() => {
         updatePasswordMock.mockReset();
@@ -56,12 +60,12 @@ describe('SetPasswordModal', () => {
         document.body.innerHTML = '<div id="app-root-layout"></div>';
     });
 
-    const fillPasswordFields = (password = 'secure-password') => {
+    const fillPasswordFields = (value = VALID_PASSPHRASE) => {
         fireEvent.change(screen.getByLabelText('auth.modal.register.passwordPlaceholder'), {
-            target: { value: password },
+            target: { value },
         });
         fireEvent.change(screen.getByLabelText('auth.modal.register.confirmPlaceholder'), {
-            target: { value: password },
+            target: { value },
         });
     };
 
@@ -74,8 +78,8 @@ describe('SetPasswordModal', () => {
         expect(confirmation.getAttribute('autocomplete')).toBe('new-password');
         expect(password.getAttribute('maxlength')).toBe(String(AUTH_PASSWORD_MAX_LENGTH));
 
-        fireEvent.change(password, { target: { value: 'secure-password' } });
-        fireEvent.change(confirmation, { target: { value: 'different-password' } });
+        fireEvent.change(password, { target: { value: VALID_PASSPHRASE } });
+        fireEvent.change(confirmation, { target: { value: MISMATCHED_PASSPHRASE } });
         fireEvent.click(screen.getByRole('button', { name: 'common.confirm' }));
 
         expect(await screen.findByText('auth.modal.register.passwordMismatch')).toBeTruthy();
@@ -83,7 +87,7 @@ describe('SetPasswordModal', () => {
     });
 
     it('recovers from a rejected provider request without exposing its contents', async () => {
-        updatePasswordMock.mockRejectedValueOnce(new Error('Bearer secret-token user-content'));
+        updatePasswordMock.mockRejectedValueOnce(new Error(`Bearer ${PROVIDER_FAILURE_CANARY} user-content`));
         render(<SetPasswordModal open onCancel={vi.fn()} />);
         fillPasswordFields();
 
@@ -94,7 +98,7 @@ describe('SetPasswordModal', () => {
             name: 'common.confirm',
         }) as HTMLButtonElement).disabled).toBe(false);
         expect(messageErrorMock).toHaveBeenCalledWith('auth.modal.errors.unavailable');
-        expect(screen.queryByText(/secret-token/i)).toBeNull();
+        expect(screen.queryByText(PROVIDER_FAILURE_CANARY)).toBeNull();
     });
 
     it('ignores a late success after the owner closes the modal', async () => {

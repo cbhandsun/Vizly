@@ -1,0 +1,76 @@
+name: CI
+
+# Release governance: this workflow is the public app release health/smoke gate.
+# Rollback uses the previous healthy deployment artifact or the last accepted
+# @vizly/core package artifact documented in RELEASE.md.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  verify:
+    name: Verify public app
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.2
+          cache: npm
+
+      - name: Normalize local Core dependency
+        run: |
+          node <<'NODE'
+          const { execFileSync } = require('node:child_process');
+          const fs = require('node:fs');
+
+          const pkgPath = 'package.json';
+          const manifest = JSON.parse(fs.readFileSync('open-app-manifest.json', 'utf8'));
+          const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+          const current = pkg.dependencies && pkg.dependencies['@vizly/core'];
+
+          if (typeof current === 'string' && current.startsWith('file:')) {
+            const version = manifest.sdkPackages['@vizly/core'];
+            const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+            const peerJson = execFileSync(npmBin, ['view', `@vizly/core@${version}`, 'peerDependencies', '--json'], {
+              encoding: 'utf8',
+              stdio: ['ignore', 'pipe', 'inherit'],
+              shell: process.platform === 'win32',
+            });
+            const peerResult = JSON.parse(peerJson || '{}');
+            const peers = Array.isArray(peerResult) ? peerResult[0] || {} : peerResult;
+            const missing = ['yjs', 'y-websocket'].filter((name) => !peers[name]);
+            if (missing.length > 0) {
+              throw new Error(`@vizly/core@${version} is missing required peer dependency metadata: ${missing.join(', ')}. Publish the validated Core package or keep this check local-only.`);
+            }
+            pkg.dependencies['@vizly/core'] = version;
+            fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+          }
+          NODE
+          npm install --package-lock-only --ignore-scripts
+
+      - name: Install
+        run: npm ci
+
+      - name: Release health gate
+        run: npm run check
+
+      - name: Smoke test gate
+        run: npm run test
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build release artifact
+        run: npm run build
+

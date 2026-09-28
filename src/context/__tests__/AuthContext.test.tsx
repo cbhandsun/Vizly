@@ -1,6 +1,8 @@
+// @vitest-environment jsdom
+
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AuthProvider } from '../AuthContext';
@@ -36,6 +38,7 @@ const Probe = () => {
 
 describe('AuthProvider', () => {
   afterEach(() => {
+    cleanup();
     vi.unstubAllEnvs();
     vi.clearAllMocks();
     delete document.body.dataset.authError;
@@ -59,5 +62,35 @@ describe('AuthProvider', () => {
 
     screen.getByRole('button', { name: 'sign in' }).click();
     await waitFor(() => expect(document.body.dataset.authError).toBe('Supabase is not configured'));
+  });
+
+  it('ignores encoded auth-looking strings that are not Supabase hash parameters', async () => {
+    vi.stubEnv('VITE_SUPABASE_URL', 'https://project.supabase.co');
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'anon-key');
+    window.location.hash = '#next=access_token%3Dtest-canary';
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>
+    );
+
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'));
+    expect(supabaseModuleMock).not.toHaveBeenCalled();
+  });
+
+  it('loads Supabase when a recovery session hash is present', async () => {
+    vi.stubEnv('VITE_SUPABASE_URL', 'https://project.supabase.co');
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'anon-key');
+    window.location.hash = '#type=recovery';
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>
+    );
+
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'));
+    expect(supabaseModuleMock).toHaveBeenCalled();
   });
 });

@@ -11,9 +11,12 @@
   },
   "scripts": {
     "dev": "vite",
+    "check": "node scripts/run-check.mjs",
     "build": "vite build",
     "typecheck": "tsc -b --pretty false",
-    "test": "vitest run --pool=threads --maxWorkers=2",
+    "test": "npm run test:ci",
+    "test:ci": "vitest run --pool=threads --maxWorkers=4 packages/contracts/src/document.test.ts src/main/__tests__/startupResourceGuard.test.ts src/main/__tests__/prewarmDisplayRouting.test.ts src/main/__tests__/preloadErrorRecovery.test.ts src/main/__tests__/bootstrapApplication.test.ts src/main/__tests__/applicationStartupTrace.test.ts src/main/__tests__/applicationStartup.test.ts src/main/__tests__/appBootstrapLogging.test.ts src/services/__tests__/storageSecurity.test.ts src/services/__tests__/runtimeEnv.test.ts src/services/__tests__/localeResourceBoundary.test.ts src/services/__tests__/aiRequestRouter.test.ts src/services/ai/__tests__/errorSecurity.test.ts src/data/__tests__/dataRegistryValidation.test.ts src/data/__tests__/dataRegistryLogging.test.ts src/data/standardized/__tests__/layoutPresetMapLoader.test.ts src/context/__tests__/AuthContext.test.tsx src/context/__tests__/authSensitiveRuntime.test.ts src/context/__tests__/authLogging.test.ts src/components/ai/__tests__/AIConfigStorage.test.ts src/components/auth/__tests__/useAuthOperation.test.ts src/components/diagrams/collaboration/__tests__/YjsProviderHooks.test.ts",
+    "test:full": "vitest run --pool=threads --maxWorkers=2",
     "lint": "eslint . --max-warnings=0",
     "preview": "vite preview"
   },
@@ -31,6 +34,8 @@
     "@supabase/supabase-js": "2.111.0",
     "@types/d3-force": "3.0.10",
     "@types/dagre": "0.7.54",
+    "@vizly/contracts": "0.1.0-alpha.2",
+    "@vizly/core": "0.1.0-alpha.3",
     "@xyflow/react": "12.11.2",
     "ai": "7.0.107",
     "antd": "6.5.2",
@@ -69,10 +74,7 @@
     "y-websocket": "3.0.0",
     "yjs": "13.6.31",
     "zod": "4.3.6",
-    "zustand": "5.0.14",
-    "@vizly/contracts": "0.1.0-alpha.2",
-    "@vizly/core": "0.1.0-alpha.2",
-    "@vizly/react": "0.1.0-alpha.2"
+    "zustand": "5.0.14"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

@@ -19,10 +19,14 @@ import {
     serializeAIProviderRequestBody,
 } from '../aiProviderClient';
 
+const PROVIDER_API_KEY_CANARY = ['sk', 'test', 'api-key', 'canary'].join('-');
+const LEAKED_TOKEN_CANARY = ['leaked', 'provider', 'canary'].join('-');
+const LIVE_KEY_CANARY = ['sk', 'live', 'canary'].join('-');
+
 const provider = {
     name: 'OpenAI',
     baseUrl: 'https://api.openai.com/v1/',
-    apiKey: 'sk-test-api-key-placeholder',
+    apiKey: PROVIDER_API_KEY_CANARY,
 };
 
 describe('aiProviderClient', () => {
@@ -43,14 +47,14 @@ describe('aiProviderClient', () => {
 
         expect(headers).toEqual({
             'Content-Type': 'application/json',
-            Authorization: 'Bearer sk-test-api-key-placeholder',
+            Authorization: `Bearer ${PROVIDER_API_KEY_CANARY}`,
         });
-        expect(provider.apiKey).toBe('sk-test-api-key-placeholder');
+        expect(provider.apiKey).toBe(PROVIDER_API_KEY_CANARY);
     });
 
     it('redacts provider error bodies before throwing HTTP errors', async () => {
         const makeErrorResponse = () => new Response(
-            'failed Authorization: Bearer leaked-token api_key=sk-live-secret-value',
+            `failed Authorization: Bearer ${LEAKED_TOKEN_CANARY} api_key=${LIVE_KEY_CANARY}`,
             { status: 401 }
         );
         vi.spyOn(globalThis, 'fetch')
@@ -67,8 +71,8 @@ describe('aiProviderClient', () => {
             expect(error).toBeInstanceOf(AIProviderHttpError);
             const formatted = formatAIProviderRequestError(error, 120);
             expect(formatted).toContain('AI 接口错误 401');
-            expect(formatted).not.toContain('leaked-token');
-            expect(formatted).not.toContain('sk-live-secret-value');
+            expect(formatted).not.toContain(LEAKED_TOKEN_CANARY);
+            expect(formatted).not.toContain(LIVE_KEY_CANARY);
         }
     });
 
@@ -81,7 +85,7 @@ describe('aiProviderClient', () => {
         await expect(requestAIModels(provider)).resolves.toEqual({ data: [{ id: 'gpt-4o' }] });
         expect(fetchMock).toHaveBeenCalledWith('https://api.openai.com/v1/models', expect.objectContaining({
             method: 'GET',
-            headers: { Authorization: 'Bearer sk-test-api-key-placeholder' },
+            headers: { Authorization: `Bearer ${PROVIDER_API_KEY_CANARY}` },
             signal: expect.any(AbortSignal),
         }));
     });

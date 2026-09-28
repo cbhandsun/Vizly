@@ -5,16 +5,19 @@ import {
 } from '../ai/aiGatewayClient';
 import { AIProviderInvalidRequestError } from '../ai/aiProviderClient';
 
+const PROVIDER_KEY_CANARY = ['provider', 'key', 'canary'].join('-');
+const JWT_CANARY = ['header', 'payload', 'signature'].join('.');
+
 const provider = {
   id: 'deepseek',
   name: 'DeepSeek',
   baseUrl: 'https://api.deepseek.com',
-  apiKey: 'provider-secret-placeholder',
+  apiKey: PROVIDER_KEY_CANARY,
 };
 
 const gatewayOptions = {
   supabaseUrl: 'https://project.supabase.co',
-  jwtToken: 'header.payload.signature-token',
+  jwtToken: JWT_CANARY,
   timeoutMs: 10_000,
 };
 
