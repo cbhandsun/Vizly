@@ -41,7 +41,7 @@ export const i18nReady: Promise<void> = i18n
         supportedLngs: ['en', 'zh'],
         nonExplicitSupportedLngs: true,
         load: 'languageOnly',
-        debug: process.env.NODE_ENV === 'development',
+        debug: import.meta.env.DEV,
 
         interpolation: {
             escapeValue: false, // not needed for react as it escapes by default
