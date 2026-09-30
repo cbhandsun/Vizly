@@ -28,7 +28,7 @@ import {
 } from '@vizly/core/logging';
 import { renderSafeThemePreviewGradient } from '@vizly/core/theme';
 import { downloadFile } from '@vizly/core/export';
-import { ThemeChoiceButton } from './ThemeChoiceButton';
+import { ThemeChoiceButton, type ThemePreviewDetails } from './ThemeChoiceButton';
 import { ThemeSelectorDialog, type ThemeSelectorTab } from './ThemeSelectorDialog';
 
 export interface EnhancedThemeSelectorProps {
@@ -302,6 +302,22 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
     reader.readAsText(file);
   }, [actions, state.integration]);
 
+  const resolveThemePreviewDetails = (themeData: unknown, preset?: unknown): ThemePreviewDetails | undefined => {
+    const p = preset as { theme?: Theme; category?: string } | undefined;
+    const t = (p?.theme || themeData) as Theme | undefined;
+    if (!t) return undefined;
+    const isDark = t.mode === 'dark';
+    const canvasBg = t.diagram?.canvas?.background || (isDark ? '#141414' : '#ffffff');
+    const gridColor = t.diagram?.canvas?.grid?.color || (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)');
+    const nodeBg = t.diagram?.nodes?.default?.background || t.diagram?.nodes?.default?.main || (isDark ? '#1e293d' : '#ffffff');
+    const nodeBorder = t.diagram?.nodes?.default?.border || t.palette?.primary?.border || t.palette?.primary?.main || (isDark ? '#38bdf8' : '#cbd5e1');
+    const nodeText = t.diagram?.nodes?.default?.text || (isDark ? '#f1f5f9' : '#0f172a');
+    const edgeColor = t.diagram?.edges?.default?.main || t.palette?.primary?.main || (isDark ? '#38bdf8' : '#2563eb');
+    const accentColor = t.palette?.primary?.main || t.diagram?.edges?.primary?.main || (isDark ? '#60a5fa' : '#2563eb');
+    const mode: 'light' | 'dark' = (t.mode as 'light' | 'dark') || (isDark ? 'dark' : 'light');
+    return { canvasBg, gridColor, nodeBg, nodeBorder, nodeText, edgeColor, accentColor, mode };
+  };
+
   const getGradientBackground = (item: ThemePreviewItem) => {
     const themeManager = state.integration?.getThemeManager();
     const themeData = item.theme || item;
@@ -360,6 +376,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
             disabled={isThemeActionPending}
             gradient={getGradientBackground(preset || themeData || { id: themeId })}
             label={themeName}
+            previewDetails={resolveThemePreviewDetails(themeData, preset)}
             onSelect={() => void handleThemeChange(themeId)}
           />
         );
@@ -397,6 +414,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
                       disabled={isThemeActionPending}
                       gradient={getGradientBackground(preset)}
                       label={preset.name || preset.id}
+                      previewDetails={resolveThemePreviewDetails(preset.theme, preset)}
                       onSelect={() => void handleApplyPreset(preset)}
                     />
                   );

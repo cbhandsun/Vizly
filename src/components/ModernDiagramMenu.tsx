@@ -16,7 +16,7 @@ import {
 import type { IconType } from 'react-icons';
 import { Button as AntButton, Input, Popover, Tooltip, theme as antdTheme } from 'antd';
 import type { InputRef } from 'antd';
-import { MoreOutlined, StarFilled, StarOutlined } from '@ant-design/icons';
+import { CheckOutlined, MoreOutlined, StarFilled, StarOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import type { DiagramDefinition } from '@vizly/core/types';
 import {
@@ -173,7 +173,14 @@ const ModernDiagramMenu: React.FC<ModernDiagramMenuProps> = ({
       'high-contrast': t('designer.menu.theme.highContrast'),
       'sunset': t('designer.menu.theme.sunset'),
       'mono': t('designer.menu.theme.mono'),
-      'original': t('designer.menu.theme.original')
+      'original': t('designer.menu.theme.original'),
+      'corporate': t('designer.menu.theme.corporate'),
+      'enterprise': t('designer.menu.theme.enterprise'),
+      'midnight': t('designer.menu.theme.midnight'),
+      'emerald': t('designer.menu.theme.emerald'),
+      'nordic': t('designer.menu.theme.nordic'),
+      'blueprint': t('designer.menu.theme.blueprint'),
+      'sketch': t('designer.menu.theme.sketch')
     };
     return themeNames[themeId] || themeId;
   };
@@ -392,27 +399,129 @@ const ModernDiagramMenu: React.FC<ModernDiagramMenuProps> = ({
     </div>
   );
 
+  const THEME_GROUPS = [
+    {
+      key: 'commercial',
+      labelKey: 'designer.menu.themeCategory.commercial',
+      themes: ['corporate', 'enterprise', 'midnight', 'emerald', 'nordic']
+    },
+    {
+      key: 'standard',
+      labelKey: 'designer.menu.themeCategory.standard',
+      themes: ['light', 'dark']
+    },
+    {
+      key: 'creative',
+      labelKey: 'designer.menu.themeCategory.creative',
+      themes: ['blueprint', 'sketch']
+    },
+    {
+      key: 'natural',
+      labelKey: 'designer.menu.themeCategory.natural',
+      themes: ['ocean', 'forest', 'sunset']
+    },
+    {
+      key: 'accessibility',
+      labelKey: 'designer.menu.themeCategory.accessibility',
+      themes: ['mono', 'original', 'high-contrast']
+    }
+  ];
+
   const renderThemeMenu = () => {
     const tm = integrationState.integration?.getThemeManager?.();
     if (!tm) return null;
+
+    const availableSet = new Set(availableThemes);
+    const groupsWithThemes = THEME_GROUPS.map(group => ({
+      ...group,
+      items: group.themes.filter(id => availableSet.has(id))
+    })).filter(group => group.items.length > 0);
+
+    const categorized = new Set(THEME_GROUPS.flatMap(g => g.themes));
+    const extraThemes = availableThemes.filter(id => !categorized.has(id));
+
     return (
-      <div className="p-2 min-w-[180px]">
-        <h4 className="mt-0 mb-2 font-semibold text-[13px] text-slate-800 dark:text-slate-200">{t('designer.menu.switchTheme')}</h4>
-        <div className="flex flex-col gap-1">
-          {availableThemes.map(themeId => (
-            <AntButton
-              key={themeId}
-              type={currentTheme === themeId ? 'primary' : 'text'}
-              onClick={() => {
-                const normalizedThemeId = normalizeThemeId(themeId);
-                if (normalizedThemeId) tm.setTheme(normalizedThemeId);
-              }}
-              className="text-left flex items-center gap-2 w-full px-2 py-1"
-            >
-              <span className="inline-block w-4 h-4 rounded-full border border-black/10 dark:border-white/10" style={{ backgroundColor: tm.getThemeColor(themeId, 'primary') || '#ccc' }} />
-              {getThemeDisplayName(themeId)}
-            </AntButton>
+      <div className="p-2 min-w-[220px] max-w-[260px]">
+        <div className="flex items-center justify-between mt-0 mb-2 pb-1.5 border-b border-black/5 dark:border-white/10">
+          <h4 className="m-0 font-semibold text-[13px] text-slate-800 dark:text-slate-200">
+            {t('designer.menu.switchTheme')}
+          </h4>
+          <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono">
+            {availableThemes.length}
+          </span>
+        </div>
+        <div className="flex flex-col gap-2.5 max-h-[360px] overflow-y-auto pr-1">
+          {groupsWithThemes.map(group => (
+            <div key={group.key} className="flex flex-col gap-1">
+              <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider px-1">
+                {t(group.labelKey)}
+              </span>
+              <div className="flex flex-col gap-0.5">
+                {group.items.map(themeId => {
+                  const isSelected = currentTheme === themeId;
+                  const primaryColor = tm.getThemeColor(themeId, 'primary') || '#4f46e5';
+                  const secondaryColor = tm.getThemeColor(themeId, 'secondary') || primaryColor;
+                  return (
+                    <button
+                      key={themeId}
+                      type="button"
+                      onClick={() => {
+                        const normalizedThemeId = normalizeThemeId(themeId);
+                        if (normalizedThemeId) tm.setTheme(normalizedThemeId);
+                      }}
+                      className={`text-left flex items-center gap-2.5 w-full px-2 py-1.5 rounded-lg text-[12px] transition-all duration-150 cursor-pointer border ${
+                        isSelected
+                          ? 'bg-indigo-50/80 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-medium border-indigo-200 dark:border-indigo-800/60 shadow-xs'
+                          : 'bg-transparent text-slate-700 dark:text-slate-300 hover:bg-slate-100/70 dark:hover:bg-slate-800/50 border-transparent'
+                      }`}
+                    >
+                      <span className="relative flex items-center justify-center w-4 h-4 shrink-0">
+                        <span
+                          className="w-3.5 h-3.5 rounded-full border border-black/10 dark:border-white/10 shadow-xs"
+                          style={{
+                            background: `linear-gradient(135deg, ${primaryColor} 50%, ${secondaryColor} 50%)`,
+                          }}
+                        />
+                      </span>
+                      <span className="truncate flex-1">{getThemeDisplayName(themeId)}</span>
+                      {isSelected && (
+                        <CheckOutlined className="text-indigo-600 dark:text-indigo-400 text-xs shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           ))}
+          {extraThemes.length > 0 && (
+            <div className="flex flex-col gap-1 pt-1 border-t border-black/5 dark:border-white/10">
+              {extraThemes.map(themeId => {
+                const isSelected = currentTheme === themeId;
+                const primaryColor = tm.getThemeColor(themeId, 'primary') || '#4f46e5';
+                return (
+                  <button
+                    key={themeId}
+                    type="button"
+                    onClick={() => {
+                      const normalizedThemeId = normalizeThemeId(themeId);
+                      if (normalizedThemeId) tm.setTheme(normalizedThemeId);
+                    }}
+                    className={`text-left flex items-center gap-2.5 w-full px-2 py-1.5 rounded-lg text-[12px] transition-all duration-150 cursor-pointer border ${
+                      isSelected
+                        ? 'bg-indigo-50/80 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-medium border-indigo-200 dark:border-indigo-800/60 shadow-xs'
+                        : 'bg-transparent text-slate-700 dark:text-slate-300 hover:bg-slate-100/70 dark:hover:bg-slate-800/50 border-transparent'
+                    }`}
+                  >
+                    <span className="w-3.5 h-3.5 rounded-full border border-black/10 dark:border-white/10 shadow-xs shrink-0" style={{ backgroundColor: primaryColor }} />
+                    <span className="truncate flex-1">{getThemeDisplayName(themeId)}</span>
+                    {isSelected && (
+                      <CheckOutlined className="text-indigo-600 dark:text-indigo-400 text-xs shrink-0" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     );

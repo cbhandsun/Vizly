@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Grid, Select, Tooltip, Popover } from 'antd';
-import { SearchOutlined, RightOutlined } from '@ant-design/icons';
+import { SearchOutlined, RightOutlined, SettingOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import ExportTools from '../ExportTools';
 import { DeferredEnhancedThemeSelector } from './DeferredEnhancedThemeSelector';
 import { LanguageSwitcher } from '../shared/LanguageSwitcher';
 import { AuthStatusCompact } from '../auth/AuthStatus';
-import { FaChevronDown, FaEllipsisV, FaHome } from 'react-icons/fa';
+import { FaChevronDown, FaHome } from 'react-icons/fa';
 import type { TopToolbarProps } from './TopToolbar';
 import { getToolbarPopupContainer, isToolbarEdgeMode } from './topToolbarGuards';
 import { DiagramTitleEditor } from './DiagramTitleEditor';
@@ -280,7 +280,18 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
           className={`${islandBaseClass} gap-1 ${isMobile ? 'min-w-0 max-w-full' : 'shrink-0'}`}
           style={{ paddingLeft: '14px', paddingRight: '14px' }}
         >
-          {!isMobile && (
+          {isMobile ? (
+            <a
+              href="#/manage"
+              aria-label="Vizly"
+              className="flex items-center justify-center w-[26px] h-[26px] rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-all no-underline flex-shrink-0 active:scale-95"
+              onClick={(e) => { e.preventDefault(); window.location.hash = '#/manage'; }}
+            >
+              <div className="w-[22px] h-[22px] bg-gradient-to-tr from-indigo-600 to-violet-500 rounded-md flex items-center justify-center shadow-sm">
+                <span className="text-[11px] font-black text-white italic">V</span>
+              </div>
+            </a>
+          ) : (
             <a
               href="#/manage"
               className="flex items-center gap-2 px-1.5 py-1 rounded-[6px] hover:bg-black/5 dark:hover:bg-white/5 transition-all no-underline active:scale-95"
@@ -305,7 +316,9 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
               >
                 {title}
               </h1>
-              <RightOutlined className="text-[10px] text-slate-300 dark:text-slate-600 mx-1.5 flex-shrink-0" />
+              {!isMobile && (
+                <RightOutlined className="text-[10px] text-slate-300 dark:text-slate-600 mx-1.5 flex-shrink-0" />
+              )}
               <Popover
                 content={
                   <div
@@ -395,7 +408,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
       {/* ── CENTER SECTION: Tools ── */}
       <div className={
         isMobile
-          ? 'absolute top-[48px] left-0 right-0 flex items-center justify-center min-w-0'
+          ? 'absolute top-[52px] left-0 right-0 flex items-center justify-center min-w-0'
           : 'flex-1 flex items-center justify-center min-w-0'
       } data-designer-top-toolbar-center="true">
         <div className={`flex items-center gap-2 max-w-full ${
@@ -455,7 +468,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
                 aria-controls={morePopoverId}
                 title={moreSettingsSummary}
               >
-                <FaEllipsisV className="text-[13px]" />
+                <SettingOutlined className="text-[14px]" />
               </button>
             </Popover>
           </div>

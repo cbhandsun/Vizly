@@ -20,8 +20,8 @@ interface ThemeSelectorDialogProps {
   title: string;
 }
 
-const ACTIVE_TAB_CLASS = 'bg-white dark:bg-white/10 text-gray-900 dark:text-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] rounded-[6px] font-semibold transform transition-all duration-300 ring-1 ring-black/[0.04] dark:ring-white/[0.05]';
-const INACTIVE_TAB_CLASS = 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] rounded-[6px] font-medium transition-all duration-300 opacity-80 hover:opacity-100';
+const ACTIVE_TAB_CLASS = 'bg-white dark:bg-white/10 text-gray-900 dark:text-white shadow-[0_1px_3px_rgba(0,0,0,0.08)] rounded-[6px] font-semibold transform transition-all duration-200 ring-1 ring-black/[0.04] dark:ring-white/[0.05]';
+const INACTIVE_TAB_CLASS = 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] rounded-[6px] font-medium transition-all duration-200 opacity-80 hover:opacity-100';
 
 export const ThemeSelectorDialog: React.FC<ThemeSelectorDialogProps> = ({
   activeTab,
@@ -82,10 +82,10 @@ export const ThemeSelectorDialog: React.FC<ThemeSelectorDialogProps> = ({
         aria-labelledby={titleId}
         tabIndex={-1}
         onKeyDown={handleDialogKeyDown}
-        className="relative flex flex-col w-full max-w-3xl max-h-[calc(100dvh-32px)] sm:max-h-[85dvh] rounded-[var(--glass-radius)] bg-slate-50/90 dark:bg-[#111113]/95 backdrop-blur-2xl backdrop-saturate-[180%] border border-white/40 dark:border-white/10 shadow-[0_16px_40px_-8px_rgba(0,0,0,0.15)] overflow-hidden pointer-events-auto"
+        className="relative flex flex-col w-full max-w-3xl max-h-[calc(100dvh-32px)] sm:max-h-[88dvh] rounded-[var(--glass-radius)] bg-slate-50/95 dark:bg-[#111113]/95 backdrop-blur-2xl backdrop-saturate-[180%] border border-white/60 dark:border-white/10 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.25)] overflow-hidden pointer-events-auto"
         onPointerDown={(event) => event.stopPropagation()}
       >
-        <div className="flex-none px-4 sm:px-8 py-3 sm:py-5 bg-white/40 dark:bg-black/20 border-b border-black/5 dark:border-white/5 flex items-center justify-between shrink-0">
+        <div className="flex-none px-4 sm:px-8 py-3.5 sm:py-5 bg-white/40 dark:bg-black/20 border-b border-black/5 dark:border-white/5 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3 text-[16px] font-semibold text-gray-800 dark:text-gray-100 tracking-tight">
             <FaPalette className="text-indigo-500" aria-hidden="true" />
             <h2 id={titleId}>{title}</h2>
@@ -103,7 +103,7 @@ export const ThemeSelectorDialog: React.FC<ThemeSelectorDialogProps> = ({
           </button>
         </div>
 
-        <div className="flex-none px-4 sm:px-8 py-3 sm:py-5 overflow-x-auto custom-scrollbar">
+        <div className="flex-none px-4 sm:px-8 py-3 sm:py-4 overflow-x-auto custom-scrollbar">
           <span id={tabListLabelId} className="sr-only">{title}</span>
           <div role="tablist" aria-labelledby={tabListLabelId} className="flex items-center gap-1 p-1 bg-black/[0.04] dark:bg-white/[0.06] rounded-[8px] w-max min-w-full sm:min-w-0 border border-black/[0.02] dark:border-white/[0.02]">
             {tabs.map((tab, index) => (
@@ -116,7 +116,15 @@ export const ThemeSelectorDialog: React.FC<ThemeSelectorDialogProps> = ({
                 aria-controls={panelId}
                 aria-label={tab.iconOnly ? tab.label : undefined}
                 tabIndex={activeTab === tab.id ? 0 : -1}
-                className={`flex-none min-h-[44px] px-4 text-[14px] whitespace-nowrap cursor-pointer ${tab.iconOnly ? 'flex items-center justify-center min-w-[44px]' : ''} ${activeTab === tab.id ? ACTIVE_TAB_CLASS : INACTIVE_TAB_CLASS}`}
+                className={`flex-none min-h-[44px] px-4 text-[14px] whitespace-nowrap cursor-pointer rounded-[6px] ${tab.iconOnly ? 'flex items-center justify-center min-w-[44px]' : 'inline-flex items-center justify-center'} ${activeTab === tab.id ? ACTIVE_TAB_CLASS : INACTIVE_TAB_CLASS}`}
+                style={{
+                  padding: tab.iconOnly ? '0 12px' : '0 16px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: 'none',
+                  outline: 'none',
+                }}
                 onClick={() => onTabChange(tab.id)}
                 onKeyDown={(event) => handleTabKeyDown(event, index)}
               >
@@ -126,7 +134,7 @@ export const ThemeSelectorDialog: React.FC<ThemeSelectorDialogProps> = ({
           </div>
         </div>
 
-        <div id={panelId} role="tabpanel" aria-label={tabs.find(tab => tab.id === activeTab)?.label} className="flex-1 overflow-y-auto px-4 sm:px-8 pb-4 sm:pb-8 custom-scrollbar">
+        <div id={panelId} role="tabpanel" aria-label={tabs.find(tab => tab.id === activeTab)?.label} className="flex-1 overflow-y-auto px-4 sm:px-8 pt-1 pb-6 sm:pb-8 custom-scrollbar">
           {children}
         </div>
       </div>

@@ -117,6 +117,8 @@ const applyCssVariables = (t: BridgeTokens, theme: Theme | null) => {
 
     const patternDot = t.mode === 'dark' ? toRgba(neutralBorder, 0.35) : toRgba(neutralBorder, 0.7);
     el.style.setProperty('--bg-pattern', `radial-gradient(${patternDot} 1px, transparent 1px)`);
+    const panelBg = t.mode === 'dark' ? 'rgba(24, 24, 32, 0.85)' : 'rgba(255, 255, 255, 0.82)';
+    el.style.setProperty('--designer-panel-bg', panelBg);
   } catch { void 0; }
 };
 
@@ -141,6 +143,8 @@ export const AntdThemeBridge: React.FC<{ children: React.ReactNode }> = ({ child
     return tokens.mode === 'dark' ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm;
   }, [tokens.mode]);
 
+  const isDark = tokens.mode === 'dark';
+
   const themeConfig = useMemo(() => {
     return {
       algorithm,
@@ -155,21 +159,22 @@ export const AntdThemeBridge: React.FC<{ children: React.ReactNode }> = ({ child
         // 🚀 V3: 增加组件级的玻璃态与高级投影
         components: {
           Card: {
-            boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-            colorBorderSecondary: 'rgba(0,0,0,0.06)'
+            boxShadow: isDark ? '0 1px 2px rgba(0,0,0,0.2)' : '0 1px 2px rgba(0,0,0,0.03)',
+            colorBorderSecondary: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'
           },
           Input: {
-            colorBgContainer: 'rgba(255, 255, 255, 0.45)',
-            colorBorder: 'rgba(0, 0, 0, 0.1)'
+            colorBgContainer: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.45)',
+            colorBorder: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.1)'
           },
           Modal: {
-            contentBg: 'rgba(255, 255, 255, 0.72)',
-            boxShadow: '0 20px 40px -10px rgba(0,0,0,0.1)'
+            contentBg: isDark ? 'rgba(24, 24, 32, 0.88)' : 'rgba(255, 255, 255, 0.82)',
+            headerBg: 'transparent',
+            boxShadow: isDark ? '0 24px 48px -10px rgba(0,0,0,0.5)' : '0 20px 40px -10px rgba(0,0,0,0.1)'
           }
         }
       }
     } as const;
-  }, [algorithm, tokens]);
+  }, [algorithm, tokens, isDark]);
 
   return (
     <ConfigProvider theme={themeConfig}>

@@ -160,13 +160,13 @@ describe('ModernTopToolbar responsive layout', () => {
     expect(container.querySelector('[data-designer-top-toolbar="true"]')).toBeTruthy();
     expect(centerSection?.getAttribute('data-designer-top-toolbar-center')).toBe('true');
     expect(centerSection?.className).toContain('absolute');
-    expect(centerSection?.className).toContain('top-[48px]');
+    expect(centerSection?.className).toContain('top-[52px]');
     expect(screen.queryByTestId('export-tools')).toBeNull();
     expect(screen.queryByTestId('theme-selector')).toBeNull();
     expect(screen.getByRole('button', { name: 'rename-title' })).toBeTruthy();
     expect(screen.getByTestId('rename-title').getAttribute('data-commercial-touch-target')).toBe('true');
     expect(screen.getByTestId('auth-status').getAttribute('data-commercial-touch-target')).toBe('true');
-    expect(screen.queryByRole('link')).toBeNull();
+    expect(screen.getByRole('link', { name: 'Vizly' })).toBeTruthy();
     const diagramSwitcher = screen.getByRole('button', { name: 'Open diagrams and templates：Untitled flowchart' });
     expect(diagramSwitcher.className).toContain('h-[44px]');
     expect(diagramSwitcher.style.minHeight).toBe('var(--commercial-touch-target, 44px)');

@@ -226,7 +226,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                     onToggleFullscreen: handleToggleFullscreen,
                     setIsCommandOpen: setIsCommandOpen,
                     showExport: true,
-                    showThemeSelector: false,
+                    showThemeSelector: true,
                     showStyleSwitcher: false,
                     hideCenterIsland: shouldHideDiagramViewerCenterIsland(resolvedPluginId),
                     leftChildren: (switcherOpen) => switcherOpen ? (
