@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { THEME_JSON_IMPORT_MAX_BYTES, getFileSizeLimitError } from '@vizly/core/input';
 import { theme } from 'antd';
 import Popconfirm from 'antd/es/popconfirm';
-import { FaPalette, FaDownload, FaUpload, FaPlus, FaTrash, FaCheck, FaTimes } from 'react-icons/fa';
+import { FaPalette, FaDownload, FaUpload, FaPlus, FaTrash, FaCheck, FaTimes, FaSearch } from 'react-icons/fa';
 
 import { useConfigIntegration } from '@vizly/core/editor-hooks';
 import { useTheme } from '@vizly/core/theme';
@@ -96,6 +96,8 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
   const [isThemeActionPending, setIsThemeActionPending] = useState(false);
   const [importStatus, setImportStatus] = useState<'success' | 'rejected' | 'failed' | null>(null);
   const [themeCache, setThemeCache] = useState<Record<string, Theme>>({});
+  const [themeSearchTerm, setThemeSearchTerm] = useState('');
+  const [themeModeFilter, setThemeModeFilter] = useState<'all' | 'light' | 'dark'>('all');
   const themeActionPendingRef = useRef(false);
   const importInputRef = useRef<HTMLInputElement>(null);
   const importInputId = useId();
@@ -350,39 +352,120 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
   };
 
   // 渲染主题列表
-  const renderThemeList = () => (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6" aria-busy={isThemeActionPending}>
-      {availableThemes.map((themeId: string) => {
-        const themeManager = state.integration?.getThemeManager();
-        // 优先从预设加载颜色数据，确保预览卡片能显示出五彩渐变色
-        let preset = presets.find(p => p.id === themeId);
-        if (!preset) {
-            preset = getCachedThemePreset(themeId);
-        }
-        
-        const themeData = themeCache[themeId] || (preset ? preset.theme : (themeManager?.getCurrentThemeId() === themeId ? themeManager?.getCurrentTheme() : null));
-        
-        const isActive = currentTheme?.id === themeId;
-        const themeName = preset?.name || t(`theme.selector.${themeId}`, { defaultValue: themeId });
+  const renderThemeList = () => {
+    const filteredThemes = availableThemes.filter((themeId: string) => {
+      let preset = presets.find(p => p.id === themeId);
+      if (!preset) {
+        preset = getCachedThemePreset(themeId);
+      }
+      const themeManager = state.integration?.getThemeManager();
+      const themeData = themeCache[themeId] || (preset ? preset.theme : (themeManager?.getCurrentThemeId() === themeId ? themeManager?.getCurrentTheme() : null));
+      const previewDetails = resolveThemePreviewDetails(themeData, preset);
 
-        return (
-          <ThemeChoiceButton
-            key={themeId}
-            themeId={themeId}
-            active={isActive}
-            categoryLabel={preset?.category
-              ? t(`theme.selector.categories.${preset.category}`, { defaultValue: preset.category })
-              : t('theme.selector.themes')}
-            disabled={isThemeActionPending}
-            gradient={getGradientBackground(preset || themeData || { id: themeId })}
-            label={themeName}
-            previewDetails={resolveThemePreviewDetails(themeData, preset)}
-            onSelect={() => void handleThemeChange(themeId)}
-          />
-        );
-      })}
-    </div>
-  );
+      if (themeModeFilter !== 'all' && previewDetails?.mode && previewDetails.mode !== themeModeFilter) {
+        return false;
+      }
+      if (themeSearchTerm.trim()) {
+        const query = themeSearchTerm.trim().toLowerCase();
+        const themeName = (preset?.name || t(`theme.selector.${themeId}`, { defaultValue: themeId })).toLowerCase();
+        return themeName.includes(query) || themeId.toLowerCase().includes(query);
+      }
+      return true;
+    });
+
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-1 border-b border-slate-100 dark:border-white/5">
+          <div className="inline-flex items-center gap-1 p-0.5 bg-slate-100 dark:bg-white/[0.06] rounded-lg border border-slate-200/50 dark:border-white/[0.04]">
+            {(['all', 'light', 'dark'] as const).map(mode => (
+              <button
+                key={mode}
+                type="button"
+                className={`px-3 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                  themeModeFilter === mode
+                    ? 'bg-white dark:bg-white/15 text-slate-900 dark:text-white shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
+                }`}
+                onClick={() => setThemeModeFilter(mode)}
+              >
+                {mode === 'all'
+                  ? t('theme.selector.filterAll', '全部')
+                  : mode === 'light'
+                  ? t('theme.selector.light', '浅色')
+                  : t('theme.selector.dark', '深色')}
+              </button>
+            ))}
+          </div>
+
+          <div className="relative min-w-[200px] flex-1 sm:flex-initial">
+            <input
+              type="text"
+              value={themeSearchTerm}
+              onChange={(e) => setThemeSearchTerm(e.target.value)}
+              placeholder={t('theme.selector.searchPlaceholder', '搜索主题名称...')}
+              className="w-full pl-8 pr-6 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+            />
+            <FaSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 w-3 h-3 pointer-events-none" />
+            {themeSearchTerm && (
+              <button
+                type="button"
+                onClick={() => setThemeSearchTerm('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs w-4 h-4 flex items-center justify-center cursor-pointer"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        </div>
+
+        {filteredThemes.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5" aria-busy={isThemeActionPending}>
+            {filteredThemes.map((themeId: string) => {
+              const themeManager = state.integration?.getThemeManager();
+              let preset = presets.find(p => p.id === themeId);
+              if (!preset) {
+                preset = getCachedThemePreset(themeId);
+              }
+
+              const themeData = themeCache[themeId] || (preset ? preset.theme : (themeManager?.getCurrentThemeId() === themeId ? themeManager?.getCurrentTheme() : null));
+              const isActive = currentTheme?.id === themeId;
+              const themeName = preset?.name || t(`theme.selector.${themeId}`, { defaultValue: themeId });
+
+              return (
+                <ThemeChoiceButton
+                  key={themeId}
+                  themeId={themeId}
+                  active={isActive}
+                  categoryLabel={preset?.category
+                    ? t(`theme.selector.categories.${preset.category}`, { defaultValue: preset.category })
+                    : t('theme.selector.themes')}
+                  disabled={isThemeActionPending}
+                  gradient={getGradientBackground(preset || themeData || { id: themeId })}
+                  label={themeName}
+                  previewDetails={resolveThemePreviewDetails(themeData, preset)}
+                  onSelect={() => void handleThemeChange(themeId)}
+                />
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-12 text-center text-slate-400">
+            <p className="text-sm">{t('theme.selector.noMatchingThemes', '未找到匹配的主题')}</p>
+            <button
+              type="button"
+              className="mt-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+              onClick={() => {
+                setThemeSearchTerm('');
+                setThemeModeFilter('all');
+              }}
+            >
+              {t('theme.selector.clearFilters', '重置筛选条件')}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // 渲染预设列表
   const renderPresetList = () => {
