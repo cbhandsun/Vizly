@@ -20,8 +20,8 @@ interface ThemeSelectorDialogProps {
   title: string;
 }
 
-const ACTIVE_TAB_CLASS = 'bg-white dark:bg-white/15 text-slate-900 dark:text-white shadow-[0_1px_3px_rgba(0,0,0,0.08)] rounded-lg font-semibold transition-all duration-200 ring-1 ring-black/[0.04] dark:ring-white/[0.06]';
-const INACTIVE_TAB_CLASS = 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-black/[0.02] dark:hover:bg-white/[0.02] rounded-lg font-medium transition-all duration-200';
+const ACTIVE_TAB_CLASS = 'bg-white dark:bg-zinc-800 text-indigo-600 dark:text-indigo-400 shadow-[0_1px_3px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.06)] rounded-lg font-bold transition-all duration-200 border border-black/[0.06] dark:border-white/[0.1]';
+const INACTIVE_TAB_CLASS = 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-black/[0.03] dark:hover:bg-white/[0.03] rounded-lg font-medium transition-all duration-200';
 
 export const ThemeSelectorDialog: React.FC<ThemeSelectorDialogProps> = ({
   activeTab,
@@ -73,7 +73,7 @@ export const ThemeSelectorDialog: React.FC<ThemeSelectorDialogProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[3000] flex items-center justify-center p-4 sm:p-6 bg-slate-900/40 dark:bg-black/60 backdrop-blur-md transition-opacity duration-200"
+      className="fixed inset-0 z-[3000] flex items-center justify-center p-3 sm:p-6 bg-slate-900/40 dark:bg-black/65 backdrop-blur-md transition-opacity duration-200"
       onPointerDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -86,13 +86,13 @@ export const ThemeSelectorDialog: React.FC<ThemeSelectorDialogProps> = ({
         aria-labelledby={titleId}
         tabIndex={-1}
         onKeyDown={handleDialogKeyDown}
-        className="relative flex flex-col w-full max-w-4xl max-h-[calc(100dvh-32px)] sm:max-h-[88dvh] rounded-2xl bg-white/98 dark:bg-[#111216]/98 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.25)] overflow-hidden pointer-events-auto"
+        className="relative flex flex-col w-full max-w-[940px] max-h-[calc(100dvh-24px)] sm:max-h-[88dvh] rounded-2xl bg-white/98 dark:bg-[#121317]/98 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.28)] overflow-hidden pointer-events-auto"
         onPointerDown={(event) => event.stopPropagation()}
       >
         {/* ── Dialog Header ── */}
-        <div className="flex-none px-6 py-4.5 bg-slate-50/50 dark:bg-white/[0.02] border-b border-slate-200/70 dark:border-white/5 flex items-center justify-between shrink-0">
+        <div className="flex-none px-6 py-4 bg-slate-50/60 dark:bg-white/[0.02] border-b border-slate-200/70 dark:border-white/5 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500/15 via-violet-500/10 to-indigo-500/5 dark:from-indigo-400/20 dark:to-purple-400/10 border border-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-xs shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500/15 via-violet-500/10 to-indigo-500/5 dark:from-indigo-400/20 dark:to-purple-400/10 border border-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-2xs shrink-0">
               <FaPalette className="w-4 h-4" aria-hidden="true" />
             </div>
             <div className="flex flex-col">
@@ -120,12 +120,12 @@ export const ThemeSelectorDialog: React.FC<ThemeSelectorDialogProps> = ({
         </div>
 
         {/* ── Segmented Control Tab Navigation ── */}
-        <div className="flex-none px-6 py-3 border-b border-slate-100 dark:border-white/5 bg-slate-50/30 dark:bg-white/[0.01]">
+        <div className="flex-none px-6 py-2.5 border-b border-slate-100 dark:border-white/5 bg-slate-50/30 dark:bg-white/[0.01]">
           <span id={tabListLabelId} className="sr-only">{title}</span>
           <div
             role="tablist"
             aria-labelledby={tabListLabelId}
-            className="inline-flex items-center gap-1 p-1 bg-slate-100 dark:bg-white/[0.06] rounded-xl border border-slate-200/50 dark:border-white/[0.04] max-w-full overflow-x-auto"
+            className="inline-flex items-center gap-1 p-1 rounded-xl max-w-full overflow-x-auto shadow-xs" style={{ backgroundColor: 'rgba(0, 0, 0, 0.06)', border: '1px solid rgba(0, 0, 0, 0.08)' }}
           >
             {tabs.map((tab, index) => {
               const IconComponent = tab.icon;
@@ -161,7 +161,7 @@ export const ThemeSelectorDialog: React.FC<ThemeSelectorDialogProps> = ({
           role="tabpanel"
           aria-label={activeTabItem.label}
           tabIndex={0}
-          className="flex-1 overflow-y-auto px-6 py-5 focus-visible:outline-none"
+          className="flex-1 overflow-y-auto px-6 py-4 focus-visible:outline-none"
         >
           {children}
         </div>
@@ -170,3 +170,4 @@ export const ThemeSelectorDialog: React.FC<ThemeSelectorDialogProps> = ({
     document.body
   );
 };
+

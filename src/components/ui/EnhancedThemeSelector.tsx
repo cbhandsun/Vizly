@@ -15,6 +15,7 @@ import { useTheme } from '@vizly/core/theme';
 import type { Theme, ThemeMode, ThemePreset } from '@vizly/core/theme';
 
 import { getCachedThemePreset, parseThemeImportJson } from '@vizly/core/theme';
+import { themePresetMap } from '@vizly/core/theme-presets';
 import {
   logThemeSelectorApplyPresetFailure,
   logThemeSelectorChangeFailure,
@@ -121,12 +122,20 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
         const allPresets = presetManager.getAllPresets();
         const allCustomThemes = themeManager.getCustomThemes();
 
+        const themeResults = await Promise.all(
+          availableBuiltInIds.map(async (id) => {
+            try {
+              const t = await themeManager.getTheme(id);
+              return [id, t] as const;
+            } catch {
+              return [id, null] as const;
+            }
+          })
+        );
         const cache: Record<string, Theme> = {};
-        for (const id of availableBuiltInIds) {
-          const t = await themeManager.getTheme(id);
+        for (const [id, t] of themeResults) {
           if (t) cache[id] = t;
         }
-        
         setThemeCache(cache);
         setPresets(allPresets);
         setCustomThemes(allCustomThemes);
@@ -304,9 +313,10 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
     reader.readAsText(file);
   }, [actions, state.integration]);
 
-  const resolveThemePreviewDetails = (themeData: unknown, preset?: unknown): ThemePreviewDetails | undefined => {
+  const resolveThemePreviewDetails = (themeData: unknown, preset?: unknown, fallbackThemeId?: string): ThemePreviewDetails | undefined => {
     const p = preset as { theme?: Theme; category?: string } | undefined;
-    const t = (p?.theme || themeData) as Theme | undefined;
+    const staticPreset = fallbackThemeId && fallbackThemeId in themePresetMap ? themePresetMap[fallbackThemeId as keyof typeof themePresetMap] : undefined;
+    const t = (p?.theme || themeData || staticPreset?.theme) as Theme | undefined;
     if (!t) return undefined;
     const isDark = t.mode === 'dark';
     const canvasBg = t.diagram?.canvas?.background || (isDark ? '#141414' : '#ffffff');
@@ -360,7 +370,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
       }
       const themeManager = state.integration?.getThemeManager();
       const themeData = themeCache[themeId] || (preset ? preset.theme : (themeManager?.getCurrentThemeId() === themeId ? themeManager?.getCurrentTheme() : null));
-      const previewDetails = resolveThemePreviewDetails(themeData, preset);
+      const previewDetails = resolveThemePreviewDetails(themeData, preset, themeId);
 
       if (themeModeFilter !== 'all' && previewDetails?.mode && previewDetails.mode !== themeModeFilter) {
         return false;
@@ -375,17 +385,30 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
 
     return (
       <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-1 border-b border-slate-100 dark:border-white/5">
-          <div className="inline-flex items-center gap-1 p-0.5 bg-slate-100 dark:bg-white/[0.06] rounded-lg border border-slate-200/50 dark:border-white/[0.04]">
+        <div className="flex items-center justify-between gap-3 pb-3 mb-1 border-b border-slate-200/60 dark:border-white/10">
+          {/* Mode Switcher */}
+          <div
+            className="inline-flex items-center gap-1 p-1 rounded-xl shadow-xs"
+            style={{
+              backgroundColor: 'rgba(0, 0, 0, 0.06)',
+              border: '1px solid rgba(0, 0, 0, 0.08)',
+            }}
+          >
             {(['all', 'light', 'dark'] as const).map(mode => (
               <button
                 key={mode}
                 type="button"
-                className={`px-3 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                   themeModeFilter === mode
-                    ? 'bg-white dark:bg-white/15 text-slate-900 dark:text-white shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
+                    ? 'text-indigo-600 dark:text-indigo-400 font-bold'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white font-medium'
                 }`}
+                style={{
+                  backgroundColor: themeModeFilter === mode ? '#ffffff' : 'transparent',
+                  color: themeModeFilter === mode ? '#4f46e5' : '#475569',
+                  boxShadow: themeModeFilter === mode ? '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                  border: themeModeFilter === mode ? '1px solid rgba(0,0,0,0.06)' : '1px solid transparent',
+                }}
                 onClick={() => setThemeModeFilter(mode)}
               >
                 {mode === 'all'
@@ -397,29 +420,38 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
             ))}
           </div>
 
-          <div className="relative min-w-[200px] flex-1 sm:flex-initial">
-            <input
-              type="text"
-              value={themeSearchTerm}
-              onChange={(e) => setThemeSearchTerm(e.target.value)}
-              placeholder={t('theme.selector.searchPlaceholder', '搜索主题名称...')}
-              className="w-full pl-8 pr-6 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-            />
-            <FaSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 w-3 h-3 pointer-events-none" />
-            {themeSearchTerm && (
-              <button
-                type="button"
-                onClick={() => setThemeSearchTerm('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs w-4 h-4 flex items-center justify-center cursor-pointer"
-              >
-                ×
-              </button>
-            )}
+          {/* Search Box */}
+          <div className="relative w-56 sm:w-64">
+            <div
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all shadow-xs"
+              style={{
+                backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                border: '1px solid rgba(0, 0, 0, 0.09)',
+              }}
+            >
+              <FaSearch className="w-3.5 h-3.5 text-slate-400 shrink-0 pointer-events-none" />
+              <input
+                type="text"
+                value={themeSearchTerm}
+                onChange={(e) => setThemeSearchTerm(e.target.value)}
+                placeholder={t('theme.selector.searchPlaceholder', '搜索主题名称...')}
+                className="w-full bg-transparent text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 outline-none border-none p-0 focus:ring-0"
+              />
+              {themeSearchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setThemeSearchTerm('')}
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs w-4 h-4 flex items-center justify-center cursor-pointer shrink-0"
+                >
+                  ×
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
         {filteredThemes.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5" aria-busy={isThemeActionPending}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-4.5 pt-1" aria-busy={isThemeActionPending}>
             {filteredThemes.map((themeId: string) => {
               const themeManager = state.integration?.getThemeManager();
               let preset = presets.find(p => p.id === themeId);
@@ -442,7 +474,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
                   disabled={isThemeActionPending}
                   gradient={getGradientBackground(preset || themeData || { id: themeId })}
                   label={themeName}
-                  previewDetails={resolveThemePreviewDetails(themeData, preset)}
+                  previewDetails={resolveThemePreviewDetails(themeData, preset, themeId)}
                   onSelect={() => void handleThemeChange(themeId)}
                 />
               );
@@ -485,7 +517,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
               <h4 className="text-xs font-bold tracking-wider text-gray-500 uppercase dark:text-gray-400">
                 {t(`theme.selector.categories.${category.id}`, { defaultValue: category.name })}
               </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6" aria-busy={isThemeActionPending}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-4.5" aria-busy={isThemeActionPending}>
                 {categoryPresets.map(preset => {
                   const isActive = currentTheme?.id === preset.id;
                   return (
@@ -497,7 +529,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
                       disabled={isThemeActionPending}
                       gradient={getGradientBackground(preset)}
                       label={preset.name || preset.id}
-                      previewDetails={resolveThemePreviewDetails(preset.theme, preset)}
+                      previewDetails={resolveThemePreviewDetails(preset.theme, preset, preset.id)}
                       onSelect={() => void handleApplyPreset(preset)}
                     />
                   );
@@ -599,7 +631,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-4.5">
         {customThemes.map(theme => (
           <div key={theme.id} className="relative flex flex-col gap-3 p-4 transition-all duration-200 rounded-xl bg-white/30 dark:bg-black/20 border border-black/5 dark:border-white/5 hover:bg-white/50 dark:hover:bg-black/30 group">
             <div className="w-full h-16 rounded-lg opacity-90 shadow-inner" style={{
