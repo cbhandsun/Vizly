@@ -125,6 +125,7 @@ export const AuthStatus: React.FC<AuthStatusProps> = ({
                         aria-label={t('auth.login')}
                         icon={<LoginOutlined />}
                         onClick={() => setIsModalOpen(true)}
+                        className={`auth-compact-login-btn${commercialTouchTarget ? ' auth-compact-login-btn--commercial' : ''}`}
                         style={commercialTouchTarget ? COMMERCIAL_TOUCH_TARGET_STYLE : undefined}
                     />
                 </Tooltip>
@@ -155,7 +156,7 @@ export const AuthStatus: React.FC<AuthStatusProps> = ({
             <button
                 ref={accountMenuTriggerRef}
                 type="button"
-                className={`auth-account-menu-trigger${commercialTouchTarget ? ' auth-account-menu-trigger--commercial' : ''}`}
+                className={`auth-account-menu-trigger${commercialTouchTarget ? ' auth-account-menu-trigger--commercial' : ''}${compact ? ' auth-account-menu-trigger--compact' : ''}`}
                 aria-label={t('auth.accountMenu')}
                 aria-haspopup="menu"
                 aria-expanded={isAccountMenuOpen}
@@ -164,7 +165,8 @@ export const AuthStatus: React.FC<AuthStatusProps> = ({
                 onKeyDown={handleAccountMenuTriggerKeyDown}
             >
                 <Avatar
-                    size="small"
+                    size={commercialTouchTarget ? 'default' : 'small'}
+                    className="auth-account-avatar"
                     style={{ backgroundColor: '#1890ff' }}
                     icon={<UserOutlined />}
                 >

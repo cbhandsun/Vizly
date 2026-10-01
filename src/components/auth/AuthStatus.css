@@ -7,16 +7,20 @@
     min-height: 32px;
     padding: 4px;
     border: 0;
-    border-radius: 8px;
+    border-radius: 9999px;
     background: transparent;
     color: inherit;
     cursor: pointer;
-    transition: background-color 160ms ease, box-shadow 160ms ease;
+    transition: background-color 160ms ease, box-shadow 160ms ease, transform 120ms ease;
 }
 
 .auth-account-menu-trigger:hover,
 .auth-account-menu-trigger[aria-expanded='true'] {
-    background: color-mix(in srgb, var(--vz-brand-from, #6366f1) 10%, transparent);
+    background: color-mix(in srgb, var(--vz-brand-from, #6366f1) 12%, transparent);
+}
+
+.auth-account-menu-trigger:active {
+    transform: scale(0.95);
 }
 
 .auth-account-menu-trigger:focus-visible {
@@ -24,15 +28,79 @@
     outline-offset: 2px;
 }
 
+.auth-account-menu-trigger--compact {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    padding: 0;
+}
+
 .auth-account-menu-trigger--commercial {
     width: var(--commercial-touch-target, 44px);
     min-width: var(--commercial-touch-target, 44px);
     height: var(--commercial-touch-target, 44px);
     min-height: var(--commercial-touch-target, 44px);
+    padding: 0;
+}
+
+.auth-account-avatar {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 24px !important;
+    height: 24px !important;
+    border-radius: 9999px !important;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+    transition: box-shadow 160ms ease;
+    flex-shrink: 0;
+}
+
+[data-theme='dark'] .auth-account-avatar,
+.dark .auth-account-avatar {
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.auth-compact-login-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+    padding: 0 !important;
+    border-radius: 6px !important;
+    color: rgb(100 116 139) !important;
+    transition: background-color 160ms ease, color 160ms ease !important;
+}
+
+.auth-compact-login-btn:hover {
+    color: rgb(15 23 42) !important;
+    background-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme='dark'] .auth-compact-login-btn,
+.dark .auth-compact-login-btn {
+    color: rgb(148 163 184) !important;
+}
+
+[data-theme='dark'] .auth-compact-login-btn:hover,
+.dark .auth-compact-login-btn:hover {
+    color: rgb(241 245 249) !important;
+    background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.auth-compact-login-btn--commercial {
+    width: var(--commercial-touch-target, 44px) !important;
+    min-width: var(--commercial-touch-target, 44px) !important;
+    height: var(--commercial-touch-target, 44px) !important;
+    min-height: var(--commercial-touch-target, 44px) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .auth-account-menu-trigger {
-        transition: none;
+    .auth-account-menu-trigger,
+    .auth-compact-login-btn {
+        transition: none !important;
     }
 }

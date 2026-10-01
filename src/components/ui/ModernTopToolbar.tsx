@@ -476,10 +476,13 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
           <div className="w-[1px] h-4 bg-slate-200/80 dark:bg-white/10 mx-0.5 flex-shrink-0" />
           <div className="flex items-center gap-1">
             {!isMobile && showThemeSelector && (
-              <DeferredEnhancedThemeSelector variant="icon" />
+              <DeferredEnhancedThemeSelector
+                variant="icon"
+                className="w-8 h-8 min-w-0 min-h-0 inline-flex items-center justify-center rounded-[6px] border-none text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+              />
             )}
             <div
-              className={`${isMobile ? 'w-[44px] h-[44px]' : 'w-7 h-7'} rounded-full overflow-hidden border border-slate-200/50 dark:border-slate-700 flex-shrink-0 cursor-pointer active:scale-95`}
+              className={`${isMobile ? 'w-[44px] min-w-[44px] h-[44px] min-h-[44px]' : 'w-8 h-8'} flex items-center justify-center flex-shrink-0`}
               style={isMobile ? MOBILE_SQUARE_TOUCH_TARGET_STYLE : undefined}
             >
               <AuthStatusCompact commercialTouchTarget={isMobile} />

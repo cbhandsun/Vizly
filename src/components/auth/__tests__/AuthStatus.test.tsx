@@ -57,6 +57,18 @@ describe('AuthStatusCompact', () => {
         expect(trigger.style.minWidth).toBe('var(--commercial-touch-target, 44px)');
         expect(trigger.style.height).toBe('var(--commercial-touch-target, 44px)');
         expect(trigger.style.minHeight).toBe('var(--commercial-touch-target, 44px)');
+        expect(trigger.classList.contains('auth-compact-login-btn')).toBe(true);
+        expect(trigger.classList.contains('auth-compact-login-btn--commercial')).toBe(true);
+    });
+
+    it('renders compact account menu trigger and avatar when authenticated', () => {
+        authState.user = { email: 'member@example.com' };
+        render(<AuthStatusCompact />);
+
+        const trigger = screen.getByRole('button', { name: '账户菜单' });
+        expect(trigger.classList.contains('auth-account-menu-trigger--compact')).toBe(true);
+        const avatar = trigger.querySelector('.auth-account-avatar');
+        expect(avatar).toBeTruthy();
     });
 
     it('uses a native account menu button with explicit popup state', async () => {
