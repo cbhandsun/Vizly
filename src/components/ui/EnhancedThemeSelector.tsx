@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { THEME_JSON_IMPORT_MAX_BYTES, getFileSizeLimitError } from '@vizly/core/input';
 import { theme } from 'antd';
 import Popconfirm from 'antd/es/popconfirm';
-import { FaPalette, FaDownload, FaUpload, FaPlus, FaTrash, FaCheck, FaTimes, FaSearch } from 'react-icons/fa';
+import { FaPalette, FaDownload, FaUpload, FaPlus, FaTrash, FaCheck, FaTimes, FaSearch, FaLayerGroup, FaInfoCircle, FaFileCode, FaSlidersH, FaArrowRight } from 'react-icons/fa';
 
 import { useConfigIntegration } from '@vizly/core/editor-hooks';
 import { useTheme } from '@vizly/core/theme';
@@ -555,6 +555,53 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
 
     const presetManager = state.integration.getPresetManager();
     const categories = presetManager.getCategories();
+    const hasAnyCategoryPresets = categories.some(category =>
+      presets.some(preset => preset.category === category.id)
+    );
+
+    if (!hasAnyCategoryPresets) {
+      return (
+        <div className="py-12 sm:py-16 px-6 text-center rounded-2xl border border-dashed border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/[0.02] flex flex-col items-center justify-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-2xl shadow-sm border border-indigo-100 dark:border-indigo-500/20">
+            <FaLayerGroup aria-hidden="true" />
+          </div>
+          <div className="flex flex-col gap-1 max-w-md">
+            <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">
+              {t('theme.selector.emptyPresetsTitle', '暂无专属预设组合')}
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+              {t(
+                'theme.selector.emptyPresetsDesc',
+                '预设组合支持针对流程、图例与容器一键打包多套预制方案。当前尚未导入或配置场景预设，您可以直接选用基础主题，或在「自定义」中创建您的专属配色。'
+              )}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab('themes')}
+              className="flex min-h-[44px] items-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 rounded-xl shadow-sm transition-all hover:shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+            >
+              <span>{t('theme.selector.viewAllThemes', '浏览全部主题')}</span>
+              <FaArrowRight className="text-xs opacity-80" aria-hidden="true" />
+            </button>
+            {showCustomThemes && (
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('custom');
+                  setIsCreatingCustom(true);
+                }}
+                className="flex min-h-[44px] items-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/10 rounded-xl shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+              >
+                <FaPlus className="text-xs" aria-hidden="true" />
+                <span>{t('theme.selector.create', '新建主题')}</span>
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="flex flex-col gap-6">
@@ -564,10 +611,13 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
 
           return (
             <div key={category.id} className="flex flex-col gap-3">
-              <h4 className="text-xs font-bold tracking-wider text-gray-500 uppercase dark:text-gray-400">
+              <h4 className="text-xs font-bold tracking-wider text-slate-500 uppercase dark:text-slate-400">
                 {t(`theme.selector.categories.${category.id}`, { defaultValue: category.name })}
               </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-7 lg:gap-8 pt-2 pb-6" aria-busy={isThemeActionPending}>
+              <div
+                className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-7 lg:gap-8 pt-2 pb-6"
+                aria-busy={isThemeActionPending}
+              >
                 {categoryPresets.map(preset => {
                   const isActive = currentTheme?.id === preset.id;
                   return (
@@ -594,160 +644,245 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
 
   // 渲染自定义主题
   const renderCustomThemes = () => (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between pointer-events-none">
-        <h4 className="text-sm font-bold tracking-wider text-gray-500 uppercase dark:text-gray-400 pointer-events-auto">{t('theme.selector.custom')}</h4>
-        <button
-          type="button"
-          className="flex min-h-[44px] items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 dark:bg-blue-500/10 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors pointer-events-auto shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-          onClick={() => setIsCreatingCustom(true)}
-        >
-          <FaPlus aria-hidden="true" /> {t('theme.selector.create')}
-        </button>
+    <div className="flex flex-col gap-5">
+      {/* 顶部标题与新建操作栏 */}
+      <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-0.5">
+          <h4 className="text-sm font-semibold tracking-wide text-slate-800 dark:text-slate-200">
+            {t('theme.selector.custom', '自定义主题')}
+          </h4>
+          <p className="text-xs text-slate-400 dark:text-slate-500">
+            {t('theme.selector.customSubtitle', '定制符合您品牌或项目规范的配色风格')}
+          </p>
+        </div>
+        {!isCreatingCustom && (
+          <button
+            type="button"
+            className="flex min-h-[44px] items-center gap-2 px-3.5 py-1.5 text-xs sm:text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 rounded-xl shadow-sm transition-all hover:shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+            onClick={() => setIsCreatingCustom(true)}
+          >
+            <FaPlus className="text-xs" aria-hidden="true" />
+            <span>{t('theme.selector.create', '新建主题')}</span>
+          </button>
+        )}
       </div>
 
+      {/* 创建表单卡片 */}
       {isCreatingCustom && (
         <form
-          className="flex flex-col gap-3 p-4 rounded-xl bg-white/50 dark:bg-black/30 border border-blue-200/50 dark:border-blue-800/30"
-          onSubmit={(event) => { event.preventDefault(); void handleCreateCustomTheme(); }}
+          className="flex flex-col gap-4 p-5 sm:p-6 rounded-2xl bg-white/80 dark:bg-slate-900/60 border border-indigo-200/80 dark:border-indigo-500/20 shadow-md backdrop-blur-sm"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleCreateCustomTheme();
+          }}
         >
-          <label className="flex flex-col gap-1 text-xs font-medium text-gray-600 dark:text-gray-300">
-            {t('theme.selector.name')}
-            <input
-              autoFocus
-              type="text"
-              required
-              maxLength={80}
-              value={customThemeForm.name}
-              onChange={(e) => setCustomThemeForm(prev => ({ ...prev, name: e.target.value }))}
-              className="w-full px-3 py-2 text-sm transition-colors border rounded-md border-gray-300/50 dark:border-gray-600/50 bg-white/70 dark:bg-black/40 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-xs font-medium text-gray-600 dark:text-gray-300">
-            {t('theme.selector.desc')}
-            <input
-              type="text"
-              maxLength={240}
-              value={customThemeForm.description}
-              onChange={(e) => setCustomThemeForm(prev => ({ ...prev, description: e.target.value }))}
-              className="w-full px-3 py-2 text-sm transition-colors border rounded-md border-gray-300/50 dark:border-gray-600/50 bg-white/70 dark:bg-black/40 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-xs font-medium text-gray-600 dark:text-gray-300">
-            {t('theme.selector.mode')}
-            <select
-              value={customThemeForm.mode}
-              onChange={(e) => setCustomThemeForm(prev => ({ ...prev, mode: e.target.value as ThemeMode }))}
-              className="w-full px-3 py-2 text-sm transition-colors border rounded-md border-gray-300/50 dark:border-gray-600/50 bg-white/70 dark:bg-black/40 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+          <div className="flex items-center justify-between pb-3 border-b border-slate-200/60 dark:border-white/[0.08]">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+              <FaPalette className="text-indigo-500" aria-hidden="true" />
+              <span>{t('theme.selector.createFormTitle', '创建自定义主题')}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setIsCreatingCustom(false);
+                setCustomThemeForm(EMPTY_CUSTOM_THEME_FORM);
+              }}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+              aria-label={t('theme.selector.actions.cancel', '取消')}
             >
-            <option value="light">{t('theme.selector.light')}</option>
-            <option value="dark">{t('theme.selector.dark')}</option>
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-xs font-medium text-gray-600 dark:text-gray-300">
-            {t('theme.selector.baseTheme')}
-            <select
-              value={customThemeForm.baseTheme}
-              onChange={(e) => setCustomThemeForm(prev => ({ ...prev, baseTheme: e.target.value }))}
-              className="w-full px-3 py-2 text-sm transition-colors border rounded-md border-gray-300/50 dark:border-gray-600/50 bg-white/70 dark:bg-black/40 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+              <FaTimes aria-hidden="true" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label className="flex flex-col gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
+              <span>{t('theme.selector.name', '主题名称')} <span className="text-rose-500">*</span></span>
+              <input
+                autoFocus
+                type="text"
+                required
+                maxLength={80}
+                placeholder={t('theme.selector.namePlaceholder', '如：品牌专属暗色')}
+                value={customThemeForm.name}
+                onChange={(e) => setCustomThemeForm(prev => ({ ...prev, name: e.target.value }))}
+                className="w-full px-3 py-2 text-sm transition-colors border rounded-xl border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/80 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              />
+            </label>
+            <label className="flex flex-col gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
+              <span>{t('theme.selector.mode', '色彩模式')}</span>
+              <select
+                value={customThemeForm.mode}
+                onChange={(e) => setCustomThemeForm(prev => ({ ...prev, mode: e.target.value as ThemeMode }))}
+                className="w-full px-3 py-2 text-sm transition-colors border rounded-xl border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/80 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+              >
+                <option value="light">{t('theme.selector.light', '亮色')}</option>
+                <option value="dark">{t('theme.selector.dark', '暗色')}</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label className="flex flex-col gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
+              <span>{t('theme.selector.baseTheme', '基准底色模板')}</span>
+              <select
+                value={customThemeForm.baseTheme}
+                onChange={(e) => setCustomThemeForm(prev => ({ ...prev, baseTheme: e.target.value }))}
+                className="w-full px-3 py-2 text-sm transition-colors border rounded-xl border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/80 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+              >
+                {availableThemes.map((themeId: string) => (
+                  <option key={themeId} value={themeId}>{t(`theme.selector.${themeId}`, { defaultValue: themeId })} ({themeId})</option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
+              <span>{t('theme.selector.desc', '描述')}</span>
+              <input
+                type="text"
+                maxLength={240}
+                placeholder={t('theme.selector.descPlaceholder', '主题适用场景或配色说明（可选）')}
+                value={customThemeForm.description}
+                onChange={(e) => setCustomThemeForm(prev => ({ ...prev, description: e.target.value }))}
+                className="w-full px-3 py-2 text-sm transition-colors border rounded-xl border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/80 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              />
+            </label>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                setIsCreatingCustom(false);
+                setCustomThemeForm(EMPTY_CUSTOM_THEME_FORM);
+              }}
+              className="flex min-h-[44px] items-center justify-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700/80 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
             >
-              {availableThemes.map((themeId: string) => (
-                <option key={themeId} value={themeId}>{themeId}</option>
-              ))}
-            </select>
-          </label>
-          <div className="flex gap-2 mt-2">
+              <FaTimes aria-hidden="true" />
+              <span>{t('theme.selector.actions.cancel', '取消')}</span>
+            </button>
             <button
               type="submit"
               disabled={!customThemeForm.name.trim()}
-              className="flex min-h-[44px] flex-1 items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex min-h-[44px] items-center justify-center gap-2 px-5 py-2 text-xs sm:text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 rounded-xl shadow-sm transition-all hover:shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <FaCheck aria-hidden="true" /> {t('theme.selector.actions.create')}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setIsCreatingCustom(false); setCustomThemeForm(EMPTY_CUSTOM_THEME_FORM); }}
-              className="flex min-h-[44px] flex-1 items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-            >
-              <FaTimes aria-hidden="true" /> {t('theme.selector.actions.cancel')}
+              <FaCheck aria-hidden="true" />
+              <span>{t('theme.selector.actions.create', '创建主题')}</span>
             </button>
           </div>
         </form>
       )}
 
+      {/* 空状态引导 */}
       {customThemes.length === 0 && !isCreatingCustom && (
-        <div className="text-center py-8 text-gray-400 dark:text-gray-500 text-sm">
-          {t('theme.selector.emptyCustom')}
+        <div className="py-12 sm:py-16 px-6 text-center rounded-2xl border border-dashed border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/[0.02] flex flex-col items-center justify-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-2xl shadow-sm border border-indigo-100 dark:border-indigo-500/20">
+            <FaSlidersH aria-hidden="true" />
+          </div>
+          <div className="flex flex-col gap-1 max-w-md">
+            <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">
+              {t('theme.selector.emptyCustomTitle', '尚未创建自定义主题')}
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+              {t(
+                'theme.selector.emptyCustomDesc',
+                '基于现有基础主题进行微调，定制适合特定报告、业务流程或品牌的专属配色，并在随时一键应用与导出。'
+              )}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsCreatingCustom(true)}
+            className="flex min-h-[44px] items-center gap-2 px-4 py-2 text-xs sm:text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 rounded-xl shadow-sm transition-all hover:shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+          >
+            <FaPlus className="text-xs" aria-hidden="true" />
+            <span>{t('theme.selector.createFirstTheme', '创建第一个主题')}</span>
+          </button>
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-4.5">
-        {customThemes.map(theme => (
-          <div key={theme.id} className="relative flex flex-col gap-3 p-4 transition-all duration-200 rounded-xl bg-white/30 dark:bg-black/20 border border-black/5 dark:border-white/5 hover:bg-white/50 dark:hover:bg-black/30 group">
-            <div className="w-full h-16 rounded-lg opacity-90 shadow-inner" style={{
-              background: getGradientBackground(theme),
-            }} />
-            <div className="flex flex-col">
-              <div className="text-sm font-semibold text-gray-800 dark:text-gray-100">{theme.name}</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{theme.description}</div>
-            </div>
-            <div className="absolute top-2 right-2 flex gap-1 bg-white/90 dark:bg-black/60 p-1 rounded-lg shadow-sm backdrop-blur-sm pointer-events-auto">
-              <button
-                type="button"
-                aria-label={`${t('theme.selector.actions.apply')} ${theme.name}`}
-                aria-pressed={currentTheme?.id === theme.id}
+      {/* 自定义主题卡片列表 */}
+      {customThemes.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-7 lg:gap-8 pt-2 pb-6">
+          {customThemes.map(theme => (
+            <div key={theme.id} className="relative group">
+              <ThemeChoiceButton
+                themeId={theme.id}
+                active={currentTheme?.id === theme.id}
+                categoryLabel={theme.mode === 'dark' ? t('theme.selector.dark', '暗色') : t('theme.selector.light', '亮色')}
                 disabled={isThemeActionPending}
-                className="flex min-h-[44px] min-w-[44px] items-center justify-center p-1.5 text-blue-500 hover:text-blue-600 hover:bg-blue-50 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-wait disabled:opacity-50"
-                onClick={() => void handleThemeChange(theme.id)}
-                title={t('theme.selector.actions.apply') || 'Apply'}
-              >
-                <FaCheck aria-hidden="true" />
-              </button>
-              <Popconfirm
-                title={t('theme.selector.deleteConfirmTitle', { name: theme.name })}
-                description={t('theme.selector.deleteConfirmDescription')}
-                okText={t('common.delete')}
-                cancelText={t('common.cancel')}
-                okButtonProps={{ danger: true }}
-                onConfirm={() => handleDeleteCustomTheme(theme.id)}
-              >
-                <button
-                  type="button"
-                  aria-label={`${t('theme.selector.actions.delete')} ${theme.name}`}
-                  className="flex min-h-[44px] min-w-[44px] items-center justify-center p-1.5 text-red-500 hover:text-red-600 hover:bg-red-50 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-                  title={t('theme.selector.actions.delete') || 'Delete'}
+                gradient={getGradientBackground(theme)}
+                label={theme.name}
+                previewDetails={resolveThemePreviewDetails(theme, undefined, theme.id)}
+                onSelect={() => void handleThemeChange(theme.id)}
+              />
+              <div className="absolute top-3.5 right-3.5 z-10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all duration-200">
+                <Popconfirm
+                  title={t('theme.selector.deleteConfirmTitle', { name: theme.name })}
+                  description={t('theme.selector.deleteConfirmDescription')}
+                  okText={t('common.delete', '删除')}
+                  cancelText={t('common.cancel', '取消')}
+                  okButtonProps={{ danger: true }}
+                  onConfirm={(e) => {
+                    e?.stopPropagation();
+                    void handleDeleteCustomTheme(theme.id);
+                  }}
                 >
-                  <FaTrash aria-hidden="true" />
-                </button>
-              </Popconfirm>
+                  <button
+                    type="button"
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label={`${t('theme.selector.actions.delete', '删除')} ${theme.name}`}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/95 dark:bg-slate-800/95 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 shadow-sm border border-slate-200/80 dark:border-white/10 backdrop-blur-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                    title={t('theme.selector.actions.delete', '删除')}
+                  >
+                    <FaTrash className="text-xs" aria-hidden="true" />
+                  </button>
+                </Popconfirm>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 
   // 渲染设置面板
   const renderSettings = () => (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 max-w-3xl">
       {showImportExport && (
-        <div className="flex flex-col gap-3">
-          <h4 className="text-xs font-bold tracking-wider text-gray-500 uppercase dark:text-gray-400">{t('theme.selector.import')}/{t('theme.selector.export')}</h4>
-          <div className="flex gap-4">
+        <div className="p-5 sm:p-6 rounded-2xl border border-slate-200/80 dark:border-white/[0.08] bg-white/70 dark:bg-white/[0.02] shadow-sm flex flex-col gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center text-lg shrink-0 border border-blue-100 dark:border-blue-500/20">
+              <FaFileCode aria-hidden="true" />
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                {t('theme.selector.settingsBackupTitle', '主题配置导入与导出')}
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                {t(
+                  'theme.selector.settingsBackupDesc',
+                  '将当前自定义主题及主题偏好导出为标准 JSON 格式文件，便于跨工作区、设备同步或备份归档。'
+                )}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 pt-1">
             <button
               type="button"
               onClick={() => void handleExportThemes()}
-              className="flex min-h-[44px] items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white/50 border border-gray-200/50 rounded-lg hover:bg-white/80 dark:bg-black/40 dark:text-gray-200 dark:border-gray-700/50 dark:hover:bg-black/60 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+              className="flex min-h-[44px] items-center gap-2.5 px-4 py-2 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-slate-700/60 rounded-xl shadow-xs transition-all hover:shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
             >
-              <FaDownload aria-hidden="true" /> {t('theme.selector.export')}
+              <FaDownload className="text-slate-400 dark:text-slate-500 text-xs" aria-hidden="true" />
+              <span>{t('theme.selector.export', '导出配置文件 (.json)')}</span>
             </button>
             <button
               type="button"
               aria-controls={importInputId}
-              className="flex min-h-[44px] items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white/50 border border-gray-200/50 rounded-lg hover:bg-white/80 dark:bg-black/40 dark:text-gray-200 dark:border-gray-700/50 dark:hover:bg-black/60 shadow-sm cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
               onClick={() => importInputRef.current?.click()}
+              className="flex min-h-[44px] items-center gap-2.5 px-4 py-2 text-xs sm:text-sm font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50/80 dark:bg-indigo-500/10 border border-indigo-200/60 dark:border-indigo-500/20 hover:bg-indigo-100/80 dark:hover:bg-indigo-500/20 rounded-xl shadow-xs cursor-pointer transition-all hover:shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
             >
-              <FaUpload aria-hidden="true" /> {t('theme.selector.import')}
+              <FaUpload className="text-xs" aria-hidden="true" />
+              <span>{t('theme.selector.import', '导入主题配置')}</span>
             </button>
             <input
               ref={importInputRef}
@@ -757,20 +892,73 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
               onChange={handleImportThemes}
               className="sr-only"
               tabIndex={-1}
-              aria-label={t('theme.selector.import')}
-              title={t('theme.selector.import')}
+              aria-label={t('theme.selector.import', '导入主题配置')}
+              title={t('theme.selector.import', '导入主题配置')}
             />
           </div>
+
+          <div className="flex items-center gap-2 text-[11px] text-slate-400 dark:text-slate-500 pt-1">
+            <FaInfoCircle className="shrink-0" aria-hidden="true" />
+            <span>{t('theme.selector.jsonFormatHint', '配置文件遵循 Vizly Theme JSON 标准规范，单文件最大支持 2MB。')}</span>
+          </div>
+
           {importStatus && (
-            <p
+            <div
               role={importStatus === 'success' ? 'status' : 'alert'}
-              className={`text-sm ${importStatus === 'success' ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}
+              className={`flex items-center gap-2 p-3 rounded-xl text-xs font-medium border ${
+                importStatus === 'success'
+                  ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200/80 dark:border-emerald-800/40'
+                  : 'bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-400 border-rose-200/80 dark:border-rose-800/40'
+              }`}
             >
-              {t(`theme.selector.importStatus.${importStatus}`)}
-            </p>
+              {importStatus === 'success' ? (
+                <FaCheck className="shrink-0" aria-hidden="true" />
+              ) : (
+                <FaInfoCircle className="shrink-0" aria-hidden="true" />
+              )}
+              <span>{t(`theme.selector.importStatus.${importStatus}`)}</span>
+            </div>
           )}
         </div>
       )}
+
+      {/* 当前生效主题概览 */}
+      <div className="p-5 sm:p-6 rounded-2xl border border-slate-200/80 dark:border-white/[0.08] bg-white/70 dark:bg-white/[0.02] shadow-sm flex flex-col gap-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center text-lg shrink-0 border border-purple-100 dark:border-purple-500/20">
+            <FaPalette aria-hidden="true" />
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+              {t('theme.selector.overviewTitle', '当前生效主题概览')}
+            </h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              {t('theme.selector.overviewDesc', '查看当前画布应用的主题状态与配置信息。')}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+          <div className="p-3.5 rounded-xl bg-slate-50/80 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/5 flex flex-col gap-1">
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">当前应用主题</span>
+            <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">
+              {currentTheme?.name || currentTheme?.id || '默认主题'}
+            </span>
+          </div>
+          <div className="p-3.5 rounded-xl bg-slate-50/80 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/5 flex flex-col gap-1">
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">色彩渲染模式</span>
+            <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+              {currentTheme?.mode === 'dark' ? '暗色模式 (Dark)' : '亮色模式 (Light)'}
+            </span>
+          </div>
+          <div className="p-3.5 rounded-xl bg-slate-50/80 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/5 flex flex-col gap-1">
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">已保存自定义主题</span>
+            <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+              {customThemes.length} 个方案
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 

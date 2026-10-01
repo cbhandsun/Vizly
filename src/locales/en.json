@@ -1897,7 +1897,21 @@
       "sunset": "Sunset",
       "mono": "Monochrome",
       "original": "Original",
-      "high-contrast": "High Contrast"
+      "high-contrast": "High Contrast",
+      "create": "New Theme",
+      "emptyPresetsTitle": "No Theme Presets Available",
+      "emptyPresetsDesc": "Presets bundle color systems for flows, legends, and containers. You can choose from standard themes or create your own custom theme.",
+      "viewAllThemes": "Browse All Themes",
+      "emptyCustomTitle": "No Custom Themes Yet",
+      "emptyCustomDesc": "Fine-tune any built-in theme to tailor styles to your brand or workflow, and export them anytime.",
+      "createFirstTheme": "Create Your First Theme",
+      "createFormTitle": "Create Custom Theme",
+      "customSubtitle": "Customize color styles to match your brand or project guidelines",
+      "settingsBackupTitle": "Import & Export Theme Configuration",
+      "settingsBackupDesc": "Export or import your custom themes and preferences for multi-device sync and team sharing.",
+      "jsonFormatHint": "Follows Vizly Theme JSON format specifications (max file size 2MB).",
+      "overviewTitle": "Current Active Theme Overview",
+      "overviewDesc": "Inspect current canvas theme status and active configuration."
     }
   },
   "edgeToolbar": {

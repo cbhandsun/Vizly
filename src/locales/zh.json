@@ -2093,7 +2093,21 @@
       "sunset": "日落",
       "mono": "单色",
       "original": "经典",
-      "high-contrast": "高对比"
+      "high-contrast": "高对比",
+      "create": "新建主题",
+      "emptyPresetsTitle": "暂无专属预设组合",
+      "emptyPresetsDesc": "预设组合支持针对流程、图例与容器一键打包多套预制方案。当前尚未导入或配置场景预设，您可以直接选用基础主题，或在「自定义」中创建您的专属配色。",
+      "viewAllThemes": "浏览全部主题",
+      "emptyCustomTitle": "尚未创建自定义主题",
+      "emptyCustomDesc": "基于现有基础主题进行微调，定制适合特定报告、业务流程或品牌的专属配色，并在随时一键应用与导出。",
+      "createFirstTheme": "创建第一个主题",
+      "createFormTitle": "创建自定义主题",
+      "customSubtitle": "定制符合您品牌或项目规范的配色风格",
+      "settingsBackupTitle": "主题配置导入与导出",
+      "settingsBackupDesc": "将当前自定义主题及主题偏好导出为标准 JSON 格式文件，便于跨工作区、设备同步或备份归档。",
+      "jsonFormatHint": "配置文件遵循 Vizly Theme JSON 标准规范，单文件最大支持 2MB。",
+      "overviewTitle": "当前生效主题概览",
+      "overviewDesc": "查看当前画布应用的主题状态与配置信息。"
     }
   },
   "edgeToolbar": {
