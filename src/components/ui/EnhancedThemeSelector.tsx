@@ -100,9 +100,22 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
   const [themeSearchTerm, setThemeSearchTerm] = useState('');
   const [themeModeFilter, setThemeModeFilter] = useState<'all' | 'light' | 'dark'>('all');
   const themeActionPendingRef = useRef(false);
+    const searchInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const importInputId = useId();
   const closeThemeDialog = useCallback(() => setIsOpen(false), []);
+    useEffect(() => {
+      if (!isOpen) return;
+      const handleGlobalKeyDown = (e: KeyboardEvent) => {
+        if (e.key === '/' && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          searchInputRef.current?.focus();
+        }
+      };
+      window.addEventListener('keydown', handleGlobalKeyDown);
+      return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    }, [isOpen]);
+
   const triggerLabel = ariaLabel || t('theme.selector.title');
 
   // 加载预设和自定义主题
@@ -385,73 +398,101 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
 
     return (
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between gap-3 pb-3 mb-1 border-b border-slate-200/60 dark:border-white/10">
+        <div className="flex items-center justify-between gap-4 pb-4 mb-2 border-b border-slate-200/60 dark:border-white/10">
           {/* Mode Switcher */}
-          <div
-            className="inline-flex items-center gap-1 p-1 rounded-xl shadow-xs"
-            style={{
-              backgroundColor: 'rgba(0, 0, 0, 0.06)',
-              border: '1px solid rgba(0, 0, 0, 0.08)',
-            }}
-          >
-            {(['all', 'light', 'dark'] as const).map(mode => (
-              <button
-                key={mode}
-                type="button"
-                className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                  themeModeFilter === mode
-                    ? 'text-indigo-600 dark:text-indigo-400 font-bold'
-                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white font-medium'
-                }`}
-                style={{
-                  backgroundColor: themeModeFilter === mode ? '#ffffff' : 'transparent',
-                  color: themeModeFilter === mode ? '#4f46e5' : '#475569',
-                  boxShadow: themeModeFilter === mode ? '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06)' : 'none',
-                  border: themeModeFilter === mode ? '1px solid rgba(0,0,0,0.06)' : '1px solid transparent',
-                }}
-                onClick={() => setThemeModeFilter(mode)}
-              >
-                {mode === 'all'
-                  ? t('theme.selector.filterAll', '全部')
-                  : mode === 'light'
-                  ? t('theme.selector.light', '浅色')
-                  : t('theme.selector.dark', '深色')}
-              </button>
-            ))}
+          <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-slate-100/90 dark:bg-zinc-800/80 border border-slate-200/60 dark:border-white/10 shadow-2xs">
+            {(['all', 'light', 'dark'] as const).map(mode => {
+              const isSelected = themeModeFilter === mode;
+              const count = mode === 'all'
+                ? availableThemes.length
+                : availableThemes.filter((themeId: string) => {
+                    let preset = presets.find(p => p.id === themeId);
+                    if (!preset) {
+                      preset = getCachedThemePreset(themeId);
+                    }
+                    const themeManager = state.integration?.getThemeManager();
+                    const themeData = themeCache[themeId] || (preset ? preset.theme : (themeManager?.getCurrentThemeId() === themeId ? themeManager?.getCurrentTheme() : null));
+                    const previewDetails = resolveThemePreviewDetails(themeData, preset, themeId);
+                    return previewDetails?.mode === mode;
+                  }).length;
+
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-white dark:bg-zinc-700 text-indigo-600 dark:text-indigo-400 font-bold shadow-xs border border-slate-200/50 dark:border-white/10'
+                      : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white font-medium border border-transparent'
+                  }`}
+                  onClick={() => setThemeModeFilter(mode)}
+                >
+                  <span>
+                    {mode === 'all'
+                      ? t('theme.selector.filterAll', '全部')
+                      : mode === 'light'
+                      ? t('theme.selector.light', '浅色')
+                      : t('theme.selector.dark', '深色')}
+                  </span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-medium ${
+                      isSelected
+                        ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300'
+                        : 'bg-slate-200/60 dark:bg-zinc-700/60 text-slate-500 dark:text-slate-400'
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Search Box */}
           <div className="relative w-56 sm:w-64">
-            <div
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all shadow-xs"
-              style={{
-                backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                border: '1px solid rgba(0, 0, 0, 0.09)',
-              }}
-            >
+            <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-100/70 dark:bg-zinc-800/60 hover:bg-slate-100 dark:hover:bg-zinc-800 focus-within:bg-white dark:focus-within:bg-zinc-800 border border-slate-200/80 dark:border-white/10 focus-within:border-indigo-500 dark:focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all shadow-2xs">
               <FaSearch className="w-3.5 h-3.5 text-slate-400 shrink-0 pointer-events-none" />
               <input
+                ref={searchInputRef}
                 type="text"
                 value={themeSearchTerm}
                 onChange={(e) => setThemeSearchTerm(e.target.value)}
                 placeholder={t('theme.selector.searchPlaceholder', '搜索主题名称...')}
                 className="w-full bg-transparent text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 outline-none border-none p-0 focus:ring-0"
               />
-              {themeSearchTerm && (
+              {themeSearchTerm ? (
                 <button
                   type="button"
                   onClick={() => setThemeSearchTerm('')}
-                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs w-4 h-4 flex items-center justify-center cursor-pointer shrink-0"
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs w-4 h-4 flex items-center justify-center cursor-pointer shrink-0 rounded-full hover:bg-slate-200 dark:hover:bg-zinc-700 transition-colors"
+                  title="清除"
                 >
                   ×
                 </button>
+              ) : (
+                <kbd className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-white/80 dark:bg-zinc-700/80 border border-slate-200/60 dark:border-white/10 text-[10px] font-mono text-slate-400 select-none shadow-2xs">/</kbd>
               )}
             </div>
           </div>
         </div>
 
         {filteredThemes.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-4.5 pt-1" aria-busy={isThemeActionPending}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-7 lg:gap-8 pt-2 pb-6" aria-busy={isThemeActionPending} onKeyDown={(e) => {
+            const target = e.target as HTMLElement;
+            if (!target.matches("button[data-theme-card]")) return;
+            const cards = Array.from(e.currentTarget.querySelectorAll("button[data-theme-card]"));
+            const index = cards.indexOf(target);
+            if (index < 0) return;
+            let nextIdx = -1;
+            if (e.key === "ArrowRight") nextIdx = (index + 1) % cards.length;
+            else if (e.key === "ArrowLeft") nextIdx = (index - 1 + cards.length) % cards.length;
+            else if (e.key === "ArrowDown") nextIdx = Math.min(cards.length - 1, index + 3);
+            else if (e.key === "ArrowUp") nextIdx = Math.max(0, index - 3);
+            if (nextIdx >= 0 && nextIdx !== index) {
+              e.preventDefault();
+              (cards[nextIdx] as HTMLElement)?.focus();
+            }
+          }}>
             {filteredThemes.map((themeId: string) => {
               const themeManager = state.integration?.getThemeManager();
               let preset = presets.find(p => p.id === themeId);
@@ -481,17 +522,26 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
             })}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-12 text-center text-slate-400">
-            <p className="text-sm">{t('theme.selector.noMatchingThemes', '未找到匹配的主题')}</p>
+          <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-zinc-800/80 border border-slate-200/80 dark:border-white/10 flex items-center justify-center text-slate-400 mb-3.5 shadow-2xs">
+              <FaSearch className="w-4 h-4 text-slate-400" />
+            </div>
+            <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1">
+              未找到与 &ldquo;{themeSearchTerm}&rdquo; 匹配的主题
+            </h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mb-4">
+              请检查关键词拼写，或切换亮色/暗色筛选条件重新检索
+            </p>
             <button
               type="button"
-              className="mt-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold cursor-pointer shadow-sm hover:shadow transition-all" style={{ backgroundColor: "#4f46e5", color: "#ffffff", padding: "8px 20px", borderRadius: "10px" }}
               onClick={() => {
                 setThemeSearchTerm('');
                 setThemeModeFilter('all');
+                searchInputRef.current?.focus();
               }}
             >
-              {t('theme.selector.clearFilters', '重置筛选条件')}
+              <span>重置全部筛选</span>
             </button>
           </div>
         )}
@@ -517,7 +567,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
               <h4 className="text-xs font-bold tracking-wider text-gray-500 uppercase dark:text-gray-400">
                 {t(`theme.selector.categories.${category.id}`, { defaultValue: category.name })}
               </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-4.5" aria-busy={isThemeActionPending}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-7 lg:gap-8 pt-2 pb-6" aria-busy={isThemeActionPending}>
                 {categoryPresets.map(preset => {
                   const isActive = currentTheme?.id === preset.id;
                   return (
