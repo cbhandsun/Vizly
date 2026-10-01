@@ -175,6 +175,7 @@
         "accountExists": "An account already exists for this email. Try signing in instead.",
         "passwordRejected": "This password does not meet the account security requirements.",
         "rateLimited": "Too many attempts. Please wait a moment and try again.",
+        "notConfigured": "Sign-in is not configured for this deployment. Please contact the administrator.",
         "unavailable": "Authentication is temporarily unavailable. Please try again."
       }
     }

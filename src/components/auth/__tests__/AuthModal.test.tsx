@@ -4,6 +4,10 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AUTH_MODAL_Z_INDEX, AuthModal } from '../AuthModal';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+const authModalStyles = readFileSync(resolve(process.cwd(), 'src/components/auth/AuthModal.css'), 'utf8');
 
 const {
     signInWithEmailMock,
@@ -58,6 +62,30 @@ vi.mock('react-i18next', () => ({
 }));
 
 describe('AuthModal', () => {
+    it.each(['password', 'magiclink', 'register'])('keeps %s tab labels centered inside the scrolling body', async (tab) => {
+        const style = document.createElement('style');
+        style.textContent = authModalStyles;
+        document.head.appendChild(style);
+        try {
+            render(<AuthModal open onCancel={vi.fn()} />);
+            fireEvent.click(screen.getByRole('tab', { name: `auth.modal.tabs.${tab}` }));
+            await waitFor(() => {
+                const activeTab = screen.getByRole('tab', { selected: true });
+                const tabStyle = getComputedStyle(activeTab);
+                expect(tabStyle.display).toBe('inline-flex');
+                expect(tabStyle.alignItems).toBe('center');
+                const tabs = activeTab.closest('.ant-tabs');
+                if (!tabs) throw new Error('Authentication tabs are missing');
+                expect(Number.parseFloat(getComputedStyle(tabs).marginTop) || 0).toBeGreaterThanOrEqual(0);
+            });
+            for (const input of document.querySelectorAll('.auth-modal .ant-input-affix-wrapper-lg')) {
+                expect(getComputedStyle(input).alignItems).toBe('center');
+            }
+        } finally {
+            style.remove();
+        }
+    });
+
     it('exposes a stable accessible name for the authentication dialog', () => {
         render(<AuthModal open onCancel={vi.fn()} />);
 

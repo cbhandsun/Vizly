@@ -6,6 +6,17 @@ Once released, the packages are installable anonymously from npm. The MIT licens
 
 ## Development
 
+For email/password and Magic Link sign-in, copy `.env.example` to `.env.local`
+and set your Supabase project URL and frontend publishable/anon key. Keep
+`.env.local` untracked and never use a secret or service-role key. Restart Vite
+after changing environment files. Without this configuration, local editing
+remains available but sign-in and cloud features are disabled.
+
+For hosted deployments, set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
+in the build environment and rebuild/redeploy; Vite embeds them at build time.
+Configure Supabase Auth's Site URL and redirect allowlist for each application
+origin (including `http://localhost:5173` when testing Magic Links locally).
+
 ```sh
 npm ci
 npm run check

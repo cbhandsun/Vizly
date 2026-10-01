@@ -31,6 +31,15 @@
     padding-block: 0;
 }
 
+.auth-modal .ant-tabs-tab-btn {
+    display: inline-flex;
+    align-items: center;
+}
+
+.auth-modal .ant-input-affix-wrapper-lg {
+    align-items: center;
+}
+
 .auth-modal__switch-row {
     text-align: center;
 }

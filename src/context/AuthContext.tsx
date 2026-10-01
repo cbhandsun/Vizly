@@ -16,7 +16,7 @@ declare global {
     }
 }
 
-const noSupabaseError = { error: { message: 'Supabase is not configured', name: 'AuthError', status: 0 } as unknown as AuthError };
+const noSupabaseError = { error: { message: 'Supabase is not configured', code: 'auth_not_configured', name: 'AuthError', status: 0 } as unknown as AuthError };
 
 let supabaseModulePromise: Promise<typeof import('@/services/supabase')> | null = null;
 

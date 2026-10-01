@@ -9,6 +9,7 @@ export type AuthErrorMessageKey =
     | 'auth.modal.errors.accountExists'
     | 'auth.modal.errors.passwordRejected'
     | 'auth.modal.errors.rateLimited'
+    | 'auth.modal.errors.notConfigured'
     | 'auth.modal.errors.unavailable';
 
 interface AuthOperationResult {
@@ -37,6 +38,9 @@ export const resolveAuthErrorMessageKey = (error: unknown): AuthErrorMessageKey 
     const message = readStringField(error, 'message');
     const status = readStatus(error);
 
+    if (code === 'auth_not_configured') {
+        return 'auth.modal.errors.notConfigured';
+    }
     if (status === 429 || code.includes('rate_limit') || message.includes('rate limit')) {
         return 'auth.modal.errors.rateLimited';
     }

@@ -417,7 +417,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 }}
                 items={tabItems.map((item) => ({ ...item, disabled: operation.busy }))}
                 centered
-                style={{ marginTop: -8 }}
             />
         </Modal>
     );

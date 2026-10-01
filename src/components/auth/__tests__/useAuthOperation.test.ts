@@ -8,6 +8,7 @@ import {
 
 describe('authentication input and error boundaries', () => {
     it.each([
+        [{ code: 'auth_not_configured' }, 'auth.modal.errors.notConfigured'],
         [{ code: 'invalid_credentials' }, 'auth.modal.invalidCredentials'],
         [{ message: 'Invalid login credentials' }, 'auth.modal.invalidCredentials'],
         [{ code: 'user_already_exists' }, 'auth.modal.errors.accountExists'],

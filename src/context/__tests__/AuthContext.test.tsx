@@ -25,8 +25,9 @@ const Probe = () => {
         onClick={() => {
           void auth.signInWithEmail('user@example.test').then(({
             error,
-          }: { error: { message: string } | null }) => {
+          }: { error: { message: string; code?: string } | null }) => {
             document.body.dataset.authError = error?.message || '';
+            document.body.dataset.authErrorCode = error?.code || '';
           });
         }}
       >
@@ -42,13 +43,19 @@ describe('AuthProvider', () => {
     vi.unstubAllEnvs();
     vi.clearAllMocks();
     delete document.body.dataset.authError;
+    delete document.body.dataset.authErrorCode;
     localStorage.clear();
     window.location.hash = '';
   });
 
-  it('treats invalid Supabase URLs as unconfigured auth', async () => {
-    vi.stubEnv('VITE_SUPABASE_URL', 'javascript:alert(1)');
-    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'anon-key');
+  it.each([
+    ['', ''],
+    ['https://project.supabase.co', ''],
+    ['', 'anon-key'],
+    ['javascript:alert(1)', 'anon-key'],
+  ])('reports missing or invalid auth configuration without loading the client', async (url, key) => {
+    vi.stubEnv('VITE_SUPABASE_URL', url);
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', key);
     window.location.hash = '#access_token=token';
 
     render(
@@ -62,6 +69,7 @@ describe('AuthProvider', () => {
 
     screen.getByRole('button', { name: 'sign in' }).click();
     await waitFor(() => expect(document.body.dataset.authError).toBe('Supabase is not configured'));
+    expect(document.body.dataset.authErrorCode).toBe('auth_not_configured');
   });
 
   it('ignores encoded auth-looking strings that are not Supabase hash parameters', async () => {
