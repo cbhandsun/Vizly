@@ -10,6 +10,7 @@ export default defineConfig({
     alias: { '@': resolve(import.meta.dirname, 'src') },
     dedupe: ['yjs', 'react', 'react-dom'],
   },
+  optimizeDeps: { force: true, include: ['@vizly/core', '@vizly/contracts'] },
   ssr: { noExternal: ['@vizly/core', '@vizly/contracts'] },
   worker: { format: 'es' },
   test: {

@@ -2107,7 +2107,13 @@
       "settingsBackupDesc": "将当前自定义主题及主题偏好导出为标准 JSON 格式文件，便于跨工作区、设备同步或备份归档。",
       "jsonFormatHint": "配置文件遵循 Vizly Theme JSON 标准规范，单文件最大支持 2MB。",
       "overviewTitle": "当前生效主题概览",
-      "overviewDesc": "查看当前画布应用的主题状态与配置信息。"
+      "overviewDesc": "查看当前画布应用的主题状态与配置信息。",
+      "filterAll": "全部",
+      "searchPlaceholder": "搜索主题名称...",
+      "namePlaceholder": "如：品牌专属暗色",
+      "descPlaceholder": "主题适用场景或配色说明（可选）",
+      "tremor": "Tremor 中台",
+      "catppuccin": "Catppuccin 极客"
     }
   },
   "edgeToolbar": {

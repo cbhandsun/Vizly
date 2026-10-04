@@ -1911,7 +1911,13 @@
       "settingsBackupDesc": "Export or import your custom themes and preferences for multi-device sync and team sharing.",
       "jsonFormatHint": "Follows Vizly Theme JSON format specifications (max file size 2MB).",
       "overviewTitle": "Current Active Theme Overview",
-      "overviewDesc": "Inspect current canvas theme status and active configuration."
+      "overviewDesc": "Inspect current canvas theme status and active configuration.",
+      "filterAll": "All",
+      "searchPlaceholder": "Search themes by name...",
+      "namePlaceholder": "e.g. Custom Dark",
+      "descPlaceholder": "Theme usage or description (optional)",
+      "tremor": "Tremor SaaS",
+      "catppuccin": "Catppuccin Mocha"
     }
   },
   "edgeToolbar": {

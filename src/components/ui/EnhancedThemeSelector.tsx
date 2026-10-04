@@ -15,7 +15,7 @@ import { useTheme } from '@vizly/core/theme';
 import type { Theme, ThemeMode, ThemePreset } from '@vizly/core/theme';
 
 import { getCachedThemePreset, parseThemeImportJson } from '@vizly/core/theme';
-import { themePresetMap } from '@vizly/core/theme-presets';
+import { themePresetMap, themePresets } from '@vizly/core/theme-presets';
 import {
   logThemeSelectorApplyPresetFailure,
   logThemeSelectorChangeFailure,
@@ -99,8 +99,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
   const [themeCache, setThemeCache] = useState<Record<string, Theme>>({});
   const [themeSearchTerm, setThemeSearchTerm] = useState('');
   const [themeModeFilter, setThemeModeFilter] = useState<'all' | 'light' | 'dark'>('all');
-  const themeActionPendingRef = useRef(false);
-    const searchInputRef = useRef<HTMLInputElement>(null);
+      const searchInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const importInputId = useId();
   const closeThemeDialog = useCallback(() => setIsOpen(false), []);
@@ -132,7 +131,8 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
         const availableBuiltInIds = themeManager.getAvailablePresetIds().filter(id => !id.startsWith('custom-'));
         await themeManager.preloadThemes(availableBuiltInIds);
 
-        const allPresets = presetManager.getAllPresets();
+        const managerPresets = presetManager.getAllPresets();
+        const allPresets = managerPresets.length > 0 ? managerPresets : (themePresets || []);
         const allCustomThemes = themeManager.getCustomThemes();
 
         const themeResults = await Promise.all(
@@ -173,8 +173,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
 
   // 处理主题切换
   const handleThemeChange = useCallback(async (themeId: string) => {
-    if (themeActionPendingRef.current) return;
-    themeActionPendingRef.current = true;
+    if (isThemeActionPending) return;
     setIsThemeActionPending(true);
     try {
       await setTheme(themeId);
@@ -188,21 +187,19 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
     } catch (error) {
       logThemeSelectorChangeFailure(error);
     } finally {
-      themeActionPendingRef.current = false;
       setIsThemeActionPending(false);
     }
-  }, [setTheme, state.integration, onThemeChange]);
+  }, [setTheme, state.integration, onThemeChange, isThemeActionPending]);
 
   // 应用预设
   const handleApplyPreset = useCallback(async (preset: ThemePreset) => {
-    if (themeActionPendingRef.current) return;
-    themeActionPendingRef.current = true;
+    if (isThemeActionPending) return;
     setIsThemeActionPending(true);
     try {
       if (!state.integration) return;
 
       const presetManager = state.integration.getPresetManager();
-      const theme = presetManager.applyPreset(preset.id);
+      const theme = presetManager.applyPreset(preset.id) || preset.theme || null;
       await setTheme(preset.id);
       
       // ⭐ 同样广播此预设应用事件
@@ -214,10 +211,9 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
     } catch (error) {
       logThemeSelectorApplyPresetFailure(error);
     } finally {
-      themeActionPendingRef.current = false;
       setIsThemeActionPending(false);
     }
-  }, [state.integration, onThemeChange, setTheme]);
+  }, [state.integration, onThemeChange, setTheme, isThemeActionPending]);
 
   // 创建自定义主题
   const handleCreateCustomTheme = useCallback(async () => {
@@ -696,7 +692,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <label className="flex flex-col gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
-              <span>{t('theme.selector.name', '主题名称')} <span className="text-rose-500">*</span></span>
+              <span>{t('theme.selector.name', '主题名称')} <span className="text-rose-500" aria-hidden="true">*</span></span>
               <input
                 autoFocus
                 type="text"
@@ -811,6 +807,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
                 disabled={isThemeActionPending}
                 gradient={getGradientBackground(theme)}
                 label={theme.name}
+                ariaLabel={`${t('theme.selector.actions.apply', '应用')} ${theme.name}`}
                 previewDetails={resolveThemePreviewDetails(theme, undefined, theme.id)}
                 onSelect={() => void handleThemeChange(theme.id)}
               />
@@ -830,7 +827,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
                     type="button"
                     onClick={(e) => e.stopPropagation()}
                     aria-label={`${t('theme.selector.actions.delete', '删除')} ${theme.name}`}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/95 dark:bg-slate-800/95 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 shadow-sm border border-slate-200/80 dark:border-white/10 backdrop-blur-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                    className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg bg-white/95 dark:bg-slate-800/95 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 shadow-sm border border-slate-200/80 dark:border-white/10 backdrop-blur-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
                     title={t('theme.selector.actions.delete', '删除')}
                   >
                     <FaTrash className="text-xs" aria-hidden="true" />

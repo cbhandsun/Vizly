@@ -18,6 +18,7 @@ interface ThemeChoiceButtonProps {
   disabled: boolean;
   gradient: string;
   label: string;
+  ariaLabel?: string;
   previewDetails?: ThemePreviewDetails;
   onSelect: () => void;
 }
@@ -29,6 +30,7 @@ export const ThemeChoiceButton: React.FC<ThemeChoiceButtonProps> = ({
   disabled,
   gradient,
   label,
+  ariaLabel,
   previewDetails,
   onSelect,
 }) => {
@@ -86,7 +88,8 @@ export const ThemeChoiceButton: React.FC<ThemeChoiceButtonProps> = ({
     <button
       type="button"
       data-theme-id={themeId}
-      aria-label={label}
+      data-theme-card
+      aria-label={ariaLabel || label}
       aria-pressed={active}
       disabled={disabled}
       className={`group relative flex min-h-[44px] flex-col gap-2.5 p-3 sm:p-3.5 text-left transition-all duration-300 rounded-2xl cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70 ${
