@@ -2,14 +2,28 @@ import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { setTimeout } from 'node:timers/promises';
 import { probeS3Readiness } from './s3ReadinessProbe.mjs';
+import { fileURLToPath } from 'node:url';
 
+const fixtureImage = 'vizly-s3-fixture:source-0d7408fc9969';
+const fixtureContext = fileURLToPath(new URL('../../integration/fixtures/minio/', import.meta.url));
+
+export function prepareIsolatedS3Fixture() {
+  const result = spawnSync('docker', ['build', '--tag', fixtureImage, fixtureContext], {
+    encoding: 'utf8', timeout: 600000, windowsHide: true,
+  });
+  if (result.error || result.status !== 0) throw new Error('Isolated S3 source fixture build failed');
+}
+
+/** @param {unknown} mode */
 export async function runIsolatedS3Integration(mode) {
   if (mode !== 'service' && mode !== 'browser') throw new Error('Invalid isolated S3 integration mode');
+  prepareIsolatedS3Fixture();
   const container = `vizly-s3-${mode}-${process.pid}-${randomBytes(4).toString('hex')}`;
-  const image = 'minio/minio@sha256:a1ea29fa28355559ef137d71fc570e508a214ec84ff8083e39bc5428980b015e';
+  const image = fixtureImage;
   const accessKey = `vizly${randomBytes(12).toString('hex')}`;
   const secretKey = randomBytes(32).toString('hex');
   const dockerEnv = { ...process.env, MINIO_ROOT_USER: accessKey, MINIO_ROOT_PASSWORD: secretKey };
+  /** @param {string[]} args */
   const docker = args => {
     const result = spawnSync('docker', args, { encoding: 'utf8', timeout: 60000, env: dockerEnv, windowsHide: true });
     if (result.error || result.status !== 0) throw new Error('Isolated S3 Docker operation failed');

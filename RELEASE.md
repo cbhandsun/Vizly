@@ -8,6 +8,15 @@ Core package integration check when `@vizly/core` is tested from a local tarball
 - Run `npm run check` before a release candidate is tagged.
 - For local Core integration, install the approved `.tgz` from `vizly-core`,
   then rerun `npm run check` in this repository.
+- In a disposable integration checkout, use
+  `node scripts/install-locked-core-artifact.mjs <approved-core.tgz>`.
+  This runs `npm ci` against a temporary Core-only manifest/lock overlay,
+  rejects dependency or peer graph changes, and verifies installed versions,
+  URLs and integrity values. Source manifests are restored byte-for-byte;
+  the installed Core remains available for the following validation gates.
+  A later ordinary `npm ci` restores the source-declared Core package.
+  Do not use `npm install --package-lock=false` for locked integration checks:
+  it can resolve newer unrelated packages even when the source lock stays unchanged.
 - Verify the application starts and loads a representative diagram without
   console errors.
 - Keep the release artifact provenance clear: record the app commit, the

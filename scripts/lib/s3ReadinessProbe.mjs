@@ -1,3 +1,7 @@
+/**
+ * @param {unknown} endpoint
+ * @param {{timeoutMs?: number, fetchImpl?: typeof fetch}} [options]
+ */
 export const probeS3Readiness = async (endpoint, { timeoutMs = 1000, fetchImpl = fetch } = {}) => {
   const portMatch = typeof endpoint === 'string' && endpoint.length <= 64
     ? /^http:\/\/127\.0\.0\.1:(\d+)$/.exec(endpoint) : null;
@@ -9,9 +13,11 @@ export const probeS3Readiness = async (endpoint, { timeoutMs = 1000, fetchImpl =
     throw new Error('Invalid isolated S3 readiness options');
   }
   const controller = new AbortController();
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
   let timer;
   // AbortSignal.timeout uses an unreferenced timer. A pending fetch must keep
   // this standalone gate alive until its bounded readiness decision settles.
+  /** @type {Promise<boolean>} */
   const deadline = new Promise(resolve => {
     timer = setTimeout(() => {
       controller.abort();

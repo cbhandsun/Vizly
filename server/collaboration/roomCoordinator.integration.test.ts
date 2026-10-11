@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
-import WebSocket from 'ws';
+import WebSocket, { type RawData } from 'ws';
 import { WebsocketProvider } from 'y-websocket';
 import { createFilePersistence } from './persistence.js';
 import { createCollaborationServer } from './server.js';
@@ -50,6 +50,35 @@ const peer = async (url: string, token: string) => {
   cleanup.push(dispose);
   await vi.waitFor(() => expect(provider.synced).toBe(true), { timeout: 5000 });
   return { doc, provider, dispose, problems, revisions };
+};
+/** A local Yjs update is not a durable server acknowledgement. */
+const publishAndAwaitCommit = (client: Awaited<ReturnType<typeof peer>>, publish: () => void) => {
+  const socket = client.provider.ws as unknown as WebSocket | null;
+  if (!socket || socket.readyState !== WebSocket.OPEN) return Promise.reject(new Error('Editor socket is unavailable'));
+  return new Promise<void>((resolve, reject) => {
+    let targetClock = 0;
+    const cleanup = () => { socket.off('message', onMessage); socket.off('close', onClose); socket.off('error', onError); };
+    const onClose = () => { cleanup(); reject(new Error('Editor socket closed before committed update')); };
+    const onError = (error: Error) => { cleanup(); reject(error); };
+    const onMessage = (data: RawData) => {
+      try {
+        const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : Array.isArray(data) ? Buffer.concat(data) : data;
+        const decoder = decoding.createDecoder(bytes);
+        if (decoding.readVarUint(decoder) !== 0 || decoding.readVarUint(decoder) !== sync.messageYjsUpdate) return;
+        const update = decoding.readVarUint8Array(decoder);
+        if (decoding.hasContent(decoder)) throw new Error('Unexpected acknowledgement content');
+        if (targetClock === 0 || (Y.parseUpdateMeta(update).to.get(client.doc.clientID) ?? 0) < targetClock) return;
+        cleanup(); resolve();
+      } catch (error: unknown) { cleanup(); reject(error); }
+    };
+    socket.on('message', onMessage); socket.once('close', onClose); socket.once('error', onError);
+    try {
+      const previousClock = Y.decodeStateVector(Y.encodeStateVector(client.doc)).get(client.doc.clientID) ?? 0;
+      publish();
+      targetClock = Y.decodeStateVector(Y.encodeStateVector(client.doc)).get(client.doc.clientID) ?? 0;
+      if (targetClock <= previousClock) throw new Error('No local update to acknowledge');
+    } catch (error: unknown) { cleanup(); reject(error); }
+  });
 };
 const setup = async (active = false) => {
   const directory = await mkdtemp(join(tmpdir(), 'vizly-coordinator-integration-'));
@@ -191,7 +220,9 @@ describe('cold cloud coordinator over actual sockets and disk', () => {
     const viewer = await peer(runtime.url, 'viewer');
     const map = editor.doc.getMap<unknown>('flowchart-nodes');
     const previous = readCollaborationElement(map.get('a')) ?? undefined;
-    editor.doc.transact(() => publishCollaborationElement(map, 'a', node('Original', 99), previous));
+    await publishAndAwaitCommit(editor, () => {
+      editor.doc.transact(() => publishCollaborationElement(map, 'a', node('Original', 99), previous));
+    });
     await vi.waitFor(() => expect(readCollaborationElement(viewer.doc.getMap('flowchart-nodes').get('a'))).toEqual(node('Original', 99)));
     runtime.setCloud(checkpoint('Online cloud change', '2026-10-08T20:00:00.123457Z'));
     await vi.waitFor(() => {
@@ -203,6 +234,45 @@ describe('cold cloud coordinator over actual sockets and disk', () => {
     expect((await runtime.persistence.loadRecord(id))?.checkpoint?.revision).toBe('2026-10-08T20:00:00.123457Z');
     expect(runtime.readCloud, JSON.stringify({ events: runtime.log.mock.calls,
       readers: runtime.readCloud.mock.calls.map(call => (call as unknown as [{ userId: string }])[0]?.userId) })).toHaveBeenCalledTimes(2);
+  });
+  it('does not acknowledge a local drag before persistence accepts it', async () => {
+    const runtime = await setup(true);
+    const editor = await peer(runtime.url, 'editor'), viewer = await peer(runtime.url, 'viewer');
+    const save = runtime.persistence.save.bind(runtime.persistence);
+    let release: () => void = () => { throw new Error('Not initialized'); };
+    let begin: () => void = () => { throw new Error('Not initialized'); };
+    const pending = new Promise<void>(resolve => { release = resolve; });
+    const begun = new Promise<void>(resolve => { begin = resolve; });
+    const held = vi.spyOn(runtime.persistence, 'save').mockImplementationOnce(async (...args) => {
+      begin(); await pending; return save(...args);
+    });
+    const map = editor.doc.getMap<unknown>('flowchart-nodes');
+    let acknowledged = false;
+    const committed = publishAndAwaitCommit(editor, () => {
+      editor.doc.transact(() => publishCollaborationElement(map, 'a', node('Original', 101), readCollaborationElement(map.get('a')) ?? undefined));
+    }).then(() => { acknowledged = true; });
+    try {
+      await begun;
+      expect(acknowledged).toBe(false);
+      expect(readCollaborationElement(viewer.doc.getMap('flowchart-nodes').get('a'))).toEqual(node());
+    } finally { release(); }
+    await committed;
+    await vi.waitFor(() => expect(readCollaborationElement(viewer.doc.getMap('flowchart-nodes').get('a'))).toEqual(node('Original', 101)));
+    held.mockRestore();
+  });
+  it('rejects the acknowledgement when an editor update cannot be persisted', async () => {
+    const runtime = await setup(true);
+    const editor = await peer(runtime.url, 'editor'), viewer = await peer(runtime.url, 'viewer');
+    const before = await readFile(join(runtime.directory, `${id}.yjs`));
+    const rejected = vi.spyOn(runtime.persistence, 'save').mockRejectedValueOnce(new Error('Synthetic disk failure'));
+    const map = editor.doc.getMap<unknown>('flowchart-nodes');
+    await expect(publishAndAwaitCommit(editor, () => {
+      editor.doc.transact(() => publishCollaborationElement(map, 'a', node('Original', 101), readCollaborationElement(map.get('a')) ?? undefined));
+    })).rejects.toThrow('closed before committed update');
+    expect(readCollaborationElement(viewer.doc.getMap('flowchart-nodes').get('a'))).toEqual(node());
+    expect(await readFile(join(runtime.directory, `${id}.yjs`))).toEqual(before);
+    expect(runtime.log).toHaveBeenCalledWith('persistence-failed');
+    rejected.mockRestore();
   });
   it('polls revision only without downloading an unchanged full graph repeatedly', async () => {
     const runtime = await setup(true);

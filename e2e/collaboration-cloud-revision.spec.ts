@@ -69,7 +69,9 @@ test('accepted cloud revision follows the live canvas and survives designer brid
     }, id);
     await expect(node).toContainText('Accepted cloud revision canvas');
     await expect.poll(readRevision).toBe(revision);
-    await node.dblclick();
+    await page.getByRole('button', { name: '适应屏幕', exact: true }).click();
+    await expect(node).toBeInViewport();
+    await node.getByText('Accepted cloud revision canvas', { exact: true }).dblclick();
     const editor = node.getByRole('textbox', { name: 'Edit Node Text', exact: true });
     await editor.fill('Local edit after accepted cloud'); await editor.press('Enter');
     await expect(node).toContainText('Local edit after accepted cloud');

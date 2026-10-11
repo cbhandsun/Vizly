@@ -52,7 +52,9 @@ test('collaboration conflict retains edits and saves a local copy before reconne
   await page.goto('/?precompiledCapture=wms-process-flow-v1#/?diagram=wms-process-flow-v1&room=vizly-room-wms-process-flow-v1');
   await expect(page.getByRole('button', { name: '打开协作详情：已连接协作服务', exact: true })).toBeVisible();
   const node = page.locator('.react-flow__node[data-id="order-import"]');
-  await node.dblclick();
+  await page.getByRole('button', { name: '适应屏幕', exact: true }).click();
+  await expect(node).toBeInViewport();
+  await node.getByText('订单导入/创建', { exact: true }).dblclick();
   const editor = node.getByRole('textbox', { name: 'Edit Node Text', exact: true });
   await editor.fill('Recovery retained edit'); await editor.press('Enter');
   await expect(node).toContainText('Recovery retained edit');

@@ -10,8 +10,13 @@ export default defineConfig([
   globalIgnores(['dist', 'dist-collaboration', 'coverage', 'node_modules', 'tmp/**/assets/**', 'tmp/vercel-collaboration-production/api/index.js']),
   {
     files: ['scripts/prepare-vercel-static.mjs', 'scripts/deploy-prepared-vercel-static.mjs',
+      'scripts/install-locked-core-artifact.mjs',
+      'scripts/lib/coreArtifactLockOverlay.mjs', 'scripts/lib/coreArtifactLockOverlay.test.mjs',
+      'scripts/lib/installLockedCoreArtifact.mjs', 'scripts/lib/installLockedCoreArtifact.test.mjs',
       'scripts/lib/vercelDeploymentEnvironment.mjs', 'scripts/lib/vercelDeploymentEnvironment.test.mjs',
       'scripts/lib/jsonCheckpoint.mjs', 'scripts/lib/jsonCheckpoint.test.mjs',
+      'scripts/lib/isolatedS3Integration.mjs', 'scripts/lib/isolatedS3Integration.test.mjs',
+      'scripts/lib/s3ReadinessProbe.mjs', 'scripts/lib/s3ReadinessProbe.test.mjs',
       'scripts/lib/vercel-static-artifact.mjs', 'scripts/lib/vercel-static-artifact.test.mjs',
       'scripts/lib/preparedVercelDeployment.mjs', 'scripts/lib/preparedVercelDeployment.test.mjs'],
     extends: [js.configs.recommended],
