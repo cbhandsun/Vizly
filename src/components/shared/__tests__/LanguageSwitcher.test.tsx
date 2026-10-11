@@ -63,8 +63,8 @@ interface MockDropdownProps {
   };
 }
 
-vi.mock('antd', () => ({
-  Dropdown: ({ children, menu, onOpenChange, open = false, classNames }: MockDropdownProps) => {
+vi.mock('antd/es/dropdown', () => ({
+  default: ({ children, menu, onOpenChange, open = false, classNames }: MockDropdownProps) => {
     const trigger = cloneElement(children, {
       onClick: event => {
         children.props.onClick?.(event);
@@ -104,7 +104,9 @@ vi.mock('antd', () => ({
       </div>
     );
   },
-  Select: ({ 'aria-label': ariaLabel }: { 'aria-label'?: string }) => (
+}));
+vi.mock('antd/es/select', () => ({
+  default: ({ 'aria-label': ariaLabel }: { 'aria-label'?: string }) => (
     <select aria-label={ariaLabel} />
   ),
 }));

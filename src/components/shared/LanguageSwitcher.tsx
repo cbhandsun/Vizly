@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Select, Dropdown } from 'antd';
+import Select from 'antd/es/select';
+import Dropdown from 'antd/es/dropdown';
 import { GlobalOutlined } from '@ant-design/icons';
 import {
     logLanguageSwitcherConfigManagerInitFailure,

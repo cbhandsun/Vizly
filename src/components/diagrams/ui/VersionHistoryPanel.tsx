@@ -81,6 +81,7 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
         if (currentOperation?.kind === 'save' || currentOperation?.kind === 'restore') return;
         if (currentOperation?.kind === 'preview') finishOperation(currentOperation);
         const previewBase = exitPreview();
+        if (previewVersion && !previewBase) return;
         if (previewBase) {
             setNodes(previewBase.nodes);
             setEdges(previewBase.edges);

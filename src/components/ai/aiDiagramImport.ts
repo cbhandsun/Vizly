@@ -9,6 +9,9 @@ export interface AIDiagramImportFallback {
 }
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem'>;
+export type LocalDiagramRegistrationService = {
+    registerRemoteDiagram: (...args: Parameters<DataService['registerRemoteDiagram']>) => StandardDiagramData | Promise<StandardDiagramData>;
+};
 
 export const parseAIDiagramJson = (
     jsonContent: string,
@@ -28,12 +31,12 @@ export const serializeAIDiagram = (diagram: StandardDiagramData): string => (
 );
 
 export const registerAIDiagramLocally = (
-    dataService: Pick<DataService, 'registerRemoteDiagram'>,
+    dataService: LocalDiagramRegistrationService,
     diagram: StandardDiagramData,
     title: string
-): StandardDiagramData => {
+): Promise<StandardDiagramData> => {
     const id = diagram.id || crypto.randomUUID();
-    return dataService.registerRemoteDiagram(diagram, {
+    return Promise.resolve(dataService.registerRemoteDiagram(diagram, {
         id,
         title,
     }, true, {
@@ -42,7 +45,7 @@ export const registerAIDiagramLocally = (
             ...(diagram.metadata || {}),
             title,
         },
-    });
+    }));
 };
 
 export const upsertDiagramConfigIndex = (

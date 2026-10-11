@@ -21,8 +21,8 @@ describe('ShareService', () => {
         window.history.replaceState({}, '', '/');
     });
 
-    const createQueryMock = (result: any = { data: null, error: null }) => {
-        const query: any = {
+    const createQueryMock = (result: { data: unknown; error: unknown } = { data: null, error: null }) => {
+        const query: Record<string, ReturnType<typeof vi.fn>> = {
             select: vi.fn(() => query),
             eq: vi.fn(() => query),
             insert: vi.fn(() => query),

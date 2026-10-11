@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Conversation, Message } from '../AIConversationService';
 
-const mockSupabaseState = vi.hoisted(() => ({ value: null as any }));
+const mockSupabaseState = vi.hoisted(() => ({ value: null as { from: ReturnType<typeof vi.fn> } | null }));
 const safeLogState = vi.hoisted(() => ({
     debug: vi.fn(),
     info: vi.fn(),
@@ -239,7 +239,7 @@ describe('AIConversationService', () => {
     });
 
     it('confirms cloud conversation deletion by requiring one deleted row', async () => {
-        const query: any = {
+        const query: Record<string, ReturnType<typeof vi.fn>> = {
             delete: vi.fn(() => query),
             eq: vi.fn(() => query),
             select: vi.fn(() => Promise.resolve({ data: [{ id: 'conv-1' }], error: null })),
@@ -265,7 +265,7 @@ describe('AIConversationService', () => {
     });
 
     it('does not throw or report cloud success when cloud conversation deletion fails', async () => {
-        const query: any = {
+        const query: Record<string, ReturnType<typeof vi.fn>> = {
             delete: vi.fn(() => query),
             eq: vi.fn(() => query),
             select: vi.fn(() => Promise.resolve({ data: [], error: null })),

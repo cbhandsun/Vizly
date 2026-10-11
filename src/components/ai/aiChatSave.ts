@@ -1,7 +1,8 @@
 import type { StandardDiagramData } from '@vizly/core/types';
-import type { DataService } from '@/services/DataService';
+import type { LocalDiagramRegistrationService } from './aiDiagramImport';
 import type { UnifiedStorageService } from '@/services/UnifiedStorageService';
 import type { IStorageProvider } from '@/services/storage/types';
+import { readSavedDiagramId } from '@/services/cloudSaveIdentity';
 
 export type AIChatSaveTarget = 'local' | 's3' | 'supabase';
 
@@ -33,12 +34,12 @@ export interface ExecuteAIChatDiagramSaveOptions {
     now?: () => number;
     createUuid?: () => string;
     parseDiagram: (jsonContent: string, fallback: { id: string; title: string }) => StandardDiagramData;
-    getLocalDataService: () => Pick<DataService, 'registerRemoteDiagram'>;
+    getLocalDataService: () => LocalDiagramRegistrationService;
     registerLocalDiagram: (
-        dataService: Pick<DataService, 'registerRemoteDiagram'>,
+        dataService: LocalDiagramRegistrationService,
         diagram: StandardDiagramData,
         title: string
-    ) => StandardDiagramData;
+    ) => StandardDiagramData | Promise<StandardDiagramData>;
     persistLocalIndex: (storage: LocalStorageLike, diagram: StandardDiagramData, title: string) => void;
     loadUnifiedStorage: () => Promise<Pick<UnifiedStorageService, 'getProvider'>>;
 }
@@ -127,9 +128,11 @@ export const executeAIChatDiagramSave = async ({
 
     diagram.metadata = diagram.metadata || {};
     diagram.metadata.title = trimmedTitle;
+    // Imported/generated JSON has no authenticated loaded-view revision.
+    diagram.metadata.cloud = undefined;
 
     if (target === 'local') {
-        const registeredDiagram = registerLocalDiagram(getLocalDataService(), diagram, trimmedTitle);
+        const registeredDiagram = await registerLocalDiagram(getLocalDataService(), diagram, trimmedTitle);
         persistLocalIndex(localStorage, registeredDiagram, trimmedTitle);
         return {
             target,
@@ -146,7 +149,7 @@ export const executeAIChatDiagramSave = async ({
     const finalId = resolveAIChatCloudDiagramId(target, diagram.id, createUuid, now);
     diagram.id = finalId;
 
-    await provider.saveDiagram({
+    const saved = await provider.saveDiagram({
         id: finalId,
         title: trimmedTitle,
         content: diagram,
@@ -157,6 +160,6 @@ export const executeAIChatDiagramSave = async ({
     return {
         target,
         title: trimmedTitle,
-        diagramId: finalId,
+        diagramId: readSavedDiagramId(saved),
     };
 };

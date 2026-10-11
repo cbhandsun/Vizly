@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 
 import { act, renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beginVersionPreview, discardVersionPreview } from '../../collaboration/versionPreviewSession';
+import { commitCollaborationCloudRevision } from '../../collaboration/collaborationCloudRevision';
 
 const storageMocks = vi.hoisted(() => ({
     isConfigured: vi.fn(),
@@ -80,6 +82,8 @@ vi.mock('../cloudSaveRecovery', () => ({
 }));
 
 import { useCloudSave } from '../useCloudSave';
+import { tryAttachDiagramSnapshot } from '@vizly/core/export';
+import { S3ConditionalWriteConflictError } from '@/services/s3ObjectRevision';
 
 interface TestBridge {
     id: string;
@@ -93,6 +97,7 @@ interface TestBridge {
             provider: 'supabase' | 's3';
             id: string;
             title?: string;
+            revision?: string;
         };
     };
 }
@@ -106,11 +111,149 @@ const createBridge = (): TestBridge => ({
 });
 
 describe('useCloudSave', () => {
+    it('conditionally saves the accepted collaboration revision and then advances to the saved revision', async () => {
+        const bridge = createBridge();
+        bridge.metadata = { cloud: { provider: 'supabase', id: bridge.id, revision: '2026-10-08T20:00:00.123456Z' } };
+        const accepted = '2026-10-08T20:00:00.123457Z', saved = '2026-10-08T20:00:00.123458Z';
+        expect(commitCollaborationCloudRevision(bridge, bridge.id, accepted)).toBe(true);
+        bridgeMocks.get.mockReturnValue(bridge);
+        storageMocks.provider.saveDiagram.mockImplementation(async payload => ({ ...payload, updated_at: saved }));
+        const { result } = renderHook(() => useCloudSave(bridge.id));
+        await act(async () => { await result.current.saveToCloud(); });
+        expect(storageMocks.provider.saveDiagram).toHaveBeenCalledTimes(1);
+        expect(storageMocks.provider.saveDiagram.mock.calls[0][0].expectedRevision).toBe(accepted);
+        expect(bridge.metadata.cloud?.revision).toBe(saved);
+    });
+    it('rejects snapshot preparation interrupted by an accepted collaboration revision without sending a stale write', async () => {
+        const bridge = createBridge();
+        bridge.metadata = { cloud: { provider: 'supabase', id: bridge.id, revision: '2026-10-08T20:00:00.123456Z' } };
+        bridgeMocks.get.mockReturnValue(bridge);
+        vi.mocked(tryAttachDiagramSnapshot).mockImplementationOnce(async diagram => {
+            commitCollaborationCloudRevision(bridge, bridge.id, '2026-10-08T20:00:00.123457Z');
+            return { diagram };
+        });
+        const { result } = renderHook(() => useCloudSave(bridge.id));
+        await act(async () => { await expect(result.current.saveToCloud()).rejects.toThrow('已切换'); });
+        expect(storageMocks.provider.saveDiagram).not.toHaveBeenCalled();
+        expect(bridge.metadata.cloud?.revision).toBe('2026-10-08T20:00:00.123457Z');
+        expect(messageMocks.success).not.toHaveBeenCalled();
+    });
+    afterEach(() => { discardVersionPreview('diagram-1'); });
+    it('blocks historical preview cloud writes and reports a safe error', async () => {
+        bridgeMocks.get.mockReturnValue(createBridge());
+        beginVersionPreview('diagram-1', { nodes: [], edges: [] });
+        const { result } = renderHook(() => useCloudSave('diagram-1'));
+        await act(async () => { await expect(result.current.saveToCloud()).rejects.toThrow('历史版本'); });
+        expect(storageMocks.provider.saveDiagram).not.toHaveBeenCalled();
+        expect(messageMocks.error).toHaveBeenCalledWith(expect.stringContaining('历史版本'));
+        expect(messageMocks.success).not.toHaveBeenCalled();
+    });
+    it('cancels prepared snapshot content after even a completed intervening preview', async () => {
+        bridgeMocks.get.mockReturnValue(createBridge());
+        vi.mocked(tryAttachDiagramSnapshot).mockImplementationOnce(async diagram => {
+            beginVersionPreview('diagram-1', { nodes: [], edges: [] }); discardVersionPreview('diagram-1'); return { diagram };
+        });
+        const { result } = renderHook(() => useCloudSave('diagram-1'));
+        await act(async () => { await expect(result.current.saveToCloud()).rejects.toThrow('历史版本'); });
+        expect(storageMocks.provider.saveDiagram).not.toHaveBeenCalled();
+        expect(messageMocks.success).not.toHaveBeenCalled();
+    });
+    it('retains S3 edits and loaded revision on conflict without announcing success', async () => {
+        storageMocks.provider.id = 's3';
+        const bridge = createBridge();
+        bridge.metadata = { cloud: { provider: 's3', id: 'remote.json', title: 'Diagram', revision: '"loaded-2"' } };
+        bridgeMocks.get.mockReturnValue(bridge);
+        storageMocks.provider.saveDiagram.mockRejectedValue(new S3ConditionalWriteConflictError(412));
+        const { result } = renderHook(() => useCloudSave('diagram-1'));
+        await act(async () => { await expect(result.current.saveToCloud()).rejects.toThrow('本地编辑已保留'); });
+        expect(storageMocks.provider.saveDiagram.mock.calls[0][0].expectedRevision).toBe('"loaded-2"');
+        expect(bridge.metadata.cloud?.revision).toBe('"loaded-2"');
+        expect(bridge.nodes).toHaveLength(1);
+        expect(messageMocks.error).toHaveBeenCalledWith(expect.stringContaining('本地编辑已保留'));
+        expect(messageMocks.success).not.toHaveBeenCalled();
+    });
+    it('blocks a reopened S3 legacy view without a loaded revision before snapshot or write', async () => {
+        storageMocks.provider.id = 's3';
+        const bridge = createBridge();
+        bridge.metadata = { cloud: { provider: 's3', id: 'remote.json', title: 'Diagram' } };
+        bridgeMocks.get.mockReturnValue(bridge);
+        const { result } = renderHook(() => useCloudSave('diagram-1'));
+        await act(async () => { await expect(result.current.saveToCloud()).rejects.toThrow('缺少加载版本'); });
+        expect(storageMocks.provider.saveDiagram).not.toHaveBeenCalled();
+        expect(tryAttachDiagramSnapshot).not.toHaveBeenCalled();
+    });
+    it('rejects an S3 revision advanced during asynchronous snapshot work', async () => {
+        storageMocks.provider.id = 's3';
+        const bridge = createBridge();
+        const cloud = { provider: 's3' as const, id: 'remote.json', title: 'Diagram', revision: '"loaded-2"' };
+        bridge.metadata = { cloud };
+        bridgeMocks.get.mockReturnValue(bridge);
+        vi.mocked(tryAttachDiagramSnapshot).mockImplementationOnce(async diagram => { cloud.revision = '"advanced-3"'; return { diagram }; });
+        const { result } = renderHook(() => useCloudSave('diagram-1'));
+        await act(async () => { await expect(result.current.saveToCloud()).rejects.toThrow('已切换'); });
+        expect(storageMocks.provider.saveDiagram).not.toHaveBeenCalled();
+        expect(cloud.revision).toBe('"advanced-3"');
+    });
+    it('captures the loaded revision before snapshot work and advances it from the saved row', async () => {
+        const revision = '2026-10-08T14:00:00.123456+00:00';
+        const nextRevision = '2026-10-08T14:00:00.123457+00:00';
+        const bridge = createBridge();
+        bridge.metadata = { cloud: { provider: 'supabase', id: bridge.id, title: 'Diagram', revision } };
+        bridgeMocks.get.mockReturnValue(bridge);
+        storageMocks.provider.saveDiagram.mockImplementation(async payload => ({ ...payload, updated_at: nextRevision }));
+        const { result } = renderHook(() => useCloudSave('diagram-1'));
+        await act(async () => { await result.current.saveToCloud(); });
+        expect(storageMocks.provider.saveDiagram.mock.calls[0][0].expectedRevision).toBe(revision);
+        expect(bridge.metadata.cloud?.revision).toBe(nextRevision);
+    });
+    it('blocks an asynchronous snapshot from saving a newly switched view', async () => {
+        const bridge = createBridge();
+        const cloud = { provider: 'supabase' as const, id: bridge.id, title: 'Diagram', revision: '2026-10-08T14:00:00.123456Z' };
+        bridge.metadata = { cloud };
+        bridgeMocks.get.mockReturnValue(bridge);
+        vi.mocked(tryAttachDiagramSnapshot).mockImplementationOnce(async diagram => {
+            bridge.id = 'different-view';
+            return { diagram };
+        });
+        const { result } = renderHook(() => useCloudSave('diagram-1'));
+        await act(async () => { await expect(result.current.saveToCloud()).rejects.toThrow('已切换'); });
+        expect(storageMocks.provider.saveDiagram).not.toHaveBeenCalled();
+        expect(bridge.metadata.cloud).toBe(cloud);
+        expect(messageMocks.success).not.toHaveBeenCalled();
+        expect(messageMocks.error).toHaveBeenCalledWith(expect.stringContaining('已切换'));
+    });
+    it('rejects a failed or still-loading designer without writing an empty cloud document', async () => {
+        bridgeMocks.get.mockReturnValue({ ...createBridge(), nodes: [], isCanvasReady: () => false });
+        const { result } = renderHook(() => useCloudSave('diagram-1'));
+        await act(async () => { await expect(result.current.saveToCloud()).rejects.toThrow('图表尚未加载完成'); });
+        expect(storageMocks.provider.saveDiagram).not.toHaveBeenCalled();
+        expect(messageMocks.error).toHaveBeenCalledWith('图表尚未加载完成，请等待或重试后保存');
+        expect(messageMocks.success).not.toHaveBeenCalled();
+    });
+    it('rechecks readiness after asynchronous snapshot capture before writing', async () => {
+        let ready = true;
+        bridgeMocks.get.mockReturnValue({ ...createBridge(), isCanvasReady: () => ready });
+        vi.mocked(tryAttachDiagramSnapshot).mockImplementationOnce(async diagram => {
+            ready = false;
+            return { diagram };
+        });
+        const { result } = renderHook(() => useCloudSave('diagram-1'));
+        await act(async () => { await expect(result.current.saveToCloud()).rejects.toThrow('图表尚未加载完成'); });
+        expect(storageMocks.provider.saveDiagram).not.toHaveBeenCalled();
+        expect(messageMocks.success).not.toHaveBeenCalled();
+    });
+    it('allows a successfully loaded intentionally empty document to save', async () => {
+        bridgeMocks.get.mockReturnValue({ ...createBridge(), nodes: [], isCanvasReady: () => true });
+        const { result } = renderHook(() => useCloudSave('diagram-1'));
+        await act(async () => { await result.current.saveToCloud(); });
+        expect(storageMocks.provider.saveDiagram).toHaveBeenCalledOnce();
+        expect(messageMocks.success).toHaveBeenCalledWith('已保存到云端');
+    });
     beforeEach(() => {
         vi.clearAllMocks();
         storageMocks.isConfigured.mockReturnValue(true);
         storageMocks.provider.id = 'supabase';
-        storageMocks.provider.saveDiagram.mockResolvedValue(undefined);
+        storageMocks.provider.saveDiagram.mockImplementation(async payload => ({ ...payload, expectedRevision: '"saved-revision"' }));
         authMocks.user = { id: 'user-1' };
         messageMocks.loading.mockReturnValue(messageMocks.hideLoading);
         bridgeMocks.get.mockReturnValue(createBridge());
@@ -214,8 +357,8 @@ describe('useCloudSave', () => {
 
     it('coalesces concurrent authenticated saves into one provider write', async () => {
         let finishProviderSave: (() => void) | undefined;
-        storageMocks.provider.saveDiagram.mockReturnValue(new Promise<void>((resolve) => {
-            finishProviderSave = resolve;
+        storageMocks.provider.saveDiagram.mockReturnValue(new Promise<{ id: string; updated_at: string }>((resolve) => {
+            finishProviderSave = () => resolve({ id: createBridge().id, updated_at: '2026-10-08T14:00:00.123456Z' });
         }));
         const { result } = renderHook(() => useCloudSave('diagram-1', '客户流程'));
 
@@ -242,7 +385,7 @@ describe('useCloudSave', () => {
         const providerError = new Error('temporary provider failure');
         storageMocks.provider.saveDiagram
             .mockRejectedValueOnce(providerError)
-            .mockResolvedValueOnce(undefined);
+            .mockResolvedValueOnce({ id: createBridge().id, updated_at: '2026-10-08T14:00:00.123456Z' });
         const { result } = renderHook(() => useCloudSave('diagram-1', '客户流程'));
 
         await expect(result.current.saveToCloud()).rejects.toBe(providerError);
@@ -303,7 +446,8 @@ describe('useCloudSave', () => {
 
     it.each([
         ['missing bridge', null],
-        ['empty nodes', { ...createBridge(), nodes: [] }],
+        ['missing nodes', { ...createBridge(), nodes: undefined }],
+        ['invalid nodes', { ...createBridge(), nodes: {} }],
     ])('rejects when diagram data is %s', async (_label, bridge) => {
         bridgeMocks.get.mockReturnValue(bridge);
         const { result } = renderHook(() => useCloudSave('diagram-1'));
@@ -355,10 +499,41 @@ describe('useCloudSave', () => {
             provider: 'supabase',
             id: bridge.id,
             title: '客户流程',
+            revision: expect.any(String),
         });
         expect(messageMocks.success).toHaveBeenCalledWith('已保存到云端');
         expect(messageMocks.error).not.toHaveBeenCalled();
         expect(messageMocks.hideLoading).toHaveBeenCalledTimes(1);
+    });
+
+    it('persists an empty canvas and uses the provider canonical id for sharing', async () => {
+        const bridge = { ...createBridge(), nodes: [], edges: [] };
+        bridgeMocks.get.mockReturnValue(bridge);
+        storageMocks.provider.id = 's3';
+        storageMocks.provider.saveDiagram.mockResolvedValue({ id: `${bridge.id}.json`, expectedRevision: '"saved-revision"' });
+        const { result } = renderHook(() => useCloudSave('diagram-1'));
+        let saved: unknown;
+        await act(async () => { saved = await result.current.ensureSaved(); });
+        expect(saved).toEqual({ status: 'saved', diagramId: `${bridge.id}.json` });
+        expect(bridge.metadata?.cloud?.id).toBe(`${bridge.id}.json`);
+        expect(messageMocks.success).toHaveBeenCalledOnce();
+    });
+
+    it('updates the reopened cloud identity on repeated saves rather than generating another diagram', async () => {
+        const cloudId = '22222222-2222-4222-8222-222222222222';
+        const bridge = createBridge();
+        bridge.id = 'local-view';
+        bridge.metadata = { title: '已重开的图', cloud: { provider: 'supabase', id: cloudId, title: '已重开的图', revision: '2026-10-08T14:00:00.123456Z' } };
+        bridgeMocks.get.mockReturnValue(bridge);
+        const { result } = renderHook(() => useCloudSave('local-view', '继续编辑'));
+        await act(async () => { await result.current.saveToCloud(); });
+        await act(async () => { await result.current.saveToCloud(); });
+        expect(storageMocks.provider.saveDiagram).toHaveBeenCalledTimes(2);
+        for (const [payload] of storageMocks.provider.saveDiagram.mock.calls) {
+            expect(payload).toMatchObject({ id: cloudId, content: { id: cloudId, metadata: { cloud: { provider: 'supabase', id: cloudId } } } });
+        }
+        expect(bridge.metadata.cloud?.id).toBe(cloudId);
+        expect(messageMocks.error).not.toHaveBeenCalled();
     });
 
     it('does not reuse a cloud identity that belongs to a different provider', async () => {
@@ -394,6 +569,7 @@ describe('useCloudSave', () => {
             provider: 's3',
             id: savedDiagram?.id,
             title: '客户流程',
+            revision: '"saved-revision"',
         });
     });
 

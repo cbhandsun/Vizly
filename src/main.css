@@ -631,10 +631,10 @@ body {
 
 /* 注意：.react-flow__node 保持默认的 overflow: visible 以允许阴影和选中效果显示 */
 
-/* 确保 SubGroup 和 TitleGroup 节点也裁剪溢出内容 */
+/* Group ports extend beyond the outer node; inner content keeps its own clipping. */
 .react-flow__node-subGroup,
 .react-flow__node-titleGroup {
-  overflow: hidden !important;
+  overflow: visible !important;
 }
 
 

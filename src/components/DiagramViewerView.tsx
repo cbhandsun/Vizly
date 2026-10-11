@@ -3,7 +3,7 @@ import type { TFunction } from 'i18next';
 import Spin from 'antd/es/spin';
 import { ConfigProvider } from 'antd';
 
-import { CommandPalette, DiagramControlBridge } from '@vizly/core/editor-ui';
+import { DiagramControlBridge } from '@vizly/core/editor-control-bridge';
 import type { CommandItem } from '@vizly/core/types';
 import type {
     DiagramCollaborationStatus,
@@ -20,6 +20,9 @@ import { loadLayoutPresetMapForDiagram } from '@/data/standardized/layoutPresetM
 import { shouldHideDiagramViewerCenterIsland } from './diagramViewerChrome';
 import { SettingsPanelBoundary } from './ui/SettingsPanelBoundary';
 import { DraggableSettingsPanel } from './ui/DraggableSettingsPanel';
+import { DeferredCommandPalette } from './ui/DeferredCommandPalette';
+import { CollaborationRecoveryBanner } from './diagrams/ui/CollaborationRecoveryBanner';
+import type { CoordinationProblem } from '../../server/collaboration/coordinationStatus';
 
 const RoutingDebugPanel = import.meta.env.DEV
     ? lazy(() => import('./debug/RoutingDebugPanel').then(module => ({ default: module.RoutingDebugPanel })))
@@ -84,6 +87,10 @@ interface DiagramViewerViewProps {
     onExportPermissionCheck: (format: DiagramExportFormat) => boolean;
     isYjsSynced: boolean;
     collaborationStatus: DiagramCollaborationStatus;
+    coordinationProblem?: CoordinationProblem | null;
+    retryCollaboration?: () => void;
+    restoreCloudRoom?: () => Promise<void>;
+    canPersistCanvas: NonNullable<DiagramComponentProps['canPersistCanvas']>;
     openCollaborationModal: () => void;
     pushLocalChangesToYjs: NonNullable<DiagramComponentProps['onSyncPush']>;
     provider: { awareness?: DiagramComponentProps['yAwareness'] } | null;
@@ -157,6 +164,10 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
     onExportPermissionCheck,
     isYjsSynced,
     collaborationStatus,
+    coordinationProblem,
+    retryCollaboration,
+    restoreCloudRoom,
+    canPersistCanvas,
     openCollaborationModal,
     pushLocalChangesToYjs,
     provider,
@@ -247,7 +258,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
             >
                 {/* Host actions are now unified in the designer's internal toolbar islands */}
 
-                <CommandPalette
+                {isCommandOpen && <DeferredCommandPalette
                     open={isCommandOpen}
                     onClose={() => setIsCommandOpen(false)}
                     onDismiss={() => {
@@ -256,7 +267,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                     }}
                     items={commandItems}
                     getContainer={() => document.getElementById('app-root-layout') || document.body}
-                />
+                />}
                 {isShortcutsOpen && (
                     <Suspense fallback={null}>
                         <KeyboardShortcutPanel
@@ -284,6 +295,12 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
 
                 {/* Main Content Area */}
                 <div id={`diagram-${selectedDiagramId}`} className={`flex-1 flex flex-col relative bg-surface ${isFullscreen ? 'fixed inset-0 z-[1000]' : ''}`} style={{ height: '100%', width: '100%' }}>
+                    {coordinationProblem && retryCollaboration && <CollaborationRecoveryBanner
+                        problem={coordinationProblem}
+                        onSaveCopy={() => handleSaveTo('local')}
+                        onRetry={retryCollaboration}
+                        onRestore={restoreCloudRoom}
+                    />}
                     <ConfigProvider
                         getPopupContainer={(trigger) => {
                             if (isFullscreen) {
@@ -322,6 +339,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                                                 onExportPermissionCheck={onExportPermissionCheck}
                                                 isYjsSynced={isYjsSynced}
                                                 collaborationStatus={collaborationStatus}
+                                                canPersistCanvas={canPersistCanvas}
                                                 onOpenCollaboration={openCollaborationModal}
                                                 onSyncPush={pushLocalChangesToYjs}
                                                 activeUsers={activeUsers || []}

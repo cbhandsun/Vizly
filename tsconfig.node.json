@@ -21,6 +21,9 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": [
-    "vite.config.ts"
+    "vite.config.ts",
+    "playwright.config.ts",
+    "playwright.recovery.config.ts",
+    "scripts/playwrightOutputIsolation.test.ts"
   ]
 }

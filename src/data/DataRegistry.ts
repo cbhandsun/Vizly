@@ -242,6 +242,7 @@ export class DataRegistry {
           }
       } catch (err) {
           logLocalDiagramLoadFailure(err);
+          throw err;
       }
   }
 

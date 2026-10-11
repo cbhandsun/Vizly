@@ -62,15 +62,29 @@ vi.mock('react-i18next', () => ({
 }));
 
 describe('AuthModal', () => {
-    it.each(['password', 'magiclink', 'register'])('keeps %s tab labels centered inside the scrolling body', async (tab) => {
+    it.each(['password', 'magiclink', 'register'] as const)('keeps %s tab labels centered inside the scrolling body', async (tab) => {
         const style = document.createElement('style');
         style.textContent = authModalStyles;
-        document.head.appendChild(style);
+
         try {
             render(<AuthModal open onCancel={vi.fn()} />);
-            fireEvent.click(screen.getByRole('tab', { name: `auth.modal.tabs.${tab}` }));
+            const dialog = screen.getByRole('dialog', { name: 'auth.login' });
+            const targetTab = within(dialog).getByRole('tab', { name: `auth.modal.tabs.${tab}` });
+            fireEvent.click(targetTab);
+            const submitNames = {
+                password: 'auth.modal.loginButton',
+                magiclink: 'auth.modal.sendMagicLink',
+                register: 'auth.modal.register.button',
+            };
+            const panel = within(dialog).getByRole('tabpanel');
+            const submit = within(panel).getByLabelText(submitNames[tab], { selector: 'button' });
+            expect(submit.getAttribute('type')).toBe('submit');
+            // Accessible form queries precede CSS injection to avoid repeated
+            // jsdom style resolution; all style assertions use the real CSS.
+            document.head.appendChild(style);
             await waitFor(() => {
-                const activeTab = screen.getByRole('tab', { selected: true });
+                expect(targetTab.getAttribute('aria-selected')).toBe('true');
+                const activeTab = targetTab;
                 const tabStyle = getComputedStyle(activeTab);
                 expect(tabStyle.display).toBe('inline-flex');
                 expect(tabStyle.alignItems).toBe('center');
@@ -78,7 +92,9 @@ describe('AuthModal', () => {
                 if (!tabs) throw new Error('Authentication tabs are missing');
                 expect(Number.parseFloat(getComputedStyle(tabs).marginTop) || 0).toBeGreaterThanOrEqual(0);
             });
-            for (const input of document.querySelectorAll('.auth-modal .ant-input-affix-wrapper-lg')) {
+            const inputWrappers = dialog.querySelectorAll('.ant-input-affix-wrapper-lg');
+            expect(inputWrappers.length).toBeGreaterThan(0);
+            for (const input of inputWrappers) {
                 expect(getComputedStyle(input).alignItems).toBe('center');
             }
         } finally {
@@ -140,49 +156,70 @@ describe('AuthModal', () => {
         expect(screen.getByRole('button', { name: 'auth.modal.backToLogin' })).toBeTruthy();
     });
 
-    const expectActiveEmailField = async () => {
+    const expectActiveEmailField = async (email: HTMLElement) => {
         await waitFor(() => {
-            expect(document.activeElement).toBe(
-                within(screen.getByRole('tabpanel')).getByLabelText('auth.modal.emailPlaceholder'),
-            );
+            expect(document.activeElement).toBe(email);
         });
     };
 
     it('focuses the email field after password login validation fails', async () => {
         render(<AuthModal open onCancel={vi.fn()} />);
 
-        fireEvent.click(screen.getByRole('button', { name: /auth\.modal\.loginButton$/ }));
-        await expectActiveEmailField();
+        const panel = within(screen.getByRole('tabpanel'));
+        const email = panel.getByLabelText('auth.modal.emailPlaceholder');
+        await act(async () => {
+            fireEvent.click(panel.getByLabelText('auth.modal.loginButton', { selector: 'button' }));
+        });
+        expect(await panel.findByText('auth.modal.emailRequired')).toBeTruthy();
+        await expectActiveEmailField(email);
     });
 
     it('focuses the email field after magic-link validation fails', async () => {
         render(<AuthModal open onCancel={vi.fn()} />);
 
         fireEvent.click(screen.getByRole('tab', { name: 'auth.modal.tabs.magiclink' }));
-        fireEvent.click(screen.getByRole('button', { name: /auth\.modal\.sendMagicLink$/ }));
-        await expectActiveEmailField();
+        const panel = within(screen.getByRole('tabpanel'));
+        const email = panel.getByLabelText('auth.modal.emailPlaceholder');
+        await act(async () => {
+            fireEvent.click(panel.getByLabelText('auth.modal.sendMagicLink', { selector: 'button' }));
+        });
+        expect(await panel.findByText('auth.modal.emailRequired')).toBeTruthy();
+        await expectActiveEmailField(email);
     });
 
     it('focuses the email field after registration validation fails', async () => {
         render(<AuthModal open onCancel={vi.fn()} />);
 
         fireEvent.click(screen.getByRole('tab', { name: 'auth.modal.tabs.register' }));
-        fireEvent.click(screen.getByRole('button', { name: 'auth.modal.register.button' }));
-        await expectActiveEmailField();
+        const panel = within(screen.getByRole('tabpanel'));
+        const email = panel.getByLabelText('auth.modal.emailPlaceholder');
+        await act(async () => {
+            fireEvent.click(panel.getByLabelText('auth.modal.register.button', { selector: 'button' }));
+        });
+        expect(await panel.findByText('auth.modal.emailRequired')).toBeTruthy();
+        await expectActiveEmailField(email);
     });
 
-    it('clears stale validation when switching methods without discarding entered values', async () => {
+    it.each(['tabs', 'inline-actions'] as const)('clears stale validation when switching methods via %s without discarding entered values', async (method) => {
         render(<AuthModal open onCancel={vi.fn()} />);
 
-        const email = within(screen.getByRole('tabpanel')).getByLabelText('auth.modal.emailPlaceholder');
+        const initialPanel = within(screen.getByRole('tabpanel'));
+        const email = initialPanel.getByLabelText('auth.modal.emailPlaceholder');
         fireEvent.change(email, { target: { value: 'member@example.com' } });
-        fireEvent.click(screen.getByRole('button', { name: /auth\.modal\.loginButton$/ }));
+        fireEvent.click(initialPanel.getByLabelText('auth.modal.loginButton', { selector: 'button' }));
 
         await waitFor(() => {
-            expect(screen.getByText('auth.modal.password.required')).toBeTruthy();
+            expect(initialPanel.getByText('auth.modal.password.required')).toBeTruthy();
         });
-        fireEvent.click(screen.getByRole('tab', { name: 'auth.modal.tabs.register' }));
-        fireEvent.click(screen.getByRole('tab', { name: 'auth.modal.tabs.password' }));
+        if (method === 'tabs') {
+            const tabs = within(screen.getByRole('tablist'));
+            fireEvent.click(tabs.getByRole('tab', { name: 'auth.modal.tabs.register' }));
+            fireEvent.click(tabs.getByRole('tab', { name: 'auth.modal.tabs.password' }));
+        } else {
+            fireEvent.click(initialPanel.getByRole('button', { name: 'auth.modal.registerNow' }));
+            const registerPanel = within(screen.getByRole('tabpanel'));
+            fireEvent.click(registerPanel.getByRole('button', { name: 'auth.modal.backToLogin' }));
+        }
 
         const activePanel = within(screen.getByRole('tabpanel'));
         const password = activePanel.getByLabelText('auth.modal.password.placeholder');
@@ -191,6 +228,34 @@ describe('AuthModal', () => {
         expect((activePanel.getByLabelText(
             'auth.modal.emailPlaceholder',
         ) as HTMLInputElement).value).toBe('member@example.com');
+    });
+
+    it.each(['register', 'magiclink'] as const)('unmounts inactive %s forms and preserves password login values', async (method) => {
+        render(<AuthModal open onCancel={vi.fn()} />);
+        const dialog = screen.getByRole('dialog');
+        const modal = within(dialog);
+        const emailLabel = 'auth.modal.emailPlaceholder';
+        const passwordLabel = 'auth.modal.password.placeholder';
+        fireEvent.change(modal.getByLabelText(emailLabel), {
+            target: { value: 'retained@example.invalid' },
+        });
+        fireEvent.change(modal.getByLabelText(passwordLabel), {
+            target: { value: 'retained-password' },
+        });
+        fireEvent.click(modal.getByRole('tab', { name: `auth.modal.tabs.${method}` }));
+        await waitFor(() => {
+            expect(dialog.querySelectorAll('form')).toHaveLength(1);
+            expect(modal.queryByLabelText(passwordLabel)).toBeNull();
+        });
+        fireEvent.click(modal.getByRole('tab', { name: 'auth.modal.tabs.password' }));
+        await waitFor(() => {
+            expect(dialog.querySelectorAll('form')).toHaveLength(1);
+            expect((modal.getByLabelText(emailLabel) as HTMLInputElement).value).toBe('retained@example.invalid');
+            expect((modal.getByLabelText(passwordLabel) as HTMLInputElement).value).toBe('retained-password');
+        });
+        expect(signInWithPasswordMock).not.toHaveBeenCalled();
+        expect(signInWithEmailMock).not.toHaveBeenCalled();
+        expect(signUpMock).not.toHaveBeenCalled();
     });
 
     it('exposes a close action that calls the owner callback', () => {

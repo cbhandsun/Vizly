@@ -1,6 +1,6 @@
 # Vizly Application
 
-This repository contains the open application layer for Vizly. The proprietary editor implementation is consumed through exact-version public npm packages: `@vizly/contracts@0.1.0-alpha.2` and `@vizly/core@0.1.0-alpha.3`. The app imports React bindings from `@vizly/core/react` so local Core package validation uses a single Core instance.
+This repository contains the open application layer for Vizly. The proprietary editor implementation is consumed through `@vizly/contracts` and `@vizly/core`; `package.json` and `package-lock.json` record the selected versions or local package artifacts. The app imports React bindings from `@vizly/core/react` so local Core package validation uses a single Core instance.
 
 Once released, the packages are installable anonymously from npm. The MIT license for this application does not cover the proprietary `@vizly/core` package; commercial production deployment of Core requires separate authorization.
 
@@ -22,11 +22,16 @@ npm ci
 npm run check
 ```
 
-`npm run check` is the local release gate for the public app. It runs typecheck,
-lint, the stable CI test shard, and a production build. Use `npm run test` for
-the same stable test shard. Use `npm run test:full` when investigating broader
-coverage locally; it can emit jsdom pseudo-element diagnostics from legacy
-component cases and is not the pull-request gate.
+`npm run check` runs typecheck, lint, the complete CI unit-test entry, RLS and
+S3 tests, the application build, and the collaboration-server build. `npm run
+test`, `npm run test:ci`, and `npm run test:full` use the same unit-test entry.
+Run `npm run test:e2e` separately for both browser regression groups. Local
+checks do not establish hosted CI or deployed-service acceptance.
+
+Real-time collaborative editing also needs a separate authenticated WebSocket
+service. Supabase login and document storage alone do not provide this service.
+See [Collaboration setup and deployment](COLLABORATION.md) for configuration,
+durability requirements, and the distinct-account acceptance checklist.
 
 ## User flow
 

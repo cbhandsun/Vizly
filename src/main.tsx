@@ -1,4 +1,3 @@
-import '@vizly/core/style.css';
 // src/main.tsx
 
 import * as React from 'react';

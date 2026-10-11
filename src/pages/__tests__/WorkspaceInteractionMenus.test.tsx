@@ -629,6 +629,8 @@ describe('createWorkspaceDeleteConfirmation', () => {
       autoFocusButton: 'cancel',
       focusTriggerAfterClose: false,
     });
+    expect(config.okButtonProps?.['aria-label']).toBe('Delete');
+    expect(config.cancelButtonProps?.['aria-label']).toBe('Cancel');
     config.afterClose?.();
     expect(document.activeElement).toBe(trigger);
   });

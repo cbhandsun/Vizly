@@ -35,6 +35,8 @@ const renderCollection = (
   loadedInventoryScopes: ReadonlySet<WorkspaceInventoryScope> = new Set(['documents', 'templates']),
   loadFailure: WorkspaceInventoryLoadFailureReason | null = null,
   onRetryLoad: () => void = () => undefined,
+  cloudProvider: 's3' | 'supabase' = 'supabase',
+  isAuthenticated = true,
 ): string => renderToStaticMarkup(
   <WorkspaceDiagramCollection
     activeView={activeView}
@@ -49,7 +51,8 @@ const renderCollection = (
     loading={false}
     loadFailure={loadFailure}
     onRetryLoad={onRetryLoad}
-    isAuthenticated
+    isAuthenticated={isAuthenticated}
+    cloudProvider={cloudProvider}
     onRequestAuth={() => undefined}
     openingDiagramKeys={new Set()}
     onOpenDiagram={() => undefined}
@@ -120,6 +123,21 @@ const renderLoadingCollection = (): string => renderToStaticMarkup(
 );
 
 describe('WorkspaceDiagramCollection', () => {
+  it('shows S3 cloud cards without a Supabase account while protecting Supabase and Shared', () => {
+    const item: UnifiedDiagramItem = { id: 's3_audit.json', title: 'S3 audit', updatedAt: 0, source: 's3', role: 'owner', raw: { id: 'audit.json', title: 'S3 audit', updatedAt: new Date(0) } };
+    const renderAnonymous = (provider: 's3' | 'supabase', view: FilterViewType) => renderCollection(item, [item], '', view, 'grid', new Set(['documents']), null, () => undefined, provider, false);
+    expect(renderAnonymous('s3', 'cloud')).toContain('Open diagram S3 audit');
+    expect(renderAnonymous('supabase', 'cloud')).not.toContain('Open diagram S3 audit');
+    expect(renderAnonymous('s3', 'shared')).not.toContain('Open diagram S3 audit');
+  });
+  it.each(['viewer', 'editor'] as const)('counts %s access in the Shared filter', role => {
+    const html = renderCollection({
+      id: 'supabase_shared_audit', title: 'Audit shared', updatedAt: 0,
+      source: 'supabase', role, raw: { id: 'audit', title: 'Audit shared', updatedAt: new Date(0), role },
+    }, [], '', 'shared');
+    const sharedButton = html.match(/data-workspace-filter-view="shared"[\s\S]*?<\/button>/)?.[0];
+    expect(sharedButton).toContain('<span class="filter-tab-count">1</span>');
+  });
   it('announces the loading state instead of exposing an unexplained blank region', () => {
     const html = renderLoadingCollection();
 

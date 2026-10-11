@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { readLoadedCloudRevision } from '@/services/cloudSaveVersion';
 import { Modal, Card, Button, Space, Typography, Empty, Row, Col, Spin, Popconfirm, Tabs, Tag, Checkbox } from 'antd';
 import {
     CloudOutlined,
@@ -261,7 +262,8 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
                             provider: requestedProvider,
                             id: savedDiagram.id,
                             title: savedDiagram.title,
-                            openedAt: new Date().toISOString()
+                            openedAt: new Date().toISOString(),
+                            revision: readLoadedCloudRevision(requestedProvider, savedDiagram),
                         }
                     }
                 });

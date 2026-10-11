@@ -27,7 +27,7 @@ export const persistDiagramTitle = async ({
     if (!currentDiagram) throw new Error('Diagram is unavailable.');
 
     const updatedAt = Date.now();
-    dataService.registerDiagram({
+    await dataService.registerDiagram({
         ...currentDiagram,
         name: nextTitle,
         metadata: {

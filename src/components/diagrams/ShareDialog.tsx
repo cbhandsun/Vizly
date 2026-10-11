@@ -514,7 +514,9 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                             aria-label={t('share.expiration')}
                             disabled={!user}
                         />
-                        <Button type="primary" icon={<FaLink />} loading={creatingLink} onClick={handleCreateLink} disabled={!user || inviting}>
+                        <Button type="primary" icon={<FaLink />} loading={creatingLink} onClick={handleCreateLink}
+                            aria-label={t('share.generateLink')} aria-busy={creatingLink}
+                            disabled={!user || inviting || creatingLink}>
                             {t('share.generateLink')}
                         </Button>
                     </div>

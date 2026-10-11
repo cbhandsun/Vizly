@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, lazy, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useDiagramControls, useUIState } from '@vizly/core/editor-hooks';
@@ -75,7 +75,7 @@ import { getPersistedDiagramTitle } from './diagramViewerTitle';
 import { persistDiagramTitle } from './diagramViewerRename';
 import { ensureDiagramViewerExportAllowed } from './diagramViewerExportPolicy';
 import type { DiagramExportFormat } from '@vizly/core/types';
-import { loadFlowchartDesigner, PLUGIN_EMPTY_CANVAS_IDS } from './diagramViewerFlowchartLoader';
+import { getFlowchartDesignerComponent, PLUGIN_EMPTY_CANVAS_IDS } from './diagramViewerFlowchartLoader';
 
 const DiagramViewer: React.FC = () => {
     const { t } = useTranslation();
@@ -108,6 +108,11 @@ const DiagramViewer: React.FC = () => {
     const {
         activeUsers,
         collaborationStatus,
+        coordinationProblem,
+        retryCollaboration,
+        restoreCloudRoom,
+        isCollaborationReadOnly,
+        canPersistCanvas,
         collabModalVisible,
         isSynced: isYjsSynced,
         openCollaborationModal,
@@ -116,25 +121,11 @@ const DiagramViewer: React.FC = () => {
         roomName,
         setCollabModalVisible,
     } = useDiagramViewerCollaboration({
-        cloudSyncEnabled: hasFeature('cloud-sync'),
         jwtToken,
         roomFromUrl,
         selectedDiagramId,
     });
 
-    const {
-        cancelCloudSaveAuthentication,
-        cloudSaveAuthOpen,
-        cloudSaveAuthEnabled,
-        closeShareDialog,
-        completeCloudSaveAuthentication,
-        ensureSaved,
-        openShareDialog,
-        restoreCloudSaveFocus,
-        saveToCloud,
-        shareDialogOpen,
-    } = useCloudSave(selectedDiagramId);
-    
     // --- Phase 6: Mermaid Import Logic ---
     const handleImportMermaidNodes = useCallback(async (nodes: unknown[], edges: unknown[]): Promise<boolean> => {
         try {
@@ -269,6 +260,18 @@ const DiagramViewer: React.FC = () => {
         loadedDiagram: loadedDocType,
         translate: (key, fallback) => fallback ? t(key, fallback) : t(key),
     });
+    const {
+        cancelCloudSaveAuthentication,
+        cloudSaveAuthOpen,
+        cloudSaveAuthEnabled,
+        closeShareDialog,
+        completeCloudSaveAuthentication,
+        ensureSaved,
+        openShareDialog,
+        restoreCloudSaveFocus,
+        saveToCloud,
+        shareDialogOpen,
+    } = useCloudSave(selectedDiagramId, diagramTitle);
     const canRenameDiagram = !selectedDiagram
         && loadedDocType?.diagramId === selectedDiagramId
         && Boolean(loadedDocType.name);
@@ -307,11 +310,11 @@ const DiagramViewer: React.FC = () => {
             // Plugins that override the canvas entirely (mindmap, timeline, network...)
             // register themselves via PluginRegistry and contribute canvas + toolbar via hooks.
             // The legacy UnifiedDesigner is just an architecture skeleton and must NOT be used here.
-            return lazy(() => loadFlowchartDesigner(resolvedPluginId, selectedDiagramId));
+            return getFlowchartDesignerComponent(resolvedPluginId, selectedDiagramId);
         }
 
         // Fallback to FlowchartDesigner if not found
-        return lazy(() => loadFlowchartDesigner(undefined, selectedDiagramId));
+        return getFlowchartDesignerComponent(undefined, selectedDiagramId);
     }, [selectedDiagram, resolvedPluginId, selectedDiagramId]);
 
     // 仅显示主流程（动线）开关状态（函数级注释）
@@ -326,7 +329,11 @@ const DiagramViewer: React.FC = () => {
     // Phase 6: 高级图表展示安全防护与多级存管
     // ==========================================
     /** 图表锁定防误触：禁止所有拖拽连线编排 */
-    const [isReadonly, setIsReadonly] = useState<boolean>(false);
+    const [manualReadonly, setManualReadonly] = useState<boolean>(false);
+    const isReadonly = manualReadonly || isCollaborationReadOnly;
+    const setIsReadonly = useCallback((readonly: boolean) => {
+        if (!isCollaborationReadOnly) setManualReadonly(readonly);
+    }, [isCollaborationReadOnly]);
 
     /** 沉浸式演示模式：隐藏 UI 侧边栏与工具栏 */
     const [isPresentationMode, setIsPresentationMode] = useState<boolean>(false);
@@ -341,6 +348,7 @@ const DiagramViewer: React.FC = () => {
     }, [setSearchParams]);
     const { handleSaveTo, handleDirectSave } = useDiagramViewerSaveActions({
         selectedDiagramId,
+        diagramName: diagramTitle,
         t,
         onCloudReplicaSaved: handleCloudReplicaSaved,
     });
@@ -647,6 +655,10 @@ const DiagramViewer: React.FC = () => {
             onExportPermissionCheck={handleExportPermissionCheck}
             isYjsSynced={isYjsSynced}
             collaborationStatus={collaborationStatus}
+            coordinationProblem={coordinationProblem}
+            retryCollaboration={retryCollaboration}
+            restoreCloudRoom={restoreCloudRoom}
+            canPersistCanvas={canPersistCanvas}
             openCollaborationModal={openCollaborationModal}
             pushLocalChangesToYjs={pushLocalChangesToYjs}
             provider={provider ?? null}

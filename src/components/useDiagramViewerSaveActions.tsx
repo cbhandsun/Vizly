@@ -23,15 +23,19 @@ import {
 } from './diagramViewerLogging';
 import {
     DIAGRAM_SAVE_AS_NAME_MAX_LENGTH,
+    createDiagramViewerSaveCopy,
     isDiagramViewerBridgeSavable,
     saveDiagramViewerCloudReplica,
     saveDiagramViewerDirectCloud,
     validateDiagramSaveAsName,
 } from './diagramViewerSave';
 import { openLocalWorkspaceManager } from './diagrams/ui/openLocalWorkspaceManager';
+import { assertVersionPreviewPersistenceAllowed } from './diagrams/collaboration/versionPreviewSession';
+import { registerDiagramViewerCloudReplica } from './diagramViewerReplicaRegistration';
 
 interface UseDiagramViewerSaveActionsOptions {
     selectedDiagramId: string;
+    diagramName?: string;
     t: TFunction;
     onCloudReplicaSaved: (id: string) => void;
 }
@@ -52,17 +56,20 @@ const getSaveTargetLabel = (target: DiagramSaveAsTarget, t: TFunction): string =
 
 export function useDiagramViewerSaveActions({
     selectedDiagramId,
+    diagramName,
     t,
     onCloudReplicaSaved,
 }: UseDiagramViewerSaveActionsOptions) {
     const handleSaveTo = useCallback(async (target: DiagramSaveAsTarget) => {
+        try { assertVersionPreviewPersistenceAllowed(selectedDiagramId); }
+        catch (error) { appMessage.error(getErrorMessage(error)); return; }
         const bridge = getFlowDataBridge(selectedDiagramId);
         if (!isDiagramViewerBridgeSavable(bridge)) {
             appMessage.error('未找到图表数据，无法保存');
             return;
         }
 
-        const defaultName = bridge.metadata?.title || bridge.name || t('diagramViewer.saveAs.defaultName');
+        const defaultName = diagramName || bridge.metadata?.title || bridge.name || t('diagramViewer.saveAs.defaultName');
         const targetLabel = getSaveTargetLabel(target, t);
         const nameMaxLength = target === 'local'
             ? CUSTOM_PRESET_NAME_MAX_LENGTH
@@ -120,14 +127,13 @@ export function useDiagramViewerSaveActions({
             const hideLoading = appMessage.loading(t('diagramViewer.saveAs.saving', { target: targetLabel }), 0);
             let saveSucceeded = false;
             try {
-                const dataToSave = {
-                    ...bridge,
-                    id: crypto.randomUUID(),
-                    name: normalizedName,
-                    metadata: { ...(bridge.metadata || {}), title: normalizedName },
-                };
+                assertVersionPreviewPersistenceAllowed(selectedDiagramId);
+                const dataToSave = createDiagramViewerSaveCopy({
+                    bridge, name: normalizedName, createId: () => crypto.randomUUID(),
+                });
 
                 if (target === 'local') {
+                    assertVersionPreviewPersistenceAllowed(selectedDiagramId);
                     const localSaveResult = saveCustomPreset(normalizedName, dataToSave);
                     if (!localSaveResult.ok) {
                         inlineLocalSaveError = localSaveResult.error;
@@ -152,6 +158,7 @@ export function useDiagramViewerSaveActions({
                         attachSnapshot: tryAttachDiagramSnapshot,
                         invalidatePreview: invalidateRemoteDiagramPreview,
                         createId: () => crypto.randomUUID(),
+                        prepareReplica: registerDiagramViewerCloudReplica,
                     });
                     onCloudReplicaSaved(savedId);
                     appMessage.success(t('diagramViewer.saveAs.cloudSuccess'));
@@ -233,7 +240,7 @@ export function useDiagramViewerSaveActions({
             cancelText: t('common.cancel'),
             okButtonProps: { onClick: () => { void handleConfirm(); } },
         });
-    }, [onCloudReplicaSaved, selectedDiagramId, t]);
+    }, [diagramName, onCloudReplicaSaved, selectedDiagramId, t]);
 
     const handleDirectSave = useCallback(async () => {
         const bridge = getFlowDataBridge(selectedDiagramId);

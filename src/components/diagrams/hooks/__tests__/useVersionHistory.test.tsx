@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { Edge, Node } from '@xyflow/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beginVersionPreview, discardVersionPreview, isVersionPreviewReadOnly, retainVersionPreviewRemote } from '../../collaboration/versionPreviewSession';
 
 vi.mock('react-i18next', () => {
     const t = (key: string, params?: { message?: string }) => ({
@@ -53,7 +54,7 @@ const routingSnapshot = {
     schema: 'vizly-routing-only-document-v2',
     candidate: {
         schema: 'vizly-routing-only-candidate-v2',
-        routingVersion: '23',
+        routingVersion: '24',
         inputSignature: '4321',
         inputGeometryDigest: `geometry-v1:${'e'.repeat(32)}`,
         outputRouteSignature: 'route-v2:1:2:0123456789abcdef',
@@ -107,13 +108,61 @@ const makeBackupVersion = () => ({
 });
 
 describe('useVersionHistory', () => {
+    afterEach(() => { discardVersionPreview('diagram-1'); });
+    it('retains the save guard after failed unmount recovery and restores live content on remount', async () => {
+        const replaceCanvasSnapshot = vi.fn();
+        const bridge = { id: 'diagram-1', nodes: originalNodes, edges: originalEdges, replaceCanvasSnapshot };
+        (window as unknown as { __flowDataBridge: Record<string, typeof bridge> }).__flowDataBridge = { 'diagram-1': bridge };
+        const first = renderHook(() => useVersionHistory('diagram-1'));
+        await act(async () => { await first.result.current.enterPreview('version-1', vi.fn(), vi.fn(), () => originalNodes, () => originalEdges); });
+        replaceCanvasSnapshot.mockImplementationOnce(() => { throw new Error('temporary canvas failure'); });
+        first.unmount();
+        expect(isVersionPreviewReadOnly('diagram-1')).toBe(true);
+        expect(retainVersionPreviewRemote('diagram-1', { nodes: originalNodes, edges: originalEdges })).toBe(true);
+        const second = renderHook(() => useVersionHistory('diagram-1'));
+        expect(replaceCanvasSnapshot).toHaveBeenLastCalledWith({ nodes: originalNodes, edges: originalEdges });
+        second.unmount();
+    });
+    it('applies preview and exit through the controlled canvas bridge instead of editing callbacks', async () => {
+        const replaceCanvasSnapshot = vi.fn();
+        const bridge = { id: 'diagram-1', nodes: originalNodes, edges: originalEdges, replaceCanvasSnapshot };
+        (window as unknown as { __flowDataBridge: Record<string, typeof bridge> }).__flowDataBridge = { 'diagram-1': bridge };
+        const setNodes = vi.fn(); const setEdges = vi.fn();
+        const { result } = renderHook(() => useVersionHistory('diagram-1'));
+        await act(async () => { expect(await result.current.enterPreview('version-1', setNodes, setEdges, () => originalNodes, () => originalEdges)).toBe(true); });
+        expect(replaceCanvasSnapshot).toHaveBeenLastCalledWith(expect.objectContaining({ nodes: previewNodes }));
+        expect(setNodes).not.toHaveBeenCalled(); expect(setEdges).not.toHaveBeenCalled();
+        act(() => { result.current.exitPreview(); });
+        expect(replaceCanvasSnapshot).toHaveBeenLastCalledWith({ nodes: originalNodes, edges: originalEdges });
+    });
+    it('keeps preview persistence blocked when the controlled canvas replacement fails', async () => {
+        const bridge = { id: 'diagram-1', nodes: originalNodes, edges: [], replaceCanvasSnapshot: () => { throw new Error('canvas unavailable'); } };
+        (window as unknown as { __flowDataBridge: Record<string, typeof bridge> }).__flowDataBridge = { 'diagram-1': bridge };
+        const { result } = renderHook(() => useVersionHistory('diagram-1'));
+        await act(async () => { expect(await result.current.enterPreview('version-1', vi.fn(), vi.fn(), () => originalNodes, () => [])).toBe(false); });
+        await act(async () => { expect(await result.current.saveVersion('Unsafe')).toBe(false); });
+        expect(storageMocks.saveVersion).not.toHaveBeenCalled();
+        act(() => { expect(result.current.exitPreview()).toBeNull(); });
+        expect(result.current.previewVersion?.id).toBe('version-1');
+        expect(isVersionPreviewReadOnly('diagram-1')).toBe(true);
+        expect(retainVersionPreviewRemote('diagram-1', { nodes: originalNodes, edges: [] })).toBe(true);
+    });
+    it('does not create a history snapshot from a historical preview canvas', async () => {
+        const bridge = { id: 'diagram-1', nodes: originalNodes, edges: [] };
+        (window as unknown as { __flowDataBridge: Record<string, typeof bridge> }).__flowDataBridge = { 'diagram-1': bridge };
+        const { result } = renderHook(() => useVersionHistory('diagram-1'));
+        beginVersionPreview('diagram-1', { nodes: originalNodes, edges: [] });
+        await act(async () => { expect(await result.current.saveVersion('Preview must stay local')).toBe(false); });
+        expect(storageMocks.saveVersion).not.toHaveBeenCalled();
+        expect(messageMocks.success).not.toHaveBeenCalled();
+    });
     beforeEach(() => {
         storageMocks.listVersions.mockReset().mockResolvedValue([]);
         storageMocks.loadVersion.mockReset().mockResolvedValue(makeVersion());
         storageMocks.saveVersion.mockReset().mockResolvedValue(makeBackupVersion());
         messageMocks.error.mockReset();
         messageMocks.success.mockReset();
-        delete (window as any).__flowDataBridge;
+        delete (window as unknown as { __flowDataBridge?: unknown }).__flowDataBridge;
     });
 
     it('applies preview snapshots and returns the original canvas on exit', async () => {
@@ -469,7 +518,7 @@ describe('useVersionHistory', () => {
                 setEdges(snapshot.edges);
             }),
         };
-        (window as any).__flowDataBridge = { 'diagram-1': bridge };
+        (window as unknown as { __flowDataBridge: Record<string, typeof bridge> }).__flowDataBridge = { 'diagram-1': bridge };
         const { result } = renderHook(() => useVersionHistory('diagram-1'));
 
         await waitFor(() => expect(storageMocks.listVersions).toHaveBeenCalledWith('diagram-1'));
@@ -504,7 +553,7 @@ describe('useVersionHistory', () => {
         expect(result.current.exitPreview()).toBeNull();
     });
 
-    it('returns success and appends a saved snapshot', async () => {
+    it.each([['24', true], ['23', false]] as const)('saves compatible routes and discards stale routes: %s', async (routingVersion, compatible) => {
         storageMocks.saveVersion.mockResolvedValue(makeVersion());
         const bridge = {
             id: 'diagram-1',
@@ -513,7 +562,7 @@ describe('useVersionHistory', () => {
             getCanvasSnapshot: vi.fn(() => ({
                 nodes: originalNodes,
                 edges: originalEdges,
-                routingSnapshot,
+                routingSnapshot: { ...routingSnapshot, candidate: { ...routingSnapshot.candidate, routingVersion } },
             })),
         };
         (window as unknown as { __flowDataBridge: Record<string, typeof bridge> }).__flowDataBridge = { 'diagram-1': bridge };
@@ -528,7 +577,7 @@ describe('useVersionHistory', () => {
         expect(saved).toBe(true);
         expect(storageMocks.saveVersion).toHaveBeenCalledWith(
             'diagram-1',
-            { nodes: originalNodes, edges: originalEdges, routingSnapshot },
+            { nodes: originalNodes, edges: originalEdges, ...(compatible ? { routingSnapshot } : {}) },
             '发布候选版本',
         );
         expect(bridge.getCanvasSnapshot).toHaveBeenCalledTimes(1);
@@ -763,6 +812,8 @@ describe('useVersionHistory', () => {
         });
         await waitFor(() => expect(result.current.previewVersion?.id).toBe('version-1'));
 
+        expect(bridge.replaceCanvasSnapshot).toHaveBeenCalledWith(expect.objectContaining({ nodes: previewNodes }));
+        bridge.replaceCanvasSnapshot.mockClear();
         let restored = true;
         await act(async () => {
             restored = await result.current.restoreVersion('version-1', setNodes, setEdges);

@@ -1,3 +1,5 @@
+import { isLocallyOwnedPreloadFailure } from './localPreloadRecovery';
+
 const PRELOAD_RECOVERY_STORAGE_KEY = 'vizly:preload-error-recovery';
 const PRELOAD_RECOVERY_TTL_MS = 60_000;
 
@@ -118,6 +120,7 @@ export const installVitePreloadErrorRecovery = (
   }
 
   const handlePreloadError = (event: Event): void => {
+    if (isLocallyOwnedPreloadFailure(event, runtime.target)) return;
     event.preventDefault();
     if (disposed) return;
 
@@ -149,3 +152,4 @@ export const installVitePreloadErrorRecovery = (
     if (markerTimer !== null) runtime.clearTimer(markerTimer);
   };
 };
+

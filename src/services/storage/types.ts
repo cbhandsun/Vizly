@@ -15,6 +15,8 @@ export interface SavedDiagram {
     content: unknown;
     updated_at: string;
     user_id: string;
+    /** Exact revision of the loaded view. Omit only when creating a new document. */
+    expectedRevision?: string;
 }
 
 export interface DiagramVersion {

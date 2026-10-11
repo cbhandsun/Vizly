@@ -12,15 +12,18 @@ vi.mock('../supabase', () => ({
     supabase: mockSupabase,
 }));
 
-const createTableMock = (result: any = { data: null, error: null }) => {
-    const table: any = {
+const createTableMock = (result: { data: unknown; error: unknown } = { data: null, error: null }) => {
+    const table: Record<string, ReturnType<typeof vi.fn>> = {
         delete: vi.fn(() => table),
         insert: vi.fn(() => table),
         upsert: vi.fn(() => table),
+        update: vi.fn(() => table),
         select: vi.fn(() => table),
         single: vi.fn(() => Promise.resolve(result)),
+        maybeSingle: vi.fn(() => Promise.resolve(result)),
         eq: vi.fn(() => table),
-        order: vi.fn(() => Promise.resolve(result)),
+        order: vi.fn(() => table),
+        range: vi.fn().mockResolvedValueOnce(result).mockResolvedValue({ data: [], error: null }),
         limit: vi.fn(() => Promise.resolve(result)),
     };
     return table;
@@ -62,8 +65,135 @@ const makeAIConfig = () => ({
 });
 
 describe('SupabaseStorageProvider', () => {
+    it('rejects a zero-row permission or version miss without returning a saved identity', async () => {
+        mockSupabase.auth.getUser.mockResolvedValue({ data: { user: { id: 'viewer' } }, error: null });
+        const table = createTableMock({ data: null, error: null });
+        mockSupabase.from.mockReturnValue(table);
+        const { SupabaseStorageProvider } = await import('../SupabaseStorage');
+        await expect(new SupabaseStorageProvider().saveDiagram({
+            id: 'diagram-1', title: 'Diagram', content: makeDiagramContent(), user_id: 'viewer', updated_at: '',
+            expectedRevision: '2026-10-08T14:00:00.123456Z',
+        })).rejects.toThrow('编辑权限已撤销');
+        expect(table.update.mock.calls[0][0]).not.toHaveProperty('user_id');
+    });
+    it('rejects a stale writer after the first writer advances the exact revision', async () => {
+        const loadedRevision = '2026-10-08T14:00:00.123456+00:00';
+        let currentRevision = loadedRevision;
+        const row = { id: 'diagram-1', title: 'Diagram', content: makeDiagramContent(),
+            user_id: 'owner', updated_at: loadedRevision };
+        mockSupabase.auth.getUser.mockResolvedValue({ data: { user: { id: 'editor' } }, error: null });
+        const tables: ReturnType<typeof createTableMock>[] = [];
+        mockSupabase.from.mockImplementation(() => {
+            const table = createTableMock();
+            let expected: unknown;
+            let next: unknown;
+            table.eq.mockImplementation((column: string, value: unknown) => {
+                if (column === 'updated_at') expected = value;
+                return table;
+            });
+            table.update.mockImplementation((payload: { updated_at: string }) => { next = payload.updated_at; return table; });
+            table.maybeSingle.mockImplementation(async () => {
+                if (expected !== currentRevision) return { data: null, error: null };
+                if (typeof next !== 'string') throw new Error('Missing next revision');
+                currentRevision = next;
+                return { data: { ...row, updated_at: next }, error: null };
+            });
+            tables.push(table);
+            return table;
+        });
+        const { SupabaseStorageProvider } = await import('../SupabaseStorage');
+        const provider = new SupabaseStorageProvider();
+        const payload = { ...row, user_id: 'editor', expectedRevision: loadedRevision };
+        const first = await provider.saveDiagram(payload);
+        expect(first.user_id).toBe('owner');
+        expect(first.updated_at).not.toBe(loadedRevision);
+        await expect(provider.saveDiagram(payload)).rejects.toThrow('本地编辑已保留');
+        expect(currentRevision).toBe(first.updated_at);
+        for (const table of tables) {
+            expect(table.update.mock.calls[0][0]).not.toHaveProperty('user_id');
+            expect(table.upsert).not.toHaveBeenCalled();
+            expect(table.insert).not.toHaveBeenCalled();
+        }
+    });
+    it.each([null, '', 'invalid', '2026-02-30T00:00:00Z'])('rejects an invalid supplied revision before a database write: %j', expectedRevision => {
+        mockSupabase.auth.getUser.mockResolvedValue({ data: { user: { id: 'editor' } }, error: null });
+        return import('../SupabaseStorage').then(async ({ SupabaseStorageProvider }) => {
+            await expect(new SupabaseStorageProvider().saveDiagram({
+                id: 'diagram-1', title: 'Diagram', content: makeDiagramContent(), user_id: 'editor',
+                updated_at: '', expectedRevision: expectedRevision as string,
+            })).rejects.toThrow('revision is invalid');
+            expect(mockSupabase.from).not.toHaveBeenCalled();
+        });
+    });
+    it('surfaces create collisions without updating the existing row', async () => {
+        mockSupabase.auth.getUser.mockResolvedValue({ data: { user: { id: 'editor' } }, error: null });
+        const table = createTableMock({ data: null, error: { code: '23505' } });
+        mockSupabase.from.mockReturnValue(table);
+        const { SupabaseStorageProvider } = await import('../SupabaseStorage');
+        await expect(new SupabaseStorageProvider().saveDiagram({
+            id: 'diagram-1', title: 'Diagram', content: makeDiagramContent(), user_id: 'different-owner', updated_at: '',
+        })).rejects.toThrow('另存为副本');
+        expect(table.insert).toHaveBeenCalledWith(expect.objectContaining({ user_id: 'editor' }));
+        expect(table.update).not.toHaveBeenCalled();
+        expect(table.upsert).not.toHaveBeenCalled();
+    });
+    it.each(['2026-10-08T10:12:02.605123+00:00', '2026-10-08T10:12:02.605124+00:00'])('preserves the loaded microsecond revision %s', async revision => {
+        mockSupabase.from.mockReturnValue(createTableMock({ data: {
+            id: 'diagram-1', title: 'Diagram', content: makeDiagramContent(),
+            user_id: 'owner', updated_at: revision,
+        }, error: null }));
+        const { SupabaseStorageProvider } = await import('../SupabaseStorage');
+        expect((await new SupabaseStorageProvider().loadDiagram('diagram-1')).updated_at).toBe(revision);
+    });
+    it.each([undefined, null, 'not-a-date', '2026-02-30T00:00:00Z'])('rejects a loaded row without a trustworthy revision: %j', async updated_at => {
+        mockSupabase.from.mockReturnValue(createTableMock({ data: {
+            id: 'diagram-1', title: 'Diagram', content: makeDiagramContent(), user_id: 'owner', updated_at,
+        }, error: null }));
+        const { SupabaseStorageProvider } = await import('../SupabaseStorage');
+        await expect(new SupabaseStorageProvider().loadDiagram('diagram-1')).rejects.toThrow('invalid diagram revision');
+    });
     afterEach(() => {
         vi.clearAllMocks();
+    });
+
+    it('lists all diagram pages with a deterministic tie breaker', async () => {
+        mockSupabase.auth.getUser.mockResolvedValue({ data: { user: { id: 'owner' } }, error: null });
+        const first = createTableMock({ data: [{ id: 'one', title: 'One', updated_at: '2026-06-11T00:00:00Z' }], error: null });
+        const second = createTableMock({ data: [{ id: 'two', title: 'Two', updated_at: '2026-06-11T00:00:00Z' }], error: null });
+        const last = createTableMock({ data: [], error: null });
+        mockSupabase.from.mockReturnValueOnce(first).mockReturnValueOnce(second).mockReturnValueOnce(last);
+        const { SupabaseStorageProvider } = await import('../SupabaseStorage');
+        expect((await new SupabaseStorageProvider().listDiagrams()).map(row => row.id)).toEqual(['one', 'two']);
+        expect(first.order.mock.calls).toEqual([['updated_at', { ascending: false }], ['id', { ascending: true }]]);
+        expect(first.range).toHaveBeenCalledWith(0, 499);
+        expect(second.range).toHaveBeenCalledWith(1, 500);
+        expect(last.range).toHaveBeenCalledWith(2, 501);
+        for (const page of [first, second, last]) expect(page.eq).toHaveBeenCalledWith('user_id', 'owner');
+    });
+
+    it.each([
+        { data: { user: null }, error: null },
+        { data: { user: null }, error: new Error('Synthetic auth failure') },
+    ])('does not list cloud ownership without a verified user: %j', async auth => {
+        mockSupabase.auth.getUser.mockResolvedValue(auth);
+        const { SupabaseStorageProvider } = await import('../SupabaseStorage');
+        await expect(new SupabaseStorageProvider().listDiagrams()).rejects.toThrow();
+        expect(mockSupabase.from).not.toHaveBeenCalled();
+    });
+
+    it('keeps version pages scoped to the requested diagram and omits snapshot payloads', async () => {
+        const diagramId = '11111111-1111-4111-8111-111111111111';
+        const row = { id: '22222222-2222-4222-8222-222222222222', diagram_id: diagramId, created_at: '2026-06-11T00:00:00Z' };
+        const first = createTableMock({ data: [row], error: null });
+        const last = createTableMock({ data: [], error: null });
+        mockSupabase.from.mockReturnValueOnce(first).mockReturnValueOnce(last);
+        const { SupabaseStorageProvider } = await import('../SupabaseStorage');
+        expect(await new SupabaseStorageProvider().listVersions(diagramId)).toHaveLength(1);
+        for (const page of [first, last]) {
+            expect(page.eq).toHaveBeenCalledWith('diagram_id', diagramId);
+            expect(page.select).toHaveBeenCalledWith('id, diagram_id, author_id, created_at, message');
+            expect(page.order).toHaveBeenCalledWith('id', { ascending: true });
+        }
     });
 
     it('uses the authenticated user when saving new anonymous diagrams', async () => {
@@ -93,7 +223,7 @@ describe('SupabaseStorageProvider', () => {
             updated_at: '',
         });
 
-        expect(table.upsert).toHaveBeenCalledWith(expect.objectContaining({
+        expect(table.insert).toHaveBeenCalledWith(expect.objectContaining({
             user_id: '11111111-1111-4111-8111-111111111111',
         }));
     });
@@ -123,11 +253,15 @@ describe('SupabaseStorageProvider', () => {
             content: makeDiagramContent(),
             user_id: '11111111-1111-4111-8111-111111111111',
             updated_at: '',
+            expectedRevision: '2026-06-11T00:00:00.123456+00:00',
         });
 
-        expect(table.upsert).toHaveBeenCalledWith(expect.objectContaining({
-            user_id: '11111111-1111-4111-8111-111111111111',
-        }));
+        expect(table.update).toHaveBeenCalledOnce();
+        expect(table.update.mock.calls[0][0]).not.toHaveProperty('user_id');
+        expect(table.eq).toHaveBeenCalledWith('id', 'diagram-1');
+        expect(table.eq).toHaveBeenCalledWith('updated_at', '2026-06-11T00:00:00.123456+00:00');
+        expect(table.insert).not.toHaveBeenCalled();
+        expect(table.upsert).not.toHaveBeenCalled();
     });
 
     it('rejects config saves when the expected user does not match the authenticated user', async () => {
@@ -289,6 +423,7 @@ describe('SupabaseStorageProvider', () => {
     });
 
     it('filters malformed Supabase diagram metadata rows', async () => {
+        mockSupabase.auth.getUser.mockResolvedValue({ data: { user: { id: '11111111-1111-4111-8111-111111111111' } }, error: null });
         const table = createTableMock({
             data: [
                 {

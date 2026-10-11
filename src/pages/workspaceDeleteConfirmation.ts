@@ -84,8 +84,10 @@ export const createWorkspaceDeleteConfirmation = (
     title: options.title,
     content: options.description,
     okText: options.deleteLabel,
+    okButtonProps: { 'aria-label': options.deleteLabel },
     okType: 'danger',
     cancelText: options.cancelLabel,
+    cancelButtonProps: { 'aria-label': options.cancelLabel },
     focusable: {
       autoFocusButton: 'cancel',
       focusTriggerAfterClose: false,

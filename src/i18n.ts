@@ -9,6 +9,7 @@ import {
     type SupportedLanguageCode,
 } from '@vizly/core/i18n';
 import { loadLocaleResource } from './services/localeResourceBoundary';
+import { awaitLocaleInitialization } from './services/localeInitialization';
 
 const localeLoaders: Record<SupportedLanguageCode, () => Promise<Record<string, unknown>>> = {
     en: () => loadLocaleResource(enLocaleUrl),
@@ -22,12 +23,12 @@ const localeBackend: BackendModule = {
         const supportedLanguage = coerceSupportedLanguage(language);
         void localeLoaders[supportedLanguage]().then(
             resources => callback(null, resources),
-            error => callback(error instanceof Error ? error : new Error('locale-load-failed'), false),
+            () => callback(new Error('Locale resource initialization failed.'), false),
         );
     },
 };
 
-export const i18nReady: Promise<void> = i18n
+export const i18nReady: Promise<void> = awaitLocaleInitialization(i18n
     // detect user language
     // learn more: https://github.com/i18next/i18next-browser-languagedetector
     .use(LanguageDetector)
@@ -46,8 +47,10 @@ export const i18nReady: Promise<void> = i18n
         interpolation: {
             escapeValue: false, // not needed for react as it escapes by default
         },
-    })
-    .then(() => undefined, () => undefined);
+    }), () => i18n.getResourceBundle(
+        coerceSupportedLanguage(i18n.resolvedLanguage || i18n.language),
+        'translation',
+    ));
 
 i18n.on('languageChanged', (language) => {
     syncDocumentLanguage(language, typeof document === 'undefined' ? null : document);
