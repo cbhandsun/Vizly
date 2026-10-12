@@ -64,6 +64,9 @@ jobs:
   browser:
     name: Browser acceptance (${{ matrix.phase }})
     runs-on: ubuntu-latest
+    env:
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
     timeout-minutes: 20
     strategy:
       fail-fast: false

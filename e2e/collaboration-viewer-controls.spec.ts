@@ -36,6 +36,10 @@ test('server viewer role disables editing and follows promotion and downgrade', 
   await expect(page.getByRole('button', { name: '打开协作详情：已连接协作服务', exact: true })).toBeVisible();
   const node = page.locator('.react-flow__node[data-id="order-import"]');
   await expect(node).toContainText('订单导入/创建');
+  // The readable first view can focus a different business node. Navigate
+  // through the real overview control before testing this node's role policy.
+  await page.getByRole('button', { name: '适应屏幕', exact: true }).click();
+  await expect(node).toBeInViewport({ ratio: 1 });
   await node.dblclick();
   await expect(node.getByRole('textbox', { name: 'Edit Node Text', exact: true })).toHaveCount(0);
   sendRole('editor');
