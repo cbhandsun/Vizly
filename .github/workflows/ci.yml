@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, review/ci-failure-acceptance-20261011-r629]
 
 permissions:
   contents: read
@@ -60,6 +60,12 @@ jobs:
         run: node scripts/bootstrap-ci-npm.mjs
       - name: Install
         run: npm ci
+      - name: Inject owned regression for failure propagation acceptance
+        run: |
+          node --input-type=module <<'NODE'
+          import { writeFile } from 'node:fs/promises';
+          await writeFile('src/components/diagrams/hooks/__tests__/ciFailurePropagationSentinel.test.ts', 'import { expect, it } from "vitest";\nit("CI_REQUIRED_FAILURE_PROPAGATION_R629", () => { expect(false).toBe(true); });\n', { flag: 'wx' });
+          NODE
       - name: Run all discovered tests in this shard
         run: npm run test:ci -- --shard=${{ matrix.shard }}/4
 
