@@ -36,6 +36,7 @@ import { resolveExportableNodeCount, resolveExportMenuAvailability } from './exp
 import { useKeyboardAccessibleDropdown } from '@vizly/core/keyboard-dropdown';
 import { ExportProgressOverlay } from './ExportProgressOverlay';
 import { buildMarkdownDiagramExport } from './markdownDiagramExport';
+import { useCanvasViewportReadiness } from './useCanvasViewportReadiness';
 import './ExportTools.css';
 
 const ShareDialog = React.lazy(() => import('@/components/diagrams/ShareDialog'));
@@ -93,6 +94,10 @@ const ExportTools: React.FC<ExportToolsProps> = ({
   const { hasFeature, showUpgradeModal } = useSubscription();
   // 用于 fallback：当 dataService 无数据时从 ReactFlow 获取当前节点/边
   const reactFlowInstance = useReactFlow();
+  const readViewportControlSnapshot = useCallback(() => readRegisteredReactFlowSnapshot(diagramId)
+    ?? { nodes: reactFlowInstance.getNodes() }, [diagramId, reactFlowInstance]);
+  const readViewportControlBridge = useCallback(() => getFlowDataBridge(diagramId), [diagramId]);
+  const viewportControlsReady = useCanvasViewportReadiness(diagramId, readViewportControlSnapshot, readViewportControlBridge);
   const getReactFlowSnapshot = useCallback(() => enrichSnapshotWithRenderedNodeStyles(
     readRegisteredReactFlowSnapshot(diagramId) ?? {
       nodes: reactFlowInstance.getNodes(),
@@ -542,10 +547,10 @@ const ExportTools: React.FC<ExportToolsProps> = ({
         {showControls && (
           <>
             <Tooltip title={t('export.backToTop')} getPopupContainer={(trigger) => (document.fullscreenElement as HTMLElement) || trigger.parentElement || document.body}>
-              <Button type="text" aria-label={t('export.backToTop')} icon={<FaHome className="text-[13px]" />} onClick={handleBackToTop} disabled={isExporting} className="w-8 h-8 p-0 border-none flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
+              <Button type="text" aria-label={t('export.backToTop')} icon={<FaHome className="text-[13px]" />} onClick={handleBackToTop} disabled={isExporting || !viewportControlsReady} className="w-8 h-8 p-0 border-none flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
             </Tooltip>
             <Tooltip title={t('export.fitScreen')} getPopupContainer={(trigger) => (document.fullscreenElement as HTMLElement) || trigger.parentElement || document.body}>
-              <Button type="text" aria-label={t('export.fitScreen')} icon={<FaRuler className="text-[13px]" />} onClick={handleFitDiagram} disabled={isExporting} className="w-8 h-8 p-0 border-none flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
+              <Button type="text" aria-label={t('export.fitScreen')} icon={<FaRuler className="text-[13px]" />} onClick={handleFitDiagram} disabled={isExporting || !viewportControlsReady} className="w-8 h-8 p-0 border-none flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
             </Tooltip>
             <Tooltip title={isFullscreen ? t('export.exitFullScreen') : t('export.fullScreen')} getPopupContainer={(trigger) => (document.fullscreenElement as HTMLElement) || trigger.parentElement || document.body}>
               <Button
