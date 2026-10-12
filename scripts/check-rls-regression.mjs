@@ -6,7 +6,7 @@ import { runRlsPerformanceRegression } from './lib/check-rls-performance.mjs';
 import { runCollaboratorDuplicateIndexRegression } from './lib/check-collaborator-duplicate-index.mjs';
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { setTimeout } from 'node:timers/promises';
+import { waitForIsolatedPostgres } from './lib/isolatedPostgresReadiness.mjs';
 
 const container = `vizly-rls-regression-${process.pid}`;
 // Match the production major/minor version and pin the accepted image manifest.
@@ -20,13 +20,9 @@ let started = false;
 try {
   runDocker(['run', '--detach', '--name', container, '--network', 'none', '--tmpfs', '/var/lib/postgresql/data', '--env', 'POSTGRES_HOST_AUTH_METHOD=trust', postgresImage]);
   started = true;
-  let ready = false;
-  for (let attempt = 0; attempt < 30; attempt++) {
-    const probe = spawnSync('docker', ['exec', container, 'pg_isready', '-U', 'postgres'], { encoding: 'utf8', timeout: 5000 });
-    if (probe.status === 0) { ready = true; break; }
-    await setTimeout(500);
-  }
-  if (!ready) throw new Error('Isolated Postgres did not become ready');
+  await waitForIsolatedPostgres({ container,
+    probe: args => spawnSync('docker', args, { encoding: 'utf8', timeout: 5000 }),
+  });
   const fixture = readFileSync(new URL('./fixtures/rls-bootstrap.sql', import.meta.url), 'utf8');
   const migration = readFileSync(new URL('../supabase/migrations/20260611000000_harden_rls_policies.sql', import.meta.url), 'utf8');
   const assertions = readFileSync(new URL('./fixtures/rls-assertions.sql', import.meta.url), 'utf8');

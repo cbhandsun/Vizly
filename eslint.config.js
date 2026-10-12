@@ -12,6 +12,7 @@ export default defineConfig([
     files: ['scripts/prepare-vercel-static.mjs', 'scripts/deploy-prepared-vercel-static.mjs',
       'scripts/install-locked-core-artifact.mjs',
       'scripts/verify-ci-negative-gates.mjs', 'scripts/lib/ciNegativeGateProbe.mjs', 'scripts/lib/ciNegativeGateProbe.test.mjs',
+      'scripts/lib/isolatedPostgresReadiness.mjs', 'scripts/lib/isolatedPostgresReadiness.test.mjs',
       'scripts/lib/coreArtifactLockOverlay.mjs', 'scripts/lib/coreArtifactLockOverlay.test.mjs',
       'scripts/lib/installLockedCoreArtifact.mjs', 'scripts/lib/installLockedCoreArtifact.test.mjs',
       'scripts/lib/vercelDeploymentEnvironment.mjs', 'scripts/lib/vercelDeploymentEnvironment.test.mjs',
