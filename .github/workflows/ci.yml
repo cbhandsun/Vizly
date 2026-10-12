@@ -29,6 +29,8 @@ jobs:
         run: npm run typecheck
       - name: Lint
         run: npm run lint
+      - name: Prove negative test, type and lint enforcement
+        run: node scripts/verify-ci-negative-gates.mjs
       - name: Permission regression
         run: npm run test:rls
       - name: Real storage regression

@@ -34,6 +34,7 @@ describe('public CI toolchain and regression discovery contract',()=>{
     expect(workflow).toContain('shard: [1, 2, 3, 4]');
     expect(workflow).toContain('run: npm run test:ci -- --shard=${{ matrix.shard }}/4');
     expect(workflow).toContain('needs: [health, tests, browser, security]');
+    expect(workflow).toContain('run: node scripts/verify-ci-negative-gates.mjs');
     for(const result of ['HEALTH_RESULT','TESTS_RESULT','BROWSER_RESULT','SECURITY_RESULT']) {
       expect(workflow).toContain(`test "$${result}" = success`);
     }

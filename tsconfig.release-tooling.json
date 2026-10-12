@@ -14,5 +14,5 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "files": ["scripts/lib/vercelDeploymentEnvironment.mjs", "scripts/lib/jsonCheckpoint.mjs", "scripts/lib/isolatedS3Integration.mjs", "scripts/lib/s3ReadinessProbe.mjs", "scripts/lib/coreArtifactLockOverlay.mjs", "scripts/lib/installLockedCoreArtifact.mjs", "scripts/install-locked-core-artifact.mjs"]
+  "files": ["scripts/lib/vercelDeploymentEnvironment.mjs", "scripts/lib/jsonCheckpoint.mjs", "scripts/lib/isolatedS3Integration.mjs", "scripts/lib/s3ReadinessProbe.mjs", "scripts/lib/coreArtifactLockOverlay.mjs", "scripts/lib/installLockedCoreArtifact.mjs", "scripts/install-locked-core-artifact.mjs", "scripts/lib/ciNegativeGateProbe.mjs", "scripts/verify-ci-negative-gates.mjs"]
 }
