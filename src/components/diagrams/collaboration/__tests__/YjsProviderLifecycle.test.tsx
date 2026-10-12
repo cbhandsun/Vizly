@@ -145,6 +145,35 @@ describe('collaboration connection ownership', () => {
     hook.unmount();
   });
 
+  it('replaces a stored Guest identity with the current account and refreshes it on account change', () => {
+    sessionStorage.setItem('vizly_collaborator_name', 'Guest 589');
+    sessionStorage.setItem('vizly_collaborator_color', '#6366f1');
+    const hook = renderHook(({ userId }) => useYjsCollaboration({ ...options, userId }), {
+      initialProps: { userId: '23c11572-1234-4567-89ab-123456789abc' },
+    });
+    const current = fixture.providers.at(-1) as unknown as {
+      destroyed: boolean; awareness: { setLocalStateField: ReturnType<typeof vi.fn> };
+    };
+    expect(current.awareness.setLocalStateField).toHaveBeenCalledWith('user', { name: 'User 23c11572', color: '#0ea5e9' });
+    hook.rerender({ userId: 'abcdef12-1234-4567-89ab-123456789abc' });
+    expect(current.destroyed).toBe(true);
+    const next = fixture.providers.at(-1) as unknown as { awareness: { setLocalStateField: ReturnType<typeof vi.fn> } };
+    expect(next.awareness.setLocalStateField).toHaveBeenCalledWith('user', { name: 'User abcdef12', color: '#0ea5e9' });
+    hook.rerender({ userId: '' });
+    const signedOut = fixture.providers.at(-1) as unknown as { awareness: { setLocalStateField: ReturnType<typeof vi.fn> } };
+    expect(signedOut.awareness.setLocalStateField).toHaveBeenCalledWith('user', { name: 'Guest 589', color: '#6366f1' });
+    hook.unmount();
+  });
+
+  it('keeps an authenticated display identity when browser nickname storage is unavailable', () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('Storage blocked'); });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Storage blocked'); });
+    const hook = renderHook(() => useYjsCollaboration({ ...options, userId: '23c11572-1234-4567-89ab-123456789abc' }));
+    const current = fixture.providers.at(-1) as unknown as { awareness: { setLocalStateField: ReturnType<typeof vi.fn> } };
+    expect(current.awareness.setLocalStateField).toHaveBeenCalledWith('user', { name: 'User 23c11572', color: '#0ea5e9' });
+    hook.unmount();
+  });
+
   it('keeps a live connection after StrictMode effect replay and destroys every allocation on unmount', () => {
     const hook = renderHook(() => useYjsCollaboration(options), { wrapper });
     expect(hook.result.current.provider).not.toBeNull();

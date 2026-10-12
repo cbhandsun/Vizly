@@ -10,6 +10,7 @@ import {
     useDiagramHostStorage,
 } from '@vizly/core/editor-hooks';
 import { useSubscription } from '../context/useSubscription';
+import { useAuth } from '../context/useAuth';
 
 import { LayeredConfigManager, ConfigLayer } from '@vizly/core/config';
 import { useCloudSave } from './diagrams/hooks/useCloudSave';
@@ -84,6 +85,7 @@ const DiagramViewer: React.FC = () => {
 
     // 商业化订阅信息
     const { hasFeature, jwtToken, showUpgradeModal } = useSubscription();
+    const { user } = useAuth();
 
     // 使用新的存储 Hook
     const {
@@ -121,6 +123,7 @@ const DiagramViewer: React.FC = () => {
         roomName,
         setCollabModalVisible,
     } = useDiagramViewerCollaboration({
+        userId: user?.id,
         jwtToken,
         roomFromUrl,
         selectedDiagramId,

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef, useSyncExternalStore } from 'react';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import { Node, Edge, useReactFlow } from '@xyflow/react';
@@ -13,6 +13,7 @@ import { publishCollaborationElement, readCollaborationElement } from '../../../
 import { createCollaborationConnectionState } from './collaborationConnectionState';
 import { COLLABORATION_ACCESS_MESSAGE, readCollaborationAccess } from './collaborationAccessProtocol';
 import { createCollaborationAwareness } from './collaborationAwareness';
+import { resolveAuthenticatedCollaboratorIdentity } from './collaborationDisplayIdentity';
 import { createCollaborationSocket } from './collaborationSocket';
 import { COORDINATION_STATUS_MESSAGE, readCoordinationProblem } from '../../../../server/collaboration/coordinationStatus';
 import { CLOUD_REVISION_MESSAGE, hasAcceptedCloudState, readAcceptedCloudRevision, type AcceptedCloudRevision } from '../../../../server/collaboration/cloudRevisionProtocol';
@@ -85,6 +86,7 @@ export const persistCollaboratorIdentity = (identity: CollaboratorIdentity): voi
 };
 
 export interface YjsCollaborationOptions {
+    userId?: string;
     roomName: string;
     serverUrl: string;
     token?: string;
@@ -94,7 +96,7 @@ export interface YjsCollaborationOptions {
 }
 
 export function useYjsCollaboration(options: YjsCollaborationOptions) {
-    const { roomName, serverUrl, token, enabled = true, onRemoteSnapshot, isLocalSnapshotReady } = options;
+    const { roomName, serverUrl, token, userId, enabled = true, onRemoteSnapshot, isLocalSnapshotReady } = options;
     const reactFlowInstance = useReactFlow();
     
     const [connectionState] = useState(createCollaborationConnectionState);
@@ -158,7 +160,7 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
             pendingRetryTimerRef.current = setTimeout(retry, 100);
         }
     }, [flushPendingRemoteSnapshot]);
-    const [localUser] = useState<CollaboratorIdentity>(() => {
+    const [storedLocalUser] = useState<CollaboratorIdentity>(() => {
         const storedIdentity = readStoredCollaboratorIdentity();
         if (storedIdentity) return storedIdentity;
 
@@ -166,6 +168,8 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         persistCollaboratorIdentity(nextIdentity);
         return nextIdentity;
     });
+    const localUser = useMemo(() => resolveAuthenticatedCollaboratorIdentity(userId) ?? storedLocalUser,
+        [userId, storedLocalUser]);
 
     // Capture owned JSON values so a later caller mutation cannot change the baseline.
     const lastSyncedNodesRef = useRef<Map<string, unknown>>(new Map());

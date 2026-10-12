@@ -1,11 +1,12 @@
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ bridge: undefined as unknown, enabled: false, role: null as 'editor' | 'viewer' | null }));
+const fixture = vi.hoisted(() => ({ bridge: undefined as unknown, enabled: false, userId: undefined as string | undefined, role: null as 'editor' | 'viewer' | null }));
 vi.mock('@vizly/core/collaboration', () => ({ resolveDiagramCollaborationStatus: (wanted: boolean) => wanted ? 'connecting' : 'disconnected' }));
 vi.mock('@vizly/core/diagram-data', () => ({ getFlowDataBridge: () => fixture.bridge }));
-vi.mock('../diagrams/collaboration/YjsProviderHooks', () => ({ useYjsCollaboration: (options: { enabled?: boolean }) => {
+vi.mock('../diagrams/collaboration/YjsProviderHooks', () => ({ useYjsCollaboration: (options: { enabled?: boolean; userId?: string }) => {
   fixture.enabled = options.enabled === true;
+  fixture.userId = options.userId;
   return { coordinationProblem: null, isSynced: false, accessRole: fixture.role, wsStatus: 'disconnected', activeUsers: [], provider: null,
     retryCollaboration: vi.fn(), pushLocalChangesToYjs: vi.fn() };
 } }));
@@ -20,7 +21,7 @@ describe('viewer automatic collaboration requires its actual cloud document', ()
   beforeEach(() => {
     vi.useFakeTimers();
     vi.stubEnv('VITE_YJS_WEBSOCKET_URL', 'ws://127.0.0.1:5422');
-    fixture.bridge = undefined; fixture.enabled = false; fixture.role = null;
+    fixture.bridge = undefined; fixture.enabled = false; fixture.role = null; fixture.userId = undefined;
   });
   afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllEnvs(); });
 
@@ -35,6 +36,18 @@ describe('viewer automatic collaboration requires its actual cloud document', ()
     fixture.bridge = bridge();
     renderHook(() => useDiagramViewerCollaboration(options()));
     expect(fixture.enabled).toBe(true);
+  });
+
+  it('forwards the active account display identity without granting an editor role', () => {
+    fixture.bridge = bridge();
+    const hook = renderHook(props => useDiagramViewerCollaboration(props), {
+      initialProps: { ...options(), userId: '23c11572-1234-4567-89ab-123456789abc' },
+    });
+    expect(fixture.userId).toBe('23c11572-1234-4567-89ab-123456789abc');
+    expect(hook.result.current.isCollaborationReadOnly).toBe(true);
+    hook.rerender({ ...options(), userId: '' });
+    expect(fixture.userId).toBe('');
+    expect(hook.result.current.isCollaborationReadOnly).toBe(true);
   });
 
   it('keeps the viewer canvas locked while reconnect authorization is unknown and unlocks only a confirmed editor', () => {

@@ -23,12 +23,14 @@ import {
 } from './collaborationModalFocus';
 
 interface UseDiagramViewerCollaborationOptions {
+  userId?: string;
   jwtToken?: string;
   roomFromUrl: string | null;
   selectedDiagramId: string;
 }
 
 export const useDiagramViewerCollaboration = ({
+  userId,
   jwtToken,
   roomFromUrl,
   selectedDiagramId,
@@ -73,6 +75,7 @@ export const useDiagramViewerCollaboration = ({
   const isLocalSnapshotReady = useCallback(() => getFlowDataBridge(selectedDiagramId)?.isCanvasReady?.() === true, [selectedDiagramId]);
   const collaborationEnabled = Boolean(serverUrl) && wantsCollaboration && roomBinding.valid;
   const collaboration = useYjsCollaboration({
+    userId,
     roomName,
     serverUrl,
     token: normalizeCollaborationToken(jwtToken),
