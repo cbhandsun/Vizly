@@ -50,6 +50,12 @@ BEGIN
 
   IF to_regclass('public.diagrams') IS NOT NULL THEN
     ALTER TABLE public.diagrams ENABLE ROW LEVEL SECURITY;
+    -- Permissive policies are OR-combined. Remove the deployed legacy policies
+    -- before installing the narrower role-aware replacements.
+    DROP POLICY IF EXISTS owner_all ON public.diagrams;
+    DROP POLICY IF EXISTS collaborator_read ON public.diagrams;
+    REVOKE ALL ON public.diagrams FROM anon;
+    REVOKE TRUNCATE, REFERENCES, TRIGGER ON public.diagrams FROM authenticated;
 
     CREATE OR REPLACE FUNCTION public.prevent_diagram_user_id_change()
     RETURNS trigger
@@ -71,6 +77,7 @@ BEGIN
     BEFORE UPDATE OF user_id ON public.diagrams
     FOR EACH ROW
     EXECUTE FUNCTION public.prevent_diagram_user_id_change();
+    REVOKE ALL ON FUNCTION public.prevent_diagram_user_id_change() FROM PUBLIC, anon, authenticated;
 
     DROP POLICY IF EXISTS "Users can insert own diagrams" ON public.diagrams;
     CREATE POLICY "Users can insert own diagrams"
@@ -228,6 +235,12 @@ BEGIN
 
   IF has_diagram_collaborators THEN
     ALTER TABLE public.diagram_collaborators ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS adder_all ON public.diagram_collaborators;
+    DROP POLICY IF EXISTS self_read ON public.diagram_collaborators;
+    -- Management is available through the owner-checked RPCs below. A direct
+    -- insert with added_by=auth.uid() must never grant access to another diagram.
+    REVOKE ALL ON public.diagram_collaborators FROM anon;
+    REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.diagram_collaborators FROM authenticated;
 
     DROP POLICY IF EXISTS "Users can read own collaborations" ON public.diagram_collaborators;
     CREATE POLICY "Users can read own collaborations"
@@ -239,6 +252,11 @@ BEGIN
 
   IF to_regclass('public.shared_diagrams') IS NOT NULL THEN
     ALTER TABLE public.shared_diagrams ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS creator_all ON public.shared_diagrams;
+    DROP POLICY IF EXISTS read_active ON public.shared_diagrams;
+    -- Possession of a token is checked by the scoped RPC, not by table listing.
+    REVOKE ALL ON public.shared_diagrams FROM anon;
+    REVOKE TRUNCATE, REFERENCES, TRIGGER ON public.shared_diagrams FROM authenticated;
 
     DROP POLICY IF EXISTS "Users can manage own share links" ON public.shared_diagrams;
     CREATE POLICY "Users can manage own share links"
@@ -307,10 +325,10 @@ BEGIN
     EXECUTE $function$
       CREATE OR REPLACE FUNCTION public.get_diagram_collaborators(p_diagram_id uuid)
       RETURNS TABLE(
-        diagram_id text,
-        user_id text,
+        diagram_id uuid,
+        user_id uuid,
         role text,
-        added_by text,
+        added_by uuid,
         created_at timestamptz,
         email text
       )
@@ -319,10 +337,10 @@ BEGIN
       SET search_path = public, auth
       AS $sql$
         SELECT
-          dc.diagram_id::text,
-          dc.user_id::text,
+          dc.diagram_id::uuid,
+          dc.user_id::uuid,
           dc.role::text,
-          dc.added_by::text,
+          dc.added_by::uuid,
           dc.created_at,
           u.email::text
         FROM public.diagram_collaborators dc
@@ -355,7 +373,7 @@ BEGIN
         p_target_email text,
         p_role text DEFAULT 'viewer'
       )
-      RETURNS jsonb
+      RETURNS json
       LANGUAGE plpgsql
       SECURITY DEFINER
       SET search_path = public, auth
@@ -372,7 +390,7 @@ BEGIN
           RETURN jsonb_build_object('success', false, 'error', 'Not authenticated');
         END IF;
 
-        IF v_role NOT IN ('viewer', 'editor') THEN
+        IF v_role IS NULL OR v_role NOT IN ('viewer', 'editor') THEN
           RETURN jsonb_build_object('success', false, 'error', 'Invalid collaborator role');
         END IF;
 
@@ -493,9 +511,9 @@ BEGIN
       $sql$;
     $function$;
 
-    REVOKE ALL ON FUNCTION public.get_diagram_collaborators(uuid) FROM PUBLIC;
-    REVOKE ALL ON FUNCTION public.add_diagram_collaborator(uuid, text, text) FROM PUBLIC;
-    REVOKE ALL ON FUNCTION public.remove_diagram_collaborator(uuid, uuid) FROM PUBLIC;
+    REVOKE ALL ON FUNCTION public.get_diagram_collaborators(uuid) FROM PUBLIC, anon;
+    REVOKE ALL ON FUNCTION public.add_diagram_collaborator(uuid, text, text) FROM PUBLIC, anon;
+    REVOKE ALL ON FUNCTION public.remove_diagram_collaborator(uuid, uuid) FROM PUBLIC, anon;
     GRANT EXECUTE ON FUNCTION public.get_diagram_collaborators(uuid) TO authenticated;
     GRANT EXECUTE ON FUNCTION public.add_diagram_collaborator(uuid, text, text) TO authenticated;
     GRANT EXECUTE ON FUNCTION public.remove_diagram_collaborator(uuid, uuid) TO authenticated;

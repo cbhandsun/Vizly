@@ -114,6 +114,16 @@ vi.mock('../../hooks/useVersionHistory', () => ({
 import { VersionHistoryPanel } from '../VersionHistoryPanel';
 
 describe('VersionHistoryPanel commercial preview safeguards', () => {
+    it('keeps the panel open when exiting an active preview cannot restore the canvas', () => {
+        historyMocks.previewVersion = { id: 'version-1', message: 'Snapshot' };
+        historyMocks.exitPreview.mockReturnValue(null);
+        const onClose = vi.fn();
+        render(<VersionHistoryPanel diagramId="diagram-1" isOpen onClose={onClose} />);
+        fireEvent.click(screen.getByRole('button', { name: /^Close version history$/ }));
+        expect(historyMocks.exitPreview).toHaveBeenCalled();
+        expect(onClose).not.toHaveBeenCalled();
+        expect(screen.getByText('Previewing: Snapshot')).toBeTruthy();
+    });
     beforeEach(() => {
         historyMocks.versions = [];
         historyMocks.previewVersion = null;

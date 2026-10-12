@@ -80,9 +80,9 @@ describe('UnifiedStorageService', () => {
 
         const { UnifiedStorageService } = await loadUnifiedStorageModule();
         const service = new UnifiedStorageService();
-        (service as any).providers.supabase = createProvider({
+        Object.assign(service.getProvider('supabase'), createProvider({
             saveVersion: vi.fn().mockRejectedValueOnce(new Error('token=live-secret')),
-        });
+        }));
         service.setProvider('supabase');
 
         const result = await service.saveVersion('diagram-1', { nodes: [] }, 'save');
@@ -109,10 +109,10 @@ describe('UnifiedStorageService', () => {
 
         const { UnifiedStorageService } = await loadUnifiedStorageModule();
         const service = new UnifiedStorageService();
-        (service as any).providers.supabase = createProvider({
+        Object.assign(service.getProvider('supabase'), createProvider({
             listVersions: vi.fn().mockRejectedValueOnce(new Error('Authorization: Bearer sk-live-secret')),
             loadVersion: vi.fn().mockRejectedValueOnce(new Error('Authorization: Bearer sk-live-secret')),
-        });
+        }));
         service.setProvider('supabase');
 
         await expect(service.listVersions('diagram-2')).resolves.toEqual(localVersions);

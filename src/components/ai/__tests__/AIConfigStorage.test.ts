@@ -48,7 +48,7 @@ describe('AI config storage isolation', () => {
     beforeEach(() => {
         localStorage.clear();
         clearRuntimeAIConfig();
-        delete (window as any).__currentUserId;
+        delete window.__currentUserId;
         Object.values(safeLogState).forEach(mock => mock.mockReset());
     });
 
@@ -64,7 +64,7 @@ describe('AI config storage isolation', () => {
     it('uses the explicit current user hint without scanning unrelated user keys', () => {
         localStorage.setItem(getAIConfigKey('user-a'), JSON.stringify(makeConfig('', 'user-a prompt')));
         localStorage.setItem(getAIConfigKey('user-b'), JSON.stringify(makeConfig('', 'user-b prompt')));
-        (window as any).__currentUserId = 'user-b';
+        window.__currentUserId = 'user-b';
 
         const currentUserConfig = getAIConfig();
 

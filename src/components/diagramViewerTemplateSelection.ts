@@ -1,3 +1,5 @@
+import { readLoadedCloudRevision } from '@/services/cloudSaveVersion';
+
 export interface DiagramViewerTemplateData {
     id?: string;
     name?: string;
@@ -9,6 +11,8 @@ export interface RemoteDiagramSelection {
     id: string;
     title?: string;
     content: unknown;
+    updated_at?: string;
+    expectedRevision?: string;
 }
 
 export interface DiagramViewerTemplateSelectionContext {
@@ -77,7 +81,9 @@ export const coerceRemoteDiagramSelection = (
     const id = normalizeSelectionValue(record.id) ?? normalizeSelectionValue(fallbackId);
     if (!id || record.content === undefined || record.content === null) return null;
     const title = normalizeSelectionValue(record.title) ?? undefined;
-    return { id, title, content: record.content };
+    return { id, title, content: record.content,
+        ...(typeof record.expectedRevision === 'string' ? { expectedRevision: record.expectedRevision } : {}),
+        ...(typeof record.updated_at === 'string' ? { updated_at: record.updated_at } : {}) };
 };
 
 const withRemoteMetadata = (
@@ -91,7 +97,8 @@ const withRemoteMetadata = (
     metadata: {
         ...(parsed.metadata || {}),
         title: remote.title,
-        ...(provider ? { cloud: { provider, id: remote.id, title: remote.title } } : {}),
+        ...(provider ? { cloud: { provider, id: remote.id, title: remote.title,
+            revision: readLoadedCloudRevision(provider, remote) } } : {}),
     },
 });
 

@@ -13,6 +13,7 @@ import {
 } from './requestPolicy.ts';
 import { createGatewayStreamResponse } from './streamResponse.ts';
 import type { AIGatewayUserAuthenticator } from './userAuthentication.ts';
+import { BodyLimitError, readBoundedBody } from '../_shared/boundedBody.ts';
 
 export interface AIGatewayEnvironment {
   allowedOrigins?: string;
@@ -67,7 +68,20 @@ export const handleAIGatewayRequest = async (
   if (Number.isFinite(contentLength) && contentLength > AI_GATEWAY_MAX_BODY_CHARS) {
     return jsonResponse(413, 'Request body is too large.', corsHeaders);
   }
-  const rawBody = await request.text();
+  let rawBody: string;
+  try {
+    rawBody = await readBoundedBody(
+      request.body,
+      AI_GATEWAY_MAX_BODY_CHARS,
+      AbortSignal.any([request.signal, AbortSignal.timeout(30_000)]),
+    );
+  } catch (error) {
+    if (error instanceof BodyLimitError) return jsonResponse(413, 'Request body is too large.', corsHeaders);
+    if (error instanceof DOMException && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
+      return jsonResponse(408, 'Request body could not be read in time.', corsHeaders);
+    }
+    return jsonResponse(400, 'Invalid request body.', corsHeaders);
+  }
   const parsed = parseAIGatewayRequest(rawBody);
   if (!parsed.ok) {
     const status = parsed.reason === 'body-too-large' ? 413 : 400;

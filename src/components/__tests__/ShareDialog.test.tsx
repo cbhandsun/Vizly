@@ -703,21 +703,33 @@ describe('ShareDialog commercial failure handling', () => {
 
   it('treats a cancelled prerequisite save as a neutral user decision', async () => {
     authMocks.user = { id: USER_ID };
+    let cancelSave: (() => void) | undefined;
+    const ensureSaved = vi.fn(() => new Promise<{ status: 'cancelled' }>(resolve => {
+      cancelSave = () => resolve({ status: 'cancelled' });
+    }));
     render(
       <ShareDialog
         open
         onClose={vi.fn()}
         diagramId={DIAGRAM_ID}
-        onEnsureSaved={vi.fn(async () => ({ status: 'cancelled' } as const))}
+        onEnsureSaved={ensureSaved}
       />,
     );
 
     fireEvent.click(await screen.findByText('公开链接'));
-    fireEvent.click(await screen.findByRole('button', { name: '生成分享链接' }));
-
-    await waitFor(() => {
-      expect((screen.getByRole('button', { name: '生成分享链接' }) as HTMLButtonElement).disabled).toBe(false);
+    const generate = await screen.findByRole('button', { name: '生成分享链接' });
+    if (!(generate instanceof HTMLButtonElement)) throw new Error('Generate control is not a button');
+    fireEvent.click(generate);
+    expect(ensureSaved).toHaveBeenCalledTimes(1);
+    expect(generate.disabled).toBe(true);
+    expect(generate.getAttribute('aria-busy')).toBe('true');
+    await act(async () => {
+      if (!cancelSave) throw new Error('Prerequisite save was not started');
+      cancelSave();
     });
+    expect(generate.disabled).toBe(false);
+    expect(generate.getAttribute('aria-busy')).toBe('false');
+    expect(screen.getByRole('button', { name: '生成分享链接' })).toBe(generate);
     expect(serviceMocks.createShareLink).not.toHaveBeenCalled();
     expect(screen.queryByText('无法生成分享链接')).toBeNull();
     expect(messageMocks.error).not.toHaveBeenCalled();

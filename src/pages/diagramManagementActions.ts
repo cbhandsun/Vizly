@@ -1,4 +1,5 @@
 import { coerceDiagramId } from '@vizly/core/input';
+import { readLoadedCloudRevision } from '@/services/cloudSaveVersion';
 import { upsertDiagramConfigIndex } from '@vizly/core/app-storage';
 
 import {
@@ -111,7 +112,7 @@ export const createWorkspaceDiagramActions = (
     const clonedId = createValidId(dependencies);
     const title = boundedTitle(data.title, item.title || 'Untitled');
     const createdAt = dependencies.nowIso();
-    const cloned = localService.registerRemoteDiagram(data.content, {
+    const cloned = await localService.registerRemoteDiagram(data.content, {
       id: clonedId,
       title,
     }, true, {
@@ -137,7 +138,7 @@ export const createWorkspaceDiagramActions = (
     if (!diagramId) return { kind: 'invalid-id' };
 
     const unifiedStorage = await dependencies.loadUnifiedStorage();
-    const savedDiagram = await unifiedStorage.loadDiagram(diagramId);
+    const savedDiagram = await unifiedStorage.getProvider(cloudProvider).loadDiagram(diagramId);
     if (!savedDiagram) return { kind: 'not-found' };
     const savedDiagramId = coerceDiagramId(savedDiagram.id);
     if (!savedDiagramId) return { kind: 'invalid-id' };
@@ -147,7 +148,7 @@ export const createWorkspaceDiagramActions = (
     const dataRegistry = await dependencies.loadDataRegistry();
     await dataRegistry.initialize();
     const localService = dataRegistry.getDataService();
-    const normalized = localService.registerRemoteDiagram(savedDiagram.content, {
+    const normalized = await localService.registerRemoteDiagram(savedDiagram.content, {
       id: savedDiagramId,
       title,
     }, true, {
@@ -161,10 +162,15 @@ export const createWorkspaceDiagramActions = (
           id: savedDiagramId,
           title,
           openedAt: dependencies.nowIso(),
+          revision: readLoadedCloudRevision(cloudProvider, savedDiagram),
         },
       },
       isReadonly: item.role === 'viewer',
     });
+    // Opening a cloud card explicitly selects the persisted remote version.
+    // A previous local canvas autosave must not override that version on mount.
+    // Invalidate only after registration commits; storage failures must prevent navigation.
+    dependencies.getStorage()?.removeItem(`flowchart-autosave-v2-${savedDiagramId}`);
     persistDiagramIndex(dependencies, normalized);
     return { kind: 'navigate', diagramId: savedDiagramId };
   };
@@ -190,7 +196,7 @@ export const createWorkspaceDiagramActions = (
       if (item.source === 'local') {
         const dataRegistry = await dependencies.loadDataRegistry();
         await dataRegistry.initialize();
-        dataRegistry.getDataService().deleteDiagram(diagramId);
+        await dataRegistry.getDataService().deleteDiagram(diagramId);
       } else {
         const unifiedStorage = await dependencies.loadUnifiedStorage();
         await unifiedStorage.deleteDiagram(diagramId);
@@ -220,7 +226,7 @@ export const createWorkspaceDiagramActions = (
         createdAt,
         updatedAt: createdAt,
       };
-      localService.registerDiagram(cloned);
+      await localService.registerDiagram(cloned);
       persistDiagramIndex(dependencies, cloned);
       return cloned.id;
     },

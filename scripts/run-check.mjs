@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 
-const gates = ['typecheck', 'lint', 'test', 'build'];
+const gates = ['typecheck', 'lint', 'test', 'test:rls', 'test:s3', 'build', 'collaboration:build'];
 const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
 const runGate = (name) => new Promise((resolve) => {
@@ -31,7 +31,9 @@ const runGate = (name) => new Promise((resolve) => {
   });
 });
 
-const results = await Promise.all(gates.map(runGate));
+// Avoid simultaneous TS, bundler and test-worker memory pressure.
+const results = [];
+for (const gate of gates) results.push(await runGate(gate));
 const failed = results.filter((result) => result.status !== 'passed');
 
 for (const result of results) {

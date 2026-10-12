@@ -5,7 +5,8 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { exportToPNG, appMessageMocks, subscriptionMocks } = vi.hoisted(() => ({
+const { exportToPNG, appMessageMocks, subscriptionMocks, saveReadinessMocks } = vi.hoisted(() => ({
+  saveReadinessMocks: { getBridge: vi.fn<() => unknown>(() => null), save: vi.fn(), getDiagram: vi.fn() },
   exportToPNG: vi.fn<(signal?: AbortSignal) => Promise<void>>(async () => undefined),
   appMessageMocks: {
     error: vi.fn(),
@@ -84,10 +85,14 @@ vi.mock('@/context/useSubscription', () => ({
 }));
 
 vi.mock('@vizly/core/diagram-data', () => ({
-  getFlowDataBridge: () => null,
+  getFlowDataBridge: saveReadinessMocks.getBridge,
   getFlowDataBridgeNodes: () => [],
   getStandardFlowDataBridge: () => null,
 }));
+vi.mock('@/services/UnifiedStorageService', () => ({ unifiedStorage: {
+  isConfigured: () => true, activeProvider: { name: 'supabase', id: 'supabase', saveDiagram: saveReadinessMocks.save },
+} }));
+vi.mock('@/data/DataRegistry', () => ({ dataRegistry: { initialize: async () => undefined, getDataService: () => ({ getDiagram: saveReadinessMocks.getDiagram }) } }));
 
 vi.mock('@vizly/core/antd', () => ({
   appMessage: appMessageMocks,
@@ -97,6 +102,9 @@ import ExportTools from '../ExportTools';
 
 describe('ExportTools keyboard menu', () => {
   beforeEach(() => {
+    saveReadinessMocks.getBridge.mockReset().mockReturnValue(null);
+    saveReadinessMocks.save.mockReset();
+    saveReadinessMocks.getDiagram.mockReset();
     exportToPNG.mockClear();
     exportToPNG.mockResolvedValue(undefined);
     appMessageMocks.error.mockClear();
@@ -123,6 +131,16 @@ describe('ExportTools keyboard menu', () => {
         dispatchEvent: vi.fn(),
       })),
     });
+  });
+  it('blocks cloud export fallback while the active designer has not loaded', async () => {
+    saveReadinessMocks.getBridge.mockReturnValue({ nodes: [], isCanvasReady: () => false });
+    render(<ExportTools diagramId="diagram-1" diagramName="Diagram" showControls={false} variant="compact" />);
+    fireEvent.click(screen.getByRole('button', { name: '导出' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: '保存到云端' }));
+    await waitFor(() => expect(appMessageMocks.error).toHaveBeenCalled());
+    expect(saveReadinessMocks.save).not.toHaveBeenCalled();
+    expect(saveReadinessMocks.getDiagram).not.toHaveBeenCalled();
+    expect(appMessageMocks.success).not.toHaveBeenCalled();
   });
 
   it('keeps the export menu visually isolated and clear of the mobile dock', () => {

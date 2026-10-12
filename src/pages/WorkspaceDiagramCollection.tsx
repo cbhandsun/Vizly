@@ -30,6 +30,7 @@ import {
   detectDiagramType,
   getNodeCount,
   isTemplateItem,
+  isSharedWorkspaceItem,
   RECENT_WORKSPACE_LIMIT,
   type FilterViewType,
   type SortKey,
@@ -63,6 +64,7 @@ const asRecord = (value: unknown): Record<string, unknown> =>
     : {};
 
 interface WorkspaceDiagramCollectionProps {
+  cloudProvider?: 's3' | 'supabase';
   activeView: FilterViewType;
   onActiveViewChange: (view: FilterViewType) => void;
   unifiedItems: UnifiedDiagramItem[];
@@ -94,6 +96,7 @@ interface WorkspaceDiagramCollectionProps {
 }
 
 export const WorkspaceDiagramCollection = ({
+  cloudProvider = 'supabase',
   activeView,
   onActiveViewChange,
   unifiedItems,
@@ -128,11 +131,11 @@ export const WorkspaceDiagramCollection = ({
   );
   const localCount = unifiedItems.filter(item => item.source === 'local').length;
   const cloudCount = unifiedItems.filter(item => item.source === 's3' || item.source === 'supabase').length;
-  const sharedCount = unifiedItems.filter(item => item.role === 'viewer').length;
+  const sharedCount = unifiedItems.filter(isSharedWorkspaceItem).length;
   const documentCountsKnown = loadedInventoryScopes.has('documents');
   const templateCountsKnown = loadedInventoryScopes.has('templates');
   const protectedViewRequiresAuth = !isAuthenticated
-    && (activeView === 'cloud' || activeView === 'shared');
+    && (activeView === 'shared' || (activeView === 'cloud' && cloudProvider === 'supabase'));
   const renderFilterCount = (count: number, known: boolean) => (
     known ? <span className="filter-tab-count">{count}</span> : null
   );
@@ -606,7 +609,7 @@ export const WorkspaceDiagramCollection = ({
                                                         <Boxes size={14} strokeWidth={2} /> {nodeCount}
                                                     </span>
                                                 )}
-                                                {item.role === 'viewer' && <span style={{ color: '#8b5cf6', fontWeight: 600, fontSize: 11 }}>{t('workspace.shared')}</span>}
+                                                {isSharedWorkspaceItem(item) && <span style={{ color: '#8b5cf6', fontWeight: 600, fontSize: 11 }}>{t('workspace.shared')}</span>}
                                             </div>
                                         </div>
                                     </article>

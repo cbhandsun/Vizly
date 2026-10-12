@@ -7,6 +7,7 @@ import { appMessage } from '@vizly/core/antd';
 import { getFlowDataBridge } from '@vizly/core/diagram-data';
 import { coerceClipboardData } from '@vizly/core/diagram-import';
 import { sanitizeCanvasEdgesForNodes } from '@vizly/core/security';
+import { areVersionPreviewSnapshotsEqual, beginVersionPreview, discardVersionPreview, endVersionPreview, readVersionPreviewLive, withVersionPreviewPersistence } from '../collaboration/versionPreviewSession';
 import {
     coerceDiagramVersion,
     parseDiagramVersionList,
@@ -107,6 +108,7 @@ export function useVersionHistory(diagramId: string) {
 
         return runExclusiveMutation(async () => {
             try {
+                return await withVersionPreviewPersistence(diagramId, async assertCurrent => {
                 const unifiedStorage = await loadUnifiedStorage();
                 if (currentDiagramIdRef.current !== diagramId) return false;
                 const bridge = getFlowDataBridge(diagramId);
@@ -116,6 +118,7 @@ export function useVersionHistory(diagramId: string) {
                     return false;
                 }
 
+                assertCurrent();
                 const newVersion = coerceDiagramVersion(
                     await unifiedStorage.saveVersion(diagramId, snapshot, commitMessage),
                 );
@@ -133,6 +136,7 @@ export function useVersionHistory(diagramId: string) {
                 }));
                 appMessage.success(t('designer.versionHistoryPanel.saveSuccess'));
                 return true;
+                });
             } catch (error) {
                 if (currentDiagramIdRef.current !== diagramId) return false;
                 logVersionHistorySaveFailure(error);
@@ -191,9 +195,22 @@ export function useVersionHistory(diagramId: string) {
             return false;
         }
 
+        if (!beginVersionPreview(diagramId, currentSnapshot)) {
+            appMessage.error(t('designer.versionHistoryPanel.canvasUnavailable'));
+            return false;
+        }
         previewBaseRef.current ??= { diagramId, ...currentSnapshot };
-        setNodes(snapshot.nodes);
-        setEdges(snapshot.edges);
+        const bridge = getFlowDataBridge(diagramId);
+        try {
+            if (typeof bridge?.replaceCanvasSnapshot === 'function') bridge.replaceCanvasSnapshot(snapshot);
+            else { setNodes(snapshot.nodes); setEdges(snapshot.edges); }
+        } catch (error) {
+            logVersionHistoryRestoreFailure(error);
+            appMessage.error(t('designer.versionHistoryPanel.previewInvalid'));
+            // Keep persistence blocked if the controlled canvas could not be replaced.
+            setPreviewVersion(fullVersion);
+            return false;
+        }
         setPreviewVersion(fullVersion);
         return true;
     }, [diagramId, loadVersionData, t]);
@@ -201,15 +218,26 @@ export function useVersionHistory(diagramId: string) {
     const exitPreview = useCallback(() => {
         previewRequestIdRef.current += 1;
         const previewBase = previewBaseRef.current;
+        const live = endVersionPreview(diagramId);
         if (previewBase?.diagramId === diagramId) {
+            const snapshot = live ?? { nodes: previewBase.nodes, edges: previewBase.edges };
+            const bridge = getFlowDataBridge(diagramId);
+            try {
+                if (typeof bridge?.replaceCanvasSnapshot === 'function') bridge.replaceCanvasSnapshot(snapshot);
+            } catch (error) {
+                beginVersionPreview(diagramId, snapshot);
+                logVersionHistoryRestoreFailure(error);
+                appMessage.error(t('designer.versionHistoryPanel.restoreFailed'));
+                return null;
+            }
             previewBaseRef.current = null;
             setPreviewVersion(null);
-            return { nodes: previewBase.nodes, edges: previewBase.edges };
+            return snapshot;
         }
         previewBaseRef.current = null;
         setPreviewVersion(null);
         return null;
-    }, [diagramId]);
+    }, [diagramId, t]);
 
     const restoreVersion = useCallback(async (
         versionId: string,
@@ -238,9 +266,9 @@ export function useVersionHistory(diagramId: string) {
             return false;
         }
 
-        const backupSnapshot = previewBaseRef.current?.diagramId === diagramId
+        const backupSnapshot = readVersionPreviewLive(diagramId) ?? (previewBaseRef.current?.diagramId === diagramId
             ? sanitizeVersionCanvasSnapshot(coerceClipboardData(previewBaseRef.current))
-            : readBridgeCanvasSnapshot(bridge);
+            : readBridgeCanvasSnapshot(bridge));
         if (!backupSnapshot) {
             appMessage.error(t('designer.versionHistoryPanel.backupFailed'));
             return false;
@@ -259,6 +287,10 @@ export function useVersionHistory(diagramId: string) {
                 throw new Error('Storage returned an invalid backup version.');
             }
             if (currentDiagramIdRef.current !== diagramId) return false;
+            const currentLive = readVersionPreviewLive(diagramId) ?? readBridgeCanvasSnapshot(getFlowDataBridge(diagramId));
+            if (!areVersionPreviewSnapshotsEqual(backupSnapshot, currentLive)) {
+                throw new Error('Live canvas changed during safety backup');
+            }
             setVersionCollection(prev => ({
                 diagramId,
                 items: prev.diagramId === diagramId
@@ -279,6 +311,7 @@ export function useVersionHistory(diagramId: string) {
                 setNodes(snapshot.nodes);
                 setEdges(snapshot.edges);
             }
+            discardVersionPreview(diagramId);
 
             appMessage.success(t('designer.versionHistoryPanel.restoreSuccess', {
                 message: fullVersion.message || fullVersion.id.substring(0, 8),
@@ -294,11 +327,30 @@ export function useVersionHistory(diagramId: string) {
     }), [diagramId, previewVersion, loadVersionData, runExclusiveMutation, t]);
 
     useLayoutEffect(() => {
+        const abandonedLive = endVersionPreview(diagramId);
+        if (abandonedLive) {
+            const bridge = getFlowDataBridge(diagramId);
+            try {
+                if (typeof bridge?.replaceCanvasSnapshot !== 'function') throw new Error('Canvas restore unavailable');
+                bridge.replaceCanvasSnapshot(abandonedLive);
+            } catch (error) {
+                beginVersionPreview(diagramId, abandonedLive);
+                logVersionHistoryRestoreFailure(error);
+            }
+        }
         currentDiagramIdRef.current = diagramId;
         versionsRequestIdRef.current += 1;
         previewRequestIdRef.current += 1;
         previewBaseRef.current = null;
         mutationPromiseRef.current = null;
+        return () => {
+            const live = endVersionPreview(diagramId);
+            const bridge = getFlowDataBridge(diagramId);
+            if (live && typeof bridge?.replaceCanvasSnapshot === 'function') {
+                try { bridge.replaceCanvasSnapshot(live); }
+                catch (error) { beginVersionPreview(diagramId, live); logVersionHistoryRestoreFailure(error); }
+            } else if (live) beginVersionPreview(diagramId, live);
+        };
     }, [diagramId]);
 
     // Initial load

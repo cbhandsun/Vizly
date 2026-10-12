@@ -1,6 +1,8 @@
 {
   "files": [],
   "references": [
+    { "path": "./tsconfig.release-tooling.json" },
+    { "path": "./server/tsconfig.json" },
     {
       "path": "./tsconfig.app.json"
     },

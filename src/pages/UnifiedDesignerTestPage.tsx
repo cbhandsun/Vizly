@@ -1,3 +1,4 @@
+import '@vizly/core/style.css';
 import React, { useEffect } from 'react';
 import { FlowchartDesigner as UnifiedDesigner } from '@vizly/core/react';
 import { PluginRegistry } from '@vizly/core/plugin-registry';

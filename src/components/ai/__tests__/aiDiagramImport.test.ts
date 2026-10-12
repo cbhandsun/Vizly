@@ -69,7 +69,7 @@ describe('aiDiagramImport', () => {
         });
     });
 
-    it('registers AI local saves through the remote diagram guard', () => {
+    it('registers AI local saves through the remote diagram guard', async () => {
         const diagram = parseAIDiagramJson(makeDiagramJson(), {
             id: 'fallback',
             title: 'Fallback',
@@ -80,7 +80,7 @@ describe('aiDiagramImport', () => {
             id: fallback.id,
         }));
 
-        const registered = registerAIDiagramLocally({ registerRemoteDiagram }, diagram, 'Saved AI Diagram');
+        const registered = await registerAIDiagramLocally({ registerRemoteDiagram }, diagram, 'Saved AI Diagram');
 
         expect(registerRemoteDiagram).toHaveBeenCalledWith(diagram, {
             id: 'ai-diagram',

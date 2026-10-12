@@ -3,7 +3,8 @@
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import type { TFunction } from 'i18next';
 import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beginVersionPreview, discardVersionPreview } from '../diagrams/collaboration/versionPreviewSession';
 
 const mocks = vi.hoisted(() => ({
     bridge: { nodes: [], metadata: {} } as Record<string, unknown> | null,
@@ -54,6 +55,24 @@ const t = ((key: string, options?: { target?: string }) => (
 )) as unknown as TFunction;
 
 describe('useDiagramViewerSaveActions', () => {
+    afterEach(() => { discardVersionPreview('diagram-1'); });
+    it('blocks a Save As confirmation that was opened before entering preview', async () => {
+        const { result } = renderHook(() => useDiagramViewerSaveActions({ selectedDiagramId: 'diagram-1', t, onCloudReplicaSaved: vi.fn() }));
+        await act(async () => { await result.current.handleSaveTo('local'); });
+        const config = mocks.confirm.mock.calls[0]?.[0] as { okButtonProps: { onClick: () => void } };
+        beginVersionPreview('diagram-1', { nodes: [], edges: [] });
+        act(() => { config.okButtonProps.onClick(); });
+        await waitFor(() => expect(mocks.error).toHaveBeenCalled());
+        expect(mocks.saveCustomPreset).not.toHaveBeenCalled();
+        expect(mocks.success).not.toHaveBeenCalled();
+    });
+    it('does not open Save As while historical preview is active', async () => {
+        beginVersionPreview('diagram-1', { nodes: [], edges: [] });
+        const { result } = renderHook(() => useDiagramViewerSaveActions({ selectedDiagramId: 'diagram-1', t, onCloudReplicaSaved: vi.fn() }));
+        await act(async () => { await result.current.handleSaveTo('local'); });
+        expect(mocks.confirm).not.toHaveBeenCalled();
+        expect(mocks.error).toHaveBeenCalledWith(expect.stringContaining('历史版本'));
+    });
     beforeEach(() => {
         vi.clearAllMocks();
         mocks.bridge = { nodes: [], metadata: {} };

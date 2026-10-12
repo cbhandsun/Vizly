@@ -4,6 +4,7 @@
  */
 
 import React, { Suspense, useEffect, useRef, useState } from 'react';
+import '@vizly/core/style.css';
 import { useSearchParams } from 'react-router';
 import { Button, Result, Spin, Tag, Typography } from 'antd';
 import { useTranslation } from 'react-i18next';
@@ -116,7 +117,7 @@ const ShareViewPage: React.FC = () => {
                 }
 
                 const contentForRegistration = { ...result.diagram.content, id: diagramId };
-                const content = dataService.registerRemoteDiagram(contentForRegistration, {
+                const content = await dataService.registerRemoteDiagram(contentForRegistration, {
                     id: diagramId,
                     title: coerceShareViewTitle(result.diagram.title, fallbackTitle),
                 });

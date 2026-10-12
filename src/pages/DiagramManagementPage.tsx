@@ -64,6 +64,7 @@ import {
     type WorkspaceInventoryLoadFailureReason,
 } from './workspaceInventoryLoad';
 import { scheduleWorkspaceInventoryLoad } from './workspaceInventorySchedule';
+import { observeWorkspaceCreateNavigationReturn } from './workspaceCreateNavigationRecovery';
 
 const AuthModal = React.lazy(() => import('@/components/auth/AuthModal').then(module => ({
     default: module.AuthModal,
@@ -115,7 +116,18 @@ const WorkspaceDashboardPage: React.FC = () => {
     const openingDiagramKeysRef = useRef(new Set<string>());
     const inventoryRequestIdRef = useRef(0);
     const diagramCreateLockRef = useRef({ active: false });
+    const diagramCreateNavigationPendingRef = useRef(false);
     const deleteDialogLockRef = useRef({ active: false });
+
+    useEffect(() => observeWorkspaceCreateNavigationReturn({
+        events: window,
+        currentHash: () => window.location.hash,
+        isNavigationPending: () => diagramCreateNavigationPendingRef.current,
+        recover: () => {
+            diagramCreateNavigationPendingRef.current = false;
+            if (finishWorkspaceDiagramCreate(diagramCreateLockRef.current)) setIsCreatingDiagram(false);
+        },
+    }), []);
 
     const commitDisplayPreferences = useCallback((next: WorkspaceDisplayPreferences) => {
         setDisplayPreferences(next);
@@ -363,11 +375,13 @@ const WorkspaceDashboardPage: React.FC = () => {
                 requestedName,
                 t('workspace.mindMapRootTopic'),
             );
+            diagramCreateNavigationPendingRef.current = Boolean(coerceDiagramId(diagramId));
             keepLockUntilNavigation = navigateToCreatedWorkspaceDiagram(diagramId, navigateToDiagram);
         } catch (error: unknown) {
             safeLog.error('Failed to create workspace diagram', redactSensitiveLogValue(error));
             appMessage.error('Failed to create diagram.');
         } finally {
+            if (!keepLockUntilNavigation) diagramCreateNavigationPendingRef.current = false;
             if (!keepLockUntilNavigation && finishWorkspaceDiagramCreate(diagramCreateLockRef.current)) {
                 setIsCreatingDiagram(false);
             }
@@ -449,6 +463,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                     onRetryLoad={loadAllData}
                     isAuthenticated={Boolean(user)}
                     onRequestAuth={openAuthModal}
+                    cloudProvider={cloudProvider}
                     isCreatingDiagram={isCreatingDiagram}
                     openingDiagramKeys={openingDiagramKeys}
                     onOpenDiagram={handleOpenDiagram}

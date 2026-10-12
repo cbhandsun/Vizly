@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { TextAreaRef } from 'antd/es/input/TextArea';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -89,15 +89,16 @@ describe('AIChatViewLayout commercial interactions', () => {
         const handleSwitchChat = vi.fn();
         const setIsSidebarOpen = vi.fn();
         render(<AIChatViewLayout {...createProps({ handleSwitchChat, setIsSidebarOpen })} />);
+        const history = within(screen.getByRole('dialog', { name: 'aiChat.historyTitle' }));
 
-        fireEvent.click(screen.getByRole('button', { name: conversation.title }));
+        fireEvent.click(history.getByRole('button', { name: conversation.title }));
 
         expect(handleSwitchChat).toHaveBeenCalledWith(conversation.id);
         expect(setIsSidebarOpen).toHaveBeenCalledWith(false);
-        expect(screen.getByRole('button', {
+        expect(history.getByRole('button', {
             name: `aiChat.renameConversation: ${conversation.title}`,
         })).not.toBeNull();
-        expect(screen.getByRole('button', {
+        expect(history.getByRole('button', {
             name: `aiChat.deleteConversationLabel: ${conversation.title}`,
         })).not.toBeNull();
     });

@@ -5,13 +5,41 @@
     --vz-text-primary: #0f172a;
     --vz-text-secondary: #475569;
     --vz-border: rgba(15, 23, 42, 0.08);
+    --vz-storage-background: #fcfcfc;
+    --vz-storage-header: rgba(255, 255, 255, 0.88);
+    --vz-storage-surface: #fff;
+    --vz-storage-error: #b42318;
     height: 100dvh;
     min-height: 0;
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior-y: contain;
-    background: var(--vz-dashboard-bg, #fcfcfc);
+    background: var(--vz-storage-background);
     color: var(--vz-text-primary);
+}
+
+.dark .storage-config-page {
+    --vz-text-primary: #e5e7eb;
+    --vz-text-secondary: #94a3b8;
+    --vz-border: rgba(148, 163, 184, 0.2);
+    --vz-storage-background: #0b101b;
+    --vz-storage-header: rgba(17, 24, 39, 0.92);
+    --vz-storage-surface: #111827;
+    --vz-storage-error: #fca5a5;
+}
+
+.storage-config-intro .ant-typography,
+.storage-config-card .ant-card-head-title,
+.storage-config-card .ant-form-item-label > label {
+    color: var(--vz-text-primary);
+}
+
+.storage-config-intro .ant-typography-secondary {
+    color: var(--vz-text-secondary);
+}
+
+.storage-config-card .ant-form-item-explain-error {
+    color: var(--vz-storage-error);
 }
 
 .storage-config-header {
@@ -24,7 +52,7 @@
     min-height: 56px;
     padding: 0 24px;
     border-bottom: 1px solid var(--vz-border);
-    background: rgba(255, 255, 255, 0.88);
+    background: var(--vz-storage-header);
     backdrop-filter: blur(16px);
 }
 
@@ -107,7 +135,7 @@
 
 .storage-config-card {
     border-radius: 12px;
-    background: rgba(255, 255, 255, 0.86);
+    background: var(--vz-storage-surface);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 16px 32px -8px rgba(0, 0, 0, 0.05);
     backdrop-filter: blur(20px);
 }
@@ -140,7 +168,7 @@
     border: 0;
     border-radius: 8px;
     background: transparent;
-    color: rgba(15, 23, 42, 0.58);
+    color: var(--vz-text-secondary);
     cursor: pointer;
 }
 

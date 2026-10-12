@@ -1,8 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router';
 
 type CanvasOpsOptions = {
     diagramId?: string;
@@ -26,6 +26,28 @@ const exportToGIFMock = vi.fn();
 const openShareDialogMock = vi.fn();
 const configValueSetterMock = vi.fn();
 const { appMessageInfoMock } = vi.hoisted(() => ({ appMessageInfoMock: vi.fn() }));
+const collaborationFixture = vi.hoisted(() => ({
+    role: null as 'editor' | 'viewer' | null,
+    cloudDocumentPresent: false,
+    enabled: false,
+    cloudSyncEntitled: true,
+}));
+const replicaNavigation = vi.hoisted(() => ({ saved: undefined as undefined | ((id: string) => void) }));
+vi.mock('../useDiagramViewerSaveActions', () => ({
+    useDiagramViewerSaveActions: (options: { onCloudReplicaSaved: (id: string) => void }) => {
+        replicaNavigation.saved = options.onCloudReplicaSaved;
+        return { handleSaveTo: vi.fn(), handleDirectSave: vi.fn() };
+    },
+}));
+vi.mock('@vizly/core/react', () => ({
+    FlowchartDesigner: ({ id }: { id: string }) => <div data-testid="replica-designer">{id}</div>,
+}));
+vi.mock('@vizly/core/routing-runtime', () => ({
+    prefetchBaseReactFlowPrecompiledRoute: async () => false,
+}));
+vi.mock('@/data/DataRegistry', () => ({
+    dataRegistry: { initialize: async () => undefined, getDataService: () => ({ getDiagram: () => undefined }) },
+}));
 const useDiagramControlsMock = vi.fn((
     _diagramId: string,
     _ready: boolean,
@@ -67,21 +89,30 @@ vi.mock('@vizly/core/editor-hooks', () => ({
     writeFavoriteDiagramIds: vi.fn(),
 }));
 
-vi.mock('../context/useSubscription', () => ({
+vi.mock('../../context/useSubscription', () => ({
     useSubscription: () => ({
-        hasFeature: () => true,
+        hasFeature: (feature: string) => feature !== 'cloud-sync' || collaborationFixture.cloudSyncEntitled,
         jwtToken: '',
         showUpgradeModal: vi.fn(),
     }),
 }));
 
+vi.mock('../useCloudCollaborationIdentity', () => ({
+    useCloudCollaborationIdentity: (_diagramId: string, transportConfigured: boolean) =>
+        transportConfigured && collaborationFixture.cloudDocumentPresent,
+}));
+
 vi.mock('../diagrams/collaboration/YjsProviderHooks', () => ({
-    useYjsCollaboration: () => ({
-        isSynced: false,
-        pushLocalChangesToYjs: vi.fn(),
-        activeUsers: [],
-        provider: undefined,
-    }),
+    useYjsCollaboration: ({ enabled }: { enabled: boolean }) => {
+        collaborationFixture.enabled = enabled;
+        return {
+            accessRole: collaborationFixture.role,
+            isSynced: false,
+            pushLocalChangesToYjs: vi.fn(),
+            activeUsers: [],
+            provider: undefined,
+        };
+    },
 }));
 
 vi.mock('../diagrams/hooks/useCloudSave', () => ({
@@ -94,8 +125,10 @@ vi.mock('../diagrams/hooks/useCloudSave', () => ({
     }),
 }));
 
-vi.mock('@vizly/core/editor-ui', () => ({
+vi.mock('@vizly/core/editor-control-bridge', () => ({
     DiagramControlBridge: () => <div data-testid="diagram-control-bridge" />,
+}));
+vi.mock('@vizly/core/editor-ui', () => ({
     CommandPalette: () => <div />,
 }));
 
@@ -215,6 +248,7 @@ vi.mock('@vizly/core/plugins', () => ({
 
 vi.mock('@/data/standardized/presetMetadata', () => ({
     getStandardPresetDocTypeById: () => undefined,
+    getStandardPresetCatalogItemById: () => undefined,
 }));
 
 vi.mock('@vizly/core/storage', async (importOriginal) => ({
@@ -239,7 +273,7 @@ vi.mock('@vizly/core/diagram-data', () => ({
 }));
 
 vi.mock('../diagramViewerLocation', () => ({
-    getDiagramViewerRouteParam: () => 'test-diagram',
+    getDiagramViewerRouteParam: (params: URLSearchParams, _location: unknown, name: string) => params.get(name) || (name === 'diagram' ? 'test-diagram' : null),
     setDiagramSearchParam: vi.fn(),
     buildDiagramHashRoute: vi.fn(() => '/diagram'),
 }));
@@ -273,6 +307,7 @@ vi.mock('@/data/diagram-definitions', () => ({
                 <button type="button" onClick={props.onOpenShareDialog}>share</button>
                 <button type="button" onClick={props.onOpenSettings}>open-settings</button>
                 <button type="button" onClick={() => props.onReadonlyChange?.(true)}>lock</button>
+                <button type="button" onClick={() => props.onReadonlyChange?.(false)}>unlock</button>
             </div>
         ),
     }],
@@ -295,6 +330,66 @@ vi.mock('react-i18next', () => ({
 import DiagramViewer from '../DiagramViewer';
 
 describe('DiagramViewer regression', () => {
+    beforeEach(() => {
+        collaborationFixture.role = null;
+        collaborationFixture.cloudDocumentPresent = false;
+        collaborationFixture.enabled = false;
+        collaborationFixture.cloudSyncEntitled = true;
+        vi.stubEnv('VITE_YJS_WEBSOCKET_URL', 'ws://127.0.0.1:5422');
+    });
+    afterEach(() => { vi.unstubAllEnvs(); });
+
+    it('restores an existing cloud collaboration for a free owner without unlocking an unverified role', () => {
+        collaborationFixture.cloudSyncEntitled = false;
+        collaborationFixture.cloudDocumentPresent = true;
+        const view = render(<MemoryRouter><DiagramViewer /></MemoryRouter>);
+        expect(collaborationFixture.enabled).toBe(true);
+        expect(screen.getByTestId('diagram')).toHaveAttribute('data-readonly', 'true');
+        collaborationFixture.role = 'editor';
+        view.rerender(<MemoryRouter><DiagramViewer /></MemoryRouter>);
+        expect(screen.getByTestId('diagram')).toHaveAttribute('data-readonly', 'false');
+    });
+
+    it('commits the new canvas after cloud replica navigation suspends to load its renderer', async () => {
+        const router = createMemoryRouter([{ path: '*', element: <React.Suspense fallback={null}><DiagramViewer /></React.Suspense> }], { initialEntries: ['/?diagram=test-diagram'] });
+        render(<RouterProvider router={router} />);
+        expect(screen.getByTestId('diagram')).toBeInTheDocument();
+        expect(replicaNavigation.saved).toBeTypeOf('function');
+        await act(async () => { replicaNavigation.saved?.('replica-cloud-id'); });
+        expect(await screen.findByTestId('replica-designer')).toHaveTextContent('replica-cloud-id');
+        expect(screen.queryByTestId('diagram')).toBeNull();
+    });
+
+    it('locks verified viewers and prevents manual unlock, then honors server promotion to editor', () => {
+        collaborationFixture.cloudDocumentPresent = true;
+        collaborationFixture.role = 'viewer';
+        const view = render(<MemoryRouter><DiagramViewer /></MemoryRouter>);
+        expect(collaborationFixture.enabled).toBe(true);
+        expect(screen.getByTestId('diagram')).toHaveAttribute('data-readonly', 'true');
+        fireEvent.click(screen.getByRole('button', { name: 'unlock' }));
+        expect(screen.getByTestId('diagram')).toHaveAttribute('data-readonly', 'true');
+        collaborationFixture.role = 'editor';
+        view.rerender(<MemoryRouter><DiagramViewer /></MemoryRouter>);
+        expect(screen.getByTestId('diagram')).toHaveAttribute('data-readonly', 'false');
+    });
+
+    it('preserves a user-selected canvas lock across server role changes', () => {
+        collaborationFixture.cloudDocumentPresent = true;
+        collaborationFixture.role = 'editor';
+        const view = render(<MemoryRouter><DiagramViewer /></MemoryRouter>);
+        fireEvent.click(screen.getByRole('button', { name: 'lock' }));
+        collaborationFixture.role = 'viewer';
+        view.rerender(<MemoryRouter><DiagramViewer /></MemoryRouter>);
+        collaborationFixture.role = 'editor';
+        view.rerender(<MemoryRouter><DiagramViewer /></MemoryRouter>);
+        expect(screen.getByTestId('diagram')).toHaveAttribute('data-readonly', 'true');
+    });
+    it('keeps a local canvas editable when the collaboration transport is inactive', () => {
+        collaborationFixture.role = 'viewer';
+        render(<MemoryRouter><DiagramViewer /></MemoryRouter>);
+        expect(collaborationFixture.enabled).toBe(false);
+        expect(screen.getByTestId('diagram')).toHaveAttribute('data-readonly', 'false');
+    });
     it('mounts the template catalog only while the diagram switcher is open', async () => {
         render(
             <MemoryRouter initialEntries={['/diagram?diagram=test-diagram']}>

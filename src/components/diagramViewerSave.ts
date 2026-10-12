@@ -1,3 +1,8 @@
+import { readSavedDiagramId } from '@/services/cloudSaveIdentity';
+import { withVersionPreviewPersistence } from './diagrams/collaboration/versionPreviewSession';
+import { assertDesignerSaveReady, isDesignerSaveReady } from '@/services/designerSaveReadiness';
+import { assertCloudSaveViewCurrent, captureCloudSaveVersion, readSavedCloudRevision } from '@/services/cloudSaveVersion';
+
 export type DiagramBridgeLike = {
   id?: string;
   name?: string;
@@ -11,6 +16,7 @@ type CloudDiagramPayload = {
   content: Record<string, unknown>;
   updated_at: string;
   user_id: string;
+  expectedRevision?: string;
 };
 
 type CloudProviderLike = {
@@ -19,7 +25,7 @@ type CloudProviderLike = {
 };
 
 type DiagramSnapshotAttacher<TDiagram extends DiagramBridgeLike> = (
-  diagram: TDiagram,
+  diagram: TDiagram | ReturnType<typeof createDiagramViewerSaveCopy<TDiagram>>,
   selectedDiagramId: string,
 ) => Promise<{ diagram: unknown }>;
 
@@ -29,6 +35,14 @@ const asRecord = (value: unknown): Record<string, unknown> =>
     : {};
 
 export type DiagramViewerCloudProviderName = 's3' | 'supabase';
+
+export interface DiagramViewerSavedReplica {
+  id: string;
+  title: string;
+  content: Record<string, unknown>;
+  provider: DiagramViewerCloudProviderName;
+  revision?: string;
+}
 
 const parseCloudProviderName = (value: unknown): DiagramViewerCloudProviderName | null => (
   value === 's3' || value === 'supabase' ? value : null
@@ -68,7 +82,7 @@ export const normalizeDiagramSaveAsName = (value: unknown): string | null => {
 export const isDiagramViewerBridgeSavable = (
   bridge: DiagramBridgeLike | null | undefined,
 ): bridge is DiagramBridgeLike & { nodes: unknown[] } => (
-  Boolean(bridge && Array.isArray(bridge.nodes) && bridge.nodes.length >= 0)
+  Boolean(bridge && Array.isArray(bridge.nodes) && isDesignerSaveReady(bridge))
 );
 
 export const createDiagramViewerSaveCopy = <TDiagram extends DiagramBridgeLike>({
@@ -79,32 +93,42 @@ export const createDiagramViewerSaveCopy = <TDiagram extends DiagramBridgeLike>(
   bridge: TDiagram;
   name: string;
   createId: () => string;
-}) => ({
-  ...bridge,
-  id: createId(),
-  name,
-  metadata: {
-    ...(bridge.metadata || {}),
-    title: name,
-  },
-});
+}): Omit<TDiagram, 'id' | 'name' | 'metadata'> & {
+  id: string;
+  name: string;
+  metadata: Record<string, unknown> & { title: string; cloud?: undefined };
+} => {
+  assertDesignerSaveReady(bridge);
+  return {
+    ...bridge,
+    id: createId(),
+    name,
+    metadata: {
+      ...(bridge.metadata || {}),
+      title: name,
+      cloud: undefined,
+    },
+  };
+};
 
 export const syncDiagramViewerBridgeCloudReplica = ({
   bridge,
   provider,
   id,
   title,
+  revision,
 }: {
   bridge: DiagramBridgeLike;
   provider: DiagramViewerCloudProviderName;
   id: string;
   title: string;
+  revision?: string;
 }) => {
   bridge.id = id;
   bridge.name = title;
   bridge.metadata = {
     ...(bridge.metadata || {}),
-    cloud: { provider, id, title },
+    cloud: { provider, id, title, ...(revision ? { revision } : {}) },
   };
 };
 
@@ -117,6 +141,7 @@ export const saveDiagramViewerCloudReplica = async <TDiagram extends DiagramBrid
   attachSnapshot,
   invalidatePreview,
   createId,
+  prepareReplica,
 }: {
   bridge: TDiagram;
   selectedDiagramId: string;
@@ -126,9 +151,13 @@ export const saveDiagramViewerCloudReplica = async <TDiagram extends DiagramBrid
   attachSnapshot: DiagramSnapshotAttacher<TDiagram>;
   invalidatePreview: (id: string) => void;
   createId: () => string;
-}) => {
+  prepareReplica?: (replica: DiagramViewerSavedReplica) => Promise<void>;
+}) => withVersionPreviewPersistence(selectedDiagramId, async assertCurrent => {
   const safeTitle = parseRequiredText(title);
+  assertDesignerSaveReady(bridge);
   if (!safeTitle) throw new Error('图表名称无效');
+  const capturedId = bridge.id;
+  const capturedCloud = bridge.metadata?.cloud;
 
   const saveCopy = createDiagramViewerSaveCopy({
     bridge,
@@ -141,7 +170,10 @@ export const saveDiagramViewerCloudReplica = async <TDiagram extends DiagramBrid
     throw new Error(`${providerName} 驱动未配置`);
   }
 
-  await provider.saveDiagram({
+  assertDesignerSaveReady(bridge);
+  assertCloudSaveViewCurrent(bridge, capturedId, capturedCloud, undefined);
+  assertCurrent();
+  const saved = await provider.saveDiagram({
     id: saveCopy.id,
     title: safeTitle,
     content: { ...asRecord(snapshot.diagram), id: saveCopy.id, name: safeTitle },
@@ -149,16 +181,29 @@ export const saveDiagramViewerCloudReplica = async <TDiagram extends DiagramBrid
     user_id: 'anonymous',
   });
 
-  invalidatePreview(saveCopy.id);
+  const savedId = readSavedDiagramId(saved);
+  assertCurrent();
+  const revision = readSavedCloudRevision(providerName, saved);
+  invalidatePreview(savedId);
+  assertCloudSaveViewCurrent(bridge, capturedId, capturedCloud, undefined);
+  if (prepareReplica) {
+    await prepareReplica({
+      id: savedId, title: safeTitle, provider: providerName, revision,
+      content: { ...asRecord(snapshot.diagram), id: savedId, name: safeTitle },
+    });
+    assertCurrent();
+    assertCloudSaveViewCurrent(bridge, capturedId, capturedCloud, undefined);
+  }
   syncDiagramViewerBridgeCloudReplica({
     bridge,
     provider: providerName,
-    id: saveCopy.id,
+    id: savedId,
     title: safeTitle,
+    revision,
   });
 
-  return saveCopy.id;
-};
+  return savedId;
+});
 
 export const saveDiagramViewerDirectCloud = async <TDiagram extends DiagramBridgeLike>({
   bridge,
@@ -172,8 +217,11 @@ export const saveDiagramViewerDirectCloud = async <TDiagram extends DiagramBridg
   getProvider: (provider: DiagramViewerCloudProviderName) => Promise<CloudProviderLike>;
   attachSnapshot: DiagramSnapshotAttacher<TDiagram>;
   invalidatePreview: (id: string) => void;
-}) => {
+}) => withVersionPreviewPersistence(selectedDiagramId, async assertCurrent => {
   const cloudMeta = asRecord(bridge.metadata?.cloud);
+  const capturedId = bridge.id;
+  const capturedCloud = bridge.metadata?.cloud;
+  assertDesignerSaveReady(bridge);
   if (!cloudMeta?.provider || !cloudMeta?.title) {
     return null;
   }
@@ -184,22 +232,32 @@ export const saveDiagramViewerDirectCloud = async <TDiagram extends DiagramBridg
     throw new Error('云端保存元数据无效');
   }
 
-  const snapshot = await attachSnapshot(bridge, selectedDiagramId);
-  const provider = await getProvider(providerName);
   const targetId = parseRequiredText(cloudMeta.id)
     || parseRequiredText(bridge.id)
     || selectedDiagramId;
-  await provider.saveDiagram({
+  const expectedRevision = captureCloudSaveVersion(providerName, targetId, capturedCloud);
+  const snapshot = await attachSnapshot(bridge, selectedDiagramId);
+  const provider = await getProvider(providerName);
+  assertDesignerSaveReady(bridge);
+  assertCloudSaveViewCurrent(bridge, capturedId, capturedCloud, expectedRevision);
+  assertCurrent();
+  const saved = await provider.saveDiagram({
     id: targetId,
     title,
     content: { ...asRecord(snapshot.diagram), id: targetId },
     updated_at: new Date().toISOString(),
     user_id: 'anonymous',
+    expectedRevision,
   });
-  invalidatePreview(targetId);
+  const savedId = readSavedDiagramId(saved);
+  assertCurrent();
+  const revision = readSavedCloudRevision(providerName, saved);
+  invalidatePreview(savedId);
+  assertCloudSaveViewCurrent(bridge, capturedId, capturedCloud, expectedRevision);
+  syncDiagramViewerBridgeCloudReplica({ bridge, provider: providerName, id: savedId, title, revision });
   return {
     provider: providerName,
-    id: targetId,
+    id: savedId,
     title,
   };
-};
+});

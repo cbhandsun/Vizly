@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { readLoadedCloudRevision } from '@/services/cloudSaveVersion';
 import { DiagramMetadata } from '@/services/storage/types';
 import type { StandardDiagramData } from '@vizly/core/types';
 import { dataService } from '@/services/DataService';
@@ -113,10 +114,14 @@ export function useDiagramStorage() {
       const provider = unifiedStorage.getProvider(sourceGroup);
       const saved = await provider.loadDiagram(key);
       if (saved && saved.content) {
-        return parseRemoteDiagramContent(saved.content, {
+        const diagram = parseRemoteDiagramContent(saved.content, {
           id: saved.id || key,
           title: saved.title || key,
         }) as StandardDiagramData;
+        return { ...diagram, metadata: { ...diagram.metadata, cloud: {
+          provider: sourceGroup, id: saved.id, title: saved.title,
+          revision: readLoadedCloudRevision(sourceGroup, saved),
+        } } };
       }
     } catch (e) {
       // Fallback: if loadDiagram fails (e.g. shared diagrams), try locally registered data

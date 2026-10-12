@@ -216,7 +216,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const supabase = await ensureAuthSubscription();
         if (!supabase) return noSupabaseError;
         const previousUserId = user?.id ?? lastUserIdRef.current;
-        const result = await supabase.auth.signOut();
+        const result = await supabase.auth.signOut({ scope: 'local' });
         if (!result.error && previousUserId) {
             void clearSensitiveRuntimeState(previousUserId, { removeLocalSecret: true });
             applySession(null);

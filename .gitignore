@@ -1,5 +1,7 @@
 node_modules/
 dist/
+dist-collaboration/
+.collaboration-data/
 coverage/
 .common-tools/
 .common-tools-audit/
@@ -7,3 +9,5 @@ coverage/
 !.env.example
 .npmrc
 *.log
+playwright-report/
+test-results/

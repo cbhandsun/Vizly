@@ -23,6 +23,26 @@ const makeRemoteDiagram = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('remoteDiagramContent', () => {
+    it.each(['object', 'json'] as const)('preserves a bounded preview over 20KB through the %s boundary', mode => {
+        const dataUrl = `data:image/jpeg;base64,${'A'.repeat(24_000)}`;
+        const raw = makeRemoteDiagram({ metadata: { title: 'Preview', description: 'x'.repeat(24_000), preview: { mime: 'image/jpeg', dataUrl, width: 640, height: 360, constructor: 'blocked' } } });
+        const parsed = parseRemoteDiagramContent(mode === 'json' ? JSON.stringify(raw) : raw, { id: 'fallback', title: 'Fallback' });
+        expect(parsed.metadata?.preview?.dataUrl).toBe(dataUrl);
+        expect(parsed.metadata?.description).toHaveLength(20_000);
+        expect(parsed.metadata?.preview).not.toHaveProperty('constructor');
+    });
+    it.each([
+        null, {},
+        { mime: 'image/jpeg', dataUrl: 'https://example.com/image.jpg', width: 10, height: 10 },
+        { mime: 'image/svg+xml', dataUrl: 'data:image/svg+xml;base64,AAAA', width: 10, height: 10 },
+        { mime: 'image/jpeg', dataUrl: 'data:image/jpeg;base64,AAAA', width: 4097, height: 10 },
+        { mime: 'image/jpeg', dataUrl: 'data:image/jpeg;base64,AAAA', width: 4096, height: 4096 },
+        { mime: 'image/jpeg', dataUrl: `data:image/jpeg;base64,${'A'.repeat(4 * 1024 * 1024)}`, width: 10, height: 10 },
+    ])('discards an invalid preview without relaxing the content boundary', preview => {
+        const parsed = parseRemoteDiagramContent(makeRemoteDiagram({ metadata: { preview } }), { id: 'fallback', title: 'Fallback' });
+        expect(parsed.metadata?.preview).toBeUndefined();
+        expect(parsed.nodes).toHaveLength(1);
+    });
     it('parses string remote content through bounded diagram coercion', () => {
         const diagram = parseRemoteDiagramContent(JSON.stringify(makeRemoteDiagram()), {
             id: 'fallback',

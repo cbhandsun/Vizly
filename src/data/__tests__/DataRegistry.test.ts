@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
-import { normalizeLocalDiagramForRegistry } from '../DataRegistry';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { dataRegistry, normalizeLocalDiagramForRegistry } from '../DataRegistry';
+import { localDB } from '../../services/IndexedDBStorage';
+import * as presetLoader from '../standardized/presetLoader';
 import type { StandardDiagramData } from '@vizly/core/types';
 
 const makeLocalDiagram = (overrides: Record<string, unknown> = {}) => ({
@@ -29,6 +31,19 @@ const makeLocalDiagram = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('DataRegistry local diagram normalization', () => {
+  afterEach(() => { vi.restoreAllMocks(); dataRegistry.reset(); });
+  it('propagates local storage read failures and allows initialization to retry', async () => {
+    dataRegistry.reset();
+    const failure = new Error('controlled local storage failure');
+    vi.spyOn(presetLoader, 'loadStandardPresetById').mockResolvedValue(makeLocalDiagram() as unknown as StandardDiagramData);
+    const read = vi.spyOn(localDB, 'listDiagrams').mockRejectedValueOnce(failure).mockResolvedValue([]);
+    await expect(dataRegistry.initialize()).rejects.toBe(failure);
+    expect(read).toHaveBeenCalledOnce();
+    await expect(dataRegistry.initialize()).resolves.toBeUndefined();
+    expect(read).toHaveBeenCalledTimes(2);
+    await dataRegistry.initialize();
+    expect(read).toHaveBeenCalledTimes(2);
+  });
   it('sanitizes persisted local diagrams before registry insertion', () => {
     const diagram = normalizeLocalDiagramForRegistry(makeLocalDiagram());
 
