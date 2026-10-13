@@ -234,6 +234,12 @@
     }
   },
   "designer": {
+    "connection": {
+      "keyboardPending": "已选择起点。Tab 移到目标连接点，按 Enter 连接；Esc 取消。",
+      "keyboardInvalid": "无法连接该目标，请选择其他连接点或按 Esc 取消。",
+      "keyboardConnected": "连接已创建。",
+      "keyboardCancelled": "连接已取消。"
+    },
     "title": "图表视图",
     "quickConnect": {
       "title": "快速连接形状选择器",
@@ -503,7 +509,8 @@
       "more": "更多",
       "moreSettings": "更多设置",
       "renderFailed": "渲染失败",
-      "renderFailedSubtitle": "图表渲染出现异常，请刷新页面或切换到其他图表。"
+      "renderFailedSubtitle": "图表渲染出现异常，可重试或切换到其他图表。未保存的编辑可能需要重新操作。",
+      "retryRender": "重新加载画布"
     },
     "canvas": {
       "initializing": "正在初始化画布…"
@@ -1115,6 +1122,10 @@
       "inlineEditorUnderlineShortcut": "下划线（Ctrl+U）",
       "inlineEditorLarger": "增大字号",
       "inlineEditorSmaller": "减小字号",
+      "quickAddShape": "添加并连接…",
+      "quickShapeProcess": "处理步骤",
+      "quickShapeDecision": "判断",
+      "quickShapeTerminator": "开始 / 结束",
       "quickAddOrConnect": "单击快速添加，拖拽创建连线",
       "quickAddDirection": "向{{direction}}快速添加并连接",
       "direction": {
@@ -2122,6 +2133,7 @@
     }
   },
   "edgeToolbar": {
+    "editHint": "双击连线编辑标签；Shift + 双击在连线中插入节点",
     "switchToCurve": "切换至曲线",
     "switchToOrthogonal": "切换至正交",
     "dashStyle": "线型：{{style}}（点击切换）",

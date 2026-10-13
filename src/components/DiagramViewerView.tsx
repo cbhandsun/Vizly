@@ -313,6 +313,8 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                             <ErrorBoundary
                                 title={t('designer.viewer.renderFailed')}
                                 subTitle={t('designer.viewer.renderFailedSubtitle')}
+                                retryLabel={t('designer.viewer.retryRender')}
+                                resetKey={`${selectedDiagramId}-${refreshNonce}`}
                             >
                                 <Suspense
                                     fallback={
