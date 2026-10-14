@@ -235,6 +235,12 @@
     }
   },
   "designer": {
+    "connection": {
+      "keyboardPending": "Source selected. Tab to a target port and press Enter to connect; Escape cancels.",
+      "keyboardInvalid": "Cannot connect to this target. Choose another port or press Escape to cancel.",
+      "keyboardConnected": "Connection created.",
+      "keyboardCancelled": "Connection cancelled."
+    },
     "title": "Diagram View",
     "quickConnect": {
       "title": "Quick connect shape picker",
@@ -495,7 +501,8 @@
       "more": "More",
       "moreSettings": "More settings",
       "renderFailed": "Render failed",
-      "renderFailedSubtitle": "An error occurred while rendering the diagram. Refresh or switch to another diagram."
+      "renderFailedSubtitle": "The diagram could not render. Retry or switch diagrams. Unsaved edits may need to be repeated.",
+      "retryRender": "Reload canvas"
     },
     "canvas": {
       "initializing": "Initializing canvas…"
@@ -975,6 +982,10 @@
       "inlineEditorUnderlineShortcut": "Underline (Ctrl+U)",
       "inlineEditorLarger": "Increase text size",
       "inlineEditorSmaller": "Decrease text size",
+      "quickAddShape": "Add and connect…",
+      "quickShapeProcess": "Process",
+      "quickShapeDecision": "Decision",
+      "quickShapeTerminator": "Start / End",
       "quickAddOrConnect": "Click to add; drag to connect",
       "quickAddDirection": "Quick add and connect {{direction}}",
       "direction": {
@@ -1923,6 +1934,7 @@
     }
   },
   "edgeToolbar": {
+    "editHint": "Double-click a connection to edit its label; Shift + double-click inserts a node",
     "switchToCurve": "Switch to curve",
     "switchToOrthogonal": "Switch to orthogonal",
     "dashStyle": "Line style: {{style}} (click to switch)",
