@@ -2,10 +2,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DataService } from '../DataService';
 import type { StandardDiagramData } from '@vizly/core/types';
 import { unifiedStorage } from '../UnifiedStorageService';
+import { localDB } from '../IndexedDBStorage';
 
+vi.mock('../IndexedDBStorage', () => ({
+  localDB: { saveDiagram: vi.fn().mockResolvedValue(undefined), deleteDiagram: vi.fn().mockResolvedValue(undefined) },
+}));
+
+const storageLoad = vi.hoisted(() => vi.fn());
 vi.mock('../UnifiedStorageService', () => ({
   unifiedStorage: {
-    loadDiagram: vi.fn(),
+    loadDiagram: storageLoad,
+    activeProvider: { id: 'supabase', loadDiagram: storageLoad },
   },
 }));
 
@@ -48,6 +55,8 @@ describe('DataService', () => {
     touchedIds.forEach(id => service.deleteDiagram(id, false));
     touchedIds.clear();
     service.clearCache();
+    vi.mocked(localDB.saveDiagram).mockReset().mockResolvedValue(undefined);
+    vi.mocked(localDB.deleteDiagram).mockReset().mockResolvedValue(undefined);
   });
 
   it('invalidates cached query results when diagrams are registered', () => {
@@ -173,7 +182,7 @@ describe('DataService', () => {
       edges: [{ id: 'bad-edge', source: 'missing', target: 'missing' }],
       layout: 'not-a-layout',
       metadata: 'not-metadata',
-    } as any);
+    } as unknown as Parameters<DataService['registerRemoteDiagram']>[3]);
     touchedIds.add(id);
 
     expect(registered.nodes).toHaveLength(1);
@@ -216,6 +225,7 @@ describe('DataService', () => {
     expect(Object.hasOwn(loaded?.nodes[0] ?? {}, 'constructor')).toBe(false);
     expect(Object.prototype).not.toHaveProperty('polluted');
     expect(service.getDiagram('unsafe-id')).toBe(loaded);
+    expect(loaded?.metadata?.cloud).toMatchObject({ provider: 'supabase', id: 'remote-diagram', revision: '2026-06-14T00:00:00.000Z' });
   });
 
   it('rejects invalid remote storage content before registration', async () => {
@@ -243,5 +253,41 @@ describe('DataService', () => {
     expect(JSON.stringify(consoleErrorSpy.mock.calls[0]?.[1])).not.toContain('sk-live-secret');
 
     consoleErrorSpy.mockRestore();
+  });
+
+  it('publishes a durable registration only after persistence commits', async () => {
+    const id = 'durable-registration';
+    touchedIds.add(id);
+    let complete: (() => void) | undefined;
+    vi.mocked(localDB.saveDiagram).mockImplementationOnce(() => new Promise(resolve => { complete = resolve; }));
+    const pending = service.registerDiagram(makeDiagram(id));
+    expect(service.getDiagram(id)).toBeNull();
+    complete?.();
+    await pending;
+    expect(service.getDiagram(id)?.id).toBe(id);
+  });
+
+  it('propagates write failure while preserving the last committed diagram and query cache', async () => {
+    const id = 'failed-registration';
+    touchedIds.add(id);
+    service.registerDiagram(makeDiagram(id), false);
+    const before = service.getDiagram(id);
+    const query = { search: `unique-search-${id}` };
+    service.queryDiagrams(query);
+    vi.mocked(localDB.saveDiagram).mockRejectedValueOnce(new DOMException('Quota exhausted', 'QuotaExceededError'));
+    await expect(service.registerDiagram({ ...makeDiagram(id), name: 'Uncommitted' })).rejects.toThrow('Quota exhausted');
+    expect(service.getDiagram(id)).toBe(before);
+    expect(service.queryDiagrams(query).data[0]).toBe(before);
+  });
+
+  it('retains a diagram on failed deletion and removes it only on durable success', async () => {
+    const id = 'durable-deletion';
+    touchedIds.add(id);
+    service.registerDiagram(makeDiagram(id), false);
+    vi.mocked(localDB.deleteDiagram).mockRejectedValueOnce(new Error('Transaction aborted'));
+    await expect(service.deleteDiagram(id)).rejects.toThrow('Transaction aborted');
+    expect(service.getDiagram(id)).not.toBeNull();
+    await service.deleteDiagram(id);
+    expect(service.getDiagram(id)).toBeNull();
   });
 });

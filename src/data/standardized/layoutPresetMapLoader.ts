@@ -1,6 +1,7 @@
 import type { StandardDiagramData } from '@vizly/core/types';
 
-import { loadAllStandardPresets, loadStandardPresetById } from './presetLoader';
+import { loadStandardPresetById } from './presetLoader';
+import { readStandardizedCustomPresetMap } from './customStandardPresets';
 
 type StandardPresetLoader = (id?: string) => Promise<StandardDiagramData | null>;
 type FallbackPresetMapLoader = () => Promise<Record<string, unknown>>;
@@ -12,13 +13,14 @@ export type LayoutPresetMapLoaderDependencies = Readonly<{
 
 const defaultDependencies: LayoutPresetMapLoaderDependencies = {
   loadStandardPreset: loadStandardPresetById,
-  loadFallbackPresetMap: loadAllStandardPresets,
+  loadFallbackPresetMap: async () => typeof localStorage === 'undefined'
+    ? {} : readStandardizedCustomPresetMap(localStorage),
 };
 
 /**
  * Standard diagrams already have an ID-addressable lazy loader. Loading the
- * eager catalog here would download and parse every bundled preset before the
- * first layout command. Custom diagrams retain the full-map compatibility path.
+ * eager catalog here would download every bundled preset. Custom diagrams read
+ * only locally stored presets; an unknown identifier never downloads the catalog.
  */
 export const loadLayoutPresetMapForDiagram = async (
   diagramId: string,

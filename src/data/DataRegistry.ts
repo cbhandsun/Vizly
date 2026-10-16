@@ -20,17 +20,8 @@ import {
 import { getDiagramCollectionIssues } from './dataRegistryValidation';
 
 // 导入标准化数据
-import logisticsStandardData from './standardized/LogisticsStandardData.json';
-import logisticsPlanningData from './standardized/LogisticsPlanningStandardData.json';
-import systemsInteractionData from './standardized/SystemsInteractionStandardData.json';
-import tmsStandardData from './standardized/TmsStandardData.json';
-import transportDrivenData from './standardized/TransportDrivenStandardData.json';
-import wmsArchitectureData from './standardized/WmsStandardData.json';
-import wmsOrderToTaskFlowData from './standardized/WmsOrderToTaskFlowData.json';
-import wmsProcessFlowData from './standardized/WmsProcessFlowStandardData.json';
-import demandAllocationData from './standardized/DeamndAllocation.json';
-import blankCanvasStandardData from './standardized/BlankCanvasStandardData.json';
-import { loadStandardPresetById } from './standardized/presetLoader';
+import { loadStandardPresetCatalog } from './standardized/presetLoader';
+import { STANDARD_PRESET_KEYS } from './standardized/presetMetadata';
 
 let supabaseModulePromise: Promise<typeof import('../services/supabase')> | null = null;
 
@@ -148,27 +139,13 @@ export class DataRegistry {
    * 注册标准化数据
    */
   private async registerStandardData(): Promise<void> {
-    const enterpriseArchitectureData = await loadStandardPresetById('ArchitectureStandardData');
-    if (!enterpriseArchitectureData) {
-      throw new Error('Built-in enterprise architecture preset is unavailable.');
-    }
-    const diagrams: unknown[] = [
-      enterpriseArchitectureData,
-      logisticsStandardData,
-      logisticsPlanningData,
-      systemsInteractionData,
-      tmsStandardData,
-      transportDrivenData,
-      wmsArchitectureData,
-      wmsOrderToTaskFlowData,
-      wmsProcessFlowData,
-      demandAllocationData,
-      blankCanvasStandardData,
-    ];
+    const catalog = await loadStandardPresetCatalog();
+    const diagrams = STANDARD_PRESET_KEYS.map(key => catalog[key]);
 
     // 批量注册内置图表数据，并禁止重复写入 IndexedDB
     for (const rawDiagram of diagrams) {
-      const diagram = rawDiagram as StandardDiagramData;
+      if (!rawDiagram) throw new Error('Built-in preset is unavailable.');
+      const diagram = rawDiagram;
       this.builtInDiagrams.set(diagram.id, diagram);
       this.dataService.registerDiagram(diagram, false);
     }
@@ -242,6 +219,7 @@ export class DataRegistry {
           }
       } catch (err) {
           logLocalDiagramLoadFailure(err);
+          throw err;
       }
   }
 

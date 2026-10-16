@@ -1,3 +1,4 @@
+import { getBrowserSessionUser } from './browserSessionUser';
 /**
  * 分享服务层
  * 封装所有云分享相关的 CRUD 操作
@@ -257,7 +258,7 @@ class ShareService {
             throw new Error('Share links require a saved cloud diagram id.');
         }
 
-        const { data: authData, error: authError } = await supabase!.auth.getUser();
+        const { data: authData, error: authError } = await getBrowserSessionUser(supabase!);
         if (authError) throw authError;
         const userId = authData.user?.id;
         if (!userId || userId !== options.userId) {
@@ -368,7 +369,7 @@ class ShareService {
     async listSharesForDiagram(diagramId: string): Promise<ShareRecord[]> {
         if (!isValidUuid(diagramId)) return [];
 
-        const { data: authData, error: authError } = await supabase!.auth.getUser();
+        const { data: authData, error: authError } = await getBrowserSessionUser(supabase!);
         if (authError) throw authError;
         const userId = authData.user?.id;
         if (!userId) throw new Error('Share links require authentication.');
@@ -395,7 +396,7 @@ class ShareService {
             throw new Error('Invalid share id.');
         }
 
-        const { data: authData, error: authError } = await supabase!.auth.getUser();
+        const { data: authData, error: authError } = await getBrowserSessionUser(supabase!);
         if (authError) throw authError;
         const userId = authData.user?.id;
         if (!userId) throw new Error('Share links require authentication.');
@@ -521,7 +522,7 @@ class ShareService {
      * 获取“与我共享”的图表列表
      */
     async listSharedWithMe(): Promise<SharedWithMeRecord[]> {
-        const { data: authData, error: authError } = await supabase!.auth.getUser();
+        const { data: authData, error: authError } = await getBrowserSessionUser(supabase!);
         if (authError) throw authError;
         const userId = authData.user?.id;
         if (!userId) throw new Error('Shared diagrams require authentication.');

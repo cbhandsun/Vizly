@@ -24,6 +24,26 @@ const validRequest = {
 };
 
 describe('AI gateway boundaries', () => {
+  it('preserves the deployed Responses API contract while rejecting invalid modes', () => {
+    for (const apiMode of ['responses', 'chat-completions'] as const) {
+      const result = parseAIGatewayRequest(JSON.stringify({
+        ...validRequest, provider: { ...validRequest.provider, apiMode },
+      }));
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.value.provider.apiMode).toBe(apiMode);
+    }
+    const legacy = parseAIGatewayRequest(JSON.stringify(validRequest));
+    if (!legacy.ok) throw new Error('Legacy request rejected');
+    expect(legacy.value.provider.apiMode).toBe('chat-completions');
+    for (const apiMode of ['', 'invalid', null, {}, 1]) {
+      expect(parseAIGatewayRequest(JSON.stringify({
+        ...validRequest, provider: { ...validRequest.provider, apiMode },
+      }))).toEqual({ ok: false, reason: 'invalid-request' });
+    }
+    expect(resolveGatewayProviderKind('custom', 'https://proxy.example.com/v1', 'responses'))
+      .toBe('openai-responses');
+  });
+
   it('parses a bounded valid request', () => {
     const result = parseAIGatewayRequest(JSON.stringify(validRequest));
     expect(result.ok).toBe(true);

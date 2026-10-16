@@ -3,6 +3,7 @@
  * 提供统一的数据访问接口，支持数据获取、转换、缓存和验证
  */
 
+import { readLoadedCloudRevision } from './cloudSaveVersion';
 import type {
   StandardDiagramData,
   StandardNodeData,
@@ -219,7 +220,10 @@ export class DataService {
 
   // === 数据注册与获取 ===
 
-  registerDiagram(diagram: StandardDiagramData, persistToIndexedDB: boolean = true): void {
+  registerDiagram(diagram: StandardDiagramData, persistToIndexedDB: false): void;
+  registerDiagram(diagram: StandardDiagramData, persistToIndexedDB?: true): Promise<void>;
+  registerDiagram(diagram: StandardDiagramData, persistToIndexedDB: boolean): void | Promise<void>;
+  registerDiagram(diagram: StandardDiagramData, persistToIndexedDB: boolean = true): void | Promise<void> {
     if (!diagram || !diagram.id) {
       throw new Error(`Invalid diagram data: ${diagram?.id || 'null/undefined'}`);
     }
@@ -227,35 +231,39 @@ export class DataService {
     const safeDiagram = stripUnsafeDiagramKeys(diagram);
 
     if (!DataValidator.validateDiagramData(safeDiagram)) {
-      safeLog.warn(`[DataService] Diagram "${safeDiagram.id}" did not pass strict validation, registering with lenient mode.`);
+      safeLog.warn('[DataService] Diagram did not pass strict validation, registering with lenient mode.');
     }
 
-    this.dataRegistry.set(safeDiagram.id, safeDiagram);
-    this.cache.set(`diagram:${safeDiagram.id}`, safeDiagram);
-    this.invalidateQueryCache();
-    
-    if (persistToIndexedDB) {
-      // Fire and forget, don't block the UI
-      localDB.saveDiagram(safeDiagram).catch(err => {
-          safeLog.error('[DataService] Failed to persist diagram to IndexedDB', redactSensitiveLogValue(err));
-      });
-    }
+    const register = () => {
+      this.dataRegistry.set(safeDiagram.id, safeDiagram);
+      this.cache.set(`diagram:${safeDiagram.id}`, safeDiagram);
+      this.invalidateQueryCache();
+    };
+    if (!persistToIndexedDB) return register();
+    return localDB.saveDiagram(safeDiagram).then(register).catch(error => {
+      safeLog.error('[DataService] Failed to persist diagram to IndexedDB', redactSensitiveLogValue(error));
+      throw error;
+    });
   }
 
+  registerRemoteDiagram(content: unknown, fallback: { id: string; title: string }, persistToIndexedDB: false, overrides?: RemoteDiagramRegistrationOverrides): StandardDiagramData;
+  registerRemoteDiagram(content: unknown, fallback: { id: string; title: string }, persistToIndexedDB?: true, overrides?: RemoteDiagramRegistrationOverrides): Promise<StandardDiagramData>;
+  registerRemoteDiagram(content: unknown, fallback: { id: string; title: string }, persistToIndexedDB: boolean, overrides?: RemoteDiagramRegistrationOverrides): StandardDiagramData | Promise<StandardDiagramData>;
   registerRemoteDiagram(
     content: unknown,
     fallback: { id: string; title: string },
     persistToIndexedDB: boolean = true,
     overrides: RemoteDiagramRegistrationOverrides = {}
-  ): StandardDiagramData {
+  ): StandardDiagramData | Promise<StandardDiagramData> {
     const parsed = parseRemoteDiagramContent(content, fallback) as StandardDiagramData;
     const diagram = applyRemoteDiagramRegistrationOverrides(parsed, overrides);
-    this.registerDiagram(diagram, persistToIndexedDB);
-    const registered = this.getDiagram(diagram.id);
-    if (!registered) {
-      throw new Error(`Failed to register remote diagram: ${diagram.id}`);
-    }
-    return registered;
+    const registration = this.registerDiagram(diagram, persistToIndexedDB);
+    const readRegistered = () => {
+      const registered = this.getDiagram(diagram.id);
+      if (!registered) throw new Error('Failed to register remote diagram.');
+      return registered;
+    };
+    return registration ? registration.then(readRegistered) : readRegistered();
   }
 
   getDiagram(id: string): StandardDiagramData | null {
@@ -273,16 +281,20 @@ export class DataService {
     return null;
   }
 
-  deleteDiagram(id: string, removeFromIndexedDB: boolean = true): void {
-    this.dataRegistry.delete(id);
-    this.cache.delete(`diagram:${id}`);
-    this.invalidateQueryCache();
-    
-    if (removeFromIndexedDB) {
-        localDB.deleteDiagram(id).catch(err => {
-            safeLog.error('[DataService] Failed to delete diagram from IndexedDB', redactSensitiveLogValue(err));
-        });
-    }
+  deleteDiagram(id: string, removeFromIndexedDB: false): void;
+  deleteDiagram(id: string, removeFromIndexedDB?: true): Promise<void>;
+  deleteDiagram(id: string, removeFromIndexedDB: boolean): void | Promise<void>;
+  deleteDiagram(id: string, removeFromIndexedDB: boolean = true): void | Promise<void> {
+    const remove = () => {
+      this.dataRegistry.delete(id);
+      this.cache.delete(`diagram:${id}`);
+      this.invalidateQueryCache();
+    };
+    if (!removeFromIndexedDB) return remove();
+    return localDB.deleteDiagram(id).then(remove).catch(error => {
+      safeLog.error('[DataService] Failed to delete diagram from IndexedDB', redactSensitiveLogValue(error));
+      throw error;
+    });
   }
 
   // === 数据查询 ===
@@ -442,16 +454,16 @@ export class DataService {
     return this.getDiagram(id);
   }
 
-  importDiagram(diagram: StandardDiagramData): void {
-    this.registerDiagram(diagram);
+  async importDiagram(diagram: StandardDiagramData): Promise<void> {
+    await this.registerDiagram(diagram);
   }
 
   exportAllDiagrams(): StandardDiagramData[] {
     return Array.from(this.dataRegistry.values());
   }
 
-  importDiagrams(diagrams: StandardDiagramData[]): void {
-    diagrams.forEach(diagram => this.registerDiagram(diagram));
+  async importDiagrams(diagrams: StandardDiagramData[]): Promise<void> {
+    for (const diagram of diagrams) await this.registerDiagram(diagram);
   }
 
   // === 外部存储集成 ===
@@ -459,11 +471,16 @@ export class DataService {
   async loadFromStorage(key: string): Promise<StandardDiagramData | null> {
     try {
       const { unifiedStorage: storageService } = await import('./UnifiedStorageService');
-      const savedData = await storageService.loadDiagram(key);
-      const diagramContent = this.registerRemoteDiagram(savedData.content, {
+      const provider = storageService.activeProvider;
+      const savedData = await provider.loadDiagram(key);
+      const diagramContent = await this.registerRemoteDiagram(savedData.content, {
         id: savedData.id || key,
         title: savedData.title || key,
-      });
+      }, true, { metadata: { cloud: {
+        provider: provider.id, id: savedData.id,
+        title: savedData.title,
+        revision: readLoadedCloudRevision(provider.id, savedData),
+      } } });
 
       if (diagramContent && DataValidator.validateDiagramData(diagramContent)) {
         return diagramContent;

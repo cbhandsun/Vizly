@@ -25,6 +25,25 @@ const createDependencies = (): DiagramViewerTemplateSelectionDependencies => ({
 });
 
 describe('selectDiagramViewerTemplate', () => {
+    it('preserves the S3 object ETag through remote selection into the designer seed', async () => {
+        const revision = '"multipart-16"';
+        const dependencies = createDependencies();
+        vi.mocked(dependencies.loadRemoteDiagram).mockResolvedValue(coerceRemoteDiagramSelection({ id: 'remote.json', title: 'Remote', content: {}, expectedRevision: revision }, 'fallback'));
+        await selectDiagramViewerTemplate('remote.json', 's3', dependencies);
+        expect(dependencies.seedAndNavigate).toHaveBeenCalledWith(expect.objectContaining({ metadata: expect.objectContaining({
+            cloud: expect.objectContaining({ provider: 's3', id: 'remote.json', revision }),
+        }) }), 'remote.json', expect.anything());
+    });
+    it('passes the exact loaded revision through remote selection into the designer seed', async () => {
+        const revision = '2026-10-08T14:00:00.123456+00:00';
+        const remote = coerceRemoteDiagramSelection({ id: 'remote-1', title: 'Remote', content: {}, updated_at: revision }, 'fallback');
+        const dependencies = createDependencies();
+        vi.mocked(dependencies.loadRemoteDiagram).mockResolvedValue(remote);
+        await selectDiagramViewerTemplate('remote-1', 'supabase', dependencies);
+        expect(dependencies.seedAndNavigate).toHaveBeenCalledWith(expect.objectContaining({ metadata: expect.objectContaining({
+            cloud: expect.objectContaining({ provider: 'supabase', id: 'remote-1', revision }),
+        }) }), 'remote-1', expect.anything());
+    });
     it('makes only the latest selection context current', () => {
         const sequence = { current: 0 };
         const first = beginDiagramViewerTemplateSelection(sequence);

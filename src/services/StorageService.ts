@@ -1,4 +1,5 @@
 import { createS3FetchClient, type S3FetchClient } from './s3FetchClient';
+import { requireS3ObjectRevision } from './s3ObjectRevision';
 import { IStorageProvider, DiagramMetadata, SavedDiagram } from './storage/types';
 import {
     coerceS3StorageConfig,
@@ -287,9 +288,21 @@ export class S3StorageProvider implements IStorageProvider {
         }
 
         try {
-            const response = await this.client.listObjects({ prefix: '' });
-
-            return response.contents
+            const contents = new Map<string, Awaited<ReturnType<S3FetchClient['listObjects']>>['contents'][number]>();
+            const seenTokens = new Set<string>();
+            let continuationToken: string | undefined;
+            for (let page = 0; ; page++) {
+                if (page >= 1000) throw new Error('S3 listing exceeds the page limit.');
+                const response = await this.client.listObjects({ prefix: '', continuationToken });
+                for (const item of response.contents) contents.set(item.key, item);
+                if (contents.size > 100_000) throw new Error('S3 listing exceeds the object limit.');
+                if (!response.isTruncated) break;
+                const nextToken = response.nextContinuationToken;
+                if (!nextToken || seenTokens.has(nextToken)) throw new Error('S3 listing returned an invalid continuation token.');
+                seenTokens.add(nextToken);
+                continuationToken = nextToken;
+            }
+            return [...contents.values()]
                 .filter(item => item.key.endsWith('.json'))
                 .map(item => ({
                     id: item.key,
@@ -321,6 +334,7 @@ export class S3StorageProvider implements IStorageProvider {
                 id: id,
                 title: content.metadata?.title || content.name || fallbackTitle,
                 content: content,
+                expectedRevision: requireS3ObjectRevision(response.etag, 'load'),
                 updated_at: (response.lastModified || new Date()).toISOString(),
                 user_id: 's3-user' // S3 doesn't have inherent user concept here
             };
@@ -345,15 +359,25 @@ export class S3StorageProvider implements IStorageProvider {
         }
 
         try {
-            await this.client.putObject(
+            if (!diagram.content || typeof diagram.content !== 'object' || Array.isArray(diagram.content)) {
+                throw new Error('S3 diagram content must be an object.');
+            }
+            const content = { ...diagram.content, id: key };
+            const expectedRevision = diagram.expectedRevision === undefined
+                ? undefined : requireS3ObjectRevision(diagram.expectedRevision, 'load');
+            const result = await this.client.putObject(
                 key,
-                JSON.stringify(diagram.content, null, 2), // Storing just content to remain compatible with generic S3 viewers
+                JSON.stringify(content, null, 2),
                 'application/json',
+                undefined,
+                expectedRevision === undefined ? { ifNoneMatch: '*' } : { ifMatch: expectedRevision },
             );
 
             return {
                 ...diagram,
-                id: key
+                id: key,
+                content,
+                expectedRevision: requireS3ObjectRevision(result.etag, 'save'),
             };
         } catch (error) {
             safeLog.error('Save diagram failed:', redactSensitiveLogValue(error));

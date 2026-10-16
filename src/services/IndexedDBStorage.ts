@@ -7,6 +7,7 @@ import {
 } from './versionSnapshotSecurity';
 import { safeLog } from '@vizly/core/logging';
 import { redactSensitiveLogValue } from '@vizly/core/logging';
+import { runIndexedDBTransaction } from './indexedDBTransaction';
 
 const DB_NAME = 'VizlyLocalDB';
 const DB_VERSION = 2;
@@ -38,6 +39,10 @@ export class LocalDB {
 
             request.onsuccess = (event) => {
                 this.db = (event.target as IDBOpenDBRequest).result;
+                this.db.onversionchange = () => {
+                    this.db?.close();
+                    this.db = null;
+                };
                 resolve();
             };
 
@@ -48,7 +53,11 @@ export class LocalDB {
             };
         });
 
-        return this.initPromise;
+        try {
+            await this.initPromise;
+        } finally {
+            this.initPromise = null;
+        }
     }
 
     async saveVersion(diagramId: string, snapshotData: unknown, message?: string): Promise<DiagramVersion> {
@@ -57,111 +66,59 @@ export class LocalDB {
         }
         const safeSnapshotData = coerceVersionSnapshotData(snapshotData);
         await this.init();
-        return new Promise((resolve, reject) => {
-            const version: DiagramVersion = {
-                id: crypto.randomUUID(),
-                diagramId: diagramId.trim(),
-                snapshotData: safeSnapshotData,
-                createdAt: Date.now(),
-                message: coerceVersionMessage(message),
-                authorId: 'local'
-            };
-
-            const transaction = this.db!.transaction([STORE_NAME], 'readwrite');
-            const store = transaction.objectStore(STORE_NAME);
-            const request = store.add(version);
-
-            request.onsuccess = () => resolve(version);
-            request.onerror = (event) => reject((event.target as IDBRequest).error);
-        });
+        const version: DiagramVersion = {
+            id: crypto.randomUUID(),
+            diagramId: diagramId.trim(),
+            snapshotData: safeSnapshotData,
+            createdAt: Date.now(),
+            message: coerceVersionMessage(message),
+            authorId: 'local',
+        };
+        await runIndexedDBTransaction(this.db!, STORE_NAME, 'readwrite', store => store.add(version));
+        return version;
     }
 
     async listVersions(diagramId: string): Promise<DiagramVersion[]> {
         await this.init();
-        return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction([STORE_NAME], 'readonly');
-            const store = transaction.objectStore(STORE_NAME);
-            const index = store.index('diagramId');
-            const request = index.getAll(diagramId);
-
-            request.onsuccess = (event) => {
-                const results = (event.target as IDBRequest).result as DiagramVersion[];
-                // Sort descending (newest first)
-                const safeResults = results
-                    .map(result => coerceDiagramVersion({ ...result, snapshotData: null }))
-                    .filter(Boolean) as DiagramVersion[];
-                safeResults.sort((a, b) => b.createdAt - a.createdAt);
-                
-                // Omit snapshotData here for consistency with Supabase if we want, but local is fast enough
-                resolve(safeResults);
-            };
-            request.onerror = (event) => reject((event.target as IDBRequest).error);
-        });
+        const results: unknown[] = await runIndexedDBTransaction(
+            this.db!, STORE_NAME, 'readonly', store => store.index('diagramId').getAll(diagramId),
+        );
+        const safeResults = results
+            .map(result => result && typeof result === 'object'
+                ? coerceDiagramVersion({ ...result, snapshotData: null }) : null)
+            .filter((version): version is DiagramVersion => version !== null);
+        safeResults.sort((a, b) => b.createdAt - a.createdAt);
+        return safeResults;
     }
 
     async loadVersion(diagramId: string, versionId: string): Promise<DiagramVersion | null> {
         await this.init();
-        return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction([STORE_NAME], 'readonly');
-            const store = transaction.objectStore(STORE_NAME);
-            const request = store.get(versionId);
-
-            request.onsuccess = (event) => {
-                const result = (event.target as IDBRequest).result as DiagramVersion;
-                const safeResult = result ? coerceDiagramVersion(result) : null;
-                if (safeResult && safeResult.diagramId === diagramId.trim()) {
-                    resolve(safeResult);
-                } else {
-                    resolve(null);
-                }
-            };
-            request.onerror = (event) => reject((event.target as IDBRequest).error);
-        });
+        const result: unknown = await runIndexedDBTransaction(
+            this.db!, STORE_NAME, 'readonly', store => store.get(versionId),
+        );
+        const safeResult = result ? coerceDiagramVersion(result) : null;
+        return safeResult && safeResult.diagramId === diagramId.trim() ? safeResult : null;
     }
 
     // --- Diagram Storage Methods ---
     async saveDiagram(diagram: unknown): Promise<void> {
         await this.init();
-        return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction([DIAGRAMS_STORE], 'readwrite');
-            const store = transaction.objectStore(DIAGRAMS_STORE);
-            const request = store.put(diagram);
-            request.onsuccess = () => resolve();
-            request.onerror = (event) => reject((event.target as IDBRequest).error);
-        });
+        await runIndexedDBTransaction(this.db!, DIAGRAMS_STORE, 'readwrite', store => store.put(diagram));
     }
 
     async loadDiagram(id: string): Promise<unknown | null> {
         await this.init();
-        return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction([DIAGRAMS_STORE], 'readonly');
-            const store = transaction.objectStore(DIAGRAMS_STORE);
-            const request = store.get(id);
-            request.onsuccess = (event) => resolve((event.target as IDBRequest).result || null);
-            request.onerror = (event) => reject((event.target as IDBRequest).error);
-        });
+        return (await runIndexedDBTransaction(this.db!, DIAGRAMS_STORE, 'readonly', store => store.get(id))) ?? null;
     }
 
     async listDiagrams(): Promise<unknown[]> {
         await this.init();
-        return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction([DIAGRAMS_STORE], 'readonly');
-            const store = transaction.objectStore(DIAGRAMS_STORE);
-            const request = store.getAll();
-            request.onsuccess = (event) => resolve((event.target as IDBRequest).result || []);
-            request.onerror = (event) => reject((event.target as IDBRequest).error);
-        });
+        return await runIndexedDBTransaction(this.db!, DIAGRAMS_STORE, 'readonly', store => store.getAll());
     }
 
     async deleteDiagram(id: string): Promise<void> {
         await this.init();
-        return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction([DIAGRAMS_STORE], 'readwrite');
-            const store = transaction.objectStore(DIAGRAMS_STORE);
-            const request = store.delete(id);
-            request.onsuccess = () => resolve();
-            request.onerror = (event) => reject((event.target as IDBRequest).error);
-        });
+        await runIndexedDBTransaction(this.db!, DIAGRAMS_STORE, 'readwrite', store => store.delete(id));
     }
 }
 

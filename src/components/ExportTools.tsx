@@ -10,6 +10,9 @@ import { useAuth } from '@/context/useAuth';
 import { useSubscription } from '@/context/useSubscription';
 import { tryAttachDiagramSnapshot } from '@vizly/core/export';
 import { invalidateRemoteDiagramPreview } from '@/services/remoteDiagramPreview';
+import { assertDesignerSaveReady } from '@/services/designerSaveReadiness';
+import { readSavedDiagramId } from '@/services/cloudSaveIdentity';
+import { assertCloudSaveViewCurrent, captureCloudSaveVersion, CloudSaveVersionError, readSavedCloudRevision } from '@/services/cloudSaveVersion';
 import { appMessage } from '@vizly/core/antd';
 import { getFlowDataBridge, getFlowDataBridgeNodes, getStandardFlowDataBridge } from '@vizly/core/diagram-data';
 import {
@@ -19,11 +22,7 @@ import {
 import { logCloudSaveEnsureFailure, logCloudSaveFailure } from '@/components/diagrams/hooks/diagramStorageLogging';
 import {
   downloadFile,
-  escapeMarkdownInlineText,
-  escapeMarkdownTableCell,
-  escapeMermaidLabel,
   focusAvailableExportTrigger,
-  toMermaidNodeId,
 } from '@vizly/core/export';
 import type { StandardDiagramData } from '@vizly/core/types';
 import type { DiagramEnsureSavedResult } from '@vizly/core/types';
@@ -36,6 +35,8 @@ import { resolveExportPopupContainer } from './exportPopupContainer';
 import { resolveExportableNodeCount, resolveExportMenuAvailability } from './exportMenuAvailability';
 import { useKeyboardAccessibleDropdown } from '@vizly/core/keyboard-dropdown';
 import { ExportProgressOverlay } from './ExportProgressOverlay';
+import { buildMarkdownDiagramExport } from './markdownDiagramExport';
+import { useCanvasViewportReadiness } from './useCanvasViewportReadiness';
 import './ExportTools.css';
 
 const ShareDialog = React.lazy(() => import('@/components/diagrams/ShareDialog'));
@@ -49,8 +50,6 @@ const loadDataService = async () => {
   return dataRegistry.getDataService();
 };
 
-const MARKDOWN_EXPORT_MAX_NODES = 1000;
-const MARKDOWN_EXPORT_MAX_EDGES = 2000;
 const EXPORT_MENU_OVERLAY_CLASS = 'vizly-export-actions-menu';
 const EXPORT_MENU_ID = 'diagram-export-actions-menu';
 
@@ -95,6 +94,10 @@ const ExportTools: React.FC<ExportToolsProps> = ({
   const { hasFeature, showUpgradeModal } = useSubscription();
   // 用于 fallback：当 dataService 无数据时从 ReactFlow 获取当前节点/边
   const reactFlowInstance = useReactFlow();
+  const readViewportControlSnapshot = useCallback(() => readRegisteredReactFlowSnapshot(diagramId)
+    ?? { nodes: reactFlowInstance.getNodes() }, [diagramId, reactFlowInstance]);
+  const readViewportControlBridge = useCallback(() => getFlowDataBridge(diagramId), [diagramId]);
+  const viewportControlsReady = useCanvasViewportReadiness(diagramId, readViewportControlSnapshot, readViewportControlBridge);
   const getReactFlowSnapshot = useCallback(() => enrichSnapshotWithRenderedNodeStyles(
     readRegisteredReactFlowSnapshot(diagramId) ?? {
       nodes: reactFlowInstance.getNodes(),
@@ -298,13 +301,15 @@ const ExportTools: React.FC<ExportToolsProps> = ({
   const handleExportGIF = () => wrapExport('gif', exportToGIF);
   
   const handleExportMarkdown = async () => {
-    const dataService = await loadDataService();
-    let diagram = dataService.getDiagram(diagramId);
-    
-    // Fallback Bridge
-    if (!diagram || !diagram.nodes || diagram.nodes.length === 0) {
-      const bridgeData = getStandardFlowDataBridge(diagramId);
-      if (bridgeData) diagram = bridgeData;
+    let diagram: unknown = readRegisteredReactFlowSnapshot(diagramId);
+    if (!diagram) {
+      const nodes = reactFlowInstance.getNodes();
+      if (nodes.length > 0) diagram = { nodes, edges: reactFlowInstance.getEdges() };
+    }
+    if (!diagram) {
+      const dataService = await loadDataService();
+      const saved = dataService.getDiagram(diagramId);
+      diagram = saved?.nodes.length ? saved : getStandardFlowDataBridge(diagramId);
     }
 
     if (!diagram) {
@@ -312,47 +317,7 @@ const ExportTools: React.FC<ExportToolsProps> = ({
        return;
     }
 
-    const safeNodes = (diagram.nodes || []).slice(0, MARKDOWN_EXPORT_MAX_NODES);
-    const safeNodeIds = new Set(safeNodes.map(n => n.id));
-    const safeEdges = (diagram.edges || [])
-      .filter(e => safeNodeIds.has(e.source) && safeNodeIds.has(e.target))
-      .slice(0, MARKDOWN_EXPORT_MAX_EDGES);
-
-    const nodeDetails = safeNodes.map(n => `| ${escapeMarkdownTableCell(n.id)} | ${escapeMarkdownTableCell(n.data?.label || n.id)} | ${escapeMarkdownTableCell(n.data?.domainClass || n.type || 'N/A')} | ${escapeMarkdownTableCell(n.data?.description || '')} |`).join('\n');
-    const edgeDetails = safeEdges.map(e => `- ${escapeMarkdownTableCell(e.source)} --> ${escapeMarkdownTableCell(e.target)}${e.label ? `: ${escapeMarkdownTableCell(e.label)}` : ''}`).join('\n');
-
-    const mermaid = `graph TD\n` + safeEdges.map(e => {
-      const sourceId = toMermaidNodeId(e.source);
-      const targetId = toMermaidNodeId(e.target);
-      const sourceLabel = escapeMermaidLabel(safeNodes.find(n => n.id === e.source)?.data?.label || e.source);
-      const targetLabel = escapeMermaidLabel(safeNodes.find(n => n.id === e.target)?.data?.label || e.target);
-      const edgeLabel = escapeMermaidLabel(e.label || '');
-      return edgeLabel
-        ? `  ${sourceId}["${sourceLabel}"] -->|"${edgeLabel}"| ${targetId}["${targetLabel}"]`
-        : `  ${sourceId}["${sourceLabel}"] --> ${targetId}["${targetLabel}"]`;
-    }).join('\n');
-
-    const content = `# Architecture Blueprint: ${escapeMarkdownInlineText(diagramName || 'Untitled')}
-
-## 1. Overview
-This architectural blueprint was generated by Vizly AI Studio.
-
-## 2. Component Inventory
-| ID | Label | Layer (Domain) | Description |
-|---|---|---|---|
-${nodeDetails}
-
-## 3. Interaction Flows
-${edgeDetails}
-
-## 4. Logical Visual (Mermaid)
-\`\`\`mermaid
-${mermaid}
-\`\`\`
-
----
-*Generated by Vizly AI Studio - ${new Date().toLocaleString()}*
-`;
+    const content = buildMarkdownDiagramExport(diagram, diagramName || 'Untitled', new Date());
 
     downloadFile(content, `${diagramName || 'blueprint'}.md`, 'text/markdown');
     appMessage.success('📄 文档已导出为 Markdown');
@@ -374,7 +339,10 @@ ${mermaid}
 
     const hide = appMessage.loading(t('export.savingToCloud'), 0);
     try {
+      const liveBridge = getFlowDataBridge(diagramId);
+      if (liveBridge) assertDesignerSaveReady(liveBridge);
       const dataService = await loadDataService();
+      const registeredCloudView = dataService.getDiagram(diagramId);
       let diagram = dataService.getDiagram(diagramId);
 
       // Fallback: 当 dataService 中无图表数据时（FlowchartDesigner 场景），从 ReactFlow 实例构造
@@ -412,46 +380,62 @@ ${mermaid}
         return undefined;
       }
 
+      const versionSource = liveBridge || registeredCloudView || diagram;
+      const capturedCloud = versionSource.metadata?.cloud;
+      const capturedId = versionSource.id;
+      const cloudProvider = capturedCloud?.provider;
+      const cloudId = capturedCloud?.id;
+      if (cloudProvider && cloudProvider !== 's3' && cloudProvider !== 'supabase') {
+        throw new CloudSaveVersionError('云端图表提供商无效，请重新打开图表');
+      }
+      const provider = cloudProvider === 's3' || cloudProvider === 'supabase'
+        ? unifiedStorage.getProvider(cloudProvider) : unifiedStorage.activeProvider;
+      const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(diagram.id);
+      const finalId = cloudId || (isValidUuid ? diagram.id : crypto.randomUUID());
+      const expectedRevision = captureCloudSaveVersion(provider.id, finalId, capturedCloud);
       const snap = await tryAttachDiagramSnapshot(diagram, diagramId);
       if (snap.warning) {
         appMessage.warning(t('export.snapshotFailed', { reason: snap.warning }));
       }
 
-      const cloudProvider = snap.diagram.metadata?.cloud?.provider;
-      const cloudId = snap.diagram.metadata?.cloud?.id;
-      const provider = cloudProvider ? unifiedStorage.getProvider(cloudProvider) : unifiedStorage.activeProvider;
-      // 如果没有云端 ID，且本地 ID 不是合法 UUID，则生成新 UUID
-      const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(snap.diagram.id);
-      const finalId = cloudId || (isValidUuid ? snap.diagram.id : crypto.randomUUID());
       const finalTitle = diagramName || snap.diagram.metadata?.title || snap.diagram.name;
 
-      await provider.saveDiagram({
+      if (liveBridge) assertDesignerSaveReady(liveBridge);
+      assertCloudSaveViewCurrent(versionSource, capturedId, capturedCloud, expectedRevision);
+      if (liveBridge && getFlowDataBridge(diagramId) !== liveBridge) throw new CloudSaveVersionError('保存期间图表已关闭或切换，请保留编辑后重试');
+      const saved = await provider.saveDiagram({
         id: finalId,
         title: finalTitle,
         content: { ...snap.diagram, id: finalId, name: finalTitle },
         updated_at: new Date().toISOString(),
-        user_id: user?.id || 'anonymous'
+        user_id: user?.id || 'anonymous',
+        expectedRevision,
       });
-      invalidateRemoteDiagramPreview(finalId);
+      const savedId = readSavedDiagramId(saved);
+      const revision = readSavedCloudRevision(provider.id, saved);
+      invalidateRemoteDiagramPreview(savedId);
 
       // ⭐ 回写 cloud 信息，使下次保存复用同一 ID（更新而非新增）
-      const cloudInfo = { provider: provider.id, id: finalId, title: finalTitle, openedAt: new Date().toISOString() };
+      const cloudInfo = { provider: provider.id, id: savedId, title: finalTitle, revision, openedAt: new Date().toISOString() };
       // 回写到桥接数据（FlowchartDesigner 场景）
       const bridge = getFlowDataBridge(diagramId);
-      if (bridge) {
+      if (bridge && bridge === liveBridge) {
+        assertCloudSaveViewCurrent(bridge, capturedId, capturedCloud, expectedRevision);
         bridge.metadata = { ...(bridge.metadata || {}), cloud: cloudInfo };
+        window.dispatchEvent(new Event('vizly:flow-data-bridge-identity'));
       }
       // 回写到 dataService（GenericStandardDiagram 场景）
       const currentDiagram = dataService.getDiagram(diagramId);
-      if (currentDiagram) {
+      if (currentDiagram && currentDiagram === registeredCloudView) {
+        if (!liveBridge) assertCloudSaveViewCurrent(currentDiagram, capturedId, capturedCloud, expectedRevision);
         currentDiagram.metadata = { ...(currentDiagram.metadata || {}), cloud: cloudInfo };
       }
 
       appMessage.success(t('export.cloudSaveSuccess'));
-      return finalId;
+      return savedId;
     } catch (error) {
       logCloudSaveFailure('ExportTools', error);
-      appMessage.error(t('export.cloudSaveFailed'));
+      appMessage.error(error instanceof CloudSaveVersionError ? error.message : t('export.cloudSaveFailed'));
       return undefined;
     } finally {
       hide();
@@ -564,10 +548,10 @@ ${mermaid}
         {showControls && (
           <>
             <Tooltip title={t('export.backToTop')} getPopupContainer={(trigger) => (document.fullscreenElement as HTMLElement) || trigger.parentElement || document.body}>
-              <Button type="text" aria-label={t('export.backToTop')} icon={<FaHome className="text-[13px]" />} onClick={handleBackToTop} disabled={isExporting} className="w-8 h-8 p-0 border-none flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
+              <Button type="text" aria-label={t('export.backToTop')} icon={<FaHome className="text-[13px]" />} onClick={handleBackToTop} disabled={isExporting || !viewportControlsReady} className="w-8 h-8 p-0 border-none flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
             </Tooltip>
             <Tooltip title={t('export.fitScreen')} getPopupContainer={(trigger) => (document.fullscreenElement as HTMLElement) || trigger.parentElement || document.body}>
-              <Button type="text" aria-label={t('export.fitScreen')} icon={<FaRuler className="text-[13px]" />} onClick={handleFitDiagram} disabled={isExporting} className="w-8 h-8 p-0 border-none flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
+              <Button type="text" aria-label={t('export.fitScreen')} icon={<FaRuler className="text-[13px]" />} onClick={handleFitDiagram} disabled={isExporting || !viewportControlsReady} className="w-8 h-8 p-0 border-none flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
             </Tooltip>
             <Tooltip title={isFullscreen ? t('export.exitFullScreen') : t('export.fullScreen')} getPopupContainer={(trigger) => (document.fullscreenElement as HTMLElement) || trigger.parentElement || document.body}>
               <Button

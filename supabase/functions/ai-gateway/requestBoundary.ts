@@ -14,6 +14,7 @@ const gatewayRequestSchema = z.object({
     name: z.string().trim().min(1).max(160).optional(),
     baseUrl: z.string().trim().min(1).max(2_048),
     apiKey: z.string().min(1).max(8_000),
+    apiMode: z.enum(['chat-completions', 'responses']).default('chat-completions'),
   }).strict(),
   model: z.string().trim().min(1).max(160).regex(safeId),
   messages: z.array(messageSchema).min(1).max(80),
@@ -41,3 +42,4 @@ export const parseAIGatewayRequest = (rawBody: string): AIGatewayRequestParseRes
     ? { ok: true, value: result.data }
     : { ok: false, reason: 'invalid-request' };
 };
+

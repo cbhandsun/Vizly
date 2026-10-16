@@ -36,6 +36,9 @@ export interface UnifiedDiagramItem {
     raw: StandardDiagramData | DiagramMetadata | RemoteTemplateMetadata;
 }
 
+export const isSharedWorkspaceItem = (item: Pick<UnifiedDiagramItem, 'role'>): boolean =>
+    item.role === 'viewer' || item.role === 'editor';
+
 const FILTER_VIEW_TYPES = new Set<FilterViewType>(['recent', 'local', 'cloud', 'shared', 'templates', 'general_templates']);
 
 export const loadSupabaseClient = async () => {
@@ -155,7 +158,7 @@ export const filterAndSortItems = (
             viewFiltered = unifiedItems.filter(item => item.source === 's3' || item.source === 'supabase');
             break;
         case 'shared':
-            viewFiltered = unifiedItems.filter(item => item.role === 'viewer');
+            viewFiltered = unifiedItems.filter(isSharedWorkspaceItem);
             break;
         case 'templates':
             viewFiltered = unifiedItems.filter(item => item.source === 'template');
@@ -334,7 +337,7 @@ export const loadWorkspaceItems = async (activeView: FilterViewType, cloudProvid
         const cloudStorageProvider = unifiedStorage.getProvider(cloudProvider);
         if (cloudStorageProvider.isConfigured() && (cloudProvider !== 'supabase' || user)) {
             try {
-                const cloudResults = await unifiedStorage.listDiagrams();
+                const cloudResults = await cloudStorageProvider.listDiagrams();
                 cloudResults.forEach((diagram) => {
                     items.push({
                         id: `${cloudProvider}_${diagram.id}`,
@@ -361,7 +364,7 @@ export const loadWorkspaceItems = async (activeView: FilterViewType, cloudProvid
                             title: diagram.title || 'Untitled',
                             updatedAt: diagram.updatedAt?.getTime() || 0,
                             source: 'supabase',
-                            role: 'viewer',
+                            role: diagram.role,
                             raw: diagram
                         });
                     }

@@ -1,8 +1,12 @@
+import { getBrowserSessionUser } from './browserSessionUser';
 import { supabase } from './supabase';
 import { IStorageProvider, DiagramMetadata, SavedDiagram, DiagramVersion } from './storage/types';
 import { coerceRemoteDiagramContent } from './remoteDiagramContent';
 import { coerceCloudConfigRows, coerceCloudConfigValue, normalizeCloudConfigKey } from './cloudConfigSecurity';
 import { coerceVersionMessage, coerceVersionSnapshotData } from './versionSnapshotSecurity';
+import { collectSupabaseListPages } from './supabaseListPages';
+import { parseCloudDiagramRevision } from './cloudDiagramRevision';
+import { CloudSaveVersionError } from './cloudSaveVersion';
 
 // Backward compatibility export (type mostly)
 export type { SavedDiagram };
@@ -35,7 +39,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
     }
 
     private async requireAuthenticatedUser(expectedUserId?: string): Promise<string> {
-        const { data: { user }, error } = await supabase!.auth.getUser();
+        const { data: { user }, error } = await getBrowserSessionUser(supabase!);
         if (error) throw error;
         if (!user?.id) {
             throw new Error('Supabase storage requires an authenticated user.');
@@ -48,37 +52,38 @@ export class SupabaseStorageProvider implements IStorageProvider {
 
     async saveDiagram(diagram: SavedDiagram): Promise<SavedDiagram> {
         const authenticatedUserId = await this.requireAuthenticatedUser();
-        const ownerUserId = diagram.user_id && diagram.user_id !== 'anonymous'
-            ? diagram.user_id
-            : authenticatedUserId;
+        const revision = diagram.expectedRevision === undefined ? undefined
+            : parseCloudDiagramRevision(diagram.expectedRevision);
+        if (revision === null) throw new Error('Cloud diagram revision is invalid. Reopen the document before saving.');
         const content = coerceRemoteDiagramContent(diagram.content, {
             id: diagram.id,
             title: diagram.title || diagram.id,
         });
 
-        const { data, error } = await supabase!
-            .from('diagrams')
-            .upsert({
-                id: diagram.id,
-                title: diagram.title,
-                content,
-                user_id: ownerUserId,
-                updated_at: new Date().toISOString(),
-            })
-            .select()
-            .single();
+        const updatedAt = new Date(Math.max(Date.now(), revision ? Date.parse(revision) + 1 : 0)).toISOString();
+        if (!parseCloudDiagramRevision(updatedAt)) throw new Error('Cloud diagram revision is out of range.');
+        const payload = { title: diagram.title, content, updated_at: updatedAt };
+        // An update never sends ownership. A create collision must not overwrite a row.
+        const query = revision === undefined
+            ? supabase!.from('diagrams').insert({ ...payload, id: diagram.id, user_id: authenticatedUserId })
+            : supabase!.from('diagrams').update(payload).eq('id', diagram.id).eq('updated_at', revision);
+        const { data, error } = await query.select().maybeSingle();
 
+        if (error?.code === '23505') throw new CloudSaveVersionError('云端已存在同 ID 图表，请另存为副本；本地编辑已保留');
         if (error) throw error;
+        if (!data) throw new CloudSaveVersionError('云端图表已更新或编辑权限已撤销；本地编辑已保留，请重新打开或另存为副本');
         return this.normalizeSavedDiagram(data);
     }
 
     async listDiagrams(): Promise<DiagramMetadata[]> {
-        const { data, error } = await supabase!
+        const userId = await this.requireAuthenticatedUser();
+        const data = await collectSupabaseListPages((from, to) => supabase!
             .from('diagrams')
             .select('id, title, updated_at, user_id')
-            .order('updated_at', { ascending: false });
-
-        if (error) throw error;
+            .eq('user_id', userId)
+            .order('updated_at', { ascending: false })
+            .order('id', { ascending: true })
+            .range(from, to));
 
         return (Array.isArray(data) ? data : [])
             .map(item => this.coerceDiagramMetadata(item))
@@ -118,7 +123,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
              throw new Error("Version history requires a saved Cloud Diagram (UUID format required).");
         }
 
-        const { data: { user }, error: userError } = await supabase!.auth.getUser();
+        const { data: { user }, error: userError } = await getBrowserSessionUser(supabase!);
         if (userError) throw userError;
         if (!user?.id) {
             throw new Error('Version history requires an authenticated user.');
@@ -149,13 +154,13 @@ export class SupabaseStorageProvider implements IStorageProvider {
              return [];
         }
 
-        const { data, error } = await supabase!
+        const data = await collectSupabaseListPages((from, to) => supabase!
             .from('diagram_versions')
             .select('id, diagram_id, author_id, created_at, message') // Omit heavy snapshotData for list
             .eq('diagram_id', diagramId)
-            .order('created_at', { ascending: false });
-
-        if (error) throw error;
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: true })
+            .range(from, to));
         return (Array.isArray(data) ? data : [])
             .map(item => this.coerceDiagramVersion(item, { includeSnapshot: false, requireSnapshot: false }))
             .filter((item): item is DiagramVersion => item !== null);
@@ -293,14 +298,15 @@ export class SupabaseStorageProvider implements IStorageProvider {
         const title = rawTitle || rawId || 'Untitled';
         const id = rawId || title;
         const content = coerceRemoteDiagramContent(diagram.content, { id, title });
-        const timestamp = coerceTimestamp(diagram.updated_at);
+        const revision = parseCloudDiagramRevision(diagram.updated_at);
+        if (!revision) throw new Error('Supabase returned an invalid diagram revision.');
 
         return {
             ...diagram,
             id,
             title: content.metadata?.title || content.name || title,
             content,
-            updated_at: timestamp?.iso || new Date().toISOString(),
+            updated_at: revision,
             user_id: coerceString(diagram.user_id) || 'anonymous',
         };
     }

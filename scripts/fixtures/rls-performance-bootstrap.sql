@@ -1,0 +1,10 @@
+CREATE TABLE public.ai_conversations(id integer PRIMARY KEY,user_id uuid REFERENCES auth.users(id));
+CREATE TABLE public.user_configs(id integer PRIMARY KEY,user_id uuid);
+GRANT ALL ON public.ai_conversations,public.user_configs TO anon,authenticated;
+ALTER TABLE public.ai_conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_configs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their own conversations" ON public.ai_conversations FOR ALL USING(auth.uid()=user_id);
+CREATE POLICY owner_all ON public.user_configs FOR ALL USING(auth.uid()=user_id) WITH CHECK(auth.uid()=user_id);
+INSERT INTO public.ai_conversations SELECT i,CASE WHEN i%2=0 THEN '11111111-1111-4111-8111-111111111111' ELSE '22222222-2222-4222-8222-222222222222' END::uuid FROM generate_series(1,10000)i;
+INSERT INTO public.user_configs VALUES(1,'11111111-1111-4111-8111-111111111111'),(2,'22222222-2222-4222-8222-222222222222');
+ANALYZE public.ai_conversations;

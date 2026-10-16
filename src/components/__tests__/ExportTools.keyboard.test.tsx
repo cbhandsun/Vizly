@@ -5,7 +5,8 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { exportToPNG, appMessageMocks, subscriptionMocks } = vi.hoisted(() => ({
+const { exportToPNG, appMessageMocks, subscriptionMocks, saveReadinessMocks } = vi.hoisted(() => ({
+  saveReadinessMocks: { getBridge: vi.fn<() => unknown>(() => null), save: vi.fn(), getDiagram: vi.fn() },
   exportToPNG: vi.fn<(signal?: AbortSignal) => Promise<void>>(async () => undefined),
   appMessageMocks: {
     error: vi.fn(),
@@ -84,19 +85,31 @@ vi.mock('@/context/useSubscription', () => ({
 }));
 
 vi.mock('@vizly/core/diagram-data', () => ({
-  getFlowDataBridge: () => null,
+  getFlowDataBridge: saveReadinessMocks.getBridge,
   getFlowDataBridgeNodes: () => [],
   getStandardFlowDataBridge: () => null,
 }));
+vi.mock('@/services/UnifiedStorageService', () => ({ unifiedStorage: {
+  isConfigured: () => true, activeProvider: { name: 'supabase', id: 'supabase', saveDiagram: saveReadinessMocks.save },
+} }));
+vi.mock('@/data/DataRegistry', () => ({ dataRegistry: { initialize: async () => undefined, getDataService: () => ({ getDiagram: saveReadinessMocks.getDiagram }) } }));
 
 vi.mock('@vizly/core/antd', () => ({
   appMessage: appMessageMocks,
+}));
+
+vi.mock('@vizly/core/export', async importOriginal => ({
+  ...await importOriginal<typeof import('@vizly/core/export')>(),
+  tryAttachDiagramSnapshot: async (diagram: unknown) => ({ diagram }),
 }));
 
 import ExportTools from '../ExportTools';
 
 describe('ExportTools keyboard menu', () => {
   beforeEach(() => {
+    saveReadinessMocks.getBridge.mockReset().mockReturnValue(null);
+    saveReadinessMocks.save.mockReset();
+    saveReadinessMocks.getDiagram.mockReset();
     exportToPNG.mockClear();
     exportToPNG.mockResolvedValue(undefined);
     appMessageMocks.error.mockClear();
@@ -123,6 +136,35 @@ describe('ExportTools keyboard menu', () => {
         dispatchEvent: vi.fn(),
       })),
     });
+  });
+  it('blocks cloud export fallback while the active designer has not loaded', async () => {
+    saveReadinessMocks.getBridge.mockReturnValue({ nodes: [], isCanvasReady: () => false });
+    render(<ExportTools diagramId="diagram-1" diagramName="Diagram" showControls={false} variant="compact" />);
+    fireEvent.click(screen.getByRole('button', { name: '导出' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: '保存到云端' }));
+    await waitFor(() => expect(appMessageMocks.error).toHaveBeenCalled());
+    expect(saveReadinessMocks.save).not.toHaveBeenCalled();
+    expect(saveReadinessMocks.getDiagram).not.toHaveBeenCalled();
+    expect(appMessageMocks.success).not.toHaveBeenCalled();
+  });
+
+  it('notifies identity subscribers after saving the active bridge', async () => {
+    const bridge = { id: 'diagram-1', metadata: {}, isCanvasReady: () => true };
+    saveReadinessMocks.getBridge.mockReturnValue(bridge);
+    saveReadinessMocks.getDiagram.mockReturnValue({ id: 'diagram-1', name: 'Diagram', nodes: [{ id: 'node-1' }], edges: [] });
+    saveReadinessMocks.save.mockResolvedValue({ id: '12345678-1234-1234-1234-123456789abc', updated_at: '2026-10-14T01:00:00.000Z' });
+    const notified = vi.fn();
+    window.addEventListener('vizly:flow-data-bridge-identity', notified);
+    try {
+      render(<ExportTools diagramId="diagram-1" diagramName="Diagram" showControls={false} variant="compact" />);
+      fireEvent.click(screen.getByRole('button', { name: '导出' }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: '保存到云端' }));
+      await waitFor(() => expect(appMessageMocks.success).toHaveBeenCalled());
+      expect(notified).toHaveBeenCalledTimes(1);
+      expect(bridge.metadata).toMatchObject({ cloud: { provider: 'supabase', id: '12345678-1234-1234-1234-123456789abc' } });
+    } finally {
+      window.removeEventListener('vizly:flow-data-bridge-identity', notified);
+    }
   });
 
   it('keeps the export menu visually isolated and clear of the mobile dock', () => {

@@ -16,6 +16,49 @@ export interface VizlyPoint {
   y: number;
 }
 
+export type VizlyEdgeAnchorSide = 'top' | 'right' | 'bottom' | 'left';
+
+export type VizlyEdgeMarkerKind =
+  | 'arrow'
+  | 'openArrow'
+  | 'hollowArrow'
+  | 'diamond'
+  | 'hollowDiamond'
+  | 'circle'
+  | 'crowsFootOne'
+  | 'crowsFootMany'
+  | 'crowsFootZeroOrOne'
+  | 'crowsFootOneOrMany'
+  | 'crowsFootZeroOrMany'
+  | 'defaultFlowSlash'
+  | 'none';
+
+export interface VizlyEdgeAnchorContract {
+  side?: VizlyEdgeAnchorSide;
+  /** Normalized perimeter ratio along the side in [0, 1] (0.5 = center). */
+  ratio?: number;
+  pinned?: boolean;
+}
+
+export interface VizlyEdgeLabelsContract {
+  center?: string;
+  source?: string;
+  target?: string;
+  stereotype?: string;
+  labelPosition?: VizlyPoint;
+  labelOffset?: VizlyPoint;
+}
+
+export interface VizlyEdgeConnectorData {
+  waypoints?: VizlyPoint[];
+  sourceAnchor?: VizlyEdgeAnchorContract;
+  targetAnchor?: VizlyEdgeAnchorContract;
+  labels?: VizlyEdgeLabelsContract;
+  markerStart?: VizlyEdgeMarkerKind;
+  markerEnd?: VizlyEdgeMarkerKind;
+  routingLineHops?: string;
+}
+
 export interface VizlyDocumentNode {
   id: string;
   type?: string;

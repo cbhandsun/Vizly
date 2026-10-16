@@ -74,6 +74,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         }
     };
 
+    const changeAuthenticationMethod = (key: string) => {
+        if (operation.busy || (key !== 'password' && key !== 'magiclink' && key !== 'register')) return;
+        operation.clearError();
+        clearActiveFormValidation();
+        setActiveTab(key);
+    };
+
     useLayoutEffect(() => {
         if (!open) invalidateOperation();
     }, [invalidateOperation, open]);
@@ -202,7 +209,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     size="large"
                     loading={operation.busy}
                     disabled={operation.busy}
-                    icon={<UserOutlined />}
+                    aria-label={t('auth.modal.loginButton')}
+                    icon={<UserOutlined aria-hidden="true" />}
                 >
                     {t('auth.modal.loginButton')}
                 </Button>
@@ -215,10 +223,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         size="small"
                         className="auth-modal__switch-action"
                         disabled={operation.busy}
-                        onClick={() => {
-                            operation.clearError();
-                            setActiveTab('register');
-                        }}
+                        onClick={() => changeAuthenticationMethod('register')}
                     >
                         {t('auth.modal.registerNow')}
                     </Button>
@@ -279,7 +284,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     size="large"
                     loading={operation.busy}
                     disabled={operation.busy}
-                    icon={<KeyOutlined />}
+                    aria-label={t('auth.modal.sendMagicLink')}
+                    icon={<KeyOutlined aria-hidden="true" />}
                 >
                     {t('auth.modal.sendMagicLink')}
                 </Button>
@@ -362,6 +368,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     size="large"
                     loading={operation.busy}
                     disabled={operation.busy}
+                    aria-label={t('auth.modal.register.button')}
                 >
                     {t('auth.modal.register.button')}
                 </Button>
@@ -374,10 +381,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         size="small"
                         className="auth-modal__switch-action"
                         disabled={operation.busy}
-                        onClick={() => {
-                            operation.clearError();
-                            setActiveTab('password');
-                        }}
+                        onClick={() => changeAuthenticationMethod('password')}
                     >
                         {t('auth.modal.backToLogin')}
                     </Button>
@@ -409,12 +413,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         >
             <Tabs
                 activeKey={activeTab}
-                onChange={(k) => {
-                    if (operation.busy) return;
-                    operation.clearError();
-                    clearActiveFormValidation();
-                    setActiveTab(k as TabKey);
-                }}
+                destroyOnHidden
+                onChange={changeAuthenticationMethod}
                 items={tabItems.map((item) => ({ ...item, disabled: operation.busy }))}
                 centered
             />

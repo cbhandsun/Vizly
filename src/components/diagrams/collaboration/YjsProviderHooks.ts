@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef, useSyncExternalStore } from 'react';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import { Node, Edge, useReactFlow } from '@xyflow/react';
@@ -7,7 +7,17 @@ import {
     normalizeCollaborationServerUrl,
     normalizeCollaborationToken,
 } from './collaborationSecurity';
-import { logUiStorageReadFailure, logUiStorageWriteFailure } from '@vizly/core/logging';
+import { logUiStorageReadFailure, logUiStorageWriteFailure, safeLog } from '@vizly/core/logging';
+import { areCollaborationElementsEqual, parseCollaborationSnapshot } from './collaborationSnapshot';
+import { createLocalCollaborationSnapshotCache } from './localCollaborationSnapshotCache';
+import { publishCollaborationElement, readCollaborationElement } from '../../../../server/collaboration/documentModel';
+import { createCollaborationConnectionState } from './collaborationConnectionState';
+import { COLLABORATION_ACCESS_MESSAGE, readCollaborationAccess } from './collaborationAccessProtocol';
+import { createCollaborationAwareness } from './collaborationAwareness';
+import { resolveAuthenticatedCollaboratorIdentity } from './collaborationDisplayIdentity';
+import { createCollaborationSocket } from './collaborationSocket';
+import { COORDINATION_STATUS_MESSAGE, readCoordinationProblem } from '../../../../server/collaboration/coordinationStatus';
+import { CLOUD_REVISION_MESSAGE, hasAcceptedCloudState, readAcceptedCloudRevision, type AcceptedCloudRevision } from '../../../../server/collaboration/cloudRevisionProtocol';
 
 export const STORAGE_KEY_NAME = 'vizly_collaborator_name';
 export const STORAGE_KEY_COLOR = 'vizly_collaborator_color';
@@ -76,66 +86,82 @@ export const persistCollaboratorIdentity = (identity: CollaboratorIdentity): voi
     }
 };
 
-// Lightweight, performant strict equality check designed specifically for React Flow elements
-const isElementEqual = (a: Node | Edge, b: Node | Edge): boolean => {
-    if (a === b) return true;
-    if (!a || !b) return false;
-    if (a.id !== b.id || a.type !== b.type || a.selected !== b.selected || a.hidden !== b.hidden) return false;
-    
-    // Compare positions if they exist (Nodes)
-    if ('position' in a && 'position' in b) {
-        if (a.position.x !== b.position.x || a.position.y !== b.position.y) return false;
-    }
-
-    // Compare measured dimensions if they exist
-    if ('measured' in a && 'measured' in b && a.measured && b.measured) {
-         if (a.measured.width !== b.measured.width || a.measured.height !== b.measured.height) return false;
-    }
-    
-    // Compare source/target properties if they exist (Edges)
-    if ('source' in a || 'source' in b) {
-        if (!('source' in a) || !('source' in b)) return false;
-        if (a.source !== b.source || a.target !== b.target) return false;
-        if (a.sourceHandle !== b.sourceHandle || a.targetHandle !== b.targetHandle) return false;
-    }
-
-    // Fast check for data payload changes
-    // Using simple reference check first, then shallow/key-level comparison for top level
-    if (a.data !== b.data) {
-        if (!a.data || !b.data) return false;
-        const keysA = Object.keys(a.data);
-        const keysB = Object.keys(b.data);
-        if (keysA.length !== keysB.length) return false;
-        for (let i = 0; i < keysA.length; i++) {
-            const key = keysA[i];
-            // Since data objects can be deep, we do a basic identity check or stringify just the sub-value if it's an object,
-            // but typical payload props are primitives. For perfect safety, stringify strictly the data payload if mismatched.
-            if (typeof a.data[key] === 'object' && a.data[key] !== null) {
-                if (JSON.stringify(a.data[key]) !== JSON.stringify(b.data[key])) return false;
-            } else if (a.data[key] !== b.data[key]) {
-                return false;
-            }
-        }
-    }
-    
-    return true;
-};
-
 export interface YjsCollaborationOptions {
+    userId?: string;
     roomName: string;
     serverUrl: string;
     token?: string;
     enabled?: boolean;
+    onRemoteSnapshot?: (snapshot: { nodes: Node[]; edges: Edge[] }, cloudRevision?: string) => boolean;
+    isLocalSnapshotReady?: () => boolean;
 }
 
 export function useYjsCollaboration(options: YjsCollaborationOptions) {
-    const { roomName, serverUrl, token, enabled = true } = options;
+    const { roomName, serverUrl, token, userId, enabled = true, onRemoteSnapshot, isLocalSnapshotReady } = options;
     const reactFlowInstance = useReactFlow();
     
-    const [synced, setSynced] = useState(false);
-    const [activeUsers, setActiveUsers] = useState<ActiveCollaborator[]>([]);
-    const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
-    const [localUser] = useState<CollaboratorIdentity>(() => {
+    const [connectionState] = useState(createCollaborationConnectionState);
+    const { synced, activeUsers, wsStatus, provider, accessRole, coordinationProblem } = useSyncExternalStore(
+        connectionState.subscribe, connectionState.getSnapshot, connectionState.getSnapshot,
+    );
+    const [connectionAttempt, setConnectionAttempt] = useState(0);
+    const retryCollaboration = useCallback(() => setConnectionAttempt(attempt => attempt + 1), []);
+    const connectionRef = useRef<{
+        doc: Y.Doc;
+        yNodes: Y.Map<unknown>;
+        yEdges: Y.Map<unknown>;
+        hasSynced: boolean;
+    } | null>(null);
+    const reactFlowRef = useRef(reactFlowInstance);
+    const remoteSnapshotHandlerRef = useRef(onRemoteSnapshot);
+    const localSnapshotReadinessRef = useRef(isLocalSnapshotReady);
+    const pendingRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const remoteCommitFailureReportedRef = useRef(false);
+    const pendingRemoteSnapshotRef = useRef<{
+        doc: Y.Doc;
+        snapshot: { nodes: Node[]; edges: Edge[] };
+        cloudRevision?: string;
+    } | null>(null);
+    useEffect(() => {
+        reactFlowRef.current = reactFlowInstance;
+    }, [reactFlowInstance]);
+    useEffect(() => {
+        remoteSnapshotHandlerRef.current = onRemoteSnapshot;
+    }, [onRemoteSnapshot]);
+    useEffect(() => { localSnapshotReadinessRef.current = isLocalSnapshotReady; }, [isLocalSnapshotReady]);
+
+    const flushPendingRemoteSnapshot = useCallback(() => {
+        const pending = pendingRemoteSnapshotRef.current;
+        if (!pending || connectionRef.current?.doc !== pending.doc || connectionState.getSnapshot().coordinationProblem) return false;
+        try {
+            const handler = remoteSnapshotHandlerRef.current;
+            if (handler) {
+                const committed = pending.cloudRevision === undefined
+                    ? handler(pending.snapshot) : handler(pending.snapshot, pending.cloudRevision);
+                if (!committed) return false;
+            } else {
+                reactFlowRef.current.setNodes(pending.snapshot.nodes);
+                reactFlowRef.current.setEdges(pending.snapshot.edges);
+            }
+            pendingRemoteSnapshotRef.current = null;
+            remoteCommitFailureReportedRef.current = false;
+            return true;
+        } catch {
+            if (!remoteCommitFailureReportedRef.current) {
+                safeLog.warn('[Collaboration] Remote canvas commit failed; pending snapshot retained.');
+                remoteCommitFailureReportedRef.current = true;
+            }
+            return false;
+        }
+    }, [connectionState]);
+    const retryPendingRemoteSnapshot = useCallback(function retry(): void {
+        if (pendingRetryTimerRef.current !== null) clearTimeout(pendingRetryTimerRef.current);
+        pendingRetryTimerRef.current = null;
+        if (!flushPendingRemoteSnapshot() && pendingRemoteSnapshotRef.current) {
+            pendingRetryTimerRef.current = setTimeout(retry, 100);
+        }
+    }, [flushPendingRemoteSnapshot]);
+    const [storedLocalUser] = useState<CollaboratorIdentity>(() => {
         const storedIdentity = readStoredCollaboratorIdentity();
         if (storedIdentity) return storedIdentity;
 
@@ -143,156 +169,216 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         persistCollaboratorIdentity(nextIdentity);
         return nextIdentity;
     });
+    const localUser = useMemo(() => resolveAuthenticatedCollaboratorIdentity(userId) ?? storedLocalUser,
+        [userId, storedLocalUser]);
 
-    // GAP-02: Collaboration Optimization. Track references instead of stringifying everything
+    // Capture owned JSON values so a later caller mutation cannot change the baseline.
     const lastSyncedNodesRef = useRef<Map<string, Node>>(new Map());
+    const localSnapshotCache = useMemo(() => createLocalCollaborationSnapshotCache(), []);
     const lastSyncedEdgesRef = useRef<Map<string, Edge>>(new Map());
 
-    const { doc, provider, yNodes, yEdges } = useMemo(() => {
+    useEffect(() => {
+        connectionState.update({ synced: false, canWrite: false, accessRole: null, activeUsers: [], wsStatus: 'disconnected', provider: null, coordinationProblem: null });
+        lastSyncedNodesRef.current.clear();
+        localSnapshotCache.clear();
+        lastSyncedEdgesRef.current.clear();
+        pendingRemoteSnapshotRef.current = null;
+        remoteCommitFailureReportedRef.current = false;
+        if (pendingRetryTimerRef.current !== null) clearTimeout(pendingRetryTimerRef.current);
+        pendingRetryTimerRef.current = null;
         const safeServerUrl = normalizeCollaborationServerUrl(serverUrl);
-        if (!enabled || !safeServerUrl) return { doc: null, provider: null, yNodes: null, yEdges: null };
+        if (!enabled || !safeServerUrl) return;
         
         const ydoc = new Y.Doc();
+        const awareness = createCollaborationAwareness(ydoc);
         const safeToken = normalizeCollaborationToken(token);
         const safeRoomName = normalizeCollaborationRoomName(roomName);
         const wsParams = safeToken ? { params: { token: safeToken } } : {};
         
-        const yProvider = new WebsocketProvider(safeServerUrl, safeRoomName, ydoc, {
-            connect: true,
-            ...wsParams
-        });
+        let provider: WebsocketProvider;
+        try {
+            provider = new WebsocketProvider(safeServerUrl, safeRoomName, ydoc, {
+                connect: true,
+                disableBc: true,
+                awareness,
+                WebSocketPolyfill: createCollaborationSocket(),
+                ...wsParams
+            });
+        } catch (error: unknown) {
+            ydoc.destroy();
+            throw error;
+        }
             
-        const nodesMap = ydoc.getMap<Node>('flowchart-nodes');
-        const edgesMap = ydoc.getMap<Edge>('flowchart-edges');
+        const yNodes = ydoc.getMap<unknown>('flowchart-nodes');
+        const yEdges = ydoc.getMap<unknown>('flowchart-edges');
+        connectionRef.current = { doc: ydoc, yNodes, yEdges, hasSynced: false };
+        connectionState.update({ provider, wsStatus: 'connecting' });
 
-        yProvider.awareness.setLocalStateField('user', {
+        provider.awareness.setLocalStateField('user', {
             name: localUser.name,
             color: localUser.color
         });
 
-        return { doc: ydoc, provider: yProvider, yNodes: nodesMap, yEdges: edgesMap };
-    }, [roomName, serverUrl, token, enabled, localUser]);
-
-    useEffect(() => {
-        if (!provider || !yNodes || !yEdges) return;
-
-        const handleSync = (isSynced: boolean) => setSynced(isSynced);
+        const isCurrentConnection = () => connectionRef.current?.doc === ydoc;
+        let acceptedCloudRevision: AcceptedCloudRevision | null = null;
+        const applyRemoteSnapshot = () => {
+            if (!isCurrentConnection() || connectionState.getSnapshot().coordinationProblem) return;
+            const snapshot = parseCollaborationSnapshot(yNodes.entries(), yEdges.entries(), readCollaborationElement);
+            if (!snapshot) {
+                safeLog.warn('[Collaboration] Rejected invalid remote canvas snapshot.');
+                return;
+            }
+            pendingRemoteSnapshotRef.current = { doc: ydoc, snapshot,
+                cloudRevision: acceptedCloudRevision && hasAcceptedCloudState(ydoc, acceptedCloudRevision)
+                    ? acceptedCloudRevision.revision : undefined };
+            retryPendingRemoteSnapshot();
+        };
+        provider.messageHandlers[CLOUD_REVISION_MESSAGE] = (_encoder, decoder, _provider, emitSynced) => {
+            if (!emitSynced || !isCurrentConnection() || connectionState.getSnapshot().coordinationProblem) return;
+            const accepted = readAcceptedCloudRevision(decoder);
+            if (!accepted || !hasAcceptedCloudState(ydoc, accepted)) return;
+            acceptedCloudRevision = accepted;
+            applyRemoteSnapshot();
+        };
+        provider.messageHandlers[COLLABORATION_ACCESS_MESSAGE] = (_encoder, decoder, _provider, emitSynced) => {
+            // Access claims are accepted only from the server transport, never BroadcastChannel peers.
+            if (!emitSynced || !isCurrentConnection() || connectionState.getSnapshot().coordinationProblem) return;
+            const access = readCollaborationAccess(decoder);
+            connectionState.update({ canWrite: access === 'editor', accessRole: access ?? 'viewer' });
+        };
+        provider.messageHandlers[COORDINATION_STATUS_MESSAGE] = (_encoder, decoder, _provider, emitSynced) => {
+            if (!emitSynced || !isCurrentConnection()) return;
+            const problem = readCoordinationProblem(decoder);
+            if (!problem) return;
+            // Preserve the current canvas/document, but stop automatic retries
+            // and publication until the user explicitly chooses recovery.
+            provider.shouldConnect = false;
+            pendingRemoteSnapshotRef.current = null;
+            if (pendingRetryTimerRef.current !== null) clearTimeout(pendingRetryTimerRef.current);
+            pendingRetryTimerRef.current = null;
+            connectionState.update({ coordinationProblem: problem, canWrite: false, synced: false, wsStatus: 'disconnected' });
+        };
+        const handleSync = (isSynced: boolean) => {
+            if (!isCurrentConnection() || connectionState.getSnapshot().coordinationProblem) return;
+            if (isSynced && connectionRef.current) connectionRef.current.hasSynced = true;
+            // A document with deletion history is authoritative even when its
+            // maps are empty. An untouched new room can still be seeded locally.
+            if (isSynced && Y.decodeStateVector(Y.encodeStateVector(ydoc)).size > 0) applyRemoteSnapshot();
+            connectionState.update({ synced: isSynced });
+        };
         provider.on('sync', handleSync);
 
         const handleStatus = (event: { status: 'connecting' | 'connected' | 'disconnected' }) => {
-            setWsStatus(event.status);
+            if (isCurrentConnection() && connectionState.getSnapshot().coordinationProblem) {
+                connectionState.update({ wsStatus: 'disconnected', canWrite: false, synced: false });
+                return;
+            }
+            if (isCurrentConnection()) connectionState.update(event.status === 'connected'
+                ? { wsStatus: event.status }
+                : { wsStatus: event.status, canWrite: false, synced: false });
         };
         provider.on('status', handleStatus);
 
         const handleAwarenessChange = () => {
+            if (!isCurrentConnection()) return;
             const states = Array.from(provider.awareness.getStates().entries());
-            setActiveUsers(states.map(([clientId, state]) => ({
+            connectionState.update({ activeUsers: states.map(([clientId, state]) => ({
                 clientId,
                 isLocal: clientId === provider.awareness.clientID,
                 user: parseCollaboratorIdentity(state.user),
-            })));
+            })) });
         };
         provider.awareness.on('change', handleAwarenessChange);
+        // The local identity was set before subscribing; publish that initial state too.
+        handleAwarenessChange();
 
-        const handleRemoteNodeChange = (event: Y.YMapEvent<Node>) => {
-            if (event.transaction.local) return;
-            reactFlowInstance.setNodes(currentNodes => {
-                const nextNodes = [...currentNodes];
-                event.changes.keys.forEach((change, key) => {
-                    if (change.action === 'add' || change.action === 'update') {
-                        const newElement = yNodes.get(key);
-                        if (!newElement) return;
-                        const idx = nextNodes.findIndex(n => n.id === key);
-                        if (idx > -1) nextNodes[idx] = newElement;
-                        else nextNodes.push(newElement);
-                    } else if (change.action === 'delete') {
-                        const idx = nextNodes.findIndex(n => n.id === key);
-                        if (idx > -1) nextNodes.splice(idx, 1);
-                    }
-                });
-                return nextNodes;
-            });
+        const processedRemoteTransactions = new WeakSet<Y.Transaction>();
+        const handleRemoteElementChange = (_events: unknown, transaction: Y.Transaction) => {
+            if (!transaction.local && !processedRemoteTransactions.has(transaction)) {
+                processedRemoteTransactions.add(transaction);
+                applyRemoteSnapshot();
+            }
         };
 
-        const handleRemoteEdgeChange = (event: Y.YMapEvent<Edge>) => {
-            if (event.transaction.local) return;
-            reactFlowInstance.setEdges(currentEdges => {
-                const nextEdges = [...currentEdges];
-                event.changes.keys.forEach((change, key) => {
-                    if (change.action === 'add' || change.action === 'update') {
-                        const newElement = yEdges.get(key);
-                        if (!newElement) return;
-                        const idx = nextEdges.findIndex(e => e.id === key);
-                        if (idx > -1) nextEdges[idx] = newElement;
-                        else nextEdges.push(newElement);
-                    } else if (change.action === 'delete') {
-                        const idx = nextEdges.findIndex(e => e.id === key);
-                        if (idx > -1) nextEdges.splice(idx, 1);
-                    }
-                });
-                return nextEdges;
-            });
-        };
-
-        yNodes.observe(handleRemoteNodeChange);
-        yEdges.observe(handleRemoteEdgeChange);
+        yNodes.observeDeep(handleRemoteElementChange);
+        yEdges.observeDeep(handleRemoteElementChange);
 
         return () => {
             provider.off('sync', handleSync);
             provider.off('status', handleStatus);
             provider.awareness.off('change', handleAwarenessChange);
-            yNodes.unobserve(handleRemoteNodeChange);
-            yEdges.unobserve(handleRemoteEdgeChange);
+            yNodes.unobserveDeep(handleRemoteElementChange);
+            yEdges.unobserveDeep(handleRemoteElementChange);
+            connectionRef.current = null;
+            pendingRemoteSnapshotRef.current = null;
+            if (pendingRetryTimerRef.current !== null) clearTimeout(pendingRetryTimerRef.current);
+            pendingRetryTimerRef.current = null;
             provider.destroy();
-            doc?.destroy();
+            ydoc.destroy();
         };
-    }, [provider, yNodes, yEdges, reactFlowInstance, doc]);
+    }, [roomName, serverUrl, token, enabled, localUser, connectionState, retryPendingRemoteSnapshot, connectionAttempt, localSnapshotCache]);
 
     const pushLocalChangesToYjs = (nodes: Node[], edges: Edge[]) => {
-        if (!doc || !yNodes || !yEdges || !enabled) return;
+        const connection = connectionRef.current;
+        if (!connection || !enabled) return;
+        const { doc, yNodes, yEdges } = connection;
+        if (pendingRemoteSnapshotRef.current?.doc === doc) {
+            // A newly mounted canvas can still contain its pre-sync local state.
+            // Commit the pending remote document before publishing any local state.
+            flushPendingRemoteSnapshot();
+            queueMicrotask(() => flushPendingRemoteSnapshot());
+            return;
+        }
+        const access = connectionState.getSnapshot();
+        // Yjs retains these operations across a transport reconnect. The server
+        // reauthorizes every update; a prior editor claim never grants server access.
+        const retainOfflineEdit = connection.hasSynced && access.accessRole === 'editor'
+            && access.wsStatus !== 'connected' && !access.coordinationProblem;
+        if ((!access.synced || !access.canWrite) && !retainOfflineEdit) return;
+        try {
+            if (localSnapshotReadinessRef.current && !localSnapshotReadinessRef.current()) return;
+        } catch {
+            safeLog.warn('[Collaboration] Canvas readiness check failed; local publication blocked.');
+            return;
+        }
         
+        const snapshot = localSnapshotCache.parse(nodes, edges);
+        if (!snapshot) {
+            safeLog.warn('[Collaboration] Invalid local snapshot; publication blocked.');
+            return;
+        }
         doc.transact(() => {
             // 1. Process Nodes
-            const currentYNodeKeys = new Set(yNodes.keys());
+            const removedLocalNodeKeys = new Set(lastSyncedNodesRef.current.keys());
             const newNodesCache = new Map<string, Node>();
             
-            nodes.forEach(n => {
+            snapshot.nodes.forEach(n => {
                 newNodesCache.set(n.id, n);
-                currentYNodeKeys.delete(n.id); // Mark as kept
+                removedLocalNodeKeys.delete(n.id); // Only delete elements previously seen locally.
                 
-                // O(1) reference check. Only deep dive if reference changed
                 const lastSynced = lastSyncedNodesRef.current.get(n.id);
-                if (lastSynced !== n) {
-                    const existing = yNodes.get(n.id);
-                    // Use fast performant diff instead of JSON.stringify which hangs UI during dense drags
-                    if (!existing || !isElementEqual(existing, n)) {
-                        yNodes.set(n.id, n);
-                    }
+                if (!lastSynced || !areCollaborationElementsEqual(n, lastSynced)) {
+                    publishCollaborationElement(yNodes, n.id, n, lastSynced);
                 }
             });
             // Delete removed nodes
-            currentYNodeKeys.forEach(k => yNodes.delete(k));
+            removedLocalNodeKeys.forEach(k => yNodes.delete(k));
             lastSyncedNodesRef.current = newNodesCache; // Update cache
 
             // 2. Process Edges
-            const currentYEdgeKeys = new Set(yEdges.keys());
+            const removedLocalEdgeKeys = new Set(lastSyncedEdgesRef.current.keys());
             const newEdgesCache = new Map<string, Edge>();
             
-            edges.forEach(e => {
+            snapshot.edges.forEach(e => {
                 newEdgesCache.set(e.id, e);
-                currentYEdgeKeys.delete(e.id);
+                removedLocalEdgeKeys.delete(e.id);
                 
-                // O(1) reference check.
                 const lastSynced = lastSyncedEdgesRef.current.get(e.id);
-                if (lastSynced !== e) {
-                    const existing = yEdges.get(e.id);
-                    // Fast performant edge diff
-                    if (!existing || !isElementEqual(existing, e)) {
-                        yEdges.set(e.id, e);
-                    }
+                if (!lastSynced || !areCollaborationElementsEqual(e, lastSynced)) {
+                    publishCollaborationElement(yEdges, e.id, e, lastSynced);
                 }
             });
-            currentYEdgeKeys.forEach(k => yEdges.delete(k));
+            removedLocalEdgeKeys.forEach(k => yEdges.delete(k));
             lastSyncedEdgesRef.current = newEdgesCache; // Update cache
         });
     };
@@ -300,8 +386,11 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
     return {
         isSynced: synced,
         provider,
+        accessRole,
         activeUsers,
         wsStatus,
+        coordinationProblem,
+        retryCollaboration,
         pushLocalChangesToYjs,
     };
 }

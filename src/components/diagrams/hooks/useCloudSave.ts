@@ -9,6 +9,11 @@ import { logCloudSaveFailure } from './diagramStorageLogging';
 import { showCloudSaveConfigurationRecovery } from './cloudSaveRecovery';
 import { useAuth } from '@/context/useAuth';
 import type { DiagramEnsureSavedResult, DiagramSaveResult } from '@vizly/core/types';
+import { readSavedDiagramId } from '@/services/cloudSaveIdentity';
+import { isDesignerSaveReady } from '@/services/designerSaveReadiness';
+import { assertCloudSaveViewCurrent, captureCloudSaveVersion, CloudSaveVersionError, readSavedCloudRevision } from '@/services/cloudSaveVersion';
+import { S3ConditionalWriteConflictError, S3ObjectRevisionError } from '@/services/s3ObjectRevision';
+import { VersionPreviewPersistenceError, withVersionPreviewPersistence } from '../collaboration/versionPreviewSession';
 
 const loadUnifiedStorage = async () => (await import('@/services/UnifiedStorageService')).unifiedStorage;
 
@@ -64,6 +69,7 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
     const performCloudSave = useCallback(async () => {
         let hideLoading: (() => void) | undefined;
         try {
+            return await withVersionPreviewPersistence(diagramId, async assertCurrent => {
             const unifiedStorage = await loadUnifiedStorage();
             if (!unifiedStorage.isConfigured()) {
                 throw new CloudSaveBoundaryError('云存储未配置，请先在设置中配置');
@@ -72,13 +78,17 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
 
             // 从桥接数据中读取（FlowchartDesigner 的 useEffect 会持续更新此数据）
             const bridge = getFlowDataBridge(diagramId);
-            if (!bridge || !bridge.nodes || bridge.nodes.length === 0) {
+            if (!bridge || !Array.isArray(bridge.nodes)) {
                 throw new CloudSaveBoundaryError('未找到图表数据');
+            }
+            if (!isDesignerSaveReady(bridge)) {
+                throw new CloudSaveBoundaryError('图表尚未加载完成，请等待或重试后保存');
             }
 
             hideLoading = appMessage.loading('正在保存到云端...', 0);
 
             const bridgeCloud = bridge.metadata?.cloud;
+            const capturedId = bridge.id;
             const cloudProvider = bridgeCloud?.provider;
             const normalizedCloud: NonNullable<StandardDiagramData['metadata']>['cloud'] = (
                 cloudProvider === provider.id
@@ -90,6 +100,7 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
                 id: bridgeCloud.id,
                 title: typeof bridgeCloud.title === 'string' ? bridgeCloud.title : undefined,
                 openedAt: typeof bridgeCloud.openedAt === 'string' ? bridgeCloud.openedAt : undefined,
+                revision: bridgeCloud.revision,
             } : undefined;
 
             const diagram = coerceToStandardDiagramData({
@@ -106,8 +117,6 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
                 title: diagramName || bridge.name || diagramId,
             });
 
-            const snap = await tryAttachDiagramSnapshot(diagram, diagramId);
-
             const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(diagram.id || '');
             const hasForeignCloudIdentity = (
                 (cloudProvider === 'supabase' || cloudProvider === 's3')
@@ -122,29 +131,46 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
                     : diagram.id
             );
             const finalTitle = diagramName || diagram.metadata?.title || diagram.name;
+            const expectedRevision = captureCloudSaveVersion(provider.id, finalId, bridgeCloud);
+            const snap = await tryAttachDiagramSnapshot(diagram, diagramId);
 
-            await provider.saveDiagram({
+            if (!isDesignerSaveReady(bridge)) {
+                throw new CloudSaveBoundaryError('图表尚未加载完成，请等待或重试后保存');
+            }
+            assertCloudSaveViewCurrent(bridge, capturedId, bridgeCloud, expectedRevision);
+            if (getFlowDataBridge(diagramId) !== bridge) throw new CloudSaveVersionError('保存期间图表已关闭或切换，请保留编辑后重试');
+            assertCurrent();
+            const saved = await provider.saveDiagram({
                 id: finalId,
                 title: finalTitle,
                 content: { ...snap.diagram, id: finalId, name: finalTitle },
                 updated_at: new Date().toISOString(),
                 user_id: 'anonymous',
+                expectedRevision,
             });
+            assertCurrent();
 
-            invalidateRemoteDiagramPreview(finalId!);
+            const savedId = readSavedDiagramId(saved);
+            const revision = readSavedCloudRevision(provider.id, saved);
+            invalidateRemoteDiagramPreview(savedId);
 
             // 回写 cloud 信息以便下次更新而非新增
             if (bridge) {
+                assertCloudSaveViewCurrent(bridge, capturedId, bridgeCloud, expectedRevision);
+                if (getFlowDataBridge(diagramId) !== bridge) throw new CloudSaveVersionError('保存期间图表已关闭或切换，请重新打开确认保存结果');
                 bridge.metadata = {
                     ...(bridge.metadata || {}),
-                    cloud: { provider: provider.id, id: finalId, title: finalTitle },
+                    cloud: { provider: provider.id, id: savedId, title: finalTitle, ...(revision ? { revision } : {}) },
                 };
+                window.dispatchEvent(new Event('vizly:flow-data-bridge-identity'));
             }
 
             appMessage.success('已保存到云端');
+            });
         } catch (error) {
-            if (error instanceof CloudSaveBoundaryError) {
-                appMessage.error(error.userMessage);
+            if (error instanceof VersionPreviewPersistenceError || error instanceof CloudSaveBoundaryError || error instanceof CloudSaveVersionError
+                || error instanceof S3ConditionalWriteConflictError || error instanceof S3ObjectRevisionError) {
+                appMessage.error(error instanceof CloudSaveBoundaryError ? error.userMessage : error.message);
             } else {
                 logCloudSaveFailure('useCloudSave', error);
                 appMessage.error('保存到云端失败');

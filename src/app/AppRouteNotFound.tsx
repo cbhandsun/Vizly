@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { ArrowLeft, CircleHelp, House } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import './AppRouteError.css';
 
@@ -20,6 +21,7 @@ const AppRouteNotFound: React.FC<AppRouteNotFoundProps> = ({
   onGoBack = goBack,
   onReturnToProjects = returnToProjects,
 }) => {
+  const { t } = useTranslation();
   const projectsButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -32,10 +34,10 @@ const AppRouteNotFound: React.FC<AppRouteNotFoundProps> = ({
         <div className="app-route-error__icon" aria-hidden="true">
           <CircleHelp />
         </div>
-        <p className="app-route-error__eyebrow">Vizly navigation</p>
-        <h1 id="app-route-not-found-title">This page doesn&apos;t exist</h1>
+        <p className="app-route-error__eyebrow">{t('routeNotFound.eyebrow')}</p>
+        <h1 id="app-route-not-found-title">{t('routeNotFound.title')}</h1>
         <p id="app-route-not-found-description" className="app-route-error__description">
-          The address may be incomplete or no longer available. Return to Projects to choose a diagram safely.
+          {t('routeNotFound.description')}
         </p>
         <div className="app-route-error__actions">
           <button
@@ -45,7 +47,7 @@ const AppRouteNotFound: React.FC<AppRouteNotFoundProps> = ({
             onClick={onReturnToProjects}
           >
             <House aria-hidden="true" />
-            Return to Projects
+            {t('routeNotFound.projects')}
           </button>
           <button
             type="button"
@@ -53,11 +55,11 @@ const AppRouteNotFound: React.FC<AppRouteNotFoundProps> = ({
             onClick={onGoBack}
           >
             <ArrowLeft aria-hidden="true" />
-            Go back
+            {t('routeNotFound.back')}
           </button>
         </div>
         <p className="app-route-error__hint">
-          Your diagrams have not been changed.
+          {t('routeNotFound.hint')}
         </p>
       </section>
     </main>

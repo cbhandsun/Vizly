@@ -234,6 +234,12 @@
     }
   },
   "designer": {
+    "connection": {
+      "keyboardPending": "已选择起点。Tab 移到目标连接点，按 Enter 连接；Esc 取消。",
+      "keyboardInvalid": "无法连接该目标，请选择其他连接点或按 Esc 取消。",
+      "keyboardConnected": "连接已创建。",
+      "keyboardCancelled": "连接已取消。"
+    },
     "title": "图表视图",
     "quickConnect": {
       "title": "快速连接形状选择器",
@@ -337,6 +343,7 @@
     },
     "commandPalette": {
       "open": "打开命令搜索",
+      "loadFailed": "命令搜索未能加载。关闭此窗口可继续编辑。",
       "group": {
         "favorites": "收藏",
         "recent": "最近",
@@ -489,6 +496,9 @@
       }
     },
     "intelligence": {
+      "analyze": "分析图表",
+      "suggest": "布局建议",
+      "generating": "生成中…",
       "optimize": "智能优化",
       "optimizeDesc": "智能全图优化 (解决重叠与对齐)",
       "optimizing": "正在智能优化图表布局...",
@@ -499,7 +509,8 @@
       "more": "更多",
       "moreSettings": "更多设置",
       "renderFailed": "渲染失败",
-      "renderFailedSubtitle": "图表渲染出现异常，请刷新页面或切换到其他图表。"
+      "renderFailedSubtitle": "图表渲染出现异常，可重试或切换到其他图表。未保存的编辑可能需要重新操作。",
+      "retryRender": "重新加载画布"
     },
     "canvas": {
       "initializing": "正在初始化画布…"
@@ -825,6 +836,7 @@
       "annotationDisabled": "批注模式已关闭"
     },
     "initialLoad": {
+      "failed": "图表加载失败，请重试后再编辑或保存。",
       "templateLoaded": "模板加载成功",
       "autosaveRecovered": "已恢复上次编辑内容，请检查后继续"
     },
@@ -1110,6 +1122,10 @@
       "inlineEditorUnderlineShortcut": "下划线（Ctrl+U）",
       "inlineEditorLarger": "增大字号",
       "inlineEditorSmaller": "减小字号",
+      "quickAddShape": "添加并连接…",
+      "quickShapeProcess": "处理步骤",
+      "quickShapeDecision": "判断",
+      "quickShapeTerminator": "开始 / 结束",
       "quickAddOrConnect": "单击快速添加，拖拽创建连线",
       "quickAddDirection": "向{{direction}}快速添加并连接",
       "direction": {
@@ -2117,6 +2133,7 @@
     }
   },
   "edgeToolbar": {
+    "editHint": "双击连线编辑标签；Shift + 双击在连线中插入节点",
     "switchToCurve": "切换至曲线",
     "switchToOrthogonal": "切换至正交",
     "dashStyle": "线型：{{style}}（点击切换）",
@@ -3784,6 +3801,27 @@
     "svgPreviewUnavailable": "暂时无法生成 SVG 预览"
   },
   "collaboration": {
+    "recovery": {
+      "conflictTitle": "云端与当前编辑存在冲突，协作同步已暂停",
+      "unavailableTitle": "暂时无法核对云端版本，协作同步已暂停",
+      "description": "当前画布仍保留。请先另存本地副本，再处理云端版本或重新连接。",
+      "saveCopy": "另存本地副本…",
+      "copyFailed": "无法打开另存副本，请重试。",
+      "retry": "重新连接",
+      "retryTitle": "重新连接协作？",
+      "retryDescription": "重新连接会加载协作版本，可能替换当前画布。请先另存本地副本，保留尚未同步的修改。",
+      "keepEditing": "保留当前画布",
+      "restoreErrors": {
+        "unavailable": "恢复暂时不可用，当前画布和已保存的副本仍保留。",
+        "denied": "只有图表所有者可以恢复协作，请确认当前账号。",
+        "copyFailed": "本地副本未能完整保存，已停止恢复。请检查浏览器存储空间后重试。",
+        "changed": "房间或云端版本已变化，请等待其他成员离开后重试。",
+        "cancelled": "图表或登录会话已变化，恢复已取消。"
+      },
+      "restore": "从云端恢复并重连",
+      "restoreDescription": "仅图表所有者可操作。系统会先将当前画布保存为独立本地副本，并备份服务器上的协作文件，再以已确认的云端版本恢复协作。保存副本失败或版本变化时不会继续。",
+      "restoreTitle": "保留本地副本后恢复云端版本？"
+    },
     "modalTitle": "实时协作（Beta）",
     "inviteLink": "邀请链接",
     "copy": "复制",
@@ -3925,5 +3963,13 @@
     "unknownError": "未知错误",
     "unknownResponse": "未知服务器响应",
     "statusError": "状态码 {{status}}: {{message}}"
+  },
+  "routeNotFound": {
+    "eyebrow": "Vizly 导航",
+    "title": "页面不存在",
+    "description": "地址可能不完整或已失效。请返回工作台选择图表。",
+    "projects": "返回工作台",
+    "back": "返回上一页",
+    "hint": "你的图表没有被修改。"
   }
 }

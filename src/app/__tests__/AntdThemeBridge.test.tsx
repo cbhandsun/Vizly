@@ -1,7 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
+import antdTheme from 'antd/es/theme';
 import type { Theme } from '@vizly/core/theme-runtime';
 import AntdThemeBridge from '../AntdThemeBridge';
 
@@ -108,5 +109,38 @@ describe('AntdThemeBridge', () => {
     expect(document.documentElement.style.getPropertyValue('--color-primary-500')).toBe('#177ddc');
     expect(document.documentElement.style.getPropertyValue('--bg-app')).toBe('#1f1f1f');
     expect(document.documentElement.style.colorScheme).toBe('dark');
+  });
+});
+
+const MotionProbe = () => {
+  const { token } = antdTheme.useToken();
+  return <output data-testid="motion-policy">{String(token.motion)}</output>;
+};
+
+afterEach(() => vi.unstubAllGlobals());
+describe('Ant Design system motion preference', () => {
+  it('disables motion for a reduced-motion preference', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true }));
+    render(<AntdThemeBridge><MotionProbe /></AntdThemeBridge>);
+    expect(screen.getByTestId('motion-policy').textContent).toBe('false');
+  });
+
+  it('updates motion after the preference changes and removes the subscription', () => {
+    let matches = false;
+    const listeners = new Set<() => void>();
+    const media = {
+      get matches() { return matches; },
+      addEventListener: (_event: string, listener: () => void) => listeners.add(listener),
+      removeEventListener: (_event: string, listener: () => void) => listeners.delete(listener),
+    };
+    vi.stubGlobal('matchMedia', () => media);
+    const view = render(<AntdThemeBridge><MotionProbe /></AntdThemeBridge>);
+    expect(screen.getByTestId('motion-policy').textContent).toBe('true');
+    act(() => { matches = true; for (const listener of listeners) listener(); });
+    expect(screen.getByTestId('motion-policy').textContent).toBe('false');
+    act(() => { matches = false; for (const listener of listeners) listener(); });
+    expect(screen.getByTestId('motion-policy').textContent).toBe('true');
+    view.unmount();
+    expect(listeners.size).toBe(0);
   });
 });

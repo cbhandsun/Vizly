@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import AntdApp from 'antd/es/app';
+import { usePrefersReducedMotion } from './usePrefersReducedMotion';
 import ConfigProvider from 'antd/es/config-provider';
 import antdTheme from 'antd/es/theme';
 import { AntdApiBridge } from '@vizly/core/antd';
@@ -123,6 +124,7 @@ const applyCssVariables = (t: BridgeTokens, theme: Theme | null) => {
 };
 
 export const AntdThemeBridge: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const reducedMotion = usePrefersReducedMotion();
   const [tokens, setTokens] = useState<BridgeTokens>(fallbackTokens);
 
   useEffect(() => {
@@ -149,6 +151,7 @@ export const AntdThemeBridge: React.FC<{ children: React.ReactNode }> = ({ child
     return {
       algorithm,
       token: {
+        motion: !reducedMotion,
         fontFamily: tokens.fontFamily,
         colorPrimary: tokens.primary,
         colorInfo: tokens.info,
@@ -174,7 +177,7 @@ export const AntdThemeBridge: React.FC<{ children: React.ReactNode }> = ({ child
         }
       }
     } as const;
-  }, [algorithm, tokens, isDark]);
+  }, [algorithm, tokens, isDark, reducedMotion]);
 
   return (
     <ConfigProvider theme={themeConfig}>

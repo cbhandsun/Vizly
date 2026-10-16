@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Conversation, Message } from '../AIConversationService';
 
-const mockSupabaseState = vi.hoisted(() => ({ value: null as any }));
+const mockSupabaseState = vi.hoisted(() => ({ value: null as { from: ReturnType<typeof vi.fn> } | null }));
 const safeLogState = vi.hoisted(() => ({
     debug: vi.fn(),
     info: vi.fn(),
@@ -38,6 +38,21 @@ const importFreshService = async () => {
 };
 
 describe('AIConversationService', () => {
+    it('caches reads, protects owned messages and invalidates on account and storage changes', () => {
+        const service = module.aiConversationService;
+        service.createConversation({ id: 'welcome', role: 'assistant', content: 'hello' });
+        const reads = vi.spyOn(Storage.prototype, 'getItem');
+        const first = service.getConversations();
+        first[0].messages[0].content = 'mutated';
+        expect(service.getConversations()[0].messages[0].content).toBe('hello');
+        expect(reads).not.toHaveBeenCalled();
+        window.dispatchEvent(new StorageEvent('storage', { key: 'AIChatPanel.conversations_anonymous', storageArea: localStorage }));
+        service.getConversations();
+        expect(reads).toHaveBeenCalledOnce();
+        service.setUserId('other-user');
+        expect(service.getConversations()).toEqual([]);
+        expect(reads).toHaveBeenCalledTimes(2);
+    });
     let module: Awaited<ReturnType<typeof importFreshService>>;
 
     beforeEach(async () => {
@@ -239,7 +254,7 @@ describe('AIConversationService', () => {
     });
 
     it('confirms cloud conversation deletion by requiring one deleted row', async () => {
-        const query: any = {
+        const query: Record<string, ReturnType<typeof vi.fn>> = {
             delete: vi.fn(() => query),
             eq: vi.fn(() => query),
             select: vi.fn(() => Promise.resolve({ data: [{ id: 'conv-1' }], error: null })),
@@ -265,7 +280,7 @@ describe('AIConversationService', () => {
     });
 
     it('does not throw or report cloud success when cloud conversation deletion fails', async () => {
-        const query: any = {
+        const query: Record<string, ReturnType<typeof vi.fn>> = {
             delete: vi.fn(() => query),
             eq: vi.fn(() => query),
             select: vi.fn(() => Promise.resolve({ data: [], error: null })),

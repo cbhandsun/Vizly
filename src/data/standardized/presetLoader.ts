@@ -18,8 +18,9 @@ import transportDrivenPresetUrl from './TransportDrivenStandardData.json?url&no-
 import wmsOrderToTaskPresetUrl from './WmsOrderToTaskFlowData.json?url&no-inline';
 import wmsProcessPresetUrl from './WmsProcessFlowStandardData.json?url&no-inline';
 import wmsPresetUrl from './WmsStandardData.json?url&no-inline';
+import catalogUrl from './StandardPresetCatalog.json?url&no-inline';
 
-type PresetLoader = () => Promise<unknown>;
+type PresetLoader = () => Promise<StandardDiagramData>;
 
 const MAX_PRESET_JSON_LENGTH = 1024 * 1024;
 const COMPACT_EDGE_TYPES = ['main', 'dependency', 'data', 'support', 'feedback', 'system', 'exception'] as const;
@@ -154,6 +155,32 @@ const PRESET_LOADERS: Record<StandardPresetKey, PresetLoader> = {
 };
 
 const presetPromises = new Map<StandardPresetKey, Promise<StandardDiagramData>>();
+let catalogPromise: Promise<Record<StandardPresetKey, StandardDiagramData>> | undefined;
+
+export const parseStandardPresetCatalog = (source: unknown): Record<StandardPresetKey, StandardDiagramData> => {
+  if (typeof source !== 'string' || !source || source.length > 2 * MAX_PRESET_JSON_LENGTH) throw new Error('Invalid preset catalog');
+  const parsed: unknown = JSON.parse(source);
+  if (!isRecord(parsed) || parsed.schemaVersion !== 1 || !isRecord(parsed.presets)
+    || Object.keys(parsed).some(key => key !== 'schemaVersion' && key !== 'presets')
+    || Object.keys(parsed.presets).length !== STANDARD_PRESET_KEYS.length
+    || STANDARD_PRESET_KEYS.some(key => !Object.hasOwn(parsed.presets as Record<string, unknown>, key))) throw new Error('Invalid preset catalog');
+  const entries = STANDARD_PRESET_KEYS.map(key => [key, parseStandardPresetModule((parsed.presets as Record<string, unknown>)[key], key)] as const);
+  return Object.fromEntries(entries) as Record<StandardPresetKey, StandardDiagramData>;
+};
+
+/** Only callers displaying the complete catalog request this aggregate asset. */
+export const loadStandardPresetCatalog = (): Promise<Record<StandardPresetKey, StandardDiagramData>> => {
+  catalogPromise ??= (async () => {
+    const response = await fetch(catalogUrl, { credentials: 'same-origin' });
+    if (!response.ok) throw new Error('Preset catalog unavailable');
+    const length = response.headers.get('content-length');
+    if (length !== null && (!/^\d{1,10}$/u.test(length) || Number(length) > 2 * MAX_PRESET_JSON_LENGTH)) throw new Error('Invalid preset catalog length');
+    const catalog = parseStandardPresetCatalog(await response.text());
+    for (const key of STANDARD_PRESET_KEYS) if (!presetPromises.has(key)) presetPromises.set(key, Promise.resolve(catalog[key]));
+    return catalog;
+  })().catch((error: unknown) => { catalogPromise = undefined; throw error; });
+  return catalogPromise;
+};
 
 export const loadStandardPresetById = (id?: string): Promise<StandardDiagramData | null> => {
   const key = resolvePresetKey(id);
@@ -164,9 +191,7 @@ export const loadStandardPresetById = (id?: string): Promise<StandardDiagramData
 
   let cached = presetPromises.get(key);
   if (!cached) {
-    cached = loader().then((moduleValue) => (
-      parseStandardPresetModule(moduleValue, key)
-    )).catch((error) => {
+    cached = loader().catch((error) => {
       presetPromises.delete(key);
       throw error;
     });

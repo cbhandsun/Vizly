@@ -50,7 +50,8 @@ export function useAIChatConversations({
 
     useEffect(() => {
         const changed = presentedConversations.filter(
-            (conversation, index) => conversation !== conversations[index],
+            (conversation, index) => conversation !== conversations[index]
+                && !conversation.messages.some(message => message.isStreaming),
         );
         if (changed.length === 0) return;
         changed.forEach((conversation) => {

@@ -34,7 +34,7 @@ const xmlListResponse = (body = '<ListBucketResult />') => new Response(body, {
 });
 
 const jsonObjectResponse = (body: string, lastModified = 'Thu, 01 Jan 2026 00:00:00 GMT') => new Response(body, {
-    headers: { 'last-modified': lastModified },
+    headers: { 'last-modified': lastModified, etag: '"loaded-fixture-2"' },
     status: 200,
 });
 
@@ -228,6 +228,7 @@ describe('S3StorageProvider', () => {
         const savedContent = saved.content as StandardDiagramData;
 
         expect(saved.title).toBe('Remote Title');
+          expect(saved.expectedRevision).toBe('"loaded-fixture-2"');
         expect(saved.content).toEqual(expect.objectContaining({
             id: 'remote.json',
             name: 'Remote Diagram',
@@ -246,7 +247,7 @@ describe('S3StorageProvider', () => {
         const { s3Storage } = await loadStorageService();
         s3Storage.saveConfig(config);
 
-        await expect(s3Storage.loadDiagram('oversized.json')).rejects.toThrow('Remote diagram JSON is too large');
+        await expect(s3Storage.loadDiagram('oversized.json')).rejects.toThrow('Body exceeds the byte limit.');
     });
 
     it('rejects invalid remote S3 diagram structures', async () => {
@@ -307,7 +308,14 @@ describe('S3StorageProvider', () => {
 
         await s3Storage.testConnection(config, controller.signal);
 
-        expect(fetchMock).toHaveBeenCalledWith(expect.any(URL), expect.objectContaining({ signal: controller.signal }));
+        const requestSignal: unknown = fetchMock.mock.calls[0]?.[1]?.signal;
+        expect(requestSignal).toBeInstanceOf(AbortSignal);
+        if (!(requestSignal instanceof AbortSignal)) throw new Error('Missing request signal');
+        expect(requestSignal.aborted).toBe(false);
+        const reason = new DOMException('Cancelled connection probe', 'AbortError');
+        controller.abort(reason);
+        expect(requestSignal.aborted).toBe(true);
+        expect(requestSignal.reason).toBe(reason);
     });
 
     it('redacts storage bootstrap errors before logging them', async () => {

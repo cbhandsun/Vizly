@@ -1,4 +1,6 @@
 import type { ValidatedS3StorageConfig } from './storageSecurity';
+import { readBoundedBody } from '../../supabase/functions/_shared/boundedBody';
+import { parseS3ObjectRevision, S3ConditionalWriteConflictError, s3WriteConditionHeaders, type S3WriteCondition } from './s3ObjectRevision';
 
 const SERVICE = 's3';
 const TERMINATOR = 'aws4_request';
@@ -13,11 +15,14 @@ export interface S3FetchObjectSummary {
 
 export interface S3FetchListObjectsResult {
   contents: S3FetchObjectSummary[];
+  isTruncated: boolean;
+  nextContinuationToken?: string;
 }
 
 export interface S3FetchGetObjectResult {
   bodyText: string;
   lastModified?: Date;
+  etag?: string;
 }
 
 export type S3FetchLike = typeof fetch;
@@ -137,6 +142,7 @@ const signS3Request = async ({
   method,
   now,
   query,
+  condition,
 }: {
   body?: string;
   config: ValidatedS3StorageConfig;
@@ -145,6 +151,7 @@ const signS3Request = async ({
   method: string;
   now: Date;
   query?: URLSearchParams;
+  condition?: S3WriteCondition;
 }): Promise<SignedS3Request> => {
   const url = buildS3Url(config, key ?? '', query);
   const { amzDate, shortDate } = formatAmzDate(now);
@@ -156,6 +163,9 @@ const signS3Request = async ({
     'x-amz-date': amzDate,
   });
   if (contentType) headers.set('content-type', contentType);
+  if (condition !== undefined) {
+    for (const [name, value] of Object.entries(s3WriteConditionHeaders(condition))) headers.set(name, value);
+  }
 
   const { canonicalHeaders, signedHeaders } = getCanonicalHeaders(headers);
   const canonicalRequest = [
@@ -189,20 +199,6 @@ const signS3Request = async ({
   };
 };
 
-const responseText = async (response: Response): Promise<string> => {
-  try {
-    return await response.text();
-  } catch {
-    return '';
-  }
-};
-
-const assertS3ResponseOk = async (response: Response, operation: string): Promise<void> => {
-  if (response.ok) return;
-  const body = (await responseText(response)).slice(0, 512);
-  throw new Error(`S3 ${operation} failed with HTTP ${response.status}${body ? `: ${body}` : ''}`);
-};
-
 const parseS3Date = (value: string | null): Date | undefined => {
   if (!value) return undefined;
   const date = new Date(value);
@@ -217,7 +213,7 @@ const parseS3Size = (value: string | null): number | undefined => {
 
 const parseListObjectsXml = (xml: string): S3FetchListObjectsResult => {
   const documentNode = new DOMParser().parseFromString(xml, XML_MIME);
-  if (documentNode.querySelector('parsererror')) {
+  if (documentNode.querySelector('parsererror') || documentNode.documentElement.localName !== 'ListBucketResult') {
     throw new Error('S3 list response XML is invalid');
   }
   const contents = [...documentNode.querySelectorAll('Contents')]
@@ -231,21 +227,35 @@ const parseListObjectsXml = (xml: string): S3FetchListObjectsResult => {
       };
     })
     .filter((item): item is S3FetchObjectSummary => item !== null);
-  return { contents };
+  const truncatedValue = documentNode.querySelector('IsTruncated')?.textContent?.trim();
+  if (truncatedValue !== undefined && truncatedValue !== 'true' && truncatedValue !== 'false') {
+    throw new Error('S3 list response has an invalid truncation flag.');
+  }
+  const isTruncated = truncatedValue === 'true';
+  const nextContinuationToken = documentNode.querySelector('NextContinuationToken')?.textContent || undefined;
+  if (isTruncated && (!nextContinuationToken || nextContinuationToken.length > 4096)) {
+    throw new Error('S3 truncated list response is missing a valid continuation token.');
+  }
+  return { contents, isTruncated, nextContinuationToken };
 };
 
 export class S3FetchClient {
   private readonly config: ValidatedS3StorageConfig;
   private readonly fetchImpl: S3FetchLike;
   private readonly now: () => Date;
+  private readonly timeoutMs: number;
 
   constructor(
     config: ValidatedS3StorageConfig,
-    options: { fetchImpl?: S3FetchLike; now?: () => Date } = {},
+    options: { fetchImpl?: S3FetchLike; now?: () => Date; timeoutMs?: number } = {},
   ) {
     this.config = config;
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    this.fetchImpl = options.fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
     this.now = options.now ?? (() => new Date());
+    this.timeoutMs = options.timeoutMs ?? 30_000;
+    if (!Number.isFinite(this.timeoutMs) || this.timeoutMs <= 0 || this.timeoutMs > 120_000) {
+      throw new RangeError('Invalid S3 request timeout.');
+    }
   }
 
   private async request({
@@ -256,6 +266,8 @@ export class S3FetchClient {
     operation,
     query,
     signal,
+    maxBytes = 2 * 1024 * 1024,
+    condition,
   }: {
     body?: string;
     contentType?: string;
@@ -264,61 +276,93 @@ export class S3FetchClient {
     operation: string;
     query?: URLSearchParams;
     signal?: AbortSignal;
-  }): Promise<Response> {
-    const signed = await signS3Request({
-      body,
-      config: this.config,
-      contentType,
-      key,
-      method,
-      now: this.now(),
-      query,
-    });
-    const response = await this.fetchImpl(signed.url, {
-      body: signed.body,
-      headers: signed.headers,
-      method: signed.method,
-      signal,
-    });
-    await assertS3ResponseOk(response, operation);
-    return response;
+    maxBytes?: number;
+    condition?: S3WriteCondition;
+  }): Promise<{ response: Response; bodyText: string }> {
+    const deadline = new AbortController();
+    const combinedSignal = signal ? AbortSignal.any([signal, deadline.signal]) : deadline.signal;
+    const timer = setTimeout(() => deadline.abort(new DOMException('S3 request timed out.', 'TimeoutError')), this.timeoutMs);
+    try {
+      combinedSignal.throwIfAborted();
+      const signed = await signS3Request({
+        body,
+        config: this.config,
+        contentType,
+        key,
+        method,
+        now: this.now(),
+        query,
+        condition,
+      });
+      combinedSignal.throwIfAborted();
+      const response = await this.fetchImpl(signed.url, {
+        body: signed.body,
+        headers: signed.headers,
+        method: signed.method,
+        signal: combinedSignal,
+      });
+      if (!response.ok) {
+        await response.body?.cancel();
+        if (condition && (response.status === 409 || response.status === 412)) {
+          throw new S3ConditionalWriteConflictError(response.status);
+        }
+        // Provider error bodies can contain signed URLs, credentials or user content.
+        throw new Error(`S3 ${operation} failed with HTTP ${response.status}`);
+      }
+      const contentLength = Number(response.headers.get('content-length') ?? '0');
+      if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+        await response.body?.cancel();
+        throw new Error('S3 response exceeds the byte limit.');
+      }
+      const bodyText = await readBoundedBody(response.body, maxBytes, combinedSignal);
+      return { response, bodyText };
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
-  async listObjects(options: { maxKeys?: number; prefix?: string; signal?: AbortSignal } = {}): Promise<S3FetchListObjectsResult> {
+  async listObjects(options: { maxKeys?: number; prefix?: string; continuationToken?: string; signal?: AbortSignal } = {}): Promise<S3FetchListObjectsResult> {
+    if (options.maxKeys !== undefined && (!Number.isSafeInteger(options.maxKeys) || options.maxKeys < 1 || options.maxKeys > 1000)) throw new RangeError('Invalid S3 page size.');
+    if (options.continuationToken !== undefined && (!options.continuationToken || options.continuationToken.length > 4096)) throw new Error('Invalid S3 continuation token.');
     const query = new URLSearchParams({ 'list-type': '2' });
     if (options.prefix) query.set('prefix', options.prefix);
     if (options.maxKeys !== undefined) query.set('max-keys', String(options.maxKeys));
-    const response = await this.request({
+    if (options.continuationToken) query.set('continuation-token', options.continuationToken);
+    const { bodyText } = await this.request({
       method: 'GET',
       operation: 'list objects',
       query,
       signal: options.signal,
+      maxBytes: 8 * 1024 * 1024,
     });
-    return parseListObjectsXml(await response.text());
+    return parseListObjectsXml(bodyText);
   }
 
   async getObject(key: string, signal?: AbortSignal): Promise<S3FetchGetObjectResult> {
-    const response = await this.request({
+    const { response, bodyText } = await this.request({
       key,
       method: 'GET',
       operation: 'get object',
       signal,
     });
     return {
-      bodyText: await response.text(),
+      bodyText,
       lastModified: parseS3Date(response.headers.get('last-modified')),
+      etag: parseS3ObjectRevision(response.headers.get('etag')),
     };
   }
 
-  async putObject(key: string, body: string, contentType: string, signal?: AbortSignal): Promise<void> {
-    await this.request({
+  async putObject(key: string, body: string, contentType: string, signal?: AbortSignal, condition?: S3WriteCondition): Promise<{ etag?: string }> {
+    const { response } = await this.request({
       body,
       contentType,
       key,
       method: 'PUT',
       operation: 'put object',
       signal,
+      condition,
     });
+    return { etag: parseS3ObjectRevision(response.headers.get('etag')) };
   }
 
   async deleteObject(key: string, signal?: AbortSignal): Promise<void> {
@@ -333,7 +377,7 @@ export class S3FetchClient {
 
 export const createS3FetchClient = (
   config: ValidatedS3StorageConfig,
-  options?: { fetchImpl?: S3FetchLike; now?: () => Date },
+  options?: { fetchImpl?: S3FetchLike; now?: () => Date; timeoutMs?: number },
 ): S3FetchClient => new S3FetchClient(config, options);
 
 export const __s3FetchClientTestUtils = {

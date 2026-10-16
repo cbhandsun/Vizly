@@ -1,0 +1,42 @@
+import { expect, test } from '@playwright/test';
+
+test.use({ hasTouch: true });
+
+test('mobile overview retains full edge text and restores label layout through navigation', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => localStorage.setItem('i18nextLng', 'zh'));
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.name));
+  await page.goto('/#/?diagram=wms-process-flow-v1');
+  await expect(page.locator('.react-flow__node[data-id="allocation"]')).toBeAttached();
+  await page.evaluate(() => document.fonts.ready);
+  const labels = page.locator('[data-edge-id][data-edge-label-placement]');
+  await expect(labels).toHaveCount(44);
+  const text = await labels.evaluateAll(elements => Object.fromEntries(elements.map(element => [element.getAttribute('data-edge-id'), element.textContent])));
+  await page.getByRole('button', { name: /^适应(?:\s|\(|$)/ }).tap();
+  await expect.poll(() => page.locator('.react-flow__viewport').evaluate(element => new DOMMatrixReadOnly(getComputedStyle(element).transform).a)).toBeLessThan(0.1);
+  await expect.poll(() => labels.evaluateAll(elements => elements.filter(element => element.getAttribute('data-edge-label-placement') === 'unresolved' && getComputedStyle(element).display !== 'none').length)).toBe(0);
+  expect(await labels.evaluateAll(elements => Object.fromEntries(elements.map(element => [element.getAttribute('data-edge-id'), element.textContent])))).toEqual(text);
+  await testInfo.attach('mobile overview label disclosure', { body: await page.screenshot(), contentType: 'image/png' });
+  await page.getByRole('button', { name: '图层', exact: true }).tap();
+  await page.getByRole('dialog').getByRole('button', { name: '导航', exact: true }).tap();
+  const drawer = page.locator('.side-drawer');
+  await drawer.getByRole('textbox').fill('WCS');
+  await drawer.getByRole('tree').locator('.ant-tree-node-content-wrapper').filter({ hasText: /WCS/ }).last().tap();
+  await expect(page.locator('.react-flow__node[data-id="wcs-integration"].selected')).toHaveCount(1);
+  await drawer.getByRole('button', { name: '关闭', exact: true }).tap();
+  await expect(drawer).not.toBeVisible();
+  await expect.poll(() => page.locator('.react-flow__viewport').evaluate(element => new DOMMatrixReadOnly(getComputedStyle(element).transform).a)).toBeGreaterThanOrEqual(1);
+  await expect(labels).toHaveCount(44);
+  await expect.poll(() => labels.evaluateAll(elements => elements.filter(element => getComputedStyle(element).display === 'none').length)).toBe(0);
+  await expect.poll(() => page.locator('[data-edge-id][data-edge-label-placement="unresolved"]').count()).toBe(0);
+  expect(await labels.evaluateAll(elements => Object.fromEntries(elements.map(element => [element.getAttribute('data-edge-id'), element.textContent])))).toEqual(text);
+  await page.reload();
+  await expect(page.locator('.react-flow__node[data-id="wcs-integration"]')).toBeAttached();
+  await expect(labels).toHaveCount(44);
+  await expect.poll(() => page.locator('[data-edge-id][data-edge-label-placement="unresolved"]').count()).toBe(0);
+  expect(await labels.evaluateAll(elements => Object.fromEntries(elements.map(element => [element.getAttribute('data-edge-id'), element.textContent])))).toEqual(text);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+  expect(errors).toEqual([]);
+  await testInfo.attach('mobile focused edge labels restored', { body: await page.screenshot(), contentType: 'image/png' });
+});

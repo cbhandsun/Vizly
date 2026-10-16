@@ -30,7 +30,7 @@ describe('aiChatConversationState', () => {
         expect(result.updatedMessages).toHaveLength(4);
     });
 
-    it('updates streaming assistant content and extracts partial diagram json', () => {
+    it('updates streaming text without parsing incomplete diagram json', () => {
         const updated = updateAIChatAssistantMessage(
             baseMessages,
             'assistant-1',
@@ -46,8 +46,8 @@ describe('aiChatConversationState', () => {
             content: '```json\n{"nodes":[],"edges":[]}',
             reasoningContent: 'thinking',
             isStreaming: true,
-            hasJson: true,
-            jsonContent: '{"nodes":[],"edges":[]}',
+            hasJson: false,
+            jsonContent: undefined,
         });
     });
 

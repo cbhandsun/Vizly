@@ -1,4 +1,3 @@
-@import '@xyflow/react/dist/style.css';
 /* ReactFlow 样式 */
 
 
@@ -614,13 +613,8 @@ body {
   cursor: pointer;
 }
 
-/* ===== Gap 3: 连接拖拽目标高亮 ===== */
-/* 当 data-connect-highlight="true" 时显示绿色外发光 */
-.react-flow__node[data-connect-highlight="true"] {
-  filter: drop-shadow(0 0 0 3px rgba(16, 185, 129, 0.6)) drop-shadow(0 0 12px rgba(16, 185, 129, 0.3));
-  z-index: 1000 !important;
-  transition: filter 0.15s ease;
-}
+/* Connection paint belongs to the Core shape/handle states. Keep container
+   stacking and whole-node filters out of the application-level feedback. */
 
 /* ===== React Flow Node Overflow Handling ===== */
 /* 确保自定义节点内容不会超出其计算的边界 */
@@ -631,10 +625,10 @@ body {
 
 /* 注意：.react-flow__node 保持默认的 overflow: visible 以允许阴影和选中效果显示 */
 
-/* 确保 SubGroup 和 TitleGroup 节点也裁剪溢出内容 */
+/* Group ports extend beyond the outer node; inner content keeps its own clipping. */
 .react-flow__node-subGroup,
 .react-flow__node-titleGroup {
-  overflow: hidden !important;
+  overflow: visible !important;
 }
 
 
@@ -1193,14 +1187,28 @@ html {
 }
 
 /* Make handles larger on hover to induce that tactile snapping sensation */
-.react-flow__handle:hover {
+.react-flow__handle:not(.flowchart-handle):hover {
   transform: scale(1.6) !important;
   box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.25) !important;
   z-index: 1000 !important;
 }
 
-[data-theme='dark'] .react-flow__handle:hover {
+[data-theme='dark'] .react-flow__handle:not(.flowchart-handle):hover {
   box-shadow: 0 0 0 6px rgba(147, 197, 253, 0.15) !important;
+}
+
+/* Keep React Flow anchors positioned while hovering their quick-add children. */
+.diagram-root .flowchart-handle.react-flow__handle-top:hover,
+.diagram-root .flowchart-handle.react-flow__handle-left:hover {
+  transform: translate(-50%, -50%) !important;
+}
+
+.diagram-root .flowchart-handle.react-flow__handle-right:hover {
+  transform: translate(50%, -50%) !important;
+}
+
+.diagram-root .flowchart-handle.react-flow__handle-bottom:hover {
+  transform: translate(-50%, 50%) !important;
 }
 
 /* 3. Cyber Minimap Radar Overrides */

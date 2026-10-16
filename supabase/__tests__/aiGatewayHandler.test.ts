@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { handleAIGatewayRequest } from '../functions/ai-gateway/handler';
+import { AI_GATEWAY_MAX_BODY_CHARS } from '../functions/ai-gateway/requestBoundary';
 
 const PROVIDER_KEY_CANARY = ['provider', 'key', 'canary'].join('-');
 const JWT_CANARY = ['header', 'payload', 'signature'].join('.');
@@ -14,6 +15,24 @@ const authenticatedEnvironment = {
 };
 
 describe('AI gateway handler', () => {
+  it('rejects an oversized streamed UTF-8 body without Content-Length and cancels the reader', async () => {
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('图'.repeat(Math.ceil(AI_GATEWAY_MAX_BODY_CHARS / 3) + 1)));
+      },
+      cancel() { cancelled = true; },
+    });
+    const request = new Request('https://project.supabase.co/functions/v1/ai-gateway', {
+      method: 'POST', headers: authHeaders, body,
+      ...{ duplex: 'half' },
+    });
+    const response = await handleAIGatewayRequest(request, authenticatedEnvironment);
+    expect(response.status).toBe(413);
+    expect(cancelled).toBe(true);
+    await expect(response.json()).resolves.toEqual({ error: 'Request body is too large.' });
+  });
+
   it('exposes an authenticated capability probe with protocol identity', async () => {
     const response = await handleAIGatewayRequest(new Request(
       'https://project.supabase.co/functions/v1/ai-gateway?health=1',
