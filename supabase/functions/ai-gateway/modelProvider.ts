@@ -65,4 +65,3 @@ export const createGatewayLanguageModel = (
     baseURL: config.baseURL,
   })(config.modelId);
 };
-

@@ -42,4 +42,3 @@ export const parseAIGatewayRequest = (rawBody: string): AIGatewayRequestParseRes
     ? { ok: true, value: result.data }
     : { ok: false, reason: 'invalid-request' };
 };
-

@@ -64,4 +64,3 @@ export const readCollaborationJsonElement = (input: unknown, sharedReader?: (val
     return value;
   } catch { return null; }
 };
-
