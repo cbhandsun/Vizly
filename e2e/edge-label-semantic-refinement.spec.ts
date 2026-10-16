@@ -28,6 +28,23 @@ test('desktop overview retains all four cleared label associations after reload'
       ) });
       throw failure;
     });
+    await expect.poll(() => page.evaluate(async () => {
+      await document.fonts.ready;
+      const signature = () => JSON.stringify([
+        document.querySelector('.react-flow__viewport')?.getAttribute('style'),
+        [...document.querySelectorAll('[data-edge-id][data-edge-label-placement]')].map(element => [
+          element.getAttribute('style'), element.getAttribute('data-edge-label-placement'),
+          element.getBoundingClientRect().toJSON(),
+        ]),
+        [...document.querySelectorAll('.shared-trunk-edge-interaction')].map(path => path.getAttribute('d')),
+      ]);
+      const before = signature();
+      for (let frame = 0; frame < 3; frame++) {
+        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+        if (signature() !== before) return false;
+      }
+      return true;
+    }), { message: 'Loaded fonts, overview viewport, labels and canonical routes must settle' }).toBe(true);
     for (const id of ['e-allocation-task', 'e-packing-exec', 'e-sorting-exec', 'e-wcs']) {
       await expect(page.locator(`[data-edge-id="${id}"][data-edge-label-placement]`)).toHaveAttribute('data-edge-label-placement', 'placed');
       const leader = page.locator(`[data-edge-label-leader="${id}"]`);
@@ -64,11 +81,13 @@ test('desktop overview retains all four cleared label associations after reload'
             });
           const own = distances.filter(item => item.id === edgeId);
           if (own.length !== 1 || distances.length !== 44) throw new Error('Incomplete association geometry');
-          const foreign = Math.min(...distances.filter(item => item.id !== edgeId).map(item => item.distance));
-          return { ownerAdvantage: foreign - own[0].distance };
+          const foreign = distances.filter(item => item.id !== edgeId).sort((a, b) => a.distance - b.distance)[0];
+          return { ownerAdvantage: foreign.distance - own[0].distance,
+            own: own[0], nearestForeign: foreign, rect: rect.toJSON(),
+            labelStyle: label.getAttribute('style'), viewport: document.querySelector('.react-flow__viewport')?.getAttribute('style') };
         }, id);
         // Retain the 6px ownership requirement with conservative sample error.
-        expect(association.ownerAdvantage).toBeGreaterThanOrEqual(6.5);
+        expect(association.ownerAdvantage, JSON.stringify({ id, reload, ...association })).toBeGreaterThanOrEqual(6.5);
       }
     }
   }
