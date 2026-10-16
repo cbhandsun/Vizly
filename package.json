@@ -46,7 +46,7 @@
     "@types/d3-force": "3.0.10",
     "@types/dagre": "0.7.54",
     "@vizly/contracts": "0.1.0-alpha.2",
-    "@vizly/core": "file:vendor/vizly-core-0.1.0-alpha.8-6c14aa759be33eff.tgz",
+    "@vizly/core": "file:vendor/vizly-core-0.1.0-alpha.8-a6d84fef1319ddd4.tgz",
     "@xyflow/react": "12.11.2",
     "ai": "7.0.107",
     "antd": "6.5.2",
