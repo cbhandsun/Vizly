@@ -63,6 +63,9 @@ async function capturePaintAndGeometry(page: Page) {
         const label = document.querySelector('.stable-path-edge-label[data-edge-id="semantic"]');
         if (!label) throw new Error('Expected condition label');
         const bounds = label.getBoundingClientRect();
+        const viewport = document.querySelector('.react-flow__viewport');
+        if (!viewport) throw new Error('Expected canvas viewport');
+        const viewportBounds = viewport.getBoundingClientRect();
         return {
             nodes: [...document.querySelectorAll('.react-flow__node')].map(node => ({ id: node.getAttribute('data-id'), style: node.getAttribute('style') })),
             routes: [...document.querySelectorAll('.stable-path-semantic-fragment')].map(path => {
@@ -72,7 +75,10 @@ async function capturePaintAndGeometry(page: Page) {
                 const markerNode = markerId ? document.getElementById(markerId) : null;
                 return { d: path.getAttribute('d'), marker, markerWidth: markerNode?.getAttribute('markerWidth'), markerHeight: markerNode?.getAttribute('markerHeight'), stroke: style.stroke, width: style.strokeWidth, dash: style.strokeDasharray, filter: style.filter };
             }),
-            label: { transform: label.getAttribute('style'), x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height, fontWeight: getComputedStyle(label).fontWeight, status: label.getAttribute('data-edge-label-placement'), conflicts: label.getAttribute('data-edge-label-conflicts') },
+            // Selecting the edge opens the inspector and recenters the entire
+            // viewport. Keep label geometry relative to that viewport so this
+            // contract detects label drift without treating canvas reflow as it.
+            label: { transform: label.getAttribute('style'), x: bounds.x - viewportBounds.x, y: bounds.y - viewportBounds.y, width: bounds.width, height: bounds.height, fontWeight: getComputedStyle(label).fontWeight, status: label.getAttribute('data-edge-label-placement'), conflicts: label.getAttribute('data-edge-label-conflicts') },
         };
     });
 }
