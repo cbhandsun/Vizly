@@ -78,7 +78,9 @@ async function capturePaintAndGeometry(page: Page) {
             // Selecting the edge opens the inspector and recenters the entire
             // viewport. Keep label geometry relative to that viewport so this
             // contract detects label drift without treating canvas reflow as it.
-            label: { transform: label.getAttribute('style'), x: bounds.x - viewportBounds.x, y: bounds.y - viewportBounds.y, width: bounds.width, height: bounds.height, fontWeight: getComputedStyle(label).fontWeight, status: label.getAttribute('data-edge-label-placement'), conflicts: label.getAttribute('data-edge-label-conflicts') },
+            // Chromium returns float32 screen bounds; subtracting two shifted
+            // bounds can differ by a few ULPs. Retain millipixel precision.
+            label: { transform: label.getAttribute('style'), x: Math.round((bounds.x - viewportBounds.x) * 1000) / 1000, y: Math.round((bounds.y - viewportBounds.y) * 1000) / 1000, width: bounds.width, height: bounds.height, fontWeight: getComputedStyle(label).fontWeight, status: label.getAttribute('data-edge-label-placement'), conflicts: label.getAttribute('data-edge-label-conflicts') },
         };
     });
 }
