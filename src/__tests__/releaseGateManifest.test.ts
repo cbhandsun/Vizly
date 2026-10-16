@@ -11,7 +11,8 @@ describe('release gate manifest', () => {
     const command = manifest.scripts['test:ci'].split(/\s+/);
     expect(command.slice(0, 2)).toEqual(['vitest', 'run']);
     expect(command.slice(2).every(argument => /^--(?:pool|maxWorkers)=/.test(argument))).toBe(true);
-    expect(manifest.scripts.test).toBe('npm run test:ci');
+    // npm's optional argument separator forwards filters without changing discovery.
+    expect(manifest.scripts.test).toMatch(/^npm run test:ci(?: --)?$/);
   });
 
   it('provides every npm entry referenced by the CI workflow and unified check', () => {
