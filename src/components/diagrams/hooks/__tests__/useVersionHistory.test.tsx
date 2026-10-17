@@ -54,7 +54,7 @@ const routingSnapshot = {
     schema: 'vizly-routing-only-document-v2',
     candidate: {
         schema: 'vizly-routing-only-candidate-v2',
-        routingVersion: '24',
+        routingVersion: '25',
         inputSignature: '4321',
         inputGeometryDigest: `geometry-v1:${'e'.repeat(32)}`,
         outputRouteSignature: 'route-v2:1:2:0123456789abcdef',
@@ -553,7 +553,7 @@ describe('useVersionHistory', () => {
         expect(result.current.exitPreview()).toBeNull();
     });
 
-    it.each([['24', true], ['23', false]] as const)('saves compatible routes and discards stale routes: %s', async (routingVersion, compatible) => {
+    it.each([['25', true], ['24', false], ['23', false]] as const)('saves compatible routes and discards stale routes: %s', async (routingVersion, compatible) => {
         storageMocks.saveVersion.mockResolvedValue(makeVersion());
         const bridge = {
             id: 'diagram-1',

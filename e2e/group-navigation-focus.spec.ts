@@ -30,6 +30,16 @@ for (const width of [390, 1440]) {
       return Math.max(Math.abs(node.x + node.width / 2 - canvas.x - canvas.width / 2),
         Math.abs(node.y + node.height / 2 - canvas.y - canvas.height / 2));
     })).toBeLessThan(2);
+    // Centering can become accurate before the final animation frame. Capture
+    // the retained viewport only after the transform has stopped changing.
+    await expect.poll(() => page.locator('.react-flow__viewport').evaluate(async element => {
+      const transform = getComputedStyle(element).transform;
+      for (let frame = 0; frame < 3; frame++) {
+        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+        if (getComputedStyle(element).transform !== transform) return false;
+      }
+      return true;
+    })).toBe(true);
     const viewport = await page.locator('.react-flow__viewport').evaluate(element => getComputedStyle(element).transform);
     await page.waitForTimeout(1000);
     expect(await page.locator('.react-flow__viewport').evaluate(element => getComputedStyle(element).transform)).toBe(viewport);
