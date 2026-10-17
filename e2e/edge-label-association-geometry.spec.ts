@@ -17,6 +17,14 @@ test('direct ownership measures the actual path and rejects detached or ambiguou
   const direct = await measureDirectLabelAssociation(label);
   expect(direct.ownDistance).toBeCloseTo(10);
   expect(direct.foreignDistance).toBeCloseTo(70);
+  expect(direct.foreignDistanceLowerBound).toBeGreaterThan(direct.ownDistance);
+
+  // Unique ownership does not require reaching a layout optimizer's target.
+  await page.locator('path.stable-path-semantic-fragment').last().evaluate(element => element.setAttribute('d', 'M 0 143.3 L 500 143.3'));
+  const nearby = await measureDirectLabelAssociation(label);
+  expect(nearby.foreignDistance - nearby.ownDistance).toBeCloseTo(3.3);
+  expect(nearby.foreignDistanceLowerBound).toBeGreaterThan(nearby.ownDistance);
+  await page.locator('path.stable-path-semantic-fragment').last().evaluate(element => element.setAttribute('d', 'M 0 200 L 500 200'));
 
   await label.evaluate(element => { element.style.top = '240px'; });
   const detached = await measureDirectLabelAssociation(label);
@@ -24,7 +32,7 @@ test('direct ownership measures the actual path and rejects detached or ambiguou
 
   await label.evaluate(element => { element.style.top = '140px'; });
   const ambiguous = await measureDirectLabelAssociation(label);
-  expect(ambiguous.foreignDistance - ambiguous.ownDistance).toBeLessThan(5);
+  expect(ambiguous.foreignDistanceLowerBound).toBeLessThanOrEqual(ambiguous.ownDistance);
 
   await page.locator('path.stable-path-semantic-fragment').first().evaluate(element => element.removeAttribute('d'));
   expect((await measureDirectLabelAssociation(label)).ownDistance).toBe(Infinity);

@@ -30,6 +30,10 @@ export async function measureDirectLabelAssociation(label: Locator) {
         foreignDistance = Math.min(foreignDistance, distance);
       }
     }
-    return { ownDistance, foreignDistance };
+    // Distance is 1-Lipschitz along a path. With <=1 unit between samples,
+    // subtracting one gives a conservative lower bound, including bends.
+    // Comparing that bound to the owner's sampled upper bound proves unique
+    // ownership without imposing the optimizer's optional 6-unit target.
+    return { ownDistance, foreignDistance, foreignDistanceLowerBound: Math.max(0, foreignDistance - 1) };
   });
 }

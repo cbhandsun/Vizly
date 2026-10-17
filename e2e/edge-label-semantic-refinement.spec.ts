@@ -32,7 +32,7 @@ test('desktop overview retains all four cleared label associations after reload'
         const direct = await measureDirectLabelAssociation(page.locator(`[data-edge-id="${id}"][data-edge-label-placement]`));
         // Direct placement permits a 12.5-unit gap; sampling adds at most one.
         expect(direct.ownDistance).toBeLessThanOrEqual(13.5);
-        expect(direct.foreignDistance - direct.ownDistance).toBeGreaterThanOrEqual(5);
+        expect(direct.foreignDistanceLowerBound).toBeGreaterThan(direct.ownDistance);
       }
     }
   }
