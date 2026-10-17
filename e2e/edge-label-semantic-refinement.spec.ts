@@ -48,10 +48,10 @@ test('desktop overview retains all four cleared label associations after reload'
     for (const id of ['e-allocation-task', 'e-packing-exec', 'e-sorting-exec', 'e-wcs']) {
       await expect(page.locator(`[data-edge-id="${id}"][data-edge-label-placement]`)).toHaveAttribute('data-edge-label-placement', 'placed');
       const leader = page.locator(`[data-edge-label-leader="${id}"]`);
-      if (id !== 'e-wcs' || await leader.count() > 0) {
+      if (await leader.count() > 0) {
         await expect(leader).toHaveAttribute('data-edge-label-placement', 'placed');
       } else {
-        // Ownership refinement can place WCS directly beside its own edge.
+        // Ownership refinement can place a label directly beside its own edge.
         // Prove the association geometrically instead of requiring a leader
         // after the label already has an unambiguous direct placement.
         const association = await page.evaluate(edgeId => {
