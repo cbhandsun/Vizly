@@ -64,8 +64,10 @@ for (const theme of ['light', 'dark']) {
             await page.mouse.down();
             expect(await captureNodes(page)).toEqual(before);
             await page.mouse.move((from.x + to.x) / 2, (from.y + to.y) / 2, { steps: 6 });
-            await expect(page.locator('.react-flow__node.rf-connecting')).toHaveCount(3);
-            await expect(page.locator('.react-flow__node.rf-connect-preview')).toHaveCount(1);
+            await expect(page.locator('.react-flow__node.rf-connecting')).toHaveCount(1);
+            await expect(sourceNode).toHaveClass(/rf-connecting/);
+            await expect(page.locator('.react-flow__node.rf-connectable')).toHaveCount(2);
+            await expect(page.locator('.react-flow__connection')).toBeVisible();
             await testInfo.attach(`${targetId} middle of drag`, { body: await page.screenshot({ path: testInfo.outputPath(`${targetId}-middle.png`) }), contentType: 'image/png' });
             const during = await captureNodes(page);
             await testInfo.attach(`${targetId} node geometry before and during drag`, { body: JSON.stringify({ before, during }), contentType: 'application/json' });
@@ -93,6 +95,7 @@ for (const theme of ['light', 'dark']) {
         await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
         await page.mouse.up();
         await expect(page.locator('.react-flow__node.rf-connecting')).toHaveCount(0);
+        await expect(page.locator('.react-flow__node.rf-connectable')).toHaveCount(0);
         await expect(page.locator('.react-flow__node.rf-connect-preview')).toHaveCount(0);
         await expect(page.locator('.react-flow__edge')).toHaveCount(2);
         expect(await captureNodes(page)).toEqual(beforeCancel);

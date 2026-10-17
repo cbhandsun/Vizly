@@ -45,6 +45,7 @@ export function boundedJsonAssetsPlugin(): Plugin {
       allowedPaths = new Set([
         ...['en', 'zh'].map(locale => resolve(config.root, `src/locales/${locale}.json`)),
         ...STANDARD_PRESET_KEYS.map(preset => resolve(config.root, `src/data/standardized/${preset}.json`)),
+        resolve(config.root, 'src/data/standardized/StandardPresetCatalog.json'),
       ]);
     },
     async load(id) {

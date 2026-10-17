@@ -113,8 +113,18 @@ const coerceConversations = (value: unknown): Conversation[] => {
 
 class AIConversationService {
     private currentUserId: string | null = null;
+    private conversationsCache: Conversation[] | null = null;
+
+    constructor() {
+        if (typeof window !== 'undefined') window.addEventListener('storage', event => {
+            if (event.storageArea === localStorage && (event.key === null || event.key === this.getStorageKey())) {
+                this.conversationsCache = null;
+            }
+        });
+    }
 
     setUserId(userId: string | null) {
+        if (this.currentUserId !== userId) this.conversationsCache = null;
         this.currentUserId = userId;
     }
 
@@ -182,6 +192,7 @@ class AIConversationService {
     }
 
     private clearConversationsCache(): void {
+        this.conversationsCache = null;
         try {
             localStorage.removeItem(this.getStorageKey());
         } catch (error) {
@@ -196,6 +207,15 @@ class AIConversationService {
     }
 
     getConversations(): Conversation[] {
+        return this.copyConversations(this.conversationsCache ??= this.readConversations());
+    }
+
+    private copyConversations(conversations: Conversation[]): Conversation[] {
+        return conversations.map(conversation => ({ ...conversation,
+            messages: conversation.messages.map(message => ({ ...message })) }));
+    }
+
+    private readConversations(): Conversation[] {
         try {
             const saved = localStorage.getItem(this.getStorageKey());
             if (saved) {
@@ -230,8 +250,10 @@ class AIConversationService {
     }
 
     saveConversations(conversations: Conversation[]) {
+        const safeConversations = coerceConversations(conversations);
+        this.conversationsCache = safeConversations;
         try {
-            localStorage.setItem(this.getStorageKey(), JSON.stringify(coerceConversations(conversations)));
+            localStorage.setItem(this.getStorageKey(), JSON.stringify(safeConversations));
             // 如果需要，这里可以限制并发或进行全量同步，但通常 upsert 单条更好
         } catch (e) {
             logUiStorageWriteFailure('AIConversationService.saveConversations', this.getStorageKey(), e);

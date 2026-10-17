@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { measureDirectLabelAssociation } from './support/edgeLabelAssociation';
 
 test('desktop overview retains all four cleared label associations after reload', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -22,7 +23,17 @@ test('desktop overview retains all four cleared label associations after reload'
     await expect(page.locator('[data-edge-id][data-edge-label-placement="unresolved"]')).toHaveCount(0);
     for (const id of ['e-allocation-task', 'e-packing-exec', 'e-sorting-exec', 'e-wcs']) {
       await expect(page.locator(`[data-edge-id="${id}"][data-edge-label-placement]`)).toHaveAttribute('data-edge-label-placement', 'placed');
-      await expect(page.locator(`[data-edge-label-leader="${id}"]`)).toHaveAttribute('data-edge-label-placement', 'placed');
+      const leader = page.locator(`[data-edge-label-leader="${id}"]`);
+      if (await leader.count()) {
+        await expect(leader).toHaveAttribute('data-edge-label-placement', 'placed');
+      } else {
+        // A direct label needs no callout. Still prove proximity and unambiguous
+        // ownership; removing a necessary leader must not make this test pass.
+        const direct = await measureDirectLabelAssociation(page.locator(`[data-edge-id="${id}"][data-edge-label-placement]`));
+        // Direct placement permits a 12.5-unit gap; sampling adds at most one.
+        expect(direct.ownDistance).toBeLessThanOrEqual(13.5);
+        expect(direct.foreignDistanceLowerBound).toBeGreaterThan(direct.ownDistance);
+      }
     }
   }
   expect(pageErrors).toEqual([]);

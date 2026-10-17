@@ -1,4 +1,4 @@
-import React, { useState, ReactNode } from 'react';
+import React, { useState, useCallback, useMemo, ReactNode } from 'react';
 import { useAuth } from '@/context/useAuth';
 import { SubscriptionContext, type UserTier } from './SubscriptionContextValue';
 
@@ -25,22 +25,21 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
   const tier = coerceUserTier(user?.app_metadata?.tier);
   const jwtToken = session?.access_token;
 
-  const hasFeature = (featureName: string) => {
+  const hasFeature = useCallback((featureName: string) => {
     return TIER_FEATURES[tier].includes(featureName);
-  };
+  }, [tier]);
 
-  const showUpgradeModal = (featureName?: string) => {
+  const showUpgradeModal = useCallback((featureName?: string) => {
     setUpgradeFeatureContext(featureName);
     setUpgradeModalVisible(true);
-  };
+  }, []);
 
-  const hideUpgradeModal = () => {
+  const hideUpgradeModal = useCallback(() => {
     setUpgradeModalVisible(false);
     setUpgradeFeatureContext(undefined);
-  };
+  }, []);
 
-  return (
-    <SubscriptionContext.Provider value={{
+  const value = useMemo(() => ({
       tier,
       hasFeature,
       isUpgradeModalVisible,
@@ -48,7 +47,10 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
       hideUpgradeModal,
       upgradeFeatureContext,
       jwtToken
-    }}>
+    }), [tier, hasFeature, isUpgradeModalVisible, showUpgradeModal, hideUpgradeModal, upgradeFeatureContext, jwtToken]);
+
+  return (
+    <SubscriptionContext.Provider value={value}>
       {children}
     </SubscriptionContext.Provider>
   );

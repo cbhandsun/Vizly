@@ -39,14 +39,15 @@ const Designer = ({ id, ready = true, editing = false }: { id: string; ready?: b
   return <output data-testid="designer-canvas" data-editing={String(nodes[0]?.data.isEditing ?? false)} data-selected={String(nodes[0]?.selected ?? false)}>{nodes.map(node => node.id).join(',')}:{edges.length}</output>;
 };
 const Host = ({ room = null, ready = true, editing = false }: { room?: string | null; ready?: boolean; editing?: boolean }) => {
-  useDiagramViewerCollaboration({ selectedDiagramId: diagramId, roomFromUrl: room });
+  const collaboration = useDiagramViewerCollaboration({ selectedDiagramId: diagramId, roomFromUrl: room });
   const hostNodes = useNodes();
-  return <><output data-testid="host-canvas">{hostNodes.map(node => node.id).join(',')}</output><ReactFlowProvider><Designer id={diagramId} ready={ready} editing={editing} /></ReactFlowProvider></>;
+  return <>{collaboration.collaborationRuntime}<output data-testid="host-canvas">{hostNodes.map(node => node.id).join(',')}</output><ReactFlowProvider><Designer id={diagramId} ready={ready} editing={editing} /></ReactFlowProvider></>;
 };
 
 describe('remote collaboration targets the active controlled designer', () => {
-  it('keeps a local text editor open when the saved canvas is acknowledged remotely', () => {
+  it('keeps a local text editor open when the saved canvas is acknowledged remotely', async () => {
     const view = render(<ReactFlowProvider><Host editing /></ReactFlowProvider>);
+    await waitFor(() => expect(fixture.docs).toHaveLength(1));
     const peer = new Y.Doc();
     try {
       peer.getMap<Node>('flowchart-nodes').set(initialNode.id, { ...initialNode, data: { label: 'Accepted cloud label' } });
@@ -60,9 +61,10 @@ describe('remote collaboration targets the active controlled designer', () => {
     vi.stubEnv('VITE_YJS_WEBSOCKET_URL', 'wss://collaboration.example.com');
   });
   afterEach(() => vi.unstubAllEnvs());
-  it('commits remote node edits through the designer bridge instead of the outer ReactFlow context', () => {
+  it('commits remote node edits through the designer bridge instead of the outer ReactFlow context', async () => {
     const view = render(<ReactFlowProvider><Host /></ReactFlowProvider>);
     expect(screen.getByTestId('designer-canvas').textContent).toBe('initial:0');
+    await waitFor(() => expect(fixture.docs).toHaveLength(1));
     const peer = new Y.Doc();
     peer.getMap<Node>('flowchart-nodes').set(remoteNode.id, remoteNode);
     act(() => Y.applyUpdate(fixture.docs[0], Y.encodeStateAsUpdate(peer)));
@@ -79,6 +81,7 @@ describe('remote collaboration targets the active controlled designer', () => {
   });
   it('retains a remote snapshot while initialization is pending and commits it after readiness', async () => {
     const view = render(<ReactFlowProvider><Host ready={false} /></ReactFlowProvider>);
+    await waitFor(() => expect(fixture.docs).toHaveLength(1));
     const peer = new Y.Doc();
     try {
       peer.getMap<Node>('flowchart-nodes').set(remoteNode.id, remoteNode);

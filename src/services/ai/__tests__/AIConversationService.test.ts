@@ -38,6 +38,21 @@ const importFreshService = async () => {
 };
 
 describe('AIConversationService', () => {
+    it('caches reads, protects owned messages and invalidates on account and storage changes', () => {
+        const service = module.aiConversationService;
+        service.createConversation({ id: 'welcome', role: 'assistant', content: 'hello' });
+        const reads = vi.spyOn(Storage.prototype, 'getItem');
+        const first = service.getConversations();
+        first[0].messages[0].content = 'mutated';
+        expect(service.getConversations()[0].messages[0].content).toBe('hello');
+        expect(reads).not.toHaveBeenCalled();
+        window.dispatchEvent(new StorageEvent('storage', { key: 'AIChatPanel.conversations_anonymous', storageArea: localStorage }));
+        service.getConversations();
+        expect(reads).toHaveBeenCalledOnce();
+        service.setUserId('other-user');
+        expect(service.getConversations()).toEqual([]);
+        expect(reads).toHaveBeenCalledTimes(2);
+    });
     let module: Awaited<ReturnType<typeof importFreshService>>;
 
     beforeEach(async () => {

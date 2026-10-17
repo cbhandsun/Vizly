@@ -20,6 +20,13 @@ const preset = {
 } satisfies StandardDiagramData;
 
 describe('loadLayoutPresetMapForDiagram', () => {
+  it('does not download bundled presets for a custom UUID or empty identifier', async () => {
+    const fetch = vi.spyOn(globalThis, 'fetch');
+    await expect(loadLayoutPresetMapForDiagram('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')).resolves.toEqual({});
+    await expect(loadLayoutPresetMapForDiagram('')).resolves.toEqual({});
+    expect(fetch).not.toHaveBeenCalled();
+    fetch.mockRestore();
+  });
   it('loads only the requested standard preset and skips the eager catalog', async () => {
     const loadStandardPreset = vi.fn(async () => preset);
     const loadFallbackPresetMap = vi.fn(async () => ({ fallback: preset }));

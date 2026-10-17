@@ -1,3 +1,4 @@
+import { getBrowserSessionUser } from './browserSessionUser';
 import { supabase } from './supabase';
 import { IStorageProvider, DiagramMetadata, SavedDiagram, DiagramVersion } from './storage/types';
 import { coerceRemoteDiagramContent } from './remoteDiagramContent';
@@ -38,7 +39,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
     }
 
     private async requireAuthenticatedUser(expectedUserId?: string): Promise<string> {
-        const { data: { user }, error } = await supabase!.auth.getUser();
+        const { data: { user }, error } = await getBrowserSessionUser(supabase!);
         if (error) throw error;
         if (!user?.id) {
             throw new Error('Supabase storage requires an authenticated user.');
@@ -122,7 +123,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
              throw new Error("Version history requires a saved Cloud Diagram (UUID format required).");
         }
 
-        const { data: { user }, error: userError } = await supabase!.auth.getUser();
+        const { data: { user }, error: userError } = await getBrowserSessionUser(supabase!);
         if (userError) throw userError;
         if (!user?.id) {
             throw new Error('Version history requires an authenticated user.');

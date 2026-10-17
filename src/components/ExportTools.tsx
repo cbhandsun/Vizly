@@ -422,6 +422,7 @@ const ExportTools: React.FC<ExportToolsProps> = ({
       if (bridge && bridge === liveBridge) {
         assertCloudSaveViewCurrent(bridge, capturedId, capturedCloud, expectedRevision);
         bridge.metadata = { ...(bridge.metadata || {}), cloud: cloudInfo };
+        window.dispatchEvent(new Event('vizly:flow-data-bridge-identity'));
       }
       // 回写到 dataService（GenericStandardDiagram 场景）
       const currentDiagram = dataService.getDiagram(diagramId);

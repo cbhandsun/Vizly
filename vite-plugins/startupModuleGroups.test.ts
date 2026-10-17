@@ -35,15 +35,17 @@ describe('measured startup module groups', () => {
       expect(() => parseStartupModuleInventory(value)).toThrow();
     }
   });
-  it('limits each seed module to one group and includes its initialization dependencies', () => {
-    expect(startupModuleGroups).toHaveLength(6);
+  it('limits seeds to one group without pulling lazy initialization into startup', () => {
+    expect(startupModuleGroups).toHaveLength(8);
     expect(startupModuleGroups.filter(group => group.test('/repo/node_modules/react/cjs/react.production.js'))).toHaveLength(1);
     for (const group of startupModuleGroups) {
       expect(group.entriesAware).toBe(false);
-      expect(group.includeDependenciesRecursively).toBe(true);
+      expect(group.includeDependenciesRecursively).toBe(false);
     }
     const config = readFileSync('vite.config.ts', 'utf8');
     expect(config).toContain('codeSplitting: { groups: startupModuleGroups }');
     expect(config).not.toContain('strictExecutionOrder: true');
+    expect(startupModuleGroups.filter(group => group.test('/repo/node_modules/antd/es/button/index.js')).map(group => group.name)).toEqual(['antd-vendor']);
+    expect(startupModuleGroups.every(group => !group.test('/repo/node_modules/@vizly/core/dist/chunks/EnhancedThemeManagerRefactored-ABcd1234.js'))).toBe(true);
   });
 });

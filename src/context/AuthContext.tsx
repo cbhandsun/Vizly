@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import type { User, Session, AuthError } from '@supabase/supabase-js';
 import { normalizeSupabaseUrl } from '@/services/runtimeEnv';
 import { getWindowHashString } from '@vizly/core/input';
@@ -179,7 +179,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
     }, [applySession, ensureAuthSubscription]);
 
-    const signInWithEmail = async (email: string) => {
+    const signInWithEmail = useCallback(async (email: string) => {
         const supabase = await ensureAuthSubscription();
         if (!supabase) return noSupabaseError;
         return supabase.auth.signInWithOtp({
@@ -188,17 +188,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 emailRedirectTo: window.location.origin
             }
         });
-    };
+    }, [ensureAuthSubscription]);
 
-    const signInWithPassword = async (email: string, password: string) => {
+    const signInWithPassword = useCallback(async (email: string, password: string) => {
         const supabase = await ensureAuthSubscription();
         if (!supabase) return noSupabaseError;
         const result = await supabase.auth.signInWithPassword({ email, password });
         if (!result.error) applySession(result.data.session);
         return result;
-    };
+    }, [ensureAuthSubscription, applySession]);
 
-    const signUp = async (email: string, password: string) => {
+    const signUp = useCallback(async (email: string, password: string) => {
         const supabase = await ensureAuthSubscription();
         if (!supabase) return noSupabaseError;
         const result = await supabase.auth.signUp({
@@ -210,9 +210,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         if (!result.error) applySession(result.data.session);
         return result;
-    };
+    }, [ensureAuthSubscription, applySession]);
 
-    const signOut = async () => {
+    const signOut = useCallback(async () => {
         const supabase = await ensureAuthSubscription();
         if (!supabase) return noSupabaseError;
         const previousUserId = user?.id ?? lastUserIdRef.current;
@@ -222,19 +222,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             applySession(null);
         }
         return result;
-    };
+    }, [ensureAuthSubscription, user?.id, applySession]);
 
-    const updatePassword = async (password: string) => {
+    const updatePassword = useCallback(async (password: string) => {
         const supabase = await ensureAuthSubscription();
         if (!supabase) return noSupabaseError;
         return supabase.auth.updateUser({ password });
-    };
+    }, [ensureAuthSubscription]);
+
+    const value = useMemo(() => ({ user, session, loading,
+        signInWithEmail, signInWithPassword, signUp, updatePassword, signOut,
+    }), [user, session, loading, signInWithEmail, signInWithPassword, signUp, updatePassword, signOut]);
 
     return (
-        <AuthContext.Provider value={{
-            user, session, loading,
-            signInWithEmail, signInWithPassword, signUp, updatePassword, signOut,
-        }}>
+        <AuthContext.Provider value={value}>
             {children}
         </AuthContext.Provider>
     );

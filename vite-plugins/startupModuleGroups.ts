@@ -51,15 +51,43 @@ const inventorySource = readFileSync(new URL('./startupModuleInventory.json', im
 if (inventorySource.length > 512_000) throw new Error('Startup module inventory exceeds its size limit');
 const inventory: unknown = JSON.parse(inventorySource);
 const modulesByGroup = parseStartupModuleInventory(inventory);
-export const startupModuleGroups = groupNames.flatMap(name => ['vendor', 'core'].map(owner => ({
+const isFrameworkModule = (key: string): boolean => /^(?:react\/|react-dom\/|scheduler\/|react-router\/|i18next\/|react-i18next\/|i18next-browser-languagedetector\/)/u.test(key);
+const isAntdModule = (key: string): boolean => /^(?:antd\/|@ant-design\/|@rc-component\/|rc-[^/]+\/)/u.test(key)
+  || key === '@vizly/core/dist/antd.js' || key === '@vizly/core/dist/chunks/antdStaticBridge.js';
+const isCoreStartupUtility = (key: string): boolean => /^@vizly\/core\/dist\/chunks\/(?:BaseConstants|ConfigValueBoundary|applicationDiagramRuntime|boundedResponse|coerceDiagram|colorUtils|consoleCleanup|inputBoundary|jsonUtils|logSecurity|mindMapAIRuntime|performanceMonitor|persistedRoutingCandidate|remoteDiagramContent|themeLogging|uiStorageLogging)\.js$/u.test(key)
+  || /^@vizly\/core\/dist\/(?:diagnostics|i18n|logging)\.js$/u.test(key);
+
+export const startupModuleGroups = [
+  {
+    name: 'framework-vendor',
+    test: (id: unknown): boolean => {
+      const key = startupPackageModuleKey(id);
+      return key !== null && isFrameworkModule(key);
+    },
+    entriesAware: false,
+    includeDependenciesRecursively: false,
+  },
+  {
+    name: 'antd-vendor',
+    test: (id: unknown): boolean => {
+      const key = startupPackageModuleKey(id);
+      return key !== null && isAntdModule(key) && modulesByGroup.common.has(key);
+    },
+    entriesAware: false,
+    includeDependenciesRecursively: false,
+  },
+  ...groupNames.flatMap(name => ['vendor', 'core'].map(owner => ({
   name: `startup-${name}-${owner}`,
   test: (id: unknown): boolean => {
     const key = startupPackageModuleKey(id);
-    return key !== null && (key.startsWith('@vizly/core/') ? owner === 'core' : owner === 'vendor') && modulesByGroup[name].has(key);
+    return key !== null && !isFrameworkModule(key)
+      && !(isAntdModule(key) && modulesByGroup.common.has(key))
+      && !(name === 'common' && owner === 'core' && !isCoreStartupUtility(key))
+      && (key.startsWith('@vizly/core/') ? owner === 'core' : owner === 'vendor') && modulesByGroup[name].has(key);
   },
-  // Start from measured cold requests and include their static dependencies.
-  // This keeps initialization dependencies together and avoids circular chunks
-  // without introducing strictExecutionOrder's eager barrel initializers.
+  // Preserve actual static reachability. Recursively collecting dependencies
+  // merges lazy UI modules back into the framework's cold-start graph.
   entriesAware: false,
-  includeDependenciesRecursively: true,
-})));
+  includeDependenciesRecursively: false,
+}))),
+];

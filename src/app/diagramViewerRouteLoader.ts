@@ -28,4 +28,5 @@ export const createDiagramViewerRouteLoader = ({
 
 export const loadDiagramViewerRoute = createDiagramViewerRouteLoader({
   loadPage: () => import('./DiagramViewerRoute'),
+  preloadCanvasRuntime: () => import('@vizly/core/react'),
 });

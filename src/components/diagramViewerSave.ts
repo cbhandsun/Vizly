@@ -130,6 +130,7 @@ export const syncDiagramViewerBridgeCloudReplica = ({
     ...(bridge.metadata || {}),
     cloud: { provider, id, title, ...(revision ? { revision } : {}) },
   };
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('vizly:flow-data-bridge-identity'));
 };
 
 export const saveDiagramViewerCloudReplica = async <TDiagram extends DiagramBridgeLike>({

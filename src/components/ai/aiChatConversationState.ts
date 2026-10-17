@@ -21,7 +21,7 @@ const buildStreamingAssistantMessage = (
     fallbackContent?: string
 ): Message => {
     const resolvedContent = snapshot.content || fallbackContent || (snapshot.reasoningContent ? '' : '（无内容）');
-    const jsonContent = extractJson(snapshot.content, isStreaming);
+    const jsonContent = isStreaming ? null : extractJson(snapshot.content);
 
     return {
         ...baseMessage,

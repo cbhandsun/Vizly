@@ -21,7 +21,8 @@ describe('Playwright artifact ownership', () => {
     const [first, second] = await Promise.all([readBuild(), readBuild()]);
     for (const value of [first, second]) {
       const outputs = [...value.command.matchAll(/--outDir\s+(\S+)/g)].map(match => match[1]);
-      expect(outputs).toEqual([`dist/e2e-${kind}-${value.pid}`, `dist/e2e-${kind}-${value.pid}`]);
+      expect(outputs).toEqual([`tmp/e2e-${kind}-${value.pid}`, `tmp/e2e-${kind}-${value.pid}`]);
+      expect(outputs.every(output => !output.startsWith('dist/'))).toBe(true);
       expect(value.reuse).toBe(false);
     }
     expect(first.command).not.toBe(second.command);

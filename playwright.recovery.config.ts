@@ -3,7 +3,7 @@ import { defineConfig } from '@playwright/test';
 const port = Number(process.env.VIZLY_RECOVERY_E2E_PORT ?? 5463);
 if (!Number.isSafeInteger(port) || port < 1 || port > 65535) throw new Error('Invalid recovery browser test port');
 const baseURL = `http://127.0.0.1:${port}`;
-const buildDirectory = `dist/e2e-recovery-${process.pid}`;
+const buildDirectory = `tmp/e2e-recovery-${process.pid}`;
 
 export default defineConfig({
   testDir: './e2e-recovery',

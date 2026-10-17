@@ -102,8 +102,8 @@ vi.mock('../useCloudCollaborationIdentity', () => ({
         transportConfigured && collaborationFixture.cloudDocumentPresent,
 }));
 
-vi.mock('../diagrams/collaboration/YjsProviderHooks', () => ({
-    useYjsCollaboration: ({ enabled }: { enabled: boolean }) => {
+vi.mock('../diagrams/collaboration/useDeferredYjsCollaboration', () => ({
+    useDeferredYjsCollaboration: ({ enabled }: { enabled: boolean }) => {
         collaborationFixture.enabled = enabled;
         return {
             accessRole: collaborationFixture.role,

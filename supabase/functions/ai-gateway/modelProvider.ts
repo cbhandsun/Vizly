@@ -4,19 +4,27 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { LanguageModel } from 'ai';
 
-export type GatewayProviderKind = 'anthropic' | 'google' | 'openai' | 'openai-compatible';
+export type GatewayProviderKind =
+  | 'anthropic'
+  | 'google'
+  | 'openai'
+  | 'openai-compatible'
+  | 'openai-responses';
 
 export interface GatewayModelProviderConfig {
   id?: string;
   baseURL: string;
   apiKey: string;
   modelId: string;
+  apiMode?: 'chat-completions' | 'responses';
 }
 
 export const resolveGatewayProviderKind = (
   providerId: unknown,
   baseURL: string,
+  apiMode: unknown = 'chat-completions',
 ): GatewayProviderKind => {
+  if (apiMode === 'responses') return 'openai-responses';
   const origin = new URL(baseURL).origin;
   if (providerId === 'anthropic' && origin === 'https://api.anthropic.com') return 'anthropic';
   if (providerId === 'gemini' && origin === 'https://generativelanguage.googleapis.com') return 'google';
@@ -31,7 +39,14 @@ const resolveGoogleBaseURL = (baseURL: string): string => (
 export const createGatewayLanguageModel = (
   config: GatewayModelProviderConfig,
 ): LanguageModel => {
-  const kind = resolveGatewayProviderKind(config.id, config.baseURL);
+  const kind = resolveGatewayProviderKind(config.id, config.baseURL, config.apiMode);
+  if (kind === 'openai-responses') {
+    return createOpenAI({
+      apiKey: config.apiKey,
+      baseURL: config.baseURL,
+      name: 'vizly-responses-compatible',
+    }).responses(config.modelId);
+  }
   if (kind === 'anthropic') {
     return createAnthropic({ apiKey: config.apiKey, baseURL: config.baseURL })(config.modelId);
   }

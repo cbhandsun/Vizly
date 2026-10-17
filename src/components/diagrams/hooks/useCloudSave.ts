@@ -162,6 +162,7 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
                     ...(bridge.metadata || {}),
                     cloud: { provider: provider.id, id: savedId, title: finalTitle, ...(revision ? { revision } : {}) },
                 };
+                window.dispatchEvent(new Event('vizly:flow-data-bridge-identity'));
             }
 
             appMessage.success('已保存到云端');

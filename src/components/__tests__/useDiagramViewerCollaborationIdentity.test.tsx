@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ bridge: undefined as unknown, enabled: false, userId: undefined as string | undefined, role: null as 'editor' | 'viewer' | null }));
 vi.mock('@vizly/core/collaboration', () => ({ resolveDiagramCollaborationStatus: (wanted: boolean) => wanted ? 'connecting' : 'disconnected' }));
 vi.mock('@vizly/core/diagram-data', () => ({ getFlowDataBridge: () => fixture.bridge }));
-vi.mock('../diagrams/collaboration/YjsProviderHooks', () => ({ useYjsCollaboration: (options: { enabled?: boolean; userId?: string }) => {
+vi.mock('../diagrams/collaboration/useDeferredYjsCollaboration', () => ({ useDeferredYjsCollaboration: (options: { enabled?: boolean; userId?: string }) => {
   fixture.enabled = options.enabled === true;
   fixture.userId = options.userId;
   return { coordinationProblem: null, isSynced: false, accessRole: fixture.role, wsStatus: 'disconnected', activeUsers: [], provider: null,
@@ -65,7 +65,7 @@ describe('viewer automatic collaboration requires its actual cloud document', ()
   it('locks the initial unknown cloud identity without locking a local document or a disabled transport', () => {
     const hook = renderHook(() => useDiagramViewerCollaboration(options()));
     expect(hook.result.current.isCollaborationReadOnly).toBe(false);
-    act(() => { fixture.bridge = bridge(); vi.advanceTimersByTime(250); });
+    act(() => { fixture.bridge = bridge(); window.dispatchEvent(new Event('vizly:flow-data-bridge-identity')); });
     expect(hook.result.current.isCollaborationReadOnly).toBe(true);
     vi.stubEnv('VITE_YJS_WEBSOCKET_URL', ''); hook.rerender();
     expect(hook.result.current.isCollaborationReadOnly).toBe(false);
@@ -83,9 +83,9 @@ describe('viewer automatic collaboration requires its actual cloud document', ()
   it('observes asynchronous identity loading and later removal without editing the canvas', () => {
     renderHook(() => useDiagramViewerCollaboration(options()));
     expect(fixture.enabled).toBe(false);
-    act(() => { fixture.bridge = bridge(); vi.advanceTimersByTime(250); });
+    act(() => { fixture.bridge = bridge(); window.dispatchEvent(new Event('vizly:flow-data-bridge-identity')); });
     expect(fixture.enabled).toBe(true);
-    act(() => { fixture.bridge = { id, metadata: {} }; vi.advanceTimersByTime(250); });
+    act(() => { fixture.bridge = { id, metadata: {} }; window.dispatchEvent(new Event('vizly:flow-data-bridge-identity')); });
     expect(fixture.enabled).toBe(false);
   });
 

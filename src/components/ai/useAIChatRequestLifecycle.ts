@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { TFunction } from 'i18next';
 
 import {
@@ -50,7 +50,7 @@ interface UseAIChatRequestLifecycleOptions {
     setShowCommands: (visible: boolean) => void;
     activeId: string | null;
     messages: Message[];
-    setConversations: (conversations: Conversation[]) => void;
+    setConversations: Dispatch<SetStateAction<Conversation[]>>;
     pluginId?: string;
     diagramNodesRef: AIChatPanelProps['diagramNodesRef'];
     diagramEdgesRef: AIChatPanelProps['diagramEdgesRef'];
@@ -183,17 +183,11 @@ export function useAIChatRequestLifecycle({
                         structuredToolCalls = state.toolCalls;
                         if (!activeId || Date.now() - lastUpdateTimestamp <= 60) return;
 
-                        const current = [...aiConversationService.getConversations()];
-                        const index = current.findIndex(conversation => conversation.id === activeId);
-                        if (index !== -1) {
-                            current[index].messages = buildAIChatConversationUpdate(
-                                current[index],
-                                assistantMessageId,
-                                state,
-                                { isStreaming: true },
-                            ).messages || current[index].messages;
-                            setConversations(current);
-                        }
+                        setConversations(current => current.map(conversation => conversation.id === activeId
+                            ? { ...conversation, ...buildAIChatConversationUpdate(
+                                conversation, assistantMessageId, state, { isStreaming: true },
+                            ) }
+                            : conversation));
                         lastUpdateTimestamp = Date.now();
                     },
                 });

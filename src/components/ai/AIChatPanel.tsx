@@ -190,12 +190,10 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<TextAreaRef>(null);
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    };
-
     useEffect(() => {
-        scrollToBottom();
+        messagesEndRef.current?.scrollIntoView({
+            behavior: messages.some(message => message.isStreaming) ? 'auto' : 'smooth',
+        });
     }, [messages]);
 
     // --- Keyboard Shortcuts ---

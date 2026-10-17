@@ -109,6 +109,7 @@ const DiagramViewer: React.FC = () => {
     const roomFromUrl = getDiagramViewerRouteParam(searchParams, browserLocation, 'room');
     const {
         activeUsers,
+        collaborationRuntime,
         collaborationStatus,
         coordinationProblem,
         retryCollaboration,
@@ -658,6 +659,7 @@ const DiagramViewer: React.FC = () => {
             onExportPermissionCheck={handleExportPermissionCheck}
             isYjsSynced={isYjsSynced}
             collaborationStatus={collaborationStatus}
+            collaborationRuntime={collaborationRuntime}
             coordinationProblem={coordinationProblem}
             retryCollaboration={retryCollaboration}
             restoreCloudRoom={restoreCloudRoom}

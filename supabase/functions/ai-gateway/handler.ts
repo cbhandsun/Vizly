@@ -108,6 +108,7 @@ export const handleAIGatewayRequest = async (
       apiKey: parsed.value.provider.apiKey,
       baseURL: baseUrlResult.baseURL,
       modelId: parsed.value.model,
+      apiMode: parsed.value.provider.apiMode,
     }),
     messages: parsed.value.messages.map((message, index) => (
       index === 0 && message.role === 'system' && parsed.value.toolMode === 'diagram'

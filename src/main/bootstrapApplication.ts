@@ -20,8 +20,8 @@ export interface DataRegistryWarmupOptions {
 }
 
 const loadDataRegistry = async (): Promise<void> => {
-  const { initializeDataRegistry } = await import('@/data/DataRegistry');
-  await initializeDataRegistry();
+  // Warm the module only. Catalog consumers initialize it when they need it.
+  await import('@/data/DataRegistry');
 };
 
 const getBrowserWindow = (): WarmupWindowLike | undefined => (

@@ -2,7 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 const port = Number(process.env.VIZLY_S3_E2E_PORT ?? 5443);
 if (!Number.isSafeInteger(port) || port < 1 || port > 65535) throw new Error('Invalid S3 browser server port');
-const buildDirectory = `dist/e2e-s3-${process.pid}`;
+const buildDirectory = `tmp/e2e-s3-${process.pid}`;
 
 export default defineConfig({
   testDir: './integration/browser',

@@ -10,7 +10,7 @@ vi.mock('../diagrams/collaboration/collaborationRecoveryClient', async importOri
   const actual = await importOriginal<typeof import('../diagrams/collaboration/collaborationRecoveryClient')>();
   return { ...actual, createCollaborationRecoveryClient: () => ({ inspect: fixture.inspect, recover: fixture.recover }) };
 });
-vi.mock('../diagrams/collaboration/YjsProviderHooks', () => ({ useYjsCollaboration: (options: { onRemoteSnapshot: typeof fixture.remote }) => {
+vi.mock('../diagrams/collaboration/useDeferredYjsCollaboration', () => ({ useDeferredYjsCollaboration: (options: { onRemoteSnapshot: typeof fixture.remote }) => {
   fixture.remote = options.onRemoteSnapshot;
   return { coordinationProblem: 'cloud-conflict', isSynced: false, accessRole: 'editor', wsStatus: 'disconnected', activeUsers: [], provider: null, retryCollaboration: fixture.retry, pushLocalChangesToYjs: vi.fn() };
 } }));

@@ -3,7 +3,7 @@ import { defineConfig } from '@playwright/test';
 const port = Number(process.env.VIZLY_E2E_PORT ?? 5410);
 if (!Number.isSafeInteger(port) || port < 1 || port > 65535) throw new Error('Invalid browser test server port');
 const baseURL = `http://127.0.0.1:${port}`;
-const buildDirectory = `dist/e2e-main-${process.pid}`;
+const buildDirectory = `tmp/e2e-main-${process.pid}`;
 
 export default defineConfig({
   testDir: './e2e',

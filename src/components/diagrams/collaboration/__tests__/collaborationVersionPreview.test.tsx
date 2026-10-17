@@ -1,5 +1,6 @@
+import { renderCollaborationHook } from './renderCollaborationHook';
 import { useEffect, useState } from 'react';
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, waitFor } from '@testing-library/react';
 import type { Edge, Node } from '@xyflow/react';
 import * as Y from 'yjs';
 import * as encoding from 'lib0/encoding';
@@ -61,7 +62,8 @@ describe('version preview remains local during collaboration', () => {
   });
   afterEach(() => vi.unstubAllEnvs());
   it('never publishes a historical preview into the shared document', async () => {
-    const hook = renderHook(useHarness); const provider = grant();
+    const hook = renderCollaborationHook(useHarness, value => value.collaboration.collaborationRuntime);
+    await waitFor(() => expect(fixture.providers).toHaveLength(1)); const provider = grant();
     await waitFor(() => expect(provider.doc.getMap('flowchart-nodes').has('live')).toBe(true));
     await act(async () => { await hook.result.current.history.enterPreview('v1', hook.result.current.setNodes, hook.result.current.setEdges, () => hook.result.current.nodes, () => []); });
     expect(hook.result.current.nodes[0].id).toBe('history');
@@ -70,7 +72,8 @@ describe('version preview remains local during collaboration', () => {
     hook.unmount();
   });
   it('retains incoming peer edits while previewing and restores the newest live canvas on exit', async () => {
-    const hook = renderHook(useHarness); const provider = grant();
+    const hook = renderCollaborationHook(useHarness, value => value.collaboration.collaborationRuntime);
+    await waitFor(() => expect(fixture.providers).toHaveLength(1)); const provider = grant();
     await act(async () => { await hook.result.current.history.enterPreview('v1', hook.result.current.setNodes, hook.result.current.setEdges, () => hook.result.current.nodes, () => []); });
     act(() => {
       const remote = new Y.Doc();
@@ -88,7 +91,8 @@ describe('version preview remains local during collaboration', () => {
     hook.unmount();
   });
   it('cancels restore when a peer changes the live canvas while the safety backup is pending', async () => {
-    const hook = renderHook(useHarness); const provider = grant();
+    const hook = renderCollaborationHook(useHarness, value => value.collaboration.collaborationRuntime);
+    await waitFor(() => expect(fixture.providers).toHaveLength(1)); const provider = grant();
     await act(async () => { await hook.result.current.history.enterPreview('v1', hook.result.current.setNodes, hook.result.current.setEdges, () => hook.result.current.nodes, () => []); });
     let resolveBackup: ((value: unknown) => void) | undefined;
     storage.saveVersion.mockImplementation(() => new Promise(resolve => { resolveBackup = resolve; }));

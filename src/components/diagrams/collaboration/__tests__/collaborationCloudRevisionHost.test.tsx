@@ -1,4 +1,5 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { renderCollaborationHook } from './renderCollaborationHook';
+import { act, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
 import * as encoding from 'lib0/encoding';
@@ -38,8 +39,9 @@ describe('trusted collaboration revision commits through the active designer', (
     const replace = vi.fn<() => void>(() => { throw new Error('Synthetic canvas failure'); });
     const bridge = { id, metadata: { cloud: { provider: 'supabase', id, revision: oldRevision } },
       isCanvasReady: () => ready, replaceCanvasSnapshot: replace };
-    const unregister = registerFlowDataBridge(id, bridge), hook = renderHook(useHost);
+    const unregister = registerFlowDataBridge(id, bridge), hook = renderCollaborationHook(useHost, value => value.collaborationRuntime);
     try {
+      await waitFor(() => expect(fixture.providers).toHaveLength(1));
       signal(); expect(replace).not.toHaveBeenCalled(); expect(bridge.metadata.cloud.revision).toBe(oldRevision);
       ready = true;
       await waitFor(() => expect(replace).toHaveBeenCalled());
@@ -53,8 +55,9 @@ describe('trusted collaboration revision commits through the active designer', (
     const replace = vi.fn();
     const bridge = { id, metadata: { cloud: { provider: 'supabase', id, revision: oldRevision } },
       isCanvasReady: () => true, replaceCanvasSnapshot: replace };
-    const unregister = registerFlowDataBridge(id, bridge), hook = renderHook(useHost);
+    const unregister = registerFlowDataBridge(id, bridge), hook = renderCollaborationHook(useHost, value => value.collaborationRuntime);
     try {
+      await waitFor(() => expect(fixture.providers).toHaveLength(1));
       act(() => { expect(beginVersionPreview(id, { nodes: [], edges: [] })).toBe(true); });
       signal(); expect(replace).not.toHaveBeenCalled(); expect(bridge.metadata.cloud.revision).toBe(oldRevision);
       act(() => { expect(endVersionPreview(id)).toEqual({ nodes: [node], edges: [] }); });

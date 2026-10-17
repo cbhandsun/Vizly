@@ -87,6 +87,7 @@ interface DiagramViewerViewProps {
     onExportPermissionCheck: (format: DiagramExportFormat) => boolean;
     isYjsSynced: boolean;
     collaborationStatus: DiagramCollaborationStatus;
+    collaborationRuntime?: React.ReactNode;
     coordinationProblem?: CoordinationProblem | null;
     retryCollaboration?: () => void;
     restoreCloudRoom?: () => Promise<void>;
@@ -164,6 +165,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
     onExportPermissionCheck,
     isYjsSynced,
     collaborationStatus,
+    collaborationRuntime,
     coordinationProblem,
     retryCollaboration,
     restoreCloudRoom,
@@ -257,6 +259,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                 showMenu={false}
             >
                 {/* Host actions are now unified in the designer's internal toolbar islands */}
+                {collaborationRuntime}
 
                 {isCommandOpen && <DeferredCommandPalette
                     open={isCommandOpen}

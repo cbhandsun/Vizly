@@ -98,6 +98,8 @@ test('late Supabase identity starts collaboration and removing it closes the con
       const bridge = window.__flowDataBridge?.[id];
       if (!bridge) throw new Error('Ready identity fixture bridge unavailable');
       bridge.metadata = { ...bridge.metadata, cloud: { provider: 'supabase', id } };
+      // Match save and bridge producers, which notify after identity changes.
+      window.dispatchEvent(new Event('vizly:flow-data-bridge-identity'));
     }, id);
     await expect.poll(() => connections).toBe(1);
     await expect(page.locator('.presence-header-container')).toContainText('已连接');
@@ -106,6 +108,7 @@ test('late Supabase identity starts collaboration and removing it closes the con
       const bridge = window.__flowDataBridge?.[id];
       if (!bridge) throw new Error('Accepted identity fixture bridge unavailable');
       const metadata = { ...bridge.metadata }; delete metadata.cloud; bridge.metadata = metadata;
+      window.dispatchEvent(new Event('vizly:flow-data-bridge-identity'));
     }, id);
     await expect.poll(() => closed).toBe(1);
     await expect(page.locator('.presence-header-container')).toHaveCount(0);

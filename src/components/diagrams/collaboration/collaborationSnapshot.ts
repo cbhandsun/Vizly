@@ -1,5 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
-import { readCollaborationElement } from '../../../../server/collaboration/documentModel';
+import { readCollaborationJsonElement } from '../../../../server/collaboration/jsonElement';
 import { coerceClipboardData } from '@vizly/core/diagram-import';
 
 export const COLLABORATION_MAX_NODES = 1000;
@@ -31,10 +31,10 @@ const validateJsonBudget = (value: unknown, budget: { bytes: number }, depth = 0
     return true;
 };
 
-const readElements = (entries: Iterable<[string, unknown]>, maxCount: number, budget: { bytes: number }): unknown[] | null => {
+const readElements = (entries: Iterable<[string, unknown]>, maxCount: number, budget: { bytes: number }, readElement: typeof readCollaborationJsonElement): unknown[] | null => {
     const elements: unknown[] = [];
     for (const [key, raw] of entries) {
-        const value = readCollaborationElement(raw);
+        const value = readElement(raw);
         if (elements.length >= maxCount || !value || typeof value !== 'object' || Array.isArray(value)) return null;
         if (key !== key.trim() || [...key].some(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)
             || (value as Record<string, unknown>).id !== key || !validateJsonBudget(value, budget)) return null;
@@ -43,15 +43,26 @@ const readElements = (entries: Iterable<[string, unknown]>, maxCount: number, bu
     return elements;
 };
 
+/** The same cumulative budget used by the full parser, before clipboard coercion. */
+export const inspectCollaborationElementBudget = (input: unknown): { bytes: number; fingerprint: string } | null => {
+    try {
+        const value = readCollaborationJsonElement(input);
+        const budget = { bytes: 0 };
+        return value && validateJsonBudget(value, budget)
+            ? { bytes: budget.bytes, fingerprint: JSON.stringify(value) } : null;
+    } catch { return null; }
+};
+
 /** Reject an invalid batch atomically, preserving the last usable canvas. */
 export const parseCollaborationSnapshot = (
     nodeEntries: Iterable<[string, unknown]>,
     edgeEntries: Iterable<[string, unknown]>,
+    readElement: typeof readCollaborationJsonElement = readCollaborationJsonElement,
 ): { nodes: Node[]; edges: Edge[] } | null => {
   try {
     const budget = { bytes: 0 };
-    const nodes = readElements(nodeEntries, COLLABORATION_MAX_NODES, budget);
-    const edges = readElements(edgeEntries, COLLABORATION_MAX_EDGES, budget);
+    const nodes = readElements(nodeEntries, COLLABORATION_MAX_NODES, budget, readElement);
+    const edges = readElements(edgeEntries, COLLABORATION_MAX_EDGES, budget, readElement);
     if (!nodes || !edges) return null;
     if (nodes.length === 0) return edges.length === 0 ? { nodes: [], edges: [] } : null;
     const snapshot = coerceClipboardData({ nodes, edges });

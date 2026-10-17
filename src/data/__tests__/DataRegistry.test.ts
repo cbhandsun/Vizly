@@ -3,6 +3,7 @@ import { dataRegistry, normalizeLocalDiagramForRegistry } from '../DataRegistry'
 import { localDB } from '../../services/IndexedDBStorage';
 import * as presetLoader from '../standardized/presetLoader';
 import type { StandardDiagramData } from '@vizly/core/types';
+import { STANDARD_PRESET_KEYS, type StandardPresetKey } from '../standardized/presetMetadata';
 
 const makeLocalDiagram = (overrides: Record<string, unknown> = {}) => ({
   id: 'local-diagram',
@@ -35,7 +36,7 @@ describe('DataRegistry local diagram normalization', () => {
   it('propagates local storage read failures and allows initialization to retry', async () => {
     dataRegistry.reset();
     const failure = new Error('controlled local storage failure');
-    vi.spyOn(presetLoader, 'loadStandardPresetById').mockResolvedValue(makeLocalDiagram() as unknown as StandardDiagramData);
+    vi.spyOn(presetLoader, 'loadStandardPresetCatalog').mockResolvedValue(Object.fromEntries(STANDARD_PRESET_KEYS.map(key => [key, makeLocalDiagram()])) as unknown as Record<StandardPresetKey, StandardDiagramData>);
     const read = vi.spyOn(localDB, 'listDiagrams').mockRejectedValueOnce(failure).mockResolvedValue([]);
     await expect(dataRegistry.initialize()).rejects.toBe(failure);
     expect(read).toHaveBeenCalledOnce();

@@ -4,7 +4,7 @@ import { flushSync } from 'react-dom';
 import { resolveDiagramCollaborationStatus } from '@vizly/core/collaboration';
 import { getFlowDataBridge } from '@vizly/core/diagram-data';
 import type { Edge, Node } from '@xyflow/react';
-import { useYjsCollaboration } from './diagrams/collaboration/YjsProviderHooks';
+import { useDeferredYjsCollaboration } from './diagrams/collaboration/useDeferredYjsCollaboration';
 import { useCloudCollaborationIdentity } from './useCloudCollaborationIdentity';
 import {
   normalizeCollaborationServerUrl,
@@ -74,7 +74,7 @@ export const useDiagramViewerCollaboration = ({
   }, [selectedDiagramId, recoveryContext]);
   const isLocalSnapshotReady = useCallback(() => getFlowDataBridge(selectedDiagramId)?.isCanvasReady?.() === true, [selectedDiagramId]);
   const collaborationEnabled = Boolean(serverUrl) && wantsCollaboration && roomBinding.valid;
-  const collaboration = useYjsCollaboration({
+  const collaboration = useDeferredYjsCollaboration({
     userId,
     roomName,
     serverUrl,

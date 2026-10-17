@@ -8,7 +8,8 @@ import {
     normalizeCollaborationToken,
 } from './collaborationSecurity';
 import { logUiStorageReadFailure, logUiStorageWriteFailure, safeLog } from '@vizly/core/logging';
-import { parseCollaborationSnapshot } from './collaborationSnapshot';
+import { areCollaborationElementsEqual, parseCollaborationSnapshot } from './collaborationSnapshot';
+import { createLocalCollaborationSnapshotCache } from './localCollaborationSnapshotCache';
 import { publishCollaborationElement, readCollaborationElement } from '../../../../server/collaboration/documentModel';
 import { createCollaborationConnectionState } from './collaborationConnectionState';
 import { COLLABORATION_ACCESS_MESSAGE, readCollaborationAccess } from './collaborationAccessProtocol';
@@ -172,12 +173,14 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         [userId, storedLocalUser]);
 
     // Capture owned JSON values so a later caller mutation cannot change the baseline.
-    const lastSyncedNodesRef = useRef<Map<string, unknown>>(new Map());
-    const lastSyncedEdgesRef = useRef<Map<string, unknown>>(new Map());
+    const lastSyncedNodesRef = useRef<Map<string, Node>>(new Map());
+    const localSnapshotCache = useMemo(() => createLocalCollaborationSnapshotCache(), []);
+    const lastSyncedEdgesRef = useRef<Map<string, Edge>>(new Map());
 
     useEffect(() => {
         connectionState.update({ synced: false, canWrite: false, accessRole: null, activeUsers: [], wsStatus: 'disconnected', provider: null, coordinationProblem: null });
         lastSyncedNodesRef.current.clear();
+        localSnapshotCache.clear();
         lastSyncedEdgesRef.current.clear();
         pendingRemoteSnapshotRef.current = null;
         remoteCommitFailureReportedRef.current = false;
@@ -220,7 +223,7 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         let acceptedCloudRevision: AcceptedCloudRevision | null = null;
         const applyRemoteSnapshot = () => {
             if (!isCurrentConnection() || connectionState.getSnapshot().coordinationProblem) return;
-            const snapshot = parseCollaborationSnapshot(yNodes.entries(), yEdges.entries());
+            const snapshot = parseCollaborationSnapshot(yNodes.entries(), yEdges.entries(), readCollaborationElement);
             if (!snapshot) {
                 safeLog.warn('[Collaboration] Rejected invalid remote canvas snapshot.');
                 return;
@@ -289,8 +292,12 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         // The local identity was set before subscribing; publish that initial state too.
         handleAwarenessChange();
 
+        const processedRemoteTransactions = new WeakSet<Y.Transaction>();
         const handleRemoteElementChange = (_events: unknown, transaction: Y.Transaction) => {
-            if (!transaction.local) applyRemoteSnapshot();
+            if (!transaction.local && !processedRemoteTransactions.has(transaction)) {
+                processedRemoteTransactions.add(transaction);
+                applyRemoteSnapshot();
+            }
         };
 
         yNodes.observeDeep(handleRemoteElementChange);
@@ -309,7 +316,7 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
             provider.destroy();
             ydoc.destroy();
         };
-    }, [roomName, serverUrl, token, enabled, localUser, connectionState, retryPendingRemoteSnapshot, connectionAttempt]);
+    }, [roomName, serverUrl, token, enabled, localUser, connectionState, retryPendingRemoteSnapshot, connectionAttempt, localSnapshotCache]);
 
     const pushLocalChangesToYjs = (nodes: Node[], edges: Edge[]) => {
         const connection = connectionRef.current;
@@ -335,10 +342,7 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
             return;
         }
         
-        const snapshot = parseCollaborationSnapshot(
-            nodes.map(node => [node.id, node] as [string, unknown]),
-            edges.map(edge => [edge.id, edge] as [string, unknown]),
-        );
+        const snapshot = localSnapshotCache.parse(nodes, edges);
         if (!snapshot) {
             safeLog.warn('[Collaboration] Invalid local snapshot; publication blocked.');
             return;
@@ -346,14 +350,16 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         doc.transact(() => {
             // 1. Process Nodes
             const removedLocalNodeKeys = new Set(lastSyncedNodesRef.current.keys());
-            const newNodesCache = new Map<string, unknown>();
+            const newNodesCache = new Map<string, Node>();
             
             snapshot.nodes.forEach(n => {
-                newNodesCache.set(n.id, readCollaborationElement(n));
+                newNodesCache.set(n.id, n);
                 removedLocalNodeKeys.delete(n.id); // Only delete elements previously seen locally.
                 
                 const lastSynced = lastSyncedNodesRef.current.get(n.id);
-                publishCollaborationElement(yNodes, n.id, n, lastSynced);
+                if (!lastSynced || !areCollaborationElementsEqual(n, lastSynced)) {
+                    publishCollaborationElement(yNodes, n.id, n, lastSynced);
+                }
             });
             // Delete removed nodes
             removedLocalNodeKeys.forEach(k => yNodes.delete(k));
@@ -361,14 +367,16 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
 
             // 2. Process Edges
             const removedLocalEdgeKeys = new Set(lastSyncedEdgesRef.current.keys());
-            const newEdgesCache = new Map<string, unknown>();
+            const newEdgesCache = new Map<string, Edge>();
             
             snapshot.edges.forEach(e => {
-                newEdgesCache.set(e.id, readCollaborationElement(e));
+                newEdgesCache.set(e.id, e);
                 removedLocalEdgeKeys.delete(e.id);
                 
                 const lastSynced = lastSyncedEdgesRef.current.get(e.id);
-                publishCollaborationElement(yEdges, e.id, e, lastSynced);
+                if (!lastSynced || !areCollaborationElementsEqual(e, lastSynced)) {
+                    publishCollaborationElement(yEdges, e.id, e, lastSynced);
+                }
             });
             removedLocalEdgeKeys.forEach(k => yEdges.delete(k));
             lastSyncedEdgesRef.current = newEdgesCache; // Update cache

@@ -4,6 +4,12 @@ This repository contains the open application layer for Vizly. The proprietary e
 
 Once released, the packages are installable anonymously from npm. The MIT license for this application does not cover the proprietary `@vizly/core` package; commercial production deployment of Core requires separate authorization.
 
+This website release pins its accepted compiled Core package under `vendor/`.
+`npm ci` installs that artifact using the integrity recorded in the lockfile;
+the package contains compiled code and declarations, without private sources.
+Its SHA256 is `b144a649eec9476f18e104463d4c995fc1ddff3466b73c64990aa0c8fa3b497e`.
+This local package delivery does not publish a new npm SDK version.
+
 ## Development
 
 For email/password and Magic Link sign-in, copy `.env.example` to `.env.local`

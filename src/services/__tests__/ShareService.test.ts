@@ -5,6 +5,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const mockSupabase = vi.hoisted(() => ({
     auth: {
         getUser: vi.fn(),
+        // Existing fixtures describe user/error; adapt them to the browser session contract.
+        getSession: async () => {
+            const result = await mockSupabase.auth.getUser();
+            return { data: { session: result.data.user ? { user: result.data.user, access_token: 'synthetic-session' } : null }, error: result.error };
+        },
     },
     rpc: vi.fn(),
     from: vi.fn(),
