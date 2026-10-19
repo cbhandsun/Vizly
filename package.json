@@ -46,7 +46,7 @@
     "@types/d3-force": "3.0.10",
     "@types/dagre": "0.7.54",
     "@vizly/contracts": "0.1.0-alpha.2",
-    "@vizly/core": "file:vendor/vizly-core-0.1.0-alpha.8-2b7d284cf3ef2e52.tgz",
+    "@vizly/core": "file:vendor/vizly-core-0.1.0-alpha.8-0cd6b6557b6d49e1.tgz",
     "@xyflow/react": "12.11.2",
     "ai": "7.0.107",
     "antd": "6.5.2",
@@ -61,6 +61,7 @@
     "immer": "11.1.15",
     "jspdf": "4.2.1",
     "jszip": "3.10.1",
+    "lib0": "0.2.118",
     "lucide-react": "1.27.0",
     "marked": "18.0.7",
     "mind-elixir": "5.14.0",
@@ -82,16 +83,16 @@
     "svg2pdf.js": "2.8.1",
     "three": "0.185.1",
     "web-worker": "1.5.0",
+    "ws": "8.21.1",
+    "y-protocols": "1.0.7",
     "y-websocket": "3.0.0",
     "yjs": "13.6.31",
     "zod": "4.3.6",
-    "zustand": "5.0.14",
-    "lib0": "0.2.118",
-    "y-protocols": "1.0.7",
-    "ws": "8.21.1"
+    "zustand": "5.0.14"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.63.0",
     "@tailwindcss/vite": "4.3.3",
     "@testing-library/jest-dom": "7.0.0",
     "@testing-library/react": "16.3.2",
@@ -99,6 +100,7 @@
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
     "@types/three": "0.185.1",
+    "@types/ws": "8.18.2",
     "@typescript/native": "npm:typescript@7.0.2",
     "@vitejs/plugin-react": "6.0.4",
     "@vitest/coverage-v8": "4.1.11",
@@ -112,9 +114,7 @@
     "typescript": "npm:@typescript/typescript6@6.0.2",
     "typescript-eslint": "8.65.0",
     "vite": "8.1.5",
-    "vitest": "4.1.11",
-    "@playwright/test": "1.63.0",
-    "@types/ws": "8.18.2"
+    "vitest": "4.1.11"
   },
   "overrides": {
     "dompurify": "^3.4.13",
