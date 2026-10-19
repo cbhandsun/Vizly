@@ -2,7 +2,8 @@
 
 import '@testing-library/jest-dom/vitest';
 import type { ReactNode } from 'react';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { ConfigProvider } from 'antd';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -77,7 +78,16 @@ const renderStorageConfig = (initialEntries = ['/storage-config']) => {
         initialIndex: initialEntries.length - 1,
     });
 
-    return { router, ...render(<RouterProvider router={router} />) };
+    // These tests exercise validation and recovery, while browser tests cover paint.
+    // Disable decorative motion so field feedback does not depend on animation frames.
+    return {
+        router,
+        ...render(
+            <ConfigProvider theme={{ token: { motion: false } }}>
+                <RouterProvider router={router} />
+            </ConfigProvider>,
+        ),
+    };
 };
 
 beforeEach(() => {
@@ -598,32 +608,35 @@ describe('StorageConfigPage validation recovery', () => {
 
     it('offers an explicit cancel action during a connection test and restores editing', async () => {
         storageMocks.testConnection.mockImplementationOnce(() => new Promise<void>(() => {}));
-        renderStorageConfig();
-        fireEvent.change(screen.getByPlaceholderText('https://...'), {
+        const { container } = renderStorageConfig();
+        const form = container.querySelector('form');
+        if (!form) throw new Error('Expected the storage configuration form');
+        const fields = within(form);
+        fireEvent.change(fields.getByPlaceholderText('https://...'), {
             target: { value: 'https://storage.example.com' },
         });
-        fireEvent.change(screen.getByPlaceholderText('my-diagrams-bucket'), {
+        fireEvent.change(fields.getByPlaceholderText('my-diagrams-bucket'), {
             target: { value: 'vizly-audit-bucket' },
         });
-        fireEvent.change(screen.getByPlaceholderText('storageConfig.form.accessKeyPlaceholder'), {
+        fireEvent.change(fields.getByPlaceholderText('storageConfig.form.accessKeyPlaceholder'), {
             target: { value: 'AUDIT_ACCESS_KEY' },
         });
-        fireEvent.change(screen.getByPlaceholderText('storageConfig.form.secretKeyPlaceholder'), {
+        fireEvent.change(fields.getByPlaceholderText('storageConfig.form.secretKeyPlaceholder'), {
             target: { value: 'AUDIT_SECRET_KEY' },
         });
 
-        fireEvent.click(screen.getByRole('button', { name: 'storageConfig.form.testBtn' }));
+        fireEvent.click(fields.getByRole('button', { name: 'storageConfig.form.testBtn' }));
         await waitFor(() => expect(storageMocks.testConnection).toHaveBeenCalledTimes(1));
         const signal = storageMocks.testConnection.mock.calls[0]?.[1] as AbortSignal | undefined;
-        const cancelButton = screen.getByRole('button', { name: 'storageConfig.form.cancelTestBtn' });
+        const cancelButton = fields.getByRole('button', { name: 'storageConfig.form.cancelTestBtn' });
         expect(cancelButton).toBeEnabled();
 
         fireEvent.click(cancelButton);
         expect(signal?.aborted).toBe(true);
-        expect(screen.queryByRole('button', { name: 'storageConfig.form.cancelTestBtn' })).not.toBeInTheDocument();
+        expect(fields.queryByRole('button', { name: 'storageConfig.form.cancelTestBtn' })).not.toBeInTheDocument();
         expect(screen.getByText('storageConfig.status.dirty')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'storageConfig.form.saveBtn' })).toBeEnabled();
-        expect(screen.getByRole('button', { name: 'storageConfig.form.testBtn' })).toBeEnabled();
+        expect(fields.getByRole('button', { name: 'storageConfig.form.saveBtn' })).toBeEnabled();
+        expect(fields.getByRole('button', { name: 'storageConfig.form.testBtn' })).toBeEnabled();
     });
 
     it('restores a clean saved status when cancelling a test without configuration changes', async () => {
