@@ -223,7 +223,17 @@ const DiagramViewer: React.FC = () => {
             if (cancelled) return;
             try {
                 const dataService = dataRegistry.getDataService();
-                const loadedDiagram = dataService.getDiagram(selectedDiagramId);
+                let loadedDiagram = dataService.getDiagram(selectedDiagramId);
+                if (!loadedDiagram) {
+                    const { localDB } = await import('@/services/IndexedDBStorage');
+                    const raw = await localDB.loadDiagram(selectedDiagramId);
+                    if (raw && typeof raw === 'object') {
+                        const { normalizeLocalDiagramForRegistry } = await import('@/data/DataRegistry');
+                        const normalized = normalizeLocalDiagramForRegistry(raw);
+                        dataService.registerDiagram(normalized, false);
+                        loadedDiagram = normalized;
+                    }
+                }
                 setLoadedDocType({
                     diagramId: selectedDiagramId,
                     type: loadedDiagram?.type,
