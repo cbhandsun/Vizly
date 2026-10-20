@@ -36,7 +36,7 @@ export interface DiagramViewerTemplateSelectionDependencies {
     parseRemoteContent: (
         content: unknown,
         fallback: { id: string; title?: string },
-    ) => DiagramViewerTemplateData;
+    ) => DiagramViewerTemplateData | Promise<DiagramViewerTemplateData>;
     seedAndNavigate: (
         data: DiagramViewerTemplateData,
         id: string,
@@ -124,7 +124,8 @@ export async function selectDiagramViewerTemplate(
                 dependencies.showError(dependencies.translate('storage.manager.noContent'));
                 return;
             }
-            const parsed = dependencies.parseRemoteContent(remote.content, remote);
+            const parsed = await dependencies.parseRemoteContent(remote.content, remote);
+            if (!context.isCurrent()) return;
             await dependencies.seedAndNavigate(withRemoteMetadata(parsed, remote, provider), remote.id, context);
         } catch (error) {
             if (context.isCurrent()) {
@@ -148,7 +149,8 @@ export async function selectDiagramViewerTemplate(
                 dependencies.showError(dependencies.translate('storage.manager.noContent'));
                 return;
             }
-            const parsed = dependencies.parseRemoteContent(remote.content, remote);
+            const parsed = await dependencies.parseRemoteContent(remote.content, remote);
+            if (!context.isCurrent()) return;
             await dependencies.seedAndNavigate(withRemoteMetadata(parsed, remote), remote.id, context);
         } catch (error) {
             if (context.isCurrent()) {

@@ -177,12 +177,13 @@ export const EnhancedStyleSwitcher: React.FC<EnhancedStyleSwitcherProps> = ({
     const buttonSizeClass = size === 'sm' ? 'h-8 px-2.5 text-[12px]' : 'h-10 px-3.5 text-[13px]';
 
     const categories = useMemo(() => {
+        if (!isOpen) return [];
         return diagramStyleManager.getCategories().map((cat) => ({
             id: cat,
             ...diagramStyleManager.getCategoryMeta(cat),
             presets: diagramStyleManager.getPresetsByCategory(cat),
         }));
-    }, []);
+    }, [isOpen]);
 
     const handleClose = useCallback(() => setIsOpen(false), []);
     const { containerRef: panelRef, handleKeyDown: handlePanelKeyDown } = useModalFocusTrap<HTMLDivElement>({

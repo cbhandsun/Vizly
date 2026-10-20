@@ -21,8 +21,11 @@ import { shouldHideDiagramViewerCenterIsland } from './diagramViewerChrome';
 import { SettingsPanelBoundary } from './ui/SettingsPanelBoundary';
 import { DraggableSettingsPanel } from './ui/DraggableSettingsPanel';
 import { DeferredCommandPalette } from './ui/DeferredCommandPalette';
-import { CollaborationRecoveryBanner } from './diagrams/ui/CollaborationRecoveryBanner';
 import type { CoordinationProblem } from '../../server/collaboration/coordinationStatus';
+
+const CollaborationRecoveryBanner = lazy(() => import('./diagrams/ui/CollaborationRecoveryBanner').then(module => ({
+    default: module.CollaborationRecoveryBanner,
+})));
 
 const RoutingDebugPanel = import.meta.env.DEV
     ? lazy(() => import('./debug/RoutingDebugPanel').then(module => ({ default: module.RoutingDebugPanel })))
@@ -298,12 +301,16 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
 
                 {/* Main Content Area */}
                 <div id={`diagram-${selectedDiagramId}`} className={`flex-1 flex flex-col relative bg-surface ${isFullscreen ? 'fixed inset-0 z-[1000]' : ''}`} style={{ height: '100%', width: '100%' }}>
-                    {coordinationProblem && retryCollaboration && <CollaborationRecoveryBanner
-                        problem={coordinationProblem}
-                        onSaveCopy={() => handleSaveTo('local')}
-                        onRetry={retryCollaboration}
-                        onRestore={restoreCloudRoom}
-                    />}
+                    {coordinationProblem && retryCollaboration && (
+                        <Suspense fallback={null}>
+                            <CollaborationRecoveryBanner
+                                problem={coordinationProblem}
+                                onSaveCopy={() => handleSaveTo('local')}
+                                onRetry={retryCollaboration}
+                                onRestore={restoreCloudRoom}
+                            />
+                        </Suspense>
+                    )}
                     <ConfigProvider
                         getPopupContainer={(trigger) => {
                             if (isFullscreen) {

@@ -3,9 +3,12 @@ import { Layout, Button, ConfigProvider } from 'antd';
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { ModernTopToolbar } from '../ui/ModernTopToolbar';
 import type { TopToolbarProps } from '../ui/TopToolbar';
-import ModernDiagramMenu from '../ModernDiagramMenu';
-import { ModernFlowchartSidebar } from '@vizly/core/flowchart-sidebar';
 import type { DiagramDefinition } from '@vizly/core/types';
+
+const ModernDiagramMenu = React.lazy(() => import('../ModernDiagramMenu'));
+const ModernFlowchartSidebar = React.lazy(() =>
+  import('@vizly/core/flowchart-sidebar').then(module => ({ default: module.ModernFlowchartSidebar }))
+);
 import { diagramConfigManager } from '@vizly/core/config';
 import {
   readDesignerRightSidebarVisible,
@@ -261,13 +264,15 @@ export const DiagramLayout: React.FC<DiagramLayoutProps> = ({
                 }}
                 trigger={null}
               >
-                <ModernDiagramMenu
-                  diagrams={menuProps.diagrams}
-                  selectedDiagram={menuProps.selectedDiagramId}
-                  onSelectDiagram={menuProps.onSelectDiagram}
-                  isCollapsed={menuProps.isCollapsed}
-                  onToggleCollapse={menuProps.onToggleCollapse}
-                />
+                <React.Suspense fallback={null}>
+                  <ModernDiagramMenu
+                    diagrams={menuProps.diagrams}
+                    selectedDiagram={menuProps.selectedDiagramId}
+                    onSelectDiagram={menuProps.onSelectDiagram}
+                    isCollapsed={menuProps.isCollapsed}
+                    onToggleCollapse={menuProps.onToggleCollapse}
+                  />
+                </React.Suspense>
               </Sider>
               <div
                 role="separator"
@@ -333,12 +338,14 @@ export const DiagramLayout: React.FC<DiagramLayoutProps> = ({
           {/* Optional Secondary Sider (Flowchart Tools) */}
           {!isPresentationMode && showFlowchartSidebar && flowchartSidebarProps && (
             <>
-              <ModernFlowchartSidebar
-                isCollapsed={flowchartSidebarProps.isCollapsed}
-                onToggleCollapse={flowchartSidebarProps.onToggleCollapse}
-                width={flowSidebarWidth}
-                collapsedWidth={56}
-              />
+              <React.Suspense fallback={null}>
+                <ModernFlowchartSidebar
+                  isCollapsed={flowchartSidebarProps.isCollapsed}
+                  onToggleCollapse={flowchartSidebarProps.onToggleCollapse}
+                  width={flowSidebarWidth}
+                  collapsedWidth={56}
+                />
+              </React.Suspense>
               <div
                 role="separator"
                 onMouseDown={flowchartSidebarProps.isCollapsed ? undefined : startDragFlow}

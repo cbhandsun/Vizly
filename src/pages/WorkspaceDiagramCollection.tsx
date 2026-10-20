@@ -125,13 +125,37 @@ export const WorkspaceDiagramCollection = ({
   const { t, i18n } = useTranslation();
   const locale = i18n.resolvedLanguage || i18n.language || 'en';
   const unknownTime = t('workspace.unknownTime');
-  const recentCount = Math.min(
-    unifiedItems.filter(item => !isTemplateItem(item)).length,
-    RECENT_WORKSPACE_LIMIT,
-  );
-  const localCount = unifiedItems.filter(item => item.source === 'local').length;
-  const cloudCount = unifiedItems.filter(item => item.source === 's3' || item.source === 'supabase').length;
-  const sharedCount = unifiedItems.filter(isSharedWorkspaceItem).length;
+  const {
+    recentCount,
+    localCount,
+    cloudCount,
+    sharedCount,
+    templateCount,
+    generalTemplateCount,
+  } = React.useMemo(() => {
+    let nonTemplate = 0;
+    let local = 0;
+    let cloud = 0;
+    let shared = 0;
+    let templates = 0;
+    let generalTemplates = 0;
+    for (const item of unifiedItems) {
+      if (!isTemplateItem(item)) nonTemplate += 1;
+      if (item.source === 'local') local += 1;
+      else if (item.source === 's3' || item.source === 'supabase') cloud += 1;
+      else if (item.source === 'template') templates += 1;
+      else if (item.source === 'general_template') generalTemplates += 1;
+      if (isSharedWorkspaceItem(item)) shared += 1;
+    }
+    return {
+      recentCount: Math.min(nonTemplate, RECENT_WORKSPACE_LIMIT),
+      localCount: local,
+      cloudCount: cloud,
+      sharedCount: shared,
+      templateCount: templates,
+      generalTemplateCount: generalTemplates,
+    };
+  }, [unifiedItems]);
   const documentCountsKnown = loadedInventoryScopes.has('documents');
   const templateCountsKnown = loadedInventoryScopes.has('templates');
   const protectedViewRequiresAuth = !isAuthenticated
@@ -281,14 +305,14 @@ export const WorkspaceDiagramCollection = ({
                             <button type="button" className={`filter-tab ${activeView === 'templates' ? 'active' : ''}`} aria-pressed={activeView === 'templates'} data-workspace-filter-view="templates" tabIndex={activeView === 'templates' ? 0 : -1} onClick={() => onActiveViewChange('templates')}>
                                 <LayoutGrid size={14} strokeWidth={2} /> {t('workspace.industryTemplates')}
                                 {renderFilterCount(
-                                    unifiedItems.filter(item => item.source === 'template').length,
+                                    templateCount,
                                     templateCountsKnown,
                                 )}
                             </button>
                             <button type="button" className={`filter-tab ${activeView === 'general_templates' ? 'active' : ''}`} aria-pressed={activeView === 'general_templates'} data-workspace-filter-view="general_templates" tabIndex={activeView === 'general_templates' ? 0 : -1} onClick={() => onActiveViewChange('general_templates')}>
                                 <Blocks size={14} strokeWidth={2} /> {t('workspace.generalTemplates')}
                                 {renderFilterCount(
-                                    unifiedItems.filter(item => item.source === 'general_template').length,
+                                    generalTemplateCount,
                                     templateCountsKnown,
                                 )}
                             </button>
@@ -539,6 +563,8 @@ export const WorkspaceDiagramCollection = ({
                                                                 <img
                                                                     src={thumbnailUrl}
                                                                     alt={item.title}
+                                                                    loading="lazy"
+                                                                    decoding="async"
                                                                     style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                                                                     onError={(e) => {
                                                                         (e.target as HTMLImageElement).style.display = 'none';

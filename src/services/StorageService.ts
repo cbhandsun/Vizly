@@ -8,11 +8,17 @@ import {
     redactSensitiveValue,
     type ValidatedS3StorageConfig,
 } from './storageSecurity';
-import { parseRemoteDiagramJson } from './remoteDiagramContent';
 import { safeLog } from '@vizly/core/logging';
 import { redactSensitiveLogValue } from '@vizly/core/logging';
 import { logUiStorageReadFailure, logUiStorageWriteFailure } from '@vizly/core/logging';
 import { safeJsonParseWithLimit } from '@vizly/core/input';
+
+let remoteDiagramContentModulePromise: Promise<typeof import('./remoteDiagramContent')> | null = null;
+
+const loadRemoteDiagramContentModule = () => {
+    remoteDiagramContentModulePromise ??= import('./remoteDiagramContent');
+    return remoteDiagramContentModulePromise;
+};
 
 export type StorageConfig = ValidatedS3StorageConfig;
 
@@ -326,6 +332,7 @@ export class S3StorageProvider implements IStorageProvider {
             const response = await this.client.getObject(id);
             const str = response.bodyText;
             const fallbackTitle = id.replace(/\.json$/i, '');
+            const { parseRemoteDiagramJson } = await loadRemoteDiagramContentModule();
             const content = parseRemoteDiagramJson(str, { id, title: fallbackTitle });
 
             // Adapt to SavedDiagram

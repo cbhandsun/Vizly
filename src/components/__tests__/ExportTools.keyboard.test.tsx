@@ -22,7 +22,7 @@ const { exportToPNG, appMessageMocks, subscriptionMocks, saveReadinessMocks } = 
 
 vi.mock('@xyflow/react', () => ({
   useReactFlow: () => ({
-    getNodes: () => [{ id: 'node-1' }],
+    getNodes: () => [{ id: 'node-1', position: { x: 120, y: 300 }, width: 240, height: 100 }],
     getEdges: () => [],
     getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
   }),
@@ -386,5 +386,47 @@ describe('ExportTools keyboard menu', () => {
     const trigger = screen.getByRole('button', { name: '导出' });
     expect(trigger.style.height).toBe('var(--commercial-touch-target, 44px)');
     expect(trigger.style.minHeight).toBe('var(--commercial-touch-target, 44px)');
+  });
+
+  it('aligns viewport to diagram top when clicking back-to-top button', async () => {
+    const container = document.createElement('div');
+    container.id = 'diagram-diagram-1';
+    container.className = 'diagram-container';
+    Object.defineProperty(container, 'clientWidth', { value: 1400, configurable: true });
+    Object.defineProperty(container, 'clientHeight', { value: 900, configurable: true });
+    document.body.appendChild(container);
+
+    const setViewport = vi.fn();
+    (window as Window & { reactFlowInstance?: unknown }).reactFlowInstance = {
+      getNodes: () => [{ id: 'node-1', position: { x: 120, y: 300 }, width: 240, height: 100 }],
+      getEdges: () => [],
+      setViewport,
+    };
+
+    try {
+      render(
+        <ExportTools
+          diagramId="diagram-1"
+          diagramName="Diagram"
+          showControls
+        />,
+      );
+
+      const backToTopButton = screen.getByRole('button', { name: 'export.backToTop' }) as HTMLButtonElement;
+      await waitFor(() => expect(backToTopButton.disabled).toBe(false));
+      fireEvent.click(backToTopButton);
+
+      expect(setViewport).toHaveBeenCalledTimes(1);
+      expect(setViewport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          zoom: 1,
+          y: 84 + 16 - 300,
+        }),
+        { duration: 350 },
+      );
+    } finally {
+      container.remove();
+      delete (window as Window & { reactFlowInstance?: unknown }).reactFlowInstance;
+    }
   });
 });

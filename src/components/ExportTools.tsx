@@ -1,14 +1,13 @@
 import React, { useCallback, memo, useState, useEffect, useRef } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { createPortal } from 'react-dom';
-import { FaHome, FaRuler, FaExpand, FaCompress, FaFileImage, FaFilePdf, FaFileCode, FaFileVideo, FaDownload, FaCloudUploadAlt, FaShareAlt, FaFolderOpen } from 'react-icons/fa';
+import { FaArrowUp, FaRuler, FaExpand, FaCompress, FaFileImage, FaFilePdf, FaFileCode, FaFileVideo, FaDownload, FaCloudUploadAlt, FaShareAlt, FaFolderOpen } from 'react-icons/fa';
 import { useDiagramControls } from '@vizly/core/editor-hooks';
 import { useTranslation } from 'react-i18next';
 import { Button, Dropdown, Tooltip, theme } from 'antd';
 import type { MenuProps } from 'antd';
 import { useAuth } from '@/context/useAuth';
 import { useSubscription } from '@/context/useSubscription';
-import { tryAttachDiagramSnapshot } from '@vizly/core/export';
 import { invalidateRemoteDiagramPreview } from '@/services/remoteDiagramPreview';
 import { assertDesignerSaveReady } from '@/services/designerSaveReadiness';
 import { readSavedDiagramId } from '@/services/cloudSaveIdentity';
@@ -20,10 +19,6 @@ import {
   readRegisteredReactFlowSnapshot,
 } from '@vizly/core/rendering';
 import { logCloudSaveEnsureFailure, logCloudSaveFailure } from '@/components/diagrams/hooks/diagramStorageLogging';
-import {
-  downloadFile,
-  focusAvailableExportTrigger,
-} from '@vizly/core/export';
 import type { StandardDiagramData } from '@vizly/core/types';
 import type { DiagramEnsureSavedResult } from '@vizly/core/types';
 import {
@@ -34,15 +29,25 @@ import {
 import { resolveExportPopupContainer } from './exportPopupContainer';
 import { resolveExportableNodeCount, resolveExportMenuAvailability } from './exportMenuAvailability';
 import { useKeyboardAccessibleDropdown } from '@vizly/core/keyboard-dropdown';
-import { ExportProgressOverlay } from './ExportProgressOverlay';
-import { buildMarkdownDiagramExport } from './markdownDiagramExport';
 import { useCanvasViewportReadiness } from './useCanvasViewportReadiness';
+import { applyDiagramBackToTopViewport } from './diagramTopViewport';
 import './ExportTools.css';
 
+const ExportProgressOverlay = React.lazy(() => import('./ExportProgressOverlay').then((m) => ({
+  default: m.ExportProgressOverlay,
+})));
 const ShareDialog = React.lazy(() => import('@/components/diagrams/ShareDialog'));
 const CloudStorageManagerModal = React.lazy(() => import('@/components/storage/CloudStorageManagerModal').then(async (m) => {
   return { default: m.CloudStorageManagerModal };
 }));
+let exportCoreModulePromise: Promise<typeof import('@vizly/core/export')> | null = null;
+const loadExportCoreModule = () => {
+  exportCoreModulePromise ??= import('@vizly/core/export').catch((error) => {
+    exportCoreModulePromise = null;
+    throw error;
+  });
+  return exportCoreModulePromise;
+};
 const loadUnifiedStorage = async () => (await import('../services/UnifiedStorageService')).unifiedStorage;
 const loadDataService = async () => {
   const { dataRegistry } = await import('../data/DataRegistry');
@@ -111,6 +116,13 @@ const ExportTools: React.FC<ExportToolsProps> = ({
     enableMainFlowAnimation,
     { getReactFlowSnapshot },
   );
+  const handleBackToTopClick = useCallback(() => {
+    applyDiagramBackToTopViewport({
+      diagramId,
+      readSnapshot: getReactFlowSnapshot,
+      fallbackBackToTop: handleBackToTop,
+    });
+  }, [diagramId, getReactFlowSnapshot, handleBackToTop]);
   const [isExporting, setIsExporting] = useState(false);
   const [isCancellingExport, setIsCancellingExport] = useState(false);
   const [exportType, setExportType] = useState<'png' | 'pdf' | 'svg' | 'gif' | null>(null);
@@ -128,6 +140,7 @@ const ExportTools: React.FC<ExportToolsProps> = ({
     getFlowDataBridgeNodes(diagramId).length,
   ), [diagramId, reactFlowInstance]);
   const refreshExportableNodeCount = useCallback(() => {
+    void loadExportCoreModule().catch(() => undefined);
     setExportableNodeCount(readExportableNodeCount());
   }, [readExportableNodeCount]);
   const {
@@ -146,12 +159,20 @@ const ExportTools: React.FC<ExportToolsProps> = ({
 
   useEffect(() => {
     if (isExporting || !pendingExportFocusRestoreRef.current) return undefined;
-    const frame = window.requestAnimationFrame(() => {
-      if (focusAvailableExportTrigger(exportMenuButtonRef.current)) {
-        pendingExportFocusRestoreRef.current = false;
-      }
-    });
-    return () => window.cancelAnimationFrame(frame);
+    let cancelled = false;
+    let frame = 0;
+    void loadExportCoreModule().then(({ focusAvailableExportTrigger }) => {
+      if (cancelled) return;
+      frame = window.requestAnimationFrame(() => {
+        if (focusAvailableExportTrigger(exportMenuButtonRef.current)) {
+          pendingExportFocusRestoreRef.current = false;
+        }
+      });
+    }).catch(() => undefined);
+    return () => {
+      cancelled = true;
+      if (frame) window.cancelAnimationFrame(frame);
+    };
   }, [exportMenuButtonRef, isExporting]);
 
   /**
@@ -317,6 +338,10 @@ const ExportTools: React.FC<ExportToolsProps> = ({
        return;
     }
 
+    const [{ buildMarkdownDiagramExport }, { downloadFile }] = await Promise.all([
+      import('./markdownDiagramExport'),
+      loadExportCoreModule(),
+    ]);
     const content = buildMarkdownDiagramExport(diagram, diagramName || 'Untitled', new Date());
 
     downloadFile(content, `${diagramName || 'blueprint'}.md`, 'text/markdown');
@@ -393,6 +418,7 @@ const ExportTools: React.FC<ExportToolsProps> = ({
       const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(diagram.id);
       const finalId = cloudId || (isValidUuid ? diagram.id : crypto.randomUUID());
       const expectedRevision = captureCloudSaveVersion(provider.id, finalId, capturedCloud);
+      const { tryAttachDiagramSnapshot } = await loadExportCoreModule();
       const snap = await tryAttachDiagramSnapshot(diagram, diagramId);
       if (snap.warning) {
         appMessage.warning(t('export.snapshotFailed', { reason: snap.warning }));
@@ -535,12 +561,14 @@ const ExportTools: React.FC<ExportToolsProps> = ({
     <>
       {/* 导出遮罩 */}
       {isExporting && createPortal(
-        <ExportProgressOverlay
-          exportType={exportType}
-          progress={exportProgress}
-          cancelling={isCancellingExport}
-          onCancel={handleCancelExport}
-        />,
+        <React.Suspense fallback={null}>
+          <ExportProgressOverlay
+            exportType={exportType}
+            progress={exportProgress}
+            cancelling={isCancellingExport}
+            onCancel={handleCancelExport}
+          />
+        </React.Suspense>,
         (document.fullscreenElement as HTMLElement | null) || document.body
       )}
 
@@ -548,7 +576,7 @@ const ExportTools: React.FC<ExportToolsProps> = ({
         {showControls && (
           <>
             <Tooltip title={t('export.backToTop')} getPopupContainer={(trigger) => (document.fullscreenElement as HTMLElement) || trigger.parentElement || document.body}>
-              <Button type="text" aria-label={t('export.backToTop')} icon={<FaHome className="text-[13px]" />} onClick={handleBackToTop} disabled={isExporting || !viewportControlsReady} className="w-8 h-8 p-0 border-none flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
+              <Button type="text" aria-label={t('export.backToTop')} icon={<FaArrowUp className="text-[13px]" />} onClick={handleBackToTopClick} disabled={isExporting || !viewportControlsReady} className="w-8 h-8 p-0 border-none flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
             </Tooltip>
             <Tooltip title={t('export.fitScreen')} getPopupContainer={(trigger) => (document.fullscreenElement as HTMLElement) || trigger.parentElement || document.body}>
               <Button type="text" aria-label={t('export.fitScreen')} icon={<FaRuler className="text-[13px]" />} onClick={handleFitDiagram} disabled={isExporting || !viewportControlsReady} className="w-8 h-8 p-0 border-none flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />

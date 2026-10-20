@@ -15,7 +15,6 @@ import { useAuth } from '../context/useAuth';
 import { LayeredConfigManager, ConfigLayer } from '@vizly/core/config';
 import { useCloudSave } from './diagrams/hooks/useCloudSave';
 import { useDiagramViewerCollaboration } from './useDiagramViewerCollaboration';
-import { parseAIDiagramJson } from './ai/aiDiagramImport';
 import {
     logDiagramViewerBridgeCleanupFailure,
     logDiagramViewerDocTypeDetectionFailure,
@@ -59,9 +58,7 @@ import {
     normalizeDiagramSeedData,
 } from './diagramViewerSeedNavigation';
 import { ensureDiagramSwitchConfirmed, readActiveDiagramNodeCount } from './diagramViewerSwitchGuard';
-import { parseRemoteDiagramContent } from '@/services/remoteDiagramContent';
 import { coerceToStandardDiagramData } from '@vizly/core/diagram-data';
-import { importMermaidGraphToDiagram } from './diagramViewerMermaidImport';
 import {
     beginDiagramViewerTemplateSelection,
     coerceRemoteDiagramSelection,
@@ -133,6 +130,7 @@ const DiagramViewer: React.FC = () => {
     // --- Phase 6: Mermaid Import Logic ---
     const handleImportMermaidNodes = useCallback(async (nodes: unknown[], edges: unknown[]): Promise<boolean> => {
         try {
+            const { importMermaidGraphToDiagram } = await import('./diagramViewerMermaidImport');
             const imported = await importMermaidGraphToDiagram({ diagramId: selectedDiagramId, nodes, edges });
             if (imported) return true;
             appMessage.error(t('diagramViewer.canvasNotFound'));
@@ -225,7 +223,17 @@ const DiagramViewer: React.FC = () => {
             if (cancelled) return;
             try {
                 const dataService = dataRegistry.getDataService();
-                const loadedDiagram = dataService.getDiagram(selectedDiagramId);
+                let loadedDiagram = dataService.getDiagram(selectedDiagramId);
+                if (!loadedDiagram) {
+                    const { localDB } = await import('@/services/IndexedDBStorage');
+                    const raw = await localDB.loadDiagram(selectedDiagramId);
+                    if (raw && typeof raw === 'object') {
+                        const { normalizeLocalDiagramForRegistry } = await import('@/data/DataRegistry');
+                        const normalized = normalizeLocalDiagramForRegistry(raw);
+                        dataService.registerDiagram(normalized, false);
+                        loadedDiagram = normalized;
+                    }
+                }
                 setLoadedDocType({
                     diagramId: selectedDiagramId,
                     type: loadedDiagram?.type,
@@ -432,26 +440,30 @@ const DiagramViewer: React.FC = () => {
     }, [selectedDiagramId]);
 
     const handlePreviewAIJson = useCallback((json: string) => {
-        importAIDiagramJsonToBridge({
-            diagramId: selectedDiagramId,
-            json,
-            mode: 'preview',
-            parseJson: parseAIDiagramJson,
+        void import('./ai/aiDiagramImport').then(({ parseAIDiagramJson }) => {
+            importAIDiagramJsonToBridge({
+                diagramId: selectedDiagramId,
+                json,
+                mode: 'preview',
+                parseJson: parseAIDiagramJson,
+            });
         });
     }, [selectedDiagramId]);
 
     const handleApplyAIJson = useCallback((json: string, strategy: 'append' | 'replace' | 'new-diagram' = 'append') => {
-        importAIDiagramJsonToBridge({
-            diagramId: selectedDiagramId,
-            json,
-            mode: 'apply',
-            applyStrategy: strategy,
-            parseJson: parseAIDiagramJson,
-            onNavigateNewDiagram: (newDiagramId) => {
-                saveSelectedDiagramId(newDiagramId);
-                window.location.hash = buildDiagramHashRoute(newDiagramId);
-                window.location.reload();
-            },
+        void import('./ai/aiDiagramImport').then(({ parseAIDiagramJson }) => {
+            importAIDiagramJsonToBridge({
+                diagramId: selectedDiagramId,
+                json,
+                mode: 'apply',
+                applyStrategy: strategy,
+                parseJson: parseAIDiagramJson,
+                onNavigateNewDiagram: (newDiagramId) => {
+                    saveSelectedDiagramId(newDiagramId);
+                    window.location.hash = buildDiagramHashRoute(newDiagramId);
+                    window.location.reload();
+                },
+            });
         });
     }, [selectedDiagramId, saveSelectedDiagramId]);
 
@@ -520,28 +532,6 @@ const DiagramViewer: React.FC = () => {
 
     // 展开后的视图适配统一由 BaseDiagramContainer 负责（避免重复触发造成缩放跳变）
 
-    // Diagram Settings Popover Content
-    const settingsPanel = (
-        <DiagramViewerSettingsPanel
-            selectedDiagram={selectedDiagram}
-            selectedDiagramId={selectedDiagramId}
-            edgeMode={String(edgeMode || 'native')}
-            setEdgeMode={setEdgeMode}
-            layoutStrategy={String(layoutStrategy || '')}
-            setLayoutStrategy={setLayoutStrategy}
-            nodeLayoutStrategy={String(nodeLayoutStrategy)}
-            setNodeLayoutStrategy={setNodeLayoutStrategy}
-            elkAlgorithm={String(elkAlgorithm)}
-            setElkAlgorithm={setElkAlgorithm}
-            linkOrientationEnabled={!!linkOrientationEnabled}
-            showOnlyMainFlow={showOnlyMainFlow}
-            setShowOnlyMainFlow={setShowOnlyMainFlow}
-            setRefreshNonce={setRefreshNonce}
-            isReadonly={isReadonly}
-            isPresentationMode={isPresentationMode}
-        />
-    );
-
     const handleAiTabIntercept = useCallback(() => {
         if (!hasFeature('ai-assistant')) {
             showUpgradeModal(t('diagramViewer.aiAssistant'));
@@ -575,10 +565,13 @@ const DiagramViewer: React.FC = () => {
                 return await loadStandardPresetById(id) as unknown as DiagramViewerTemplateData | null;
             },
             getLocalPreset: (id) => getCustomPreset(id) as unknown as DiagramViewerTemplateData | null,
-            parseRemoteContent: (content, fallback) => parseRemoteDiagramContent(
-                typeof content === 'string' ? content : JSON.stringify(content),
-                { id: fallback.id, title: fallback.title ?? fallback.id },
-            ) as unknown as DiagramViewerTemplateData,
+            parseRemoteContent: async (content, fallback) => {
+                const { parseRemoteDiagramContent } = await import('@/services/remoteDiagramContent');
+                return parseRemoteDiagramContent(
+                    typeof content === 'string' ? content : JSON.stringify(content),
+                    { id: fallback.id, title: fallback.title ?? fallback.id },
+                ) as unknown as DiagramViewerTemplateData;
+            },
             seedAndNavigate: seedAutoSaveAndNavigate,
             clearBlankTemplate: (id) => clearBlankTemplateLocalState(localStorage, id),
             selectDiagram: handleSelectDiagram,
@@ -620,6 +613,27 @@ const DiagramViewer: React.FC = () => {
         setMermaidModalVisible,
         exitPresentation,
     });
+
+    const settingsPanel = isSettingsOpen ? (
+        <DiagramViewerSettingsPanel
+            selectedDiagram={selectedDiagram}
+            selectedDiagramId={selectedDiagramId}
+            edgeMode={String(edgeMode || 'native')}
+            setEdgeMode={setEdgeMode}
+            layoutStrategy={String(layoutStrategy || '')}
+            setLayoutStrategy={setLayoutStrategy}
+            nodeLayoutStrategy={String(nodeLayoutStrategy)}
+            setNodeLayoutStrategy={setNodeLayoutStrategy}
+            elkAlgorithm={String(elkAlgorithm)}
+            setElkAlgorithm={setElkAlgorithm}
+            linkOrientationEnabled={!!linkOrientationEnabled}
+            showOnlyMainFlow={showOnlyMainFlow}
+            setShowOnlyMainFlow={setShowOnlyMainFlow}
+            setRefreshNonce={setRefreshNonce}
+            isReadonly={isReadonly}
+            isPresentationMode={isPresentationMode}
+        />
+    ) : null;
 
     return (
         <DiagramViewerView

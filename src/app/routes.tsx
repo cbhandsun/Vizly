@@ -1,18 +1,27 @@
-
 import React, { Suspense } from 'react';
 import { useLocation } from 'react-router';
 import { coerceSafeStringParam, getQueryOrHashParamFromLocation, type LocationLike, coerceDiagramId } from '@vizly/core/input';
 import { loadDiagramViewerRoute } from './diagramViewerRouteLoader';
 import AppRouteNotFound from './AppRouteNotFound';
 import { resolveAppRouteTarget } from './appRouteResolver';
-
-type LazyPageModule = { default: React.ComponentType };
+import type { LazyPageModule } from './appRoutePrewarm';
+import {
+  loadAntdRouteShellOnce,
+  loadDiagramManagementPage,
+  loadDocsPreviewPage,
+  loadShareViewPage,
+  loadStorageConfigPage,
+  loadThemeColorComparisonPage,
+  loadThemeSideBySideComparisonPage,
+  loadUnifiedDesignerTestPage,
+  loadWarehouse3DPage,
+} from './appRouteLoaders';
 
 const withoutAntdRoute = (loadPage: () => Promise<LazyPageModule>) => React.lazy(loadPage);
 
 const withAntdRoute = (loadPage: () => Promise<LazyPageModule>) => React.lazy(async () => {
   const [{ default: AntdRouteShell }, { default: Page }] = await Promise.all([
-    import('./AntdRouteShell'),
+    loadAntdRouteShellOnce(),
     loadPage(),
   ]);
 
@@ -26,22 +35,22 @@ const withAntdRoute = (loadPage: () => Promise<LazyPageModule>) => React.lazy(as
 });
 
 const DiagramViewerRoute = withAntdRoute(loadDiagramViewerRoute);
-const ThemeColorComparison = import.meta.env.DEV
-  ? withAntdRoute(() => import('@/pages/ThemeColorComparison'))
+const ThemeColorComparison = loadThemeColorComparisonPage
+  ? withAntdRoute(loadThemeColorComparisonPage)
   : null;
-const ThemeSideBySideComparison = import.meta.env.DEV
-  ? withAntdRoute(() => import('@/pages/ThemeSideBySideComparison'))
+const ThemeSideBySideComparison = loadThemeSideBySideComparisonPage
+  ? withAntdRoute(loadThemeSideBySideComparisonPage)
   : null;
 // These self-contained routes use native controls and their own theme styles.
 // Keeping them outside AntdRouteShell prevents the full Ant Design runtime from
 // becoming part of their critical path.
-const DocsPreview = withoutAntdRoute(() => import('@/pages/DocsPreview'));
-const Warehouse3DPage = withoutAntdRoute(() => import('@/pages/Warehouse3DPage'));
-const StorageConfigPage = withAntdRoute(() => import('@/pages/StorageConfigPage'));
-const DiagramManagementPage = withAntdRoute(() => import('@/pages/DiagramManagementPage'));
-const ShareViewPage = withAntdRoute(() => import('@/pages/ShareViewPage'));
-const UnifiedDesignerTestPage = import.meta.env.DEV
-  ? withAntdRoute(() => import('@/pages/UnifiedDesignerTestPage'))
+const DocsPreview = withoutAntdRoute(loadDocsPreviewPage);
+const Warehouse3DPage = withoutAntdRoute(loadWarehouse3DPage);
+const StorageConfigPage = withAntdRoute(loadStorageConfigPage);
+const DiagramManagementPage = withAntdRoute(loadDiagramManagementPage);
+const ShareViewPage = withAntdRoute(loadShareViewPage);
+const UnifiedDesignerTestPage = loadUnifiedDesignerTestPage
+  ? withAntdRoute(loadUnifiedDesignerTestPage)
   : null;
 
 const RouteLoadingFallback: React.FC<{ label: string }> = ({ label }) => (

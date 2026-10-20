@@ -3,12 +3,12 @@ import React, { useId, useRef, useState, type KeyboardEvent } from 'react';
 import { Button, Avatar, Dropdown, MenuProps, Tooltip } from 'antd';
 import { UserOutlined, LoginOutlined, LogoutOutlined, CloudOutlined, LockOutlined } from '@ant-design/icons';
 import { useAuth } from '@/context/useAuth';
-import { SetPasswordModal } from './SetPasswordModal';
 import './AuthStatus.css';
 const CloudStorageManagerModal = React.lazy(() => import('../storage/CloudStorageManagerModal').then(m => ({ default: m.CloudStorageManagerModal })));
 import { useTranslation } from 'react-i18next';
 
 const AuthModal = React.lazy(() => import('./AuthModal').then(m => ({ default: m.AuthModal })));
+const SetPasswordModal = React.lazy(() => import('./SetPasswordModal').then(m => ({ default: m.SetPasswordModal })));
 
 interface AuthStatusProps {
     compact?: boolean;
@@ -187,10 +187,14 @@ export const AuthStatus: React.FC<AuthStatusProps> = ({
                     />
                 </React.Suspense>
             )}
-            <SetPasswordModal
-                open={isSetPasswordModalOpen}
-                onCancel={() => setIsSetPasswordModalOpen(false)}
-            />
+            {isSetPasswordModalOpen && (
+                <React.Suspense fallback={null}>
+                    <SetPasswordModal
+                        open={isSetPasswordModalOpen}
+                        onCancel={() => setIsSetPasswordModalOpen(false)}
+                    />
+                </React.Suspense>
+            )}
             {isCloudModalOpen && (
                 <React.Suspense fallback={null}>
                     <CloudStorageManagerModal

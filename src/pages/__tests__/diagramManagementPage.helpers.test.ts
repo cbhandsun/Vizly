@@ -306,5 +306,7 @@ describe('diagramManagementPage helpers', () => {
         expect(formatWorkspaceTimeAgo(Number.NaN, 'en', 'Unknown', NOW)).toBe('Unknown');
         expect(formatWorkspaceTimeAgo(NOW + 10 * 60_000, 'en', 'Unknown', NOW)).toBe('Unknown');
         expect(formatWorkspaceTimeAgo(NOW - 120_000, 'en', 'Unknown', NOW)).toBe('2 minutes ago');
+        expect(formatWorkspaceTimeAgo(NOW - 120_000, 'invalid_locale_$$$', 'Unknown', NOW)).toBe('2 minutes ago');
+        expect(formatWorkspaceTimeAgo(NOW - 120_000, 'x'.repeat(64), 'Unknown', NOW)).toBe('2 minutes ago');
     });
 });

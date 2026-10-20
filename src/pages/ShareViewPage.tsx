@@ -4,7 +4,6 @@
  */
 
 import React, { Suspense, useEffect, useRef, useState } from 'react';
-import '@vizly/core/style.css';
 import { useSearchParams } from 'react-router';
 import { Button, Result, Spin, Tag, Typography } from 'antd';
 import { useTranslation } from 'react-i18next';
@@ -20,7 +19,8 @@ const { Text } = Typography;
 const PRODUCT_NAME = 'Vizly';
 
 const SharedDiagramCanvas = React.lazy(async () => {
-    const [{ ReactFlowProvider }, { FlowchartDesigner }] = await Promise.all([
+    const [, { ReactFlowProvider }, { FlowchartDesigner }] = await Promise.all([
+        import('@vizly/core/style.css'),
         import('@xyflow/react'),
         import('@vizly/core/react'),
     ]);

@@ -40,6 +40,16 @@ const Workers: React.FC = () => {
         return pos;
     }, []);
 
+    const { headInstances, bodyInstances, leftLegInstances, rightLegInstances } = useMemo(
+        () => ({
+            headInstances: workerPositions.map(p => ({ position: [p[0], 1.7, p[1]] as [number, number, number] })),
+            bodyInstances: workerPositions.map(p => ({ position: [p[0], 1.15, p[1]] as [number, number, number] })),
+            leftLegInstances: workerPositions.map(p => ({ position: [p[0] - 0.15, 0.45, p[1]] as [number, number, number] })),
+            rightLegInstances: workerPositions.map(p => ({ position: [p[0] + 0.15, 0.45, p[1]] as [number, number, number] })),
+        }),
+        [workerPositions],
+    );
+
     return (
         <group>
             {/* Heads */}
@@ -47,7 +57,7 @@ const Workers: React.FC = () => {
                 capacity={100}
                 geometry={headGeo}
                 material={skinMat}
-                instances={workerPositions.map(p => ({ position: [p[0], 1.7, p[1]] as [number, number, number] }))}
+                instances={headInstances}
                 castShadow
             />
 
@@ -56,7 +66,7 @@ const Workers: React.FC = () => {
                 capacity={100}
                 geometry={bodyGeo}
                 material={vestMat}
-                instances={workerPositions.map(p => ({ position: [p[0], 1.15, p[1]] as [number, number, number] }))}
+                instances={bodyInstances}
                 castShadow
             />
 
@@ -65,7 +75,7 @@ const Workers: React.FC = () => {
                 capacity={100}
                 geometry={legsGeo}
                 material={pantsMat}
-                instances={workerPositions.map(p => ({ position: [p[0] - 0.15, 0.45, p[1]] as [number, number, number] }))}
+                instances={leftLegInstances}
                 castShadow
             />
             {/* Right Leg */}
@@ -73,7 +83,7 @@ const Workers: React.FC = () => {
                 capacity={100}
                 geometry={legsGeo}
                 material={pantsMat}
-                instances={workerPositions.map(p => ({ position: [p[0] + 0.15, 0.45, p[1]] as [number, number, number] }))}
+                instances={rightLegInstances}
                 castShadow
             />
         </group>
