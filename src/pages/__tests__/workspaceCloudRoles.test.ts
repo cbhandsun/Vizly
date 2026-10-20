@@ -40,4 +40,9 @@ describe('cloud workspace collaborator roles', () => {
         fixture.shared.mockResolvedValue([]);
         await expect(loadWorkspaceItems('shared', 'supabase', { id: 'recipient' })).resolves.toEqual([]);
     });
+    it('skips querying Supabase cloud storage when unauthenticated', async () => {
+        await expect(loadWorkspaceItems('recent', 'supabase', null)).resolves.toEqual([]);
+        expect(fixture.cloud).not.toHaveBeenCalled();
+        expect(fixture.shared).not.toHaveBeenCalled();
+    });
 });

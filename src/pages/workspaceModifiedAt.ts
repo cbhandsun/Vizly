@@ -7,6 +7,32 @@ export const WORKSPACE_UNKNOWN_TIMESTAMP = -1;
 
 const MAX_FUTURE_SKEW_MS = 5 * 60 * 1000;
 const MAX_DATE_STRING_LENGTH = 64;
+const MAX_CACHED_FORMATTERS = 16;
+const relativeTimeFormatCache = new Map<string, Intl.RelativeTimeFormat>();
+
+const getRelativeTimeFormatter = (locale: string): Intl.RelativeTimeFormat => {
+  const safeLocale = typeof locale === 'string' && locale.trim() && locale.length <= 32
+    ? locale.trim()
+    : 'en';
+  const cached = relativeTimeFormatCache.get(safeLocale);
+  if (cached) {
+    relativeTimeFormatCache.delete(safeLocale);
+    relativeTimeFormatCache.set(safeLocale, cached);
+    return cached;
+  }
+  let formatter: Intl.RelativeTimeFormat;
+  try {
+    formatter = new Intl.RelativeTimeFormat(safeLocale, { numeric: 'auto' });
+  } catch {
+    formatter = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+  }
+  relativeTimeFormatCache.set(safeLocale, formatter);
+  if (relativeTimeFormatCache.size > MAX_CACHED_FORMATTERS) {
+    const oldest = relativeTimeFormatCache.keys().next().value;
+    if (oldest !== undefined) relativeTimeFormatCache.delete(oldest);
+  }
+  return formatter;
+};
 
 const asRecord = (value: unknown): Record<string, unknown> | null => (
   typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -78,7 +104,7 @@ export const formatWorkspaceTimeAgo = (
     return unknownLabel;
   }
   const minutes = Math.max(0, Math.floor((now - timestamp) / 60_000));
-  const relative = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+  const relative = getRelativeTimeFormatter(locale);
   if (minutes < 1) return relative.format(0, 'minute');
   if (minutes < 60) return relative.format(-minutes, 'minute');
   const hours = Math.floor(minutes / 60);

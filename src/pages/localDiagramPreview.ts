@@ -19,6 +19,13 @@ const DEFAULT_NODE_HEIGHT = 120;
 const DEFAULT_HORIZONTAL_SPACING = 80;
 const DEFAULT_VERTICAL_SPACING = 72;
 const MAX_SAFE_COORDINATE = 1_000_000;
+const previewCache = new WeakMap<StandardDiagramData, {
+  nodesRef: unknown;
+  edgesRef: unknown;
+  name: unknown;
+  title: unknown;
+  preview: LocalDiagramPreview | null;
+}>();
 
 interface PreviewPoint {
   x: number;
@@ -224,7 +231,29 @@ export const prepareLocalDiagramPreviewNodes = (
 export const buildLocalDiagramPreview = (
   diagram: StandardDiagramData,
 ): LocalDiagramPreview | null => {
-  if (!Array.isArray(diagram.nodes) || diagram.nodes.length === 0) return null;
+  if (!diagram || typeof diagram !== 'object') return null;
+  const title = diagram.metadata?.title;
+  const cached = previewCache.get(diagram);
+  if (
+    cached
+    && cached.nodesRef === diagram.nodes
+    && cached.edgesRef === diagram.edges
+    && cached.name === diagram.name
+    && cached.title === title
+  ) {
+    return cached.preview;
+  }
+
+  if (!Array.isArray(diagram.nodes) || diagram.nodes.length === 0) {
+    previewCache.set(diagram, {
+      nodesRef: diagram.nodes,
+      edgesRef: diagram.edges,
+      name: diagram.name,
+      title,
+      preview: null,
+    });
+    return null;
+  }
 
   const edges: Edge[] = Array.isArray(diagram.edges)
     ? diagram.edges.slice(0, MAX_PREVIEW_EDGES).map(edge => ({
@@ -248,9 +277,17 @@ export const buildLocalDiagramPreview = (
     title: diagram.name || diagram.metadata?.title || 'Diagram preview',
   });
 
-  return {
+  const result: LocalDiagramPreview = {
     dataUrl: preview.dataUrl,
     nodeCount: preview.nodeCount,
     edgeCount: preview.edgeCount,
   };
+  previewCache.set(diagram, {
+    nodesRef: diagram.nodes,
+    edgesRef: diagram.edges,
+    name: diagram.name,
+    title,
+    preview: result,
+  });
+  return result;
 };

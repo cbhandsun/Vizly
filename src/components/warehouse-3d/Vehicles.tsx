@@ -75,6 +75,9 @@ const ForkliftModel: React.FC<{ color?: string, hasLoad?: boolean }> = ({ color 
     );
 };
 
+const scratchTargetPosition = new THREE.Vector3();
+const scratchDirection = new THREE.Vector3();
+
 const AnimatedVehicle: React.FC<{
     path: [number, number, number][],
     speed?: number,
@@ -89,17 +92,18 @@ const AnimatedVehicle: React.FC<{
 
         const currentIdx = Math.floor(progress.current) % path.length;
         const targetIdx = (currentIdx + 1) % path.length;
+        const targetCoords = path[targetIdx];
 
-        const p2 = new THREE.Vector3(...path[targetIdx]);
-        const direction = new THREE.Vector3().subVectors(p2, groupRef.current.position);
-        const distanceToTarget = direction.length();
+        scratchTargetPosition.set(targetCoords[0], targetCoords[1], targetCoords[2]);
+        scratchDirection.subVectors(scratchTargetPosition, groupRef.current.position);
+        const distanceToTarget = scratchDirection.length();
 
         if (distanceToTarget < 0.2) {
             progress.current += 1;
         } else {
-            direction.normalize().multiplyScalar(speed * delta);
-            groupRef.current.position.add(direction);
-            groupRef.current.lookAt(p2);
+            scratchDirection.normalize().multiplyScalar(speed * delta);
+            groupRef.current.position.add(scratchDirection);
+            groupRef.current.lookAt(scratchTargetPosition);
         }
     });
 

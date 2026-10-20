@@ -67,4 +67,19 @@ describe('CommandPalette focus return contract', () => {
     persistentTrigger.remove();
     requestAnimationFrameSpy.mockRestore();
   });
+
+  it('defers building command items until the command palette is opened', () => {
+    const { result, unmount } = renderCommands();
+
+    expect(result.current.isCommandOpen).toBe(false);
+    expect(result.current.commandItems).toEqual([]);
+
+    act(() => result.current.setIsCommandOpen(true));
+    expect(result.current.isCommandOpen).toBe(true);
+    expect(result.current.commandItems.length).toBeGreaterThan(0);
+
+    act(() => result.current.setIsCommandOpen(false));
+    expect(result.current.commandItems).toEqual([]);
+    unmount();
+  });
 });

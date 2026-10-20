@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { tryAttachDiagramSnapshot } from '@vizly/core/export';
 import { invalidateRemoteDiagramPreview } from '@/services/remoteDiagramPreview';
 import type { StandardDiagramData } from '@vizly/core/types';
 import { appMessage } from '@vizly/core/antd';
@@ -132,6 +131,7 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
             );
             const finalTitle = diagramName || diagram.metadata?.title || diagram.name;
             const expectedRevision = captureCloudSaveVersion(provider.id, finalId, bridgeCloud);
+            const { tryAttachDiagramSnapshot } = await import('@vizly/core/export');
             const snap = await tryAttachDiagramSnapshot(diagram, diagramId);
 
             if (!isDesignerSaveReady(bridge)) {

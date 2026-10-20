@@ -36,6 +36,8 @@ const LocalDiagramCover = ({
       className="local-diagram-cover-image"
       src={preview.dataUrl}
       alt={alt}
+      loading="lazy"
+      decoding="async"
       draggable={false}
     />
   );

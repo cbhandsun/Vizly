@@ -14,7 +14,6 @@ import {
     type CustomPresetSaveError,
 } from '@vizly/core/storage';
 import { appMessage, appModal } from '@vizly/core/antd';
-import { tryAttachDiagramSnapshot } from '@vizly/core/export';
 import { getFlowDataBridge } from '@vizly/core/diagram-data';
 import { invalidateRemoteDiagramPreview } from '@/services/remoteDiagramPreview';
 import {
@@ -47,6 +46,15 @@ const getErrorMessage = (error: unknown): string => (
 const getStorageProvider = async (providerName: 's3' | 'supabase') => {
     const { unifiedStorage } = await import('@/services/UnifiedStorageService');
     return unifiedStorage.getProvider(providerName);
+};
+
+const attachDiagramSnapshot: typeof import('@vizly/core/export').tryAttachDiagramSnapshot = async (
+    diagram,
+    diagramId,
+    options,
+) => {
+    const { tryAttachDiagramSnapshot } = await import('@vizly/core/export');
+    return tryAttachDiagramSnapshot(diagram, diagramId, options);
 };
 
 const getSaveTargetLabel = (target: DiagramSaveAsTarget, t: TFunction): string => {
@@ -155,7 +163,7 @@ export function useDiagramViewerSaveActions({
                         providerName: target,
                         title: normalizedName,
                         getProvider: getStorageProvider,
-                        attachSnapshot: tryAttachDiagramSnapshot,
+                        attachSnapshot: attachDiagramSnapshot,
                         invalidatePreview: invalidateRemoteDiagramPreview,
                         createId: () => crypto.randomUUID(),
                         prepareReplica: registerDiagramViewerCloudReplica,
@@ -260,7 +268,7 @@ export function useDiagramViewerSaveActions({
                 bridge,
                 selectedDiagramId,
                 getProvider: getStorageProvider,
-                attachSnapshot: tryAttachDiagramSnapshot,
+                attachSnapshot: attachDiagramSnapshot,
                 invalidatePreview: invalidateRemoteDiagramPreview,
             });
             appMessage.success(t('diagramViewer.directSave.success'));

@@ -78,6 +78,18 @@ const AsrsSystem: React.FC = () => {
         () => createAsrsLayout(width, depth, height),
         [width, depth, height]
     );
+    const rackMeshInstances = useMemo(
+        () => rackInstances.map(d => ({ position: d.position })),
+        [rackInstances],
+    );
+    const boxMeshInstances = useMemo(
+        () => boxInstances.map(d => ({ position: d.position, scale: d.scale, color: d.color })),
+        [boxInstances],
+    );
+    const floorMeshInstances = useMemo(
+        () => floorXPositions.map(x => ({ position: [x, 0.1, 0] as [number, number, number] })),
+        [floorXPositions],
+    );
 
     return (
         <group position={[(WAREHOUSE.ASRS_X[0] + WAREHOUSE.ASRS_X[1]) / 2, 0, -5]}>
@@ -96,7 +108,7 @@ const AsrsSystem: React.FC = () => {
                 capacity={50}
                 geometry={rackGeoBase}
                 material={rackMaterial}
-                instances={rackInstances.map(d => ({ position: d.position }))}
+                instances={rackMeshInstances}
                 castShadow
             />
 
@@ -104,7 +116,7 @@ const AsrsSystem: React.FC = () => {
                 capacity={2000}
                 geometry={boxGeoBase}
                 material={boxMaterial}
-                instances={boxInstances.map(d => ({ position: d.position, scale: d.scale, color: d.color }))}
+                instances={boxMeshInstances}
                 castShadow
             />
 
@@ -112,7 +124,7 @@ const AsrsSystem: React.FC = () => {
                 capacity={12}
                 geometry={floorGeoBase}
                 material={floorMaterial}
-                instances={floorXPositions.map(x => ({ position: [x, 0.1, 0] }))}
+                instances={floorMeshInstances}
             />
 
             {/* Animated Cranes */}

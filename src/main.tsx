@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client';
 
 import './main/configureCoreRuntimes';
 import './main/configureAuthRuntime';
+import { prewarmAppRouteForLocation } from './app/appRouteLoaders';
 import { initializeApplicationRuntime } from './main/bootstrapApplication';
 import { installVitePreloadErrorRecovery } from './main/preloadErrorRecovery';
 import { prewarmDisplayRoutingForLocation } from './main/prewarmDisplayRouting';
@@ -25,6 +26,7 @@ void startApplication({
   initialize: () => {
     installVitePreloadErrorRecovery();
     initializeApplicationRuntime();
+    void prewarmAppRouteForLocation(window.location);
     void prewarmDisplayRoutingForLocation(window.location);
   },
   mount: () => {

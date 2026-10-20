@@ -49,6 +49,7 @@ export function boundedJsonAssetsPlugin(): Plugin {
       ]);
     },
     async load(id) {
+      if (!id.includes('.json?')) return null;
       const queryIndex = id.indexOf('?');
       if (queryIndex === -1) return null;
       const filePath = resolve(id.slice(0, queryIndex));

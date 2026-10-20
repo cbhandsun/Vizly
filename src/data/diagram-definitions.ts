@@ -1,7 +1,7 @@
 // diagram-definitions.ts
 import { lazy, createElement } from 'react';
 import type { DiagramComponentProps, DiagramDefinition } from '@vizly/core/types';
-import { ensureBuiltInPlugins } from '@vizly/core/plugins';
+import { loadFlowchartDesigner } from '../components/diagramViewerFlowchartLoader';
 import {
   FaSitemap,
   FaWarehouse,
@@ -12,20 +12,6 @@ import {
   FaNetworkWired,
   FaBrain,
 } from 'react-icons/fa';
-
-const loadFlowchartDesigner = async (pluginId?: string) => {
-  const [{ FlowchartDesigner }] = await Promise.all([
-    import('@vizly/core/react'),
-    ensureBuiltInPlugins(pluginId || 'flowchart'),
-  ]);
-
-  return {
-    default: (props: DiagramComponentProps) => createElement(
-      FlowchartDesigner,
-      pluginId ? { ...props, pluginId } : props
-    )
-  };
-};
 
 export const diagramDefinitions: DiagramDefinition[] = [
   {

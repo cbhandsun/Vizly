@@ -121,5 +121,26 @@ describe('local diagram preview', () => {
 
   it('returns no preview for an empty diagram', () => {
     expect(buildLocalDiagramPreview(createDiagram([]))).toBeNull();
+    expect(buildLocalDiagramPreview(null as unknown as StandardDiagramData)).toBeNull();
+  });
+
+  it('memoizes preview results by diagram identity and invalidates when nodes or titles change', () => {
+    const diagram = createDiagram([
+      createNode('a', { x: 10, y: 20 }),
+      createNode('b', { x: 260, y: 120 }),
+    ]);
+
+    const first = buildLocalDiagramPreview(diagram);
+    const second = buildLocalDiagramPreview(diagram);
+    expect(first).not.toBeNull();
+    expect(second).toBe(first);
+
+    const renamed: StandardDiagramData = {
+      ...diagram,
+      name: 'Updated preview title',
+    };
+    const third = buildLocalDiagramPreview(renamed);
+    expect(third).not.toBeNull();
+    expect(third).not.toBe(first);
   });
 });

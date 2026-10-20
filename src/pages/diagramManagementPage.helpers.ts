@@ -314,9 +314,10 @@ export const loadWorkspaceItems = async (activeView: FilterViewType, cloudProvid
     const templateView = isTemplateLibraryView(activeView);
 
     if (!templateView) {
+        const shouldQueryCloudProvider = cloudProvider !== 'supabase' || Boolean(user);
         const [dataRegistry, unifiedStorage] = await Promise.all([
             loadDataRegistry(),
-            loadUnifiedStorage(),
+            shouldQueryCloudProvider ? loadUnifiedStorage() : Promise.resolve(null),
         ]);
 
         await dataRegistry.initialize();
@@ -334,8 +335,8 @@ export const loadWorkspaceItems = async (activeView: FilterViewType, cloudProvid
             });
         });
 
-        const cloudStorageProvider = unifiedStorage.getProvider(cloudProvider);
-        if (cloudStorageProvider.isConfigured() && (cloudProvider !== 'supabase' || user)) {
+        const cloudStorageProvider = unifiedStorage?.getProvider(cloudProvider);
+        if (cloudStorageProvider?.isConfigured() && shouldQueryCloudProvider) {
             try {
                 const cloudResults = await cloudStorageProvider.listDiagrams();
                 cloudResults.forEach((diagram) => {

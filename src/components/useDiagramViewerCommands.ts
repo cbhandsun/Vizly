@@ -50,6 +50,8 @@ export interface DiagramViewerCommandsState {
     setShowDebugPanel: (open: boolean) => void;
 }
 
+const EMPTY_COMMAND_ITEMS: CommandItem[] = [];
+
 const clickFirstMatchingElement = (selectors: string[]): void => {
     for (const selector of selectors) {
         const element = document.querySelector<HTMLElement>(selector);
@@ -165,7 +167,7 @@ export function useDiagramViewerCommands({
         });
     }, []);
 
-    const commandItems = useMemo(() => createDiagramViewerCommandItems({
+    const commandItems = useMemo(() => !isCommandOpen ? EMPTY_COMMAND_ITEMS : createDiagramViewerCommandItems({
         t,
         modifierLabel: getDiagramViewerCommandModifierLabel({
             platform: typeof navigator !== 'undefined' ? navigator.platform || '' : '',
@@ -197,6 +199,7 @@ export function useDiagramViewerCommands({
         handleSelectDiagram,
         handleToggleFullscreen,
         editingEnabled,
+        isCommandOpen,
         isFullscreen,
         navigate,
         openDiagramInNewTab,
