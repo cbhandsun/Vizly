@@ -12,13 +12,15 @@ const readRouteState = (page: Page) => page.evaluate(() => {
     reason: diagnostic.reason,
     authority: state.renderAuthorityStatus,
     signature: state.outputRouteSignature,
+    inputSignature: state.signature,
+    geometry: state.inputGeometryDigest,
     edgeCount: document.querySelectorAll('.react-flow__edge').length,
   };
 });
 
-const expectCachedRoute = async (page: Page) => {
+const expectCommittedRoute = async (page: Page) => {
   await expect.poll(() => readRouteState(page)).toMatchObject({
-    stage: 'final-applied', reason: 'hit', authority: 'accepted',
+    stage: 'final-applied', authority: 'accepted',
   });
   const state = await readRouteState(page);
   expect(state.edgeCount).toBeGreaterThan(0);
@@ -36,11 +38,12 @@ for (const presetId of [
     const pageErrors: string[] = [];
     page.on('pageerror', error => pageErrors.push(error.name));
     await page.goto(`/#/?diagram=${presetId}`);
-    const initial = await expectCachedRoute(page);
-    await expect.poll(() => page.evaluate(() => Object.keys(localStorage)
-      .filter(key => key.startsWith('vizly:baseReactFlowDisplayEdges:')).length)).toBeGreaterThan(0);
+    const initial = await expectCommittedRoute(page);
+    expect(initial.reason).toBe('hit');
+    // Persisted documents may change the input identity; every reload still
+    // needs an accepted Worker commit and the same final route geometry.
     await page.reload();
-    const reloaded = await expectCachedRoute(page);
+    const reloaded = await expectCommittedRoute(page);
     expect(reloaded.signature).toBe(initial.signature);
     expect(reloaded.edgeCount).toBe(initial.edgeCount);
     expect(pageErrors).toEqual([]);
@@ -54,12 +57,21 @@ test('WMS swimlane layout accepts its precomputed route', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.addInitScript(() => localStorage.setItem('i18nextLng', 'zh'));
   await page.goto('/#/?diagram=wms-process-flow-v1');
-  const initial = await expectCachedRoute(page);
+  const initial = await expectCommittedRoute(page);
+  expect(initial.reason).toBe('hit');
   await page.getByRole('button', { name: /自动布局|layout/i }).click();
   const parent = page.locator('[data-menu-id$="group-swimlane-process"]').filter({ visible: true });
   await parent.hover();
+  const routeDownload = page.waitForResponse(response => /\/route-\d+[^/]*\.json(?:\?|$)/.test(response.url()));
   await page.locator('[data-menu-id$="domain-lanes-lr"]').filter({ visible: true }).click();
   await expect.poll(async () => (await readRouteState(page)).signature).not.toBe(initial.signature);
-  const layout = await expectCachedRoute(page);
+  const layout = await expectCommittedRoute(page);
+  const response = await routeDownload;
+  expect(response.ok()).toBe(true);
+  const artifact: unknown = await response.json();
+  expect(artifact).toMatchObject({
+    hardClean: true, inputSignature: layout.inputSignature,
+    inputGeometryDigest: layout.geometry, outputRouteSignature: layout.signature,
+  });
   expect(layout.edgeCount).toBe(initial.edgeCount);
 });
