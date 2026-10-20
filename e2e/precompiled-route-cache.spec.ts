@@ -96,8 +96,13 @@ test('WMS swimlane layout accepts its precomputed route', async ({ page }) => {
   const layout = await expectCommittedRoute(page);
   const snapshot = snapshots.find(candidate => candidate.inputSignature === layout.inputSignature && candidate.geometry === layout.geometry);
   if (snapshot) {
-    await expect.poll(() => [...downloads.values()].some(response => response.url().includes(`/${snapshot.fileName}`))).toBe(true);
-    const response = [...downloads.values()].find(item => item.url().includes(`/${snapshot.fileName}`));
+    const matchesAsset = (response: Response) => {
+      const name = new URL(response.url()).pathname.split('/').at(-1);
+      return name === snapshot.fileName
+        || (name?.startsWith(`${snapshot.fileName.slice(0, -5)}-`) && name.endsWith('.json'));
+    };
+    await expect.poll(() => [...downloads.values()].some(matchesAsset)).toBe(true);
+    const response = [...downloads.values()].find(matchesAsset);
     if (!response) throw new Error('Matching layout snapshot was not downloaded');
     expect(response.ok()).toBe(true);
     const artifact: unknown = await response.json();
