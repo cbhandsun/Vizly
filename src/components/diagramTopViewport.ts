@@ -1,12 +1,17 @@
+import { useEffect } from 'react';
+
 export const MIN_DIAGRAM_TOP_ALIGN_ZOOM = 1e-4;
 export const MAX_DIAGRAM_TOP_ALIGN_ZOOM = 1;
 export const DEFAULT_DIAGRAM_LEFT_SIDEBAR_OFFSET = 76;
 export const DEFAULT_DIAGRAM_RIGHT_SIDEBAR_OFFSET = 60;
 export const MAX_DIAGRAM_SIDEBAR_OFFSET = 800;
+export const VIEWPORT_SESSION_STORAGE_PREFIX = 'vizly:viewport:v1:';
+export const TOP_FIT_SESSION_MIGRATION_KEY = 'vizly:viewport:top-fit-migrated:v2';
 
 const DEFAULT_NODE_WIDTH = 220;
 const DEFAULT_NODE_HEIGHT = 120;
 const MOBILE_DIAGRAM_BREAKPOINT = 768;
+const MOBILE_READING_VIEW_MAX_WIDTH = 600;
 
 export interface DiagramTopContentBounds {
   minX: number;
@@ -93,6 +98,10 @@ const resolveNodeDimension = (
 
 const isNodeHidden = (node: Record<string, unknown>): boolean => {
   if (node.hidden === true) {
+    return true;
+  }
+  const data = isRecord(node.data) ? node.data : null;
+  if (data?.hidden === true) {
     return true;
   }
   const style = isRecord(node.style) ? node.style : null;
@@ -395,18 +404,21 @@ const resolveDiagramContainerElement = (diagramId: string): HTMLElement | null =
     return null;
   }
   const byId = document.getElementById(`diagram-${diagramId}`);
-  if (!byId) {
-    return null;
+  if (byId) {
+    const containerAncestor = byId.closest('.diagram-container');
+    if (containerAncestor instanceof HTMLElement) {
+      return containerAncestor;
+    }
+    const previewAncestor = byId.closest('.diagram-preview-container');
+    if (previewAncestor instanceof HTMLElement) {
+      return previewAncestor;
+    }
+    return byId;
   }
-  const containerAncestor = byId.closest('.diagram-container');
-  if (containerAncestor instanceof HTMLElement) {
-    return containerAncestor;
-  }
-  const previewAncestor = byId.closest('.diagram-preview-container');
-  if (previewAncestor instanceof HTMLElement) {
-    return previewAncestor;
-  }
-  return byId;
+  const fallbackContainer = document.querySelector(
+    '.diagram-container, .diagram-preview-container, .react-flow',
+  );
+  return fallbackContainer instanceof HTMLElement ? fallbackContainer : null;
 };
 
 const readElementViewportSize = (element: HTMLElement): { width: number; height: number } => {
@@ -425,12 +437,12 @@ export const applyDiagramBackToTopViewport = ({
   duration = 350,
 }: {
   diagramId: string;
-  readSnapshot: () => SnapshotLike | null | undefined;
-  fallbackBackToTop: () => void;
+  readSnapshot?: () => SnapshotLike | null | undefined;
+  fallbackBackToTop?: () => void;
   duration?: number;
 }): boolean => {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
-    fallbackBackToTop();
+    fallbackBackToTop?.();
     return false;
   }
 
@@ -441,7 +453,7 @@ export const applyDiagramBackToTopViewport = ({
   const container = resolveDiagramContainerElement(diagramId);
 
   if (!activeInstance || typeof activeInstance.setViewport !== 'function' || !container) {
-    fallbackBackToTop();
+    fallbackBackToTop?.();
     return false;
   }
 
@@ -452,11 +464,11 @@ export const applyDiagramBackToTopViewport = ({
   ) as HTMLElement;
   const { width: viewportWidth, height: viewportHeight } = readElementViewportSize(viewportElement);
   if (viewportWidth <= 0 || viewportHeight <= 0) {
-    fallbackBackToTop();
+    fallbackBackToTop?.();
     return false;
   }
 
-  const snapshot = readSnapshot();
+  const snapshot = readSnapshot?.();
   const liveNodes = activeInstance.getNodes?.() ?? [];
   const liveEdges = activeInstance.getEdges?.() ?? [];
   const snapshotNodes = snapshot?.nodes ?? [];
@@ -467,7 +479,7 @@ export const applyDiagramBackToTopViewport = ({
     snapshotEdges.length > 0 ? snapshotEdges : liveEdges,
   ) ?? computeDiagramTopAlignedBounds(liveNodes, liveEdges);
   if (!bounds) {
-    fallbackBackToTop();
+    fallbackBackToTop?.();
     return false;
   }
 
@@ -487,7 +499,7 @@ export const applyDiagramBackToTopViewport = ({
   });
 
   if (!targetViewport) {
-    fallbackBackToTop();
+    fallbackBackToTop?.();
     return false;
   }
 
@@ -496,4 +508,155 @@ export const applyDiagramBackToTopViewport = ({
     duration > 0 ? { duration } : undefined,
   );
   return true;
+};
+
+export const clearDiagramViewportSessionStorage = (
+  storage: Pick<Storage, 'key' | 'length' | 'removeItem'> | null | undefined,
+  diagramId?: string,
+): number => {
+  if (!storage) {
+    return 0;
+  }
+  const normalizedId = typeof diagramId === 'string' ? diagramId.trim() : '';
+  const encodedPrefix = normalizedId
+    ? `${VIEWPORT_SESSION_STORAGE_PREFIX}${encodeURIComponent(normalizedId)}`
+    : VIEWPORT_SESSION_STORAGE_PREFIX;
+
+  const keysToRemove: string[] = [];
+  try {
+    for (let i = 0; i < storage.length; i += 1) {
+      const key = storage.key(i);
+      if (!key || !key.startsWith(VIEWPORT_SESSION_STORAGE_PREFIX)) {
+        continue;
+      }
+      if (!normalizedId || key === encodedPrefix || key.startsWith(`${encodedPrefix}:`) || key.startsWith(`${encodedPrefix}%3A`)) {
+        keysToRemove.push(key);
+      }
+    }
+    for (const key of keysToRemove) {
+      storage.removeItem(key);
+    }
+  } catch {
+    return 0;
+  }
+  return keysToRemove.length;
+};
+
+export const migrateStaleDesktopViewportSessionStorage = (
+  storage: Pick<Storage, 'getItem' | 'setItem' | 'key' | 'length' | 'removeItem'> | null | undefined,
+): boolean => {
+  if (!storage) {
+    return false;
+  }
+  try {
+    if (storage.getItem(TOP_FIT_SESSION_MIGRATION_KEY) === '1') {
+      return false;
+    }
+    clearDiagramViewportSessionStorage(storage);
+    storage.setItem(TOP_FIT_SESSION_MIGRATION_KEY, '1');
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const bindDiagramTopControlInterceptor = ({
+  diagramId,
+  readSnapshot,
+  duration = 0,
+}: {
+  diagramId: string;
+  readSnapshot?: () => SnapshotLike | null | undefined;
+  duration?: number;
+}): (() => void) => {
+  if (typeof window === 'undefined' || !diagramId) {
+    return () => undefined;
+  }
+
+  let followUpTimer: ReturnType<typeof setTimeout> | null = null;
+  let userInteracted = false;
+
+  const clearFollowUp = () => {
+    if (followUpTimer !== null) {
+      clearTimeout(followUpTimer);
+      followUpTimer = null;
+    }
+  };
+
+  const handleUserGesture = (event: Event) => {
+    if (event.target instanceof Element && event.target.closest('.react-flow')) {
+      userInteracted = true;
+      clearFollowUp();
+    }
+  };
+
+  const handleDiagramControlCapture = (event: Event) => {
+    if (!(event instanceof CustomEvent)) {
+      return;
+    }
+    const detail = isRecord(event.detail) ? event.detail : null;
+    if (!detail || detail.action !== 'top') {
+      return;
+    }
+    const targetId = typeof detail.diagramId === 'string' ? detail.diagramId : undefined;
+    if (targetId && targetId !== diagramId) {
+      return;
+    }
+
+    // Preserve mobile narrow-screen reading fit while intercepting desktop 'top' fit
+    const container = resolveDiagramContainerElement(diagramId);
+    const viewportWidth = container
+      ? readElementViewportSize(container).width
+      : window.innerWidth;
+    if (viewportWidth > 0 && viewportWidth <= MOBILE_READING_VIEW_MAX_WIDTH) {
+      return;
+    }
+
+    event.stopImmediatePropagation();
+    userInteracted = false;
+    clearFollowUp();
+
+    applyDiagramBackToTopViewport({
+      diagramId,
+      readSnapshot,
+      duration,
+    });
+
+    // Follow-up refinement once ResizeObserver finishes measuring nodes after initial mount
+    followUpTimer = setTimeout(() => {
+      followUpTimer = null;
+      if (userInteracted) {
+        return;
+      }
+      applyDiagramBackToTopViewport({
+        diagramId,
+        readSnapshot,
+        duration: 0,
+      });
+    }, 140);
+  };
+
+  window.addEventListener('diagramControl', handleDiagramControlCapture, true);
+  for (const gesture of ['pointerdown', 'wheel', 'touchstart'] as const) {
+    window.addEventListener(gesture, handleUserGesture, { capture: true, passive: true });
+  }
+
+  return () => {
+    clearFollowUp();
+    window.removeEventListener('diagramControl', handleDiagramControlCapture, true);
+    for (const gesture of ['pointerdown', 'wheel', 'touchstart'] as const) {
+      window.removeEventListener(gesture, handleUserGesture, true);
+    }
+  };
+};
+
+export const useDiagramTopControlInterceptor = (
+  diagramId: string,
+  readSnapshot?: () => SnapshotLike | null | undefined,
+): void => {
+  useEffect(() => bindDiagramTopControlInterceptor({
+    diagramId,
+    readSnapshot,
+    duration: 0,
+  }), [diagramId, readSnapshot]);
 };

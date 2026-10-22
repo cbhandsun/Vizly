@@ -21,6 +21,11 @@ import { shouldHideDiagramViewerCenterIsland } from './diagramViewerChrome';
 import { SettingsPanelBoundary } from './ui/SettingsPanelBoundary';
 import { DraggableSettingsPanel } from './ui/DraggableSettingsPanel';
 import { DeferredCommandPalette } from './ui/DeferredCommandPalette';
+import { readRegisteredReactFlowSnapshot } from '@vizly/core/rendering';
+import {
+    migrateStaleDesktopViewportSessionStorage,
+    useDiagramTopControlInterceptor,
+} from './diagramTopViewport';
 import type { CoordinationProblem } from '../../server/collaboration/coordinationStatus';
 
 const CollaborationRecoveryBanner = lazy(() => import('./diagrams/ui/CollaborationRecoveryBanner').then(module => ({
@@ -224,6 +229,15 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
         setHasMountedAIConfig(true);
         setAiConfigVisible(true);
     }, [setAiConfigVisible]);
+
+    if (typeof window !== 'undefined') {
+        migrateStaleDesktopViewportSessionStorage(window.sessionStorage);
+    }
+    const readActiveDiagramSnapshot = useCallback(
+        () => readRegisteredReactFlowSnapshot(selectedDiagramId),
+        [selectedDiagramId],
+    );
+    useDiagramTopControlInterceptor(selectedDiagramId, readActiveDiagramSnapshot);
 
     useEffect(() => subscribeMindMapAIConfigRequest(openAIConfig), [openAIConfig]);
 

@@ -1,4 +1,5 @@
 import { coerceDiagramId } from '@vizly/core/input';
+import { clearDiagramViewportSessionStorage } from './diagramTopViewport';
 
 interface DiagramViewerNewTabHandle {
   opener: unknown;
@@ -16,6 +17,9 @@ export const selectDiagramInViewer = ({
   setDiagramSearchParam: (prev: URLSearchParams, id: string) => URLSearchParams;
   addRecentDiagram: (id: string) => void;
 }) => {
+  if (typeof window !== 'undefined') {
+    clearDiagramViewportSessionStorage(window.sessionStorage, id);
+  }
   setSearchParams((prev) => setDiagramSearchParam(prev, id));
   addRecentDiagram(id);
 };
