@@ -5,6 +5,7 @@ import {
     clearPreviousDiagramAutoSave,
     persistDiagramFreshSeed,
 } from './diagramViewerStorage';
+import { clearDiagramViewportSessionStorage } from './diagramTopViewport';
 import { createStandardPresetInitialMetadata } from '@vizly/core/layout';
 
 const STANDARD_EDGE_TYPES = new Set(['main', 'dependency', 'support', 'data', 'feedback', 'custom']);
@@ -127,6 +128,9 @@ export const finalizeDiagramSeedNavigation = ({
     logBridgeCleanupFailure,
 }: FinalizeDiagramSeedNavigationOptions): void => {
     clearPreviousDiagramAutoSave(storage, currentDiagramId, nextDiagramId);
+    if (typeof window !== 'undefined') {
+        clearDiagramViewportSessionStorage(window.sessionStorage, nextDiagramId);
+    }
 
     if (processedData?.nodes) {
         const payload = createPayload({

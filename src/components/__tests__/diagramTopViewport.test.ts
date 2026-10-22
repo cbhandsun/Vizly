@@ -3,13 +3,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   applyDiagramBackToTopViewport,
+  bindDiagramTopControlInterceptor,
   clampDiagramTopAlignZoom,
+  clearDiagramViewportSessionStorage,
   coerceDiagramTopSidebarOffset,
   computeDiagramTopAlignedBounds,
   computeDiagramTopAlignedViewport,
   MAX_DIAGRAM_SIDEBAR_OFFSET,
+  migrateStaleDesktopViewportSessionStorage,
   MIN_DIAGRAM_TOP_ALIGN_ZOOM,
   resolveDiagramTopViewportLayout,
+  TOP_FIT_SESSION_MIGRATION_KEY,
+  VIEWPORT_SESSION_STORAGE_PREFIX,
 } from '../diagramTopViewport';
 
 describe('diagramTopViewport', () => {
@@ -221,6 +226,89 @@ describe('diagramTopViewport', () => {
 
       expect(applied).toBe(false);
       expect(fallbackBackToTop).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('sessionStorage viewport migration & cleanup', () => {
+    it('migrates stale v1 viewports once and preserves subsequent viewports', () => {
+      window.sessionStorage.clear();
+      window.sessionStorage.setItem(`${VIEWPORT_SESSION_STORAGE_PREFIX}flow-1`, '{"x":0,"y":0,"zoom":1.15}');
+      window.sessionStorage.setItem('other:key', 'keep');
+
+      expect(migrateStaleDesktopViewportSessionStorage(window.sessionStorage)).toBe(true);
+      expect(window.sessionStorage.getItem(`${VIEWPORT_SESSION_STORAGE_PREFIX}flow-1`)).toBeNull();
+      expect(window.sessionStorage.getItem(TOP_FIT_SESSION_MIGRATION_KEY)).toBe('1');
+      expect(window.sessionStorage.getItem('other:key')).toBe('keep');
+
+      // Subsequent calls are no-ops so user-saved viewports survive reload
+      window.sessionStorage.setItem(`${VIEWPORT_SESSION_STORAGE_PREFIX}flow-1`, '{"x":10,"y":20,"zoom":0.8}');
+      expect(migrateStaleDesktopViewportSessionStorage(window.sessionStorage)).toBe(false);
+      expect(window.sessionStorage.getItem(`${VIEWPORT_SESSION_STORAGE_PREFIX}flow-1`)).toBe('{"x":10,"y":20,"zoom":0.8}');
+    });
+
+    it('clears only matching diagram viewport entries when switching templates', () => {
+      window.sessionStorage.clear();
+      window.sessionStorage.setItem(`${VIEWPORT_SESSION_STORAGE_PREFIX}flow-1`, '{"x":0,"y":0,"zoom":1}');
+      window.sessionStorage.setItem(`${VIEWPORT_SESSION_STORAGE_PREFIX}flow-1%3Apage-1`, '{"x":0,"y":0,"zoom":1}');
+      window.sessionStorage.setItem(`${VIEWPORT_SESSION_STORAGE_PREFIX}flow-2`, '{"x":0,"y":0,"zoom":1}');
+
+      const removed = clearDiagramViewportSessionStorage(window.sessionStorage, 'flow-1');
+      expect(removed).toBe(2);
+      expect(window.sessionStorage.getItem(`${VIEWPORT_SESSION_STORAGE_PREFIX}flow-1`)).toBeNull();
+      expect(window.sessionStorage.getItem(`${VIEWPORT_SESSION_STORAGE_PREFIX}flow-2`)).not.toBeNull();
+    });
+  });
+
+  describe('bindDiagramTopControlInterceptor', () => {
+    it('intercepts startup action="top" on desktop, prevents single-node reading zoom, and applies width-fit top view', () => {
+      vi.useFakeTimers();
+      try {
+        const container = document.createElement('div');
+        container.id = 'diagram-flow-1';
+        container.className = 'diagram-container';
+        const pane = document.createElement('div');
+        pane.className = 'react-flow';
+        container.appendChild(pane);
+        Object.defineProperty(container, 'clientWidth', { value: 1440, configurable: true });
+        Object.defineProperty(container, 'clientHeight', { value: 900, configurable: true });
+        Object.defineProperty(pane, 'clientWidth', { value: 1440, configurable: true });
+        Object.defineProperty(pane, 'clientHeight', { value: 900, configurable: true });
+        document.body.appendChild(container);
+
+        const setViewport = vi.fn();
+        (window as Window & { reactFlowInstance?: unknown }).reactFlowInstance = {
+          getNodes: () => [
+            { id: 'n1', position: { x: 100, y: 200 }, width: 1800, height: 120 },
+          ],
+          getEdges: () => [],
+          setViewport,
+        };
+
+        const bubbleListener = vi.fn();
+        window.addEventListener('diagramControl', bubbleListener);
+        const unbind = bindDiagramTopControlInterceptor({
+          diagramId: 'flow-1',
+        });
+
+        window.dispatchEvent(new CustomEvent('diagramControl', {
+          detail: { action: 'top', diagramId: 'flow-1' },
+        }));
+
+        expect(bubbleListener).not.toHaveBeenCalled();
+        expect(setViewport).toHaveBeenCalledTimes(1);
+        const firstViewport = setViewport.mock.calls[0]?.[0] as { x: number; y: number; zoom: number };
+        expect(firstViewport.zoom).toBeLessThan(1);
+
+        // User interaction before 140ms cancels follow-up refinement
+        pane.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+        vi.advanceTimersByTime(200);
+        expect(setViewport).toHaveBeenCalledTimes(1);
+
+        unbind();
+        window.removeEventListener('diagramControl', bubbleListener);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });
