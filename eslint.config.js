@@ -7,7 +7,7 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 
 export default defineConfig([
   // Lint source and diagnostic fixtures; compiled bundles have separate artifact gates.
-  globalIgnores(['dist', 'dist-collaboration', 'coverage', 'node_modules', 'tmp/**', 'tmp/vercel-collaboration-production/api/index.js']),
+  globalIgnores(['dist', 'dist-collaboration', 'coverage', 'node_modules', 'tmp/**/assets/**', 'tmp/vercel-collaboration-production/api/index.js']),
   {
     files: ['scripts/prepare-vercel-static.mjs', 'scripts/deploy-prepared-vercel-static.mjs',
       'scripts/install-locked-core-artifact.mjs',
