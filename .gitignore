@@ -14,3 +14,6 @@ test-results/
 .codex-audit/
 tmp/
 *.tsbuildinfo
+
+# Local CI receipt; not application source.
+devfleet-native-result.json

@@ -1,0 +1,56 @@
+# Native compatibility only; integration, security and browser acceptance remain separate.
+name: Vizly native CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  macos:
+    runs-on: vizly-app-macos
+    timeout-minutes: 120
+    steps:
+      - uses: builtin:checkout
+        with:
+          persist-credentials: false
+      - name: Native Darwin compatibility
+        shell: python
+        run: |
+          import subprocess, sys
+          subprocess.run([sys.executable, ".devfleet/native_ci.py", "--project", "app", "--expected-os", "Darwin"], check=True)
+  windows:
+    runs-on: vizly-app-windows
+    timeout-minutes: 120
+    steps:
+      - uses: builtin:checkout
+        with:
+          persist-credentials: false
+      - name: Native Windows compatibility
+        shell: python
+        run: |
+          import subprocess, sys
+          subprocess.run([sys.executable, ".devfleet/native_ci.py", "--project", "app", "--expected-os", "Windows"], check=True)
+  linux:
+    runs-on: vizly-app-linux
+    timeout-minutes: 120
+    steps:
+      - uses: builtin:checkout
+        with:
+          persist-credentials: false
+      - name: Native Linux compatibility
+        shell: python
+        run: |
+          import subprocess, sys
+          subprocess.run([sys.executable, ".devfleet/native_ci.py", "--project", "app", "--expected-os", "Linux"], check=True)
+  native-complete:
+    if: always()
+    needs: [macos, windows, linux]
+    runs-on: vizly-app-linux
+    steps:
+      - name: Require every native job
+        shell: python
+        run: |
+          results = ["${{ needs.macos.result }}", "${{ needs.windows.result }}", "${{ needs.linux.result }}"]
+          assert results == ["success", "success", "success"], results
+          print("Native compatibility passed. This is not release approval; other quality gates remain required.")
