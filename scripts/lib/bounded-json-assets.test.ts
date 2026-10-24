@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { build, type Rollup } from 'vite';
@@ -15,7 +15,8 @@ const fixtureDocument = {
 };
 
 async function buildFixture(assets: Record<string, string | Uint8Array>, base = '/nested/') {
-  const root = await mkdtemp(join(tmpdir(), 'vizly-json-assets-'));
+  // Keep the fixture root consistent with Vite's resolved source paths on macOS.
+  const root = await mkdtemp(join(await realpath(tmpdir()), 'vizly-json-assets-'));
   try {
     for (const [file, source] of Object.entries(assets)) {
       const absolute = join(root, 'src', file);
