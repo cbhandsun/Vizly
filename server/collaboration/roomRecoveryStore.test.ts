@@ -41,7 +41,7 @@ const setup = async (previous = new Uint8Array([0, 0])) => {
 afterEach(async () => {
   faults.backup = false; faults.replace = false; faults.changeAfterBackup = false;
   faults.pauseWrite = undefined;
-  for (const directory of directories.splice(0)) await rm(directory, { recursive: true, force: true });
+  for (const directory of directories.splice(0)) await rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 });
 
 describe('backed-up explicit room checkpoint recovery', () => {
