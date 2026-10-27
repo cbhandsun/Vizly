@@ -8,9 +8,16 @@ import { expect, it } from 'vitest';
 import { createOperationTelemetry } from '../../src/observability/operationTelemetry.js';
 import { createTelemetryJournal, queryTelemetryJournal } from './telemetryJournal.js';
 
-const runWindowsAcl = (path: string, script: string) => promisify(execFile)('powershell.exe', [
- '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', script,
-], { env: { ...process.env, VIZLY_TEST_PRIVATE_FILE: path }, timeout: 10_000, windowsHide: true });
+const runWindowsAcl = (path: string, script: string) => {
+ const systemRoot=process.env.SystemRoot??process.env.SYSTEMROOT;
+ if(!systemRoot)throw Error('SystemRoot is required for native Windows ACL checks');
+ // Native CI intentionally has a small PATH. Resolve the trusted system tool
+ // directly instead of requiring a terminal profile or a PATH-provided shim.
+ const powershell=join(systemRoot,'System32','WindowsPowerShell','v1.0','powershell.exe');
+ return promisify(execFile)(powershell,[
+  '-NoLogo','-NoProfile','-NonInteractive','-Command',script,
+ ],{env:{...process.env,VIZLY_TEST_PRIVATE_FILE:path},timeout:10_000,windowsHide:true});
+};
 
 async function privateDirectory() {
  const directory=await mkdtemp(join(tmpdir(),'vizly-telemetry-'));
