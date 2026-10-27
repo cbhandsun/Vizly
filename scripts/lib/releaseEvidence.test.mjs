@@ -19,7 +19,7 @@ async function fixture(promotion = false, production = promotion) {
   if (production) await writeFile(join(root, 'build/app.js'), 'const endpoint="wss://collab.example.com";');
   const environment = production ? 'production' : 'preview';
   await prepareVercelStaticArtifact({ workspace: root, buildDirectory: 'build', outputDirectory: 'stage', projectId, teamId, environment,
-    ...(production ? { productionWebSocketUrl: 'wss://collab.example.com' } : {}) });
+    ...(production ? { productionWebSocketUrl: 'wss://collab.example.com', telemetryIngestUrl: 'https://collab.example.com/telemetry' } : {}) });
   const prepared = await verifyPreparedVercelDeployment({ artifactDirectory: join(root, 'stage'), projectId, teamId, environment });
   const release = await syntheticReleaseFixture(root, prepared, promotion);
   return { root, prepared, ...release, save: () => writeFile(release.manifestPath, JSON.stringify(release.manifest)) };

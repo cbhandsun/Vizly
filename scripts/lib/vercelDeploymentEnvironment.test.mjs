@@ -51,7 +51,7 @@ it.each([undefined, null, '', {}, [], 'http://ingest.example.com/telemetry',
   'https://ingest.example.com/', 'https://ingest.example.com/telemetry/',
   'https://ingest.example.com/a/../telemetry', 'https://ingest.example.com/%74elemetry',
   'https://-.example.com/telemetry', `https://${'a'.repeat(64)}.example.com/telemetry`,
-])('rejects unsafe or unrecognized telemetry ingest endpoints %#', value => {
+].map(value => [value]))('rejects unsafe or unrecognized telemetry ingest endpoints %#', value => {
   expect(() => parseTelemetryIngestUrl(value)).toThrow('Invalid telemetry ingest');
 });
 it('includes release tooling in the unified strict type gate and rejects unknown access and implicit parameters', async () => {
