@@ -9,6 +9,7 @@ import { prepareVercelStaticArtifact } from './vercel-static-artifact.mjs';
 import { verifyPreparedVercelDeployment } from './preparedVercelDeployment.mjs';
 import { verifyReleaseEvidence, ENGINEERING_GATES, PROMOTION_GATES } from './releaseEvidence.mjs';
 import { syntheticReleaseFixture } from './releaseEvidenceFixture.mjs';
+import { CORE_HOST_GATES } from './coreHostReleaseEvidence.mjs';
 import { CORE_QUALITY_GATES } from './coreQualityReleaseEvidence.mjs';
 const roots = [], run = promisify(execFile), projectId = 'prj_Test', teamId = 'team_Test';
 const launcher = join(process.cwd(), 'scripts/deploy-prepared-vercel-static.mjs');
@@ -30,7 +31,7 @@ it('accepts exactly bound engineering evidence; promotion requires separate real
   const complete = await fixture(true);
   expect((await verifyReleaseEvidence({ ...complete, phase: 'promotion' })).gates).toBe(ENGINEERING_GATES.length + PROMOTION_GATES.length);
 });
-it.each(['app-security', 'core-package-contents', 'app-browser-main', 'app-rls', 'core-gitea-linux',
+it.each([...CORE_HOST_GATES, 'app-security', 'core-package-contents', 'app-browser-main', 'app-rls', 'core-gitea-linux',
   'app-database-paths', 'app-collaboration-auth-load', 'app-collaboration-mixed-load', 'app-browser-compatibility'])('rejects missing required gate %s', async id => {
   const f = await fixture(); f.manifest.gates = f.manifest.gates.filter(gate => gate.id !== id); await f.save();
   await expect(verifyReleaseEvidence(f)).rejects.toThrow(`missing gate ${id}`);
@@ -148,3 +149,23 @@ it.each(['runId', 'jobId', 'commit'])('rejects Core quality wrapper %s mismatch'
   reference.sha256 = createHash('sha256').update(wrapper).digest('hex'); await f.save();
   await expect(verifyReleaseEvidence(f)).rejects.toThrow('Core quality CI provenance');
 });
+
+it.each(['sdk', 'app-source', 'budget'])(
+  'rejects changed original Core host facts after wrapper hashes are refreshed: %s', async scenario => {
+    const f = await fixture();
+    const reference = f.manifest.gates.find(gate => gate.id === 'core-performance-large');
+    const path = join(f.evidence, reference.path);
+    const report = JSON.parse(await readFile(path, 'utf8'));
+    const rawPath = join(f.evidence, report.evidence.path);
+    const raw = JSON.parse(await readFile(rawPath, 'utf8'));
+    const result = raw.jobs.find(job => job.name === 'core-host-performance').host_result;
+    if (scenario === 'sdk') result.sdk_sha256 = '0'.repeat(64);
+    if (scenario === 'app-source') result.app_source.commit = '0'.repeat(40);
+    if (scenario === 'budget') result.gates.find(gate => gate.id === 'core-performance-large').summary.groups[0].workerRouting.maxMs = 751;
+    const rawBytes = JSON.stringify(raw); await writeFile(rawPath, rawBytes);
+    report.evidence.sha256 = createHash('sha256').update(rawBytes).digest('hex');
+    const bytes = JSON.stringify(report); await writeFile(path, bytes);
+    reference.sha256 = createHash('sha256').update(bytes).digest('hex'); await f.save();
+    await expect(verifyReleaseEvidence(f)).rejects.toThrow('Core host release evidence');
+  },
+);

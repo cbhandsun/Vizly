@@ -25,6 +25,12 @@ export default defineConfig([
     languageOptions: { ecmaVersion: 2023, globals: globals.node, sourceType: 'module' },
   },
   {
+    files: ['scripts/import-core-host-release-evidence.mjs', 'scripts/lib/coreHostReleaseEvidence.mjs',
+      'scripts/lib/coreHostReleaseEvidence.test.mjs', 'scripts/lib/releaseEvidenceFixture.mjs', 'scripts/lib/releaseEvidence.mjs'],
+    extends: [js.configs.recommended],
+    languageOptions: { ecmaVersion: 2023, globals: globals.node, sourceType: 'module' },
+  },
+  {
     files: ['**/*.{ts,tsx}'],
     extends: [js.configs.recommended, tseslint.configs.recommended, reactHooks.configs.flat.recommended, reactRefresh.configs.vite],
     languageOptions: { ecmaVersion: 2023, globals: globals.browser },

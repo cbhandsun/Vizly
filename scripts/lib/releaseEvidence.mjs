@@ -1,5 +1,6 @@
 import { nativeReleaseFacts } from './nativeReleaseEvidence.mjs';
 import { CORE_QUALITY_GATES, coreQualityReleaseFacts } from './coreQualityReleaseEvidence.mjs';
+import { CORE_HOST_GATES, coreHostReleaseFacts } from './coreHostReleaseEvidence.mjs';
 import { REQUIRED_BUSINESS_GATES, BUSINESS_RELEASE_GATES, businessReleaseFacts } from './businessReleaseEvidence.mjs';
 import { createHash } from 'node:crypto';
 import { lstat, readFile, readdir, realpath } from 'node:fs/promises';
@@ -8,7 +9,8 @@ import { dirname, join, resolve } from 'node:path';
 export const ENGINEERING_GATES = Object.freeze([
   'core-build', 'core-source-types', 'core-test-support-types', 'core-focus-geometry-types', 'core-build-plugin-types',
   'core-source-lint', 'core-motion-types', 'core-motion-lint', 'core-evidence-types', 'core-evidence-lint', 'core-evidence-unit',
-  'core-package-boundaries', 'core-package-contents', 'core-unit', 'core-security', 'core-browser-host',
+  'core-package-boundaries', 'core-package-contents', 'core-unit', 'core-security',
+  ...CORE_HOST_GATES,
   'app-typecheck', 'app-lint', 'app-negative-gates', 'app-unit', 'app-build', 'app-collaboration-build', 'app-security',
   'app-browser-main', 'app-browser-recovery', 'app-rls', 'app-s3', 'app-browser-s3',
   ...REQUIRED_BUSINESS_GATES,
@@ -114,6 +116,11 @@ export async function verifyReleaseEvidence({ manifestPath, prepared, phase = 'c
       let raw; try { raw = JSON.parse(rawBytes.toString('utf8')); } catch { fail('Core quality report JSON'); }
       const fact = coreQualityReleaseFacts(raw, { identity }).find(item => item.id === reference.id);
       if (!fact || ['provider', 'repository', 'commit', 'workflow', 'runId', 'jobId'].some(key => report[key] !== fact[key])) fail('Core quality CI provenance');
+    }
+    if (CORE_HOST_GATES.includes(reference.id)) {
+      let raw; try { raw = JSON.parse(rawBytes.toString('utf8')); } catch { fail('Core host report JSON'); }
+      const fact = coreHostReleaseFacts(raw, { identity }).find(item => item.id === reference.id);
+      if (!fact || ['provider', 'repository', 'commit', 'workflow', 'runId', 'jobId'].some(key => report[key] !== fact[key])) fail('Core host CI provenance');
     }
     if (reference.id === 'rollback-save-reopen-collaboration'
       && report.rollbackIdentitySha256 !== digest(manifest.previousCompatible)) fail('rollback evidence mismatch');
