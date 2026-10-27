@@ -1,4 +1,6 @@
 // @vitest-environment node
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 const factories = vi.hoisted(() => ({ file: vi.fn(), cloud: vi.fn() }));
 vi.mock('./telemetryJournal.js', () => ({ createTelemetryJournal: factories.file }));
@@ -20,8 +22,9 @@ it('uses external persistence on Vercel and explicitly configured cloud deployme
 });
 it('retains the private-directory journal for the local service', async () => {
   factories.file.mockReturnValue({ accept: vi.fn(), drain: vi.fn() });
-  const runtime = createServerTelemetryRuntime({ ...environment, VIZLY_TELEMETRY_DATA_DIR: '/private-test-journal' });
-  expect(factories.file).toHaveBeenCalledWith('/private-test-journal');
+  const directory = join(tmpdir(), 'vizly-private-test-journal');
+  const runtime = createServerTelemetryRuntime({ ...environment, VIZLY_TELEMETRY_DATA_DIR: directory });
+  expect(factories.file).toHaveBeenCalledWith(directory);
   expect(factories.cloud).not.toHaveBeenCalled(); await runtime.stop();
 });
 it('rejects an unknown storage or a filesystem journal selected on Vercel', () => {
