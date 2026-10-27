@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { classifyOperationFailure } from '@/observability/applicationTelemetry';
 import type { StandardDiagramData } from '@vizly/core/types';
 
 const mockSupabase = vi.hoisted(() => ({
@@ -17,7 +18,7 @@ vi.mock('../supabase', () => ({
     supabase: mockSupabase,
 }));
 
-const createTableMock = (result: { data: unknown; error: unknown } = { data: null, error: null }) => {
+const createTableMock = (result: { data: unknown; error: unknown; status?: number } = { data: null, error: null }) => {
     const table: Record<string, ReturnType<typeof vi.fn>> = {
         delete: vi.fn(() => table),
         insert: vi.fn(() => table),
@@ -70,6 +71,24 @@ const makeAIConfig = () => ({
 });
 
 describe('SupabaseStorageProvider', () => {
+    it.each([[401, 'denied'], [403, 'denied'], [408, 'timeout'], [409, 'conflict'], [412, 'conflict'], [429, 'unavailable'], [503, 'unavailable'], [504, 'timeout']] as const)(
+        'preserves HTTP %i for save diagnostics without retaining response content', async (status, category) => {
+            mockSupabase.auth.getUser.mockResolvedValue({ data: { user: { id: 'owner' } }, error: null });
+            const remoteError = Object.freeze({ code: 'HTTP_TEST', message: 'PRIVATE_RESPONSE_CANARY', details: 'PRIVATE_DOCUMENT_CANARY' });
+            mockSupabase.from.mockReturnValue(createTableMock({ data: null, error: remoteError, status }));
+            const { SupabaseStorageProvider } = await import('../SupabaseStorage');
+            const error = await new SupabaseStorageProvider().saveDiagram({
+                id: 'diagram-1', title: 'Diagram', content: makeDiagramContent(), user_id: 'owner', updated_at: '',
+            }).then(() => { throw new Error('Expected failed save'); }, failure => failure);
+            expect(error).toMatchObject({ status });
+            expect(classifyOperationFailure(error)).toBe(category);
+            expect(String(error)).not.toContain('CANARY');
+            expect(JSON.stringify(error)).not.toContain('CANARY');
+            expect(error).not.toHaveProperty('cause');
+            expect(remoteError).not.toHaveProperty('status');
+        },
+    );
+
     it('rejects a zero-row permission or version miss without returning a saved identity', async () => {
         mockSupabase.auth.getUser.mockResolvedValue({ data: { user: { id: 'viewer' } }, error: null });
         const table = createTableMock({ data: null, error: null });
@@ -308,14 +327,14 @@ describe('SupabaseStorageProvider', () => {
             error: null,
         });
         const table = createTableMock({
-            data: { user_id: '11111111-1111-4111-8111-111111111111', key: 'ai_config', value: makeAIConfig() },
+            data: { user_id: '11111111-1111-4111-8111-111111111111', key: 'ai_config_v3', value: makeAIConfig() },
             error: null,
         });
         mockSupabase.from.mockReturnValue(table);
         const { SupabaseStorageProvider } = await import('../SupabaseStorage');
         const provider = new SupabaseStorageProvider();
 
-        await provider.saveConfig('ai_config', {
+        await provider.saveConfig('ai_config_v3', {
             ...makeAIConfig(),
             constructor: { polluted: true },
             providers: [{
@@ -329,6 +348,8 @@ describe('SupabaseStorageProvider', () => {
         }, '11111111-1111-4111-8111-111111111111');
 
         const savedValue = table.upsert.mock.calls[0][0].value;
+        expect(savedValue.version).toBe(3);
+        expect(savedValue.providers[0].apiKey).toBe('');
         expect(Object.hasOwn(savedValue, 'constructor')).toBe(false);
         expect(Object.hasOwn(savedValue.providers[0], 'constructor')).toBe(false);
         expect(savedValue.providers[0].models).toEqual([
@@ -710,4 +731,13 @@ describe('SupabaseStorageProvider', () => {
             '22222222-2222-4222-8222-222222222222'
         )).resolves.toBeNull();
     });
+    it('rejects legacy AI writes and reads requested for a different account', async () => {
+        mockSupabase.auth.getUser.mockResolvedValue({ data: { user: { id: 'user-b' } }, error: null });
+        const { SupabaseStorageProvider } = await import('../SupabaseStorage');
+        const provider = new SupabaseStorageProvider();
+        await expect(provider.saveConfig('ai_config', makeAIConfig(), 'user-b')).rejects.toThrow('read-only');
+        await expect(provider.loadConfig('ai_config_v3', 'user-a')).rejects.toThrow('user mismatch');
+        expect(mockSupabase.from).not.toHaveBeenCalled();
+    });
+
 });

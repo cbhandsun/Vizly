@@ -1,10 +1,15 @@
 // @vitest-environment jsdom
 
 import React from 'react';
+import type { VersionStorageState } from '@/services/storage/types';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const syncPolicy = vi.hoisted(() => ({ enabled: true }));
+vi.mock('@/services/versionOutboxPolicy', () => ({ get VERSION_AUTOSYNC_ENABLED() { return syncPolicy.enabled; } }));
+afterEach(() => { syncPolicy.enabled = true; });
 
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({
@@ -81,6 +86,7 @@ const historyMocks = vi.hoisted(() => ({
         id: string;
         diagramId: string;
         snapshotData: null;
+        storage?: VersionStorageState;
         createdAt: number;
         message: string;
     }>,
@@ -91,6 +97,8 @@ const historyMocks = vi.hoisted(() => ({
     enterPreview: vi.fn(async () => true),
     exitPreview: vi.fn(() => null),
     restoreVersion: vi.fn(async () => true),
+    retryVersion: vi.fn(async () => true),
+    exportVersion: vi.fn(async () => undefined),
 }));
 
 vi.mock('@xyflow/react', () => ({
@@ -108,12 +116,59 @@ vi.mock('../../hooks/useVersionHistory', () => ({
         enterPreview: historyMocks.enterPreview,
         exitPreview: historyMocks.exitPreview,
         restoreVersion: historyMocks.restoreVersion,
+        retryVersion: historyMocks.retryVersion,
+        exportVersion: historyMocks.exportVersion,
     }),
 }));
 
 import { VersionHistoryPanel } from '../VersionHistoryPanel';
 
 describe('VersionHistoryPanel commercial preview safeguards', () => {
+    it.each(['queued', 'retrying', 'blocked', 'capacity'] as const)('shows automatic sync state %s without hiding manual recovery', state => {
+        historyMocks.versions = [{ id: 'pending', diagramId: 'diagram-1', snapshotData: null,
+            createdAt: 1, message: 'Pending copy', storage: { location: 'local', syncStatus: 'pending',
+                provider: 'supabase', ownerId: 'user-a', localCreated: true, automaticSync: state, syncAttempts: 2 } }];
+        render(<VersionHistoryPanel diagramId="diagram-1" isOpen onClose={vi.fn()} />);
+        expect(screen.getByText(`designer.versionHistoryPanel.automaticSync.${state}`)).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'designer.versionHistoryPanel.retrySync' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'designer.versionHistoryPanel.exportLocal' })).toBeTruthy();
+    });
+
+    it('shows the rollback pause while retaining manual retry and export', () => {
+        syncPolicy.enabled = false;
+        historyMocks.versions = [{ id: 'paused', diagramId: 'diagram-1', snapshotData: null,
+            createdAt: 1, message: 'Retained snapshot', storage: { location: 'local', syncStatus: 'pending',
+                provider: 'supabase', ownerId: 'user-a', localCreated: true, automaticSync: 'queued' } }];
+        render(<VersionHistoryPanel diagramId="diagram-1" isOpen onClose={vi.fn()} />);
+        expect(screen.getByText('designer.versionHistoryPanel.automaticSync.paused')).toBeTruthy();
+        expect(screen.queryByText('designer.versionHistoryPanel.automaticSync.queued')).toBeNull();
+        expect(screen.getByRole('button', { name: 'designer.versionHistoryPanel.retrySync' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'designer.versionHistoryPanel.exportLocal' })).toBeTruthy();
+    });
+
+    it('shows local failure status and exposes explicit retry and export actions', async () => {
+        historyMocks.versions = [{ id: 'local-version', diagramId: 'diagram-1', snapshotData: null,
+            createdAt: 1, message: 'Local draft', storage: { location: 'local', syncStatus: 'pending',
+                provider: 'supabase', ownerId: 'user-a', localCreated: true, failure: 'permission' } }];
+        render(<VersionHistoryPanel diagramId="diagram-1" isOpen onClose={vi.fn()} />);
+        expect(screen.getByText('designer.versionHistoryPanel.localSaved')).toBeTruthy();
+        expect(screen.getByText('designer.versionHistoryPanel.failure.permission')).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', { name: 'designer.versionHistoryPanel.exportLocal' }));
+        expect(historyMocks.exportVersion).toHaveBeenCalledWith('local-version');
+        fireEvent.click(screen.getByRole('button', { name: 'designer.versionHistoryPanel.retrySync' }));
+        await waitFor(() => expect(historyMocks.retryVersion).toHaveBeenCalledWith('local-version'));
+    });
+
+    it('identifies unknown historical records without offering cloud upload', () => {
+        historyMocks.versions = [{ id: 'legacy', diagramId: 'diagram-1', snapshotData: null,
+            createdAt: 1, message: 'Legacy', storage: { location: 'local', syncStatus: 'legacy',
+                provider: 'supabase', ownerId: null, localCreated: false } }];
+        render(<VersionHistoryPanel diagramId="diagram-1" isOpen onClose={vi.fn()} />);
+        expect(screen.getByText('designer.versionHistoryPanel.legacyLocal')).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'designer.versionHistoryPanel.retrySync' })).toBeNull();
+        expect(screen.getByRole('button', { name: 'designer.versionHistoryPanel.exportLocal' })).toBeTruthy();
+    });
+
     it('keeps the panel open when exiting an active preview cannot restore the canvas', () => {
         historyMocks.previewVersion = { id: 'version-1', message: 'Snapshot' };
         historyMocks.exitPreview.mockReturnValue(null);

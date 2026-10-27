@@ -1,4 +1,7 @@
-import { createServer } from 'node:http';
+import type { OperationTelemetry } from './operationTelemetry.js';
+import { bindServerTelemetry, beginServerOperation, observeServerOperation } from './serverTelemetry.js';
+import { createTelemetryHttp, type TelemetryReceiverOptions } from './telemetryHttp.js';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { Duplex } from 'node:stream';
 import WebSocket, { WebSocketServer, type RawData } from 'ws';
 import * as Y from 'yjs';
@@ -31,6 +34,8 @@ interface Room { doc: Y.Doc; awareness: Awareness; connections: Set<Connection>;
   distributedLease?: DistributedRoomLease; detachLease?: () => void; synchronization?: RoomSynchronization;
   nextPresenceId: number; remoteAwareness: ReturnType<typeof createRemoteRoomAwareness> }
 export interface CollaborationServerOptions {
+  telemetry?: Pick<TelemetryReceiverOptions, 'accept'>;
+  operationTelemetry?: OperationTelemetry;
   authorize: AuthorizeDiagram;
   persistence: RoomPersistence;
   acquireRoomLease?: (diagramId: string) => Promise<DistributedRoomLease>;
@@ -41,6 +46,8 @@ export interface CollaborationServerOptions {
   readAcceptedRoomRevision?: (diagramId: string) => Promise<string | undefined>;
   origins: ReadonlySet<string>;
   recheckMs?: number;
+  /** Content-free queue observations for diagnostics and controlled load tests. */
+  observeMessageQueue?: (sample: Readonly<{ waitMs: number; connectionPending: number }>) => void;
   log?: (event: SafeEvent) => void;
   recovery?: { authorizeOwner: AuthorizeDiagram; operations: ReturnType<typeof createRoomRecovery> };
 }
@@ -82,14 +89,17 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
       return () => { recoveringRooms.delete(id); };
     },
   }) : undefined;
-  const http = createServer((request, response) => {
+  const telemetryHttp = options.telemetry ? createTelemetryHttp({ ...options.telemetry, origins: options.origins }) : undefined;
+  const http = createServer(bindServerTelemetry(options.operationTelemetry, (request: IncomingMessage, response: ServerResponse) => {
     if (request.method === 'GET' && request.url === '/health') {
       response.writeHead(stopped ? 503 : 200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
       response.end(JSON.stringify({ status: stopped ? 'stopping' : 'ready' }));
+    } else if (telemetryHttp && request.url === '/telemetry') {
+      void telemetryHttp(request, response);
     } else if (recoverHttp && request.url?.startsWith('/recovery/')) {
       void recoverHttp(request, response);
     } else { response.writeHead(404); response.end(); }
-  });
+  }));
   const websocket = new WebSocketServer({ noServer: true, maxPayload: MAX_DOCUMENT_BYTES, perMessageDeflate: false });
   const close = (connection: Connection) => {
     connection.socket.close(1008, 'Access or message rejected');
@@ -98,13 +108,17 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
     timer.unref();
   };
   const authorize = async (token: string, diagramId: string) => {
+    const finish = beginServerOperation('permission');
+    let timedOut = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      return await Promise.race([
+      const result = await Promise.race([
         options.authorize(token, diagramId),
-        new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), 6000); }),
+        new Promise<null>(resolve => { timer = setTimeout(() => { timedOut = true; resolve(null); }, 6000); }),
       ]);
-    } catch { options.log?.('authorization-failed'); return null; }
+      finish(result ? 'success' : 'failure', result ? undefined : timedOut ? 'timeout' : 'denied');
+      return result;
+    } catch { finish('failure', 'unavailable'); options.log?.('authorization-failed'); return null; }
     finally { if (timer) clearTimeout(timer); }
   };
   const allowed = async (connection: Connection) => {
@@ -122,10 +136,16 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
     }
     return connection.socket.readyState === WebSocket.OPEN;
   };
-  const send = async (connection: Connection, payload: Uint8Array) => {
-    if (!await allowed(connection)) return;
+  // Only call synchronously after allowed(), with no intervening async work.
+  // This is request-local permission reuse, never a cached authorization.
+  const sendWithCurrentPermission = (connection: Connection, payload: Uint8Array) => {
+    if (stopped || connection.socket.readyState !== WebSocket.OPEN) return;
     if (connection.socket.bufferedAmount > MAX_DOCUMENT_BYTES) { close(connection); return; }
     connection.socket.send(payload);
+  };
+  const send = async (connection: Connection, payload: Uint8Array) => {
+    if (!await allowed(connection)) return;
+    sendWithCurrentPermission(connection, payload);
   };
   const broadcast = (room: Room, payload: Uint8Array) => Promise.all([...room.connections].map(connection => send(connection, payload)));
   const getRoom = async (diagramId: string, token: string, userId: string): Promise<RoomLease<Room>> => {
@@ -134,7 +154,8 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
       let distributedLease: DistributedRoomLease | undefined;
       let initializingRoom: Room | undefined;
       try {
-        distributedLease = await options.acquireRoomLease?.(diagramId);
+        distributedLease = options.acquireRoomLease
+          ? await observeServerOperation('lease', () => options.acquireRoomLease!(diagramId)) : undefined;
         distributedLease?.assertActive();
         const state = options.loadInitialRoom
           ? await options.loadInitialRoom({ token, diagramId, userId })
@@ -286,9 +307,9 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
       const payload = decoding.readVarUint8Array(decoder);
       if (decoding.hasContent(decoder)) throw new Error('Unexpected trailing message');
       if (subtype === sync.messageYjsSyncStep1) {
-        await send(connection, message(0, encoder => sync.writeSyncStep2(encoder, room.doc, payload)));
+        sendWithCurrentPermission(connection, message(0, encoder => sync.writeSyncStep2(encoder, room.doc, payload)));
         const revision = room.cloudRevision;
-        if (revision) await send(connection, message(CLOUD_REVISION_MESSAGE,
+        if (revision) sendWithCurrentPermission(connection, message(CLOUD_REVISION_MESSAGE,
           encoder => writeAcceptedCloudRevision(encoder, revision, room.doc)));
       } else if (subtype === sync.messageYjsSyncStep2 || subtype === sync.messageYjsUpdate) {
         await applyUpdate(room, connection, payload);
@@ -317,10 +338,10 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
       await broadcast(room, message(1, encoder => encoding.writeVarUint8Array(encoder, safeUpdate)));
       void room.synchronization?.notifyPresence?.().catch(() => options.log?.('room-notification-failed'));
     } else if (kind === 3 && !decoding.hasContent(decoder)) {
-      await send(connection, message(1, encoder => encoding.writeVarUint8Array(encoder, encodeAwarenessUpdate(room.awareness, [...room.awareness.getStates().keys()]))));
+      sendWithCurrentPermission(connection, message(1, encoder => encoding.writeVarUint8Array(encoder, encodeAwarenessUpdate(room.awareness, [...room.awareness.getStates().keys()]))));
     } else throw new Error('Unknown message');
   };
-  http.on('upgrade', (request, socket, head) => {
+  http.on('upgrade', bindServerTelemetry(options.operationTelemetry, (request, socket, head) => {
     const parsed = parseConnection(request.url, request.headers.origin, options.origins);
     if (!parsed || stopped || recoveringRooms.has(parsed.diagramId) || connections.size + pendingUpgrades >= 128) { rejectUpgrade(socket); return; }
     pendingUpgrades++;
@@ -360,7 +381,7 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
         room.connections.add(connection);
         connections.add(connection);
         ws.on('error', () => close(connection));
-        ws.on('message', (raw: RawData, binary: boolean) => {
+        ws.on('message', bindServerTelemetry(options.operationTelemetry, (raw: RawData, binary: boolean) => {
           const now = Date.now();
           if (now - connection.window >= 10_000) { connection.window = now; connection.messages = 0; }
           if (!binary || ++connection.messages > 120) { close(connection); return; }
@@ -390,7 +411,12 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
             connection.queuedPresence = Uint8Array.from(input);
           }
           if (++connection.pending > 16) { close(connection); return; }
+          const queuedAt = performance.now();
           room.queue = room.queue.then(() => {
+            // Observation failures must never change authorization or message processing.
+            try { options.observeMessageQueue?.(Object.freeze({
+              waitMs: Math.max(0, performance.now() - queuedAt), connectionPending: connection.pending,
+            })); } catch { /* Diagnostic adapters are not part of the data path. */ }
             const current = presenceMessage ? connection.queuedPresence : documentUpdate
               ? message(0, encoder => sync.writeUpdate(encoder, connection.queuedDocument ?? documentUpdate)) : input;
             if (presenceMessage) connection.queuedPresence = undefined;
@@ -399,8 +425,8 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
           })
             .catch(() => { options.log?.('invalid-message'); close(connection); })
             .finally(() => { connection.pending--; });
-        });
-        ws.on('close', () => {
+        }));
+        ws.on('close', bindServerTelemetry(options.operationTelemetry, () => {
           connections.delete(connection);
           room.connections.delete(connection);
           void room.synchronization?.notifyPresence?.().catch(() => options.log?.('room-notification-failed'));
@@ -411,7 +437,7 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
               .catch(() => options.log?.('authorization-failed'));
           }
           void reservation.release().catch(() => options.log?.('room-load-failed'));
-        });
+        }));
         void send(connection, message(4, encoder => encoding.writeVarString(encoder, formatCollaborationAccess(permission.role))))
           .then(() => send(connection, message(0, encoder => sync.writeSyncStep1(encoder, room.doc))))
           .catch(() => close(connection));
@@ -423,9 +449,9 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
         const remaining = (pendingRooms.get(parsed.diagramId) ?? 1) - 1;
         if (remaining === 0) pendingRooms.delete(parsed.diagramId); else pendingRooms.set(parsed.diagramId, remaining);
       });
-  });
+  }));
   let checking = false;
-  const recheck = setInterval(() => {
+  const recheck = setInterval(bindServerTelemetry(options.operationTelemetry, () => {
     if (checking || stopped) return;
     checking = true;
     void Promise.all([...connections].map(connection => allowed(connection)))
@@ -464,7 +490,7 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
       })
       .catch(() => options.log?.('authorization-failed'))
       .finally(() => { checking = false; });
-  }, options.recheckMs ?? 3000);
+  }), options.recheckMs ?? 3000);
   recheck.unref();
   return {
     http,

@@ -17,6 +17,7 @@ export const areAIConfigDraftsEqual = (
             || provider.enabled !== other.enabled
             || provider.baseUrl !== other.baseUrl
             || provider.apiKey !== other.apiKey
+            || provider.credentialState !== other.credentialState
             || provider.icon !== other.icon
             || provider.models.length !== other.models.length
         ) return false;

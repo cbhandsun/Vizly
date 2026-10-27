@@ -132,6 +132,7 @@ export const useDiagramViewerCollaboration = ({
     ...collaboration,
     collaborationStatus,
     pushLocalChangesToYjs,
+    hasVerifiedEditingAccess: collaborationEnabled && collaboration.accessRole === 'editor',
     isCollaborationReadOnly: (collaborationEnabled && collaboration.accessRole !== 'editor') || previewReadOnly || recoveryReadOnly,
     restoreCloudRoom,
     canPersistCanvas,

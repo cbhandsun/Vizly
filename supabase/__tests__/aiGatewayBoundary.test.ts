@@ -103,7 +103,7 @@ describe('AI gateway boundaries', () => {
     const headers = buildGatewayCorsHeaders('https://vizly.example.com');
 
     expect(headers.get('Access-Control-Allow-Origin')).toBe('https://vizly.example.com');
-    expect(headers.get('Access-Control-Expose-Headers')).toBe('X-Vizly-AI-Gateway');
+    expect(headers.get('Access-Control-Expose-Headers')).toBe('X-Vizly-AI-Gateway, Retry-After');
     expect(headers.get('Vary')).toBe('Origin');
   });
 

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from 'react';
+import { captureAuthSession, getAuthSessionRevision, onAuthSessionInvalidated } from '@/context/authSessionBoundary';
 import type { TFunction } from 'i18next';
 
 import {
@@ -56,7 +57,7 @@ interface UseAIChatRequestLifecycleOptions {
     diagramEdgesRef: AIChatPanelProps['diagramEdgesRef'];
     canvasOps: AIChatPanelProps['canvasOps'];
     onOpenConfig: () => void;
-    processCommands: (content: string) => Promise<unknown> | unknown;
+    processCommands: (content: string, signal?: AbortSignal) => Promise<unknown> | unknown;
 }
 
 const isAbortError = (error: unknown): boolean => (
@@ -79,20 +80,24 @@ export function useAIChatRequestLifecycle({
     onOpenConfig,
     processCommands,
 }: UseAIChatRequestLifecycleOptions) {
-    const [loading, setLoading] = useState(false);
+    const revision = useSyncExternalStore(onAuthSessionInvalidated, getAuthSessionRevision, getAuthSessionRevision);
+    const [requestState, setRequestState] = useState({ owner: userId, revision, loading: false });
+    const loading = requestState.owner === userId && requestState.revision === revision && requestState.loading;
+    const setLoading = (value: boolean) => setRequestState({ owner: userId, revision, loading: value });
     const activeRequestControllerRef = useRef<AbortController | null>(null);
 
     useEffect(() => () => {
         activeRequestControllerRef.current?.abort(new DOMException('AI chat panel unmounted', 'AbortError'));
         activeRequestControllerRef.current = null;
-    }, []);
+    }, [userId, revision]);
 
     const handleStopGeneration = () => {
         activeRequestControllerRef.current?.abort(new DOMException('用户已停止生成', 'AbortError'));
     };
 
     const sendAIMessage = async () => {
-        if (loading || !inputValue.trim()) return;
+        const session = captureAuthSession(userId);
+        if (loading || !inputValue.trim() || !session.isCurrent()) return;
 
         let config = getAIConfig(userId);
         const modelSelection = resolveAIChatActiveModelSelection(config);
@@ -165,25 +170,30 @@ export function useAIChatRequestLifecycle({
                 model: validation.model.id,
                 messages: requestMessages,
                 stream: true,
-            }, { signal: requestController.signal, timeoutMs: 120_000 });
+            }, { signal: AbortSignal.any([requestController.signal, session.signal]), timeoutMs: 120_000 });
 
+            if (!session.isCurrent()) {
+                await response.body?.cancel();
+                return;
+            }
             const reader = response.body?.getReader();
             let lastUpdateTimestamp = Date.now();
             if (reader) {
                 const streamState = await consumeAIChatStream({
                     reader,
-                    signal: requestController.signal,
+                    signal: AbortSignal.any([requestController.signal, session.signal]),
                     parseDelta: parseAIStreamDelta,
                     onAbortReader: () => {
                         void reader.cancel().catch(logAIChatCancelFailure);
                     },
                     onDelta: (state) => {
+                        if (!session.isCurrent()) return;
                         accumulatedContent = state.content;
                         accumulatedReasoning = state.reasoningContent;
                         structuredToolCalls = state.toolCalls;
                         if (!activeId || Date.now() - lastUpdateTimestamp <= 60) return;
 
-                        setConversations(current => current.map(conversation => conversation.id === activeId
+                        setConversations(current => !session.isCurrent() ? current : current.map(conversation => conversation.id === activeId
                             ? { ...conversation, ...buildAIChatConversationUpdate(
                                 conversation, assistantMessageId, state, { isStreaming: true },
                             ) }
@@ -196,6 +206,7 @@ export function useAIChatRequestLifecycle({
                 structuredToolCalls = streamState.toolCalls;
             }
 
+            if (!session.isCurrent()) return;
             const structuredCommandContent = structuredToolCalls
                 .map(command => `[COMMAND: ${JSON.stringify(command)}]`)
                 .join('\n');
@@ -203,8 +214,10 @@ export function useAIChatRequestLifecycle({
                 structuredCommandContent
                     ? `${accumulatedContent}\n${structuredCommandContent}`
                     : accumulatedContent,
+                AbortSignal.any([requestController.signal, session.signal]),
             );
-            if (activeId) {
+            requestController.signal.throwIfAborted();
+            if (session.isCurrent() && activeId) {
                 setConversations(persistAIChatAssistantSnapshot(
                     aiConversationService,
                     activeId,
@@ -213,6 +226,7 @@ export function useAIChatRequestLifecycle({
                 ));
             }
         } catch (error) {
+            if (!session.isCurrent()) return;
             if (isAbortError(error)) {
                 if (activeId) {
                     setConversations(persistAIChatAssistantSnapshot(
@@ -228,7 +242,7 @@ export function useAIChatRequestLifecycle({
 
             const safeError = formatAIProviderRequestError(error);
             appMessage.error(t('aiChat.requestFailed', { error: safeError }));
-            if (activeId) {
+            if (session.isCurrent() && activeId) {
                 setConversations(persistAIChatAssistantSnapshot(
                     aiConversationService,
                     activeId,
@@ -241,7 +255,7 @@ export function useAIChatRequestLifecycle({
             if (activeRequestControllerRef.current === requestController) {
                 activeRequestControllerRef.current = null;
             }
-            setLoading(false);
+            if (session.isCurrent()) setLoading(false);
         }
     };
 

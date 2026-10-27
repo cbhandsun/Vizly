@@ -42,13 +42,26 @@ describe('S3FetchClient', () => {
         expect(String(url)).toContain('/root/vizly-diagrams?');
         expect(String(url)).toContain('list-type=2');
         expect(String(url)).toContain('prefix=diagram+');
-        expect(init).toEqual(expect.objectContaining({ method: 'GET', signal: expect.any(AbortSignal) }));
+        expect(init).toEqual(expect.objectContaining({ method: 'GET', signal: expect.any(AbortSignal), cache: 'no-store' }));
         expect(init?.signal?.aborted).toBe(false);
         const headers = init?.headers as Headers;
         expect(headers.get('x-amz-date')).toBe('20260912T010203Z');
         expect(headers.get('authorization')).toContain('Credential=AKIA_TEST/20260912/us-east-1/s3/aws4_request');
         expect(headers.get('authorization')).toContain('SignedHeaders=host;x-amz-content-sha256;x-amz-date');
         expect(headers.get('authorization')).not.toContain('super-secret');
+    });
+
+    it('bypasses cached object bodies and ETags on every explicit read', async () => {
+        const fetchImpl = vi.fn<typeof fetch>()
+            .mockResolvedValueOnce(new Response('original', { headers: { etag: '"original"' } }))
+            .mockResolvedValueOnce(new Response('updated', { headers: { etag: '"updated"' } }));
+        const client = createS3FetchClient(config, { fetchImpl });
+        expect(await client.getObject('diagram.json')).toMatchObject({ bodyText: 'original', etag: '"original"' });
+        expect(await client.getObject('diagram.json')).toMatchObject({ bodyText: 'updated', etag: '"updated"' });
+        expect(fetchImpl).toHaveBeenCalledTimes(2);
+        for (const [, init] of fetchImpl.mock.calls) {
+            expect(init).toMatchObject({ method: 'GET', cache: 'no-store' });
+        }
     });
 
     it('builds virtual-hosted URLs while preserving encoded key segments', () => {

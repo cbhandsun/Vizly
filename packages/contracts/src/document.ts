@@ -96,6 +96,9 @@ export type VizlyDocumentParseErrorCode =
   | 'invalid-edge'
   | 'duplicate-node-id'
   | 'duplicate-edge-id'
+  | 'missing-node-parent'
+  | 'self-node-parent'
+  | 'cyclic-node-parent'
   | 'missing-edge-endpoint';
 
 export type VizlyDocumentParseResult =
@@ -192,7 +195,7 @@ const parseEdge = (value: unknown): VizlyDocumentEdge | null => {
   };
 };
 
-export const parseVizlyDocument = (value: unknown): VizlyDocumentParseResult => {
+const parseDocumentShape = (value: unknown): VizlyDocumentParseResult => {
   if (!isRecord(value) || value.schemaVersion !== 1 || !Array.isArray(value.nodes) || !Array.isArray(value.edges)) {
     return { ok: false, code: 'invalid-document', path: '$' };
   }
@@ -241,4 +244,67 @@ export const parseVizlyDocument = (value: unknown): VizlyDocumentParseResult => 
       ...(metadata ? { metadata } : {}),
     },
   };
+};
+
+export interface VizlyHierarchyRepair {
+  code: 'missing-node-parent' | 'self-node-parent' | 'cyclic-node-parent';
+  path: string;
+  nodeId: string;
+  previousParentId: string;
+}
+
+// Iterative, linear traversal: legal 10,000-node chains must not overflow the
+// stack. In repair mode only the offending parent link is removed, never nodes.
+const inspectHierarchy = (nodes: VizlyDocumentNode[], repair: boolean): VizlyHierarchyRepair[] => {
+  const indexById = new Map(nodes.map((node, index) => [node.id, index]));
+  const complete = new Set<string>();
+  const issues: VizlyHierarchyRepair[] = [];
+  for (const start of nodes) {
+    if (complete.has(start.id)) continue;
+    const visiting = new Set<string>();
+    let current = start;
+    while (!complete.has(current.id)) {
+      visiting.add(current.id);
+      const parentId = current.parentId;
+      if (parentId === undefined) break;
+      const parentIndex = indexById.get(parentId);
+      const code = parentId === current.id ? 'self-node-parent'
+        : parentIndex === undefined ? 'missing-node-parent'
+          : visiting.has(parentId) ? 'cyclic-node-parent' : undefined;
+      if (code) {
+        issues.push({ code, path: `$.nodes[${indexById.get(current.id)}].parentId`,
+          nodeId: current.id, previousParentId: parentId });
+        if (!repair) return issues;
+        delete current.parentId;
+        break;
+      }
+      current = nodes[parentIndex!];
+    }
+    for (const id of visiting) complete.add(id);
+  }
+  return issues;
+};
+
+export const parseVizlyDocument = (value: unknown): VizlyDocumentParseResult => {
+  const parsed = parseDocumentShape(value);
+  if (!parsed.ok) return parsed;
+  const issue = inspectHierarchy(parsed.value.nodes, false)[0];
+  return issue ? { ok: false, code: issue.code, path: issue.path } : parsed;
+};
+
+export type VizlyLegacyDocumentImportResult =
+  | { ok: true; value: VizlyDocument; repairs: VizlyHierarchyRepair[] }
+  | Extract<VizlyDocumentParseResult, { ok: false }>;
+
+/** Explicit recovery only: preserves stored local coordinates, not unknowable
+ * absolute positions for broken/cyclic ancestry. Callers must present repairs. */
+export const importLegacyVizlyDocument = (
+  value: unknown,
+  options: { hierarchy: 'detach-invalid-parents' },
+): VizlyLegacyDocumentImportResult => {
+  if (options?.hierarchy !== 'detach-invalid-parents') return { ok: false, code: 'invalid-document', path: '$' };
+  const parsed = parseDocumentShape(value);
+  if (!parsed.ok) return parsed;
+  const repairs = inspectHierarchy(parsed.value.nodes, true);
+  return { ok: true, value: parsed.value, repairs };
 };

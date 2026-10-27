@@ -11,7 +11,7 @@ const authHeaders = {
 };
 
 const authenticatedEnvironment = {
-  authenticateUser: async () => ({ ok: true as const }),
+  authenticateUser: async () => ({ ok: true as const, userId: 'verified-test-user' }),
 };
 
 describe('AI gateway handler', () => {

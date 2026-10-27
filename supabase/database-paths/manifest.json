@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "platform": "Supabase platform schemas and roles; PostgreSQL 17",
+  "historicalFiles": {
+    "20260414000000_add_diagram_versions.sql": "60f1af2c2d4db89e3118bcca5a84ed0477e2c6a6ddd6e1e3a80b041d5b8d69e5",
+    "20260505000000_add_system_templates.sql": "f5f54c816d8d4b26f5fdd07ab785ba7be643a4954c9e9789cf78adbbc6274669",
+    "20260513000000_add_thumbnail_url.sql": "4965960069488150b3956a0008f614261040555d683d4e7924664d2d127d1f4c",
+    "20260611000000_harden_rls_policies.sql": "60737b09a88771f4e010c35e38fbd4a59bdc77f188a4d52c13991cd82f3447c7",
+    "20261008054418_revoke_explicit_anonymous_collaborator_rpc_grants.sql": "48af1d2b9347acb17b6e545d777864c5470da4487b0ac4e8e9b81e83590c2a1b",
+    "20261008202340_harden_diagram_version_permissions.sql": "12b87439e958175cb92265537fefb235f1834435bd5bc9d8542c46289ec33f34",
+    "20261009014315_harden_system_template_permissions.sql": "c9d4ad9f8a51c48587596c15ed3c7e62faa06b63dc788195f8d9e233781a3d20",
+    "20261009160702_collaboration_atomic_room_store.sql": "3bd1da4bfc2e58a2c4ba0d9c76511a7b89051026730cbf466ff1a79f2dd2b0f9",
+    "20261009160720_private_backend_room_topics.sql": "646f75ce8fe1b56c7e4b59ea6c0d024d78409bd8ae0e608b566b428834d12735",
+    "20261009171828_optimize_rls_identity_indexes.sql": "5ea62558b560c6abf96376db40cbf5d965bd468fdc44c9b5aef1ad102df889d3",
+    "20261009172905_remove_duplicate_collaborator_unique.sql": "ae38e12625698b877a24ec0cd583d3890bbd892dcd85b5316f6a8d959434bc06"
+  },
+  "baseline": "20261026060135_vizly_empty_baseline.sql",
+  "forward": "20261026060244_vizly_database_forward_contract.sql",
+  "baselinePolicy": "Empty application schema only; never replay against populated databases",
+  "upgradePolicy": "Known 7-table application schema; version parent TEXT/UUID; unknown drift fails closed",
+  "forwardChain": [
+    "20261026060244_vizly_database_forward_contract.sql",
+    "20261026191139_ai_gateway_shared_resource_leases.sql"
+  ],
+  "extensionFiles": {
+    "20261026191139_ai_gateway_shared_resource_leases.sql": "24352e648442877ff0ab65d2a1ad334ec277a17132d0b935a7b8022348a44e88"
+  }
+}

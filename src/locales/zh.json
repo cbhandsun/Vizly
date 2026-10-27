@@ -234,6 +234,17 @@
     }
   },
   "designer": {
+    "hierarchyRecovery": {
+      "download": "下载原始数据",
+        "title": "此图表需要恢复",
+        "description": "部分父子关系异常，已暂停加载和自动保存。恢复将仅断开下列父关系，保留节点及有效连线。节点保留原先存储的坐标，因此恢复后位置可能变化。",
+        "backup": "恢复前会在当前浏览器保留一份原始数据备份。如果备份无法保存，将停止恢复。取消不会修改原文档。",
+        "backupFailed": "无法备份原始数据，尚未执行恢复。请检查浏览器存储后重试。",
+        "recover": "备份并恢复",
+        "missing-node-parent": "父节点不存在",
+        "self-node-parent": "节点以自身为父节点",
+        "cyclic-node-parent": "父子关系形成循环"
+    },
     "connection": {
       "keyboardPending": "已选择起点。Tab 移到目标连接点，按 Enter 连接；Esc 取消。",
       "keyboardInvalid": "无法连接该目标，请选择其他连接点或按 Esc 取消。",
@@ -1238,6 +1249,29 @@
       "beforeUngroup": "取消分组前—分组 {{groups}} 个，节点 {{nodes}} 个"
     },
     "versionHistoryPanel": {
+      "exportFailed": "本地副本导出失败，请重试。",
+"cloudSaved": "已保存到云端",
+  "localSaved": "仅本机保存，尚未同步",
+  "automaticSync": {
+    "queued": "等待自动同步；联网并登录原账号后继续。",
+    "retrying": "已尝试 {{count}} 次，将自动重试。",
+    "blocked": "自动重试已停止；请处理下方问题后手动重试，本地副本已保留。",
+    "capacity": "同步队列已满；本地副本已保留，请手动同步。",
+    "paused": "自动同步已暂停；本地副本已保留，仍可手动同步。"
+  },
+  "nextSyncAttempt": "下次尝试：{{time}}",
+  "legacyLocal": "旧本地记录：归属未知，不会自动上传",
+  "retrySync": "重试云同步",
+  "exportLocal": "导出本地副本",
+  "retryFailed": "同步未完成，本地副本仍保留，请查看原因后重试。",
+  "failure": {
+    "authentication": "需要重新登录后重试。",
+    "permission": "权限不足，请联系图表所有者授权。",
+    "configuration": "请先配置所选存储服务。",
+    "data": "图表或数据不符合云存储要求，请先保存为云端图表。",
+    "network": "网络或服务暂时不可用，可稍后手动重试。",
+    "unknown": "云端结果未确认，请先检查云端版本；重试可能产生重复版本。"
+  },
       "title": "版本历史",
       "close": "关闭版本历史",
       "createTitle": "创建新快照",
@@ -1726,6 +1760,8 @@
     "baseUrlHint": "仅允许 HTTPS，或本机 localhost/127.0.0.1 HTTP",
     "invalidProviderBaseUrl": "{{name}}：Base URL 必须使用 HTTPS，或本机 HTTP（localhost/127.0.0.1）。",
     "apiKeyLabel": "API Key",
+    "sessionKeyNotice": "API Key 仅保存在当前页面内存中，刷新、退出或切换账号后需要重新输入。云端仅同步非敏感设置。",
+    "credentialState": {"unconfigured": "尚未配置密钥", "required": "请重新输入当前会话的密钥", "legacy-unavailable": "旧凭证未恢复，请重新输入；旧记录保持不变", "ready": "当前会话密钥已就绪"},
     "showApiKey": "显示 API Key",
     "hideApiKey": "隐藏 API Key",
     "platformName": "平台名称",
@@ -1745,7 +1781,7 @@
     "selectProvider": "请选择左侧平台进行配置",
     "newProviderName": "新建平台",
     "saveSuccess": "配置已保存 (本地)",
-    "saveSuccessCloud": "配置已保存 (本地 + 云端加密)",
+    "saveSuccessCloud": "非敏感设置已同步，密钥仅保留在当前页面",
     "saveAgainForLatestChanges": "较早的修改已保存；保存期间产生的新修改需要再次选择“保存全部”。",
     "cloudSyncFail": "已保存到本地，但云端同步失败",
     "switchedTo": "已切换到: {{model}}",

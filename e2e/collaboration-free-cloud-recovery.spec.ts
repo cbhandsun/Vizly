@@ -37,7 +37,7 @@ for (const role of ['viewer', 'editor'] as const) {
       await page.goto('/#/manage');
       await expect(page.getByRole('button', { name: 'New flowchart', exact: true })).toBeVisible();
       await page.evaluate(async id => {
-        const request = indexedDB.open('VizlyLocalDB', 2);
+        const request = indexedDB.open('VizlyLocalDB');
         request.onupgradeneeded = () => {
           const versions = request.result.createObjectStore('diagram_versions', { keyPath: 'id' });
           versions.createIndex('diagramId', 'diagramId');

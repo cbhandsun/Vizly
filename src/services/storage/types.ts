@@ -19,13 +19,36 @@ export interface SavedDiagram {
     expectedRevision?: string;
 }
 
+export type VersionSaveFailure = 'authentication' | 'permission' | 'configuration' | 'data' | 'network' | 'unknown';
+
+export interface VersionStorageState {
+    location: 'local' | 'cloud';
+    syncStatus: 'pending' | 'synced' | 'legacy';
+    ownerId: string | null;
+    provider: 'supabase' | 's3';
+    localCreated: boolean;
+    failure?: VersionSaveFailure;
+    remoteVersionId?: string;
+    automaticSync?: 'queued' | 'retrying' | 'blocked' | 'capacity';
+    syncAttempts?: number;
+    nextSyncAttemptAt?: number;
+}
+
 export interface DiagramVersion {
+    storage?: VersionStorageState;
     id: string;
     diagramId: string;
     snapshotData: ClipboardData | null;
     authorId?: string;
     createdAt: number;
     message?: string;
+}
+
+export interface IdempotentVersionWrite {
+    ownerId: string;
+    operationId: string;
+    payloadHash: string;
+    signal?: AbortSignal;
 }
 
 export interface IStorageProvider {
@@ -42,6 +65,7 @@ export interface IStorageProvider {
     listVersions?(diagramId: string): Promise<DiagramVersion[]>;
     loadVersion?(diagramId: string, versionId: string): Promise<DiagramVersion | null>;
     saveVersion?(diagramId: string, data: unknown, message?: string): Promise<DiagramVersion>;
+    saveVersionIdempotent?(diagramId: string, data: unknown, message: string | undefined, operation: IdempotentVersionWrite): Promise<DiagramVersion>;
 
     // Config / Auth
     isConfigured(): boolean;

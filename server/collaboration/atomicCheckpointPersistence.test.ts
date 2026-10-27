@@ -1,3 +1,5 @@
+import { createOperationTelemetry, type TelemetryBatch } from './operationTelemetry.js';
+import { configureServerTelemetry } from './serverTelemetry.js';
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
@@ -132,4 +134,20 @@ describe('lease-bound atomic checkpoint persistence', () => {
     if (!stored) throw new Error('Missing test checkpoint');
     expect(await runtime.persistence.loadRecord(id)).toEqual(decodeRoomRecord(stored.record));
   });
+});
+
+it('reports real CAS contention and success without serializing room identities or payloads', async () => {
+  const batches: TelemetryBatch[] = [];
+  const telemetry = createOperationTelemetry({ releaseId: 'a'.repeat(40), transport: async b => { batches.push(b); } });
+  const stop = configureServerTelemetry(telemetry);
+  try {
+    const runtime = fixture();
+    vi.mocked(runtime.store.compareExchange).mockResolvedValueOnce(false);
+    await runtime.persistence.saveCheckpoint(id, cloud('CANARY-DOCUMENT'));
+    await telemetry.flush();
+    expect(batches[0].metrics.cas).toEqual({ started: 2, success: 1, failure: 1, cancelled: 0 });
+    expect(batches[0].events.map(e => e.code)).toEqual(['conflict', null]);
+    expect(JSON.stringify(batches)).not.toContain('CANARY');
+    expect(JSON.stringify(batches)).not.toContain(id);
+  } finally { stop(); }
 });

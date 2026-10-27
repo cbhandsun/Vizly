@@ -1,0 +1,31 @@
+import { expect, test, type Page } from '@playwright/test';
+const openConfig = async (page: Page) => {
+  await page.getByRole('button', { name: 'AI 助手', exact: true }).click();
+  await page.locator('.ai-chat-inline-secondary').getByRole('button', { name: '设置', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'AI 平台与模型配置' });
+  await dialog.getByRole('button', { name: /^Gemini \(Google\)/ }).click();
+  return dialog;
+};
+for (const width of [390, 1440]) test(`AI key stays in the page session and requires re-entry after reload / ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 });
+  await page.addInitScript(() => localStorage.setItem('i18nextLng', 'zh'));
+  await page.goto('/?precompiledCapture=wms-process-flow-v1#/?diagram=wms-process-flow-v1');
+  let dialog = await openConfig(page);
+  await expect(dialog.getByText('API Key 仅保存在当前页面内存中', { exact: false })).toBeVisible();
+  const key = 'synthetic-browser-session-canary';
+  await dialog.getByLabel('API Key', { exact: true }).fill(key);
+  await dialog.getByRole('button', { name: '保存全部', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  expect(await page.evaluate(secret => JSON.stringify({ ...localStorage, ...sessionStorage }).includes(secret), key)).toBe(false);
+  await page.locator('.ai-chat-inline-secondary').getByRole('button', { name: '设置', exact: true }).click();
+  dialog = page.getByRole('dialog', { name: 'AI 平台与模型配置' });
+  await dialog.getByRole('button', { name: /^Gemini \(Google\)/ }).click();
+  await expect(dialog.getByLabel('API Key', { exact: true })).toHaveValue(key);
+  await expect(dialog.getByText('当前会话密钥已就绪', { exact: true })).toBeVisible();
+  await dialog.getByLabel('API Key', { exact: true }).fill('');
+  await expect(dialog.getByText('尚未配置密钥', { exact: true })).toBeVisible();
+  await page.reload();
+  dialog = await openConfig(page);
+  await expect(dialog.getByLabel('API Key', { exact: true })).toHaveValue('');
+  await expect(dialog.getByText('请重新输入当前会话的密钥', { exact: true })).toBeVisible();
+});

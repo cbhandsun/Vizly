@@ -44,7 +44,7 @@ test('historical preview remains local and cannot overwrite autosave while peer 
   await page.goto('/#/manage');
   await expect(page.getByRole('button', { name: '新建流程图', exact: true })).toBeVisible();
   await page.evaluate(async ({ id, historical }) => {
-    const request = indexedDB.open('VizlyLocalDB', 2);
+    const request = indexedDB.open('VizlyLocalDB');
     request.onupgradeneeded = () => {
       const versions = request.result.createObjectStore('diagram_versions', { keyPath: 'id' });
       versions.createIndex('diagramId', 'diagramId'); versions.createIndex('createdAt', 'createdAt');

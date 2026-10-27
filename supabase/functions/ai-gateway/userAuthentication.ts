@@ -1,7 +1,7 @@
 import { verifyAuth } from '@supabase/server/core';
 
 export type AIGatewayAuthenticationResult =
-  | { ok: true }
+  | { ok: true; userId: string }
   | { ok: false; reason: 'unauthorized' | 'unavailable' };
 
 export type AIGatewayUserAuthenticator = (
@@ -12,6 +12,7 @@ interface VerifyAuthOutcome {
   data: {
     authMode: string;
     userClaims: { id?: unknown } | null;
+    jwtClaims?: Record<string, unknown> | null;
   } | null;
   error: { status?: number } | null;
 }
@@ -38,10 +39,11 @@ export const createAIGatewayUserAuthenticator = (
     }
     if (data?.authMode !== 'user'
       || typeof data.userClaims?.id !== 'string'
-      || !data.userClaims.id) {
+      || !/^[A-Za-z0-9_-]{1,128}$/.test(data.userClaims.id)
+      || data.jwtClaims?.is_anonymous === true) {
       return { ok: false, reason: 'unauthorized' };
     }
-    return { ok: true };
+    return { ok: true, userId: data.userClaims.id };
   } catch {
     return { ok: false, reason: 'unavailable' };
   }

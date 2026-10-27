@@ -1,0 +1,42 @@
+# Business evidence complements native CI; neither workflow deploys the app.
+name: Vizly business CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  business:
+    name: business-${{ matrix.profile }}
+    runs-on: vizly-app-linux
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [integration, security, browser]
+    steps:
+      - uses: builtin:checkout
+        with:
+          persist-credentials: false
+      - name: Check business executor
+        shell: python
+        run: |
+          import subprocess, sys
+          subprocess.run([sys.executable, "-B", "-m", "unittest", "discover", "-s", ".devfleet", "-p", "test_business_ci.py"], check=True)
+      - name: Run business gates
+        shell: python
+        run: |
+          import subprocess, sys
+          subprocess.run([sys.executable, ".devfleet/business_ci.py", "--profile", "${{ matrix.profile }}"], check=True)
+  business-complete:
+    if: always()
+    needs: [business]
+    runs-on: vizly-app-linux
+    steps:
+      - name: Require every business profile
+        shell: python
+        run: |
+          if "${{ needs.business.result }}" != "success":
+              raise SystemExit("Every business profile must succeed")
+          print("Business profiles passed; real-service and deployment acceptance remain separate.")

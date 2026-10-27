@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { Edge, Node } from '@xyflow/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { computeBaseReactFlowDisplayEdgesInWorker, disposeBaseReactFlowDisplayWorker, requestBaseReactFlowDisplayEdgesWorker } from '@vizly/core/routing-runtime';
 import { beginVersionPreview, discardVersionPreview, isVersionPreviewReadOnly, retainVersionPreviewRemote } from '../../collaboration/versionPreviewSession';
 
 vi.mock('react-i18next', () => {
@@ -50,11 +51,63 @@ const originalNodes: Node[] = [{
 }];
 const originalEdges: Edge[] = [];
 
-const routingSnapshot = {
+// Capture the identity produced by the public SDK client, then cancel before
+// routing. Only the transport is doubled; snapshot compatibility stays real.
+type DisplayWorkerRequest = Parameters<typeof requestBaseReactFlowDisplayEdgesWorker>[0]['request'];
+const readCurrentSdkRoutingVersion = async (): Promise<string> => {
+    const controller = new AbortController();
+    const captured: DisplayWorkerRequest[] = [];
+    const transport = {
+        addEventListener: vi.fn(), removeEventListener: vi.fn(), terminate: vi.fn(),
+        postMessage: (request: DisplayWorkerRequest) => {
+            captured.push(request);
+            controller.abort();
+        },
+    };
+    const workerRef = { current: transport as unknown as Worker | null };
+    const originalWorker = Object.getOwnPropertyDescriptor(globalThis, 'Worker');
+    const setTimeout = vi.spyOn(window, 'setTimeout');
+    const clearTimeout = vi.spyOn(window, 'clearTimeout');
+    // The client requires Worker support but reuses the supplied transport.
+    Object.defineProperty(globalThis, 'Worker', { configurable: true, writable: true,
+        value: class { constructor() { throw new Error('Unexpected Worker construction'); } } });
+    try {
+        await expect(computeBaseReactFlowDisplayEdgesInWorker({
+            workerRef, requestId: 'version-history-fixture-version',
+            nodes: originalNodes, edges: originalEdges, enableSmartEdges: true,
+            smartEdgePadding: 20, isLargeGraph: false, displayEdgeEpoch: 0,
+            timeoutMs: 1_000, signal: controller.signal,
+        })).rejects.toThrow('display-edge-worker-cancelled');
+        expect(captured).toHaveLength(1);
+        expect(workerRef.current).toBeNull();
+        expect(transport.terminate).toHaveBeenCalledTimes(1);
+        for (const [type, listener] of transport.addEventListener.mock.calls) {
+            expect(transport.removeEventListener).toHaveBeenCalledWith(type, listener);
+        }
+        for (const timer of setTimeout.mock.results) {
+            if (timer.type === 'return') expect(clearTimeout).toHaveBeenCalledWith(timer.value);
+        }
+        const version = captured[0]?.inputIdentity?.routingVersion;
+        if (typeof version !== 'string' || !/^[1-9]\d{0,8}$/.test(version)
+            || !Number.isSafeInteger(Number(version)) || Number(version) <= 2) {
+            throw new Error('SDK routing version does not support two explicit stale-version fixtures');
+        }
+        return version;
+    } finally {
+        controller.abort();
+        disposeBaseReactFlowDisplayWorker(workerRef);
+        setTimeout.mockRestore();
+        clearTimeout.mockRestore();
+        if (originalWorker) Object.defineProperty(globalThis, 'Worker', originalWorker);
+        else Reflect.deleteProperty(globalThis, 'Worker');
+    }
+};
+
+const makeRoutingSnapshot = (routingVersion: string) => ({
     schema: 'vizly-routing-only-document-v2',
     candidate: {
         schema: 'vizly-routing-only-candidate-v2',
-        routingVersion: '25',
+        routingVersion,
         inputSignature: '4321',
         inputGeometryDigest: `geometry-v1:${'e'.repeat(32)}`,
         outputRouteSignature: 'route-v2:1:2:0123456789abcdef',
@@ -68,7 +121,11 @@ const routingSnapshot = {
             data: { computedPath: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
         }],
     },
-};
+});
+let routingSnapshot: ReturnType<typeof makeRoutingSnapshot>;
+beforeAll(async () => {
+    routingSnapshot = makeRoutingSnapshot(await readCurrentSdkRoutingVersion());
+});
 
 const previewNodes: Node[] = [{
     id: 'preview-node',
@@ -553,7 +610,8 @@ describe('useVersionHistory', () => {
         expect(result.current.exitPreview()).toBeNull();
     });
 
-    it.each([['25', true], ['24', false], ['23', false]] as const)('saves compatible routes and discards stale routes: %s', async (routingVersion, compatible) => {
+    it.each([['current', 0, true], ['previous', 1, false], ['older', 2, false]] as const)('saves compatible routes and discards stale routes: %s', async (_name, offset, compatible) => {
+        const routingVersion = String(Number(routingSnapshot.candidate.routingVersion) - offset);
         storageMocks.saveVersion.mockResolvedValue(makeVersion());
         const bridge = {
             id: 'diagram-1',
@@ -680,7 +738,7 @@ describe('useVersionHistory', () => {
         expect(firstSaved).toBe(false);
         expect(result.current.versions.map(version => version.id)).toEqual(['version-2']);
         expect(messageMocks.success).toHaveBeenCalledTimes(1);
-        expect(messageMocks.success).toHaveBeenCalledWith('Snapshot saved');
+        expect(messageMocks.success).toHaveBeenCalledWith('designer.versionHistoryPanel.cloudSaved');
     });
 
     it('does not apply a restore whose safety backup finishes after switching diagrams', async () => {

@@ -1,3 +1,4 @@
+import { createServerTelemetryRuntime } from './telemetryRuntime.js';
 import { standardDataToCanvas } from '@vizly/core/canvas-conversion';
 import { createSupabaseRoomRuntime } from './supabaseRoomRuntime.js';
 import { parseProductionCollaborationConfiguration } from './productionConfiguration.js';
@@ -20,6 +21,7 @@ export interface ProductionCollaborationDependencies {
 export const createProductionCollaborationRuntime = (environment: Record<string, unknown>,
   supplied?: ProductionCollaborationDependencies, log?: CollaborationServerOptions['log']) => {
   const config = parseProductionCollaborationConfiguration(environment);
+  const telemetry = createServerTelemetryRuntime(environment);
   const dependencies = supplied ?? (() => {
     const readRevision = createCloudRoomRevisionSource(config.supabaseUrl, config.publishableKey);
     return {
@@ -33,6 +35,7 @@ export const createProductionCollaborationRuntime = (environment: Record<string,
   const { runtime, authorize, authorizeOwner, readCloud, readRevision } = dependencies;
   const coordinate = createRoomCoordinator(runtime.persistence, readCloud);
   const server = createCollaborationServer({ authorize, origins: config.origins, log,
+    telemetry: telemetry.receiver, operationTelemetry: telemetry.collector,
     persistence: runtime.persistence, acquireRoomLease: runtime.acquireRoomLease,
     openRoomSynchronization: runtime.openRoomSynchronization,
     loadInitialRoom: coordinate,
@@ -47,7 +50,8 @@ export const createProductionCollaborationRuntime = (environment: Record<string,
       stopping = Promise.resolve().then(async () => {
         const servers = await Promise.allSettled([serverStopping]);
         const stores = await Promise.allSettled([Promise.resolve().then(() => runtime.stop())]);
-        if ([...servers, ...stores].some(result => result.status === 'rejected')) throw new Error('Production collaboration disposal failed');
+        const diagnostics = await Promise.allSettled([telemetry.stop()]);
+        if ([...servers, ...stores, ...diagnostics].some(result => result.status === 'rejected')) throw new Error('Production collaboration disposal failed');
       });
       // Fence requests immediately; finish their cleanup before disposing shared stores.
       try { serverStopping = server.stop(); }

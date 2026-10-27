@@ -5,6 +5,37 @@ import type { CanvasOperations } from '../types';
 const noPause = async (): Promise<void> => {};
 
 describe('aiCommandExecution', () => {
+    it('does not dispatch remaining commands after cancellation during the canvas pause', async () => {
+        const controller = new AbortController();
+        const onAddNode = vi.fn(() => 'first');
+        await executeAICommandContent({
+            content: '[COMMAND: {"action":"addNode","label":"first"}]\n[COMMAND: {"action":"addNode","label":"late"}]',
+            signal: controller.signal, canvasOps: { onAddNode },
+            pause: async () => { controller.abort(); },
+        });
+        expect(onAddNode).toHaveBeenCalledOnce();
+        expect(onAddNode).toHaveBeenCalledWith('first', undefined);
+    });
+
+    it('does not fall back to canvas mutation when a cancelled plugin attempt resolves late', async () => {
+        const controller = new AbortController();
+        const onAddNode = vi.fn();
+        await executeAICommandContent({
+            content: '[COMMAND: {"action":"addNode","label":"late"}]',
+            signal: controller.signal, canvasOps: { onAddNode }, pluginId: 'flowchart',
+            resolvePluginContext: () => ({}),
+            executePluginAction: async () => { controller.abort(); return false; }, pause: noPause,
+        });
+        expect(onAddNode).not.toHaveBeenCalled();
+    });
+
+    it('never starts a batch whose generation has already been cancelled', async () => {
+        const controller = new AbortController(); controller.abort();
+        const onAddNode = vi.fn();
+        await executeAICommandContent({ content: '[COMMAND: {"action":"addNode","label":"late"}]',
+            signal: controller.signal, canvasOps: { onAddNode }, pause: noPause });
+        expect(onAddNode).not.toHaveBeenCalled();
+    });
     it('routes validated commands through the plugin before using canvas fallbacks', async () => {
         const onAddNode = vi.fn(() => 'fallback-node');
         const executePluginAction = vi.fn(async () => true);

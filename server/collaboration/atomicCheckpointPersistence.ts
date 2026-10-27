@@ -1,3 +1,4 @@
+import { observeServerOperation } from './serverTelemetry.js';
 import { createAtomicRoomCommitter, isRoomGeneration, parseAtomicRoomSnapshot, type AtomicRoomStore } from './atomicRoomCommit.js';
 import type { DistributedRoomLease } from './distributedRoomLease.js';
 import type { CheckpointPersistence } from './persistence.js';
@@ -26,7 +27,8 @@ export const createAtomicCheckpointPersistence = (id: string, lease: Distributed
     async compareExchange(key, nextGeneration, version, record) {
       guard(key);
       if (nextGeneration !== generation) throw new Error('Checkpoint room generation changed');
-      const exchanged = await store.compareExchange(roomId, generation, version, record);
+      const exchanged = await observeServerOperation('cas', () => store.compareExchange(roomId, generation, version, record),
+        result => result === true ? null : result === false ? 'conflict' : 'invalid');
       guard(key); return exchanged;
     },
   };

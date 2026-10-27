@@ -1,3 +1,5 @@
+import { configureApplicationTelemetry } from '@/observability/applicationTelemetry';
+import { createOperationTelemetry } from '@/observability/operationTelemetry';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
@@ -50,6 +52,36 @@ describe('editor reconnect over real WebSocket transport', () => {
         } finally { accepted.destroy(); }
       });
     } finally { hook.unmount(); await server.stop(); initial.destroy(); }
+  });
+
+  it('clears edit permission after the real server revokes an active connection', async () => {
+    const telemetry = createOperationTelemetry({ releaseId: 'c'.repeat(64), transport: async () => {} });
+    const stopTelemetry = configureApplicationTelemetry(telemetry);
+    let authorized = true;
+    let persisted: Uint8Array | null = null;
+    const initial = new Y.Doc();
+    publishCollaborationElement(initial.getMap('flowchart-nodes'), 'a', node('Before'));
+    const server = createCollaborationServer({
+      origins: new Set([origin]), recheckMs: 20,
+      persistence: { load: async () => persisted, save: async (_id, state) => { persisted = Uint8Array.from(state); } },
+      authorize: async () => authorized ? { userId: 'synthetic-editor', role: 'editor' } : null,
+      bootstrap: async () => Y.encodeStateAsUpdate(initial),
+    });
+    class Socket extends WebSocket {
+      constructor(address: string | URL, protocols?: string | string[]) { super(address, protocols, { origin }); }
+    }
+    vi.stubGlobal('WebSocket', Socket);
+    const { url } = await server.listen();
+    const hook = renderHook(() => useYjsCollaboration({ roomName: `vizly-room-${diagramId}`, serverUrl: url, token: 'test-editor' }));
+    try {
+      await waitFor(() => expect(hook.result.current).toMatchObject({ isSynced: true, accessRole: 'editor' }));
+      authorized = false;
+      await waitFor(() => expect(hook.result.current).toMatchObject({ accessRole: null, isSynced: false }));
+      await waitFor(() => expect(telemetry.snapshot().metrics.reconnect.failure).toBeGreaterThan(0));
+      act(() => hook.result.current.pushLocalChangesToYjs([node('Rejected after revocation')], []));
+      const document = hook.result.current.provider!.doc;
+      expect(readCollaborationElement(document.getMap('flowchart-nodes').get('a'))?.data).toEqual({ label: 'Before' });
+    } finally { hook.unmount(); await server.stop(); initial.destroy(); stopTelemetry(); }
   });
 
   it('rejects buffered edits when server permission was downgraded during disconnect', async () => {

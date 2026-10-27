@@ -6,12 +6,14 @@
   "type": "module",
   "packageManager": "npm@12.0.1",
   "engines": {
-    "node": ">=22.22.2 <23",
+    "node": ">=22.23.4 <23",
     "npm": ">=12 <13"
   },
   "scripts": {
     "dev": "vite",
     "collaboration:build": "tsc -p server/tsconfig.build.json",
+    "collaboration:auth-load": "npm run collaboration:build && node scripts/check-collaboration-auth-load.mjs",
+    "collaboration:mixed-load": "npm run collaboration:build && node scripts/check-collaboration-mixed-load.mjs",
     "collaboration:start": "node --env-file-if-exists=.env.collaboration.local dist-collaboration/index.js",
     "check": "node scripts/run-check.mjs",
     "build": "vite build",
@@ -21,8 +23,10 @@
     "test:full": "npm run test:ci --",
     "test:e2e": "playwright test && playwright test --config playwright.recovery.config.ts && npm run test:s3:browser",
     "test:e2e:main": "playwright test",
+    "test:e2e:compatibility": "playwright test --config playwright.compatibility.config.ts",
     "test:e2e:recovery": "playwright test --config playwright.recovery.config.ts",
     "test:e2e:s3": "npm run test:s3:browser",
+    "test:database": "node scripts/check-database-paths.mjs",
     "test:rls": "node scripts/check-rls-regression.mjs",
     "test:s3": "node scripts/check-s3-integration.mjs",
     "test:s3:browser": "node scripts/check-s3-browser-integration.mjs",
@@ -45,8 +49,8 @@
     "@supabase/supabase-js": "2.111.0",
     "@types/d3-force": "3.0.10",
     "@types/dagre": "0.7.54",
-    "@vizly/contracts": "0.1.0-alpha.2",
-    "@vizly/core": "file:vendor/vizly-core-0.1.0-alpha.8-bca4e7bbd92434fb.tgz",
+    "@vizly/contracts": "file:vendor/vizly-contracts-0.1.0-alpha.3-e05b95e8354c0bde.tgz",
+    "@vizly/core": "file:vendor/vizly-core-0.1.0-alpha.9-50f9ed51ebd7f7a4.tgz",
     "@xyflow/react": "12.11.2",
     "ai": "7.0.107",
     "antd": "6.5.2",
@@ -87,7 +91,7 @@
     "y-protocols": "1.0.7",
     "y-websocket": "3.0.0",
     "yjs": "13.6.31",
-    "zod": "4.3.6",
+    "zod": "4.6.7",
     "zustand": "5.0.14"
   },
   "devDependencies": {
@@ -103,23 +107,24 @@
     "@types/ws": "8.18.2",
     "@typescript/native": "npm:typescript@7.0.2",
     "@vitejs/plugin-react": "6.0.4",
-    "@vitest/coverage-v8": "4.1.11",
+    "@vitest/coverage-v8": "4.1.12",
     "esbuild": "0.28.2",
     "eslint": "10.8.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "eslint-plugin-react-refresh": "0.5.3",
+    "fast-png": "6.4.0",
     "globals": "17.8.0",
     "jsdom": "29.1.1",
     "tailwindcss": "4.3.3",
     "typescript": "npm:@typescript/typescript6@6.0.2",
     "typescript-eslint": "8.65.0",
-    "vite": "8.1.5",
-    "vitest": "4.1.11"
+    "vite": "8.1.6",
+    "vitest": "4.1.12"
   },
   "overrides": {
-    "dompurify": "^3.4.13",
+    "dompurify": "3.4.17",
     "nanoid": "^3.3.18",
-    "undici": "^7.29.0",
+    "undici": "7.30.1",
     "source-map-js": "1.2.2"
   }
 }

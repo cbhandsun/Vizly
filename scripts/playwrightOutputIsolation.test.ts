@@ -5,6 +5,16 @@ import { describe, expect, it } from 'vitest';
 
 const run = promisify(execFile);
 describe('Playwright artifact ownership', () => {
+  it('keeps the main and compatibility storage fixtures unconfigured despite inherited cloud settings', async () => {
+    for (const configuration of ['playwright.config.ts', 'playwright.compatibility.config.ts']) {
+      const { stdout } = await run(process.execPath, ['--experimental-strip-types', '--input-type=module', '-e',
+        `import config from './${configuration}'; const servers = Array.isArray(config.webServer) ? config.webServer : [config.webServer]; process.stdout.write(JSON.stringify({urlEmpty: servers.length === 1 && servers[0].env.VITE_SUPABASE_URL === '', keyEmpty: servers.length === 1 && servers[0].env.VITE_SUPABASE_ANON_KEY === ''}));`],
+      { cwd: process.cwd(), timeout: 10000, windowsHide: true,
+        env: { ...process.env, VITE_SUPABASE_URL: 'https://synthetic-config.invalid', VITE_SUPABASE_ANON_KEY: 'synthetic-test-key' } });
+      expect(JSON.parse(stdout)).toEqual({ urlEmpty: true, keyEmpty: true });
+    }
+  });
+
   it.each([
     ['playwright.config.ts', 'main'],
     ['playwright.recovery.config.ts', 'recovery'],

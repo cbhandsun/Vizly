@@ -1,3 +1,4 @@
+import { syntheticReleaseFixture } from './releaseEvidenceFixture.mjs';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -17,7 +18,8 @@ async function fixture() {
   await mkdir(join(root, 'build'));
   await writeFile(join(root, 'build/index.html'), '<div id="root"></div>');
   await prepareVercelStaticArtifact({ workspace: root, buildDirectory: 'build', outputDirectory: 'stage', projectId, teamId });
-  return { root, artifactDirectory: join(root, 'stage'), projectId, teamId };
+  const release = await syntheticReleaseFixture(root, { root: join(root, 'stage'), projectId, teamId, deploymentEnvironment: 'preview' });
+  return { root, artifactDirectory: join(root, 'stage'), projectId, teamId, manifestPath: release.manifestPath };
 }
 async function changeReceipt(input, update) {
   const path = join(input.artifactDirectory, 'artifact-receipt.json');
@@ -87,14 +89,14 @@ describe('prepared preview deployment preflight', () => {
     const cli = join(input.root, 'fake-cli.mjs');
     await writeFile(cli, `import { writeFile } from 'node:fs/promises'; await writeFile(${JSON.stringify(marker)}, '{}');`);
     await rm(join(input.artifactDirectory, 'artifact-receipt.json'));
-    await expect(run(process.execPath, [launcher, input.artifactDirectory, projectId, teamId, 'audit', cli], { timeout: 10000 })).rejects.toThrow();
+    await expect(run(process.execPath, [launcher, input.artifactDirectory, projectId, teamId, 'audit', cli, 'preview', input.manifestPath, '--deploy'], { timeout: 10000 })).rejects.toThrow();
     await expect(readFile(marker)).rejects.toMatchObject({ code: 'ENOENT' });
   });
   it('pins project and team IDs even if inherited deployment variables point elsewhere', async () => {
     const input = await fixture(); const marker = join(input.root, 'cli-marker.json');
     const cli = join(input.root, 'fake-cli.mjs');
     await writeFile(cli, `import { writeFile } from 'node:fs/promises'; await writeFile(${JSON.stringify(marker)}, JSON.stringify({ project: process.env.VERCEL_PROJECT_ID, team: process.env.VERCEL_ORG_ID, args: process.argv.slice(2) }));`);
-    await run(process.execPath, [launcher, input.artifactDirectory, projectId, teamId, 'audit', cli], {
+    await run(process.execPath, [launcher, input.artifactDirectory, projectId, teamId, 'audit', cli, 'preview', input.manifestPath, '--deploy'], {
       timeout: 10000, env: { ...process.env, VERCEL_PROJECT_ID: 'prj_Other', VERCEL_ORG_ID: 'team_Other' },
     });
     expect(JSON.parse(await readFile(marker, 'utf8'))).toEqual({ project: projectId, team: teamId, args: ['deploy', '--prebuilt', '--yes', '--scope', 'audit'] });
@@ -108,7 +110,8 @@ describe('prepared preview deployment preflight', () => {
     const marker = join(input.root, 'production-cli-marker.json');
     const cli = join(input.root, 'fake-production-cli.mjs');
     await writeFile(cli, `import { writeFile } from 'node:fs/promises'; await writeFile(${JSON.stringify(marker)}, JSON.stringify({ project: process.env.VERCEL_PROJECT_ID, team: process.env.VERCEL_ORG_ID, args: process.argv.slice(2) }));`);
-    await run(process.execPath, [launcher, stage, projectId, teamId, 'audit', cli, 'production'], { timeout: 10000 });
+    const release = await syntheticReleaseFixture(input.root, { root: stage, projectId, teamId, deploymentEnvironment: 'production' });
+    await run(process.execPath, [launcher, stage, projectId, teamId, 'audit', cli, 'production', release.manifestPath, '--deploy'], { timeout: 10000 });
     expect(JSON.parse(await readFile(marker, 'utf8'))).toEqual({ project: projectId, team: teamId,
       args: ['deploy', '--prebuilt', '--prod', '--skip-domain', '--yes', '--scope', 'audit'] });
     await expect(verifyPreparedVercelDeployment({ ...input, artifactDirectory: stage })).rejects.toThrow('environment mismatch');

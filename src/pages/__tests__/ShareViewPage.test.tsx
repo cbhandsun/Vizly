@@ -194,6 +194,32 @@ describe('ShareViewPage', () => {
         expect(screen.getByRole('main', { name: 'share.viewerLabel' })).toBeInTheDocument();
     });
 
+    it('leaves desktop reading and overview commands with the shared canvas', async () => {
+        getSharedDiagramMock.mockResolvedValueOnce({
+            share: { id: SHARE_RECORD_ID },
+            diagram: { title: 'Shared Flow', content: { nodes: [], edges: [] } },
+        });
+        const view = renderSharePage('/shared?token=abcdefghijklmnop');
+        const canvas = await screen.findByTestId('flowchart-designer');
+        canvas.id = `diagram-${LOCAL_SHARED_DIAGRAM_ID}`;
+        Object.defineProperty(canvas, 'clientWidth', { value: 1440 });
+        Object.defineProperty(canvas, 'clientHeight', { value: 900 });
+        const canvasControl = vi.fn();
+        window.addEventListener('diagramControl', canvasControl);
+        try {
+            for (const action of ['top', 'fit']) {
+                const event = new CustomEvent('diagramControl', {
+                    detail: { action, diagramId: LOCAL_SHARED_DIAGRAM_ID },
+                });
+                window.dispatchEvent(event);
+                expect(canvasControl).toHaveBeenLastCalledWith(event);
+            }
+        } finally {
+            view.unmount();
+            window.removeEventListener('diagramControl', canvasControl);
+        }
+    });
+
     it('loads direct-path share links that put token in the browser search string', async () => {
         const token = 'directsharetoken1';
         const content = {

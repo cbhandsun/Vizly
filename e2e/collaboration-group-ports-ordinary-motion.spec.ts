@@ -2,6 +2,7 @@ import { expect, test, type WebSocketRoute } from '@playwright/test';
 import * as Y from 'yjs';
 import * as encoding from 'lib0/encoding';
 import * as sync from 'y-protocols/sync';
+import { createCollaborationAuxiliaryNodes, doubleClickAuxiliaryTitle, expectAuxiliaryFixtureTitleClearance } from './helpers/collaborationAuxiliaryFixture';
 
 test.use({reducedMotion: 'no-preference'});
 // Real host/Core UI with a protocol fixture; does not prove Supabase identities.
@@ -23,11 +24,7 @@ for (const [id, selector] of [['sticky-test', '.sticky-note-content'], ['mind-te
       initialized = true; role('viewer');
       const doc = new Y.Doc();
       const nodes = doc.getMap('flowchart-nodes');
-      for (const [id, type, x, y] of [
-        ['sticky-test', 'sticky-note', 100, 100], ['mind-test', 'mindmap', 350, 100],
-        ['title-test', 'titleGroup', 100, 280], ['sub-test', 'subGroup', 460, 280],
-      ] as const) nodes.set(id, { id, type, position: { x, y }, width: 240, height: 120,
-        data: { label: id, description: id, domain: 'wms', depth: 1, isEditing: false } });
+      for (const node of createCollaborationAuxiliaryNodes()) nodes.set(node.id, node);
       fixtureUpdate = Y.encodeStateAsUpdate(doc);
       const initial = new Y.Doc();
       const encoder = encoding.createEncoder(); encoding.writeVarUint(encoder, 0); sync.writeSyncStep2(encoder, initial);
@@ -46,11 +43,10 @@ for (const [id, selector] of [['sticky-test', '.sticky-note-content'], ['mind-te
   socket.send(Buffer.from(encoding.toUint8Array(update)));
   await expect(page.locator('.react-flow__node[data-id="sticky-test"]')).toBeVisible();
   await page.getByRole('button', { name: '适应屏幕', exact: true }).click();
+  await expectAuxiliaryFixtureTitleClearance(page);
     const node = page.locator(`.react-flow__node[data-id="${id}"]`);
     const title = node.locator(selector).first();
-    // The subgroup's top connection handle overlaps the title center. Exercise
-    // the visible text edge without bypassing pointer hit testing.
-    const editTitle = () => title.dblclick();
+    const editTitle = () => doubleClickAuxiliaryTitle(title);
     await editTitle(); await expect(node.locator('input,textarea')).toHaveCount(0);
     role('editor'); await expect(page.getByRole('button', { name: /选择.*\(V\)/ })).toBeVisible();
     if (id === 'sub-test') {

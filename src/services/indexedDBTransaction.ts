@@ -34,3 +34,25 @@ export const runIndexedDBTransaction = <T>(
         }
     }
 });
+
+/** Queue all requests synchronously (or in IDB callbacks); never await inside operation. */
+export const runIndexedDBAtomicWrite = <T>(
+    database: IDBDatabase,
+    storeNames: string[],
+    operation: (transaction: IDBTransaction, setResult: (result: T) => void) => void,
+): Promise<T> => new Promise((resolve, reject) => {
+    let transaction: IDBTransaction | undefined;
+    let result: T;
+    let hasResult = false;
+    try {
+        transaction = database.transaction(storeNames, 'readwrite');
+        const active = transaction;
+        active.oncomplete = () => hasResult ? resolve(result) : reject(new Error('Missing atomic write result'));
+        active.onabort = () => reject(active.error ?? new DOMException('IndexedDB transaction aborted.', 'AbortError'));
+        active.onerror = () => reject(active.error ?? new Error('IndexedDB transaction failed.'));
+        operation(active, value => { result = value; hasResult = true; });
+    } catch (error) {
+        reject(error);
+        try { transaction?.abort(); } catch { /* Preserve the original error. */ }
+    }
+});

@@ -107,7 +107,8 @@ describe('AI config storage isolation', () => {
             name: 'provider-0',
             enabled: true,
             baseUrl: '',
-            apiKey: 'k'.repeat(8_000),
+            apiKey: '',
+            credentialState: 'legacy-unavailable',
             models: [
                 { id: 'safe/model-1', name: 'Safe', group: 'Main', enabled: true },
                 { id: 'model-1', name: 'Bad', enabled: true },
@@ -117,7 +118,7 @@ describe('AI config storage isolation', () => {
         expect(config.activeModelKey).toBe('provider-0:safe/model-1');
     });
 
-    it('normalizes anonymous persisted config while preserving local API keys', () => {
+    it('normalizes anonymous config without persisting API keys', () => {
         persistAIConfig(null, {
             ...makeConfig(ANONYMOUS_API_KEY_CANARY),
             providers: [{
@@ -127,7 +128,11 @@ describe('AI config storage isolation', () => {
         });
 
         const persisted = JSON.parse(localStorage.getItem(getAIConfigKey()) || '{}');
-        expect(persisted.providers[0].apiKey).toBe(ANONYMOUS_API_KEY_CANARY);
+        expect(persisted.providers[0].apiKey).toBe('');
+        expect(getAIConfig(null).providers[0].apiKey).toBe(ANONYMOUS_API_KEY_CANARY);
+        clearRuntimeAIConfig();
+        expect(getAIConfig(null).providers[0].apiKey).toBe('');
+        expect(getAIConfig(null).providers[0].credentialState).toBe('required');
         expect(persisted.providers[0].baseUrl).toBe('https://api.openai.com/v1');
     });
 
@@ -150,7 +155,8 @@ describe('AI config storage isolation', () => {
         const gemini = config.providers.find(provider => provider.id === 'gemini');
 
         expect(config.activeModelKey).toBe('gemini:gemini-2.0-flash-exp');
-        expect(gemini?.apiKey).toBe(LEGACY_API_KEY_CANARY);
+        expect(gemini?.apiKey).toBe('');
+        expect(gemini?.credentialState).toBe('legacy-unavailable');
     });
 
     it('ignores malformed or oversized legacy config and returns defaults', () => {

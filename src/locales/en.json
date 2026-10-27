@@ -235,6 +235,17 @@
     }
   },
   "designer": {
+    "hierarchyRecovery": {
+      "download": "Download original data",
+        "title": "This diagram needs recovery",
+        "description": "Some parent relationships are invalid. Loading and automatic saving are paused. Recovery will disconnect only the relationships listed below and keep the nodes and valid connections. Stored coordinates are retained, so some nodes may move.",
+        "backup": "Before recovery, an exact local backup will be kept in this browser. If the backup cannot be saved, recovery will stop. Cancel leaves the original document unchanged.",
+        "backupFailed": "The original data could not be backed up. Nothing was restored. Check browser storage and try again.",
+        "recover": "Back up and recover",
+        "missing-node-parent": "Parent is missing",
+        "self-node-parent": "Node is its own parent",
+        "cyclic-node-parent": "Parent relationship forms a cycle"
+    },
     "connection": {
       "keyboardPending": "Source selected. Tab to a target port and press Enter to connect; Escape cancels.",
       "keyboardInvalid": "Cannot connect to this target. Choose another port or press Escape to cancel.",
@@ -1236,6 +1247,29 @@
       "beforeUngroup": "Before ungrouping — Groups {{groups}}, nodes {{nodes}}"
     },
     "versionHistoryPanel": {
+      "exportFailed": "Could not export the local copy. Please retry.",
+"cloudSaved": "Saved to cloud",
+  "localSaved": "Saved on this device only; not synced",
+  "automaticSync": {
+    "queued": "Waiting to sync automatically when online and signed in to the original account.",
+    "retrying": "Attempted {{count}} times; automatic retry scheduled.",
+    "blocked": "Automatic retries stopped. Resolve the issue below and retry manually. Your local copy is retained.",
+    "capacity": "The sync queue is full. Your local copy is retained; sync it manually.",
+    "paused": "Automatic sync is paused. Your local copy is retained and manual sync is available."
+  },
+  "nextSyncAttempt": "Next attempt: {{time}}",
+  "legacyLocal": "Legacy local record: unknown owner; no automatic upload",
+  "retrySync": "Retry cloud sync",
+  "exportLocal": "Export local copy",
+  "retryFailed": "Sync incomplete. The local copy is retained; check the reason before retrying.",
+  "failure": {
+    "authentication": "Sign in again before retrying.",
+    "permission": "Permission denied. Ask the diagram owner for access.",
+    "configuration": "Configure the selected storage service first.",
+    "data": "The diagram or data does not meet cloud requirements. Save as a cloud diagram first.",
+    "network": "Network or service unavailable. Retry manually later.",
+    "unknown": "Cloud result unconfirmed. Check cloud versions first; retrying may create duplicates."
+  },
       "title": "Version history",
       "close": "Close version history",
       "createTitle": "Create snapshot",
@@ -3615,6 +3649,8 @@
     "baseUrlHint": "Use HTTPS, or HTTP for localhost/127.0.0.1 only",
     "invalidProviderBaseUrl": "{{name}}: Base URL must use HTTPS or local HTTP (localhost/127.0.0.1).",
     "apiKeyLabel": "API Key",
+    "sessionKeyNotice": "API keys stay in this page’s memory only. Re-enter after reload, sign-out or account switch. Only non-sensitive settings sync to the cloud.",
+    "credentialState": {"unconfigured": "No key configured", "required": "Re-enter the key for this session", "legacy-unavailable": "Legacy credential not restored. Re-enter your key; the old record is unchanged.", "ready": "Key ready for this session"},
     "showApiKey": "Show API Key",
     "hideApiKey": "Hide API Key",
     "platformName": "Platform Name",
@@ -3645,7 +3681,7 @@
     "selectProvider": "Select provider",
     "newProviderName": "New Provider",
     "saveSuccess": "Saved locally",
-    "saveSuccessCloud": "Saved to cloud",
+    "saveSuccessCloud": "Settings synced; key kept in this page only",
     "saveAgainForLatestChanges": "Earlier changes were saved. Choose Save All again for edits made during saving.",
     "cloudSyncFail": "Cloud sync failed, saved locally",
     "switchedTo": "Switched to: {{name}}",

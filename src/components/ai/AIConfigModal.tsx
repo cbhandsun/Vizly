@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import Modal from 'antd/es/modal';
 import Form from 'antd/es/form';
@@ -19,7 +19,7 @@ import {
     EyeOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '@/context/useAuth';
-import { CryptoService } from '@vizly/core/security';
+import { captureAuthSession, getAuthSessionRevision, onAuthSessionInvalidated } from '@/context/authSessionBoundary';
 import { appMessage } from '@vizly/core/antd';
 import { normalizeProviderBaseUrl } from '@/services/ai/providerSecurity';
 import {
@@ -31,6 +31,7 @@ import {
 import {
     AI_CONFIG_NAME_MAX_LENGTH,
     persistAIConfig,
+    saveCloudAIConfig,
     type AIModel,
     type AIProviderConfig,
 } from './aiConfigStorage';
@@ -75,7 +76,7 @@ import {
 import './AIConfigModal.css';
 
 const { Text } = Typography;
-const loadStorageService = async () => (await import('@/services/SupabaseStorage')).storageService;
+
 
 interface AIConfigModalProps {
     open: boolean;
@@ -119,6 +120,8 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
     useAIConfigCloudDraftSync(open, user?.id, replaceConfigIfPristine);
 
     const handleSave = async () => {
+        const session = captureAuthSession(user?.id);
+        if (!session.isCurrent()) return;
         const savedConfig = config;
         const invalidProvider = savedConfig.providers.find(p => p.enabled && p.baseUrl && !normalizeProviderBaseUrl(p.baseUrl));
         if (invalidProvider) {
@@ -126,26 +129,15 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
             return;
         }
 
-        // Keep logged-in secrets in memory and encrypted cloud storage only.
+        // Only non-sensitive settings are persisted; credentials stay in this session.
         persistAIConfig(user?.id, savedConfig);
 
         if (user) {
             try {
-                // Clone and encrypt keys
-                const encryptedProviders = await Promise.all(savedConfig.providers.map(async (p) => {
-                    if (p.apiKey) {
-                        const encryptedKey = await CryptoService.encrypt(p.apiKey, user.id);
-                        return { ...p, apiKey: encryptedKey };
-                    }
-                    return p;
-                }));
-
-                const cloudConfig = { ...savedConfig, providers: encryptedProviders };
-
-                const storageService = await loadStorageService();
-                await storageService.saveConfig('ai_config', cloudConfig, user.id);
+                if (!await saveCloudAIConfig(user.id, savedConfig) || !session.isCurrent()) return;
                 appMessage.success(t('aiConfig.saveSuccessCloud'));
             } catch (err) {
+                if (!session.isCurrent()) return;
                 logAIConfigCloudSaveFailure(err);
                 appMessage.warning(t('aiConfig.cloudSyncFail'));
             }
@@ -208,7 +200,9 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
         }
         setConfig(prev => ({
             ...prev,
-            providers: prev.providers.map(p => p.id === id ? { ...p, ...updates } : p)
+            providers: prev.providers.map(p => p.id === id ? { ...p, ...updates,
+                ...('apiKey' in updates ? { credentialState: updates.apiKey?.trim() ? 'ready' as const : 'unconfigured' as const } : {}),
+            } : p)
         }));
     };
 
@@ -290,6 +284,8 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
     const [isTesting, setIsTesting] = useState(false);
 
     const handleTestConnection = async (provider: AIProviderConfig) => {
+        const session = captureAuthSession(user?.id);
+        if (!session.isCurrent()) return;
         const readiness = getAIProviderConnectionReadiness(provider);
         if (!readiness.ready) {
             appMessage.warning(t(`aiConfig.connection.${readiness.issue}`));
@@ -312,16 +308,18 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
             await requestAIChatCompletion(provider, {
                 model: provider.models[0]?.id || 'test-model',
                 messages: [{ role: 'user', content: 'Hello, please reply with "OK".' }]
-            }, { timeoutMs: 30_000 });
+            }, { timeoutMs: 30_000, signal: session.signal });
+            if (!session.isCurrent()) return;
             updateConnectionStatus(provider.id, { kind: 'success', operation: 'test-connection' });
             appMessage.success(t('aiConfig.testSuccess'));
         } catch (error) {
+            if (!session.isCurrent()) return;
             logAIConfigRequestFailure('testConnection', provider.name, error);
             const message = t('aiConfig.connection.failureNotice');
             updateConnectionStatus(provider.id, createAIProviderConnectionFailure('test-connection', message));
             appMessage.error(t('aiConfig.testError', { message }));
         } finally {
-            setIsTesting(false);
+            if (session.isCurrent()) setIsTesting(false);
         }
     };
 
@@ -370,6 +368,8 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
     }, [discoveredModels, discoverySearchText]);
 
     const handleFetchModels = async (provider: AIProviderConfig) => {
+        const session = captureAuthSession(user?.id);
+        if (!session.isCurrent()) return;
         const readiness = getAIProviderConnectionReadiness(provider);
         if (!readiness.ready) {
             appMessage.warning(t(`aiConfig.connection.${readiness.issue}`));
@@ -389,7 +389,8 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
         updateConnectionStatus(provider.id, { kind: 'testing', operation: 'model-sync' });
         setIsFetchingModels(true);
         try {
-            const models = normalizeAIModelsResponse(await requestAIModels(provider, { timeoutMs: 30_000 }));
+            const models = normalizeAIModelsResponse(await requestAIModels(provider, { timeoutMs: 30_000, signal: session.signal }));
+            if (!session.isCurrent()) return;
             if (models.length > 0) {
                 updateConnectionStatus(provider.id, { kind: 'success', operation: 'model-sync' });
                 const existingModelIds = new Set(provider.models.map(m => m.id));
@@ -427,12 +428,13 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
                 appMessage.error(t('aiConfig.fetchModelsInvalidData'));
             }
         } catch (error) {
+            if (!session.isCurrent()) return;
             logAIConfigRequestFailure('fetchModels', provider.name, error);
             const message = t('aiConfig.connection.failureNotice');
             updateConnectionStatus(provider.id, createAIProviderConnectionFailure('model-sync', message));
             appMessage.error(t('aiConfig.testError', { message }));
         } finally {
-            setIsFetchingModels(false);
+            if (session.isCurrent()) setIsFetchingModels(false);
         }
     };
 
@@ -513,6 +515,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
                                     </Form.Item>
                                     <Form.Item
                                         label={t('aiConfig.apiKeyLabel')}
+                                        extra={<><div>{t('aiConfig.sessionKeyNotice')}</div><div role="status">{t(`aiConfig.credentialState.${selectedProvider.apiKey.trim() ? 'ready' : selectedProvider.credentialState ?? 'unconfigured'}`)}</div></>}
                                         required={selectedProviderReadiness?.authMode === 'bearer-required'}
                                     >
                                         <Space.Compact block>
@@ -676,4 +679,10 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
     );
 };
 
-export default AIConfigModal;
+const SessionAIConfigModal: React.FC<AIConfigModalProps> = props => {
+    const { user } = useAuth();
+    const revision = useSyncExternalStore(onAuthSessionInvalidated, getAuthSessionRevision, getAuthSessionRevision);
+    return <AIConfigModal key={`${user?.id ?? '__anonymous__'}:${revision}`} {...props} />;
+};
+
+export default SessionAIConfigModal;

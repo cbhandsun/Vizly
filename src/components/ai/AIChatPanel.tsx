@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { TextAreaRef } from 'antd/es/input/TextArea';
-import { getAIConfig, loadCloudAIConfig, persistAIConfig } from './aiConfigStorage';
+import { getAIConfig, loadCloudAIConfig, persistAIConfig, setRuntimeAIConfig } from './aiConfigStorage';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/useAuth';
 import { PluginRegistry } from '@vizly/core/plugin-registry';
@@ -109,6 +109,7 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
         loadCloudAIConfig(user.id)
             .then((cloudConfig) => {
                 if (!cancelled && cloudConfig) {
+                    setRuntimeAIConfig(user.id, cloudConfig);
                     setAiConfig(cloudConfig);
                 }
             })
@@ -230,8 +231,9 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
         }
     };
 
-    const processCommands = (content: string) => executeAICommandContent({
+    const processCommands = (content: string, signal?: AbortSignal) => executeAICommandContent({
         content,
+        signal,
         canvasOps,
         pluginId,
         resolvePluginContext: () => {

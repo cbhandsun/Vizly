@@ -1,6 +1,11 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { queryTelemetryJournal } from './telemetryJournal.js';
+import { createOperationTelemetry } from './operationTelemetry.js';
 import WebSocket from 'ws';
 import { WebsocketProvider } from 'y-websocket';
 import { createProductionCollaborationRuntime, type ProductionCollaborationDependencies } from './productionRuntime.js';
@@ -17,7 +22,7 @@ const environment = { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_PUBL
   SUPABASE_SERVER_KEY: 'sb_secret_SYNTHETIC_ONLY', VIZLY_COLLABORATION_ORIGINS: origin };
 const cleanup: Array<() => void | Promise<void>> = [];
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); });
-const fixture = () => {
+const fixture = (telemetryEnvironment: Record<string, string> = {}) => {
   let current: AtomicRoomSnapshot | null = null;
   const control: DistributedRecoveryStore = {
     claim: async () => ({ generation, expiresAt: new Date(Date.now() + 30_000).toISOString() }),
@@ -43,7 +48,7 @@ const fixture = () => {
     readCloud: async () => ({ revision: '2026-10-09T00:00:00Z', base: state, state }),
     readRevision: async () => '2026-10-09T00:00:00Z',
   };
-  const log = vi.fn(); const server = createProductionCollaborationRuntime(environment, dependencies, log);
+  const log = vi.fn(); const server = createProductionCollaborationRuntime({ ...environment, ...telemetryEnvironment }, dependencies, log);
   cleanup.push(() => server.stop());
   const peer = async (url: string, token: string) => {
     const doc = new Y.Doc();
@@ -84,4 +89,42 @@ describe('production HTTP server composition', () => {
     expect(f.dependencies.runtime.stop).toHaveBeenCalledTimes(1);
     await expect(fetch(`http://127.0.0.1:${port}/health`)).rejects.toThrow(); cleanup.splice(0);
   });
+});
+
+it('isolates production collectors, accepts browser telemetry and flushes each owner on shutdown', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'vizly-production-telemetry-'));
+  cleanup.push(() => rm(directory, { recursive: true, force: true }));
+  const firstRelease = 'd'.repeat(40), secondRelease = 'e'.repeat(40);
+  const firstDir = join(directory, 'first'), secondDir = join(directory, 'second');
+  const first = fixture({ VIZLY_TELEMETRY_ENABLED: 'true', VIZLY_RELEASE_ID: firstRelease, VIZLY_TELEMETRY_DATA_DIR: firstDir });
+  const second = fixture({ VIZLY_TELEMETRY_ENABLED: 'true', VIZLY_RELEASE_ID: secondRelease, VIZLY_TELEMETRY_DATA_DIR: secondDir });
+  const a = await first.server.listen(), b = await second.server.listen();
+  const denied = (url: string) => new Promise<void>(resolve => {
+    const socket = new WebSocket(`${url}/vizly-room-${roomId}?token=CANARY-PRIVATE`, { origin });
+    socket.on('error', () => {}); socket.on('close', () => resolve());
+  });
+  await Promise.all([denied(a.url), denied(b.url)]);
+  await first.server.stop();
+  // Closing one runtime must not dispose the other collector or its HTTP receiver.
+  await denied(b.url);
+  const source = createOperationTelemetry({ releaseId: secondRelease, transport: async batch => {
+    const response = await fetch(b.url.replace('ws:', 'http:') + '/telemetry', {
+      method: 'POST', headers: { origin, 'content-type': 'application/json' }, body: JSON.stringify(batch),
+    });
+    expect(response.status).toBe(202);
+  } });
+  source.begin('save')('failure', 'network'); await source.flush(); source.dispose();
+  await second.server.stop();
+  const firstBatches = await queryTelemetryJournal(firstDir, { releaseId: firstRelease });
+  const secondBatches = await queryTelemetryJournal(secondDir, { releaseId: secondRelease });
+  expect(firstBatches.flatMap(batch => batch.events).filter(event => event.operation === 'permission')).toHaveLength(1);
+  expect(secondBatches.flatMap(batch => batch.events).filter(event => event.operation === 'permission')).toHaveLength(2);
+  expect(secondBatches.flatMap(batch => batch.events)).toContainEqual(expect.objectContaining({ operation: 'save', code: 'network' }));
+  expect(await queryTelemetryJournal(firstDir, { releaseId: secondRelease })).toEqual([]);
+  expect(await queryTelemetryJournal(secondDir, { releaseId: firstRelease })).toEqual([]);
+  expect(JSON.stringify([firstBatches, secondBatches])).not.toMatch(/CANARY|aaaaaaaa-aaaa/);
+});
+it('keeps the production telemetry receiver disabled by default', async () => {
+  const f = fixture(); const address = await f.server.listen();
+  expect((await fetch(address.url.replace('ws:', 'http:') + '/telemetry', { method: 'POST' })).status).toBe(404);
 });

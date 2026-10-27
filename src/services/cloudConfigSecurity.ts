@@ -1,3 +1,4 @@
+import { normalizeProviderBaseUrl } from './ai/providerSecurity';
 const MAX_CONFIG_JSON_CHARS = 512 * 1024;
 const MAX_OBJECT_KEYS = 200;
 const MAX_ARRAY_ITEMS = 500;
@@ -7,7 +8,7 @@ const MAX_AI_PROVIDERS = 20;
 const MAX_AI_MODELS = 200;
 const MAX_ID_LENGTH = 160;
 const MAX_SECRET_LENGTH = 8_000;
-const SAFE_CONFIG_KEYS = new Set(['ai_config', 'layered-config-global', 'layered-config-user']);
+const SAFE_CONFIG_KEYS = new Set(['ai_config', 'ai_config_v3', 'layered-config-global', 'layered-config-user']);
 const BLOCKED_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 
 export interface CloudConfigRow {
@@ -57,7 +58,7 @@ const enforceConfigSize = (value: unknown): void => {
     }
 };
 
-const coerceAIConfigForCloud = (value: unknown): Record<string, unknown> => {
+const coerceAIConfigForCloud = (value: unknown, sessionOnly = false): Record<string, unknown> => {
     if (!isRecord(value)) throw new Error('ai_config must be an object');
 
     const sanitized = sanitizeJsonValue(value);
@@ -67,6 +68,7 @@ const coerceAIConfigForCloud = (value: unknown): Record<string, unknown> => {
     if (providers.length === 0) throw new Error('ai_config providers must be an array');
 
     return {
+        ...(sessionOnly ? { version: 3 } : {}),
         activeModelKey: typeof sanitized.activeModelKey === 'string'
             ? sanitized.activeModelKey.slice(0, MAX_ID_LENGTH * 2 + 1)
             : '',
@@ -81,8 +83,9 @@ const coerceAIConfigForCloud = (value: unknown): Record<string, unknown> => {
                     id: typeof provider.id === 'string' ? provider.id.slice(0, MAX_ID_LENGTH) : `provider-${providerIndex}`,
                     name: typeof provider.name === 'string' ? provider.name.slice(0, MAX_ID_LENGTH) : `provider-${providerIndex}`,
                     enabled: provider.enabled === true,
-                    baseUrl: typeof provider.baseUrl === 'string' ? provider.baseUrl.slice(0, 2_048) : '',
-                    apiKey: typeof provider.apiKey === 'string' ? provider.apiKey.slice(0, MAX_SECRET_LENGTH) : '',
+                    baseUrl: typeof provider.baseUrl === 'string' ? (sessionOnly ? normalizeProviderBaseUrl(provider.baseUrl) ?? '' : provider.baseUrl.slice(0, 2_048)) : '',
+                    apiKey: !sessionOnly && typeof provider.apiKey === 'string' ? provider.apiKey.slice(0, MAX_SECRET_LENGTH) : '',
+                    ...(sessionOnly ? { credentialState: provider.apiKey || provider.credentialState === 'ready' || provider.credentialState === 'required' ? 'required' : provider.credentialState === 'legacy-unavailable' ? 'legacy-unavailable' : 'unconfigured' } : {}),
                     ...(typeof provider.icon === 'string' ? { icon: provider.icon.slice(0, MAX_ID_LENGTH) } : {}),
                     models: models
                         .map((model, modelIndex) => {
@@ -107,8 +110,8 @@ export const coerceCloudConfigValue = (key: string, value: unknown): unknown => 
     const normalizedKey = normalizeCloudConfigKey(key);
     if (!normalizedKey) throw new Error('Unsupported cloud config key');
 
-    const normalized = normalizedKey === 'ai_config'
-        ? coerceAIConfigForCloud(value)
+    const normalized = (normalizedKey === 'ai_config' || normalizedKey === 'ai_config_v3')
+        ? coerceAIConfigForCloud(value, normalizedKey === 'ai_config_v3')
         : sanitizeJsonValue(value);
 
     enforceConfigSize(normalized);

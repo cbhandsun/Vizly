@@ -251,6 +251,21 @@ describe('collaboration connection ownership', () => {
     hook.unmount();
   });
 
+  it.each([1008, 1006])('handles transport close code %i without confusing denial and temporary outage', (code) => {
+    const hook = renderHook(() => useYjsCollaboration(options));
+    grantServerAccess();
+    const provider = fixture.providers[0];
+    const node: Node = { id: 'after-close', position: { x: 0, y: 0 }, data: {} };
+    act(() => {
+      provider.on.mock.calls.find(call => call[0] === 'connection-close')?.[1]({ code });
+      provider.on.mock.calls.find(call => call[0] === 'status')?.[1]({ status: 'disconnected' });
+    });
+    expect(hook.result.current.accessRole).toBe(code === 1008 ? null : 'editor');
+    act(() => hook.result.current.pushLocalChangesToYjs([node], []));
+    expect(provider.doc.getMap('flowchart-nodes').has(node.id)).toBe(code !== 1008);
+    hook.unmount();
+  });
+
   it('retains a verified editor change made during reconnect in the same Yjs document', () => {
     const hook = renderHook(() => useYjsCollaboration(options));
     grantServerAccess();

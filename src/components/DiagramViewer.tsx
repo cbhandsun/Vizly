@@ -112,6 +112,7 @@ const DiagramViewer: React.FC = () => {
         retryCollaboration,
         restoreCloudRoom,
         isCollaborationReadOnly,
+        hasVerifiedEditingAccess,
         canPersistCanvas,
         collabModalVisible,
         isSynced: isYjsSynced,
@@ -210,6 +211,7 @@ const DiagramViewer: React.FC = () => {
         diagramId: string;
         type?: string;
         name?: string;
+        isReadonly?: boolean;
     } | null>(null);
 
     useEffect(() => {
@@ -222,26 +224,17 @@ const DiagramViewer: React.FC = () => {
             await dataRegistry.initialize();
             if (cancelled) return;
             try {
-                const dataService = dataRegistry.getDataService();
-                let loadedDiagram = dataService.getDiagram(selectedDiagramId);
-                if (!loadedDiagram) {
-                    const { localDB } = await import('@/services/IndexedDBStorage');
-                    const raw = await localDB.loadDiagram(selectedDiagramId);
-                    if (raw && typeof raw === 'object') {
-                        const { normalizeLocalDiagramForRegistry } = await import('@/data/DataRegistry');
-                        const normalized = normalizeLocalDiagramForRegistry(raw);
-                        dataService.registerDiagram(normalized, false);
-                        loadedDiagram = normalized;
-                    }
-                }
+                const loadedDiagram = await dataRegistry.loadDiagram(selectedDiagramId);
+                if (cancelled) return;
                 setLoadedDocType({
                     diagramId: selectedDiagramId,
                     type: loadedDiagram?.type,
                     name: getPersistedDiagramTitle(loadedDiagram),
+                    isReadonly: loadedDiagram?.isReadonly === true,
                 });
             } catch (error) {
                 logDiagramViewerDocTypeDetectionFailure(selectedDiagramId, error);
-                setLoadedDocType({ diagramId: selectedDiagramId, type: undefined });
+                if (!cancelled) setLoadedDocType({ diagramId: selectedDiagramId, type: undefined });
             }
         }).catch((error) => {
             logDiagramViewerDocTypeDetectionFailure(selectedDiagramId, error);
@@ -284,7 +277,15 @@ const DiagramViewer: React.FC = () => {
         saveToCloud,
         shareDialogOpen,
     } = useCloudSave(selectedDiagramId, diagramTitle);
-    const canRenameDiagram = !selectedDiagram
+    const requiresDocumentPermissions = !selectedDiagram
+        && !PLUGIN_EMPTY_CANVAS_IDS.has(selectedDiagramId)
+        && !getStandardPresetDocTypeById(selectedDiagramId);
+    // Keep custom documents locked until their persisted access flag is loaded.
+    // A viewer remains read-only even when no realtime server is configured.
+    const documentReadOnly = requiresDocumentPermissions && !hasVerifiedEditingAccess
+        && (loadedDocType?.diagramId !== selectedDiagramId
+            || loadedDocType.isReadonly !== false);
+    const canRenameDiagram = !documentReadOnly && !isCollaborationReadOnly && !selectedDiagram
         && loadedDocType?.diagramId === selectedDiagramId
         && Boolean(loadedDocType.name);
     const handleRenameDiagram = useCallback(async (requestedTitle: string) => {
@@ -342,10 +343,15 @@ const DiagramViewer: React.FC = () => {
     // ==========================================
     /** 图表锁定防误触：禁止所有拖拽连线编排 */
     const [manualReadonly, setManualReadonly] = useState<boolean>(false);
-    const isReadonly = manualReadonly || isCollaborationReadOnly;
+    const accessReadOnly = documentReadOnly || isCollaborationReadOnly;
+    const isReadonly = manualReadonly || accessReadOnly;
     const setIsReadonly = useCallback((readonly: boolean) => {
-        if (!isCollaborationReadOnly) setManualReadonly(readonly);
-    }, [isCollaborationReadOnly]);
+        if (!accessReadOnly) setManualReadonly(readonly);
+    }, [accessReadOnly]);
+    const canPersistDocumentCanvas = useCallback(
+        () => !documentReadOnly && canPersistCanvas(),
+        [documentReadOnly, canPersistCanvas],
+    );
 
     /** 沉浸式演示模式：隐藏 UI 侧边栏与工具栏 */
     const [isPresentationMode, setIsPresentationMode] = useState<boolean>(false);
@@ -677,7 +683,7 @@ const DiagramViewer: React.FC = () => {
             coordinationProblem={coordinationProblem}
             retryCollaboration={retryCollaboration}
             restoreCloudRoom={restoreCloudRoom}
-            canPersistCanvas={canPersistCanvas}
+            canPersistCanvas={canPersistDocumentCanvas}
             openCollaborationModal={openCollaborationModal}
             pushLocalChangesToYjs={pushLocalChangesToYjs}
             provider={provider ?? null}

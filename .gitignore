@@ -2,6 +2,7 @@ node_modules/
 dist/
 dist-collaboration/
 .collaboration-data/
+.telemetry-data/
 coverage/
 .common-tools/
 .common-tools-audit/
@@ -15,5 +16,4 @@ test-results/
 tmp/
 *.tsbuildinfo
 
-# Local CI receipt; not application source.
-devfleet-native-result.json
+__pycache__/

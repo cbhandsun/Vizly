@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DiagramVersion, IStorageProvider } from '../storage/types';
 
+const snapshot = { nodes: [{ id: 'n1', position: { x: 0, y: 0 }, data: {} }], edges: [] };
 const saveVersionMock = vi.fn();
 const listVersionsMock = vi.fn();
 const loadVersionMock = vi.fn();
@@ -71,7 +72,7 @@ describe('UnifiedStorageService', () => {
         const localVersion: DiagramVersion = {
             id: 'local-version-1',
             diagramId: 'diagram-1',
-            snapshotData: { nodes: [], edges: [] },
+            snapshotData: snapshot,
             message: 'local fallback',
             createdAt: Date.parse('2026-06-24T00:00:00.000Z'),
             authorId: 'local-user',
@@ -85,9 +86,9 @@ describe('UnifiedStorageService', () => {
         }));
         service.setProvider('supabase');
 
-        const result = await service.saveVersion('diagram-1', { nodes: [] }, 'save');
+        const result = await service.saveVersion('diagram-1', snapshot, 'save');
 
-        expect(saveVersionMock).toHaveBeenCalledWith('diagram-1', { nodes: [] }, 'save');
+        expect(saveVersionMock).toHaveBeenCalledWith('diagram-1', expect.objectContaining(snapshot), 'save', expect.objectContaining({ location: 'local', syncStatus: 'pending', failure: 'unknown' }));
         expect(result).toEqual(localVersion);
     });
 
@@ -115,8 +116,8 @@ describe('UnifiedStorageService', () => {
         }));
         service.setProvider('supabase');
 
-        await expect(service.listVersions('diagram-2')).resolves.toEqual(localVersions);
-        await expect(service.loadVersion('diagram-2', 'local-version-2')).resolves.toEqual(localVersion);
+        await expect(service.listVersions('diagram-2')).resolves.toEqual(localVersions.map(version => ({ ...version, storage: expect.objectContaining({ syncStatus: 'legacy', ownerId: null }) })));
+        await expect(service.loadVersion('diagram-2', 'local-version-2')).resolves.toMatchObject({ ...localVersion, storage: { syncStatus: 'legacy', ownerId: null } });
         expect(listVersionsMock).toHaveBeenCalledWith('diagram-2');
         expect(loadVersionMock).toHaveBeenCalledWith('diagram-2', 'local-version-2');
     });
@@ -125,7 +126,7 @@ describe('UnifiedStorageService', () => {
         const localVersion: DiagramVersion = {
             id: 'local-version-3',
             diagramId: 'diagram-3',
-            snapshotData: { nodes: [], edges: [] },
+            snapshotData: snapshot,
             message: 'local only',
             createdAt: Date.parse('2026-06-24T00:00:00.000Z'),
             authorId: 'local-user',
@@ -150,10 +151,10 @@ describe('UnifiedStorageService', () => {
         });
         service.setProvider('supabase');
 
-        await expect(service.saveVersion('diagram-3', { nodes: [], edges: [] }, 'save')).resolves.toEqual(localVersion);
-        await expect(service.listVersions('diagram-3')).resolves.toEqual([localVersion]);
-        await expect(service.loadVersion('diagram-3', 'local-version-3')).resolves.toEqual(localVersion);
-        expect(saveVersionMock).toHaveBeenCalledWith('diagram-3', { nodes: [], edges: [] }, 'save');
+        await expect(service.saveVersion('diagram-3', snapshot, 'save')).resolves.toEqual(localVersion);
+        await expect(service.listVersions('diagram-3')).resolves.toEqual([{ ...localVersion, storage: expect.objectContaining({ syncStatus: 'legacy', ownerId: null }) }]);
+        await expect(service.loadVersion('diagram-3', 'local-version-3')).resolves.toMatchObject({ ...localVersion, storage: { syncStatus: 'legacy', ownerId: null } });
+        expect(saveVersionMock).toHaveBeenCalledWith('diagram-3', expect.objectContaining(snapshot), 'save', expect.objectContaining({ location: 'local', syncStatus: 'pending', failure: 'configuration' }));
         expect(listVersionsMock).toHaveBeenCalledWith('diagram-3');
         expect(loadVersionMock).toHaveBeenCalledWith('diagram-3', 'local-version-3');
         expect(remoteSaveVersion).not.toHaveBeenCalled();
@@ -181,7 +182,7 @@ describe('UnifiedStorageService', () => {
         mutableService.providers.supabase = createProvider({ listVersions: remoteListVersions });
         service.setProvider('supabase');
 
-        await expect(service.listVersions('diagram-4')).resolves.toEqual([localVersion]);
+        await expect(service.listVersions('diagram-4')).resolves.toEqual([{ ...localVersion, storage: expect.objectContaining({ syncStatus: 'legacy', ownerId: null }) }]);
         expect(remoteListVersions).toHaveBeenCalledWith('diagram-4');
         expect(listVersionsMock).toHaveBeenCalledWith('diagram-4');
     });

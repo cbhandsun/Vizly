@@ -1,17 +1,13 @@
-import { useEffect } from 'react';
-
 export const MIN_DIAGRAM_TOP_ALIGN_ZOOM = 1e-4;
 export const MAX_DIAGRAM_TOP_ALIGN_ZOOM = 1;
 export const DEFAULT_DIAGRAM_LEFT_SIDEBAR_OFFSET = 76;
 export const DEFAULT_DIAGRAM_RIGHT_SIDEBAR_OFFSET = 60;
 export const MAX_DIAGRAM_SIDEBAR_OFFSET = 800;
 export const VIEWPORT_SESSION_STORAGE_PREFIX = 'vizly:viewport:v1:';
-export const TOP_FIT_SESSION_MIGRATION_KEY = 'vizly:viewport:top-fit-migrated:v2';
 
 const DEFAULT_NODE_WIDTH = 220;
 const DEFAULT_NODE_HEIGHT = 120;
 const MOBILE_DIAGRAM_BREAKPOINT = 768;
-const MOBILE_READING_VIEW_MAX_WIDTH = 600;
 
 export interface DiagramTopContentBounds {
   minX: number;
@@ -430,6 +426,7 @@ const readElementViewportSize = (element: HTMLElement): { width: number; height:
   return { width, height };
 };
 
+// Explicit toolbar command; Core owns initial reading fit and saved viewports.
 export const applyDiagramBackToTopViewport = ({
   diagramId,
   readSnapshot,
@@ -540,123 +537,4 @@ export const clearDiagramViewportSessionStorage = (
     return 0;
   }
   return keysToRemove.length;
-};
-
-export const migrateStaleDesktopViewportSessionStorage = (
-  storage: Pick<Storage, 'getItem' | 'setItem' | 'key' | 'length' | 'removeItem'> | null | undefined,
-): boolean => {
-  if (!storage) {
-    return false;
-  }
-  try {
-    if (storage.getItem(TOP_FIT_SESSION_MIGRATION_KEY) === '1') {
-      return false;
-    }
-    clearDiagramViewportSessionStorage(storage);
-    storage.setItem(TOP_FIT_SESSION_MIGRATION_KEY, '1');
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-export const bindDiagramTopControlInterceptor = ({
-  diagramId,
-  readSnapshot,
-  duration = 0,
-}: {
-  diagramId: string;
-  readSnapshot?: () => SnapshotLike | null | undefined;
-  duration?: number;
-}): (() => void) => {
-  if (typeof window === 'undefined' || !diagramId) {
-    return () => undefined;
-  }
-
-  let followUpTimer: ReturnType<typeof setTimeout> | null = null;
-  let userInteracted = false;
-
-  const clearFollowUp = () => {
-    if (followUpTimer !== null) {
-      clearTimeout(followUpTimer);
-      followUpTimer = null;
-    }
-  };
-
-  const handleUserGesture = (event: Event) => {
-    if (event.target instanceof Element && event.target.closest('.react-flow')) {
-      userInteracted = true;
-      clearFollowUp();
-    }
-  };
-
-  const handleDiagramControlCapture = (event: Event) => {
-    if (!(event instanceof CustomEvent)) {
-      return;
-    }
-    const detail = isRecord(event.detail) ? event.detail : null;
-    if (!detail || detail.action !== 'top') {
-      return;
-    }
-    const targetId = typeof detail.diagramId === 'string' ? detail.diagramId : undefined;
-    if (targetId && targetId !== diagramId) {
-      return;
-    }
-
-    // Preserve mobile narrow-screen reading fit while intercepting desktop 'top' fit
-    const container = resolveDiagramContainerElement(diagramId);
-    const viewportWidth = container
-      ? readElementViewportSize(container).width
-      : window.innerWidth;
-    if (viewportWidth > 0 && viewportWidth <= MOBILE_READING_VIEW_MAX_WIDTH) {
-      return;
-    }
-
-    event.stopImmediatePropagation();
-    userInteracted = false;
-    clearFollowUp();
-
-    applyDiagramBackToTopViewport({
-      diagramId,
-      readSnapshot,
-      duration,
-    });
-
-    // Follow-up refinement once ResizeObserver finishes measuring nodes after initial mount
-    followUpTimer = setTimeout(() => {
-      followUpTimer = null;
-      if (userInteracted) {
-        return;
-      }
-      applyDiagramBackToTopViewport({
-        diagramId,
-        readSnapshot,
-        duration: 0,
-      });
-    }, 140);
-  };
-
-  window.addEventListener('diagramControl', handleDiagramControlCapture, true);
-  for (const gesture of ['pointerdown', 'wheel', 'touchstart'] as const) {
-    window.addEventListener(gesture, handleUserGesture, { capture: true, passive: true });
-  }
-
-  return () => {
-    clearFollowUp();
-    window.removeEventListener('diagramControl', handleDiagramControlCapture, true);
-    for (const gesture of ['pointerdown', 'wheel', 'touchstart'] as const) {
-      window.removeEventListener(gesture, handleUserGesture, true);
-    }
-  };
-};
-
-export const useDiagramTopControlInterceptor = (
-  diagramId: string,
-  readSnapshot?: () => SnapshotLike | null | undefined,
-): void => {
-  useEffect(() => bindDiagramTopControlInterceptor({
-    diagramId,
-    readSnapshot,
-    duration: 0,
-  }), [diagramId, readSnapshot]);
 };

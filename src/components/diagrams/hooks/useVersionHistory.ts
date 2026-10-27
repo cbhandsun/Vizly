@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import { captureAuthSession, getAuthSessionOwner, getAuthSessionRevision, onAuthSessionInvalidated } from '@/context/authSessionBoundary';
+import { useSyncExternalStore, useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
@@ -51,6 +52,8 @@ const readPreviewBaseSnapshot = (
 
 export function useVersionHistory(diagramId: string) {
     const { t } = useTranslation();
+    const sessionRevision = useSyncExternalStore(onAuthSessionInvalidated, getAuthSessionRevision);
+    const scope = `${diagramId}:${sessionRevision}`;
     const [versionCollection, setVersionCollection] = useState<{
         diagramId: string;
         items: DiagramVersion[];
@@ -63,7 +66,7 @@ export function useVersionHistory(diagramId: string) {
     const versionsRequestIdRef = useRef(0);
     const mutationPromiseRef = useRef<Promise<boolean> | null>(null);
     const currentDiagramIdRef = useRef(diagramId);
-    const versions = versionCollection.diagramId === diagramId ? versionCollection.items : [];
+    const versions = versionCollection.diagramId === scope ? versionCollection.items : [];
 
     const runExclusiveMutation = useCallback((operation: () => Promise<boolean>): Promise<boolean> => {
         if (mutationPromiseRef.current) return Promise.resolve(false);
@@ -78,6 +81,7 @@ export function useVersionHistory(diagramId: string) {
     }, []);
 
     const loadVersions = useCallback(async () => {
+        const session = captureAuthSession(getAuthSessionOwner());
         const requestId = ++versionsRequestIdRef.current;
         if (!diagramId) {
             setLoadError(false);
@@ -89,28 +93,35 @@ export function useVersionHistory(diagramId: string) {
         try {
             const unifiedStorage = await loadUnifiedStorage();
             const data = await unifiedStorage.listVersions(diagramId);
-            if (requestId !== versionsRequestIdRef.current) return;
+            if (!session.isCurrent() || requestId !== versionsRequestIdRef.current) return;
             const parsed = parseDiagramVersionList(data, diagramId);
             if (!parsed.ok) throw new Error('Storage returned an invalid version list.');
-            setVersionCollection({ diagramId, items: parsed.value });
+            setVersionCollection({ diagramId: scope, items: parsed.value });
         } catch (error) {
-            if (requestId !== versionsRequestIdRef.current) return;
+            if (!session.isCurrent() || requestId !== versionsRequestIdRef.current) return;
             setLoadError(true);
             logVersionHistoryLoadFailure(error);
             appMessage.error(t('designer.versionHistoryPanel.loadFailed'));
         } finally {
-            if (requestId === versionsRequestIdRef.current) setLoading(false);
+            if (session.isCurrent() && requestId === versionsRequestIdRef.current) setLoading(false);
         }
-    }, [diagramId, t]);
+    }, [diagramId, scope, t]);
+
+    useEffect(() => {
+        const refresh = () => { void loadVersions(); };
+        window.addEventListener('version-history-changed', refresh);
+        return () => window.removeEventListener('version-history-changed', refresh);
+    }, [loadVersions]);
 
     const saveVersion = useCallback(async (commitMessage: string): Promise<boolean> => {
         if (!diagramId) return false;
+        const session = captureAuthSession(getAuthSessionOwner());
 
         return runExclusiveMutation(async () => {
             try {
                 return await withVersionPreviewPersistence(diagramId, async assertCurrent => {
                 const unifiedStorage = await loadUnifiedStorage();
-                if (currentDiagramIdRef.current !== diagramId) return false;
+                if (!session.isCurrent() || currentDiagramIdRef.current !== diagramId) return false;
                 const bridge = getFlowDataBridge(diagramId);
                 const snapshot = readBridgeCanvasSnapshot(bridge);
                 if (!snapshot) {
@@ -125,31 +136,35 @@ export function useVersionHistory(diagramId: string) {
                 if (!newVersion || newVersion.diagramId !== diagramId) {
                     throw new Error('Storage returned an invalid saved version.');
                 }
-                if (currentDiagramIdRef.current !== diagramId) return false;
+                if (!session.isCurrent() || currentDiagramIdRef.current !== diagramId) return false;
 
                 // Add new version to list without refetching all
                 setVersionCollection(prev => ({
-                    diagramId,
-                    items: prev.diagramId === diagramId
+                    diagramId: scope,
+                    items: prev.diagramId === scope
                         ? [newVersion, ...prev.items]
                         : [newVersion],
                 }));
-                appMessage.success(t('designer.versionHistoryPanel.saveSuccess'));
+                const local = newVersion.storage?.location === 'local';
+                if (local) appMessage.warning(t('designer.versionHistoryPanel.localSaved'));
+                else appMessage.success(t('designer.versionHistoryPanel.cloudSaved'));
                 return true;
                 });
             } catch (error) {
-                if (currentDiagramIdRef.current !== diagramId) return false;
+                if (!session.isCurrent() || currentDiagramIdRef.current !== diagramId) return false;
                 logVersionHistorySaveFailure(error);
                 appMessage.error(t('designer.versionHistoryPanel.saveFailed'));
                 return false;
             }
         });
-    }, [diagramId, runExclusiveMutation, t]);
+    }, [diagramId, scope, runExclusiveMutation, t]);
 
     const loadVersionData = useCallback(async (versionId: string) => {
+        const session = captureAuthSession(getAuthSessionOwner());
         try {
             const unifiedStorage = await loadUnifiedStorage();
             const value = await unifiedStorage.loadVersion(diagramId, versionId);
+            if (!session.isCurrent()) return null;
             if (value === null) return null;
             const version = coerceDiagramVersion(value);
             if (!version || version.diagramId !== diagramId || version.id !== versionId) {
@@ -157,7 +172,7 @@ export function useVersionHistory(diagramId: string) {
             }
             return version;
         } catch (e) {
-            if (currentDiagramIdRef.current !== diagramId) return null;
+            if (!session.isCurrent() || currentDiagramIdRef.current !== diagramId) return null;
             logVersionHistoryPayloadLoadFailure(e);
             appMessage.error(t('designer.versionHistoryPanel.payloadLoadFailed'));
             return null;
@@ -171,9 +186,10 @@ export function useVersionHistory(diagramId: string) {
         getCurrentNodes: () => Node[],
         getCurrentEdges: () => Edge[]
     ) => {
+        const session = captureAuthSession(getAuthSessionOwner());
         const requestId = ++previewRequestIdRef.current;
         const fullVersion = await loadVersionData(versionId);
-        if (requestId !== previewRequestIdRef.current) return false;
+        if (!session.isCurrent() || requestId !== previewRequestIdRef.current) return false;
         if (!fullVersion || !fullVersion.snapshotData) {
             appMessage.error(t('designer.versionHistoryPanel.previewMissing'));
             return false;
@@ -244,10 +260,11 @@ export function useVersionHistory(diagramId: string) {
         setNodes: Dispatch<SetStateAction<Node[]>>,
         setEdges: Dispatch<SetStateAction<Edge[]>>
     ) => runExclusiveMutation(async () => {
+        const session = captureAuthSession(getAuthSessionOwner());
         const fullVersion = previewVersion?.diagramId === diagramId && previewVersion.id === versionId
             ? previewVersion
             : await loadVersionData(versionId);
-        if (currentDiagramIdRef.current !== diagramId) return false;
+        if (!session.isCurrent() || currentDiagramIdRef.current !== diagramId) return false;
 
         if (!fullVersion || !fullVersion.snapshotData) {
             appMessage.error(t('designer.versionHistoryPanel.restoreMissing'));
@@ -286,19 +303,19 @@ export function useVersionHistory(diagramId: string) {
             if (!backupVersion || backupVersion.diagramId !== diagramId) {
                 throw new Error('Storage returned an invalid backup version.');
             }
-            if (currentDiagramIdRef.current !== diagramId) return false;
+            if (!session.isCurrent() || currentDiagramIdRef.current !== diagramId) return false;
             const currentLive = readVersionPreviewLive(diagramId) ?? readBridgeCanvasSnapshot(getFlowDataBridge(diagramId));
             if (!areVersionPreviewSnapshotsEqual(backupSnapshot, currentLive)) {
                 throw new Error('Live canvas changed during safety backup');
             }
             setVersionCollection(prev => ({
-                diagramId,
-                items: prev.diagramId === diagramId
+                diagramId: scope,
+                items: prev.diagramId === scope
                     ? [backupVersion, ...prev.items]
                     : [backupVersion],
             }));
         } catch (e) {
-            if (currentDiagramIdRef.current !== diagramId) return false;
+            if (!session.isCurrent() || currentDiagramIdRef.current !== diagramId) return false;
             logVersionHistoryRestoreFailure(e);
             appMessage.error(t('designer.versionHistoryPanel.backupFailed'));
             return false;
@@ -324,7 +341,7 @@ export function useVersionHistory(diagramId: string) {
             appMessage.error(t('designer.versionHistoryPanel.restoreFailed'));
         }
         return false;
-    }), [diagramId, previewVersion, loadVersionData, runExclusiveMutation, t]);
+    }), [diagramId, scope, previewVersion, loadVersionData, runExclusiveMutation, t]);
 
     useLayoutEffect(() => {
         const abandonedLive = endVersionPreview(diagramId);
@@ -344,6 +361,9 @@ export function useVersionHistory(diagramId: string) {
         previewBaseRef.current = null;
         mutationPromiseRef.current = null;
         return () => {
+            currentDiagramIdRef.current = '';
+            versionsRequestIdRef.current += 1;
+            previewRequestIdRef.current += 1;
             const live = endVersionPreview(diagramId);
             const bridge = getFlowDataBridge(diagramId);
             if (live && typeof bridge?.replaceCanvasSnapshot === 'function') {
@@ -352,6 +372,39 @@ export function useVersionHistory(diagramId: string) {
             } else if (live) beginVersionPreview(diagramId, live);
         };
     }, [diagramId]);
+
+    const retryVersion = useCallback((versionId: string) => runExclusiveMutation(async () => {
+        const session = captureAuthSession(getAuthSessionOwner());
+        try {
+            const storage = await loadUnifiedStorage();
+            if (!session.isCurrent()) return false;
+            await storage.retryVersion(diagramId, versionId);
+            if (!session.isCurrent() || currentDiagramIdRef.current !== diagramId) return false;
+            await loadVersions();
+            appMessage.success(t('designer.versionHistoryPanel.cloudSaved'));
+            return true;
+        } catch {
+            if (session.isCurrent() && currentDiagramIdRef.current === diagramId) {
+                await loadVersions();
+                appMessage.error(t('designer.versionHistoryPanel.retryFailed'));
+            }
+            return false;
+        }
+    }), [diagramId, loadVersions, runExclusiveMutation, t]);
+
+    const exportVersion = useCallback(async (versionId: string) => {
+        const session = captureAuthSession(getAuthSessionOwner());
+        try {
+            const version = await loadVersionData(versionId);
+            if (!version?.snapshotData || !session.isCurrent()) return;
+            const { downloadFile } = await import('@vizly/core/export');
+            if (!session.isCurrent() || currentDiagramIdRef.current !== diagramId) return;
+            downloadFile(JSON.stringify(version.snapshotData, null, 2), `vizly-version-${version.id}.json`, 'application/json');
+        } catch {
+            if (session.isCurrent() && currentDiagramIdRef.current === diagramId)
+                appMessage.error(t('designer.versionHistoryPanel.exportFailed'));
+        }
+    }, [diagramId, loadVersionData, t]);
 
     // Initial load
     useEffect(() => {
@@ -371,6 +424,8 @@ export function useVersionHistory(diagramId: string) {
         saveVersion,
         enterPreview,
         exitPreview,
-        restoreVersion
+        restoreVersion,
+        retryVersion,
+        exportVersion
     };
 }

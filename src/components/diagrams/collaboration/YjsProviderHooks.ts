@@ -1,3 +1,4 @@
+import { createConnectionTelemetry } from '../../../observability/connectionTelemetry';
 import { useCallback, useEffect, useMemo, useState, useRef, useSyncExternalStore } from 'react';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
@@ -213,6 +214,7 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         const yEdges = ydoc.getMap<unknown>('flowchart-edges');
         connectionRef.current = { doc: ydoc, yNodes, yEdges, hasSynced: false };
         connectionState.update({ provider, wsStatus: 'connecting' });
+        const connectionTelemetry = createConnectionTelemetry();
 
         provider.awareness.setLocalStateField('user', {
             name: localUser.name,
@@ -260,7 +262,7 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         };
         const handleSync = (isSynced: boolean) => {
             if (!isCurrentConnection() || connectionState.getSnapshot().coordinationProblem) return;
-            if (isSynced && connectionRef.current) connectionRef.current.hasSynced = true;
+            if (isSynced && connectionRef.current) { connectionRef.current.hasSynced = true; connectionTelemetry.synced(); }
             // A document with deletion history is authoritative even when its
             // maps are empty. An untouched new room can still be seeded locally.
             if (isSynced && Y.decodeStateVector(Y.encodeStateVector(ydoc)).size > 0) applyRemoteSnapshot();
@@ -269,6 +271,7 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         provider.on('sync', handleSync);
 
         const handleStatus = (event: { status: 'connecting' | 'connected' | 'disconnected' }) => {
+            if (isCurrentConnection()) connectionTelemetry.status(event.status);
             if (isCurrentConnection() && connectionState.getSnapshot().coordinationProblem) {
                 connectionState.update({ wsStatus: 'disconnected', canWrite: false, synced: false });
                 return;
@@ -278,6 +281,18 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
                 : { wsStatus: event.status, canWrite: false, synced: false });
         };
         provider.on('status', handleStatus);
+
+        const handleConnectionClose = (event: CloseEvent | null) => {
+            if (!isCurrentConnection()) return;
+            // Failed handshakes close before y-websocket emits a disconnected status.
+            connectionTelemetry.status('disconnected');
+            if (event?.code !== 1008) return;
+            // A server policy rejection invalidates the prior edit grant. Ordinary
+            // transport outages still retain authorized offline work for reconnect.
+            const accessRole = connectionState.getSnapshot().accessRole === 'viewer' ? 'viewer' : null;
+            connectionState.update({ accessRole, canWrite: false, synced: false, wsStatus: 'disconnected' });
+        };
+        provider.on('connection-close', handleConnectionClose);
 
         const handleAwarenessChange = () => {
             if (!isCurrentConnection()) return;
@@ -304,8 +319,10 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         yEdges.observeDeep(handleRemoteElementChange);
 
         return () => {
+            connectionTelemetry.dispose();
             provider.off('sync', handleSync);
             provider.off('status', handleStatus);
+            provider.off('connection-close', handleConnectionClose);
             provider.awareness.off('change', handleAwarenessChange);
             yNodes.unobserveDeep(handleRemoteElementChange);
             yEdges.unobserveDeep(handleRemoteElementChange);

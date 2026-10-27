@@ -1,3 +1,4 @@
+import { beginApplicationOperation } from '../observability/applicationTelemetry';
 import { createStartupTrace, type StartupMilestone } from './applicationStartupTrace';
 
 export type StartupFailureCode = 'runtime-initialization-failed' | 'application-readiness-failed'
@@ -25,6 +26,7 @@ export const APPLICATION_READINESS_TIMEOUT_MS = 30_000;
 /** Owns only pre-React startup. A submitted render is not proof of first paint. */
 export const startApplication = async ({ initialize, ready, mount, onFailure,
   now = () => performance.now() }: StartupOptions): Promise<boolean> => {
+  const finishOperation = beginApplicationOperation('startup');
   let startedAt = NaN;
   try { startedAt = now(); } catch { /* Diagnostic clock failure must not block startup. */ }
   const trace = createStartupTrace(startedAt, now);
@@ -33,6 +35,8 @@ export const startApplication = async ({ initialize, ready, mount, onFailure,
   // Attach rejection handling before synchronous initialization can fail.
   const readiness = ready.then(() => 'ready' as const, () => 'rejected' as const);
   const fail = (code: StartupFailureCode): false => {
+    finishOperation('failure', code === 'application-readiness-timeout' ? 'timeout'
+      : stage === 'runtime' ? 'initialization' : stage === 'readiness' ? 'readiness' : 'mount');
     const elapsedMs = trace.record('failed');
     onFailure({ schema: 'vizly-startup-failure-v1', stage, code,
       elapsedMs, milestones: trace.snapshot() });
@@ -60,5 +64,6 @@ export const startApplication = async ({ initialize, ready, mount, onFailure,
   trace.record('mount-requested');
   try { mount(); } catch { return fail('application-mount-failed'); }
   trace.record('mount-submitted');
+  finishOperation('success');
   return true;
 };

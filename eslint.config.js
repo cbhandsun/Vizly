@@ -9,7 +9,7 @@ export default defineConfig([
   // Lint source and diagnostic fixtures; compiled bundles have separate artifact gates.
   globalIgnores(['dist', 'dist-collaboration', 'coverage', 'node_modules', 'tmp/**/assets/**', 'tmp/vercel-collaboration-production/api/index.js']),
   {
-    files: ['scripts/prepare-vercel-static.mjs', 'scripts/deploy-prepared-vercel-static.mjs',
+    files: ['scripts/database-path.mjs', 'scripts/build-database-paths.mjs', 'scripts/check-database-paths.mjs', 'scripts/prepare-vercel-static.mjs', 'scripts/deploy-prepared-vercel-static.mjs',
       'scripts/install-locked-core-artifact.mjs',
       'scripts/verify-ci-negative-gates.mjs', 'scripts/lib/ciNegativeGateProbe.mjs', 'scripts/lib/ciNegativeGateProbe.test.mjs',
       'scripts/lib/isolatedPostgresReadiness.mjs', 'scripts/lib/isolatedPostgresReadiness.test.mjs',

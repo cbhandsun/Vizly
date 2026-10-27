@@ -63,7 +63,7 @@ def clean_environment(state):
     empty_config = state / 'empty-npmrc'
     empty_config.touch(exist_ok=True)
     env.update({
-        'CI': 'true', 'PYTHONUTF8': '1', 'PYTHONIOENCODING': 'utf-8',
+        'CI': 'true', 'PYTHONDONTWRITEBYTECODE': '1', 'PYTHONUTF8': '1', 'PYTHONIOENCODING': 'utf-8',
         'NPM_CONFIG_USERCONFIG': str(empty_config),
         'NPM_CONFIG_GLOBALCONFIG': str(state / 'empty-global-npmrc'),
         'NPM_CONFIG_CACHE': str(state / 'npm-cache'),
@@ -72,6 +72,53 @@ def clean_environment(state):
     })
     (state / 'empty-global-npmrc').touch(exist_ok=True)
     return env
+
+
+def source_snapshot(root, output):
+    return {
+        'source': output(['git', 'rev-parse', 'HEAD']),
+        'tree': output(['git', 'rev-parse', 'HEAD^{tree}']),
+        'lock_sha256': hashlib.sha256((root / 'package-lock.json').read_bytes()).hexdigest(),
+        # Paths are unnecessary to prove clean input and may contain private identifiers.
+        'working_tree': [] if not output(['git', 'status', '--porcelain=v1', '--untracked-files=all']) else ['dirty'],
+    }
+
+
+def run_checks(root, output, run, project, system, clock=time.monotonic):
+    """Native-only evidence. Failed installation/checks and source drift never become a passing receipt."""
+    before = source_snapshot(root, output)
+    report = {'schema': 'vizly-native-v2', 'source': before['source'], 'tree': before['tree'],
+              'lock_sha256': before['lock_sha256'], 'working_tree_before': before['working_tree'],
+              'os': system, 'arch': platform.machine(), 'node': '22.23.4', 'npm': '12.0.1',
+              'project': project, 'scope': 'native-only', 'deployment': False,
+              'installation_exit_code': None, 'gates': [], 'status': 'failed'}
+    try:
+        if before['working_tree']:
+            report['failure'] = 'dirty-input'
+        else:
+            report['installation_exit_code'] = run('install')
+            if report['installation_exit_code'] == 0:
+                for gate in GATES[project]:
+                    started = clock()
+                    code = run(gate)
+                    report['gates'].append({'name': gate, 'exit_code': code,
+                                           'seconds': round(max(0, clock() - started), 2)})
+            else:
+                report['failure'] = 'installation-failed'
+    except Exception:
+        # Never serialize exception text from commands or dependencies.
+        report['failure'] = 'execution-failed'
+    after = source_snapshot(root, output)
+    report.update({'source_after': after['source'], 'tree_after': after['tree'],
+                   'lock_sha256_after': after['lock_sha256'], 'working_tree_after': after['working_tree']})
+    stable = before == after and not before['working_tree']
+    if not stable:
+        report['failure'] = 'source-drift-or-dirty'
+    if (stable and 'failure' not in report and report['installation_exit_code'] == 0
+            and len(report['gates']) == len(GATES[project])
+            and all(gate['exit_code'] == 0 for gate in report['gates'])):
+        report['status'] = 'passed'
+    return report
 
 
 def main():
@@ -84,6 +131,8 @@ def main():
     root = Path(__file__).resolve().parents[1]
     state = Path(os.environ['VIZLY_CI_STATE']).resolve()
     lock = Path(os.environ['VIZLY_CI_LOCK']).resolve()
+    if root == state or root in state.parents or root == lock or root in lock.parents:
+        parser.error('Runner state and lock must be outside the source checkout')
     node = shutil.which('node')
     npm = Path(os.environ['VIZLY_NPM_CLI']).resolve()
     if not node or not npm.is_file():
@@ -93,31 +142,23 @@ def main():
         env = clean_environment(state)
         def output(argv):
             return subprocess.check_output(argv, cwd=root, env=env, text=True, timeout=30).strip()
-        assert output([node, '--version']) == 'v22.22.2', 'Node version mismatch'
-        assert output([node, str(npm), '--version']) == '12.0.1', 'npm version mismatch'
-        source = output(['git', 'rev-parse', 'HEAD'])
-        lock_hash = hashlib.sha256((root / 'package-lock.json').read_bytes()).hexdigest()
-        report = {'source': source, 'os': platform.system(), 'arch': platform.machine(),
-                  'node': '22.22.2', 'npm': '12.0.1', 'lock_sha256': lock_hash,
-                  'project': args.project, 'scope': 'native-only', 'deployment': False,
-                  'gates': []}
-        print('VIZLY_INPUT=' + json.dumps(report), flush=True)
-        install = subprocess.run([node, str(npm), 'ci', '--no-audit', '--no-fund'], cwd=root, env=env)
-        if install.returncode:
-            return install.returncode
-        for gate in GATES[args.project]:
-            started = time.monotonic()
-            argv = [node, 'scripts/verify-ci-negative-gates.mjs'] if gate == 'negative-enforcement' else [node, str(npm), 'run', gate]
-            result = subprocess.run(argv, cwd=root, env=env)
-            report['gates'].append({'name': gate, 'exit_code': result.returncode,
-                                    'seconds': round(time.monotonic() - started, 2)})
-            (root / 'devfleet-native-result.json').write_text(json.dumps(report, indent=2) + '\n')
-        if source != output(['git', 'rev-parse', 'HEAD']):
-            raise RuntimeError('Source HEAD changed during the checks')
-        if lock_hash != hashlib.sha256((root / 'package-lock.json').read_bytes()).hexdigest():
-            raise RuntimeError('Dependency lock changed during the checks')
-        print('VIZLY_NATIVE_RESULT=' + json.dumps(report), flush=True)
-        return 1 if any(g['exit_code'] for g in report['gates']) else 0
+        if output([node, '--version']) != 'v22.23.4' or output([node, str(npm), '--version']) != '12.0.1':
+            parser.error('Pinned Node/npm version mismatch; update runner runtime before executing this source')
+        def run(gate):
+            if gate == 'install':
+                argv = [node, str(npm), 'ci', '--no-audit', '--no-fund']
+            elif gate == 'negative-enforcement':
+                argv = [node, 'scripts/verify-ci-negative-gates.mjs']
+            else:
+                argv = [node, str(npm), 'run', gate]
+            return subprocess.run(argv, cwd=root, env=env).returncode
+        report = run_checks(root, output, run, args.project, platform.system())
+        # Evidence is outside Git input; unique files preserve earlier failed attempts.
+        name = 'native-' + args.project + '-' + str(time.time_ns()) + '.json'
+        with (state / name).open('x') as stream:
+            stream.write(json.dumps(report, indent=2, allow_nan=False) + '\n')
+        print('VIZLY_NATIVE_RESULT=' + json.dumps(report, allow_nan=False), flush=True)
+        return 0 if report['status'] == 'passed' else 1
 
 
 if __name__ == '__main__':

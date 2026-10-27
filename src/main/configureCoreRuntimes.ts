@@ -14,7 +14,7 @@ configureApplicationDiagramRuntime({
   loadDiagram: async (id, options) => {
     const { dataRegistry } = await import('@/data/DataRegistry');
     if (options?.initialize) await dataRegistry.initialize();
-    return dataRegistry.getDataService().getDiagram(id);
+    return dataRegistry.loadDiagram(id);
   },
   registerDiagram: async (content, fallback, persistToIndexedDB = true, overrides = {}) => {
     const { dataRegistry } = await import('@/data/DataRegistry');
