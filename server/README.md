@@ -67,7 +67,9 @@ POST同地址只接受确认的sha256及revision，不接受客户端替换内�
 
 ## 诊断事件接收（T07，进行中）
 
-浏览器构建仅在 `VITE_TELEMETRY_ENABLED=true` 且 `VITE_RELEASE_ID` 为 40/64 位小写十六进制构建哈希时启用采集。它向同源 `/telemetry` POST，不携带 cookie、认证头或 referrer，不跟随重定向。部署必须将该路径代理到协作服务；当前代码不会自动配置生产代理。
+浏览器构建仅在 `VITE_TELEMETRY_ENABLED=true` 且 `VITE_RELEASE_ID` 为 40/64 位小写十六进制构建哈希时启用采集。它向同源 `/telemetry` POST，不携带 cookie、认证头或 referrer，不跟随重定向。静态产物准备入口用 `--telemetry-url https://collab.example.com/telemetry` 显式指定接收服务，在资源与 SPA 回退之前生成仅限 POST 的转发路由；生产产物必须提供此参数，预览未配置时 POST 返回 503，其他方法返回 405。URL 只接受 HTTPS 的 `/telemetry` 路径，拒绝本机地址、凭据、查询串和片段。
+
+发布前校验将接收地址与准备收据和完整路由配置对应，拒绝路由缺失、改变目标、重排、SPA 遮挡或额外配置。旧准备产物需重新生成，原目录保留。准备和校验本身不访问接收服务；实际部署仍须启用前后端采集、配置正确的来源白名单，并用 staging canary 验证真实投递、检索和告警，不能用配置检查代替。
 
 独立协作服务和生产运行时入口均使用 `VIZLY_TELEMETRY_ENABLED=true` 及合法的 `VIZLY_RELEASE_ID` 启用接收；`VIZLY_TELEMETRY_DATA_DIR` 指定专用私有日志目录（默认 `.telemetry-data`）。一个目录只允许一个服务写入，多实例必须使用各自目录。来源必须在既有 `VIZLY_COLLABORATION_ORIGINS` 白名单中。浏览器诊断属于不可信信号，不能用于鉴权或计费。
 

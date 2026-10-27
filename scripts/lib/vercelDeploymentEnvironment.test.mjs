@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { ESLint } from 'eslint';
-import { containsCompiledEndpoint, parseDeploymentEnvironment, parseProductionWebSocketUrl } from './vercelDeploymentEnvironment.mjs';
+import { containsCompiledEndpoint, parseDeploymentEnvironment, parseProductionWebSocketUrl, parseTelemetryIngestUrl } from './vercelDeploymentEnvironment.mjs';
 const lintWorkspace = resolve(import.meta.dirname, '../..');
 const lint = new ESLint({ cwd: lintWorkspace });
 const releaseModule = join(lintWorkspace, 'scripts/lib/vercelDeploymentEnvironment.mjs');
@@ -37,6 +37,22 @@ it('matches only the whole compiled URL literal', () => {
   expect(containsCompiledEndpoint(`const endpoint='${endpoint}/other';`, endpoint)).toBe(false);
   expect(containsCompiledEndpoint('', endpoint)).toBe(false);
   expect(containsCompiledEndpoint(null, endpoint)).toBe(false);
+});
+it('canonicalizes the selected HTTPS telemetry endpoint without issuing a request', () => {
+  expect(parseTelemetryIngestUrl('https://INGEST.example.com:443/telemetry')).toBe('https://ingest.example.com/telemetry');
+  expect(parseTelemetryIngestUrl('https://ingest.example.com:8443/telemetry')).toBe('https://ingest.example.com:8443/telemetry');
+});
+it.each([undefined, null, '', {}, [], 'http://ingest.example.com/telemetry',
+  'https://localhost/telemetry', 'https://ingest.localhost/telemetry', 'https://ingest.local/telemetry',
+  'https://127.0.0.1/telemetry', 'https://0x7f000001/telemetry', 'https://[::1]/telemetry',
+  'https://user:synthetic@ingest.example.com/telemetry', 'https://ingest.example.com/telemetry?key=synthetic',
+  'https://ingest.example.com/telemetry#fragment', 'https://ingest.example.com:65536/telemetry',
+  'https://ingest.example.com:0/telemetry', ' https://ingest.example.com/telemetry',
+  'https://ingest.example.com/', 'https://ingest.example.com/telemetry/',
+  'https://ingest.example.com/a/../telemetry', 'https://ingest.example.com/%74elemetry',
+  'https://-.example.com/telemetry', `https://${'a'.repeat(64)}.example.com/telemetry`,
+])('rejects unsafe or unrecognized telemetry ingest endpoints %#', value => {
+  expect(() => parseTelemetryIngestUrl(value)).toThrow('Invalid telemetry ingest');
 });
 it('includes release tooling in the unified strict type gate and rejects unknown access and implicit parameters', async () => {
   const workspace = resolve(import.meta.dirname, '../..');

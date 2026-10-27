@@ -1,7 +1,9 @@
 import { createHash } from 'node:crypto';
 import { readFile, readdir, realpath, stat } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve } from 'node:path';
-import { containsCompiledEndpoint, parseDeploymentEnvironment, parseProductionWebSocketUrl } from './vercelDeploymentEnvironment.mjs';
+import { isDeepStrictEqual } from 'node:util';
+import { containsCompiledEndpoint, parseDeploymentEnvironment, parseProductionWebSocketUrl,
+  parseTelemetryIngestUrl, staticDeploymentRoutes } from './vercelDeploymentEnvironment.mjs';
 
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const contained = (root, path) => {
@@ -43,6 +45,9 @@ export async function verifyPreparedVercelDeployment({ artifactDirectory, projec
   if (receiptEnvironment !== deploymentEnvironment) throw new Error('Prepared deployment environment mismatch');
   const endpoint = deploymentEnvironment === 'production' ? parseProductionWebSocketUrl(receipt.productionWebSocketUrl) : undefined;
   if (deploymentEnvironment === 'preview' && receipt.productionWebSocketUrl !== undefined) throw new Error('Production endpoint supplied for preview artifact');
+  const ingest = receipt.telemetryIngestUrl === undefined && deploymentEnvironment === 'preview'
+    ? undefined : parseTelemetryIngestUrl(receipt.telemetryIngestUrl);
+  if (!isDeepStrictEqual(config, { version: 3, routes: staticDeploymentRoutes(ingest) })) throw new Error('Prepared artifact routing mismatch');
   if (!Array.isArray(receipt.files) || receipt.files.length === 0 || receipt.files.length > 5000
     || !Number.isSafeInteger(receipt.totalBytes) || receipt.totalBytes < 0 || receipt.totalBytes > 256 * 1024 * 1024) throw new Error('Invalid artifact inventory');
   const expected = new Map();
@@ -75,5 +80,6 @@ export async function verifyPreparedVercelDeployment({ artifactDirectory, projec
   await verify(staticRoot);
   if (count !== expected.size || totalBytes !== receipt.totalBytes) throw new Error('Artifact inventory incomplete');
   if (endpoint && !compiledEndpointFound) throw new Error('Compiled production WebSocket endpoint missing');
-  return { root, projectId, teamId, files: count, totalBytes, deploymentEnvironment };
+  return { root, projectId, teamId, files: count, totalBytes, deploymentEnvironment,
+    ...(ingest ? { telemetryIngestUrl: ingest } : {}) };
 }
