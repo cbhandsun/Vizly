@@ -32,7 +32,7 @@ it.each(['failed', 'installation', 'source', 'tree', 'lock', 'dirty', 'runtime',
   },
 );
 
-it('derives eleven facts only from a complete successful business workflow', () => {
+it('derives all facts only from a complete successful business workflow', () => {
   const facts = businessReleaseFacts(syntheticBusinessCiReport(identity), { identity });
   expect(facts.map(fact => fact.id)).toEqual(BUSINESS_RELEASE_GATES);
   expect(facts.find(fact => fact.id === 'app-security').jobId).toBe('22');
@@ -60,9 +60,9 @@ it('imports an entire successful run once and refuses to replace its evidence', 
   const selected = join(root, 'identity.json'), raw = join(root, 'raw.json'), output = join(root, 'reports');
   await writeFile(selected, JSON.stringify(identity)); await writeFile(raw, JSON.stringify(syntheticBusinessCiReport(identity)));
   const result = await run(process.execPath, [cli, selected, raw, output]);
-  expect(JSON.parse(result.stdout)).toMatchObject({ status: 'imported-business-only', gates: 11, runId: '456' });
+  expect(JSON.parse(result.stdout)).toMatchObject({ status: 'imported-business-only', gates: 12, runId: '456' });
   const receipt = await readFile(join(output, 'app-business-import.json'), 'utf8');
-  expect(JSON.parse(receipt).gates).toHaveLength(11);
+  expect(JSON.parse(receipt).gates).toHaveLength(12);
   await expect(run(process.execPath, [cli, selected, raw, output])).rejects.toThrow();
   expect(await readFile(join(output, 'app-business-import.json'), 'utf8')).toBe(receipt);
 });

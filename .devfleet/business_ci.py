@@ -21,6 +21,7 @@ GATES = {
         ('app-rls', 'test:rls'),
         ('app-s3', 'test:s3'),
         ('app-collaboration-build', 'collaboration:build'),
+        ('app-telemetry-storage', 'test:telemetry'),
         ('app-collaboration-auth-load', 'collaboration:auth-load'),
         ('app-collaboration-mixed-load', 'collaboration:mixed-load'),
     ],

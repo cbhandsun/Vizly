@@ -20,9 +20,21 @@
   "upgradePolicy": "Known 7-table application schema; version parent TEXT/UUID; unknown drift fails closed",
   "forwardChain": [
     "20261026060244_vizly_database_forward_contract.sql",
-    "20261026191139_ai_gateway_shared_resource_leases.sql"
+    "20261026191139_ai_gateway_shared_resource_leases.sql",
+    "20261027211956_bounded_telemetry_journal.sql"
   ],
   "extensionFiles": {
-    "20261026191139_ai_gateway_shared_resource_leases.sql": "24352e648442877ff0ab65d2a1ad334ec277a17132d0b935a7b8022348a44e88"
+    "20261026191139_ai_gateway_shared_resource_leases.sql": "24352e648442877ff0ab65d2a1ad334ec277a17132d0b935a7b8022348a44e88",
+    "20261027211956_bounded_telemetry_journal.sql": "0f06121ede85ceda6080130e1e1f8ca9acc1e032578e81fbe5ef6d1f3959049c"
+  },
+  "extensionSchemas": {
+    "20261026191139_ai_gateway_shared_resource_leases.sql": {
+      "schema": "vizly_ai",
+      "label": "AI resource"
+    },
+    "20261027211956_bounded_telemetry_journal.sql": {
+      "schema": "vizly_telemetry",
+      "label": "Telemetry journal"
+    }
   }
 }

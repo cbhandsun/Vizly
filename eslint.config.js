@@ -10,6 +10,9 @@ export default defineConfig([
   globalIgnores(['dist', 'dist-collaboration', 'coverage', 'node_modules', 'tmp/**/assets/**', 'tmp/vercel-collaboration-production/api/index.js']),
   {
     files: ['scripts/database-path.mjs', 'scripts/build-database-paths.mjs', 'scripts/check-database-paths.mjs', 'scripts/prepare-vercel-static.mjs', 'scripts/deploy-prepared-vercel-static.mjs',
+      'scripts/lib/check-telemetry-journal-database.mjs',
+      'scripts/query-telemetry.mjs',
+      'scripts/check-telemetry-storage.mjs', 'scripts/fixtures/telemetry-journal/https-client.mjs',
       'scripts/install-locked-core-artifact.mjs',
       'scripts/verify-ci-negative-gates.mjs', 'scripts/lib/ciNegativeGateProbe.mjs', 'scripts/lib/ciNegativeGateProbe.test.mjs',
       'scripts/lib/isolatedPostgresReadiness.mjs', 'scripts/lib/isolatedPostgresReadiness.test.mjs',

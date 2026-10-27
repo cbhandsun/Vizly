@@ -109,6 +109,7 @@ class BusinessExportTests(unittest.TestCase):
     def test_exported_complete_run_imports_through_real_node_cli(self):
         checks = [('app-database-paths', 'test:database'), ('app-rls', 'test:rls'),
                   ('app-s3', 'test:s3'), ('app-collaboration-build', 'collaboration:build'),
+                  ('app-telemetry-storage', 'test:telemetry'),
                   ('app-collaboration-auth-load', 'collaboration:auth-load'),
                   ('app-collaboration-mixed-load', 'collaboration:mixed-load')]
         def complete_api(method, path, raw=False):
@@ -139,7 +140,7 @@ class BusinessExportTests(unittest.TestCase):
             result = subprocess.run(['node', str(cli), str(root / 'identity.json'),
                                      str(root / 'raw.json'), str(root / 'output')],
                                     check=True, capture_output=True, text=True, timeout=30)
-            self.assertEqual(json.loads(result.stdout)['gates'], 11)
+            self.assertEqual(json.loads(result.stdout)['gates'], 12)
             report = json.loads((root / 'output/app-security.json').read_text())
             self.assertEqual((report['runId'], report['jobId']), ('42', '2'))
 

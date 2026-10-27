@@ -1,11 +1,12 @@
 export const BUSINESS_CHECKS = Object.freeze([
   ['app-database-paths', 'test:database'], ['app-rls', 'test:rls'], ['app-s3', 'test:s3'],
   ['app-collaboration-build', 'collaboration:build'],
+  ['app-telemetry-storage', 'test:telemetry'],
   ['app-collaboration-auth-load', 'collaboration:auth-load'],
   ['app-collaboration-mixed-load', 'collaboration:mixed-load'],
 ]);
 export const REQUIRED_BUSINESS_GATES = Object.freeze([
-  'app-database-paths', 'app-collaboration-auth-load', 'app-collaboration-mixed-load',
+  'app-database-paths', 'app-telemetry-storage', 'app-collaboration-auth-load', 'app-collaboration-mixed-load',
   'app-browser-compatibility',
 ]);
 export const BROWSER_CHECKS = Object.freeze([

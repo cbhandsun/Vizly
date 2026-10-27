@@ -14,6 +14,7 @@
     "collaboration:build": "tsc -p server/tsconfig.build.json",
     "collaboration:auth-load": "npm run collaboration:build && node scripts/check-collaboration-auth-load.mjs",
     "collaboration:mixed-load": "npm run collaboration:build && node scripts/check-collaboration-mixed-load.mjs",
+    "test:telemetry": "npm run collaboration:build && node scripts/check-telemetry-storage.mjs",
     "collaboration:start": "node --env-file-if-exists=.env.collaboration.local dist-collaboration/index.js",
     "check": "node scripts/run-check.mjs",
     "build": "vite build",

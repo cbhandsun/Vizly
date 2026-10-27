@@ -1,7 +1,8 @@
 # 本地协同服务
 
 独立 Node 服务，仅监听 `127.0.0.1`。它不是公共演示服务，也尚未成为生产部署。
-不使用 service-role 权限；Auth 验证身份后，用该用户的令牌查询图表和协作者，保留 RLS。
+业务鉴权在 Auth 验证身份后，用该用户的令牌查询图表和协作者，保留 RLS。
+分布式生产状态和可选云端诊断使用的 server key 只供后端适配器使用。
 
 1. `npm run collaboration:build`
 2. 在已忽略的 `.env.collaboration.local` 配置 `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`、
@@ -85,4 +86,24 @@ POST同地址只接受确认的sha256及revision，不接受客户端替换内�
 
 生产入口与独立服务复用同一诊断生命周期。每个运行时持有独立采集器，HTTP、WebSocket 和定期权限检查在其所属异步上下文中执行；关闭时先停止业务，再刷新事件、等待日志与告警并释放采集器。`lease` 计数单位是获取／续期尝试，此外无在途续期的过期也记录一次失败；它不是唯一租约数。续期拒绝记为 conflict，非法回执记为 invalid，异常记为 unavailable，租约到期记为 timeout；正常关闭取消未完成续期，不记故障。
 
-部署须显式提供每实例独立、可写且私有的日志目录。无持久磁盘的平台不能依赖默认工作目录或临时目录提供跨重启保留；应挂载持久存储或替换日志适配器后再验收。运行时接线已通过本机真实 HTTP／WebSocket 隔离测试，这不证明云端磁盘、代理、账号或告警路径已经配置。
+文件模式须显式提供每实例独立、可写且私有的日志目录。运行时接线的本机与隔离测试不证明云端磁盘、代理、账号或告警路径已配置。
+
+### 可替换实例上的云端诊断日志（T07，验证中）
+
+`VIZLY_TELEMETRY_STORAGE=supabase` 使用与后端相同的 `SUPABASE_URL` 和 `SUPABASE_SERVER_KEY`，通过服务端专用 RPC 保存已投影的诊断快照。`VERCEL=1` 时默认选择此模式，显式选择文件模式会拒绝启动。其他 Node 环境默认保留文件模式。采集仍须由 `VIZLY_TELEMETRY_ENABLED=true` 和合法 `VIZLY_RELEASE_ID` 启用。
+
+在授权目标完成 `20261027211956_bounded_telemetry_journal.sql` 迁移后才能使用此适配器；空库与既有环境继续按 `scripts/database-path.mjs` 生成的审核事务执行。迁移追加私有 `vizly_telemetry` schema，表启用 RLS；schema、表及 RPC 不向匿名或普通登录角色授权。两个公开 RPC 使用 invoker 权限，server key 不进入浏览器。未带匹配路径收据的已有同名 schema 会被升级路径拒绝。
+
+数据库重新投影字段，只保留版本／随机关联 ID、固定事件枚举、耗时和累计计数。相同版本／stream／sequence 的同内容重试不增加记录，冲突内容被拒绝。跨实例写入共用事务锁，锁等待最多 250ms；每实例最多 8 个请求在途，外部请求有 4.5 秒截止和有界响应体，禁止重定向及自动重试。存储不可用不使业务编辑获得虚假的诊断成功回执。
+
+保留有效载荷最多 4 MiB、1000 条记录；这不包含数据库索引、WAL、死元组和其他项目数据的占用。查询只返回七天窗口内至多 1000 条快照，达到容量时会更早淘汰旧数据。写入会清理过期记录；没有新写入时，物理删除须按部署的保留策略另行安排。此有限窗口不用于承诺长期完整成功率。
+
+运维查询先编译服务：`npm run collaboration:build`。文件模式使用
+`node scripts/query-telemetry.mjs --storage file --directory /private/log-directory --release HASH`。
+云端模式在私有后端环境中执行
+`node scripts/query-telemetry.mjs --storage supabase --release HASH --request UUID`。
+
+`npm run test:telemetry` 是 Linux 专用存储集成门禁，使用固定 Node 22.23.4、已有镜像摘要、三个新建且受限的容器及内部网络；不访问云项目或发布端口。它编译实际生产运行时和运维查询 CLI，验证 HTTPS／真实 PostgREST／SQL 的存储链路、换进程后查询、匿名及登录角色拒绝、丢失回执重试、取消和截止路径，并独立核对 SQL 与原容器身份。TLS 与 opaque key 转换属于受控测试夹具，JWT 为临时角色夹具，不代表真实 GoTrue 登录或已连接云网关验收。CI 的 `app-telemetry-storage` 门禁为必需项，缺少该项的旧集成报告不能通过当前发布证据校验。
+密钥通过已有后端环境配置提供，不作为命令参数或输出；没有公开 HTTP 查询入口。返回 `query-complete` 只代表查询执行完成，零条结果不等于 canary 验收通过。累计计数须取每个 stream 的最高 sequence，不能把全部快照相加。
+
+此改动仍需完整双路径迁移、真实 PostgREST／HTTPS、最新提交全量回归，以及授权 staging 的实际投递、重连／实例替换查询和告警回执；不能以本地适配器测试作为生产已启用的证明。

@@ -74,6 +74,12 @@ class BusinessReceiptTests(unittest.TestCase):
         self.assertEqual(next(g for g in report['gates'] if g['id'] == 'app-rls')['exit_code'], 9)
         self.assertEqual(self.calls[-1], 'collaboration:mixed-load')
 
+    def test_telemetry_gate_is_required_and_failure_cannot_pass(self):
+        self.assertIn(('app-telemetry-storage', 'test:telemetry'), module.GATES['integration'])
+        report = self.receipt(lambda command: 4 if command == 'test:telemetry' else 0)
+        self.assertEqual(report['status'], 'failed')
+        self.assertEqual(next(g for g in report['gates'] if g['id'] == 'app-telemetry-storage')['exit_code'], 4)
+
     def test_source_or_lock_drift_rejects_zero_exit_codes(self):
         for field in ['head', 'tree', 'dirty', 'lock']:
             with self.subTest(field=field):

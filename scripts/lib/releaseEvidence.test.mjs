@@ -32,11 +32,11 @@ it('accepts exactly bound engineering evidence; promotion requires separate real
   expect((await verifyReleaseEvidence({ ...complete, phase: 'promotion' })).gates).toBe(ENGINEERING_GATES.length + PROMOTION_GATES.length);
 });
 it.each([...CORE_HOST_GATES, 'app-security', 'core-package-contents', 'app-browser-main', 'app-rls', 'core-gitea-linux',
-  'app-database-paths', 'app-collaboration-auth-load', 'app-collaboration-mixed-load', 'app-browser-compatibility'])('rejects missing required gate %s', async id => {
+  'app-database-paths', 'app-telemetry-storage', 'app-collaboration-auth-load', 'app-collaboration-mixed-load', 'app-browser-compatibility'])('rejects missing required gate %s', async id => {
   const f = await fixture(); f.manifest.gates = f.manifest.gates.filter(gate => gate.id !== id); await f.save();
   await expect(verifyReleaseEvidence(f)).rejects.toThrow(`missing gate ${id}`);
 });
-it.each(['app-database-paths', 'app-collaboration-auth-load', 'app-collaboration-mixed-load'])(
+it.each(['app-database-paths', 'app-telemetry-storage', 'app-collaboration-auth-load', 'app-collaboration-mixed-load'])(
   'rejects failed original business evidence even when wrapper hashes are updated: %s', async id => {
     const f = await fixture();
     const reference = f.manifest.gates.find(gate => gate.id === id);

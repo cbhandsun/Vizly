@@ -39,13 +39,16 @@ const forward = [header, expected, component('preflight'), component('normalize'
   component('postflight')].join('\n');
 const extensions = Object.entries(manifest.extensionFiles ?? {}).map(([name, digest]) => {
   if (!/^\d{14}_[a-z_]+\.sql$/.test(name) || !manifest.forwardChain.includes(name)) throw new Error('Invalid extension migration');
+  const { schema, label } = manifest.extensionSchemas?.[name] ?? {};
+  if (typeof schema !== 'string' || !/^vizly_[a-z_]{1,40}$/.test(schema)
+    || typeof label !== 'string' || !/^[A-Za-z ]{1,64}$/.test(label)) throw new Error('Invalid extension schema guard');
   const source = readFileSync(new URL(`../migrations/${name}`, root), 'utf8');
   if (sha(source) !== digest) throw new Error(`Extension migration changed: ${name}`);
   // Never silently adopt an independently installed/private schema. A matching
   // path receipt skips this entire step; otherwise inventory must be reconciled.
   const guard = `DO $extension_guard$ BEGIN
-    IF to_regnamespace('vizly_ai') IS NOT NULL THEN
-      RAISE EXCEPTION 'AI resource schema exists without a matching path receipt; reconcile inventory';
+    IF to_regnamespace(${quote(schema)}) IS NOT NULL THEN
+      RAISE EXCEPTION ${quote(`${label} schema exists without a matching path receipt; reconcile inventory`)};
     END IF;
   END $extension_guard$;\n`;
   return [name, header + guard + source.replace(/^\s*(?:BEGIN|COMMIT);\s*$/gim, '')];

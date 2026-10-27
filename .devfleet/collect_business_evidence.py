@@ -34,7 +34,8 @@ def business_receipt(value):
         if key in value:
             result[key] = [] if value[key] == [] else ['dirty-or-invalid']
     checks = {'app-database-paths':'test:database','app-rls':'test:rls','app-s3':'test:s3',
-              'app-collaboration-build':'collaboration:build','app-collaboration-auth-load':'collaboration:auth-load',
+              'app-collaboration-build':'collaboration:build','app-telemetry-storage':'test:telemetry',
+              'app-collaboration-auth-load':'collaboration:auth-load',
               'app-collaboration-mixed-load':'collaboration:mixed-load','app-security':'audit:all',
               'app-browser-runtime':'playwright:install', 'app-browser-main':'test:e2e:main',
               'app-browser-recovery':'test:e2e:recovery', 'app-browser-s3':'test:e2e:s3',

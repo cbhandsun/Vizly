@@ -22,7 +22,8 @@ jobs:
           subprocess.run([sys.executable, ".devfleet/native_ci.py", "--project", "app", "--expected-os", "Darwin"], check=True)
   windows:
     runs-on: vizly-app-windows
-    timeout-minutes: 120
+    # The shared Windows lock can wait for the observed 125.5min Core native execution.
+    timeout-minutes: 180
     steps:
       - uses: builtin:checkout
         with:

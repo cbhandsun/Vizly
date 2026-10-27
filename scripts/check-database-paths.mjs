@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { renderDatabasePath } from './database-path.mjs';
 import { waitForIsolatedPostgres } from './lib/isolatedPostgresReadiness.mjs';
 import { runVersionOutboxDatabaseRegression } from './lib/check-version-outbox-database.mjs';
+import { runTelemetryJournalDatabaseRegression } from './lib/check-telemetry-journal-database.mjs';
 const read = path => readFileSync(new URL(path, import.meta.url), 'utf8');
 const image = 'postgres:17.6-alpine@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94';
 export async function runDatabasePathRegression() {
@@ -26,7 +27,8 @@ export async function runDatabasePathRegression() {
   const scenarios = [];
   let started = false;
   try {
-    docker(['run','--detach','--name',container,'--network','none','--tmpfs','/var/lib/postgresql/data','--env','POSTGRES_HOST_AUTH_METHOD=trust',image]); started = true;
+    docker(['run','--detach','--name',container,'--network','none','--cpus','2','--memory','2g','--pids-limit','256',
+      '--tmpfs','/var/lib/postgresql/data:rw,size=1073741824','--env','POSTGRES_HOST_AUTH_METHOD=trust',image]); started = true;
     await waitForIsolatedPostgres({container,probe:args=>spawnSync('docker',args,{encoding:'utf8',timeout:5000})});
     sql('postgres','CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;');
     const platform = read('./fixtures/database-paths/platform.sql');
@@ -74,6 +76,9 @@ export async function runDatabasePathRegression() {
       // Keep the original migration/backup fixtures unchanged for later assertions.
       clone(kind, `${kind}_outbox`);
       scenarios.push(await runVersionOutboxDatabaseRegression(docker, container, `${kind}_outbox`));
+      clone(kind, `${kind}_telemetry`);
+      scenarios.push(...(await runTelemetryJournalDatabaseRegression(docker, container, `${kind}_telemetry`))
+        .map(result => `${kind}: telemetry ${result}`));
     }
     // Non-empty input cannot accidentally enter the new-install path.
     const populated = inventory('existing_uuid_before');
@@ -100,6 +105,9 @@ export async function runDatabasePathRegression() {
     clone('existing_uuid','deployed_complete');
     sql('deployed_complete',`DROP FUNCTION public.vizly_acquire_ai_lease(uuid,uuid),public.vizly_release_ai_lease(uuid,uuid);
       DROP TABLE vizly_ai.request_lease,vizly_ai.user_window,vizly_ai.resource_policy; DROP SCHEMA vizly_ai;
+      DROP FUNCTION public.vizly_record_telemetry(jsonb),public.vizly_query_telemetry(text,uuid);
+      DROP TABLE vizly_telemetry.journal;
+      DROP FUNCTION vizly_telemetry.project_batch(jsonb),vizly_telemetry.valid_counter(jsonb); DROP SCHEMA vizly_telemetry;
       DROP TABLE vizly_migrations.applied,vizly_migrations.version_reference_map; DROP SCHEMA vizly_migrations;
       INSERT INTO vizly_collaboration.room_state VALUES ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','cccccccc-cccc-4ccc-8ccc-cccccccccccc',1,decode('0102','hex'));
       INSERT INTO vizly_collaboration.recovery_backup VALUES ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',encode(sha256(decode('0102','hex')),'hex'),'cccccccc-cccc-4ccc-8ccc-cccccccccccc',decode('0102','hex'));
@@ -136,6 +144,38 @@ export async function runDatabasePathRegression() {
     sql('ai_state_repeat',upgrade);
     assert.equal(sql('ai_state_repeat','TABLE vizly_ai.resource_policy;TABLE vizly_ai.user_window;TABLE vizly_ai.request_lease;'),aiState);
     scenarios.push('same receipt preserves active AI leases, counters and customized policy');
+    clone('existing_uuid','prior_path_telemetry_upgrade');
+    sql('prior_path_telemetry_upgrade',`DROP FUNCTION public.vizly_record_telemetry(jsonb),public.vizly_query_telemetry(text,uuid);
+      DROP TABLE vizly_telemetry.journal;
+      DROP FUNCTION vizly_telemetry.project_batch(jsonb),vizly_telemetry.valid_counter(jsonb); DROP SCHEMA vizly_telemetry;
+      DELETE FROM vizly_migrations.applied WHERE name='20261027211956_bounded_telemetry_journal.sql';`);
+    clone('prior_path_telemetry_upgrade','prior_path_telemetry_before');
+    const telemetryPriorReceipts=sql('prior_path_telemetry_upgrade','SELECT name,sha256 FROM vizly_migrations.applied ORDER BY name;');
+    const telemetryPriorData=fingerprint('prior_path_telemetry_upgrade');
+    const telemetryPriorAI=sql('prior_path_telemetry_upgrade','TABLE vizly_ai.resource_policy;TABLE vizly_ai.user_window;TABLE vizly_ai.request_lease;');
+    sql('prior_path_telemetry_upgrade',upgrade);
+    assert.equal(fingerprint('prior_path_telemetry_upgrade'),telemetryPriorData);
+    assert.equal(sql('prior_path_telemetry_upgrade',"SELECT name,sha256 FROM vizly_migrations.applied WHERE name<>'20261027211956_bounded_telemetry_journal.sql' ORDER BY name;"),telemetryPriorReceipts);
+    assert.equal(sql('prior_path_telemetry_upgrade','TABLE vizly_ai.resource_policy;TABLE vizly_ai.user_window;TABLE vizly_ai.request_lease;'),telemetryPriorAI);
+    assert.equal(sql('prior_path_telemetry_upgrade',"SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='vizly_telemetry' AND c.relname='journal' AND c.relrowsecurity;").trim(),'1');
+    scenarios.push('prior path appends telemetry without changing old receipts, business data or AI state');
+    clone('existing_uuid','telemetry_without_receipt');
+    sql('telemetry_without_receipt',"DELETE FROM vizly_migrations.applied WHERE name='20261027211956_bounded_telemetry_journal.sql';");
+    const untrackedTelemetry=inventory('telemetry_without_receipt');
+    fail('telemetry_without_receipt',upgrade,/Telemetry journal schema exists without a matching path receipt/);
+    assert.equal(inventory('telemetry_without_receipt'),untrackedTelemetry);
+    scenarios.push('unreceipted telemetry schema fails without mutation');
+    const journalFingerprint=() => sql('empty_telemetry',"SELECT md5(coalesce(jsonb_agg(to_jsonb(t) ORDER BY release_id,stream_id,sequence),'[]'::jsonb)::text) FROM vizly_telemetry.journal t;");
+    const journalBeforeRepeat=journalFingerprint();
+    sql('empty_telemetry',upgrade);assert.equal(journalFingerprint(),journalBeforeRepeat);
+    scenarios.push('same receipt preserves existing telemetry payloads and receive times');
+    const telemetryBeforeFailure=inventory('prior_path_telemetry_before');
+    const telemetryFailureMarker='create table vizly_telemetry.journal (';
+    assert.ok(upgrade.includes(telemetryFailureMarker));
+    fail('prior_path_telemetry_before',upgrade.replace(telemetryFailureMarker,
+      "DO $telemetry_fault$ BEGIN RAISE EXCEPTION 'injected telemetry extension failure'; END $telemetry_fault$;\n"+telemetryFailureMarker),/injected telemetry extension failure/);
+    assert.equal(inventory('prior_path_telemetry_before'),telemetryBeforeFailure);
+    scenarios.push('telemetry extension failure rolls back schema, functions, privileges and receipt');
     clone('existing_uuid_before','conversation_uuid');
     sql('conversation_uuid',"UPDATE public.ai_conversations SET id='dddddddd-dddd-4ddd-8ddd-dddddddddddd'; ALTER TABLE public.ai_conversations ALTER COLUMN id TYPE uuid USING id::uuid;");
     const convBefore=fingerprint('conversation_uuid');sql('conversation_uuid',upgrade);
