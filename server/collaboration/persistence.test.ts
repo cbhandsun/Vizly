@@ -16,7 +16,9 @@ vi.mock('node:fs/promises', async importOriginal => {
   } };
 });
 const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-afterEach(async () => { failures.rename = false; for (const directory of folders.splice(0)) await rm(directory, { recursive: true, force: true }); });
+afterEach(async () => { failures.rename = false; for (const directory of folders.splice(0)) await rm(directory, {
+  recursive: true, force: true, maxRetries: 5, retryDelay: 100,
+}); });
 const directory = async () => { const dir = await mkdtemp(join(tmpdir(), 'vizly-collaboration-test-')); folders.push(dir); return dir; };
 describe('atomic collaboration room persistence', () => {
   it('returns empty for a new room, restores Yjs state through a new store, and replaces the file atomically', async () => {

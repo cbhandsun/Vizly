@@ -88,6 +88,8 @@ POST同地址只接受确认的sha256及revision，不接受客户端替换内�
 
 文件模式须显式提供每实例独立、可写且私有的日志目录。运行时接线的本机与隔离测试不证明云端磁盘、代理、账号或告警路径已配置。
 
+Windows 的 `mode: 0o700/0o600` 不提供 POSIX 的 owner／group／other 隔离，部署前须为专用目录配置并核对 NTFS ACL，限定服务账号及受信任的 SYSTEM／Administrators；默认 TEMP 或工作目录的继承权限不能直接作为私有目录证明。测试只给其新建夹具设置独立 ACL，并同时检查额外读取授权会被拒绝，不修改系统 TEMP 或已有目录。其他平台继续核对文件权限位。
+
 ### 可替换实例上的云端诊断日志（T07，验证中）
 
 `VIZLY_TELEMETRY_STORAGE=supabase` 使用与后端相同的 `SUPABASE_URL` 和 `SUPABASE_SERVER_KEY`，通过服务端专用 RPC 保存已投影的诊断快照。`VERCEL=1` 时默认选择此模式，显式选择文件模式会拒绝启动。其他 Node 环境默认保留文件模式。采集仍须由 `VIZLY_TELEMETRY_ENABLED=true` 和合法 `VIZLY_RELEASE_ID` 启用。
