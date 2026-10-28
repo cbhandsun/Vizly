@@ -27,6 +27,7 @@ const createRuntime = (
   target: new EventTarget(),
   storage: new MemoryStorage(),
   reload: vi.fn(),
+  isOnline: () => true,
   now: () => 1_800_000_000_000,
   setTimer: vi.fn(() => 1),
   clearTimer: vi.fn(),
@@ -56,6 +57,24 @@ describe('Vite preload error recovery', () => {
 
     expect(first.defaultPrevented).toBe(true);
     expect(second.defaultPrevented).toBe(true);
+    expect(runtime.reload).toHaveBeenCalledTimes(1);
+    dispose();
+  });
+
+  it('preserves an offline document without swallowing the failure or consuming recovery', () => {
+    let online = false;
+    const runtime = createRuntime({ isOnline: () => online });
+    const dispose = installVitePreloadErrorRecovery(runtime);
+
+    const offlineFailure = dispatchPreloadError(runtime.target);
+    expect(offlineFailure.defaultPrevented).toBe(false);
+    expect(runtime.reload).not.toHaveBeenCalled();
+    expect(runtime.storage?.getItem('vizly:preload-error-recovery')).toBeNull();
+    expect(runtime.setTimer).not.toHaveBeenCalled();
+
+    // A later online deployment mismatch retains the bounded recovery policy.
+    online = true;
+    expect(dispatchPreloadError(runtime.target).defaultPrevented).toBe(true);
     expect(runtime.reload).toHaveBeenCalledTimes(1);
     dispose();
   });

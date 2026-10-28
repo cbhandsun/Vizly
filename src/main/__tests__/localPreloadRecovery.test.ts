@@ -14,7 +14,7 @@ const createRuntime = (): PreloadRecoveryRuntime => {
   const values = new Map<string, string>();
   return { target: document.createElement('div'),
     storage: { getItem: key => values.get(key) ?? null, setItem: (key, value) => { values.set(key, value); }, removeItem: key => { values.delete(key); } },
-    reload: vi.fn(), now: () => 1_800_000_000_000, setTimer: vi.fn(() => 1), clearTimer: vi.fn() };
+    reload: vi.fn(), isOnline: () => true, now: () => 1_800_000_000_000, setTimer: vi.fn(() => 1), clearTimer: vi.fn() };
 };
 
 describe('local optional preload ownership', () => {

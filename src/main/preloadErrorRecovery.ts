@@ -13,6 +13,7 @@ export interface PreloadRecoveryRuntime {
   target: EventTarget;
   storage: RecoveryStorage | null;
   reload: () => void;
+  isOnline: () => boolean;
   now: () => number;
   setTimer: (handler: () => void, delayMs: number) => number;
   clearTimer: (timer: number) => void;
@@ -84,6 +85,7 @@ export const createBrowserPreloadRecoveryRuntime = (
     target: windowRef,
     storage,
     reload: () => windowRef.location.reload(),
+    isOnline: () => windowRef.navigator.onLine,
     now: () => Date.now(),
     setTimer: (handler, delayMs) => windowRef.setTimeout(handler, delayMs),
     clearTimer: timer => windowRef.clearTimeout(timer),
@@ -121,6 +123,9 @@ export const installVitePreloadErrorRecovery = (
 
   const handlePreloadError = (event: Event): void => {
     if (isLocallyOwnedPreloadFailure(event, runtime.target)) return;
+    // Offline imports cannot be repaired by reloading. Keep the current canvas
+    // and let the requesting feature handle its failed load.
+    if (!runtime.isOnline()) return;
     event.preventDefault();
     if (disposed) return;
 
