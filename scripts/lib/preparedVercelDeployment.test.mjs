@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { syntheticReleaseFixture } from './releaseEvidenceFixture.mjs';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -13,6 +14,8 @@ const projectId = 'prj_Audit';
 const teamId = 'team_Audit';
 const run = promisify(execFile);
 const launcher = join(process.cwd(), 'scripts/deploy-prepared-vercel-static.mjs');
+// Cover the existing 10 s child deadline plus fixture setup and cleanup.
+const CLI_TEST_TIMEOUT = 15_000;
 async function fixture({ telemetryIngestUrl } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'vizly-deploy-preflight-')); roots.push(root);
   await mkdir(join(root, 'build'));
@@ -26,7 +29,7 @@ async function changeReceipt(input, update) {
   const receipt = JSON.parse(await readFile(path, 'utf8')); update(receipt);
   await writeFile(path, JSON.stringify(receipt));
 }
-afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
+afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); });
 
 describe('prepared preview deployment preflight', () => {
   it('accepts legacy receipts for preview only', async () => {
@@ -79,7 +82,7 @@ describe('prepared preview deployment preflight', () => {
     await writeFile(path, JSON.stringify(config));
     await expect(run(process.execPath, [launcher, input.artifactDirectory, projectId, teamId, 'audit', cli, 'preview', input.manifestPath, '--deploy'], { timeout: 10000 })).rejects.toThrow('routing');
     await expect(readFile(marker)).rejects.toMatchObject({ code: 'ENOENT' });
-  });
+  }, CLI_TEST_TIMEOUT);
   it('rejects an in-progress stage before any CLI project creation', async () => {
     const input = await fixture(); await rm(join(input.artifactDirectory, 'artifact-receipt.json'));
     await expect(verifyPreparedVercelDeployment(input)).rejects.toThrow();
@@ -127,7 +130,7 @@ describe('prepared preview deployment preflight', () => {
     await rm(join(input.artifactDirectory, 'artifact-receipt.json'));
     await expect(run(process.execPath, [launcher, input.artifactDirectory, projectId, teamId, 'audit', cli, 'preview', input.manifestPath, '--deploy'], { timeout: 10000 })).rejects.toThrow();
     await expect(readFile(marker)).rejects.toMatchObject({ code: 'ENOENT' });
-  });
+  }, CLI_TEST_TIMEOUT);
   it('pins project and team IDs even if inherited deployment variables point elsewhere', async () => {
     const input = await fixture(); const marker = join(input.root, 'cli-marker.json');
     const cli = join(input.root, 'fake-cli.mjs');
@@ -136,7 +139,7 @@ describe('prepared preview deployment preflight', () => {
       timeout: 10000, env: { ...process.env, VERCEL_PROJECT_ID: 'prj_Other', VERCEL_ORG_ID: 'team_Other' },
     });
     expect(JSON.parse(await readFile(marker, 'utf8'))).toEqual({ project: projectId, team: teamId, args: ['deploy', '--prebuilt', '--yes', '--scope', 'audit'] });
-  });
+  }, CLI_TEST_TIMEOUT);
   it('stages a verified production artifact without assigning any domain', async () => {
     const input = await fixture();
     await writeFile(join(input.root, 'build/app.js'), 'const endpoint="wss://collab.example.com";');
@@ -151,7 +154,7 @@ describe('prepared preview deployment preflight', () => {
     expect(JSON.parse(await readFile(marker, 'utf8'))).toEqual({ project: projectId, team: teamId,
       args: ['deploy', '--prebuilt', '--prod', '--skip-domain', '--yes', '--scope', 'audit'] });
     await expect(verifyPreparedVercelDeployment({ ...input, artifactDirectory: stage })).rejects.toThrow('environment mismatch');
-  });
+  }, CLI_TEST_TIMEOUT);
   it.each(['production', 'invalid'])('never launches a CLI when target %s mismatches the artifact', async environment => {
     const input = await fixture();
     const marker = join(input.root, 'wrong-target-marker.json');
@@ -159,5 +162,5 @@ describe('prepared preview deployment preflight', () => {
     await writeFile(cli, `import { writeFile } from 'node:fs/promises'; await writeFile(${JSON.stringify(marker)}, '{}');`);
     await expect(run(process.execPath, [launcher, input.artifactDirectory, projectId, teamId, 'audit', cli, environment], { timeout: 10000 })).rejects.toThrow();
     await expect(readFile(marker)).rejects.toMatchObject({ code: 'ENOENT' });
-  });
+  }, CLI_TEST_TIMEOUT);
 });

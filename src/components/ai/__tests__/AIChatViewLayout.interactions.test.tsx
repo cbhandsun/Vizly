@@ -151,19 +151,24 @@ describe('AIChatViewLayout commercial interactions', () => {
 
         render(<StatefulRenameLayout />);
 
-        const renameTrigger = screen.getByRole('button', {
+        const history = within(screen.getByRole('dialog', { name: 'aiChat.historyTitle' }));
+        const newConversation = history.getByRole('button', { name: 'aiChat.newConversation' });
+        await waitFor(() => expect(document.activeElement).toBe(newConversation));
+
+        const renameTrigger = history.getByRole('button', {
             name: `aiChat.renameConversation: ${conversation.title}`,
         });
         fireEvent.click(renameTrigger);
 
-        const renameInput = screen.getByRole('textbox', {
+        const renameInput = history.getByRole('textbox', {
             name: `aiChat.renameConversation: ${conversation.title}`,
         });
         await waitFor(() => expect(document.activeElement).toBe(renameInput));
+        expect(document.activeElement).toBe(renameInput);
         fireEvent.keyDown(renameInput, { key: 'Escape' });
 
         expect(screen.getByRole('dialog', { name: 'aiChat.historyTitle' })).not.toBeNull();
-        await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', {
+        await waitFor(() => expect(document.activeElement).toBe(history.getByRole('button', {
             name: `aiChat.renameConversation: ${conversation.title}`,
         })));
     });

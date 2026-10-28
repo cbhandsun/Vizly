@@ -82,7 +82,7 @@ const publishAndAwaitCommit = (client: Awaited<ReturnType<typeof peer>>, publish
 };
 const setup = async (active = false) => {
   const directory = await mkdtemp(join(tmpdir(), 'vizly-coordinator-integration-'));
-  cleanup.push(() => rm(directory, { recursive: true, force: true }));
+  cleanup.push(() => rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
   const persistence = createFilePersistence(directory);
   let cloud = checkpoint();
   const readCloud = vi.fn(async () => cloud);
