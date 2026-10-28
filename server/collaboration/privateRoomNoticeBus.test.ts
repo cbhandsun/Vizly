@@ -96,6 +96,36 @@ describe('private backend room notification lifecycle', () => {
     f.channel.send = vi.fn(async () => { throw new Error('Synthetic credential must not escape'); });
     await expect(subscription.publish(notice)).rejects.toThrow(/^Private room notification unavailable$/);
   });
+  it('waits for asynchronous transport shutdown before reporting disposal success', async () => {
+    const f = fixture(); let finish: () => void = () => { throw new Error('Missing disconnect receipt'); };
+    const disconnected = new Promise<void>(resolve => { finish = resolve; });
+    f.client.disconnect = vi.fn(() => disconnected);
+    let settled = false; const stopping = f.bus.stop().then(() => { settled = true; });
+    try {
+      await vi.waitFor(() => expect(f.client.disconnect).toHaveBeenCalledTimes(1));
+      expect(settled).toBe(false);
+    } finally { finish(); await stopping; }
+    expect(settled).toBe(true);
+  });
+
+  it('bounds an unresponsive disconnect with the existing transport deadline', async () => {
+    vi.useFakeTimers(); const f = fixture(); f.client.disconnect = vi.fn(() => new Promise<void>(() => undefined));
+    let settled = false; const stopping = f.bus.stop();
+    void stopping.then(() => { settled = true; }, () => { settled = true; });
+    const rejected = expect(stopping).rejects.toThrow(/^Private room notification disposal failed$/);
+    try {
+      await vi.advanceTimersByTimeAsync(7999); expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1); await rejected;
+      expect(f.bus.stop()).toBe(stopping); expect(f.client.disconnect).toHaveBeenCalledTimes(1);
+    } finally { buses.splice(buses.indexOf(f.bus), 1); }
+  });
+  it('propagates and sanitizes an asynchronous transport disposal rejection', async () => {
+    const f = fixture();
+    const failed = Promise.reject(new Error('Synthetic credential must not escape'));
+    void failed.catch(() => undefined); f.client.disconnect = vi.fn(() => failed);
+    try { await expect(f.bus.stop()).rejects.toThrow(/^Private room notification disposal failed$/); }
+    finally { buses.splice(buses.indexOf(f.bus), 1); }
+  });
   it('propagates close failure after attempting all cleanup and disconnects exactly once', async () => {
     const f = fixture(); await f.subscribe(); f.channel.close = vi.fn(async () => false);
     await expect(f.bus.stop()).rejects.toThrow(/^Private room notification disposal failed$/);

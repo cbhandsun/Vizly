@@ -6,6 +6,7 @@ import { renderDatabasePath } from './database-path.mjs';
 import { waitForIsolatedPostgres } from './lib/isolatedPostgresReadiness.mjs';
 import { runVersionOutboxDatabaseRegression } from './lib/check-version-outbox-database.mjs';
 import { runTelemetryJournalDatabaseRegression } from './lib/check-telemetry-journal-database.mjs';
+import { runRealtimePolicyDatabaseRegression } from './lib/check-realtime-policy-database.mjs';
 const read = path => readFileSync(new URL(path, import.meta.url), 'utf8');
 const image = 'postgres:17.6-alpine@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94';
 export async function runDatabasePathRegression() {
@@ -80,6 +81,7 @@ export async function runDatabasePathRegression() {
       scenarios.push(...(await runTelemetryJournalDatabaseRegression(docker, container, `${kind}_telemetry`))
         .map(result => `${kind}: telemetry ${result}`));
     }
+    scenarios.push(...runRealtimePolicyDatabaseRegression(docker, container, 'existing_uuid'));
     // Non-empty input cannot accidentally enter the new-install path.
     const populated = inventory('existing_uuid_before');
     fail('existing_uuid_before',renderDatabasePath('empty'),/Baseline requires an empty application schema/);

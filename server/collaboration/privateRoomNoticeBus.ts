@@ -12,7 +12,7 @@ export interface PrivateRoomChannel {
 }
 export interface PrivateRoomRealtime {
   channel: (topic: string) => PrivateRoomChannel;
-  disconnect: () => void;
+  disconnect: () => void | Promise<void>;
 }
 const unavailable = () => new Error('Private room notification unavailable');
 const deadlineMs = 8000;
@@ -109,7 +109,8 @@ export const createPrivateRoomNoticeBus = (client: PrivateRoomRealtime): RoomNot
       stopped = true;
       stopPromise = Promise.resolve().then(async () => {
         const results = await Promise.allSettled([...channels.values()].map(subscription => subscription.close()));
-        try { client.disconnect(); } catch { throw new Error('Private room notification disposal failed'); }
+        try { await bounded(Promise.resolve().then(() => client.disconnect())); }
+        catch { throw new Error('Private room notification disposal failed'); }
         if (results.some(result => result.status === 'rejected')) throw new Error('Private room notification disposal failed');
       });
       return stopPromise;

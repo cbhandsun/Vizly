@@ -33,7 +33,7 @@ const forward = [header, expected, component('preflight'), component('normalize'
   historical('20261008054418_revoke_explicit_anonymous_collaborator_rpc_grants.sql'),
   historical('20261009014315_harden_system_template_permissions.sql'),
   historical('20261009160702_collaboration_atomic_room_store.sql'),
-  historical('20261009160720_private_backend_room_topics.sql'),
+  component('backend-topics'),
   historical('20261009171828_optimize_rls_identity_indexes.sql'),
   historical('20261009172905_remove_duplicate_collaborator_unique.sql'),
   component('postflight')].join('\n');
