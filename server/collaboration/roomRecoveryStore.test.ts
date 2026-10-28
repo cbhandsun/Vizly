@@ -7,12 +7,18 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createFilePersistence } from './persistence.js';
 import { MAX_CHECKPOINT_BYTES } from './roomCheckpoint.js';
 
-const faults = vi.hoisted(() => ({ backup: false, replace: false, changeAfterBackup: false, pauseWrite: undefined as Promise<void> | undefined }));
+const faults = vi.hoisted(() => ({ backup: false, replace: false, changeAfterBackup: false, pauseWrite: undefined as Promise<void> | undefined,
+  mutations: [] as string[] }));
 vi.mock('node:fs/promises', async importOriginal => {
   const original = await importOriginal<typeof import('node:fs/promises')>();
   return {
     ...original,
+    mkdir: async (...args: Parameters<typeof original.mkdir>) => {
+      faults.mutations.push('mkdir');
+      return original.mkdir(...args);
+    },
     writeFile: async (...args: Parameters<typeof original.writeFile>) => {
+      faults.mutations.push('writeFile');
       const file = String(args[0]);
       if (file.includes('recovery-backups') && faults.backup) throw new Error('Synthetic private backup detail');
       if (file.endsWith('.tmp') && faults.pauseWrite) await faults.pauseWrite;
@@ -23,6 +29,7 @@ vi.mock('node:fs/promises', async importOriginal => {
       }
     },
     rename: async (...args: Parameters<typeof original.rename>) => {
+      faults.mutations.push('rename');
       if (faults.replace) throw new Error('Synthetic private replacement detail');
       return original.rename(...args);
     },
@@ -41,6 +48,7 @@ const setup = async (previous = new Uint8Array([0, 0])) => {
 afterEach(async () => {
   faults.backup = false; faults.replace = false; faults.changeAfterBackup = false;
   faults.pauseWrite = undefined;
+  faults.mutations.length = 0;
   for (const directory of directories.splice(0)) await rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 });
 
@@ -49,6 +57,7 @@ describe('backed-up explicit room checkpoint recovery', () => {
     const { directory, store } = await setup(previous);
     expect(await store.inspectRecovery(id)).toEqual({ sha256: hash(previous), bytes: previous.length });
     const receipt = await store.recoverCheckpoint(id, hash(previous), checkpoint);
+    expect(faults.mutations).toEqual(expect.arrayContaining(['mkdir', 'writeFile', 'rename']));
     expect(receipt).toEqual({ backupId: `${id}.${hash(previous)}.yjs`, previousSha256: hash(previous), revision: checkpoint.revision });
     expect(await readFile(join(directory, 'recovery-backups', receipt.backupId))).toEqual(Buffer.from(previous));
     expect(await createFilePersistence(directory).loadRecord(id)).toEqual({ state: checkpoint.state, checkpoint: { revision: checkpoint.revision, base: checkpoint.base } });
@@ -57,9 +66,18 @@ describe('backed-up explicit room checkpoint recovery', () => {
   it('does not create a room when the confirmed record no longer exists', async () => {
     const { directory, store, previous } = await setup();
     await rm(join(directory, `${id}.yjs`));
+    faults.mutations.length = 0;
     expect(await store.inspectRecovery(id)).toBeNull();
-    await expect(store.recoverCheckpoint(id, hash(previous), checkpoint)).rejects.toThrow();
-    expect(await readdir(directory)).toEqual([]);
+    await expect(store.recoverCheckpoint(id, hash(previous), checkpoint)).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(await store.loadRecord(id)).toBeNull();
+    expect(faults.mutations).toEqual([]);
+    // Native Windows probes have observed short-lived extra directory entries.
+    // Check every production write primitive above; never filter or delete an
+    // unexpected entry to make this exact inventory assertion pass.
+    if (process.platform === 'win32') {
+      await expect.poll(() => readdir(directory), { timeout: 2000, interval: 50 }).toEqual([]);
+    } else { expect(await readdir(directory)).toEqual([]); }
+    expect(faults.mutations).toEqual([]);
   });
 
   it.each(['', '../outside', id.replace('-4aaa-', '-0aaa-')])('rejects invalid storage identity %s', async invalid => {
