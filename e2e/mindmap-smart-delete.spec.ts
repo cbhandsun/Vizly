@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import type { Edge, Node } from '@xyflow/react';
+import type { Edge, Node, ReactFlowInstance } from '@xyflow/react';
 import { persistedAutoSaveNodeCount } from './helpers/localDiagramDatabase';
 
 type Graph = { nodes: Node[]; edges: Edge[] };
@@ -30,6 +30,20 @@ for (const batch of [false, true]) {
         id: `smart-${source}-${target}`, source: `smart-${source}`, target: `smart-${target}`,
       })) });
     }, diagramId);
+    const injectedIds = ['smart-root', 'smart-a', 'smart-b', 'smart-child'];
+    await expect(page.locator('.react-flow__node[data-id^="smart-"]')).toHaveCount(injectedIds.length);
+    // Bridge hydration precedes ReactFlow committing and measuring replacement nodes.
+    // Queue the fit only against the current, initialized graph.
+    await expect.poll(() => page.evaluate(ids => {
+      const instance = (window as Window & { reactFlowInstance?: ReactFlowInstance }).reactFlowInstance;
+      if (!instance?.viewportInitialized || instance.getNodes().length !== ids.length) return false;
+      return ids.every(id => {
+        const node = instance.getInternalNode(id);
+        const width = node?.measured?.width ?? 0;
+        const height = node?.measured?.height ?? 0;
+        return Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0;
+      });
+    }, injectedIds)).toBe(true);
     await page.evaluate(async () => {
       await (window as unknown as { reactFlowInstance: { fitView(options: { padding: number }): Promise<unknown> } })
         .reactFlowInstance.fitView({ padding: 0.3 });
