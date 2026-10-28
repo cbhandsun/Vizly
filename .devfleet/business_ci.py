@@ -14,6 +14,7 @@ import time
 sys.dont_write_bytecode = True
 from native_ci import clean_environment, platform_lock, source_snapshot
 from browser_evidence import read_browser_evidence, sanitize_browser_evidence
+from browser_diagnostics import retain_browser_diagnostics, sanitize_browser_diagnostics
 
 GATES = {
     'integration': [
@@ -63,6 +64,9 @@ def run_checks(root, output, run, profile, clock=time.monotonic):
                     }
                     if isinstance(result, dict) and 'browser' in result:
                         gate['browser'] = result['browser']
+                    diagnostics = sanitize_browser_diagnostics(result.get('browser_diagnostics')) if isinstance(result, dict) else None
+                    if diagnostics is not None:
+                        gate['browser_diagnostics'] = diagnostics
                     report['gates'].append(gate)
             else:
                 report['failure'] = 'installation-failed'
@@ -80,6 +84,9 @@ def run_checks(root, output, run, profile, clock=time.monotonic):
           and len(report['gates']) == len(GATES[profile])
           and all(gate['exit_code'] == 0 for gate in report['gates'])
           and all(sanitize_browser_evidence(gate.get('browser')) is not None
+                  for gate in report['gates'] if gate['command'].startswith('test:e2e:'))
+          and all((diagnostics := sanitize_browser_diagnostics(gate.get('browser_diagnostics'))) is not None
+                  and diagnostics['complete']
                   for gate in report['gates'] if gate['command'].startswith('test:e2e:'))
           and 'failure' not in report):
         report['status'] = 'passed'
@@ -122,11 +129,17 @@ def main():
                     argv += ['--', '--reporter=json']
                 code = subprocess.run(argv, cwd=root, env=child_env).returncode
                 try:
+                    diagnostics = retain_browser_diagnostics(root, path)
+                except (OSError, ValueError, TypeError, KeyError, AttributeError):
+                    print('Browser diagnostics rejected: ' + command, flush=True)
+                    return {'exit_code': code or 1}
+                try:
                     evidence = read_browser_evidence(path)
                 except (OSError, ValueError, TypeError, KeyError, AttributeError):
                     print('Browser JSON evidence rejected: ' + command, flush=True)
-                    return {'exit_code': code or 1}
-                return {'exit_code': code, 'browser': evidence}
+                    return {'exit_code': code or 1, 'browser_diagnostics': diagnostics}
+                return {'exit_code': code if diagnostics['complete'] else code or 1,
+                        'browser': evidence, 'browser_diagnostics': diagnostics}
             if command == 'playwright:install':
                 code = subprocess.run([sys.executable, '-B', '-m', 'unittest', 'discover', '-s', '.devfleet',
                                        '-p', 'test_browser_evidence.py'], cwd=root, env=env).returncode

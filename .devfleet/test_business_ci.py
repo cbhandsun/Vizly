@@ -32,7 +32,10 @@ class BusinessReceiptTests(unittest.TestCase):
     def execute(self, command):
         self.calls.append(command)
         if command.startswith('test:e2e:'):
-            return {'exit_code': 0, 'browser': {'expected': 1, 'unexpected': 0, 'skipped': 0, 'flaky': 0, 'cases': 1, 'reportSha256': 'a' * 64}}
+            return {'exit_code': 0, 'browser': {'expected': 1, 'unexpected': 0, 'skipped': 0, 'flaky': 0, 'cases': 1, 'reportSha256': 'a' * 64},
+                    'browser_diagnostics': {'schema': 'vizly-browser-diagnostics-v1', 'directory': 'browser-report-synthetic',
+                        'reportSha256': 'a' * 64, 'manifestSha256': 'b' * 64, 'artifacts': 0, 'totalBytes': 100,
+                        'failedResults': 0, 'missingArtifacts': 0, 'unsafeArtifacts': 0, 'ignoredArtifacts': 0, 'complete': True}}
         return 0
 
     def receipt(self, execute=None, profile='integration'):
@@ -130,6 +133,33 @@ class BusinessReceiptTests(unittest.TestCase):
                 if command == 'test:e2e:main': result['browser'][field] = 1
                 return result
             self.assertEqual(self.receipt(execute, profile='browser')['status'], 'failed')
+
+
+    def test_browser_diagnostics_missing_or_incomplete_cannot_pass(self):
+        for mode in ['missing', 'incomplete', 'unsafe-directory']:
+            with self.subTest(mode=mode):
+                self.calls = []
+                def execute(command):
+                    result = self.execute(command)
+                    if command == 'test:e2e:main':
+                        if mode == 'missing': result.pop('browser_diagnostics')
+                        elif mode == 'incomplete': result['browser_diagnostics'].update(complete=False, missingArtifacts=1)
+                        else: result['browser_diagnostics']['directory'] = '../../PRIVATE-PATH-CANARY'
+                    return result
+                report = self.receipt(execute, profile='browser')
+                self.assertEqual(report['status'], 'failed')
+                self.assertEqual(self.calls[-1], 'test:e2e:compatibility')
+                self.assertNotIn('CANARY', json.dumps(report))
+
+    def test_browser_diagnostics_export_only_bounded_metadata(self):
+        def execute(command):
+            result = self.execute(command)
+            if command.startswith('test:e2e:'):
+                result['browser_diagnostics']['raw_report'] = 'PRIVATE-CREDENTIAL-CANARY'
+            return result
+        report = self.receipt(execute, profile='browser')
+        self.assertEqual(report['status'], 'passed')
+        self.assertNotIn('CANARY', json.dumps(report))
 
 
 if __name__ == '__main__':
