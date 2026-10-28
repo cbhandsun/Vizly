@@ -44,8 +44,10 @@ test('PNG download contains a real raster and restores canvas viewport and contr
     await instance.setViewport({ x: -800, y: 120, zoom: 0.85 });
   });
   await expect(viewport).toHaveAttribute('style', /scale\(0\.85\)/);
-  const transform = await viewport.getAttribute('style');
-  const nodesBefore = await page.locator('.react-flow__node').count();
+  const [transform, nodesBefore] = await Promise.all([
+    viewport.getAttribute('style'),
+    page.locator('.react-flow__node').count(),
+  ]);
   await page.getByRole('button', { name: '导出', exact: true }).click();
   const pending = page.waitForEvent('download');
   await page.locator('#diagram-export-actions-menu').getByText('PNG 格式', { exact: true }).click();
@@ -61,11 +63,15 @@ test('PNG download contains a real raster and restores canvas viewport and contr
   expect(bytes.readUInt32BE(20)).toBeGreaterThan(0);
   await testInfo.attach('downloaded-png', { body: bytes, contentType: 'image/png' });
   expect(pngContainsOpaqueColor(bytes, [1, 254, 7])).toBe(false);
-  await expect(viewport).toHaveAttribute('style', transform ?? '');
-  await expect(page.locator('.react-flow__node')).toHaveCount(nodesBefore);
-  await expect(page.getByRole('button', { name: '导出', exact: true })).toBeEnabled();
-  await expect(page.getByRole('button', { name: '适应屏幕', exact: true })).toBeVisible();
-  await expect(pageTabs).toBeVisible();
+  // These independent recovery checks share the same post-download state.
+  // Start them together so trace snapshots do not serialize five full DOM reads.
+  await Promise.all([
+    expect(viewport).toHaveAttribute('style', transform ?? ''),
+    expect(page.locator('.react-flow__node')).toHaveCount(nodesBefore),
+    expect(page.getByRole('button', { name: '导出', exact: true })).toBeEnabled(),
+    expect(page.getByRole('button', { name: '适应屏幕', exact: true })).toBeVisible(),
+    expect(pageTabs).toBeVisible(),
+  ]);
 });
 
 test('Markdown download uses edited canvas text instead of the registered template', async ({ page }, testInfo) => {
