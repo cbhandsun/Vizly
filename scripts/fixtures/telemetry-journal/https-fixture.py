@@ -55,7 +55,7 @@ try:
             '--tmpfs', '/var/lib/postgresql/data:rw,size=1g', '-e', 'POSTGRES_PASSWORD', '-e', 'JWT_SECRET',
             images['supabase/postgres:17.11.0.003']], extra={'POSTGRES_PASSWORD': password, 'JWT_SECRET': jwt_secret})
     for attempt in range(120):
-        if docker(['exec', database, 'pg_isready', '-U', 'postgres'], check=False).returncode == 0:
+        if docker(['exec', database, 'pg_isready', '-h', '127.0.0.1', '-U', 'postgres'], check=False).returncode == 0:
             break
         time.sleep(.5)
     else:

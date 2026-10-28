@@ -31,7 +31,7 @@
     "test:rls": "node scripts/check-rls-regression.mjs",
     "test:s3": "node scripts/check-s3-integration.mjs",
     "test:s3:browser": "node scripts/check-s3-browser-integration.mjs",
-    "lint": "eslint . --max-warnings=0",
+    "lint": "eslint . --max-warnings=0 --cache --cache-strategy content --cache-location node_modules/.cache/vizly-eslint",
     "preview": "vite preview",
     "audit:prod": "npm audit --omit=dev --audit-level=low",
     "audit:all": "npm audit --audit-level=low"
