@@ -8,6 +8,9 @@ const fixtureName = 'ciNegativeGateSentinel.test.ts';
 
 /** Keep abnormal child exits distinguishable from expected diagnostic failures.
  * Do not serialize child output, environment, paths or raw spawn errors.
+ * @param {{error?: Error & {code?: string}, signal?: string | null, status: number | null, stdout?: string | null, stderr?: string | null}} result
+ * @param {string} gate
+ * @param {number} elapsedMs
  */
 export const assertGateProcessCompleted = (result, gate, elapsedMs) => {
   if (!result.error && !result.signal && result.status !== null) return;
@@ -18,7 +21,7 @@ export const assertGateProcessCompleted = (result, gate, elapsedMs) => {
     elapsedMs: Math.max(0, Math.round(elapsedMs)),
     exitCode: Number.isInteger(result.status) ? result.status : null,
     signal: result.signal ? knownSignals.includes(result.signal) ? result.signal : 'other' : null,
-    errorCode: result.error ? knownErrors.includes(result.error.code) ? result.error.code : 'other' : null,
+    errorCode: result.error ? knownErrors.includes(result.error.code ?? '') ? result.error.code : 'other' : null,
     stdoutBytes: Buffer.byteLength(result.stdout ?? ''),
     stderrBytes: Buffer.byteLength(result.stderr ?? ''),
   };
