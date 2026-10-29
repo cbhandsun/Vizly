@@ -35,11 +35,12 @@ export function parseTelemetryIngestUrl(value) {
 
 /** Keep diagnostics out of filesystem/SPA handling; this function makes no requests.
  * @param {string | undefined} telemetryIngestUrl
+ * @param {boolean} [protectedTelemetryRelay]
  */
-export function staticDeploymentRoutes(telemetryIngestUrl) {
+export function staticDeploymentRoutes(telemetryIngestUrl, protectedTelemetryRelay = false) {
   const diagnostics = { src: '^/telemetry/?$', methods: ['POST'],
     headers: { 'Cache-Control': 'no-store' },
-    ...(telemetryIngestUrl ? { dest: telemetryIngestUrl } : { status: 503 }) };
+    ...(telemetryIngestUrl ? { dest: protectedTelemetryRelay ? '/__vizly_telemetry_relay' : telemetryIngestUrl } : { status: 503 }) };
   return [diagnostics,
     { src: '^/telemetry/?$', status: 405, headers: { Allow: 'POST', 'Cache-Control': 'no-store' } },
     { handle: 'filesystem' }, { src: '/assets/(.*)', status: 404 }, { src: '/(.*)', dest: '/index.html' },

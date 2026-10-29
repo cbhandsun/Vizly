@@ -92,6 +92,26 @@ Windows 的 `mode: 0o700/0o600` 不提供 POSIX 的 owner／group／other 隔离
 
 ### 可替换实例上的云端诊断日志（T07，验证中）
 
+受 Vercel Deployment Protection 保护的 Preview 后端还需要服务间认证。
+单纯把静态站点的 `/telemetry` 转发到另一个受保护的项目，并不能证明诊断已到达应用；
+平台返回的认证 401 与 Supabase Key 的有效性是两个独立边界。
+
+为此，Preview 打包可显式添加
+`--telemetry-auth vercel-oidc --telemetry-origin https://<实际前端Preview域名>`，
+并同时传入原有 `--telemetry-url https://<实际后端Preview域名>/telemetry`。
+该模式生成独立 Node 24 服务函数和版本2收据；公开静态目录仍只包含浏览器资源。
+服务函数从 `@vercel/oidc` 获取当前工作负载的短期身份，不接收或转发浏览器的 Cookie、
+Authorization 或身份覆盖头。它复用现有接收器的来源校验、载荷投影、32 KiB／8并发／
+每分钟240次／5秒限制；浏览器断开会取消所属上游请求，不跟随上游重定向，不返回上游内容。
+收据绑定编译后函数、Node运行时配置、模块格式和路由；上传校验同时拒绝未列出的函数或私有文件。
+
+实际部署前须确认调用方启用 Secure Backend Access with OIDC Federation，
+并在后端项目的 Trusted Sources 中授权当前前端项目 `preview → preview`。
+该访问控制变更需单独明确授权；不添加 production 访问，也不关闭部署保护。
+未授权或上游失败时返回不可用状态，不能声称诊断已持久化。
+该可选模式目前仅接受 Preview；原有公开接收端的静态转发路径不变。
+完成本地验证后仍须验收真实浏览器投递、云端关联ID检索及告警回执。
+
 `VIZLY_TELEMETRY_STORAGE=supabase` 使用与后端相同的 `SUPABASE_URL` 和 `SUPABASE_SERVER_KEY`，通过服务端专用 RPC 保存已投影的诊断快照。`VERCEL=1` 时默认选择此模式，显式选择文件模式会拒绝启动。其他 Node 环境默认保留文件模式。采集仍须由 `VIZLY_TELEMETRY_ENABLED=true` 和合法 `VIZLY_RELEASE_ID` 启用。
 
 在授权目标完成 `20261027211956_bounded_telemetry_journal.sql` 迁移后才能使用此适配器；空库与既有环境继续按 `scripts/database-path.mjs` 生成的审核事务执行。迁移追加私有 `vizly_telemetry` schema，表启用 RLS；schema、表及 RPC 不向匿名或普通登录角色授权。两个公开 RPC 使用 invoker 权限，server key 不进入浏览器。未带匹配路径收据的已有同名 schema 会被升级路径拒绝。

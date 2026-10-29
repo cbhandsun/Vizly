@@ -50,6 +50,7 @@
     "@supabase/supabase-js": "2.111.0",
     "@types/d3-force": "3.0.10",
     "@types/dagre": "0.7.54",
+    "@vercel/oidc": "4.0.4",
     "@vizly/contracts": "file:vendor/vizly-contracts-0.1.0-alpha.3-e05b95e8354c0bde.tgz",
     "@vizly/core": "file:vendor/vizly-core-0.1.0-alpha.9-ea4af881c4e9d3dd.tgz",
     "@xyflow/react": "12.11.2",
@@ -126,6 +127,9 @@
     "dompurify": "3.4.17",
     "nanoid": "^3.3.18",
     "undici": "7.30.1",
-    "source-map-js": "1.2.2"
+    "source-map-js": "1.2.2",
+    "@vercel/cli-config@0.3.4": {
+      "zod": "4.6.6"
+    }
   }
 }
