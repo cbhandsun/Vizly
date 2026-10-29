@@ -14,10 +14,16 @@ test('installed SDK reports actual export and routing operations through the bro
  await page.locator('#diagram-export-actions-menu').getByText('PNG 格式',{exact:true}).click();
  expect(await (await pending).failure()).toBeNull();
  await expect.poll(()=>batches.flatMap(b=>b.events).some(e=>e.operation==='export'&&e.outcome==='success')).toBe(true);
+ const beforeLayout={
+  started:Math.max(0,...batches.map(b=>b.metrics.route.started)),
+  success:Math.max(0,...batches.map(b=>b.metrics.route.success)),
+ };
  await page.getByRole('button',{name:/自动布局|layout/i}).click();
  await page.locator('[data-menu-id$="group-swimlane-process"]').filter({visible:true}).hover();
  await page.locator('[data-menu-id$="domain-lanes-lr"]').filter({visible:true}).click();
- await expect.poll(()=>batches.flatMap(b=>b.events).some(e=>e.operation==='route')).toBe(true);
+ await expect.poll(()=>batches.some(b=>b.metrics.route.started>beforeLayout.started
+  &&b.metrics.route.success>beforeLayout.success
+  &&b.events.some(e=>e.operation==='route'&&e.outcome==='success'))).toBe(true);
  expect(batches.flatMap(b=>b.events).some(e=>e.operation==='startup'&&e.outcome==='success')).toBe(true);
  expect(batches.every(b=>b.releaseId==='a'.repeat(40))).toBe(true);
  expect(JSON.stringify(batches)).not.toContain('order-import');expect(JSON.stringify(batches)).not.toContain('订单导入');
