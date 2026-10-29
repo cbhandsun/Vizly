@@ -1,4 +1,3 @@
-import { build } from 'esbuild';
 import { createHash } from 'node:crypto';
 import { lstat, mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative } from 'node:path';
@@ -36,6 +35,8 @@ export function parseTelemetryRelayOptions({ environment, authentication = 'none
  * @returns {Promise<RelayReceipt>}
  */
 export async function prepareTelemetryRelay(output, options) {
+  // Verification and legacy static preparation do not need to initialize a bundler.
+  const { build } = await import('esbuild');
   const result = await build({
     entryPoints: [fileURLToPath(new URL('../../server/collaboration/telemetryRelayVercel.ts', import.meta.url))],
     bundle: true, platform: 'node', target: 'node24', format: 'cjs', write: false,
