@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createOperationTelemetry, type FailureCode, type Operation, type TelemetryBatch } from '../operationTelemetry';
 import { classifyOperationFailure, configureApplicationTelemetry } from '../applicationTelemetry';
+import { CloudSaveVersionError } from '../../services/cloudSaveVersion';
 import { startApplication } from '../../main/applicationStartup';
 const releaseId = 'a'.repeat(40);
 afterEach(() => { vi.useRealTimers(); });
@@ -98,4 +99,27 @@ it('leaves queue space for failures during a burst of successful operations', ()
  expect(t.snapshot().events.length).toBeLessThanOrEqual(64);
  expect(t.snapshot().metrics.permission).toEqual({ started: 65, success: 64, failure: 1, cancelled: 0 });
  t.dispose();
+});
+
+
+it('classifies an actual cloud version conflict without reading its private error payload', () => {
+ const error = new CloudSaveVersionError('PRIVATE-CAS-PAYLOAD-CANARY');
+ const readMessage = vi.fn(() => { throw Error('PRIVATE-MESSAGE-GETTER-CANARY'); });
+ Object.defineProperty(error, 'message', { get: readMessage });
+ expect(classifyOperationFailure(error)).toBe('conflict');
+ expect(readMessage).not.toHaveBeenCalled();
+});
+
+it('records the actual version conflict with a failure denominator and no error content', async () => {
+ const batches: TelemetryBatch[] = [];
+ const telemetry = createOperationTelemetry({ releaseId, transport: async batch => { batches.push(batch); } });
+ try {
+  const error = new CloudSaveVersionError('PRIVATE-CAS-PAYLOAD-CANARY');
+  telemetry.begin('save')('failure', classifyOperationFailure(error));
+  await telemetry.flush();
+  expect(batches).toHaveLength(1);
+  expect(batches[0].events[0]).toMatchObject({ operation: 'save', outcome: 'failure', code: 'conflict' });
+  expect(batches[0].metrics.save).toEqual({ started: 1, success: 0, failure: 1, cancelled: 0 });
+  expect(JSON.stringify(batches)).not.toContain('PRIVATE-CAS-PAYLOAD-CANARY');
+ } finally { telemetry.dispose(); }
 });
