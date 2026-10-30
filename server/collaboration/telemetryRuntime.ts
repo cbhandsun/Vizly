@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { createOperationTelemetry } from './operationTelemetry.js';
 import { createHttpAlertDelivery, createTelemetryAlerts } from './telemetryAlerts.js';
+import { createFeishuAlertDelivery } from './feishuAlertDelivery.js';
 import { createTelemetryJournal } from './telemetryJournal.js';
 import { projectTelemetryPayload } from './telemetryPayload.js';
 import { createSupabaseTelemetryJournal } from './supabaseTelemetryJournal.js';
@@ -18,8 +19,14 @@ export function createServerTelemetryRuntime(environment: Record<string, unknown
     ? createSupabaseTelemetryJournal(environment.SUPABASE_URL, environment.SUPABASE_SERVER_KEY)
     : createTelemetryJournal(resolve(typeof directory === 'string' && directory ? directory : '.telemetry-data'));
   const endpoint = environment.VIZLY_TELEMETRY_ALERT_URL;
+  const provider = environment.VIZLY_TELEMETRY_ALERT_PROVIDER ?? 'http';
+  if (journal && endpoint && provider !== 'http' && provider !== 'feishu') {
+    throw Error('Invalid telemetry alert provider');
+  }
   const alerts = journal && typeof endpoint === 'string' && endpoint
-    ? createTelemetryAlerts(createHttpAlertDelivery(endpoint)) : undefined;
+    ? createTelemetryAlerts(provider === 'feishu'
+      ? createFeishuAlertDelivery(endpoint, environment.VIZLY_TELEMETRY_FEISHU_SIGNING_SECRET)
+      : createHttpAlertDelivery(endpoint)) : undefined;
   const receiver = journal ? { accept: async (batch: unknown, signal: AbortSignal) => {
     await journal.accept(batch, signal);
     alerts?.submit(projectTelemetryPayload(batch));

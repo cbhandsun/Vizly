@@ -83,6 +83,29 @@ POST同地址只接受确认的sha256及revision，不接受客户端替换内�
 
 可选 `VIZLY_TELEMETRY_ALERT_URL` 为运维预先配置的接收路径：只接受 HTTPS，或用于本机验证的 loopback HTTP；拒绝 URL 用户信息、查询参数和片段。投递字段只有 schema、releaseId、requestId、operation 和固定错误码。单次最多一条在途、每分钟最多六条，同一版本／操作／错误一分钟内去重，3 秒超时后熔断，避免监控故障累积任务。告警失败不影响已经持久化的事件或编辑；这不是保证送达队列。当前仅验证了本机 HTTP 接收，尚未向真实运维告警路径投递或取得 staging 回执。
 
+### 飞书机器人告警
+
+`VIZLY_TELEMETRY_ALERT_PROVIDER` 默认 `http`，保留上述通用 JSON 接口。选择 `feishu` 后直接发送飞书文本消息，并要求签名校验；无需另建转发服务。飞书适配只允许 `https://open.feishu.cn/open-apis/bot/v2/hook/<机器人标识>`，拒绝其他主机、端口、用户信息、查询参数或片段。
+
+1. 在专用飞书测试群打开群设置 → 群机器人 → 添加机器人 → 自定义机器人，命名“Vizly 告警”，开启“签名校验”。若同时启用关键词，配置 `Vizly 运维告警`，它是消息首行。保存 webhook 和签名密钥。
+2. 在 Vercel 后端项目 `vizly-collaboration` 的 Settings → Environment Variables 中，仅为 Preview 配置以下变量。webhook 本身也是凭据，应作为 Secret 保存；不要加 `VITE_` 前缀，不要进入浏览器构建或 Git。
+
+| 变量 | 值 |
+| --- | --- |
+| `VIZLY_TELEMETRY_ALERT_PROVIDER` | `feishu` |
+| `VIZLY_TELEMETRY_ALERT_URL` | 机器人的完整 webhook |
+| `VIZLY_TELEMETRY_FEISHU_SIGNING_SECRET` | 签名校验密钥 |
+
+现有 `VIZLY_TELEMETRY_ENABLED=true`、合法 `VIZLY_RELEASE_ID` 和诊断持久化配置仍须有效。变量只对之后的新部署生效；当前部署不会自动接入机器人。无需修改 Supabase 数据库密码、AI Key 或前端环境变量。
+
+3. 新 Preview 完成后，用受控故障触发告警，核对实际发布版本／请求标识、诊断存储原件、飞书 API 的 HTTP 成功与业务 `code=0`，并在群内确认收到相同消息。HTTP 200 但业务码非零、仅本机模拟请求或单元测试通过，都不能计为真实投递验收。
+
+消息仅包含固定标题、版本、请求标识、操作和错误码，不含图表正文、账号、聊天内容、Key 或 webhook。签名按秒级时间戳及飞书规定的 HMAC-SHA256 算法生成；异常不记录原始网络错误或响应正文，以防泄露 webhook。现有并发、去重、限频和三秒熔断继续生效；这是尽力投递，不能作为保证送达队列。
+
+停用时移除 Preview 的告警 URL 并重新部署；如凭据泄露，在飞书重置 webhook／签名密钥，再更新后端配置。未配置 Production 即不会启用生产通知。适配与受控测试不代表真实飞书渠道已验收。
+
+接口与群设置参考：[飞书自定义机器人官方指南](https://open.feishu.cn/document/client-docs/bot-v3/add-custom-bot?lang=zh-CN)。
+
 
 生产入口与独立服务复用同一诊断生命周期。每个运行时持有独立采集器，HTTP、WebSocket 和定期权限检查在其所属异步上下文中执行；关闭时先停止业务，再刷新事件、等待日志与告警并释放采集器。`lease` 计数单位是获取／续期尝试，此外无在途续期的过期也记录一次失败；它不是唯一租约数。续期拒绝记为 conflict，非法回执记为 invalid，异常记为 unavailable，租约到期记为 timeout；正常关闭取消未完成续期，不记故障。
 

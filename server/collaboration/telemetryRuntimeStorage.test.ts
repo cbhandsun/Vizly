@@ -8,7 +8,33 @@ vi.mock('./supabaseTelemetryJournal.js', () => ({ createSupabaseTelemetryJournal
 import { createServerTelemetryRuntime } from './telemetryRuntime.js';
 const environment = { VIZLY_RELEASE_ID: 'a'.repeat(40), VIZLY_TELEMETRY_ENABLED: 'true',
   SUPABASE_URL: 'https://telemetry.example.test', SUPABASE_SERVER_KEY: 'sb_secret_SYNTHETIC_12345678' };
-afterEach(() => vi.clearAllMocks());
+afterEach(() => { vi.clearAllMocks(); vi.unstubAllGlobals(); });
+
+it('persists before signed Feishu delivery and keeps the event when Feishu rejects it', async () => {
+  const order: string[] = [];
+  const accept = vi.fn(async () => { order.push('persist'); });
+  factories.cloud.mockReturnValue({ accept, drain: vi.fn() });
+  const fetcher = vi.fn<typeof fetch>(async () => {
+    order.push('notify'); return Response.json({ code: 19021 });
+  });
+  vi.stubGlobal('fetch', fetcher);
+  const runtime = createServerTelemetryRuntime({ ...environment, VERCEL: '1',
+    VIZLY_TELEMETRY_ALERT_PROVIDER: 'feishu',
+    VIZLY_TELEMETRY_ALERT_URL: 'https://open.feishu.cn/open-apis/bot/v2/hook/synthetic-hook',
+    VIZLY_TELEMETRY_FEISHU_SIGNING_SECRET: 'synthetic-secret' });
+  runtime.collector.begin('save')('failure', 'conflict');
+  await expect(runtime.stop()).resolves.toBeUndefined();
+  expect(order).toEqual(['persist', 'notify']);
+  expect(accept).toHaveBeenCalledTimes(1);
+  expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body))).toMatchObject({ msg_type: 'text' });
+});
+
+it('rejects unsupported alert providers instead of silently selecting generic delivery', () => {
+  factories.cloud.mockReturnValue({ accept: vi.fn(), drain: vi.fn() });
+  expect(() => createServerTelemetryRuntime({ ...environment, VERCEL: '1',
+    VIZLY_TELEMETRY_ALERT_PROVIDER: 'unknown', VIZLY_TELEMETRY_ALERT_URL: 'https://example.test/alerts',
+  })).toThrow('Invalid telemetry alert provider');
+});
 
 it('uses external persistence on Vercel and explicitly configured cloud deployments', async () => {
   factories.cloud.mockReturnValue({ accept: vi.fn(), drain: vi.fn() });
