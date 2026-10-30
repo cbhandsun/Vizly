@@ -24,7 +24,9 @@ export const classifyVersionSaveFailure = (error: unknown): VersionSaveFailure =
     const message = String(value.message ?? '');
     if (status === 401 || /authenticated user|JWT expired/i.test(message) || code === 'PGRST301') return 'authentication';
     if (status === 403 || code === '42501' || code === 'AccessDenied') return 'permission';
-    if (status === 400 || code.startsWith('22') || code.startsWith('23') || /UUID format|required.*saved Cloud Diagram/i.test(message)) return 'data';
+    const invalidVersionData = /^(?:Invalid (?:version operation|outbox snapshot)|Version operation (?:payload mismatch|conflicts with remote content))$/.test(message);
+    if (status === 400 || code.startsWith('22') || code.startsWith('23') || invalidVersionData
+        || /UUID format|required.*saved Cloud Diagram/i.test(message)) return 'data';
     if (/config|credential|endpoint/i.test(message)) return 'configuration';
     if (status >= 500 || status === 408 || status === 429 || /fetch|network|offline|timeout/i.test(message)) return 'network';
     return 'unknown';
@@ -40,7 +42,9 @@ const mergeVersionLists = (
 ): DiagramVersion[] => {
     const versionsById = new Map<string, DiagramVersion>();
     localVersions.forEach(version => versionsById.set(version.id, version));
-    remoteVersions.forEach(version => versionsById.set(version.id, version));
+    remoteVersions.forEach(version => {
+        if (!versionsById.has(version.id)) versionsById.set(version.id, version);
+    });
     return Array.from(versionsById.values()).sort((a, b) => b.createdAt - a.createdAt);
 };
 
@@ -302,7 +306,8 @@ export class UnifiedStorageService implements IStorageProvider {
         try { local = (await localVersionDB.listVersions(diagramId)).filter(context.visible).map(context.local); }
         catch (error) { if (!remote.length) throw error; local = []; }
         context.assertCurrent();
-        // A confirmed remote version replaces its local receipt in the timeline.
+        // Collapse only verified local receipts; an unconfirmed snapshot stays
+        // authoritative even when the remote primary key already exists.
         const remoteIds = new Set(remote.map(version => version.id));
         return mergeVersionLists(remote.map(version => ({ ...version, storage: context.state('cloud') })),
             local.filter(version => version.storage?.syncStatus !== 'synced' || !version.storage.remoteVersionId || !remoteIds.has(version.storage.remoteVersionId)));

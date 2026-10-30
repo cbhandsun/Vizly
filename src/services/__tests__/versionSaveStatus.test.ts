@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DiagramVersion, IStorageProvider, VersionStorageState } from '../storage/types';
 import { coerceDiagramVersion } from '../versionSnapshotSecurity';
+import { failedVersionOutboxTask } from '../versionOutbox';
 import { updateAuthSessionOwner } from '../../context/authSessionBoundary';
 const rows = vi.hoisted(() => new Map<string, DiagramVersion>());
 vi.mock('../IndexedDBStorage', () => ({ localVersionDB: {
@@ -38,6 +39,37 @@ const setup = () => {
 };
 beforeEach(() => { rows.clear(); localStorage.clear(); updateAuthSessionOwner('user-a', crypto.randomUUID()); });
 describe('version save outcomes and ownership', () => {
+    it.each([
+        { message: 'conflicting remote message' },
+        { snapshotData: { nodes: [{ id: 'remote-node', position: { x: 0, y: 0 }, data: { label: 'remote' } }], edges: [] } },
+        {},
+    ])('keeps the original unconfirmed local snapshot visible when a remote ID already exists: %j', async remotePatch => {
+        const { service, provider } = setup();
+        const saved = await service.saveVersion('diagram', snapshot, 'original local message');
+        const original = structuredClone(saved);
+        vi.mocked(provider.listVersions!).mockResolvedValue([{ ...saved, storage: undefined, createdAt: 2, ...remotePatch }]);
+        const timeline = await service.listVersions('diagram');
+        expect(timeline).toEqual([original]);
+        expect(timeline[0].storage).toMatchObject({ location: 'local', syncStatus: 'pending', localCreated: true });
+        expect(await service.loadVersion('diagram', saved.id)).toEqual(original);
+        expect(rows.get(saved.id)).toEqual(original);
+    });
+    it.each([
+        'Version operation conflicts with remote content',
+        'Version operation payload mismatch',
+        'Invalid version operation',
+        'Invalid outbox snapshot',
+    ])('blocks a permanent version data error on the first attempt: %s', async message => {
+        const { service } = setup();
+        const saved = await service.saveVersion('diagram', snapshot, 'retained local snapshot');
+        const failure = classifyVersionSaveFailure(new Error(message));
+        expect(failure).toBe('data');
+        const next = failedVersionOutboxTask({ operationId: saved.id, versionId: saved.id, diagramId: saved.diagramId,
+            ownerId: 'user-a', provider: 'supabase', payloadHash: 'owned-test-hash', attempts: 0,
+            status: 'pending', nextAttemptAt: 0 }, failure, 1000);
+        expect(next).toMatchObject({ status: 'blocked', failure: 'data', attempts: 1, nextAttemptAt: 0 });
+        expect(await service.loadVersion('diagram', saved.id)).toEqual(saved);
+    });
     it('retains offline status across service reloads and excludes another account and provider', async () => {
         const { service, provider } = setup();
         const saved = await service.saveVersion('diagram', snapshot, 'offline');
