@@ -1,16 +1,17 @@
 import { createDistributedRoomRegistry } from './distributedRoomRegistry.js';
 import { createSupabaseRoomLeaseStore } from './supabaseRoomLeaseStore.js';
 import { createSupabaseAtomicRoomStore } from './supabaseAtomicRoomStore.js';
-import { createSupabaseRoomNoticeBus } from './supabaseRoomNoticeBus.js';
+import { createSupabaseRoomNoticeBus, type PrivateSubscriptionDiagnostic } from './supabaseRoomNoticeBus.js';
 import { createDistributedRoomSync, type RoomNoticeBus } from './distributedRoomSync.js';
 import { randomUUID } from 'node:crypto';
 
 /** Compose backend-only stores and private document notifications; startup is separate. */
 export const createSupabaseRoomRuntime = (url: string, serverKey: string, transport: typeof fetch = fetch,
-  suppliedNotices?: RoomNoticeBus & { stop: () => Promise<void> }) => {
+  suppliedNotices?: RoomNoticeBus & { stop: () => Promise<void> },
+  observeSubscription?: (sample: PrivateSubscriptionDiagnostic) => void) => {
   const control = createSupabaseRoomLeaseStore(url, serverKey, transport);
   const registry = createDistributedRoomRegistry(control, lease => createSupabaseAtomicRoomStore(url, serverKey, lease.leaseId, transport));
-  const notices = suppliedNotices ?? createSupabaseRoomNoticeBus(url, serverKey);
+  const notices = suppliedNotices ?? createSupabaseRoomNoticeBus(url, serverKey, observeSubscription);
   const openRoomSynchronization = createDistributedRoomSync({ source: randomUUID(), bus: notices, read: registry.readAdmittedSnapshot });
   let stopPromise: Promise<void> | undefined;
   const disposing: Promise<void>[] = [];

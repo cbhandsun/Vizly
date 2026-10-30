@@ -15,6 +15,7 @@ import type { AtomicRoomSnapshot, AtomicRoomStore } from './atomicRoomCommit.js'
 import { publishCollaborationElement, readCollaborationElement } from './documentModel.js';
 import { createCollaborationAwareness } from '../../src/components/diagrams/collaboration/collaborationAwareness.js';
 import { createCollaborationSocket } from '../../src/components/diagrams/collaboration/collaborationSocket.js';
+import type { RuntimeObservation } from './runtimeObservations.js';
 const roomId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const generation = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const origin = 'https://vizly.example.com';
@@ -22,7 +23,7 @@ const environment = { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_PUBL
   SUPABASE_SERVER_KEY: 'sb_secret_SYNTHETIC_ONLY', VIZLY_COLLABORATION_ORIGINS: origin };
 const cleanup: Array<() => void | Promise<void>> = [];
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); });
-const fixture = (telemetryEnvironment: Record<string, string> = {}) => {
+const fixture = (telemetryEnvironment: Record<string, string> = {}, observe?: (sample: RuntimeObservation) => void) => {
   let current: AtomicRoomSnapshot | null = null;
   const control: DistributedRecoveryStore = {
     claim: async () => ({ generation, expiresAt: new Date(Date.now() + 30_000).toISOString() }),
@@ -48,7 +49,7 @@ const fixture = (telemetryEnvironment: Record<string, string> = {}) => {
     readCloud: async () => ({ revision: '2026-10-09T00:00:00Z', base: state, state }),
     readRevision: async () => '2026-10-09T00:00:00Z',
   };
-  const log = vi.fn(); const server = createProductionCollaborationRuntime({ ...environment, ...telemetryEnvironment }, dependencies, log);
+  const log = vi.fn(); const server = createProductionCollaborationRuntime({ ...environment, ...telemetryEnvironment }, dependencies, log, observe);
   cleanup.push(() => server.stop());
   const peer = async (url: string, token: string) => {
     const doc = new Y.Doc();
@@ -80,7 +81,8 @@ describe('production HTTP server composition', () => {
     expect(readCloud).not.toHaveBeenCalled(); expect(f.control.release).not.toHaveBeenCalled();
   });
   it('shares reentrant stop and retains failed store cleanup after HTTP cleanup', async () => {
-    const f = fixture(); const { port } = await f.server.listen(); let reentered: Promise<void> | undefined;
+    const samples: RuntimeObservation[] = [];
+    const f = fixture({}, sample => samples.push(sample)); const { port } = await f.server.listen(); let reentered: Promise<void> | undefined;
     f.dependencies.runtime.stop = vi.fn(async () => {
       reentered = f.server.stop(); await f.runtimeStop(); throw new Error('Synthetic credential must not escape');
     });
@@ -88,6 +90,22 @@ describe('production HTTP server composition', () => {
     await expect(stopped).rejects.toThrow(/^Production collaboration disposal failed$/); expect(reentered).toBe(stopped);
     expect(f.dependencies.runtime.stop).toHaveBeenCalledTimes(1);
     await expect(fetch(`http://127.0.0.1:${port}/health`)).rejects.toThrow(); cleanup.splice(0);
+    expect(samples.map(sample => sample.event)).toEqual(['server-ready', 'runtime-ready', 'runtime-stopping',
+      'server-stopping', 'server-stopped', 'runtime-stop-failed']);
+    expect(samples.every(sample => sample.instanceId === f.server.instanceId)).toBe(true);
+    expect(JSON.stringify(samples)).not.toContain('Synthetic credential');
+  });
+  it('reports runtime disposal only after the shared store has actually stopped', async () => {
+    const samples: RuntimeObservation[] = []; const f = fixture({}, sample => samples.push(sample));
+    await f.server.listen();
+    let entered = false; let release = () => {};
+    const gate = new Promise<void>(resolve => { release = resolve; }); cleanup.push(() => release());
+    f.dependencies.runtime.stop = async () => { entered = true; await gate; await f.runtimeStop(); };
+    const stopping = f.server.stop(); await vi.waitFor(() => expect(entered).toBe(true));
+    expect(samples.map(sample => sample.event)).toEqual(['server-ready', 'runtime-ready', 'runtime-stopping', 'server-stopping', 'server-stopped']);
+    release(); await stopping;
+    expect(samples.at(-1)?.event).toBe('runtime-stopped');
+    expect(samples.every(sample => sample.instanceId === f.server.instanceId)).toBe(true);
   });
 });
 
