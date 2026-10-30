@@ -438,8 +438,14 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
           }
           void reservation.release().catch(() => options.log?.('room-load-failed'));
         }));
-        void send(connection, message(4, encoder => encoding.writeVarString(encoder, formatCollaborationAccess(permission.role))))
-          .then(() => send(connection, message(0, encoder => sync.writeSyncStep1(encoder, room.doc))))
+        void allowed(connection).then(permitted => {
+          if (!permitted) return;
+          // Room loading may have outlived the admission permission. Build both
+          // immediate replies from the fresh check, without intervening awaits.
+          sendWithCurrentPermission(connection, message(4, encoder => encoding.writeVarString(encoder,
+            formatCollaborationAccess(connection.permission.role))));
+          sendWithCurrentPermission(connection, message(0, encoder => sync.writeSyncStep1(encoder, room.doc)));
+        })
           .catch(() => close(connection));
       });
     })().catch(() => { options.log?.('room-load-failed'); rejectUpgrade(socket); })
