@@ -2,10 +2,16 @@
 
 ## 配套版本
 
-本次网站集成使用 `@vizly/core@0.1.0-alpha.9` 与
-`@vizly/contracts@0.1.0-alpha.3`。Core 对 contracts 使用精确版本依赖。
-两个包均从当前源码构建为本地 tarball，通过网站的 `vendor/` 和锁文件固定；
-这不表示它们已经发布到 npm。应用自身版本仍为 `0.1.0`。
+层级契约首次验收时的历史配套记录为 `@vizly/core@0.1.0-alpha.9` 与
+`@vizly/contracts@0.1.0-alpha.3`；这不是当前候选或已部署网站的版本声明。
+Core 对 contracts 使用精确版本依赖。
+
+核对当前网站选择时，同时检查 `package.json` 中的依赖、`package-lock.json`
+对应记录、`vendor/` 中实际 tarball 的 SHA256，以及已安装包的内容。
+已部署网站还须核对对应部署凭据中的源码和 SDK 哈希，不能从本地配置推断线上版本。
+应用自身版本号以 `package.json` 为准。Core 和 contracts 的版本号不要求相同；
+升级时必须保证所需公开导出兼容，并通过安装包及网站回归。
+本地 tarball 交付不表示该版本已发布到 npm。
 
 不要只替换 Core 包而保留 registry 上的旧 contracts。新增恢复入口直接调用
 `importLegacyVizlyDocument`，旧 contracts 缺少该导出会导致网站构建失败。
