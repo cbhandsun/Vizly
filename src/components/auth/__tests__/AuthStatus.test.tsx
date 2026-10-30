@@ -67,7 +67,7 @@ describe('AuthStatusCompact', () => {
 
     it('announces only the login label for a full text login button', () => {
         render(<AuthStatus />);
-        expect(screen.getByRole('button', { name: '登录', exact: true })).toBeTruthy();
+        expect(screen.getByRole('button', { name: '登录' })).toBeTruthy();
     });
 
     it('announces account menu labels without decorative English icon names', async () => {
@@ -76,7 +76,7 @@ describe('AuthStatusCompact', () => {
         fireEvent.keyDown(screen.getByRole('button', { name: '账户菜单' }), { key: 'ArrowDown' });
         await screen.findByRole('menu', { name: '账户菜单' });
         for (const name of ['member@example.com', '我的图表', '切换账号', '设置密码', '退出登录']) {
-            expect(screen.getByRole('menuitem', { name, exact: true })).toBeTruthy();
+            expect(screen.getByRole('menuitem', { name })).toBeTruthy();
         }
     });
 
