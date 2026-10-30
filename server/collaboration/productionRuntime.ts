@@ -21,9 +21,10 @@ export interface ProductionCollaborationDependencies {
 /** Composition only: durable admission, authorization, synchronization and recovery share one lifecycle. */
 export const createProductionCollaborationRuntime = (environment: Record<string, unknown>,
   supplied?: ProductionCollaborationDependencies, log?: CollaborationServerOptions['log'],
-  observe?: (sample: RuntimeObservation) => void) => {
+  observe?: (sample: RuntimeObservation) => void,
+  waitForBackground?: (task: Promise<void>) => void) => {
   const config = parseProductionCollaborationConfiguration(environment);
-  const telemetry = createServerTelemetryRuntime(environment);
+  const telemetry = createServerTelemetryRuntime(environment, waitForBackground);
   const observations = createRuntimeObservations(observe);
   const dependencies = supplied ?? (() => {
     const readRevision = createCloudRoomRevisionSource(config.supabaseUrl, config.publishableKey);

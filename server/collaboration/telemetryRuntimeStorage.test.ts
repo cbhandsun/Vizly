@@ -66,3 +66,26 @@ it('does not initialize a sink when collection or the release identity is disabl
   }
   expect(factories.file).not.toHaveBeenCalled(); expect(factories.cloud).not.toHaveBeenCalled();
 });
+
+
+it('registers unfinished delivery before returning acceptance without delaying the response', async () => {
+  factories.cloud.mockReturnValue({ accept: vi.fn(), drain: vi.fn() });
+  let complete!: (response: Response) => void;
+  vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { complete = resolve; })));
+  const tasks: Promise<void>[] = [];
+  const runtime = createServerTelemetryRuntime({ ...environment, VERCEL: '1',
+    VIZLY_TELEMETRY_ALERT_PROVIDER: 'feishu',
+    VIZLY_TELEMETRY_ALERT_URL: 'https://open.feishu.cn/open-apis/bot/v2/hook/synthetic-hook',
+    VIZLY_TELEMETRY_FEISHU_SIGNING_SECRET: 'synthetic-secret' }, task => { tasks.push(task); });
+  runtime.collector.begin('save')('failure', 'conflict');
+  await runtime.collector.flush();
+  expect(tasks).toHaveLength(1);
+  let settled = false;
+  void tasks[0].then(() => { settled = true; });
+  await Promise.resolve();
+  expect(settled).toBe(false);
+  complete(Response.json({ code: 0 }));
+  await tasks[0];
+  expect(settled).toBe(true);
+  await runtime.stop();
+});

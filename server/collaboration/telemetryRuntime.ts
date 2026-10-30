@@ -7,7 +7,8 @@ import { projectTelemetryPayload } from './telemetryPayload.js';
 import { createSupabaseTelemetryJournal } from './supabaseTelemetryJournal.js';
 
 /** Each runtime owns its collector and journal. No global registration. */
-export function createServerTelemetryRuntime(environment: Record<string, unknown>) {
+export function createServerTelemetryRuntime(environment: Record<string, unknown>,
+  waitForBackground?: (task: Promise<void>) => void) {
   const release = environment.VIZLY_RELEASE_ID;
   const enabled = environment.VIZLY_TELEMETRY_ENABLED === 'true'
     && typeof release === 'string' && /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(release);
@@ -29,7 +30,11 @@ export function createServerTelemetryRuntime(environment: Record<string, unknown
       : createHttpAlertDelivery(endpoint)) : undefined;
   const receiver = journal ? { accept: async (batch: unknown, signal: AbortSignal) => {
     await journal.accept(batch, signal);
-    alerts?.submit(projectTelemetryPayload(batch));
+    if (alerts) {
+      alerts.submit(projectTelemetryPayload(batch));
+      // Register before the HTTP response: serverless runtimes can freeze afterwards.
+      waitForBackground?.(alerts.drain());
+    }
   } } : undefined;
   const collector = createOperationTelemetry({ releaseId: typeof release === 'string' ? release : 'development',
     transport: receiver?.accept });
