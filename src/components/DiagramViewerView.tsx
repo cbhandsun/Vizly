@@ -68,7 +68,7 @@ interface DiagramViewerViewProps {
     mainFlowAnimationEnabled: boolean;
     setMainFlowAnimationEnabled: (value: boolean) => void;
     isReadonly: boolean;
-    onReadonlyChange: (value: boolean) => void;
+    onReadonlyChange?: (value: boolean) => void;
     isPresentationMode: boolean;
     onExitPresentation: () => void;
     isFullscreen: boolean;

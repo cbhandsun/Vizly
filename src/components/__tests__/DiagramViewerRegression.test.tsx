@@ -41,7 +41,7 @@ vi.mock('../useDiagramViewerSaveActions', () => ({
     },
 }));
 vi.mock('@vizly/core/react', () => ({
-    FlowchartDesigner: ({ id, collaborationMode, isReadonly, onReadonlyChange }: { id: string; collaborationMode?: string; isReadonly?: boolean; onReadonlyChange?: (value: boolean) => void }) => <div data-testid="replica-designer" data-readonly={String(isReadonly)} data-collaboration-mode={collaborationMode}>{id}<button type="button" onClick={() => onReadonlyChange?.(false)}>unlock</button></div>,
+    FlowchartDesigner: ({ id, collaborationMode, isReadonly, onReadonlyChange }: { id: string; collaborationMode?: string; isReadonly?: boolean; onReadonlyChange?: (value: boolean) => void }) => <div data-testid="replica-designer" data-readonly={String(isReadonly)} data-can-toggle-readonly={String(typeof onReadonlyChange === 'function')} data-collaboration-mode={collaborationMode}>{id}<button type="button" onClick={() => onReadonlyChange?.(false)}>unlock</button></div>,
 }));
 vi.mock('@vizly/core/routing-runtime', () => ({
     prefetchBaseReactFlowPrecompiledRoute: async () => false,
@@ -305,7 +305,7 @@ vi.mock('@/data/diagram-definitions', () => ({
             onOpenSettings?: () => void;
             onReadonlyChange?: (value: boolean) => void;
         }) => (
-            <div data-testid="diagram" data-readonly={String(props.isReadonly)} data-collaboration-mode={props.collaborationMode}>
+            <div data-testid="diagram" data-readonly={String(props.isReadonly)} data-can-toggle-readonly={String(typeof props.onReadonlyChange === 'function')} data-collaboration-mode={props.collaborationMode}>
                 <button type="button" onClick={props.onOpenShareDialog}>share</button>
                 <button type="button" onClick={props.onOpenSettings}>open-settings</button>
                 <button type="button" onClick={() => props.onReadonlyChange?.(true)}>lock</button>
@@ -347,6 +347,7 @@ describe('DiagramViewer regression', () => {
         loadDocumentMock.mockResolvedValue({ type: 'flowchart', isReadonly });
         render(<MemoryRouter initialEntries={['/?diagram=shared-cloud-document']}><React.Suspense fallback={null}><DiagramViewer /></React.Suspense></MemoryRouter>);
         await waitFor(() => expect(screen.getByTestId('replica-designer')).toHaveAttribute('data-readonly', String(isReadonly)));
+        expect(screen.getByTestId('replica-designer')).toHaveAttribute('data-can-toggle-readonly', String(!isReadonly));
         expect(loadDocumentMock).toHaveBeenCalledWith('shared-cloud-document');
         fireEvent.click(screen.getByRole('button', { name: 'unlock' }));
         expect(screen.getByTestId('replica-designer')).toHaveAttribute('data-readonly', String(isReadonly));
@@ -462,11 +463,13 @@ describe('DiagramViewer regression', () => {
         const view = render(<MemoryRouter><DiagramViewer /></MemoryRouter>);
         expect(collaborationFixture.enabled).toBe(true);
         expect(screen.getByTestId('diagram')).toHaveAttribute('data-readonly', 'true');
+        expect(screen.getByTestId('diagram')).toHaveAttribute('data-can-toggle-readonly', 'false');
         fireEvent.click(screen.getByRole('button', { name: 'unlock' }));
         expect(screen.getByTestId('diagram')).toHaveAttribute('data-readonly', 'true');
         collaborationFixture.role = 'editor';
         view.rerender(<MemoryRouter><DiagramViewer /></MemoryRouter>);
         expect(screen.getByTestId('diagram')).toHaveAttribute('data-readonly', 'false');
+        expect(screen.getByTestId('diagram')).toHaveAttribute('data-can-toggle-readonly', 'true');
     });
 
     it('preserves a user-selected canvas lock across server role changes', () => {

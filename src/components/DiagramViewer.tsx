@@ -657,7 +657,7 @@ const DiagramViewer: React.FC = () => {
             mainFlowAnimationEnabled={mainFlowAnimationEnabled}
             setMainFlowAnimationEnabled={setMainFlowAnimationEnabled}
             isReadonly={isReadonly}
-            onReadonlyChange={setIsReadonly}
+            onReadonlyChange={accessReadOnly ? undefined : setIsReadonly}
             isPresentationMode={isPresentationMode}
             onExitPresentation={exitPresentation}
             isFullscreen={isFullscreen}

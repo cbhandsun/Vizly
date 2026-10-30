@@ -9,6 +9,10 @@ vi.mock('react-i18next', () => ({
         t: (key: string) => ({
             'auth.login': '登录',
             'auth.accountMenu': '账户菜单',
+            'auth.menu.myDiagrams': '我的图表',
+            'auth.menu.switchUser': '切换账号',
+            'auth.menu.setPassword': '设置密码',
+            'auth.menu.logout': '退出登录',
         }[key] ?? key),
     }),
 }));
@@ -59,6 +63,21 @@ describe('AuthStatusCompact', () => {
         expect(trigger.style.minHeight).toBe('var(--commercial-touch-target, 44px)');
         expect(trigger.classList.contains('auth-compact-login-btn')).toBe(true);
         expect(trigger.classList.contains('auth-compact-login-btn--commercial')).toBe(true);
+    });
+
+    it('announces only the login label for a full text login button', () => {
+        render(<AuthStatus />);
+        expect(screen.getByRole('button', { name: '登录', exact: true })).toBeTruthy();
+    });
+
+    it('announces account menu labels without decorative English icon names', async () => {
+        authState.user = { email: 'member@example.com' };
+        render(<AuthStatus />);
+        fireEvent.keyDown(screen.getByRole('button', { name: '账户菜单' }), { key: 'ArrowDown' });
+        await screen.findByRole('menu', { name: '账户菜单' });
+        for (const name of ['member@example.com', '我的图表', '切换账号', '设置密码', '退出登录']) {
+            expect(screen.getByRole('menuitem', { name, exact: true })).toBeTruthy();
+        }
     });
 
     it('renders compact account menu trigger and avatar when authenticated', () => {
