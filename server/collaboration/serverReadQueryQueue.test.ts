@@ -104,3 +104,31 @@ it('waits for in-flight reader authorization during shutdown', async () => {
     expect(reader.kinds).toEqual([]);
   } finally { release.resolve(); }
 });
+it('bounds concurrent read authorizations across connections', async () => {
+  const release = deferred();
+  let blocked = false, started = 0, active = 0, maximum = 0;
+  const server = createCollaborationServer({ origins: new Set([origin]), recheckMs: 60_000,
+    persistence: { load: async () => null, save: async () => { throw Error('Read query wrote data'); } },
+    authorize: async token => {
+      if (blocked) {
+        started++; maximum = Math.max(maximum, ++active);
+        try { await release.promise; } finally { active--; }
+      }
+      return { userId: token, role: 'viewer' };
+    } });
+  disposals.push(() => server.stop());
+  const { url } = await server.listen();
+  const peers = [];
+  for (let index = 0; index < 9; index++) peers.push(await connect(url, 'reader-' + index));
+  try {
+    blocked = true;
+    for (const peer of peers) peer.socket.send(Uint8Array.of(3));
+    await vi.waitFor(() => expect(started).toBe(8));
+    await new Promise(resolve => { setTimeout(resolve, 30); });
+    expect(started).toBe(8);
+    release.resolve();
+    await vi.waitFor(() => expect(peers.every(peer => peer.kinds.length === 1)).toBe(true));
+    expect(started).toBe(9);
+    expect(maximum).toBe(8);
+  } finally { release.resolve(); }
+});

@@ -81,6 +81,19 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
   });
   const connections = new Set<Connection>();
   const readQueries = new Set<Promise<void>>();
+  let activeReadQueries = 0;
+  const readWaiters: Array<() => void> = [];
+  const runReadQuery = async (operation: () => Promise<void> | undefined) => {
+    // Parallel readers must not turn the former room queue into an unbounded
+    // burst of remote authorization requests across connections or rooms.
+    if (activeReadQueries >= 8) await new Promise<void>(resolve => { readWaiters.push(resolve); });
+    else activeReadQueries++;
+    try { await operation(); }
+    finally {
+      const next = readWaiters.shift();
+      if (next) next(); else activeReadQueries--;
+    }
+  };
   let pendingUpgrades = 0;
   let stopped = false;
   let stopPromise: Promise<void> | undefined;
@@ -438,7 +451,7 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
           const readQuery = input.byteLength === 1 && input[0] === 3;
           const preceding = readQuery ? connection.queue
             : Promise.all([room.queue, connection.queue]);
-          const processing = preceding.then(() => {
+          const processMessage = () => {
             // Observation failures must never change authorization or message processing.
             try { options.observeMessageQueue?.(Object.freeze({
               waitMs: Math.max(0, performance.now() - queuedAt), connectionPending: connection.pending,
@@ -448,7 +461,8 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
             if (presenceMessage) connection.queuedPresence = undefined;
             if (documentUpdate) connection.queuedDocument = undefined;
             return current ? handleMessage(room, connection, current) : undefined;
-          })
+          };
+          const processing = preceding.then(() => readQuery ? runReadQuery(processMessage) : processMessage())
             .catch(() => { options.log?.('invalid-message'); close(connection); })
             .finally(() => {
               connection.pending--;
