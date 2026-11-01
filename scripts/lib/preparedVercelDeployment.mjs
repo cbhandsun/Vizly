@@ -5,6 +5,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { containsCompiledEndpoint, parseDeploymentEnvironment, parseProductionWebSocketUrl,
   parseTelemetryIngestUrl, staticDeploymentRoutes } from './vercelDeploymentEnvironment.mjs';
 import { parseTelemetryRelayOptions, verifyTelemetryRelay } from './vercelTelemetryRelayArtifact.mjs';
+import { STATIC_ASSET_CACHE_POLICY } from './staticAssetCache.mjs';
 
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const contained = (root, path) => {
@@ -55,7 +56,7 @@ export async function verifyPreparedVercelDeployment({ artifactDirectory, projec
     authentication: receipt.telemetryRelay?.authentication, origin: receipt.telemetryRelay?.origin,
     ingestUrl: ingest }) : undefined;
   if (protectedRelay && !relayOptions) throw new Error('Missing protected telemetry relay');
-  if (!isDeepStrictEqual(config, { version: 3, routes: staticDeploymentRoutes(ingest, protectedRelay) })) throw new Error('Prepared artifact routing mismatch');
+  if (receipt.staticCachePolicy !== undefined && receipt.staticCachePolicy !== STATIC_ASSET_CACHE_POLICY) throw new Error('Unknown static cache policy');
   if (!Array.isArray(receipt.files) || receipt.files.length === 0 || receipt.files.length > 5000
     || !Number.isSafeInteger(receipt.totalBytes) || receipt.totalBytes < 0 || receipt.totalBytes > 256 * 1024 * 1024) throw new Error('Invalid artifact inventory');
   const expected = new Map();
@@ -65,6 +66,8 @@ export async function verifyPreparedVercelDeployment({ artifactDirectory, projec
     expected.set(file.name, file.sha256);
   }
   if (!expected.has('index.html')) throw new Error('Artifact entry missing');
+  const cachedNames = receipt.staticCachePolicy === STATIC_ASSET_CACHE_POLICY ? [...expected.keys()] : [];
+  if (!isDeepStrictEqual(config, { version: 3, routes: staticDeploymentRoutes(ingest, protectedRelay, cachedNames) })) throw new Error('Prepared artifact routing mismatch');
   const staticRoot = await realpath(join(root, '.vercel/output/static'));
   if (!contained(root, staticRoot)) throw new Error('Static directory escaped artifact');
   let totalBytes = 0;

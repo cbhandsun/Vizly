@@ -4,6 +4,7 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { containsCompiledEndpoint, parseDeploymentEnvironment, parseProductionWebSocketUrl,
   parseTelemetryIngestUrl, staticDeploymentRoutes } from './vercelDeploymentEnvironment.mjs';
 import { parseTelemetryRelayOptions, prepareTelemetryRelay } from './vercelTelemetryRelayArtifact.mjs';
+import { STATIC_ASSET_CACHE_POLICY } from './staticAssetCache.mjs';
 
 const allowedExtensions = /\.(?:html|js|css|json|svg|png|jpe?g|webp|gif|ico|woff2?|ttf|otf|wasm)$/i;
 const localWebSocket = /wss?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?=[:/"'\s]|$)/i;
@@ -72,10 +73,11 @@ export async function prepareVercelStaticArtifact({ workspace, buildDirectory, o
     if (hash(await readFile(destination)) !== file.sha256) throw new Error('Build changed during artifact staging');
   }
   await writeFile(join(vercel, 'project.json'), JSON.stringify({ projectId, orgId: teamId }, null, 2), { flag: 'wx' });
-  await writeFile(join(vercel, 'output/config.json'), JSON.stringify({ version: 3, routes: staticDeploymentRoutes(ingest, !!relayOptions) }, null, 2), { flag: 'wx' });
+  await writeFile(join(vercel, 'output/config.json'), JSON.stringify({ version: 3, routes: staticDeploymentRoutes(ingest, !!relayOptions, files.map(file => file.name)) }, null, 2), { flag: 'wx' });
   const telemetryRelay = relayOptions ? await prepareTelemetryRelay(output, relayOptions) : undefined;
   const receipt = { version: relayOptions ? 2 : 1, projectId, teamId,
     source: relayOptions ? 'compiled-static-assets-and-telemetry-relay' : 'compiled-static-assets', deploymentEnvironment,
+    staticCachePolicy: STATIC_ASSET_CACHE_POLICY,
     ...(endpoint ? { productionWebSocketUrl: endpoint } : {}), ...(ingest ? { telemetryIngestUrl: ingest } : {}),
     ...(telemetryRelay ? { telemetryRelay } : {}),
     files: files.map(({name,sha256})=>({name,sha256})), totalBytes };

@@ -1,3 +1,5 @@
+import { fingerprintedAssetCacheRoutes } from './staticAssetCache.mjs';
+
 /** @param {unknown} value */
 export function parseDeploymentEnvironment(value) {
   if (value !== 'preview' && value !== 'production') throw new Error('Invalid deployment environment');
@@ -36,13 +38,15 @@ export function parseTelemetryIngestUrl(value) {
 /** Keep diagnostics out of filesystem/SPA handling; this function makes no requests.
  * @param {string | undefined} telemetryIngestUrl
  * @param {boolean} [protectedTelemetryRelay]
+ * @param {readonly string[]} [staticAssetNames]
  */
-export function staticDeploymentRoutes(telemetryIngestUrl, protectedTelemetryRelay = false) {
+export function staticDeploymentRoutes(telemetryIngestUrl, protectedTelemetryRelay = false, staticAssetNames = []) {
   const diagnostics = { src: '^/telemetry/?$', methods: ['POST'],
     headers: { 'Cache-Control': 'no-store' },
     ...(telemetryIngestUrl ? { dest: protectedTelemetryRelay ? '/__vizly_telemetry_relay' : telemetryIngestUrl } : { status: 503 }) };
   return [diagnostics,
     { src: '^/telemetry/?$', status: 405, headers: { Allow: 'POST', 'Cache-Control': 'no-store' } },
+    ...fingerprintedAssetCacheRoutes(staticAssetNames),
     { handle: 'filesystem' }, { src: '/assets/(.*)', status: 404 }, { src: '/(.*)', dest: '/index.html' },
   ];
 }
