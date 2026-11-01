@@ -2,12 +2,31 @@
 
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { parseEntryModuleInventory, parseStartupModuleInventory, startupModuleGroups, startupPackageModuleKey } from './startupModuleGroups';
+import { parseCanvasModuleInventory, parseEntryModuleInventory, parseStartupModuleInventory, startupModuleGroups, startupPackageModuleKey } from './startupModuleGroups';
 
 const fixture = () => ({ schemaVersion: 1, groups: {
   common: ['react/cjs/react.production.js'], management: ['antd/es/button/index.js'], storage: ['antd/es/form/index.js'],
 } });
 describe('measured startup module groups', () => {
+  it('leaves the management page dynamic theme outside the canvas bundle', () => {
+    const canvas = startupModuleGroups.find(g => g.name === 'canvas-runtime');
+    expect(canvas?.test('/repo/node_modules/@vizly/core/dist/chunks/LightTheme-DMMF1X09.js')).toBe(false);
+    expect(canvas?.test('C:\\repo\\node_modules\\@vizly\\core\\dist\\chunks\\LightTheme-DMMF1X09.js')).toBe(false);
+  });
+  it('owns each measured canvas and entry seed exactly once while retaining strict inventory bounds', () => {
+    for (const [name, parser, group] of [
+      ['canvasModuleInventory.json', parseCanvasModuleInventory, 'canvas-runtime'],
+      ['startupEntryModuleInventory.json', parseEntryModuleInventory, 'startup-entry-runtime'],
+    ] as const) {
+      const entries = parser(JSON.parse(readFileSync(new URL(name, import.meta.url), 'utf8')));
+      for (const key of entries) {
+        expect(startupModuleGroups.filter(g => g.test('/repo/node_modules/' + key)).map(g => g.name)).toEqual([group]);
+      }
+    }
+    expect(() => parseCanvasModuleInventory({schemaVersion:1,modules:Array(2_001).fill('react/index.js')})).toThrow();
+    expect(() => parseCanvasModuleInventory({schemaVersion:1,modules:['@vizly/core/src/private.js']})).toThrow();
+    expect(() => parseCanvasModuleInventory({schemaVersion:1,modules:['react/index.js','react/index.js']})).toThrow();
+  });
   it('matches portable installed modules and only strips compiled SDK chunk hashes', () => {
     expect(startupPackageModuleKey('C:\\repo\\node_modules\\antd\\es\\button\\index.js?import')).toBe('antd/es/button/index.js');
     expect(startupPackageModuleKey('/repo/node_modules/@vizly/core/dist/chunks/logSecurity-ABcd1234.js')).toBe('@vizly/core/dist/chunks/logSecurity.js');
@@ -53,12 +72,12 @@ describe('measured startup module groups', () => {
       'domainDagreFullEdgePreparation', 'edgeEndpointPathRepair']) {
       for (const prefix of ['/repo/node_modules/', 'C:\\repo\\node_modules\\']) {
         const id = prefix + '@vizly/core/dist/chunks/' + name + '-ABcd1234.js';
-        expect(startupModuleGroups.filter(group => group.test(id)).map(group => group.name)).toEqual(['canvas-layout-runtime']);
+        expect(startupModuleGroups.filter(group => group.test(id)).map(group => group.name)).toEqual(['canvas-runtime']);
       }
     }
     for (const name of ['CommandPalette', 'MindMapEditor', 'AdvancedFlowchartCanvasShellExtra', 'DomainDagreLayoutStrategyDebug']) {
       const id = '/repo/node_modules/@vizly/core/dist/chunks/' + name + '-ABcd1234.js';
-      expect(startupModuleGroups.find(group => group.name === 'canvas-layout-runtime')?.test(id)).toBe(false);
+      expect(startupModuleGroups.find(group => group.name === 'canvas-runtime')?.test(id)).toBe(false);
     }
   });
   it('keeps measured entry dependencies singly owned and rejects arbitrary virtual or private modules', () => {

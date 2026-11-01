@@ -51,9 +51,9 @@ const inventorySource = readFileSync(new URL('./startupModuleInventory.json', im
 if (inventorySource.length > 512_000) throw new Error('Startup module inventory exceeds its size limit');
 const inventory: unknown = JSON.parse(inventorySource);
 const modulesByGroup = parseStartupModuleInventory(inventory);
-export const parseEntryModuleInventory = (value: unknown): ReadonlySet<string> => {
+const parseBoundedModuleInventory = (value: unknown, limit: number): ReadonlySet<string> => {
   if (!record(value) || value.schemaVersion !== 1 || !Array.isArray(value.modules)
-    || value.modules.length < 1 || value.modules.length > 500
+    || value.modules.length < 1 || value.modules.length > limit
     || Object.keys(value).some(key => !['schemaVersion', 'modules'].includes(key))) throw new Error('Invalid static entry inventory');
   const entries = new Set<string>();
   for (const key of value.modules) {
@@ -63,9 +63,15 @@ export const parseEntryModuleInventory = (value: unknown): ReadonlySet<string> =
   }
   return entries;
 };
+export const parseEntryModuleInventory = (value: unknown): ReadonlySet<string> => parseBoundedModuleInventory(value, 500);
+export const parseCanvasModuleInventory = (value: unknown): ReadonlySet<string> => parseBoundedModuleInventory(value, 2_000);
 const entryInventorySource = readFileSync(new URL('./startupEntryModuleInventory.json', import.meta.url), 'utf8');
 if (entryInventorySource.length > 128_000) throw new Error('Static entry inventory exceeds its size limit');
 const entryModules = parseEntryModuleInventory(JSON.parse(entryInventorySource) as unknown);
+const canvasInventorySource = readFileSync(new URL('./canvasModuleInventory.json', import.meta.url), 'utf8');
+if (canvasInventorySource.length > 256_000) throw new Error('Canvas inventory exceeds its size limit');
+const canvasModules = parseCanvasModuleInventory(JSON.parse(canvasInventorySource) as unknown);
+if ([...canvasModules].some(key => entryModules.has(key))) throw new Error('Canvas and entry module ownership overlap');
 const isFrameworkModule = (key: string): boolean => /^(?:react\/|react-dom\/|scheduler\/|react-router\/|i18next\/|react-i18next\/|i18next-browser-languagedetector\/)/u.test(key);
 const isAntdModule = (key: string): boolean => /^(?:antd\/|@ant-design\/|@rc-component\/|rc-[^/]+\/)/u.test(key)
   || key === '@vizly/core/dist/antd.js' || key === '@vizly/core/dist/chunks/antdStaticBridge.js';
@@ -86,13 +92,13 @@ export const startupModuleGroups = [
     includeDependenciesRecursively: false,
   },
   {
-    name: 'canvas-layout-runtime',
+    name: 'canvas-runtime',
     test: (id: unknown): boolean => {
       const key = startupPackageModuleKey(id);
-      return key !== null && /^@vizly\/core\/dist\/chunks\/(?:AdvancedFlowchartCanvasShell|TitleGroupNode|DomainDagreLayoutStrategy|domainDagreFullEdgePreparation|edgeEndpointPathRepair)\.js$/u.test(key);
+      return key !== null && canvasModules.has(key);
     },
-    // These five modules form successive cold canvas requests in the measured
-    // graph. Keep their dependencies and unrelated routes independently lazy.
+    // Only modules actually requested by the baseline canvas, excluding all
+    // shared management/entry modules. No recursive dependency collection.
     entriesAware: false,
     includeDependenciesRecursively: false,
   },
@@ -100,7 +106,7 @@ export const startupModuleGroups = [
     name: 'framework-vendor',
     test: (id: unknown): boolean => {
       const key = startupPackageModuleKey(id);
-      return key !== null && !entryModules.has(key) && isFrameworkModule(key);
+      return key !== null && !entryModules.has(key) && !canvasModules.has(key) && isFrameworkModule(key);
     },
     entriesAware: false,
     includeDependenciesRecursively: false,
@@ -109,7 +115,7 @@ export const startupModuleGroups = [
     name: 'antd-vendor',
     test: (id: unknown): boolean => {
       const key = startupPackageModuleKey(id);
-      return key !== null && !entryModules.has(key) && isAntdModule(key) && modulesByGroup.common.has(key);
+      return key !== null && !entryModules.has(key) && !canvasModules.has(key) && isAntdModule(key) && modulesByGroup.common.has(key);
     },
     entriesAware: false,
     includeDependenciesRecursively: false,
@@ -118,7 +124,7 @@ export const startupModuleGroups = [
   name: `startup-${name}-${owner}`,
   test: (id: unknown): boolean => {
     const key = startupPackageModuleKey(id);
-    return key !== null && !entryModules.has(key) && !isFrameworkModule(key)
+    return key !== null && !entryModules.has(key) && !canvasModules.has(key) && !isFrameworkModule(key)
       && !(isAntdModule(key) && modulesByGroup.common.has(key))
       && !(name === 'common' && owner === 'core' && !isCoreStartupUtility(key))
       && (key.startsWith('@vizly/core/') ? owner === 'core' : owner === 'vendor') && modulesByGroup[name].has(key);
