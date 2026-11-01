@@ -30,17 +30,16 @@ export const getFlowchartDesignerComponent = (pluginId?: string, presetId?: stri
 export const PLUGIN_EMPTY_CANVAS_IDS = new Set(['flowchart']);
 
 export const loadFlowchartDesigner = async (pluginId?: string, presetId?: string) => {
-    const precompiledRouteReady = presetId
-        ? import('@vizly/core/routing-runtime')
-            .then(
-                module => module.prefetchBaseReactFlowPrecompiledRoute(presetId),
-                () => false,
-            )
-        : Promise.resolve(false);
+    // Speculative route data must not gate mounting. The canvas validates the
+    // measured geometry and loads its authoritative route independently.
+    if (presetId) {
+        void import('@vizly/core/routing-runtime')
+            .then(module => module.prefetchBaseReactFlowPrecompiledRoute(presetId))
+            .catch(() => false);
+    }
     const [{ FlowchartDesigner }] = await Promise.all([
         import('@vizly/core/react'),
         ensureBuiltInPlugins(pluginId || 'flowchart'),
-        precompiledRouteReady,
     ]);
 
     return {
