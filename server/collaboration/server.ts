@@ -30,7 +30,7 @@ import type { createRoomRecovery } from './roomRecovery.js';
 import { createRuntimeObservations } from './runtimeObservations.js';
 
 type SafeEvent = 'authorization-failed' | 'invalid-message' | 'persistence-failed' | 'room-load-failed' | 'cloud-coordination-failed' | 'room-synchronization-failed' | 'room-notification-failed';
-interface Connection { socket: WebSocket; token: string; diagramId: string; permission: DiagramPermission; awarenessId?: number; presenceId?: number; pending: number; window: number; messages: number; queuedPresence?: Uint8Array; queuedDocument?: Uint8Array }
+interface Connection { socket: WebSocket; token: string; diagramId: string; permission: DiagramPermission; awarenessId?: number; presenceId?: number; pending: number; window: number; messages: number; queue: Promise<void>; queuedPresence?: Uint8Array; queuedDocument?: Uint8Array }
 interface Room { doc: Y.Doc; awareness: Awareness; connections: Set<Connection>; queue: Promise<void>; cloudRevision?: string;
   distributedLease?: DistributedRoomLease; detachLease?: () => void; synchronization?: RoomSynchronization;
   nextPresenceId: number; remoteAwareness: ReturnType<typeof createRemoteRoomAwareness> }
@@ -80,6 +80,7 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
     }
   });
   const connections = new Set<Connection>();
+  const readQueries = new Set<Promise<void>>();
   let pendingUpgrades = 0;
   let stopped = false;
   let stopPromise: Promise<void> | undefined;
@@ -377,7 +378,7 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
         if (!fresh || fresh.userId !== permission.userId || stopped || socket.destroyed) { deny(); return; }
         websocket.handleUpgrade(request, socket, head, ws => {
           admission.event('socket-opened');
-          const recovery: Connection = { socket: ws, ...parsed, permission: fresh, pending: 0, window: Date.now(), messages: 0 };
+          const recovery: Connection = { socket: ws, ...parsed, permission: fresh, pending: 0, window: Date.now(), messages: 0, queue: Promise.resolve() };
           connections.add(recovery);
           ws.on('error', () => close(recovery));
           ws.on('message', () => close(recovery));
@@ -395,7 +396,7 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
       websocket.handleUpgrade(request, socket, head, ws => {
         admission.event('socket-opened');
         connected = true;
-        const connection: Connection = { socket: ws, ...parsed, permission, presenceId: room.nextPresenceId++, pending: 0, window: Date.now(), messages: 0 };
+        const connection: Connection = { socket: ws, ...parsed, permission, presenceId: room.nextPresenceId++, pending: 0, window: Date.now(), messages: 0, queue: Promise.resolve() };
         room.connections.add(connection);
         connections.add(connection);
         ws.on('error', () => close(connection));
@@ -430,7 +431,14 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
           }
           if (++connection.pending > 16) { close(connection); return; }
           const queuedAt = performance.now();
-          room.queue = room.queue.then(() => {
+          // A state query never mutates the room. Keep its fresh authorization
+          // in this connection's arrival order without blocking other readers.
+          // Mutating/protocol messages also wait for this connection's prior
+          // query, and retain the shared room serialization for durable edits.
+          const readQuery = input.byteLength === 1 && input[0] === 3;
+          const preceding = readQuery ? connection.queue
+            : Promise.all([room.queue, connection.queue]);
+          const processing = preceding.then(() => {
             // Observation failures must never change authorization or message processing.
             try { options.observeMessageQueue?.(Object.freeze({
               waitMs: Math.max(0, performance.now() - queuedAt), connectionPending: connection.pending,
@@ -442,7 +450,13 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
             return current ? handleMessage(room, connection, current) : undefined;
           })
             .catch(() => { options.log?.('invalid-message'); close(connection); })
-            .finally(() => { connection.pending--; });
+            .finally(() => {
+              connection.pending--;
+              if (readQuery) readQueries.delete(processing);
+            });
+          if (readQuery) readQueries.add(processing);
+          connection.queue = processing;
+          if (!readQuery) room.queue = processing;
         }));
         ws.on('close', bindServerTelemetry(options.operationTelemetry, () => {
           admission.event('socket-closed');
@@ -536,7 +550,7 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
       stopPromise = Promise.resolve().then(async () => {
         for (const socket of upgrades) socket.destroy();
         for (const connection of connections) connection.socket.terminate();
-        const results = await Promise.allSettled([recoverHttp?.stop(), rooms.stop(),
+        const results = await Promise.allSettled([recoverHttp?.stop(), rooms.stop(), ...readQueries,
           new Promise<void>((accept, reject) => websocket.close(error => error ? reject(error) : accept())),
           http.listening ? new Promise<void>((accept, reject) => http.close(error => error ? reject(error) : accept())) : Promise.resolve(),
         ]);
