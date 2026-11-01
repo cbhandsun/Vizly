@@ -118,7 +118,7 @@ it('bounds concurrent read authorizations across connections', async () => {
     } });
   disposals.push(() => server.stop());
   const { url } = await server.listen();
-  const peers = [];
+  const peers: Array<Awaited<ReturnType<typeof connect>>> = [];
   for (let index = 0; index < 9; index++) peers.push(await connect(url, 'reader-' + index));
   try {
     blocked = true;
