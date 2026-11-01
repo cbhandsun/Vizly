@@ -18,6 +18,37 @@ const createAuthorizer = (url: string, publishableKey: string, fetchImpl: typeof
           ? AbortSignal.any([init.signal, deadline]) : deadline }),
       },
     });
+    // A decoded subject only narrows the database query. It never grants access:
+    // the result must match this request's fresh, verified Auth response below.
+    // Both HTTPS requests remain user-scoped and get a shared bounded deadline.
+    let subjectHint: string | undefined;
+    if (token.length <= 16_384 && token.split('.').length === 3) {
+      try {
+        const payload: unknown = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
+        if (isRecord(payload) && typeof payload.sub === 'string'
+          && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(payload.sub)) {
+          subjectHint = payload.sub;
+        }
+      } catch { /* Opaque/legacy inputs still require normal server verification. */ }
+    }
+    if (subjectHint) {
+      const identity = client.auth.getUser(token);
+      const query = client.from('diagrams')
+        .select(ownerOnly ? 'user_id' : 'user_id,diagram_collaborators(user_id,role)')
+        .eq('id', diagramId);
+      if (!ownerOnly) query.eq('diagram_collaborators.user_id', subjectHint);
+      const [{ data: auth, error: authError }, { data: diagram, error }] = await Promise.all([identity, query.maybeSingle()]);
+      if (authError || !auth.user || auth.user.is_anonymous || auth.user.id !== subjectHint
+        || error || !isRecord(diagram)) return null;
+      if (diagram.user_id === auth.user.id) return { userId: auth.user.id, role: 'editor' };
+      if (ownerOnly) return null;
+      const members: unknown = diagram.diagram_collaborators;
+      if (!Array.isArray(members) || members.length !== 1 || !isRecord(members[0])
+        || members[0].user_id !== auth.user.id) return null;
+      const role = members[0].role;
+      return role === 'viewer' ? { userId: auth.user.id, role }
+        : role === 'editor' || role === 'owner' ? { userId: auth.user.id, role: 'editor' } : null;
+    }
     const { data: auth, error: authError } = await client.auth.getUser(token);
     if (authError || !auth.user || auth.user.is_anonymous || typeof auth.user.id !== 'string') return null;
     const { data: diagram, error } = await client.from('diagrams').select('user_id').eq('id', diagramId).maybeSingle();
