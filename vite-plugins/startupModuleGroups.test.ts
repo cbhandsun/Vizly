@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { parseStartupModuleInventory, startupModuleGroups, startupPackageModuleKey } from './startupModuleGroups';
+import { parseEntryModuleInventory, parseStartupModuleInventory, startupModuleGroups, startupPackageModuleKey } from './startupModuleGroups';
 
 const fixture = () => ({ schemaVersion: 1, groups: {
   common: ['react/cjs/react.production.js'], management: ['antd/es/button/index.js'], storage: ['antd/es/form/index.js'],
@@ -36,7 +36,7 @@ describe('measured startup module groups', () => {
     }
   });
   it('limits seeds to one group without pulling lazy initialization into startup', () => {
-    expect(startupModuleGroups).toHaveLength(8);
+    expect(startupModuleGroups).toHaveLength(10);
     expect(startupModuleGroups.filter(group => group.test('/repo/node_modules/react/cjs/react.production.js'))).toHaveLength(1);
     for (const group of startupModuleGroups) {
       expect(group.entriesAware).toBe(false);
@@ -47,5 +47,38 @@ describe('measured startup module groups', () => {
     expect(config).not.toContain('strictExecutionOrder: true');
     expect(startupModuleGroups.filter(group => group.test('/repo/node_modules/antd/es/button/index.js')).map(group => group.name)).toEqual(['antd-vendor']);
     expect(startupModuleGroups.every(group => !group.test('/repo/node_modules/@vizly/core/dist/chunks/EnhancedThemeManagerRefactored-ABcd1234.js'))).toBe(true);
+  });
+  it('joins measured late canvas modules without collecting unrelated feature runtimes', () => {
+    for (const name of ['AdvancedFlowchartCanvasShell', 'TitleGroupNode', 'DomainDagreLayoutStrategy',
+      'domainDagreFullEdgePreparation', 'edgeEndpointPathRepair']) {
+      for (const prefix of ['/repo/node_modules/', 'C:\\repo\\node_modules\\']) {
+        const id = prefix + '@vizly/core/dist/chunks/' + name + '-ABcd1234.js';
+        expect(startupModuleGroups.filter(group => group.test(id)).map(group => group.name)).toEqual(['canvas-layout-runtime']);
+      }
+    }
+    for (const name of ['CommandPalette', 'MindMapEditor', 'AdvancedFlowchartCanvasShellExtra', 'DomainDagreLayoutStrategyDebug']) {
+      const id = '/repo/node_modules/@vizly/core/dist/chunks/' + name + '-ABcd1234.js';
+      expect(startupModuleGroups.find(group => group.name === 'canvas-layout-runtime')?.test(id)).toBe(false);
+    }
+  });
+  it('keeps measured entry dependencies singly owned and rejects arbitrary virtual or private modules', () => {
+    expect(startupModuleGroups.filter(g => g.test('/repo/node_modules/react/cjs/react.production.js')).map(g => g.name)).toEqual(['startup-entry-runtime']);
+    expect(startupModuleGroups.filter(g => g.test('\0vite/preload-helper.js')).map(g => g.name)).toEqual(['startup-entry-runtime']);
+    for (const id of ['\0vite/preload-helper.js-extra', '\0rolldown/runtime.js', '\0/repo/node_modules/react/index.js', '/repo/src/main.tsx']) {
+      expect(startupModuleGroups.every(g => !g.test(id))).toBe(true);
+    }
+    const entry = startupModuleGroups.find(g => g.name === 'startup-entry-runtime');
+    for (const id of ['/repo/node_modules/antd/es/button/index.js', '/repo/node_modules/@vizly/core/dist/react.js',
+      '/repo/node_modules/@vizly/core/dist/chunks/AdvancedFlowchartCanvasShell-ABcd1234.js']) expect(entry?.test(id)).toBe(false);
+  });
+  it('requires a bounded canonical inventory and accepts measured ESM package files', () => {
+    const modules=['react/index.js','lucide-react/dist/esm/Icon.mjs'];
+    expect([...parseEntryModuleInventory({schemaVersion:1,modules})]).toEqual(modules);
+    for (const value of [null,{}, {schemaVersion:2,modules}, {schemaVersion:1,modules:[]},
+      {schemaVersion:1,modules,extra:true}, {schemaVersion:1,modules:Array(501).fill('react/index.js')},
+      {schemaVersion:1,modules:['react/index.js','react/index.js']},
+      ...['../react/index.js','react/../index.js','react/index.css','\0vite/preload-helper.js','@vizly/core/src/private.js','@vizly/core/dist/react.js'].map(key=>({schemaVersion:1,modules:[key]}))]) {
+      expect(()=>parseEntryModuleInventory(value)).toThrow();
+    }
   });
 });
