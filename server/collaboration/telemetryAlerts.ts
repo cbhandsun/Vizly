@@ -5,7 +5,8 @@ export interface TelemetryAlert {
 }
 export type AlertDelivery = (alert: Readonly<TelemetryAlert>, signal: AbortSignal) => Promise<void>;
 /** One active delivery, six alerts/minute; no retry storm or unbounded queue. */
-export function createTelemetryAlerts(deliver: AlertDelivery, now = Date.now) {
+export function createTelemetryAlerts(deliver: AlertDelivery, now = Date.now,
+  claim?: (alert: Readonly<TelemetryAlert>, signal: AbortSignal) => Promise<boolean>) {
   let flight: Promise<void> | null = null;
   let abort: (() => void) | null = null;
   let stopped = false, circuitOpen = false, count = 0, windowStart = now();
@@ -29,7 +30,10 @@ export function createTelemetryAlerts(deliver: AlertDelivery, now = Date.now) {
       timer = setTimeout(() => { circuitOpen = true; abort?.(); }, 3000);
     });
     const delivery = Promise.resolve().then(() => {
-      if (!controller.signal.aborted) return deliver(alert, controller.signal);
+      return (async () => {
+        if (claim && !await claim(alert, controller.signal)) return;
+        if (!controller.signal.aborted) await deliver(alert, controller.signal);
+      })();
     }).then(() => {}, () => {});
     flight = Promise.race([delivery, timeout]).then(() => { clearTimeout(timer); abort = null; flight = null; });
   };

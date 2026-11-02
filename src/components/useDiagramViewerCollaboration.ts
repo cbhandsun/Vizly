@@ -74,7 +74,12 @@ export const useDiagramViewerCollaboration = ({
   }, [selectedDiagramId, recoveryContext]);
   const isLocalSnapshotReady = useCallback(() => getFlowDataBridge(selectedDiagramId)?.isCanvasReady?.() === true, [selectedDiagramId]);
   const collaborationEnabled = Boolean(serverUrl) && wantsCollaboration && roomBinding.valid;
+  const resolveToken = useCallback(async () => {
+    const { resolveCollaborationSessionToken } = await import('@/services/collaborationSession');
+    return resolveCollaborationSessionToken(userId);
+  }, [userId]);
   const collaboration = useDeferredYjsCollaboration({
+    resolveToken,
     userId,
     roomName,
     serverUrl,

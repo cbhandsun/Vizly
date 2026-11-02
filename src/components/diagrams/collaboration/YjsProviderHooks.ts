@@ -1,3 +1,4 @@
+import { createCollaborationSessionLifecycle } from './collaborationSessionLifecycle';
 import { createConnectionTelemetry } from '../../../observability/connectionTelemetry';
 import { useCallback, useEffect, useMemo, useState, useRef, useSyncExternalStore } from 'react';
 import * as Y from 'yjs';
@@ -92,6 +93,7 @@ export interface YjsCollaborationOptions {
     roomName: string;
     serverUrl: string;
     token?: string;
+    resolveToken?: () => Promise<string | null>;
     enabled?: boolean;
     onRemoteSnapshot?: (snapshot: { nodes: Node[]; edges: Edge[] }, cloudRevision?: string) => boolean;
     isLocalSnapshotReady?: () => boolean;
@@ -99,6 +101,10 @@ export interface YjsCollaborationOptions {
 
 export function useYjsCollaboration(options: YjsCollaborationOptions) {
     const { roomName, serverUrl, token, userId, enabled = true, onRemoteSnapshot, isLocalSnapshotReady } = options;
+    const credentials = useRef({ token, resolveToken: options.resolveToken });
+    credentials.current = { token, resolveToken: options.resolveToken };
+    const lifecycleRef = useRef<ReturnType<typeof createCollaborationSessionLifecycle> | null>(null);
+    useEffect(() => { lifecycleRef.current?.credentialsChanged(token); }, [token]);
     const reactFlowInstance = useReactFlow();
     
     const [connectionState] = useState(createCollaborationConnectionState);
@@ -192,14 +198,14 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         
         const ydoc = new Y.Doc();
         const awareness = createCollaborationAwareness(ydoc);
-        const safeToken = normalizeCollaborationToken(token);
+        const safeToken = normalizeCollaborationToken(credentials.current.token);
         const safeRoomName = normalizeCollaborationRoomName(roomName);
         const wsParams = safeToken ? { params: { token: safeToken } } : {};
         
         let provider: WebsocketProvider;
         try {
             provider = new WebsocketProvider(safeServerUrl, safeRoomName, ydoc, {
-                connect: true,
+                connect: false,
                 disableBc: true,
                 awareness,
                 WebSocketPolyfill: createCollaborationSocket(),
@@ -215,6 +221,17 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         connectionRef.current = { doc: ydoc, yNodes, yEdges, hasSynced: false };
         connectionState.update({ provider, wsStatus: 'connecting' });
         const connectionTelemetry = createConnectionTelemetry();
+        const lifecycle = createCollaborationSessionLifecycle({
+            resolveToken: async () => credentials.current.resolveToken
+                ? credentials.current.resolveToken() : normalizeCollaborationToken(credentials.current.token) || null,
+            visible: () => typeof document === 'undefined' || document.visibilityState !== 'hidden',
+            connect: next => { provider.params = { token: next }; provider.connect(); },
+            disconnect: () => { connectionTelemetry.pause(); provider.disconnect(); },
+        });
+        lifecycleRef.current = lifecycle;
+        const visibilityChanged = () => lifecycle.visibilityChanged();
+        if (typeof document !== 'undefined') document.addEventListener('visibilitychange', visibilityChanged);
+        if (typeof window !== 'undefined') window.addEventListener('online', visibilityChanged);
 
         provider.awareness.setLocalStateField('user', {
             name: localUser.name,
@@ -254,6 +271,7 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
             if (!problem) return;
             // Preserve the current canvas/document, but stop automatic retries
             // and publication until the user explicitly chooses recovery.
+            lifecycle.suspend();
             provider.shouldConnect = false;
             pendingRemoteSnapshotRef.current = null;
             if (pendingRetryTimerRef.current !== null) clearTimeout(pendingRetryTimerRef.current);
@@ -262,7 +280,7 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         };
         const handleSync = (isSynced: boolean) => {
             if (!isCurrentConnection() || connectionState.getSnapshot().coordinationProblem) return;
-            if (isSynced && connectionRef.current) { connectionRef.current.hasSynced = true; connectionTelemetry.synced(); }
+            if (isSynced && connectionRef.current) { connectionRef.current.hasSynced = true; connectionTelemetry.synced(); lifecycle.synced(); }
             // A document with deletion history is authoritative even when its
             // maps are empty. An untouched new room can still be seeded locally.
             if (isSynced && Y.decodeStateVector(Y.encodeStateVector(ydoc)).size > 0) applyRemoteSnapshot();
@@ -285,7 +303,9 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         const handleConnectionClose = (event: CloseEvent | null) => {
             if (!isCurrentConnection()) return;
             // Failed handshakes close before y-websocket emits a disconnected status.
+            provider.shouldConnect = false;
             connectionTelemetry.status('disconnected');
+            lifecycle.closed(event?.code);
             if (event?.code !== 1008) return;
             // A server policy rejection invalidates the prior edit grant. Ordinary
             // transport outages still retain authorized offline work for reconnect.
@@ -318,7 +338,12 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         yNodes.observeDeep(handleRemoteElementChange);
         yEdges.observeDeep(handleRemoteElementChange);
 
+        lifecycle.start();
         return () => {
+            lifecycle.stop();
+            if (lifecycleRef.current === lifecycle) lifecycleRef.current = null;
+            if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', visibilityChanged);
+            if (typeof window !== 'undefined') window.removeEventListener('online', visibilityChanged);
             connectionTelemetry.dispose();
             provider.off('sync', handleSync);
             provider.off('status', handleStatus);
@@ -333,7 +358,7 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
             provider.destroy();
             ydoc.destroy();
         };
-    }, [roomName, serverUrl, token, enabled, localUser, connectionState, retryPendingRemoteSnapshot, connectionAttempt, localSnapshotCache]);
+    }, [roomName, serverUrl, enabled, localUser, connectionState, retryPendingRemoteSnapshot, connectionAttempt, localSnapshotCache]);
 
     const pushLocalChangesToYjs = (nodes: Node[], edges: Edge[]) => {
         const connection = connectionRef.current;

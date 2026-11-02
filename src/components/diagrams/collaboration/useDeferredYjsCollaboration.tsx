@@ -12,8 +12,8 @@ const emptyState: YjsCollaborationState = {
 
 /** Load Yjs only while a document actually requests collaboration. */
 export const useDeferredYjsCollaboration = (options: YjsCollaborationOptions) => {
-    const { roomName, serverUrl, token, userId, enabled = true } = options;
-    const scope = useMemo(() => ({ id: ++nextScope, roomName, serverUrl, token, userId, enabled }), [roomName, serverUrl, token, userId, enabled]);
+    const { roomName, serverUrl, userId, enabled = true } = options;
+    const scope = useMemo(() => ({ id: ++nextScope, roomName, serverUrl, userId, enabled }), [roomName, serverUrl, userId, enabled]);
     const live = useRef<{ scope: typeof scope; state: YjsCollaborationState } | null>(null);
     const [snapshot, setSnapshot] = useState<{ scope: typeof scope; state: YjsCollaborationState } | null>(null);
     const onState = useCallback((state: YjsCollaborationState | null) => {

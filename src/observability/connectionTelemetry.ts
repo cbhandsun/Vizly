@@ -9,6 +9,7 @@ export function createConnectionTelemetry() {
       if (status === 'connecting' && !finish) finish = beginApplicationOperation('reconnect');
       if (status === 'disconnected' && finish) { finish('failure', 'network'); finish = null; }
     },
+    pause() { finish?.('cancelled', 'cancelled'); finish = null; },
     synced() { if (!disposed && finish) { finish('success'); finish = null; } },
     dispose() { disposed = true; finish?.('cancelled', 'cancelled'); finish = null; },
   };

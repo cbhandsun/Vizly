@@ -1,3 +1,4 @@
+import type { TelemetryAlert } from './telemetryAlerts.js';
 import { createClient } from '@supabase/supabase-js';
 import { projectTelemetryPayload } from './telemetryPayload.js';
 
@@ -58,11 +59,11 @@ export function createSupabaseTelemetryJournal(url: unknown, serverKey: unknown,
     global: { fetch: async (input, init) => {
       const target = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
       if (target.origin !== parsed.origin || !['/rest/v1/rpc/vizly_record_telemetry',
-        '/rest/v1/rpc/vizly_query_telemetry'].includes(target.pathname)) throw unavailable();
+        '/rest/v1/rpc/vizly_query_telemetry', '/rest/v1/rpc/vizly_claim_telemetry_alert'].includes(target.pathname)) throw unavailable();
       const timeout = AbortSignal.timeout(4500);
       const signal = init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
       const response = await transport(input, { ...init, signal, redirect: 'error' });
-      return boundedResponse(response, signal, target.pathname.endsWith('/vizly_record_telemetry') ? 4096 : MAX_QUERY_BYTES);
+      return boundedResponse(response, signal, target.pathname.endsWith('/vizly_query_telemetry') ? MAX_QUERY_BYTES : 4096);
     } },
   });
   const pending = new Set<Promise<unknown>>();
@@ -73,6 +74,17 @@ export function createSupabaseTelemetryJournal(url: unknown, serverKey: unknown,
     try { return await task; } catch { throw unavailable(); } finally { pending.delete(task); }
   };
   return {
+    async claimAlert(alert: Readonly<TelemetryAlert>, signal: AbortSignal): Promise<boolean> {
+      if (signal.aborted) return false;
+      return perform(async () => {
+        const { data, error } = await client.rpc('vizly_claim_telemetry_alert', {
+          p_release_id: alert.releaseId, p_operation: alert.operation,
+          p_code: alert.code, p_request_id: alert.requestId,
+        }).abortSignal(signal).retry(false);
+        if (error || typeof data !== 'boolean') throw unavailable();
+        return data;
+      });
+    },
     async accept(input: unknown, signal: AbortSignal) {
       // Re-project at the persistence boundary, including direct in-process calls.
       const batch = projectTelemetryPayload(input);

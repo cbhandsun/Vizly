@@ -32,3 +32,17 @@ it('opens the circuit for a hung receiver and does not accumulate sends',async()
 it.each(['http://remote.test/alerts','https://user:secret@example.com','https://example.com?token=CANARY','file:///tmp/alerts'])('rejects unsafe receiver configuration %s',endpoint=>{
  expect(()=>createHttpAlertDelivery(endpoint)).toThrow('Invalid alert receiver');
 });
+
+it('admits a repeated failure once across independent runtimes and fails closed on claim errors', async () => {
+ const delivered = vi.fn(async () => {}); let claimed = false;
+ const claim = vi.fn(async () => { if (claimed) return false; claimed = true; return true; });
+ const one = createTelemetryAlerts(delivered, Date.now, claim), two = createTelemetryAlerts(delivered, Date.now, claim);
+ const t = createOperationTelemetry({ releaseId: 'c'.repeat(40), transport: async batch => { one.submit(projectTelemetryPayload(batch)); two.submit(projectTelemetryPayload(batch)); } });
+ try {
+   t.begin('permission')('failure', 'denied'); await t.flush(); await Promise.all([one.drain(), two.drain()]);
+   expect(delivered).toHaveBeenCalledTimes(1); expect(claim).toHaveBeenCalledTimes(2);
+   const broken = createTelemetryAlerts(delivered, Date.now, async () => { throw Error('offline'); });
+   const batch = projectTelemetryPayload({ ...t.snapshot(), sequence: 1 }); broken.submit(batch); await broken.drain();
+   expect(delivered).toHaveBeenCalledTimes(1); broken.stop();
+ } finally { t.dispose(); one.stop(); two.stop(); }
+});

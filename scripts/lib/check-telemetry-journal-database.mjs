@@ -8,6 +8,7 @@ export async function runTelemetryJournalDatabaseRegression(docker, container, d
   assert.match(database, /^(empty|legacy_text|existing_uuid)_telemetry$/);
   const argv = ['exec', '-i', container, 'psql', '-X', '-qAt', '-U', 'postgres', '-d', database, '-v', 'ON_ERROR_STOP=1'];
   const sql = input => docker(argv, { input });
+  sql(readFileSync(new URL('../../supabase/migrations/20261102030403_telemetry_alert_claims.sql', import.meta.url), 'utf8'));
   const fixture = readFileSync(new URL('../fixtures/telemetry-journal/regression.sql', import.meta.url), 'utf8');
   const output = sql("SET vizly.telemetry_fixture='owned-isolated-postgres';\n" + fixture);
   const report = JSON.parse(output.trim().split('\n').at(-1));
@@ -75,6 +76,34 @@ export async function runTelemetryJournalDatabaseRegression(docker, container, d
   }
   assert.equal(Number(sql('SELECT count(*) FROM vizly_telemetry.journal WHERE sequence>=11000;')), accepted.length);
   assert.equal(sql('SELECT count(*)<=1000 AND sum(payload_bytes)<=4194304 FROM vizly_telemetry.journal;').trim(), 't');
+  // Actual PostgreSQL roles, cooldown boundaries, global rate budget and concurrent admission.
+  const claim = (op, code, id = '11111111-1111-4111-8111-111111111111', release = 'a'.repeat(40)) =>
+    `SELECT public.vizly_claim_telemetry_alert('${release}','${op}','${code}','${id}');`;
+  assert.equal(sql(`SELECT has_function_privilege('anon','public.vizly_claim_telemetry_alert(text,text,text,uuid)','EXECUTE'),
+    has_function_privilege('authenticated','public.vizly_claim_telemetry_alert(text,text,text,uuid)','EXECUTE'),
+    has_table_privilege('anon','vizly_telemetry.alert_claims','SELECT'),
+    (SELECT NOT prosecdef FROM pg_proc WHERE proname='vizly_claim_telemetry_alert');`).trim(), 'f|f|f|t');
+  assert.equal(sql('SET ROLE service_role;' + claim('permission', 'denied')).trim(), 't');
+  assert.equal(sql('SET ROLE service_role;' + claim('permission', 'denied', '22222222-2222-4222-8222-222222222222', 'b'.repeat(40))).trim(), 'f');
+  sql("UPDATE vizly_telemetry.alert_claims SET claimed_at=clock_timestamp()-interval '11 minutes';");
+  assert.equal(sql('SET ROLE service_role;' + claim('permission', 'denied')).trim(), 'f');
+  assert.equal(sql('SET ROLE service_role;' + claim('permission', 'denied', '22222222-2222-4222-8222-222222222222')).trim(), 't');
+  for (const op of ['startup', 'save', 'connect', 'reconnect', 'lease']) assert.equal(sql('SET ROLE service_role;' + claim(op, 'network')).trim(), 't');
+  assert.equal(sql('SET ROLE service_role;' + claim('export', 'network')).trim(), 'f');
+  assert.equal(sql('SELECT count(*) FROM vizly_telemetry.alert_claims;').trim(), '6');
+  sql("UPDATE vizly_telemetry.alert_claims SET claimed_at=clock_timestamp()-interval '11 minutes';");
+  const admissions = await Promise.all(Array.from({ length: 8 }, () => new Promise(resolve => {
+    const child = spawn('docker', argv, { stdio: ['pipe', 'pipe', 'pipe'] });
+    const deadline = setTimeout(() => child.kill('SIGTERM'), 10000);
+    let out = '', error = '';
+    child.stdout.on('data', data => { out += data; }); child.stderr.on('data', data => { error += data; });
+    child.once('error', problem => { clearTimeout(deadline); resolve({ code: -1, error: problem.message }); });
+    child.once('close', code => { clearTimeout(deadline); resolve({ code, out: out.trim(), error }); });
+    child.stdin.end('SET ROLE service_role;' + claim('export', 'network'));
+  })));
+  assert.equal(admissions.filter(x => x.code === 0 && x.out === 't').length, 1);
+  assert.ok(admissions.every(x => x.code === 0 && ['t','f'].includes(x.out)));
   return [...report.cases, 'server-only-schema-and-invoker-rpcs', 'contended-writer-fails-without-mutation',
-    'independent-concurrent-writers-preserve-budget-and-acknowledgments'];
+    'independent-concurrent-writers-preserve-budget-and-acknowledgments',
+    'alert-rpc-role-isolation', 'alert-cross-release-cooldown-and-replay', 'alert-global-rate-budget', 'alert-concurrent-single-admission'];
 }

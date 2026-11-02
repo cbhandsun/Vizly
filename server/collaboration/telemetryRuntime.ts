@@ -16,9 +16,9 @@ export function createServerTelemetryRuntime(environment: Record<string, unknown
   const storage = environment.VIZLY_TELEMETRY_STORAGE ?? (environment.VERCEL === '1' ? 'supabase' : 'file');
   if (enabled && (storage !== 'file' && storage !== 'supabase'
     || (storage === 'file' && environment.VERCEL === '1'))) throw Error('Invalid telemetry storage configuration');
-  const journal = !enabled ? undefined : storage === 'supabase'
-    ? createSupabaseTelemetryJournal(environment.SUPABASE_URL, environment.SUPABASE_SERVER_KEY)
-    : createTelemetryJournal(resolve(typeof directory === 'string' && directory ? directory : '.telemetry-data'));
+  const cloudJournal = enabled && storage === 'supabase'
+    ? createSupabaseTelemetryJournal(environment.SUPABASE_URL, environment.SUPABASE_SERVER_KEY) : undefined;
+  const journal = !enabled ? undefined : cloudJournal ?? createTelemetryJournal(resolve(typeof directory === 'string' && directory ? directory : '.telemetry-data'));
   const endpoint = environment.VIZLY_TELEMETRY_ALERT_URL;
   const provider = environment.VIZLY_TELEMETRY_ALERT_PROVIDER ?? 'http';
   if (journal && endpoint && provider !== 'http' && provider !== 'feishu') {
@@ -27,7 +27,8 @@ export function createServerTelemetryRuntime(environment: Record<string, unknown
   const alerts = journal && typeof endpoint === 'string' && endpoint
     ? createTelemetryAlerts(provider === 'feishu'
       ? createFeishuAlertDelivery(endpoint, environment.VIZLY_TELEMETRY_FEISHU_SIGNING_SECRET)
-      : createHttpAlertDelivery(endpoint)) : undefined;
+      : createHttpAlertDelivery(endpoint), Date.now,
+      cloudJournal?.claimAlert) : undefined;
   const receiver = journal ? { accept: async (batch: unknown, signal: AbortSignal) => {
     await journal.accept(batch, signal);
     if (alerts) {

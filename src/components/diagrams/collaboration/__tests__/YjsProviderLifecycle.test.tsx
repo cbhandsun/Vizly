@@ -24,6 +24,8 @@ const fixture = vi.hoisted(() => ({
 vi.mock('@xyflow/react', () => ({ useReactFlow: () => fixture.flow }));
 vi.mock('y-websocket', () => ({
   WebsocketProvider: class {
+    connect = vi.fn();
+    disconnect = vi.fn();
     destroyed = false;
     messageHandlers: Array<(_encoder: unknown, decoder: decoding.Decoder, _provider: unknown, server: boolean) => void> = [];
     on = vi.fn();
