@@ -310,6 +310,8 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
             provider.shouldConnect = false;
             connectionTelemetry.status('disconnected');
             lifecycle.closed(event?.code);
+            // Failed HTTP upgrades never emit y-websocket's disconnected status.
+            connectionState.update({ canWrite: false, synced: false, wsStatus: 'disconnected' });
             if (event?.code !== 1008) return;
             // A server policy rejection invalidates the prior edit grant. Ordinary
             // transport outages still retain authorized offline work for reconnect.

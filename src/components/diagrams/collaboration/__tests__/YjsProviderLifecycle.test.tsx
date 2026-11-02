@@ -61,6 +61,15 @@ const grantServerAccess = (role = 'editor', server = true) => {
 };
 
 describe('collaboration connection ownership', () => {
+  it('exposes failed HTTP upgrade as disconnected without waiting for an open socket', () => {
+    const hook = renderHook(() => useYjsCollaboration(options));
+    const current = fixture.providers.at(-1)!;
+    expect(hook.result.current.wsStatus).toBe('connecting');
+    act(() => current.on.mock.calls.find(call => call[0] === 'connection-close')?.[1]({ code: 1006 }));
+    expect(hook.result.current.wsStatus).toBe('disconnected');
+    expect(hook.result.current.isSynced).toBe(false);
+    hook.unmount();
+  });
   it('accepts revision only from the current server after the matching state, and retains it on failed canvas commit', () => {
     const commit = vi.fn(() => false);
     const hook = renderHook(() => useYjsCollaboration({ ...options, onRemoteSnapshot: commit }));
