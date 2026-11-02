@@ -73,14 +73,14 @@ describe('measured startup module groups', () => {
     expect(startupModuleGroups.every(group => !group.test('/repo/node_modules/@vizly/core/dist/chunks/EnhancedThemeManagerRefactored-ABcd1234.js'))).toBe(true);
   });
   it('joins measured late canvas modules without collecting unrelated feature runtimes', () => {
-    for (const name of ['TitleGroupNode', 'DomainDagreLayoutStrategy',
+    for (const name of ['AdvancedFlowchartCanvasShell', 'TitleGroupNode', 'DomainDagreLayoutStrategy',
       'domainDagreFullEdgePreparation', 'edgeEndpointPathRepair']) {
       for (const prefix of ['/repo/node_modules/', 'C:\\repo\\node_modules\\']) {
         const id = prefix + '@vizly/core/dist/chunks/' + name + '-ABcd1234.js';
         expect(startupModuleGroups.filter(group => group.test(id)).map(group => group.name)).toEqual(['canvas-runtime']);
       }
     }
-    for (const name of ['CommandPalette', 'MindMapEditor', 'AdvancedFlowchartCanvasShell', 'AdvancedFlowchartCanvasShellExtra', 'DomainDagreLayoutStrategyDebug']) {
+    for (const name of ['CommandPalette', 'MindMapEditor', 'AdvancedFlowchartCanvasShellExtra', 'DomainDagreLayoutStrategyDebug']) {
       const id = '/repo/node_modules/@vizly/core/dist/chunks/' + name + '-ABcd1234.js';
       expect(startupModuleGroups.find(group => group.name === 'canvas-runtime')?.test(id)).toBe(false);
     }
