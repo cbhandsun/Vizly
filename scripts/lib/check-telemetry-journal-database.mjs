@@ -8,7 +8,6 @@ export async function runTelemetryJournalDatabaseRegression(docker, container, d
   assert.match(database, /^(empty|legacy_text|existing_uuid)_telemetry$/);
   const argv = ['exec', '-i', container, 'psql', '-X', '-qAt', '-U', 'postgres', '-d', database, '-v', 'ON_ERROR_STOP=1'];
   const sql = input => docker(argv, { input });
-  sql(readFileSync(new URL('../../supabase/migrations/20261102030403_telemetry_alert_claims.sql', import.meta.url), 'utf8'));
   const fixture = readFileSync(new URL('../fixtures/telemetry-journal/regression.sql', import.meta.url), 'utf8');
   const output = sql("SET vizly.telemetry_fixture='owned-isolated-postgres';\n" + fixture);
   const report = JSON.parse(output.trim().split('\n').at(-1));
