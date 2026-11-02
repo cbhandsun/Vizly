@@ -227,9 +227,9 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
                 connectionState.update({ canWrite: false, synced: false, wsStatus: 'disconnected' });
             },
             resolveToken: async () => credentials.current.resolveToken
-                ? credentials.current.resolveToken() : normalizeCollaborationToken(credentials.current.token) || null,
+                ? credentials.current.resolveToken() : normalizeCollaborationToken(credentials.current.token) ?? '',
             visible: () => typeof document === 'undefined' || document.visibilityState !== 'hidden',
-            connect: next => { provider.params = { token: next }; provider.connect(); },
+            connect: next => { provider.params = next ? { token: next } : {}; provider.connect(); },
             disconnect: () => { connectionTelemetry.pause(); provider.disconnect(); },
         });
         lifecycleRef.current = lifecycle;

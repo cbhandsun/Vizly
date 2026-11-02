@@ -50,3 +50,19 @@ it('rechecks the session after a real network/foreground recovery without reopen
  offline = false; lifecycle.visibilityChanged(); await Promise.resolve(); expect(connect).toHaveBeenCalledTimes(1);
  lifecycle.closed(1008); lifecycle.visibilityChanged(); await vi.advanceTimersByTimeAsync(60_000); expect(connect).toHaveBeenCalledTimes(1); lifecycle.stop();
 });
+
+it('preserves optional-token transports while refusing a missing authenticated session', async () => {
+ const anonymousConnect = vi.fn(), authenticatedConnect = vi.fn();
+ const anonymous = createCollaborationSessionLifecycle({ connect: anonymousConnect, disconnect: vi.fn(), resolveToken: async () => '', visible: () => true });
+ const authenticated = createCollaborationSessionLifecycle({ connect: authenticatedConnect, disconnect: vi.fn(), resolveToken: async () => null, visible: () => true });
+ anonymous.start(); authenticated.start(); await Promise.resolve();
+ expect(anonymousConnect).toHaveBeenCalledWith(''); expect(authenticatedConnect).not.toHaveBeenCalled();
+ anonymous.stop(); authenticated.stop();
+});
+
+it('does not spin reconnecting when a resolver returns an unchanged near-expiry token', async () => {
+ vi.useFakeTimers(); const connect = vi.fn(), token = jwt(Date.now() / 1000 + 60);
+ const lifecycle = createCollaborationSessionLifecycle({ connect, disconnect: vi.fn(), resolveToken: async () => token, visible: () => true });
+ lifecycle.start(); await vi.advanceTimersByTimeAsync(120_000);
+ expect(connect).toHaveBeenCalledTimes(2); lifecycle.stop();
+});

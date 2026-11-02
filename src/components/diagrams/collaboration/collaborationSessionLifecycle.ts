@@ -19,7 +19,9 @@ export function createCollaborationSessionLifecycle(options: {
     try {
       const next = await options.resolveToken();
       if (stopped || current !== generation || !options.visible()) return;
-      if (!next) { blocked = true; options.unavailable?.(); return; }
+      // An empty string preserves the optional-token transport contract. A null
+      // authenticated session must never fall back to anonymous or stale credentials.
+      if (next === null) { blocked = true; options.unavailable?.(); return; }
       // Decoding only prevents stale local handshakes; the server verifies authority.
       let expiry: number | undefined;
       if (next.split('.').length === 3) {
@@ -31,7 +33,13 @@ export function createCollaborationSessionLifecycle(options: {
       }
       token = next;
       options.connect(next);
-      if (expiry) timer = setTimeout(() => { pause(); void attempt(); }, Math.min(2_147_000_000, Math.max(1000, expiry - now() - 30_000)));
+      if (expiry) {
+        const refreshDelay = expiry - now() - 30_000;
+        // A resolver may return an unchanged short-lived token. Wait for its
+        // safety boundary instead of reconnecting with it every second.
+        const delay = refreshDelay > 0 ? refreshDelay : Math.max(1000, expiry - now() - 5000);
+        timer = setTimeout(() => { pause(); void attempt(); }, Math.min(2_147_000_000, delay));
+      }
     } catch {
       if (!stopped && current === generation) { options.unavailable?.(); retry(); }
     }

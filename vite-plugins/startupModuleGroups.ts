@@ -71,7 +71,8 @@ const entryModules = parseEntryModuleInventory(JSON.parse(entryInventorySource) 
 const canvasInventorySource = readFileSync(new URL('./canvasModuleInventory.json', import.meta.url), 'utf8');
 if (canvasInventorySource.length > 256_000) throw new Error('Canvas inventory exceeds its size limit');
 const canvasModules = parseCanvasModuleInventory(JSON.parse(canvasInventorySource) as unknown);
-if ([...canvasModules].some(key => entryModules.has(key))) throw new Error('Canvas and entry module ownership overlap');
+if ([...canvasModules].some(key => entryModules.has(key)
+  || groupNames.some(group => modulesByGroup[group].has(key)))) throw new Error('Canvas and startup module ownership overlap');
 const isFrameworkModule = (key: string): boolean => /^(?:react\/|react-dom\/|scheduler\/|react-router\/|i18next\/|react-i18next\/|i18next-browser-languagedetector\/)/u.test(key);
 const isAntdModule = (key: string): boolean => /^(?:antd\/|@ant-design\/|@rc-component\/|rc-[^/]+\/)/u.test(key)
   || key === '@vizly/core/dist/antd.js' || key === '@vizly/core/dist/chunks/antdStaticBridge.js';

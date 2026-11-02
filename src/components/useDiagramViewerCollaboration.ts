@@ -79,7 +79,7 @@ export const useDiagramViewerCollaboration = ({
     return resolveCollaborationSessionToken(userId);
   }, [userId]);
   const collaboration = useDeferredYjsCollaboration({
-    resolveToken,
+    resolveToken: userId ? resolveToken : undefined,
     userId,
     roomName,
     serverUrl,

@@ -14,6 +14,11 @@ describe('measured startup module groups', () => {
     expect(canvas?.test('C:\\repo\\node_modules\\@vizly\\core\\dist\\chunks\\LightTheme-DMMF1X09.js')).toBe(false);
   });
   it('owns each measured canvas and entry seed exactly once while retaining strict inventory bounds', () => {
+    const canvasSeeds = parseCanvasModuleInventory(JSON.parse(readFileSync(new URL('canvasModuleInventory.json', import.meta.url), 'utf8')));
+    const startupSeeds = parseStartupModuleInventory(JSON.parse(readFileSync(new URL('startupModuleInventory.json', import.meta.url), 'utf8')));
+    for (const group of Object.values(startupSeeds)) {
+      for (const key of group) expect(canvasSeeds.has(key)).toBe(false);
+    }
     for (const [name, parser, group] of [
       ['canvasModuleInventory.json', parseCanvasModuleInventory, 'canvas-runtime'],
       ['startupEntryModuleInventory.json', parseEntryModuleInventory, 'startup-entry-runtime'],
@@ -68,14 +73,14 @@ describe('measured startup module groups', () => {
     expect(startupModuleGroups.every(group => !group.test('/repo/node_modules/@vizly/core/dist/chunks/EnhancedThemeManagerRefactored-ABcd1234.js'))).toBe(true);
   });
   it('joins measured late canvas modules without collecting unrelated feature runtimes', () => {
-    for (const name of ['AdvancedFlowchartCanvasShell', 'TitleGroupNode', 'DomainDagreLayoutStrategy',
+    for (const name of ['TitleGroupNode', 'DomainDagreLayoutStrategy',
       'domainDagreFullEdgePreparation', 'edgeEndpointPathRepair']) {
       for (const prefix of ['/repo/node_modules/', 'C:\\repo\\node_modules\\']) {
         const id = prefix + '@vizly/core/dist/chunks/' + name + '-ABcd1234.js';
         expect(startupModuleGroups.filter(group => group.test(id)).map(group => group.name)).toEqual(['canvas-runtime']);
       }
     }
-    for (const name of ['CommandPalette', 'MindMapEditor', 'AdvancedFlowchartCanvasShellExtra', 'DomainDagreLayoutStrategyDebug']) {
+    for (const name of ['CommandPalette', 'MindMapEditor', 'AdvancedFlowchartCanvasShell', 'AdvancedFlowchartCanvasShellExtra', 'DomainDagreLayoutStrategyDebug']) {
       const id = '/repo/node_modules/@vizly/core/dist/chunks/' + name + '-ABcd1234.js';
       expect(startupModuleGroups.find(group => group.name === 'canvas-runtime')?.test(id)).toBe(false);
     }
