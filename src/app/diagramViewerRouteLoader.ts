@@ -1,5 +1,4 @@
 import type { ComponentType } from 'react';
-import { prewarmCanvasTheme } from '../main/prewarmCanvasTheme';
 
 type LazyPageModule = { default: ComponentType };
 
@@ -29,8 +28,5 @@ export const createDiagramViewerRouteLoader = ({
 
 export const loadDiagramViewerRoute = createDiagramViewerRouteLoader({
   loadPage: () => import('./DiagramViewerRoute'),
-  preloadCanvasRuntime: () => Promise.all([
-    import('@vizly/core/react'),
-    prewarmCanvasTheme(),
-  ]),
+  preloadCanvasRuntime: () => import('@vizly/core/react'),
 });
