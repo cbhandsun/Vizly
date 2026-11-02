@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 const openHistory = async (page: Page) => {
   await page.getByRole('button', { name: '文档操作', exact: true }).click();
-  await page.getByRole('menuitem', { name: /版本快照/ }).click();
+  await page.getByRole('menuitem', { name: /版本历史/ }).click();
   return page.locator('.version-history-drawer');
 };
 for (const width of [390, 1440]) test(`local version status survives reload and exports a usable snapshot / ${width}px`, async ({ page, context }) => {

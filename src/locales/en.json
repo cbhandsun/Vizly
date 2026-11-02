@@ -600,7 +600,7 @@
       "diffView": "Diff View",
       "historyPanel": "History",
       "operationHistory": "Operation history",
-      "versionHistory": "Version snapshots",
+      "versionHistory": "Version history",
       "smartOptimize": "Smart Optimize (resolve overlaps & align)",
       "pluginManager": "Plugin Manager",
       "commentMode": "Comment Mode (C)",

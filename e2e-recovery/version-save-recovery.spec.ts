@@ -69,7 +69,7 @@ test('version retry verifies cloud storage, retains 403 locally and isolates acc
   await expect(page.locator('.react-flow__node[data-id="node"]')).toBeVisible();
   const open = async () => {
     await page.getByRole('button', { name: '文档操作', exact: true }).click();
-    await page.getByRole('menuitem', { name: /版本快照/ }).click();
+    await page.getByRole('menuitem', { name: /版本历史/ }).click();
   };
   await open();
   const panel = page.locator('.version-history-drawer');

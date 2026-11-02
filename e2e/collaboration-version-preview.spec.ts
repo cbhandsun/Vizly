@@ -75,7 +75,7 @@ test('historical preview remains local and cannot overwrite autosave while peer 
     await expect(node).toContainText('Current live');
     await expect.poll(readSaved).toEqual(['Current live']);
     await page.getByRole('button', { name: '文档操作', exact: true }).click();
-    await page.getByRole('menuitem', { name: /版本快照/ }).click();
+    await page.getByRole('menuitem', { name: /版本历史/ }).click();
     await page.getByRole('button', { name: '预览版本：Historical fixture', exact: true }).click();
     await expect(node).toContainText('Historical preview');
     expect(readCollaborationElement(nodes.get(live.id))).toMatchObject({ data: { label: 'Current live' } });
