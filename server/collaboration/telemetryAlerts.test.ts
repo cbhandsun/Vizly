@@ -42,7 +42,8 @@ it('admits a repeated failure once across independent runtimes and fails closed 
    t.begin('permission')('failure', 'denied'); await t.flush(); await Promise.all([one.drain(), two.drain()]);
    expect(delivered).toHaveBeenCalledTimes(1); expect(claim).toHaveBeenCalledTimes(2);
    const broken = createTelemetryAlerts(delivered, Date.now, async () => { throw Error('offline'); });
-   const batch = projectTelemetryPayload({ ...t.snapshot(), sequence: 1 }); broken.submit(batch); await broken.drain();
+   t.begin('save')('failure', 'network');
+   const batch = projectTelemetryPayload({ ...t.snapshot(), sequence: 2 }); broken.submit(batch); await broken.drain();
    expect(delivered).toHaveBeenCalledTimes(1); broken.stop();
  } finally { t.dispose(); one.stop(); two.stop(); }
 });

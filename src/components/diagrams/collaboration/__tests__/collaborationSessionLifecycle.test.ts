@@ -35,3 +35,10 @@ it('bounds failed handshakes and session errors with backoff', async () => {
   const lifecycle = createCollaborationSessionLifecycle({ connect: vi.fn(), disconnect: vi.fn(), resolveToken, visible: () => true });
   lifecycle.start(); await vi.advanceTimersByTimeAsync(120_000); expect(resolveToken).toHaveBeenCalledTimes(5); lifecycle.stop();
 });
+
+it('does not restart a conflicted document when credentials rotate', async () => {
+ const connect = vi.fn(); let token = 'first';
+ const lifecycle = createCollaborationSessionLifecycle({ connect, disconnect: vi.fn(), resolveToken: async () => token, visible: () => true });
+ lifecycle.start(); await Promise.resolve(); lifecycle.suspend(); token = 'second'; lifecycle.credentialsChanged(token); await Promise.resolve();
+ expect(connect).toHaveBeenCalledTimes(1); lifecycle.stop();
+});

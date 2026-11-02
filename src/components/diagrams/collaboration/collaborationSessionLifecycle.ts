@@ -4,40 +4,41 @@ export function createCollaborationSessionLifecycle(options: {
   disconnect(): void;
   resolveToken(): Promise<string | null>;
   visible(): boolean;
+  unavailable?(): void;
   now?: () => number;
 }) {
   const now = options.now ?? Date.now;
-  let stopped = false, blocked = false, generation = 0, failures = 0;
+  let stopped = false, blocked = false, suspended = false, generation = 0, failures = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let token: string | undefined;
   const clear = () => { if (timer) clearTimeout(timer); timer = undefined; };
   const pause = () => { generation++; clear(); options.disconnect(); };
   const attempt = async () => {
-    if (stopped || blocked || !options.visible()) return;
+    if (stopped || blocked || suspended || !options.visible()) return;
     clear(); const current = ++generation;
     try {
       const next = await options.resolveToken();
       if (stopped || current !== generation || !options.visible()) return;
-      if (!next) { blocked = true; return; }
+      if (!next) { blocked = true; options.unavailable?.(); return; }
       // Decoding only prevents stale local handshakes; the server verifies authority.
       let expiry: number | undefined;
       if (next.split('.').length === 3) {
         try {
           const value: unknown = JSON.parse(atob(next.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
           if (value && typeof value === 'object' && 'exp' in value && typeof value.exp === 'number') expiry = value.exp * 1000;
-        } catch { blocked = true; return; }
-        if (!expiry || expiry <= now() + 5000) { blocked = true; return; }
+        } catch { blocked = true; options.unavailable?.(); return; }
+        if (!expiry || expiry <= now() + 5000) { blocked = true; options.unavailable?.(); return; }
       }
       token = next;
       options.connect(next);
       if (expiry) timer = setTimeout(() => { pause(); void attempt(); }, Math.min(2_147_000_000, Math.max(1000, expiry - now() - 30_000)));
     } catch {
-      if (!stopped && current === generation) retry();
+      if (!stopped && current === generation) { options.unavailable?.(); retry(); }
     }
   };
   const retry = () => {
     clear();
-    if (stopped || blocked || !options.visible()) return;
+    if (stopped || blocked || suspended || !options.visible()) return;
     if (++failures >= 5) { blocked = true; return; }
     timer = setTimeout(() => { void attempt(); }, Math.min(30_000, 1000 * 2 ** (failures - 1)));
   };
@@ -49,10 +50,10 @@ export function createCollaborationSessionLifecycle(options: {
       retry();
     },
     synced() { failures = 0; },
-    suspend() { blocked = true; pause(); },
+    suspend() { suspended = true; pause(); },
     visibilityChanged() { pause(); if (!blocked) void attempt(); },
     credentialsChanged(next?: string) {
-      if (next && next !== token) { blocked = false; failures = 0; pause(); void attempt(); }
+      if (!suspended && next && next !== token) { blocked = false; failures = 0; pause(); void attempt(); }
     },
     stop() { stopped = true; pause(); },
   };

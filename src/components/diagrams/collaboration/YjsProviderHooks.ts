@@ -222,6 +222,10 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         connectionState.update({ provider, wsStatus: 'connecting' });
         const connectionTelemetry = createConnectionTelemetry();
         const lifecycle = createCollaborationSessionLifecycle({
+            unavailable: () => {
+                connectionTelemetry.status('disconnected');
+                connectionState.update({ canWrite: false, synced: false, wsStatus: 'disconnected' });
+            },
             resolveToken: async () => credentials.current.resolveToken
                 ? credentials.current.resolveToken() : normalizeCollaborationToken(credentials.current.token) || null,
             visible: () => typeof document === 'undefined' || document.visibilityState !== 'hidden',
