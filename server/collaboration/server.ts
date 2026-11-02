@@ -30,10 +30,10 @@ import type { createRoomRecovery } from './roomRecovery.js';
 import { createRuntimeObservations } from './runtimeObservations.js';
 
 type SafeEvent = 'authorization-failed' | 'invalid-message' | 'persistence-failed' | 'room-load-failed' | 'cloud-coordination-failed' | 'room-synchronization-failed' | 'room-notification-failed';
-interface Connection { socket: WebSocket; token: string; diagramId: string; permission: DiagramPermission; awarenessId?: number; presenceId?: number; pending: number; window: number; messages: number; queue: Promise<void>; queuedPresence?: Uint8Array; queuedDocument?: Uint8Array }
+interface Connection { socket: WebSocket; token: string; diagramId: string; permission: DiagramPermission; awarenessId?: number; presenceId?: number; pending: number; window: number; messages: number; queue: Promise<void>; queuedPresence?: Uint8Array; queuedDocument?: Uint8Array; pendingPresence?: Set<number>; presenceFlush?: Promise<void>; processingPresence?: Promise<void> }
 interface Room { doc: Y.Doc; awareness: Awareness; connections: Set<Connection>; queue: Promise<void>; cloudRevision?: string;
   distributedLease?: DistributedRoomLease; detachLease?: () => void; synchronization?: RoomSynchronization;
-  nextPresenceId: number; remoteAwareness: ReturnType<typeof createRemoteRoomAwareness> }
+  independentMessages: Set<Promise<void>>; nextPresenceId: number; remoteAwareness: ReturnType<typeof createRemoteRoomAwareness> }
 export interface CollaborationServerOptions {
   telemetry?: Pick<TelemetryReceiverOptions, 'accept'>;
   operationTelemetry?: OperationTelemetry;
@@ -71,7 +71,7 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
   const admissions = new WeakMap<IncomingMessage, string>();
   const activeRooms = new Map<string, Room>();
   const rooms = createRoomLifetime<Room>(64, async room => {
-    try { await room.synchronization?.close(); await room.queue; }
+    try { await room.synchronization?.close(); await room.queue; await Promise.all(room.independentMessages); }
     finally {
       for (const [id, active] of activeRooms) if (active === room) activeRooms.delete(id);
       room.detachLease?.();
@@ -80,20 +80,23 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
     }
   });
   const connections = new Set<Connection>();
-  const readQueries = new Set<Promise<void>>();
-  let activeReadQueries = 0;
-  const readWaiters: Array<() => void> = [];
-  const runReadQuery = async (operation: () => Promise<void> | undefined) => {
-    // Parallel readers must not turn the former room queue into an unbounded
-    // burst of remote authorization requests across connections or rooms.
-    if (activeReadQueries >= 8) await new Promise<void>(resolve => { readWaiters.push(resolve); });
-    else activeReadQueries++;
+  const independentMessages = new Set<Promise<void>>();
+  let activeIndependentMessages = 0;
+  const independentWaiters: Array<() => void> = [];
+  const runIndependentMessage = async (operation: () => Promise<void> | undefined) => {
+    // Queries and ephemeral presence retain connection order without owning the
+    // durable room queue. Bound their combined work across all rooms.
+    if (activeIndependentMessages >= 8) await new Promise<void>(resolve => { independentWaiters.push(resolve); });
+    else activeIndependentMessages++;
     try { await operation(); }
     finally {
-      const next = readWaiters.shift();
-      if (next) next(); else activeReadQueries--;
+      const next = independentWaiters.shift();
+      if (next) next(); else activeIndependentMessages--;
     }
   };
+  const authorizationWork = new Set<Promise<DiagramPermission | null>>();
+  let activeAuthorizations = 0;
+  const authorizationWaiters: Array<() => void> = [];
   let pendingUpgrades = 0;
   let stopped = false;
   let stopPromise: Promise<void> | undefined;
@@ -131,18 +134,46 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
     timer.unref();
   };
   const authorize = async (token: string, diagramId: string) => {
+    if (stopped) return null;
     const finish = beginServerOperation('permission');
     let timedOut = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let cancelWaiting: (() => void) | undefined;
+    // One slot covers the actual upstream operation, even if its caller times
+    // out first. A queued check that expires or shuts down never calls Auth.
+    const work = (async () => {
+      if (activeAuthorizations >= 8) {
+        const acquired = await new Promise<boolean>(resolve => {
+          const wake = () => { cancelWaiting = undefined; resolve(true); };
+          authorizationWaiters.push(wake);
+          cancelWaiting = () => {
+            const index = authorizationWaiters.indexOf(wake);
+            if (index < 0) return;
+            authorizationWaiters.splice(index, 1); cancelWaiting = undefined; resolve(false);
+          };
+        });
+        if (!acquired) return null;
+      } else activeAuthorizations++;
+      try { return timedOut || stopped ? null : await options.authorize(token, diagramId); }
+      finally {
+        const next = authorizationWaiters.shift();
+        if (next) next(); else activeAuthorizations--;
+      }
+    })();
+    const bounded = Promise.race([
+      work,
+      new Promise<null>(resolve => { timer = setTimeout(() => { timedOut = true; cancelWaiting?.(); resolve(null); }, 6000); }),
+    ]);
+    // Shutdown drains the bounded request, not an adapter that ignores its
+    // own network deadline. The actual work still retains its concurrency slot.
+    const drained = bounded.catch(() => null);
+    authorizationWork.add(drained);
     try {
-      const result = await Promise.race([
-        options.authorize(token, diagramId),
-        new Promise<null>(resolve => { timer = setTimeout(() => { timedOut = true; resolve(null); }, 6000); }),
-      ]);
+      const result = await bounded;
       finish(result ? 'success' : 'failure', result ? undefined : timedOut ? 'timeout' : 'denied');
       return result;
     } catch { finish('failure', 'unavailable'); options.log?.('authorization-failed'); return null; }
-    finally { if (timer) clearTimeout(timer); }
+    finally { if (timer) clearTimeout(timer); authorizationWork.delete(drained); }
   };
   const allowed = async (connection: Connection) => {
     if (stopped || connection.socket.readyState !== WebSocket.OPEN) return false;
@@ -157,7 +188,7 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
     if (roleChanged && connection.socket.readyState === WebSocket.OPEN) {
       connection.socket.send(message(4, encoder => encoding.writeVarString(encoder, formatCollaborationAccess(permission.role))));
     }
-    return connection.socket.readyState === WebSocket.OPEN;
+    return connection.socket.readyState === WebSocket.OPEN ? permission : false;
   };
   // Only call synchronously after allowed(), with no intervening async work.
   // This is request-local permission reuse, never a cached authorization.
@@ -171,6 +202,59 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
     sendWithCurrentPermission(connection, payload);
   };
   const broadcast = (room: Room, payload: Uint8Array) => Promise.all([...room.connections].map(connection => send(connection, payload)));
+  // Call only in the synchronous continuation of this recipient's fresh
+  // allowed() check. Cursor batching never carries a permission across awaits.
+  const sendPendingPresence = (room: Room, connection: Connection) => {
+    if (!connection.pendingPresence?.size || stopped || connection.socket.readyState !== WebSocket.OPEN) return;
+    const clients = [...connection.pendingPresence].filter(id => room.awareness.meta.has(id));
+    connection.pendingPresence.clear();
+    if (clients.length === 0) return;
+    const update = encodeAwarenessUpdate(room.awareness, clients);
+    if (update.byteLength > MAX_DOCUMENT_BYTES) { close(connection); return; }
+    sendWithCurrentPermission(connection, message(1, encoder => encoding.writeVarUint8Array(encoder, update)));
+  };
+  const flushPresence = (room: Room, connection: Connection) => {
+    if (connection.presenceFlush || !connection.pendingPresence?.size || stopped
+      || connection.socket.readyState !== WebSocket.OPEN) return;
+    const flushing = (async () => {
+      while (connection.pendingPresence?.size && !stopped && connection.socket.readyState === WebSocket.OPEN) {
+        // An incoming cursor already doing fresh Auth can synchronously send
+        // these pending states when it finishes. Wait for that operation rather
+        // than issuing another check concurrently for the same recipient.
+        if (connection.processingPresence) { await connection.processingPresence; continue; }
+        if (!await allowed(connection)) return;
+        sendPendingPresence(room, connection);
+      }
+    })().catch(() => { options.log?.('invalid-message'); close(connection); }).finally(() => {
+      connection.presenceFlush = undefined;
+      independentMessages.delete(flushing); room.independentMessages.delete(flushing);
+      flushPresence(room, connection);
+    });
+    connection.presenceFlush = flushing;
+    independentMessages.add(flushing); room.independentMessages.add(flushing);
+  };
+  const publishPresence = (room: Room, clients: readonly number[]) => {
+    for (const connection of room.connections) {
+      if (connection.socket.readyState !== WebSocket.OPEN) continue;
+      const pending = connection.pendingPresence ??= new Set();
+      // Clock-zero updates can be ignored by Awareness before it has any
+      // metadata. They must not become outbound re-encoding failures.
+      for (const client of clients) if (room.awareness.meta.has(client)) pending.add(client);
+      if (pending.size > 8192) { close(connection); continue; }
+      flushPresence(room, connection);
+    }
+  };
+  const publishPresenceUpdate = (room: Room, update: Uint8Array) => {
+    if (update.byteLength > MAX_DOCUMENT_BYTES) throw new Error('Presence exceeds budget');
+    const decoder = decoding.createDecoder(update), count = decoding.readVarUint(decoder);
+    if (count > 8192) throw new Error('Presence count exceeds budget');
+    const clients: number[] = [];
+    for (let i = 0; i < count; i++) {
+      clients.push(decoding.readVarUint(decoder)); decoding.readVarUint(decoder); decoding.readVarString(decoder);
+    }
+    if (decoding.hasContent(decoder)) throw new Error('Unexpected presence bytes');
+    publishPresence(room, clients);
+  };
   const getRoom = async (diagramId: string, token: string, userId: string): Promise<RoomLease<Room>> => {
     const lease = await rooms.acquire(diagramId, async (): Promise<Room> => {
       const doc = new Y.Doc();
@@ -202,7 +286,7 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
         const awareness = new Awareness(doc);
         awareness.setLocalState(null);
         const room: Room = { doc, awareness, connections: new Set(), queue: Promise.resolve(), cloudRevision, distributedLease,
-          nextPresenceId: 0, remoteAwareness: createRemoteRoomAwareness(awareness) };
+          independentMessages: new Set(), nextPresenceId: 0, remoteAwareness: createRemoteRoomAwareness(awareness) };
         initializingRoom = room;
         if (distributedLease) {
           const lost = () => { for (const connection of room.connections) close(connection); };
@@ -231,7 +315,7 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
                 if (stopped) return; room.distributedLease?.assertActive();
                 const reserved = new Set([...room.connections].flatMap(connection => connection.awarenessId === undefined ? [] : [connection.awarenessId]));
                 const update = room.remoteAwareness.apply(delta, reserved);
-                if (update) await broadcast(room, message(1, encoder => encoding.writeVarUint8Array(encoder, update)));
+                if (update) publishPresenceUpdate(room, update);
               },
             },
             unavailable: () => { options.log?.('room-synchronization-failed'); for (const connection of room.connections) close(connection); },
@@ -295,7 +379,7 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
     }
     return lease;
   };
-  const applyUpdate = async (room: Room, connection: Connection, update: Uint8Array) => {
+  const applyUpdate = async (room: Room, connection: Connection, update: Uint8Array, permission: DiagramPermission) => {
     const candidate = new Y.Doc();
     try {
       const previous = Y.encodeStateAsUpdate(room.doc);
@@ -305,7 +389,7 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
       if (!hasSharedCollaborationElements(candidate)) throw new Error('Unsupported document format');
       const next = Y.encodeStateAsUpdate(candidate);
       if (Buffer.from(previous).equals(Buffer.from(next))) return;
-      if (connection.permission.role !== 'editor') throw new Error('Read-only document');
+      if (permission.role !== 'editor') throw new Error('Read-only document');
       try {
         room.distributedLease?.assertActive();
         const committed = acceptPersistedRoomState(next, await options.persistence.save(connection.diagramId, Uint8Array.from(next)));
@@ -321,9 +405,12 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
       void room.synchronization?.notifyCommitted().catch(() => options.log?.('room-notification-failed'));
     } finally { candidate.destroy(); }
   };
-  const handleMessage = async (room: Room, connection: Connection, input: Uint8Array) => {
-    if (!await allowed(connection)) return;
-    const decoder = decoding.createDecoder(input);
+  const handleMessage = async (room: Room, connection: Connection, input: Uint8Array, latestPresence?: () => Uint8Array | undefined) => {
+    const permission = await allowed(connection);
+    if (!permission) return;
+    const current = latestPresence ? latestPresence() : input;
+    if (!current) return;
+    const decoder = decoding.createDecoder(current);
     const kind = decoding.readVarUint(decoder);
     if (kind === 0) {
       const subtype = decoding.readVarUint(decoder);
@@ -335,7 +422,7 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
         if (revision) sendWithCurrentPermission(connection, message(CLOUD_REVISION_MESSAGE,
           encoder => writeAcceptedCloudRevision(encoder, revision, room.doc)));
       } else if (subtype === sync.messageYjsSyncStep2 || subtype === sync.messageYjsUpdate) {
-        await applyUpdate(room, connection, payload);
+        await applyUpdate(room, connection, payload, permission);
       } else throw new Error('Unknown synchronization message');
     } else if (kind === 1) {
       const update = decoding.readVarUint8Array(decoder);
@@ -358,7 +445,9 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
       encoding.writeVarString(sanitized, JSON.stringify(sanitizePresence(state, connection.permission.userId)));
       const safeUpdate = encoding.toUint8Array(sanitized);
       applyAwarenessUpdate(room.awareness, safeUpdate, connection);
-      await broadcast(room, message(1, encoder => encoding.writeVarUint8Array(encoder, safeUpdate)));
+      publishPresence(room, [clientId]);
+      // No await follows the incoming permission check before this send.
+      sendPendingPresence(room, connection);
       void room.synchronization?.notifyPresence?.().catch(() => options.log?.('room-notification-failed'));
     } else if (kind === 3 && !decoding.hasContent(decoder)) {
       sendWithCurrentPermission(connection, message(1, encoder => encoding.writeVarUint8Array(encoder, encodeAwarenessUpdate(room.awareness, [...room.awareness.getStates().keys()]))));
@@ -444,44 +533,55 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
           }
           if (++connection.pending > 16) { close(connection); return; }
           const queuedAt = performance.now();
-          // A state query never mutates the room. Keep its fresh authorization
-          // in this connection's arrival order without blocking other readers.
-          // Mutating/protocol messages also wait for this connection's prior
-          // query, and retain the shared room serialization for durable edits.
+          // Presence changes only ephemeral awareness, synchronously after its
+          // fresh authorization. Its monotonic clocks allow independent peers
+          // to progress; durable updates retain the shared room serialization.
+          // Every operation still waits for its own connection's prior work.
           const readQuery = input.byteLength === 1 && input[0] === 3;
-          const preceding = readQuery ? connection.queue
+          const independent = readQuery || presenceMessage;
+          const preceding = independent ? connection.queue
             : Promise.all([room.queue, connection.queue]);
           const processMessage = () => {
             // Observation failures must never change authorization or message processing.
             try { options.observeMessageQueue?.(Object.freeze({
               waitMs: Math.max(0, performance.now() - queuedAt), connectionPending: connection.pending,
             })); } catch { /* Diagnostic adapters are not part of the data path. */ }
-            const current = presenceMessage ? connection.queuedPresence : documentUpdate
+            if (presenceMessage) {
+              // Inputs arriving during this fresh check can still replace the
+              // cursor. Consume it after Auth, avoiding a second check merely
+              // to catch the pointer up to the position already waiting here.
+              return handleMessage(room, connection, input, () => {
+                const current = connection.queuedPresence;
+                connection.queuedPresence = undefined;
+                return current;
+              });
+            }
+            const current = documentUpdate
               ? message(0, encoder => sync.writeUpdate(encoder, connection.queuedDocument ?? documentUpdate)) : input;
-            if (presenceMessage) connection.queuedPresence = undefined;
             if (documentUpdate) connection.queuedDocument = undefined;
-            return current ? handleMessage(room, connection, current) : undefined;
+            return handleMessage(room, connection, current);
           };
-          const processing = preceding.then(() => readQuery ? runReadQuery(processMessage) : processMessage())
+          const processing = preceding.then(() => independent ? runIndependentMessage(processMessage) : processMessage())
             .catch(() => { options.log?.('invalid-message'); close(connection); })
             .finally(() => {
               connection.pending--;
-              if (readQuery) readQueries.delete(processing);
+              if (connection.processingPresence === processing) connection.processingPresence = undefined;
+              if (independent) { independentMessages.delete(processing); room.independentMessages.delete(processing); }
             });
-          if (readQuery) readQueries.add(processing);
+          if (independent) { independentMessages.add(processing); room.independentMessages.add(processing); }
           connection.queue = processing;
-          if (!readQuery) room.queue = processing;
+          if (presenceMessage) connection.processingPresence = processing;
+          if (!independent) room.queue = processing;
         }));
         ws.on('close', bindServerTelemetry(options.operationTelemetry, () => {
           admission.event('socket-closed');
           connections.delete(connection);
+          connection.pendingPresence?.clear();
           room.connections.delete(connection);
           void room.synchronization?.notifyPresence?.().catch(() => options.log?.('room-notification-failed'));
           if (!stopped && connection.awarenessId !== undefined && room.awareness.meta.has(connection.awarenessId)) {
             removeAwarenessStates(room.awareness, [connection.awarenessId], connection);
-            const update = encodeAwarenessUpdate(room.awareness, [connection.awarenessId]);
-            room.queue = room.queue.then(async () => { await broadcast(room, message(1, encoder => encoding.writeVarUint8Array(encoder, update))); })
-              .catch(() => options.log?.('authorization-failed'));
+            publishPresence(room, [connection.awarenessId]);
           }
           void reservation.release().catch(() => options.log?.('room-load-failed'));
         }));
@@ -564,7 +664,7 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
       stopPromise = Promise.resolve().then(async () => {
         for (const socket of upgrades) socket.destroy();
         for (const connection of connections) connection.socket.terminate();
-        const results = await Promise.allSettled([recoverHttp?.stop(), rooms.stop(), ...readQueries,
+        const results = await Promise.allSettled([recoverHttp?.stop(), rooms.stop(), ...independentMessages, ...authorizationWork,
           new Promise<void>((accept, reject) => websocket.close(error => error ? reject(error) : accept())),
           http.listening ? new Promise<void>((accept, reject) => http.close(error => error ? reject(error) : accept())) : Promise.resolve(),
         ]);
