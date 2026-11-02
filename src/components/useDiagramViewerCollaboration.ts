@@ -78,8 +78,11 @@ export const useDiagramViewerCollaboration = ({
     const { resolveCollaborationSessionToken } = await import('@/services/collaborationSession');
     return resolveCollaborationSessionToken(userId);
   }, [userId]);
+  // A configured Auth backend must also fence the initial session-loading gap.
+  // Optional-token transports remain available when Auth is unconfigured.
+  const requiresSession = Boolean(import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_ANON_KEY);
   const collaboration = useDeferredYjsCollaboration({
-    resolveToken: userId ? resolveToken : undefined,
+    resolveToken: requiresSession ? resolveToken : undefined,
     userId,
     roomName,
     serverUrl,
