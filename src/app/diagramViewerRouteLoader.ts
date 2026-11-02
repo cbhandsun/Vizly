@@ -28,5 +28,8 @@ export const createDiagramViewerRouteLoader = ({
 
 export const loadDiagramViewerRoute = createDiagramViewerRouteLoader({
   loadPage: () => import('./DiagramViewerRoute'),
-  preloadCanvasRuntime: () => import('@vizly/core/react'),
+  preloadCanvasRuntime: () => Promise.all([
+    import('@vizly/core/react'),
+    import('@vizly/core/theme-runtime').then(({ preloadConfiguredTheme }) => preloadConfiguredTheme()),
+  ]),
 });
