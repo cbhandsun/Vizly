@@ -8,7 +8,7 @@ export function createCollaborationSessionLifecycle(options: {
   now?: () => number;
 }) {
   const now = options.now ?? Date.now;
-  let stopped = false, blocked = false, suspended = false, generation = 0, failures = 0;
+  let stopped = false, blocked = false, suspended = false, retryExhausted = false, generation = 0, failures = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let token: string | undefined;
   const clear = () => { if (timer) clearTimeout(timer); timer = undefined; };
@@ -39,21 +39,25 @@ export function createCollaborationSessionLifecycle(options: {
   const retry = () => {
     clear();
     if (stopped || blocked || suspended || !options.visible()) return;
-    if (++failures >= 5) { blocked = true; return; }
+    if (++failures >= 5) { blocked = true; retryExhausted = true; return; }
     timer = setTimeout(() => { void attempt(); }, Math.min(30_000, 1000 * 2 ** (failures - 1)));
   };
   return {
     start() { void attempt(); },
     closed(code?: number) {
       generation++; clear();
-      if (code === 1008) blocked = true;
+      if (code === 1008) { blocked = true; retryExhausted = false; }
       retry();
     },
     synced() { failures = 0; },
     suspend() { suspended = true; pause(); },
-    visibilityChanged() { pause(); if (!blocked) void attempt(); },
+    visibilityChanged() {
+      // A real foreground/online transition may recover an outage, never a policy rejection.
+      if (options.visible() && retryExhausted && !suspended) { blocked = false; retryExhausted = false; failures = 0; }
+      pause(); if (!blocked) void attempt();
+    },
     credentialsChanged(next?: string) {
-      if (!suspended && next && next !== token) { blocked = false; failures = 0; pause(); void attempt(); }
+      if (!suspended && next && next !== token) { blocked = false; retryExhausted = false; failures = 0; pause(); void attempt(); }
     },
     stop() { stopped = true; pause(); },
   };

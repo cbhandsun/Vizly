@@ -42,3 +42,11 @@ it('does not restart a conflicted document when credentials rotate', async () =>
  lifecycle.start(); await Promise.resolve(); lifecycle.suspend(); token = 'second'; lifecycle.credentialsChanged(token); await Promise.resolve();
  expect(connect).toHaveBeenCalledTimes(1); lifecycle.stop();
 });
+
+it('rechecks the session after a real network/foreground recovery without reopening a denied socket', async () => {
+ vi.useFakeTimers(); let offline = true; const connect = vi.fn();
+ const lifecycle = createCollaborationSessionLifecycle({ connect, disconnect: vi.fn(), resolveToken: async () => { if (offline) throw Error('offline'); return 'fresh'; }, visible: () => true });
+ lifecycle.start(); await vi.advanceTimersByTimeAsync(120_000); expect(connect).not.toHaveBeenCalled();
+ offline = false; lifecycle.visibilityChanged(); await Promise.resolve(); expect(connect).toHaveBeenCalledTimes(1);
+ lifecycle.closed(1008); lifecycle.visibilityChanged(); await vi.advanceTimersByTimeAsync(60_000); expect(connect).toHaveBeenCalledTimes(1); lifecycle.stop();
+});
