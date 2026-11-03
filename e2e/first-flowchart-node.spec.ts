@@ -2,14 +2,14 @@ import { expect, test } from '@playwright/test';
 import { persistedAutoSaveNodeCount } from './helpers/localDiagramDatabase';
 
 for (const width of [390, 621, 1280]) {
-  test(`first rectangle waits safely for the advanced canvas chunk / ${width}px`, async ({ page }) => {
+  test(`first rectangle works after a delayed canvas runtime / ${width}px`, async ({ page }) => {
     const pageErrors: string[] = [];
     page.on('pageerror', error => pageErrors.push(error.message));
-    let advancedRequested = false;
+    let canvasRuntimeRequested = false;
     let releaseChunk: () => void = () => {};
     const chunkGate = new Promise<void>(resolve => { releaseChunk = resolve; });
-    await page.route('**/assets/AdvancedFlowchartCanvasShell-*.js', async route => {
-      advancedRequested = true;
+    await page.route('**/assets/canvas-runtime-*.js', async route => {
+      canvasRuntimeRequested = true;
       await chunkGate;
       await route.continue();
     });
@@ -18,17 +18,18 @@ for (const width of [390, 621, 1280]) {
     try {
       await page.goto('/#/manage');
       await page.getByRole('button', { name: '新建流程图', exact: true }).click();
-      await page.getByRole('button', { name: '选择第一个图形', exact: true }).click();
-      const library = page.getByRole('dialog', { name: '基础形状', exact: true });
-      await library.getByRole('button', { name: '矩形', exact: true }).click();
-      await expect.poll(() => advancedRequested).toBe(true);
-      await page.getByRole('button', { name: /^放大 \(/ }).click();
+      await expect.poll(() => canvasRuntimeRequested).toBe(true);
       await expect(page.getByText('渲染失败', { exact: true })).toHaveCount(0);
       expect(pageErrors).toEqual([]);
     } finally {
       releaseChunk();
     }
+    await page.getByRole('button', { name: '选择第一个图形', exact: true }).click();
+    const library = page.getByRole('dialog', { name: '基础形状', exact: true });
+    await library.getByRole('button', { name: '矩形', exact: true }).click();
+    await page.getByRole('button', { name: /^放大 \(/ }).click();
     await expect(page.locator('.react-flow__node')).toHaveCount(1);
+    await expect(page.getByText('渲染失败', { exact: true })).toHaveCount(0);
     expect(pageErrors).toEqual([]);
   });
 
