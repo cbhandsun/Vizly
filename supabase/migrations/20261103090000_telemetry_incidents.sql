@@ -62,11 +62,12 @@ begin
     end if;
   end loop;
   -- A success only resolves the same operation and producer class, after a
-  -- full quiet window. A failure in the same batch always wins.
+  -- quiet period longer than the observed two-minute reconnect cycle.
+  -- A failure in the same batch always wins.
   update vizly_telemetry.incidents as active
   set resolved_at = observed_at, notified = false
   where active.source = p_source and active.resolved_at is null
-    and active.last_failure_at <= observed_at - interval '1 minute'
+    and active.last_failure_at <= observed_at - interval '5 minutes'
     and exists (select 1 from jsonb_array_elements(projected->'events') e
       where e->>'operation' = active.operation and e->>'outcome' = 'success')
     and not exists (select 1 from jsonb_array_elements(projected->'events') e

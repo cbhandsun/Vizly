@@ -29,7 +29,7 @@
     "20261026191139_ai_gateway_shared_resource_leases.sql": "24352e648442877ff0ab65d2a1ad334ec277a17132d0b935a7b8022348a44e88",
     "20261027211956_bounded_telemetry_journal.sql": "0f06121ede85ceda6080130e1e1f8ca9acc1e032578e81fbe5ef6d1f3959049c",
     "20261102030403_telemetry_alert_claims.sql": "5c150fa0d2af34f7ef9458068b11b149ed900c78aabc2ab28462dbbba11fb5af",
-    "20261103090000_telemetry_incidents.sql": "0acfb5a49938aa989ef51962caaf929e9d8701aa61929a7c034e18cf2a9925f9"
+    "20261103090000_telemetry_incidents.sql": "3042dabf6fec1c9c151f52f23e1737d875cf96c40e68c060109e51ad8d525c46"
   },
   "extensionSchemas": {
     "20261026191139_ai_gateway_shared_resource_leases.sql": {

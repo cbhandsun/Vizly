@@ -124,11 +124,14 @@ export async function runTelemetryJournalDatabaseRegression(docker, container, d
   sql("UPDATE vizly_telemetry.incidents SET last_failure_at=clock_timestamp()-interval '20 minutes';");
   assert.equal(sql(incidentBatch(12003, 'failure', 'server', 'b'.repeat(40))).trim(), '0');
   sql("UPDATE vizly_telemetry.incidents SET last_failure_at=clock_timestamp()-interval '2 minutes';");
-  assert.equal(sql(incidentBatch(12004, 'success', 'browser')).trim(), '0');
+  // A brief successful reconnect in the observed two-minute cycle is not recovery.
+  assert.equal(sql(incidentBatch(12004, 'success')).trim(), '0');
+  sql("UPDATE vizly_telemetry.incidents SET last_failure_at=clock_timestamp()-interval '6 minutes';");
+  assert.equal(sql(incidentBatch(12005, 'success', 'browser')).trim(), '0');
   assert.equal(sql("SELECT resolved_at IS NULL FROM vizly_telemetry.incidents WHERE source='server';").trim(), 't');
-  assert.equal(sql(incidentBatch(12005, 'success')).trim(), '0');
+  assert.equal(sql(incidentBatch(12006, 'success')).trim(), '0');
   assert.equal(sql("SELECT resolved_at IS NOT NULL FROM vizly_telemetry.incidents WHERE source='server';").trim(), 't');
-  assert.equal(sql(incidentBatch(12006, 'failure')).trim(), '1');
+  assert.equal(sql(incidentBatch(12007, 'failure')).trim(), '1');
   return [...report.cases, 'server-only-schema-and-invoker-rpcs', 'contended-writer-fails-without-mutation',
     'independent-concurrent-writers-preserve-budget-and-acknowledgments',
     'alert-rpc-role-isolation', 'alert-cross-release-cooldown-and-replay', 'alert-global-rate-budget', 'alert-concurrent-single-admission',

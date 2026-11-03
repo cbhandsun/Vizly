@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
+import * as decoding from 'lib0/decoding';
+import { COLLABORATION_RESUME_PROTOCOL, COORDINATION_STATUS_MESSAGE } from './coordinationStatus.js';
 import { createCollaborationServer } from './server.js';
 import type { DistributedRoomLease } from './distributedRoomLease.js';
 import type { RoomSynchronization } from './distributedRoomSync.js';
@@ -51,7 +53,7 @@ it('keeps planned socket retirement alive until the room lease has been released
     origins: new Set([origin]), socketLifetimeMs: 100, waitForBackground: task => tasks.push(task),
   });
   const { url } = await server.listen();
-  const socket = new WebSocket(`${url}/vizly-room-${roomId}?token=synthetic`, 'vizly-resume-v1', { origin });
+  const socket = new WebSocket(`${url}/vizly-room-${roomId}?token=synthetic`, COLLABORATION_RESUME_PROTOCOL, { origin });
   try {
     const closeCode = await new Promise<number>((resolve, reject) => {
       socket.once('close', resolve);
@@ -70,6 +72,48 @@ it('keeps planned socket retirement alive until the room lease has been released
   } finally {
     releaseLease?.();
     socket.terminate();
+    await server.stop();
+  }
+});
+
+it('pauses a legacy peer on lost lease and lets a current peer reconnect', async () => {
+  const lease = new AbortController();
+  const server = createCollaborationServer({
+    authorize: async () => ({ userId: 'synthetic-editor', role: 'editor' }),
+    persistence: { load: async () => null, save: async () => undefined },
+    acquireRoomLease: async () => ({ leaseId: roomId, generation, signal: lease.signal,
+      assertActive() { lease.signal.throwIfAborted(); }, async close() {} }),
+    origins: new Set([origin]),
+  });
+  const { url } = await server.listen();
+  const room = `${url}/vizly-room-${roomId}?token=synthetic`;
+  const old = new WebSocket(room, { origin });
+  const current = new WebSocket(room, COLLABORATION_RESUME_PROTOCOL, { origin });
+  const inspect = (socket: WebSocket) => {
+    const control: string[] = [];
+    socket.on('message', data => {
+      if (!Buffer.isBuffer(data)) return;
+      const decoder = decoding.createDecoder(data);
+      if (decoding.readVarUint(decoder) === COORDINATION_STATUS_MESSAGE) control.push(decoding.readVarString(decoder));
+    });
+    const opened = new Promise<void>((resolve, reject) => {
+      socket.once('open', resolve);
+      socket.once('error', reject);
+    });
+    const closed = new Promise<number>(resolve => socket.once('close', resolve));
+    return { control, opened, closed };
+  };
+  const legacy = inspect(old);
+  const modern = inspect(current);
+  try {
+    await Promise.all([legacy.opened, modern.opened]);
+    lease.abort();
+    expect(await Promise.all([legacy.closed, modern.closed])).toEqual([1013, 1013]);
+    expect(legacy.control).toEqual(['cloud-unavailable']);
+    expect(modern.control).toEqual([]);
+  } finally {
+    old.terminate();
+    current.terminate();
     await server.stop();
   }
 });
