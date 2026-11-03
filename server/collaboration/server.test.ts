@@ -571,7 +571,7 @@ describe('authenticated collaboration over actual loopback WebSockets', () => {
     const runtime = await setup({ load: async () => Uint8Array.from([255]) });
     await expect(raw(runtime.url, 'owner-test')).rejects.toThrow('403');
     runtime.authorize.mockRejectedValueOnce(new Error('Synthetic credential error'));
-    await expect(raw(runtime.url, 'owner-test')).rejects.toThrow('403');
+    await expect(raw(runtime.url, 'owner-test')).rejects.toThrow('503');
     expect(runtime.log).toHaveBeenCalledWith('authorization-failed');
   });
 });

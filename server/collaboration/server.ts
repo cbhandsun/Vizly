@@ -30,7 +30,7 @@ import type { createRoomRecovery } from './roomRecovery.js';
 import { createRuntimeObservations } from './runtimeObservations.js';
 
 type SafeEvent = 'authorization-failed' | 'invalid-message' | 'persistence-failed' | 'room-load-failed' | 'cloud-coordination-failed' | 'room-synchronization-failed' | 'room-notification-failed';
-interface Connection { socket: WebSocket; resume?: boolean; token: string; diagramId: string; permission: DiagramPermission; awarenessId?: number; presenceId?: number; pending: number; window: number; messages: number; queue: Promise<void>; queuedPresence?: Uint8Array; queuedDocument?: Uint8Array; pendingPresence?: Set<number>; presenceFlush?: Promise<void>; processingPresence?: Promise<void> }
+interface Connection { socket: WebSocket; resume?: boolean; lastSentAt?: number; token: string; diagramId: string; permission: DiagramPermission; awarenessId?: number; presenceId?: number; pending: number; window: number; messages: number; queue: Promise<void>; queuedPresence?: Uint8Array; queuedDocument?: Uint8Array; pendingPresence?: Set<number>; presenceFlush?: Promise<void>; processingPresence?: Promise<void> }
 interface Room { doc: Y.Doc; awareness: Awareness; connections: Set<Connection>; queue: Promise<void>; cloudRevision?: string;
   distributedLease?: DistributedRoomLease; detachLease?: () => void; synchronization?: RoomSynchronization;
   independentMessages: Set<Promise<void>>; nextPresenceId: number; remoteAwareness: ReturnType<typeof createRemoteRoomAwareness> }
@@ -63,8 +63,9 @@ const message = (kind: number, body: (encoder: encoding.Encoder) => void) => {
 };
 const bytes = (data: RawData): Uint8Array => data instanceof ArrayBuffer ? new Uint8Array(data)
   : Array.isArray(data) ? Buffer.concat(data) : data;
-const rejectUpgrade = (socket: Duplex, instanceId: string, admissionId: string) => {
-  socket.end(`HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\nX-Vizly-Instance: ${instanceId}\r\nX-Vizly-Admission: ${admissionId}\r\n\r\n`);
+const rejectUpgrade = (socket: Duplex, instanceId: string, admissionId: string, unavailable = false) => {
+  const status = unavailable ? '503 Service Unavailable' : '403 Forbidden';
+  socket.end(`HTTP/1.1 ${status}\r\nConnection: close\r\nContent-Length: 0\r\nX-Vizly-Instance: ${instanceId}\r\nX-Vizly-Admission: ${admissionId}\r\n\r\n`);
 };
 
 /** Loopback-only runtime. Authorization and durability precede every accepted update. */
@@ -216,10 +217,14 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
   };
   // Only call synchronously after allowed(), with no intervening async work.
   // This is request-local permission reuse, never a cached authorization.
+  // y-websocket's watchdog measures application frames. A zero-entry
+  // awareness update keeps an authorized idle client alive without state changes.
+  const idleHeartbeat = message(1, encoder => encoding.writeVarUint8Array(encoder, Uint8Array.of(0)));
   const sendWithCurrentPermission = (connection: Connection, payload: Uint8Array) => {
     if (stopped || connection.socket.readyState !== WebSocket.OPEN) return;
     if (connection.socket.bufferedAmount > MAX_DOCUMENT_BYTES) { close(connection); return; }
     connection.socket.send(payload);
+    connection.lastSentAt = Date.now();
   };
   const send = async (connection: Connection, payload: Uint8Array) => {
     if (!await allowed(connection)) return;
@@ -478,10 +483,15 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
     } else throw new Error('Unknown message');
   };
   http.on('upgrade', bindServerTelemetry(options.operationTelemetry, (request, socket, head) => {
+    const invocationStarted = performance.now();
     const admission = observations.admission();
     admissions.set(request, admission.admissionId);
     admission.event('upgrade-started');
     const deny = () => { admission.event('upgrade-denied'); rejectUpgrade(socket, observations.instanceId, admission.admissionId); };
+    const unavailable = () => {
+      admission.event('upgrade-failed');
+      rejectUpgrade(socket, observations.instanceId, admission.admissionId, true);
+    };
     const parsed = parseConnection(request.url, request.headers.origin, options.origins);
     if (!parsed || stopped || recoveringRooms.has(parsed.diagramId) || connections.size + pendingUpgrades >= 128) { deny(); return; }
     const expiry = collaborationCredentialExpiry(parsed.token);
@@ -504,6 +514,7 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
     }
     void (async () => {
       const permission = await authorize(parsed.token, parsed.diagramId);
+      if (permission === undefined) { unavailable(); return; }
       if (!permission || stopped || socket.destroyed) { deny(); return; }
       admission.event('permission-accepted');
       admission.event('room-loading');
@@ -511,6 +522,11 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
       catch (error: unknown) {
         admission.event('room-failed');
         if (!options.loadInitialRoom || stopped || socket.destroyed) throw error;
+        if (resume && !(error instanceof CloudRoomConflictError)) {
+          options.log?.('room-load-failed');
+          unavailable();
+          return;
+        }
         // Report a content-free recovery state only after revalidating access.
         // This socket never joins a room and never accepts document updates.
         const fresh = await authorize(parsed.token, parsed.diagramId);
@@ -538,7 +554,8 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
         const connection: Connection = { socket: ws, ...parsed, permission, resume, presenceId: room.nextPresenceId++, pending: 0, window: Date.now(), messages: 0, queue: Promise.resolve() };
         room.connections.add(connection);
         connections.add(connection);
-        const lifetime = options.socketLifetimeMs;
+        const lifetime = options.socketLifetimeMs === undefined ? undefined
+          : Math.max(0, options.socketLifetimeMs - (performance.now() - invocationStarted));
         const legacyDeadline = !resume && expiry !== undefined ? expiry - Date.now() - 5000 : Infinity;
         const retirement = lifetime === undefined ? undefined : setTimeout(() => {
           admission.event('socket-retiring');
@@ -657,7 +674,12 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
   const recheck = setInterval(bindServerTelemetry(options.operationTelemetry, () => {
     if (checking || stopped) return;
     checking = true;
-    void Promise.all([...connections].map(connection => allowed(connection)))
+    void Promise.all([...connections].map(async connection => {
+      if (!await allowed(connection)) return;
+      if (Date.now() - (connection.lastSentAt ?? 0) >= 12_000) {
+        sendWithCurrentPermission(connection, idleHeartbeat);
+      }
+    }))
       .then(async () => {
         if (!options.coordinateActiveRoom || stopped) return;
         await Promise.all([...activeRooms].map(async ([diagramId, room]) => {
@@ -683,9 +705,13 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
             } finally { candidate.destroy(); }
           }).catch(async (error: unknown) => {
             options.log?.('cloud-coordination-failed');
+            if (!(error instanceof CloudRoomConflictError)) {
+              for (const connection of room.connections) interrupt(connection);
+              return;
+            }
             try {
-              await broadcast(room, message(COORDINATION_STATUS_MESSAGE, encoder => encoding.writeVarString(encoder,
-                error instanceof CloudRoomConflictError ? 'cloud-conflict' : 'cloud-unavailable')));
+              await broadcast(room, message(COORDINATION_STATUS_MESSAGE, encoder =>
+                encoding.writeVarString(encoder, 'cloud-conflict')));
             } finally { for (const connection of room.connections) close(connection); }
           });
           await room.queue;

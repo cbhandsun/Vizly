@@ -117,3 +117,28 @@ it('pauses a legacy peer on lost lease and lets a current peer reconnect', async
     await server.stop();
   }
 });
+
+it('sends an idle protocol heartbeat after a fresh permission check', async () => {
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now());
+  const authorize = vi.fn(async () => ({ userId: 'synthetic-editor', role: 'editor' as const }));
+  const server = createCollaborationServer({
+    authorize, origins: new Set([origin]), recheckMs: 15,
+    persistence: { load: async () => null, save: async () => undefined },
+  });
+  const { url } = await server.listen();
+  const socket = new WebSocket(`${url}/vizly-room-${roomId}?token=synthetic`, { origin });
+  try {
+    const received: Buffer[] = [];
+    socket.on('message', payload => { if (Buffer.isBuffer(payload)) received.push(payload); });
+    await vi.waitFor(() => expect(received.some(frame => frame[0] === 4)).toBe(true));
+    expect(received.some(frame => frame.equals(Buffer.from([1, 1, 0])))).toBe(false);
+    authorize.mockClear();
+    clock.mockReturnValue(Date.now() + 13_000);
+    await vi.waitFor(() => expect(received.some(frame => frame.equals(Buffer.from([1, 1, 0])))).toBe(true));
+    expect(authorize).toHaveBeenCalled();
+  } finally {
+    clock.mockRestore();
+    socket.terminate();
+    await server.stop();
+  }
+});
