@@ -102,7 +102,35 @@ export async function runTelemetryJournalDatabaseRegression(docker, container, d
   })));
   assert.equal(admissions.filter(x => x.code === 0 && x.out === 't').length, 1);
   assert.ok(admissions.every(x => x.code === 0 && ['t','f'].includes(x.out)));
+  assert.equal(sql(`SELECT has_function_privilege('anon','public.vizly_record_incident_telemetry(jsonb,text)','EXECUTE'),
+    has_function_privilege('authenticated','public.vizly_record_incident_telemetry(jsonb,text)','EXECUTE'),
+    has_table_privilege('anon','vizly_telemetry.incidents','SELECT'),
+    (SELECT NOT prosecdef FROM pg_proc WHERE proname='vizly_record_incident_telemetry');`).trim(), 'f|f|f|t');
+  const incidentBatch = (sequence, outcome, source = 'server', releaseId = 'a'.repeat(40)) => {
+    const operation = 'lease';
+    const requestId = `11111111-1111-4111-8111-${String(sequence).padStart(12, '0')}`;
+    const metrics = Object.fromEntries(['startup','save','connect','reconnect','permission','cas','lease','export','route']
+      .map(key => [key, { started: 1, success: 0, failure: 0, cancelled: 0 }]));
+    metrics[operation][outcome] = 1;
+    const batch = { schema: 'vizly-telemetry-v1', releaseId, streamId: '22222222-2222-4222-8222-222222222222',
+      sequence, dropped: 0, metrics, events: [{ schema: 'vizly-operation-v1', releaseId, requestId, operation,
+        outcome, code: outcome === 'success' ? null : 'timeout', durationMs: 8 }] };
+    return `SET ROLE service_role; SELECT jsonb_array_length(public.vizly_record_incident_telemetry(
+      '${JSON.stringify(batch)}','${source}')->'notifications');`;
+  };
+  assert.equal(sql(incidentBatch(12001, 'failure')).trim(), '1');
+  assert.equal(sql(incidentBatch(12001, 'failure')).trim(), '0');
+  assert.equal(sql(incidentBatch(12002, 'success')).trim(), '0');
+  sql("UPDATE vizly_telemetry.incidents SET last_failure_at=clock_timestamp()-interval '20 minutes';");
+  assert.equal(sql(incidentBatch(12003, 'failure', 'server', 'b'.repeat(40))).trim(), '0');
+  sql("UPDATE vizly_telemetry.incidents SET last_failure_at=clock_timestamp()-interval '2 minutes';");
+  assert.equal(sql(incidentBatch(12004, 'success', 'browser')).trim(), '0');
+  assert.equal(sql("SELECT resolved_at IS NULL FROM vizly_telemetry.incidents WHERE source='server';").trim(), 't');
+  assert.equal(sql(incidentBatch(12005, 'success')).trim(), '0');
+  assert.equal(sql("SELECT resolved_at IS NOT NULL FROM vizly_telemetry.incidents WHERE source='server';").trim(), 't');
+  assert.equal(sql(incidentBatch(12006, 'failure')).trim(), '1');
   return [...report.cases, 'server-only-schema-and-invoker-rpcs', 'contended-writer-fails-without-mutation',
     'independent-concurrent-writers-preserve-budget-and-acknowledgments',
-    'alert-rpc-role-isolation', 'alert-cross-release-cooldown-and-replay', 'alert-global-rate-budget', 'alert-concurrent-single-admission'];
+    'alert-rpc-role-isolation', 'alert-cross-release-cooldown-and-replay', 'alert-global-rate-budget', 'alert-concurrent-single-admission',
+    'incident-deduplication-across-releases-and-recovery', 'incident-recovery-producer-isolation'];
 }

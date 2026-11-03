@@ -2,6 +2,8 @@ import type { TelemetryAlert } from './telemetryAlerts.js';
 import { createClient } from '@supabase/supabase-js';
 import { projectTelemetryPayload } from './telemetryPayload.js';
 
+export type TelemetryProducer = 'server' | 'browser' | 'preview-server' | 'preview-browser';
+
 const MAX_RECORD_BYTES = 32_768;
 const MAX_QUERY_BYTES = 5_242_880;
 const MAX_RECORDS = 1000;
@@ -59,7 +61,7 @@ export function createSupabaseTelemetryJournal(url: unknown, serverKey: unknown,
     global: { fetch: async (input, init) => {
       const target = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
       if (target.origin !== parsed.origin || !['/rest/v1/rpc/vizly_record_telemetry',
-        '/rest/v1/rpc/vizly_query_telemetry', '/rest/v1/rpc/vizly_claim_telemetry_alert'].includes(target.pathname)) throw unavailable();
+        '/rest/v1/rpc/vizly_query_telemetry', '/rest/v1/rpc/vizly_record_incident_telemetry'].includes(target.pathname)) throw unavailable();
       const timeout = AbortSignal.timeout(4500);
       const signal = init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
       const response = await transport(input, { ...init, signal, redirect: 'error' });
@@ -74,27 +76,28 @@ export function createSupabaseTelemetryJournal(url: unknown, serverKey: unknown,
     try { return await task; } catch { throw unavailable(); } finally { pending.delete(task); }
   };
   return {
-    async claimAlert(alert: Readonly<TelemetryAlert>, signal: AbortSignal): Promise<boolean> {
-      if (signal.aborted) return false;
-      return perform(async () => {
-        const { data, error } = await client.rpc('vizly_claim_telemetry_alert', {
-          p_release_id: alert.releaseId, p_operation: alert.operation,
-          p_code: alert.code, p_request_id: alert.requestId,
-        }).abortSignal(signal).retry(false);
-        if (error || typeof data !== 'boolean') throw unavailable();
-        return data;
-      });
-    },
-    async accept(input: unknown, signal: AbortSignal) {
+    async accept(input: unknown, signal: AbortSignal, source?: TelemetryProducer): Promise<TelemetryAlert[]> {
       // Re-project at the persistence boundary, including direct in-process calls.
       const batch = projectTelemetryPayload(input);
       if (Buffer.byteLength(JSON.stringify(batch)) > MAX_RECORD_BYTES || signal.aborted) throw unavailable();
-      await perform(async () => {
-        const { data, error } = await client.rpc('vizly_record_telemetry', { p_batch: batch })
+      return perform(async () => {
+        const { data, error } = await (source
+          ? client.rpc('vizly_record_incident_telemetry', { p_batch: batch, p_source: source })
+          : client.rpc('vizly_record_telemetry', { p_batch: batch }))
           .abortSignal(signal).retry(false);
         const result: unknown = data;
         if (error || !result || typeof result !== 'object' || !('accepted' in result)
           || result.accepted !== true || !('stored' in result) || typeof result.stored !== 'boolean') throw unavailable();
+        if (!source) return [];
+        if (!('notifications' in result) || !Array.isArray(result.notifications) || result.notifications.length > 6) throw unavailable();
+        return result.notifications.map((notification: unknown) => {
+          const event = batch.events.find(event => event.outcome === 'failure'
+            && typeof notification === 'object' && notification !== null && 'requestId' in notification
+            && event.requestId === notification.requestId);
+          if (!event || !event.code) throw unavailable();
+          return { schema: 'vizly-alert-v1', releaseId: batch.releaseId, requestId: event.requestId,
+            operation: event.operation, code: event.code };
+        });
       });
     },
     /** Operator-only lookup. This adapter does not expose an HTTP query endpoint. */

@@ -31,7 +31,7 @@ it('projects before persistence, uses only the server key and does not follow re
   expect(new Headers(init?.headers).get('apikey')).toBe(key);
   expect(JSON.parse(String(init?.body))).toEqual({ p_batch: value });
   expect(String(init?.body)).not.toContain('PRIVATE-CANARY');
-  expect(Object.keys(journal).sort()).toEqual(['accept', 'claimAlert', 'drain', 'query']);
+  expect(Object.keys(journal).sort()).toEqual(['accept', 'drain', 'query']);
 });
 
 it.each(['http://telemetry.example.test', 'https://user:password@telemetry.example.test',
@@ -143,11 +143,13 @@ it('validates operator queries before network access', async () => {
   expect(transport).not.toHaveBeenCalled();
 });
 
-it('claims notification admission through a bounded server-only RPC', async () => {
- const transport = vi.fn<typeof fetch>(async () => response(false));
- const journal = createSupabaseTelemetryJournal(url, key, transport);
- const alert = { schema: 'vizly-alert-v1' as const, releaseId: release, requestId, operation: 'permission', code: 'denied' };
- expect(await journal.claimAlert(alert, signal())).toBe(false);
- expect(String(transport.mock.calls[0][0])).toBe(`${url}/rest/v1/rpc/vizly_claim_telemetry_alert`);
- expect(JSON.parse(String(transport.mock.calls[0][1]?.body))).toEqual({ p_release_id: release, p_request_id: requestId, p_operation: 'permission', p_code: 'denied' });
+it('records a producer-scoped batch and returns only notifications admitted by the database', async () => {
+  const value = batch();
+  const transport = vi.fn<typeof fetch>(async () => response({ accepted: true, stored: true, notifications: value.events }));
+  const journal = createSupabaseTelemetryJournal(url, key, transport);
+  expect(await journal.accept(value, signal(), 'server')).toEqual([
+    { schema: 'vizly-alert-v1', releaseId: release, requestId, operation: 'save', code: 'network' },
+  ]);
+  expect(String(transport.mock.calls[0][0])).toBe(`${url}/rest/v1/rpc/vizly_record_incident_telemetry`);
+  expect(JSON.parse(String(transport.mock.calls[0][1]?.body))).toEqual({ p_batch: value, p_source: 'server' });
 });

@@ -4,7 +4,7 @@ import { createHttpAlertDelivery, createTelemetryAlerts } from './telemetryAlert
 import { createFeishuAlertDelivery } from './feishuAlertDelivery.js';
 import { createTelemetryJournal } from './telemetryJournal.js';
 import { projectTelemetryPayload } from './telemetryPayload.js';
-import { createSupabaseTelemetryJournal } from './supabaseTelemetryJournal.js';
+import { createSupabaseTelemetryJournal, type TelemetryProducer } from './supabaseTelemetryJournal.js';
 
 /** Each runtime owns its collector and journal. No global registration. */
 export function createServerTelemetryRuntime(environment: Record<string, unknown>,
@@ -24,25 +24,38 @@ export function createServerTelemetryRuntime(environment: Record<string, unknown
   if (journal && endpoint && provider !== 'http' && provider !== 'feishu') {
     throw Error('Invalid telemetry alert provider');
   }
-  const alerts = journal && typeof endpoint === 'string' && endpoint
-    ? createTelemetryAlerts(provider === 'feishu'
+  const deliver = journal && typeof endpoint === 'string' && endpoint
+    ? provider === 'feishu'
       ? createFeishuAlertDelivery(endpoint, environment.VIZLY_TELEMETRY_FEISHU_SIGNING_SECRET)
-      : createHttpAlertDelivery(endpoint), Date.now,
-      cloudJournal?.claimAlert) : undefined;
-  const receiver = journal ? { accept: async (batch: unknown, signal: AbortSignal) => {
-    await journal.accept(batch, signal);
+      : createHttpAlertDelivery(endpoint)
+    : undefined;
+  const alerts = deliver && !cloudJournal ? createTelemetryAlerts(deliver) : undefined;
+  const deliveries = new Set<Promise<void>>();
+  const accept = async (batch: unknown, signal: AbortSignal, source: 'server' | 'browser') => {
+    if (cloudJournal && deliver) {
+      const producer: TelemetryProducer = environment.VERCEL_ENV === 'preview' ? `preview-${source}` : source;
+      const notifications = await cloudJournal.accept(batch, signal, producer);
+      for (const notification of notifications) {
+        const task = deliver(notification, AbortSignal.timeout(3000))
+          .catch(() => {}).finally(() => deliveries.delete(task));
+        deliveries.add(task);
+        waitForBackground?.(task);
+      }
+      return;
+    }
+    await journal?.accept(batch, signal);
     if (alerts) {
       alerts.submit(projectTelemetryPayload(batch));
-      // Register before the HTTP response: serverless runtimes can freeze afterwards.
       waitForBackground?.(alerts.drain());
     }
-  } } : undefined;
+  };
+  const receiver = journal ? { accept: (batch: unknown, signal: AbortSignal) => accept(batch, signal, 'browser') } : undefined;
   const collector = createOperationTelemetry({ releaseId: typeof release === 'string' ? release : 'development',
-    transport: receiver?.accept });
+    transport: journal ? (batch, signal) => accept(batch, signal, 'server') : undefined });
   let stopping: Promise<void> | undefined;
   return { receiver, collector, stop() {
     stopping ??= (async () => {
-      try { await collector.flush(); await journal?.drain(); await alerts?.drain(); }
+      try { await collector.flush(); await journal?.drain(); await alerts?.drain(); await Promise.all(deliveries); }
       finally { collector.dispose(); alerts?.stop(); }
     })();
     return stopping;

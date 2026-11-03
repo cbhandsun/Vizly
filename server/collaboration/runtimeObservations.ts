@@ -4,7 +4,8 @@ import type { PrivateSubscriptionDiagnostic } from './supabaseRoomNoticeBus.js';
 type InstanceEvent = 'server-ready' | 'server-stopping' | 'server-stopped' | 'server-stop-failed'
   | 'runtime-ready' | 'runtime-stopping' | 'runtime-stopped' | 'runtime-stop-failed';
 type AdmissionEvent = 'upgrade-started' | 'upgrade-denied' | 'permission-accepted' | 'room-loading'
-  | 'room-ready' | 'room-failed' | 'socket-opened' | 'socket-closed' | 'upgrade-failed';
+  | 'room-ready' | 'room-failed' | 'socket-opened' | 'socket-closed' | 'socket-retiring'
+  | 'socket-cleanup-complete' | 'expired-credential-rejected' | 'upgrade-failed';
 export type RuntimeObservation = Readonly<{
   instanceId: string; elapsedMs: number;
 } & ({ event: InstanceEvent; admissionId?: never }

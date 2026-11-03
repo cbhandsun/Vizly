@@ -1,3 +1,4 @@
+export const COLLABORATION_RESUME_PROTOCOL = 'vizly-resume-v1';
 import * as decoding from 'lib0/decoding';
 export const COORDINATION_STATUS_MESSAGE = 5;
 export type CoordinationProblem = 'cloud-conflict' | 'cloud-unavailable';

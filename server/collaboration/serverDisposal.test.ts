@@ -38,3 +38,38 @@ describe('collaboration shutdown failure receipts', () => {
     } finally { socket.terminate(); await server.stop().catch(() => undefined); }
   });
 });
+
+it('keeps planned socket retirement alive until the room lease has been released', async () => {
+  let releaseLease!: () => void;
+  const closeLease = vi.fn(() => new Promise<void>(resolve => { releaseLease = resolve; }));
+  const tasks: Promise<void>[] = [];
+  const server = createCollaborationServer({
+    authorize: async () => ({ userId: 'synthetic-editor', role: 'editor' }),
+    persistence: { load: async () => null, save: async () => undefined },
+    acquireRoomLease: async () => ({ leaseId: roomId, generation, signal: new AbortController().signal,
+      assertActive() {}, close: closeLease }),
+    origins: new Set([origin]), socketLifetimeMs: 100, waitForBackground: task => tasks.push(task),
+  });
+  const { url } = await server.listen();
+  const socket = new WebSocket(`${url}/vizly-room-${roomId}?token=synthetic`, 'vizly-resume-v1', { origin });
+  try {
+    const closeCode = await new Promise<number>((resolve, reject) => {
+      socket.once('close', resolve);
+      socket.once('error', reject);
+    });
+    expect(closeCode).toBe(1012);
+    await vi.waitFor(() => expect(closeLease).toHaveBeenCalledTimes(1));
+    expect(tasks).toHaveLength(1);
+    let completed = false;
+    void tasks[0].then(() => { completed = true; });
+    await Promise.resolve();
+    expect(completed).toBe(false);
+    releaseLease();
+    await tasks[0];
+    expect(completed).toBe(true);
+  } finally {
+    releaseLease?.();
+    socket.terminate();
+    await server.stop();
+  }
+});

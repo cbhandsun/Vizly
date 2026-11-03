@@ -22,12 +22,14 @@
     "20261026060244_vizly_database_forward_contract.sql",
     "20261026191139_ai_gateway_shared_resource_leases.sql",
     "20261027211956_bounded_telemetry_journal.sql",
-    "20261102030403_telemetry_alert_claims.sql"
+    "20261102030403_telemetry_alert_claims.sql",
+    "20261103090000_telemetry_incidents.sql"
   ],
   "extensionFiles": {
     "20261026191139_ai_gateway_shared_resource_leases.sql": "24352e648442877ff0ab65d2a1ad334ec277a17132d0b935a7b8022348a44e88",
     "20261027211956_bounded_telemetry_journal.sql": "0f06121ede85ceda6080130e1e1f8ca9acc1e032578e81fbe5ef6d1f3959049c",
-    "20261102030403_telemetry_alert_claims.sql": "5c150fa0d2af34f7ef9458068b11b149ed900c78aabc2ab28462dbbba11fb5af"
+    "20261102030403_telemetry_alert_claims.sql": "5c150fa0d2af34f7ef9458068b11b149ed900c78aabc2ab28462dbbba11fb5af",
+    "20261103090000_telemetry_incidents.sql": "3e2a4a386fceed442f58c60a16b6e313a30d67ac4969296b0d67822ba705818b"
   },
   "extensionSchemas": {
     "20261026191139_ai_gateway_shared_resource_leases.sql": {
@@ -42,6 +44,11 @@
       "schema": "vizly_telemetry",
       "relation": "alert_claims",
       "label": "Telemetry alert claims"
+    },
+    "20261103090000_telemetry_incidents.sql": {
+      "schema": "vizly_telemetry",
+      "relation": "incidents",
+      "label": "Telemetry incidents"
     }
   }
 }

@@ -12,7 +12,11 @@ afterEach(() => { vi.clearAllMocks(); vi.unstubAllGlobals(); });
 
 it('persists before signed Feishu delivery and keeps the event when Feishu rejects it', async () => {
   const order: string[] = [];
-  const accept = vi.fn(async () => { order.push('persist'); });
+  const accept = vi.fn(async () => {
+    order.push('persist');
+    return [{ releaseId: environment.VIZLY_RELEASE_ID, requestId: '11111111-1111-4111-8111-111111111111',
+      operation: 'save', code: 'conflict' }];
+  });
   factories.cloud.mockReturnValue({ accept, drain: vi.fn() });
   const fetcher = vi.fn<typeof fetch>(async () => {
     order.push('notify'); return Response.json({ code: 19021 });
@@ -69,7 +73,10 @@ it('does not initialize a sink when collection or the release identity is disabl
 
 
 it('registers unfinished delivery before returning acceptance without delaying the response', async () => {
-  factories.cloud.mockReturnValue({ accept: vi.fn(), drain: vi.fn() });
+  factories.cloud.mockReturnValue({ accept: vi.fn(async () => [
+    { releaseId: environment.VIZLY_RELEASE_ID, requestId: '11111111-1111-4111-8111-111111111111',
+      operation: 'save', code: 'conflict' },
+  ]), drain: vi.fn() });
   let complete!: (response: Response) => void;
   vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { complete = resolve; })));
   const tasks: Promise<void>[] = [];

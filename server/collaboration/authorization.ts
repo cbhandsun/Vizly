@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { isRecord } from './boundary.js';
+import { retryTransientFetch } from './retryTransientFetch.js';
 
 export interface DiagramPermission { userId: string; role: 'editor' | 'viewer' }
 export type AuthorizeDiagram = (token: string, diagramId: string) => Promise<DiagramPermission | null>;
@@ -14,8 +15,8 @@ const createAuthorizer = (url: string, publishableKey: string, fetchImpl: typeof
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
       global: {
         headers: { Authorization: `Bearer ${token}` },
-        fetch: (input, init) => fetchImpl(input, { ...init, signal: init?.signal
-          ? AbortSignal.any([init.signal, deadline]) : deadline }),
+        fetch: (input, init) => retryTransientFetch(fetchImpl, input, init ?? {},
+          init?.signal ? AbortSignal.any([init.signal, deadline]) : deadline),
       },
     });
     // A decoded subject only narrows the database query. It never grants access:
@@ -38,6 +39,8 @@ const createAuthorizer = (url: string, publishableKey: string, fetchImpl: typeof
         .eq('id', diagramId);
       if (!ownerOnly) query.eq('diagram_collaborators.user_id', subjectHint);
       const [{ data: auth, error: authError }, { data: diagram, error }] = await Promise.all([identity, query.maybeSingle()]);
+      if (deadline.aborted || (authError && (authError.status === 0 || (authError.status ?? 0) >= 500))
+        || error && (!error.code || error.code === '57014')) throw new Error('Collaboration authorization unavailable');
       if (authError || !auth.user || auth.user.is_anonymous || auth.user.id !== subjectHint
         || error || !isRecord(diagram)) return null;
       if (diagram.user_id === auth.user.id) return { userId: auth.user.id, role: 'editor' };

@@ -9,7 +9,7 @@ import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
 import * as sync from 'y-protocols/sync';
 import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate, removeAwarenessStates } from 'y-protocols/awareness';
-import { MAX_DOCUMENT_BYTES, parseConnection, validateDocument } from './boundary.js';
+import { MAX_DOCUMENT_BYTES, collaborationCredentialExpiry, parseConnection, validateDocument } from './boundary.js';
 import type { AuthorizeDiagram, DiagramPermission } from './authorization.js';
 import type { RoomPersistence } from './persistence.js';
 import { acceptPersistedRoomState } from './acceptedRoomState.js';
@@ -23,14 +23,14 @@ import { formatCollaborationAccess, hasSharedCollaborationElements, upgradeColla
 import type { BootstrapIdentity } from './roomBootstrap.js';
 import { createRoomLifetime, type RoomLease } from './roomLifetime.js';
 import { CloudRoomConflictError } from './cloudRoomReconciliation.js';
-import { COORDINATION_STATUS_MESSAGE } from './coordinationStatus.js';
+import { COLLABORATION_RESUME_PROTOCOL, COORDINATION_STATUS_MESSAGE } from './coordinationStatus.js';
 import { CLOUD_REVISION_MESSAGE, writeAcceptedCloudRevision } from './cloudRevisionProtocol.js';
 import { createRoomRecoveryHttp } from './roomRecoveryHttp.js';
 import type { createRoomRecovery } from './roomRecovery.js';
 import { createRuntimeObservations } from './runtimeObservations.js';
 
 type SafeEvent = 'authorization-failed' | 'invalid-message' | 'persistence-failed' | 'room-load-failed' | 'cloud-coordination-failed' | 'room-synchronization-failed' | 'room-notification-failed';
-interface Connection { socket: WebSocket; token: string; diagramId: string; permission: DiagramPermission; awarenessId?: number; presenceId?: number; pending: number; window: number; messages: number; queue: Promise<void>; queuedPresence?: Uint8Array; queuedDocument?: Uint8Array; pendingPresence?: Set<number>; presenceFlush?: Promise<void>; processingPresence?: Promise<void> }
+interface Connection { socket: WebSocket; resume?: boolean; token: string; diagramId: string; permission: DiagramPermission; awarenessId?: number; presenceId?: number; pending: number; window: number; messages: number; queue: Promise<void>; queuedPresence?: Uint8Array; queuedDocument?: Uint8Array; pendingPresence?: Set<number>; presenceFlush?: Promise<void>; processingPresence?: Promise<void> }
 interface Room { doc: Y.Doc; awareness: Awareness; connections: Set<Connection>; queue: Promise<void>; cloudRevision?: string;
   distributedLease?: DistributedRoomLease; detachLease?: () => void; synchronization?: RoomSynchronization;
   independentMessages: Set<Promise<void>>; nextPresenceId: number; remoteAwareness: ReturnType<typeof createRemoteRoomAwareness> }
@@ -47,6 +47,8 @@ export interface CollaborationServerOptions {
   readAcceptedRoomRevision?: (diagramId: string) => Promise<string | undefined>;
   origins: ReadonlySet<string>;
   recheckMs?: number;
+  socketLifetimeMs?: number;
+  waitForBackground?: (task: Promise<void>) => void;
   /** Content-free queue observations for diagnostics and controlled load tests. */
   observeMessageQueue?: (sample: Readonly<{ waitMs: number; connectionPending: number }>) => void;
   observations?: ReturnType<typeof createRuntimeObservations>;
@@ -95,6 +97,7 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
     }
   };
   const authorizationWork = new Set<Promise<DiagramPermission | null>>();
+  const permissionChecks = new Map<string, Promise<DiagramPermission | null | undefined>>();
   let activeAuthorizations = 0;
   const authorizationWaiters: Array<() => void> = [];
   let pendingUpgrades = 0;
@@ -127,13 +130,23 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
     const admissionId = admissions.get(request);
     if (admissionId) headers.push(`X-Vizly-Admission: ${admissionId}`);
   });
-  const close = (connection: Connection) => {
-    connection.socket.close(1008, 'Access or message rejected');
+  const close = (connection: Connection, code = 1008) => {
+    connection.socket.close(code, code === 1008 ? 'Access or message rejected' : 'Collaboration interrupted');
     // Bound close-handshake lifetime even for an unresponsive client.
     const timer = setTimeout(() => connection.socket.terminate(), 500);
     timer.unref();
   };
-  const authorize = async (token: string, diagramId: string) => {
+  const interrupt = (connection: Connection) => {
+    if (connection.socket.readyState !== WebSocket.OPEN) return;
+    if (!connection.resume) {
+      // Legacy clients understand this content-free control frame and stop
+      // their transport retry loop while keeping the canvas available.
+      connection.socket.send(message(COORDINATION_STATUS_MESSAGE, encoder =>
+        encoding.writeVarString(encoder, 'cloud-unavailable')));
+    }
+    close(connection, 1013);
+  };
+  const checkPermission = async (token: string, diagramId: string) => {
     if (stopped) return null;
     const finish = beginServerOperation('permission');
     let timedOut = false;
@@ -171,17 +184,28 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
     try {
       const result = await bounded;
       finish(result ? 'success' : 'failure', result ? undefined : timedOut ? 'timeout' : 'denied');
-      return result;
-    } catch { finish('failure', 'unavailable'); options.log?.('authorization-failed'); return null; }
+      return timedOut ? undefined : result;
+    } catch { finish('failure', 'unavailable'); options.log?.('authorization-failed'); return undefined; }
     finally { if (timer) clearTimeout(timer); authorizationWork.delete(drained); }
+  };
+  const authorize = (token: string, diagramId: string) => {
+    const key = diagramId + ':' + token;
+    const pending = permissionChecks.get(key);
+    if (pending) return pending;
+    // Share only overlapping checks. The next operation starts a fresh check
+    // against Auth and RLS once this one settles.
+    const check = checkPermission(token, diagramId).finally(() => permissionChecks.delete(key));
+    permissionChecks.set(key, check);
+    return check;
   };
   const allowed = async (connection: Connection) => {
     if (stopped || connection.socket.readyState !== WebSocket.OPEN) return false;
     try { const room = activeRooms.get(connection.diagramId); room?.distributedLease?.assertActive(); room?.synchronization?.assertActive(); }
-    catch { close(connection); return false; }
+    catch { interrupt(connection); return false; }
     const permission = await authorize(connection.token, connection.diagramId);
     try { const room = activeRooms.get(connection.diagramId); room?.distributedLease?.assertActive(); room?.synchronization?.assertActive(); }
-    catch { close(connection); return false; }
+    catch { interrupt(connection); return false; }
+    if (permission === undefined) { interrupt(connection); return false; }
     if (!permission || permission.userId !== connection.permission.userId) { close(connection); return false; }
     const roleChanged = permission.role !== connection.permission.role;
     connection.permission = permission;
@@ -289,7 +313,7 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
           independentMessages: new Set(), nextPresenceId: 0, remoteAwareness: createRemoteRoomAwareness(awareness) };
         initializingRoom = room;
         if (distributedLease) {
-          const lost = () => { for (const connection of room.connections) close(connection); };
+          const lost = () => { for (const connection of room.connections) interrupt(connection); };
           distributedLease.signal.addEventListener('abort', lost, { once: true });
           room.detachLease = () => distributedLease?.signal.removeEventListener('abort', lost);
         }
@@ -318,7 +342,7 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
                 if (update) publishPresenceUpdate(room, update);
               },
             },
-            unavailable: () => { options.log?.('room-synchronization-failed'); for (const connection of room.connections) close(connection); },
+            unavailable: () => { options.log?.('room-synchronization-failed'); for (const connection of room.connections) interrupt(connection); },
             serialize: operation => {
               const result = room.queue.then(operation);
               // The synchronizer receives rejection and fences the room.
@@ -460,11 +484,24 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
     const deny = () => { admission.event('upgrade-denied'); rejectUpgrade(socket, observations.instanceId, admission.admissionId); };
     const parsed = parseConnection(request.url, request.headers.origin, options.origins);
     if (!parsed || stopped || recoveringRooms.has(parsed.diagramId) || connections.size + pendingUpgrades >= 128) { deny(); return; }
+    const expiry = collaborationCredentialExpiry(parsed.token);
+    const resume = request.headers['sec-websocket-protocol'] === COLLABORATION_RESUME_PROTOCOL;
+    if (expiry !== undefined && expiry <= Date.now() - 5000) {
+      admission.event('expired-credential-rejected');
+      deny();
+      return;
+    }
     pendingUpgrades++;
     pendingRooms.set(parsed.diagramId, (pendingRooms.get(parsed.diagramId) ?? 0) + 1);
     upgrades.add(socket);
     let lease: RoomLease<Room> | undefined;
     let connected = false;
+    let finishLifetime: (() => void) | undefined;
+    if (options.waitForBackground) {
+      // Register while still in the upgrade invocation's request context.
+      const lifetime = new Promise<void>(resolve => { finishLifetime = resolve; });
+      options.waitForBackground(lifetime);
+    }
     void (async () => {
       const permission = await authorize(parsed.token, parsed.diagramId);
       if (!permission || stopped || socket.destroyed) { deny(); return; }
@@ -498,9 +535,17 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
       websocket.handleUpgrade(request, socket, head, ws => {
         admission.event('socket-opened');
         connected = true;
-        const connection: Connection = { socket: ws, ...parsed, permission, presenceId: room.nextPresenceId++, pending: 0, window: Date.now(), messages: 0, queue: Promise.resolve() };
+        const connection: Connection = { socket: ws, ...parsed, permission, resume, presenceId: room.nextPresenceId++, pending: 0, window: Date.now(), messages: 0, queue: Promise.resolve() };
         room.connections.add(connection);
         connections.add(connection);
+        const lifetime = options.socketLifetimeMs;
+        const legacyDeadline = !resume && expiry !== undefined ? expiry - Date.now() - 5000 : Infinity;
+        const retirement = lifetime === undefined ? undefined : setTimeout(() => {
+          admission.event('socket-retiring');
+          if (legacyDeadline <= lifetime) interrupt(connection);
+          else close(connection, 1012);
+        }, Math.max(0, Math.min(lifetime, legacyDeadline)));
+        retirement?.unref();
         ws.on('error', () => close(connection));
         ws.on('message', bindServerTelemetry(options.operationTelemetry, (raw: RawData, binary: boolean) => {
           const now = Date.now();
@@ -574,6 +619,7 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
           if (!independent) room.queue = processing;
         }));
         ws.on('close', bindServerTelemetry(options.operationTelemetry, () => {
+          if (retirement !== undefined) clearTimeout(retirement);
           admission.event('socket-closed');
           connections.delete(connection);
           connection.pendingPresence?.clear();
@@ -583,7 +629,8 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
             removeAwarenessStates(room.awareness, [connection.awarenessId], connection);
             publishPresence(room, [connection.awarenessId]);
           }
-          void reservation.release().catch(() => options.log?.('room-load-failed'));
+          void reservation.release().then(() => admission.event('socket-cleanup-complete'),
+            () => options.log?.('room-load-failed')).finally(finishLifetime);
         }));
         void allowed(connection).then(permitted => {
           if (!permitted) return;
@@ -598,7 +645,10 @@ export const createCollaborationServer = (options: CollaborationServerOptions) =
     })().catch(() => { admission.event('upgrade-failed'); options.log?.('room-load-failed'); deny(); })
       .finally(async () => {
         pendingUpgrades--; upgrades.delete(socket);
-        if (!connected) await lease?.release().catch(() => options.log?.('room-load-failed'));
+        if (!connected) {
+          try { await lease?.release().catch(() => options.log?.('room-load-failed')); }
+          finally { finishLifetime?.(); }
+        }
         const remaining = (pendingRooms.get(parsed.diagramId) ?? 1) - 1;
         if (remaining === 0) pendingRooms.delete(parsed.diagramId); else pendingRooms.set(parsed.diagramId, remaining);
       });

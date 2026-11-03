@@ -39,7 +39,8 @@ export const createProductionCollaborationRuntime = (environment: Record<string,
   const { runtime, authorize, authorizeOwner, readCloud, readRevision } = dependencies;
   const coordinate = createRoomCoordinator(runtime.persistence, readCloud);
   const server = createCollaborationServer({ authorize, origins: config.origins, log, observations,
-    telemetry: telemetry.receiver, operationTelemetry: telemetry.collector,
+    telemetry: telemetry.receiver, operationTelemetry: telemetry.collector, waitForBackground,
+    socketLifetimeMs: environment.VERCEL === '1' ? 270_000 : undefined,
     persistence: runtime.persistence, acquireRoomLease: runtime.acquireRoomLease,
     openRoomSynchronization: runtime.openRoomSynchronization,
     loadInitialRoom: coordinate,
