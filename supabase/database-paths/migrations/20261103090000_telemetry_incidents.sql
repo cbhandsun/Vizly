@@ -25,7 +25,7 @@ create function public.vizly_record_incident_telemetry(p_batch jsonb, p_source t
 returns jsonb language plpgsql security invoker set search_path='' set lock_timeout='250ms' as $$
 declare
   receipt jsonb;
-  batch jsonb;
+  projected jsonb;
   observed_at timestamptz;
   failure jsonb;
   incident vizly_telemetry.incidents%rowtype;
@@ -34,12 +34,12 @@ begin
   if p_source is null or p_source not in ('server', 'browser', 'preview-server', 'preview-browser') then
     raise exception 'Invalid telemetry source' using errcode='22023';
   end if;
-  batch := vizly_telemetry.project_batch(p_batch);
-  receipt := public.vizly_record_telemetry(batch);
+  projected := vizly_telemetry.project_batch(p_batch);
+  receipt := public.vizly_record_telemetry(projected);
   if not (receipt->>'stored')::boolean or exists (
     select 1 from vizly_telemetry.journal
-    where release_id = batch->>'releaseId' and stream_id = (batch->>'streamId')::uuid
-      and sequence > (batch->>'sequence')::bigint
+    where release_id = projected->>'releaseId' and stream_id = (projected->>'streamId')::uuid
+      and sequence > (projected->>'sequence')::bigint
   ) then
     return receipt || jsonb_build_object('notifications', notifications);
   end if;
@@ -47,7 +47,7 @@ begin
   -- cannot advance recovery or claim a notification a second time.
   observed_at := clock_timestamp();
   for failure in select distinct on (e->>'operation', e->>'code') e
-    from jsonb_array_elements(batch->'events') with ordinality as event(e, position)
+    from jsonb_array_elements(projected->'events') with ordinality as event(e, position)
     where e->>'outcome' = 'failure'
     order by e->>'operation', e->>'code', position
   loop
@@ -74,9 +74,9 @@ begin
   set resolved_at = observed_at, notified = false
   where active.source = p_source and active.resolved_at is null
     and active.last_failure_at <= observed_at - interval '1 minute'
-    and exists (select 1 from jsonb_array_elements(batch->'events') e
+    and exists (select 1 from jsonb_array_elements(projected->'events') e
       where e->>'operation' = active.operation and e->>'outcome' = 'success')
-    and not exists (select 1 from jsonb_array_elements(batch->'events') e
+    and not exists (select 1 from jsonb_array_elements(projected->'events') e
       where e->>'operation' = active.operation and e->>'outcome' = 'failure');
   return receipt || jsonb_build_object('notifications', notifications);
 end;
