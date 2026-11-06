@@ -5,10 +5,11 @@ import { resolve } from 'node:path';
 import { defineConfig } from 'vitest/config';
 import { boundedJsonAssetsPlugin } from './vite-plugins/boundedJsonAssets';
 import { startupModuleGroups } from './vite-plugins/startupModuleGroups';
+import { routeModulePreloads } from './vite-plugins/routeModulePreloads';
 import { startupResourceHints } from './vite-plugins/startupResourceHints';
 
 export default defineConfig({
-  plugins: [boundedJsonAssetsPlugin(), react(), tailwindcss(), startupResourceHints()],
+  plugins: [boundedJsonAssetsPlugin(), react(), tailwindcss(), startupResourceHints(), routeModulePreloads()],
   resolve: {
     alias: { '@': resolve(import.meta.dirname, 'src') },
     dedupe: ['yjs', 'react', 'react-dom'],
