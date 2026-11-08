@@ -73,6 +73,20 @@ describe('aiRequestRouter', () => {
     expect(directRequest).not.toHaveBeenCalled();
   });
 
+  it('uses an explicitly selected browser connection only when the gateway is optional', async () => {
+    const directRequest = vi.fn().mockResolvedValue(new Response('direct'));
+    const gatewayRequest = vi.fn().mockResolvedValue(new Response('gateway'));
+    const probe = vi.fn().mockResolvedValue(true);
+    const dependencies = { supabaseUrl: 'https://project.supabase.co', getAccessToken: async () => JWT_CANARY, directRequest, gatewayRequest, probe };
+    const provider = { ...remoteProvider, transport: 'direct' as const };
+    await requestAIChatCompletionRouted(provider, body, {}, { ...dependencies, mode: 'auto' });
+    expect(directRequest).toHaveBeenCalledOnce();
+    expect(probe).not.toHaveBeenCalled();
+    await requestAIChatCompletionRouted(provider, body, {}, { ...dependencies, mode: 'required' });
+    expect(gatewayRequest).toHaveBeenCalledOnce();
+    expect(directRequest).toHaveBeenCalledOnce();
+  });
+
   it('falls back before sending credentials when the optional gateway is absent', async () => {
     const directResponse = new Response('direct');
     const directRequest = vi.fn().mockResolvedValue(directResponse);

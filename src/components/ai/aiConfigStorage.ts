@@ -15,6 +15,7 @@ export interface AIProviderConfig {
     name: string;
     enabled: boolean;
     baseUrl: string;
+    transport?: 'direct';
     apiKey: string;
     credentialState?: 'unconfigured' | 'required' | 'legacy-unavailable' | 'ready';
     icon?: string;
@@ -174,6 +175,7 @@ export const coerceAIConfig = (value: unknown): AIConfigState => {
                     name,
                     enabled: rawProvider.enabled === true,
                     baseUrl,
+                    ...(rawProvider.transport === 'direct' ? { transport: 'direct' as const } : {}),
                     apiKey,
                     credentialState: apiKey ? 'ready' : (rawProvider.credentialState === 'required' || rawProvider.credentialState === 'legacy-unavailable' ? rawProvider.credentialState : 'unconfigured'),
                     ...(typeof rawProvider.icon === 'string' ? { icon: normalizeAIText(rawProvider.icon, '') } : {}),

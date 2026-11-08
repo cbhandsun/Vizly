@@ -73,7 +73,7 @@ export async function requestAIChatCompletionRouted(
     const directRequest = dependencies.directRequest ?? requestAIChatCompletion;
     const mode = dependencies.mode
         ?? coerceAIGatewayMode(import.meta.env.VITE_AI_GATEWAY_MODE);
-    if (mode === 'off' || !isRemoteAIProvider(provider.baseUrl)) {
+    if (mode === 'off' || !isRemoteAIProvider(provider.baseUrl) || (mode === 'auto' && provider.transport === 'direct')) {
         return directRequest(provider, body, options);
     }
 

@@ -79,6 +79,18 @@ describe('AI config storage isolation', () => {
         expect(getAIConfig('user-a').providers[0].apiKey).toBe(LOGGED_IN_API_KEY_CANARY);
     });
 
+    it('persists explicit direct transport without persisting the API key', () => {
+        const config = makeConfig(LOGGED_IN_API_KEY_CANARY);
+        config.providers[0].transport = 'direct';
+        persistAIConfig('user-a', config);
+        const stored = JSON.parse(localStorage.getItem(`${AI_CONFIG_KEY}_user-a`) || '{}');
+        expect(stored.providers[0].transport).toBe('direct');
+        expect(stored.providers[0].apiKey).toBe('');
+        expect(coerceAIConfig(stored).providers[0].transport).toBe('direct');
+        stored.providers[0].transport = 'unrecognized';
+        expect(coerceAIConfig(stored).providers[0].transport).toBeUndefined();
+    });
+
     it('coerces malformed stored providers before returning config', () => {
         localStorage.setItem(getAIConfigKey('user-a'), JSON.stringify({
             activeModelKey: 'evil:<script>',

@@ -7,6 +7,7 @@ export interface AIProviderRequestConfig {
     id?: string;
     name?: string;
     baseUrl: string;
+    transport?: 'direct';
     apiKey?: string;
 }
 

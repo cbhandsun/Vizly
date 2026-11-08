@@ -513,6 +513,9 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
                                             placeholder="https://..."
                                         />
                                     </Form.Item>
+                                    <Form.Item label={t('aiConfig.directTransportLabel')} extra={t('aiConfig.directTransportHint')}>
+                                        <Switch aria-label={t('aiConfig.directTransportLabel')} checked={selectedProvider.transport === 'direct'} onChange={checked => updateProvider(selectedProvider.id, { transport: checked ? 'direct' : undefined })} />
+                                    </Form.Item>
                                     <Form.Item
                                         label={t('aiConfig.apiKeyLabel')}
                                         extra={<><div>{t('aiConfig.sessionKeyNotice')}</div><div role="status">{t(`aiConfig.credentialState.${selectedProvider.apiKey.trim() ? 'ready' : selectedProvider.credentialState ?? 'unconfigured'}`)}</div></>}

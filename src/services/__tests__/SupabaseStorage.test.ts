@@ -339,6 +339,7 @@ describe('SupabaseStorageProvider', () => {
             constructor: { polluted: true },
             providers: [{
                 ...makeAIConfig().providers[0],
+                transport: 'direct',
                 constructor: { polluted: true },
                 models: [
                     { id: 'gpt-4o', name: 'GPT-4o', enabled: true, onclick: 'bad' },
@@ -350,6 +351,7 @@ describe('SupabaseStorageProvider', () => {
         const savedValue = table.upsert.mock.calls[0][0].value;
         expect(savedValue.version).toBe(3);
         expect(savedValue.providers[0].apiKey).toBe('');
+        expect(savedValue.providers[0].transport).toBe('direct');
         expect(Object.hasOwn(savedValue, 'constructor')).toBe(false);
         expect(Object.hasOwn(savedValue.providers[0], 'constructor')).toBe(false);
         expect(savedValue.providers[0].models).toEqual([

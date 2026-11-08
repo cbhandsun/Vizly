@@ -1757,6 +1757,8 @@
     "apiConfig": "API 连接配置",
     "testConnection": "测试连接",
     "baseUrlLabel": "API Base URL",
+    "directTransportLabel": "浏览器直连",
+    "directTransportHint": "由浏览器直接访问此平台，不经过 Vizly AI 网关及其限流。强制网关模式下此选项不生效。",
     "baseUrlHint": "仅允许 HTTPS，或本机 localhost/127.0.0.1 HTTP",
     "invalidProviderBaseUrl": "{{name}}：Base URL 必须使用 HTTPS，或本机 HTTP（localhost/127.0.0.1）。",
     "apiKeyLabel": "API Key",

@@ -84,6 +84,7 @@ const coerceAIConfigForCloud = (value: unknown, sessionOnly = false): Record<str
                     name: typeof provider.name === 'string' ? provider.name.slice(0, MAX_ID_LENGTH) : `provider-${providerIndex}`,
                     enabled: provider.enabled === true,
                     baseUrl: typeof provider.baseUrl === 'string' ? (sessionOnly ? normalizeProviderBaseUrl(provider.baseUrl) ?? '' : provider.baseUrl.slice(0, 2_048)) : '',
+                    ...(provider.transport === 'direct' ? { transport: 'direct' as const } : {}),
                     apiKey: !sessionOnly && typeof provider.apiKey === 'string' ? provider.apiKey.slice(0, MAX_SECRET_LENGTH) : '',
                     ...(sessionOnly ? { credentialState: provider.apiKey || provider.credentialState === 'ready' || provider.credentialState === 'required' ? 'required' : provider.credentialState === 'legacy-unavailable' ? 'legacy-unavailable' : 'unconfigured' } : {}),
                     ...(typeof provider.icon === 'string' ? { icon: provider.icon.slice(0, MAX_ID_LENGTH) } : {}),

@@ -3646,6 +3646,8 @@
     "apiConfig": "API Connection Config",
     "testConnection": "Test Connection",
     "baseUrlLabel": "API Base URL",
+    "directTransportLabel": "Connect directly from browser",
+    "directTransportHint": "Connect to this provider from your browser without the Vizly AI gateway or its rate limits. Required gateway mode takes precedence.",
     "baseUrlHint": "Use HTTPS, or HTTP for localhost/127.0.0.1 only",
     "invalidProviderBaseUrl": "{{name}}: Base URL must use HTTPS or local HTTP (localhost/127.0.0.1).",
     "apiKeyLabel": "API Key",
