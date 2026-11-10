@@ -1688,8 +1688,10 @@
     "autoSwitched": "Auto-switched to: {{name}}",
     "modelSwitched": "Switched to: {{name}}",
     "configStatusTitle": "AI connection is not ready",
+    "restoringKeyTitle": "Restoring your saved AI key",
     "configureNow": "Configure now",
     "configReason": {
+      "restoring-api-key": "Restoring the encrypted key saved in this browser. You do not need to enter it again.",
       "missing-model": "Enable at least one provider and model.",
       "missing-base-url": "{{provider}} needs a Base URL.",
       "invalid-base-url": "{{provider}} must use HTTPS or a local HTTP address.",

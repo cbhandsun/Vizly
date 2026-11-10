@@ -211,6 +211,20 @@ describe('AIChatViewLayout commercial interactions', () => {
         expect(handleSendMessage).not.toHaveBeenCalled();
     });
 
+    it('waits for key restoration without telling the user to configure another key', () => {
+        const handleSendMessage = vi.fn(async () => undefined);
+        render(<AIChatViewLayout {...createProps({
+            configurationState: { ready: false, reason: 'restoring-api-key', providerName: 'Provider' },
+            inputValue: 'Preserved draft',
+            handleSendMessage,
+        })} />);
+        expect(screen.getByRole('status').textContent).toContain('aiChat.restoringKeyTitle');
+        expect(screen.queryByRole('button', { name: 'aiChat.configureNow' })).toBeNull();
+        expect((screen.getByRole('button', { name: /aiChat.sendMessage/ }) as HTMLButtonElement).disabled).toBe(true);
+        fireEvent.keyDown(screen.getByRole('textbox', { name: 'aiChat.inputLabel' }), { key: 'Enter' });
+        expect(handleSendMessage).not.toHaveBeenCalled();
+    });
+
     it('allows configuration-independent help commands while the provider is not ready', () => {
         const handleSendMessage = vi.fn(async () => undefined);
         render(<AIChatViewLayout {...createProps({

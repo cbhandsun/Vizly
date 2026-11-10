@@ -1917,8 +1917,10 @@
     "autoSwitched": "已自动切换到: {{name}}",
     "modelSwitched": "已切换到: {{name}}",
     "configStatusTitle": "AI 连接尚未就绪",
+    "restoringKeyTitle": "正在恢复本机保存的 AI 密钥",
     "configureNow": "立即配置",
     "configReason": {
+      "restoring-api-key": "正在恢复此浏览器加密保存的密钥，无需重新填写。",
       "missing-model": "请启用至少一个平台和模型。",
       "missing-base-url": "{{provider}} 需要填写 Base URL。",
       "invalid-base-url": "{{provider}} 的 Base URL 必须使用 HTTPS，或本机 HTTP。",

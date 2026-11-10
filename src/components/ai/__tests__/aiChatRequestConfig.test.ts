@@ -167,6 +167,16 @@ describe('aiChatRequestConfig', () => {
         });
     });
 
+    it('distinguishes a remembered key still restoring from an unavailable key', () => {
+        const config = makeConfig({ providers: [{ ...makeConfig().providers[0], apiKey: '', rememberKey: true }] });
+        expect(getAIChatConfigurationState(config, true)).toMatchObject({ ready: false, reason: 'restoring-api-key' });
+        expect(getAIChatConfigurationState(config, false)).toMatchObject({ ready: false, reason: 'missing-api-key' });
+        config.providers[0].rememberKey = false;
+        expect(getAIChatConfigurationState(config, true)).toMatchObject({ ready: false, reason: 'missing-api-key' });
+        config.providers[0].apiKey = 'synthetic-ready-key';
+        expect(getAIChatConfigurationState(config, true).ready).toBe(true);
+    });
+
     it('does not select a disabled active provider when an enabled fallback exists', () => {
         const config = makeConfig({
             providers: [

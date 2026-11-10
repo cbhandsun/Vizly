@@ -469,16 +469,17 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
             {!configurationState.ready && (
                 <div className="ai-chat-configuration-status" role="status">
                     <div className="ai-chat-configuration-copy">
-                        <Typography.Text strong>{t('aiChat.configStatusTitle')}</Typography.Text>
+                        <Typography.Text strong>{configurationState.reason === 'restoring-api-key'
+                            ? t('aiChat.restoringKeyTitle') : t('aiChat.configStatusTitle')}</Typography.Text>
                         <Typography.Text type="secondary">
                             {t(`aiChat.configReason.${configurationState.reason}`, {
                                 provider: configurationState.providerName ?? '',
                             })}
                         </Typography.Text>
                     </div>
-                    <Button type="link" onClick={() => onOpenConfig(configurationState.providerId)}>
+                    {configurationState.reason !== 'restoring-api-key' && <Button type="link" onClick={() => onOpenConfig(configurationState.providerId)}>
                         {t('aiChat.configureNow')}
-                    </Button>
+                    </Button>}
                 </div>
             )}
 

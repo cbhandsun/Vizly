@@ -19,7 +19,7 @@ export type AIChatConfigurationState =
     | { ready: true; providerId: string; providerName: string }
     | {
         ready: false;
-        reason: 'missing-model' | AIProviderConnectionIssue;
+        reason: 'missing-model' | 'restoring-api-key' | AIProviderConnectionIssue;
         providerId?: string;
         providerName?: string;
     };
@@ -80,6 +80,7 @@ export const resolveAIChatActiveModelSelection = (
 
 export const getAIChatConfigurationState = (
     config: AIConfigState,
+    restoringKeys = false,
 ): AIChatConfigurationState => {
     const selection = resolveAIChatActiveModelSelection(config);
     if (!selection.provider || !selection.model) {
@@ -90,7 +91,8 @@ export const getAIChatConfigurationState = (
     if (!readiness.ready) {
         return {
             ready: false,
-            reason: readiness.issue,
+            reason: restoringKeys && readiness.issue === 'missing-api-key' && selection.provider.rememberKey
+                ? 'restoring-api-key' : readiness.issue,
             providerId: selection.provider.id,
             providerName: selection.provider.name,
         };

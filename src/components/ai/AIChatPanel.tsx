@@ -87,6 +87,8 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
     const canSubmitWithoutConfiguration = isConfigurationIndependentAIChatInput(inputValue, canvasOps);
 
     const [aiConfig, setAiConfig] = useState(() => getAIConfig(user?.id));
+    const [keyRestoreState, setKeyRestoreState] = useState(() => ({ owner: user?.id ?? null, settled: false }));
+    const restoringKeys = keyRestoreState.owner !== (user?.id ?? null) || !keyRestoreState.settled;
 
     useEffect(() => {
         let cancelled = false;
@@ -94,7 +96,10 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
             if (!cancelled) setAiConfig(getAIConfig(user?.id));
         };
         const refreshTimer = window.setTimeout(handleConfigChange, 0);
-        void restoreRememberedAIConfig(user?.id).then(handleConfigChange).catch(logAIChatCloudConfigLoadFailure);
+        void restoreRememberedAIConfig(user?.id).then(handleConfigChange).catch(logAIChatCloudConfigLoadFailure)
+            .finally(() => {
+                if (!cancelled) setKeyRestoreState({ owner: user?.id ?? null, settled: true });
+            });
         window.addEventListener('storage', handleConfigChange);
         window.addEventListener('aiConfigChanged', handleConfigChange);
         return () => {
@@ -180,8 +185,8 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
     }, [aiConfig]);
 
     const configurationState = useMemo(
-        () => getAIChatConfigurationState(aiConfig),
-        [aiConfig],
+        () => getAIChatConfigurationState(aiConfig, restoringKeys),
+        [aiConfig, restoringKeys],
     );
 
     const handleModelChange = (val: string) => {

@@ -72,3 +72,37 @@ for (const width of [390, 1440]) test(`encrypted opt-in restores the key after r
   await expect(dialog.getByLabel('API Key', { exact: true })).toHaveValue('');
   await expect(dialog.getByRole('switch', { name: '在此浏览器加密记住密钥', exact: true })).not.toBeChecked();
 });
+
+test('slow encrypted-key restoration shows progress and preserves the composer draft', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.addInitScript(() => localStorage.setItem('i18nextLng', 'zh'));
+  await page.goto('/?precompiledCapture=wms-process-flow-v1#/?diagram=wms-process-flow-v1');
+  const dialog = await openConfig(page);
+  await dialog.getByLabel('API Key', { exact: true }).fill('synthetic-delayed-vault-canary');
+  await dialog.getByRole('switch', { name: '在此浏览器加密记住密钥', exact: true }).check();
+  await dialog.getByRole('button', { name: '保存全部', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  await page.addInitScript(() => {
+    const decrypt = crypto.subtle.decrypt.bind(crypto.subtle);
+    const target = window as Window & { releaseSyntheticKeyRestore?: () => void };
+    const gate = new Promise<void>(resolve => { target.releaseSyntheticKeyRestore = resolve; });
+    Object.defineProperty(crypto.subtle, 'decrypt', {
+      value: async (...args: Parameters<SubtleCrypto['decrypt']>) => { await gate; return decrypt(...args); },
+    });
+  });
+  await page.reload();
+  await page.getByRole('button', { name: 'AI 助手', exact: true }).click();
+  await expect(page.getByText('正在恢复本机保存的 AI 密钥', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '立即配置', exact: true })).toHaveCount(0);
+  const draft = page.getByRole('textbox', { name: '向 AI 助手发送消息', exact: true });
+  await draft.fill('Keep this draft while restoring the saved key.');
+  const send = page.getByRole('button', { name: /^发送消息/ });
+  await expect(send).toBeDisabled();
+  await page.evaluate(() => {
+    const target = window as Window & { releaseSyntheticKeyRestore?: () => void };
+    target.releaseSyntheticKeyRestore?.();
+  });
+  await expect(page.getByText('正在恢复本机保存的 AI 密钥', { exact: true })).toHaveCount(0);
+  await expect(send).toBeEnabled();
+  await expect(draft).toHaveValue('Keep this draft while restoring the saved key.');
+});
