@@ -8,6 +8,8 @@ import { reconcileRoomCheckpoint } from './roomCheckpointCoordination.js';
 import { publishCollaborationElement, readCollaborationElement } from './documentModel.js';
 import type { createCloudRoomSource } from './cloudRoomSource.js';
 import { CloudRoomConflictError } from './cloudRoomReconciliation.js';
+import { decodeRoomRecord, encodeRoomCheckpoint } from './roomCheckpoint.js';
+import { areRoomCanvasesEqual } from './cloudRoomReconciliation.js';
 
 const state = (snapshot: Record<string, Record<string, unknown>>): Uint8Array => {
   const doc = new Y.Doc();
@@ -58,4 +60,64 @@ it('still rejects a conflicting authored port change instead of discarding it', 
   expect(() => reconcileRoomCheckpoint({ state: state(captured.live), checkpoint: {
     revision: captured.baseRevision, base: state(captured.base),
   } }, cloud)).toThrow(CloudRoomConflictError);
+});
+
+it('keeps the persisted cloud baseline readable by the previous converter on rollback', async () => {
+  const source: ReturnType<typeof createCloudRoomSource> = async () => ({
+    ...captured.cloud, diagramId: captured.cloud.content.id,
+  });
+  const cloud = await createCloudRoomCheckpoint(source, standardDataToCanvas)({
+    token: 'unused-fixture', diagramId: captured.cloud.content.id, userId: 'unused-fixture',
+  });
+  const accepted = reconcileRoomCheckpoint({ state: state(captured.live), checkpoint: {
+    revision: captured.baseRevision, base: state(captured.base),
+  } }, cloud);
+  const persisted = decodeRoomRecord(encodeRoomCheckpoint(accepted));
+  const previousState = state(captured.previousConverterCloud);
+  expect(() => reconcileRoomCheckpoint(persisted, {
+    revision: cloud.revision, base: previousState, state: previousState,
+  })).not.toThrow();
+});
+
+it('recovers the earlier automatic-port projection without clearing the retained room', async () => {
+  const source: ReturnType<typeof createCloudRoomSource> = async () => ({
+    ...captured.cloud, diagramId: captured.cloud.content.id,
+  });
+  const cloud = await createCloudRoomCheckpoint(source, standardDataToCanvas)({
+    token: 'unused-fixture', diagramId: captured.cloud.content.id, userId: 'unused-fixture',
+  });
+  const projected = reconcileRoomCheckpoint(null, cloud);
+  const accepted = reconcileRoomCheckpoint({ state: projected.state, checkpoint: {
+    revision: cloud.revision, base: projected.state,
+  } }, cloud);
+  const expected = new Y.Doc();
+  const actual = new Y.Doc();
+  try {
+    Y.applyUpdate(expected, projected.state);
+    Y.applyUpdate(actual, accepted.state);
+    expect(areRoomCanvasesEqual(expected, actual)).toBe(true);
+    expect(Buffer.from(accepted.base)).toEqual(Buffer.from(cloud.base));
+  } finally { expected.destroy(); actual.destroy(); }
+});
+
+it('rejects a changed cloud label at the same revision even with automatic-port metadata', async () => {
+  const source: ReturnType<typeof createCloudRoomSource> = async () => ({
+    ...captured.cloud, diagramId: captured.cloud.content.id,
+  });
+  const cloud = await createCloudRoomCheckpoint(source, standardDataToCanvas)({
+    token: 'unused-fixture', diagramId: captured.cloud.content.id, userId: 'unused-fixture',
+  });
+  const accepted = reconcileRoomCheckpoint(null, cloud);
+  const tampered = new Y.Doc();
+  try {
+    Y.applyUpdate(tampered, cloud.base);
+    const nodes = tampered.getMap('flowchart-nodes');
+    const node = readCollaborationElement(nodes.get('release-review'));
+    if (!node) throw Error('Missing fixture node');
+    publishCollaborationElement(nodes, 'release-review', { ...node, description: 'Changed without revision' });
+    const changed = Y.encodeStateAsUpdate(tampered);
+    expect(() => reconcileRoomCheckpoint(decodeRoomRecord(encodeRoomCheckpoint(accepted)), {
+      ...cloud, base: changed, state: changed,
+    })).toThrow(CloudRoomConflictError);
+  } finally { tampered.destroy(); }
 });

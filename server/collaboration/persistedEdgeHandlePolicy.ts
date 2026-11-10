@@ -1,18 +1,24 @@
 const record = (value: unknown): value is Record<string, unknown> => value !== null
   && typeof value === 'object' && !Array.isArray(value);
 
+export type HandleRole = 'source' | 'target';
+
+export const readPersistedAutomaticHandleRoles = (saved: unknown): HandleRole[] => {
+  if (!record(saved) || !record(saved.metadata)) return [];
+  const metadata = saved.metadata;
+  if (metadata.manualHandles === true) return [];
+  const manual = Array.isArray(metadata.manualHandleSides) ? metadata.manualHandleSides : [];
+  const automatic = Array.isArray(metadata.autoHandles) ? metadata.autoHandles : [];
+  return (['source', 'target'] as const).filter(role => !manual.includes(role)
+    && (automatic.includes(role)
+      || (metadata.manualHandles === false && saved[`${role}Handle`] === undefined)));
+};
+
 /** Persisted automatic port hints are not authored CRDT handle edits. */
 export const restorePersistedEdgeHandlePolicy = (
   element: Record<string, unknown>, saved: unknown,
 ): Record<string, unknown> => {
-  if (!record(saved) || !record(saved.metadata)) return element;
-  const metadata = saved.metadata;
-  if (metadata.manualHandles === true) return element;
-  const manual = Array.isArray(metadata.manualHandleSides) ? metadata.manualHandleSides : [];
-  const automatic = Array.isArray(metadata.autoHandles) ? metadata.autoHandles : [];
-  const roles = (['source', 'target'] as const).filter(role => !manual.includes(role)
-    && (automatic.includes(role)
-      || (metadata.manualHandles === false && saved[`${role}Handle`] === undefined)));
+  const roles = readPersistedAutomaticHandleRoles(saved);
   if (roles.length === 0) return element;
   const restored = { ...element };
   for (const role of roles) delete restored[`${role}Handle`];

@@ -1,8 +1,9 @@
 import * as Y from 'yjs';
 import { compareCloudCheckpointRevisions, encodeRoomCheckpoint, type RoomCheckpoint, type RoomRecord } from './roomCheckpoint.js';
 import { areRoomCanvasesEqual, CloudRoomConflictError, reconcileCloudRoom } from './cloudRoomReconciliation.js';
-import { upgradeCollaborationDocument } from './documentModel.js';
+import { publishCollaborationElement, readCollaborationElement, upgradeCollaborationDocument } from './documentModel.js';
 import { validateDocument } from './boundary.js';
+import { restorePersistedEdgeHandlePolicy } from './persistedEdgeHandlePolicy.js';
 
 /** Compute against a single accepted snapshot; callers own atomic persistence. */
 export const reconcileRoomCheckpoint = (stored: RoomRecord | null, cloud: RoomCheckpoint, liveState?: Uint8Array): RoomCheckpoint => {
@@ -10,11 +11,19 @@ export const reconcileRoomCheckpoint = (stored: RoomRecord | null, cloud: RoomCh
   if (!Buffer.from(cloud.base).equals(Buffer.from(cloud.state))) throw new Error('Invalid cloud checkpoint');
   const liveDoc = new Y.Doc();
   const cloudDoc = new Y.Doc();
+  const mergeCloudDoc = new Y.Doc();
   const baseDoc = new Y.Doc();
   try {
     Y.applyUpdate(cloudDoc, cloud.base);
     if (!validateDocument(cloudDoc)) throw new Error('Invalid cloud checkpoint');
-    let accepted = cloud.state;
+    Y.applyUpdate(mergeCloudDoc, cloud.base);
+    const edges = mergeCloudDoc.getMap('flowchart-edges');
+    for (const [id, roles] of cloud.automaticHandleRoles ?? []) {
+      const element = readCollaborationElement(edges.get(id));
+      if (element) publishCollaborationElement(edges, id,
+        restorePersistedEdgeHandlePolicy(element, { metadata: { autoHandles: roles } }));
+    }
+    let accepted = Y.encodeStateAsUpdate(mergeCloudDoc);
     if (stored) {
       Y.applyUpdate(liveDoc, liveState ?? stored.state);
       if (!upgradeCollaborationDocument(liveDoc) || !validateDocument(liveDoc)) throw new Error('Invalid persisted room');
@@ -22,8 +31,11 @@ export const reconcileRoomCheckpoint = (stored: RoomRecord | null, cloud: RoomCh
         const comparison = compareCloudCheckpointRevisions(cloud.revision, stored.checkpoint.revision);
         if (comparison < 0) throw new CloudRoomConflictError();
         Y.applyUpdate(baseDoc, stored.checkpoint.base);
-        if (comparison === 0 && !areRoomCanvasesEqual(baseDoc, cloudDoc)) throw new CloudRoomConflictError();
-        accepted = reconcileCloudRoom(baseDoc, liveDoc, cloudDoc);
+        // Also accept the exact projected baseline written by the earlier port
+        // fix. No other field or authored handle difference is exempted.
+        if (comparison === 0 && !areRoomCanvasesEqual(baseDoc, cloudDoc)
+          && !areRoomCanvasesEqual(baseDoc, mergeCloudDoc)) throw new CloudRoomConflictError();
+        accepted = reconcileCloudRoom(baseDoc, liveDoc, mergeCloudDoc);
       } else {
         // No reliable historical base exists. A different graph could be an
         // unsaved collaborative edit or a newer cloud edit: never guess.
@@ -44,5 +56,5 @@ export const reconcileRoomCheckpoint = (stored: RoomRecord | null, cloud: RoomCh
       }
     } finally { acceptedDoc.destroy(); }
     return { revision: cloud.revision, base: Uint8Array.from(cloud.base), state: Uint8Array.from(accepted) };
-  } finally { liveDoc.destroy(); cloudDoc.destroy(); baseDoc.destroy(); }
+  } finally { liveDoc.destroy(); cloudDoc.destroy(); mergeCloudDoc.destroy(); baseDoc.destroy(); }
 };

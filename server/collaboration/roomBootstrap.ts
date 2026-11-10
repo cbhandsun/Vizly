@@ -3,7 +3,7 @@ import { validateDocument } from './boundary.js';
 import { publishCollaborationElement, readCollaborationElement } from './documentModel.js';
 import type { createCloudRoomSource } from './cloudRoomSource.js';
 import { restorePersistedCanvasGeometry } from './persistedCanvasGeometry.js';
-import { restorePersistedEdgeHandlePolicy } from './persistedEdgeHandlePolicy.js';
+import { readPersistedAutomaticHandleRoles, type HandleRole } from './persistedEdgeHandlePolicy.js';
 
 export interface BootstrapIdentity { token: string; diagramId: string; userId: string }
 type Source = ReturnType<typeof createCloudRoomSource>;
@@ -17,7 +17,8 @@ export const createCloudRoomCheckpoint = (source: Source, convert: (content: Con
   const initialNodes: unknown[] = value.nodes;
   const initialEdges: unknown[] = value.edges;
   const savedNodes = new Map([...cloud.content.nodes, ...(cloud.content.groups ?? [])].map(node => [node.id, node]));
-  const savedEdges = new Map(cloud.content.edges.map((edge: { id?: string }) => [edge.id, edge] as const));
+  const automaticHandleRoles = new Map<string, HandleRole[]>(cloud.content.edges.map((edge: { id: string }) =>
+    [edge.id, readPersistedAutomaticHandleRoles(edge)] as const));
   const doc = new Y.Doc();
   try {
     doc.transact(() => {
@@ -27,8 +28,7 @@ export const createCloudRoomCheckpoint = (source: Source, convert: (content: Con
           const parsedElement = readCollaborationElement(input);
           const element = parsedElement && name === 'flowchart-nodes' && typeof parsedElement.id === 'string'
             ? restorePersistedCanvasGeometry(parsedElement, savedNodes.get(parsedElement.id))
-            : parsedElement && name === 'flowchart-edges' && typeof parsedElement.id === 'string'
-              ? restorePersistedEdgeHandlePolicy(parsedElement, savedEdges.get(parsedElement.id)) : parsedElement;
+            : parsedElement;
           if (!element || typeof element.id !== 'string' || map.has(element.id)
             || !publishCollaborationElement(map, element.id, element)) throw new Error('Invalid initial room');
         }
@@ -43,7 +43,9 @@ export const createCloudRoomCheckpoint = (source: Source, convert: (content: Con
     });
     if (!validateDocument(doc)) throw new Error('Invalid initial room');
     const state = Y.encodeStateAsUpdate(doc);
-    return { revision: cloud.revision, base: state, state };
+    // Keep the converter's baseline intact so an older server can still read
+    // this checkpoint after rollback. Automatic ports are projected at merge time.
+    return { revision: cloud.revision, base: state, state, automaticHandleRoles };
   } finally { doc.destroy(); }
 };
 
