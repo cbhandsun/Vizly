@@ -7,6 +7,7 @@ export interface RoomCheckpoint {
   revision: string; base: Uint8Array; state: Uint8Array;
   /** Trusted cloud metadata used only while merging; never part of the persisted format. */
   automaticHandleRoles?: ReadonlyMap<string, readonly HandleRole[]>;
+  canvasNodeZIndexes?: ReadonlyMap<string, number>;
 }
 export interface RoomRecord { state: Uint8Array; checkpoint: { revision: string; base: Uint8Array } | null }
 const magic = Buffer.from('VIZLY-ROOM-CHECKPOINT\n');

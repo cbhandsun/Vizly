@@ -48,7 +48,9 @@ describe('cloud saves of collaborative geometry', () => {
           metadata: { canvasPosition: { x: 0, y: 0 }, width: 362, height: 672,
             style: { width: 362, height: 672, zIndex: -10 } } }] },
     }), standardDataToCanvas)({ diagramId: id, userId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', token: 'synthetic-unused' });
-    const live = document(cloud.state);
+    expect(readCollaborationElement(document(cloud.base).getMap('flowchart-nodes').get('titlegroup-orders')))
+      .toMatchObject({ zIndex: -1 }); // Historical converter baseline stays readable on rollback.
+    const live = document(reconcileRoomCheckpoint(null, cloud).state);
     const group = readCollaborationElement(live.getMap('flowchart-nodes').get('titlegroup-orders'));
     expect(group).toMatchObject({ zIndex: -10 });
     publishCollaborationElement(live.getMap('flowchart-nodes'), 'titlegroup-orders', { ...group, zIndex: -10 });

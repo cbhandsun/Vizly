@@ -498,7 +498,7 @@
           "height": 180,
           "zIndex": -10
         },
-        "zIndex": -10,
+        "zIndex": -1,
         "width": 805,
         "height": 180
       },
@@ -573,8 +573,7 @@
           "zIndex": 10
         },
         "width": 291,
-        "height": 60,
-        "zIndex": 10
+        "height": 60
       }
     },
     "flowchart-edges": {
@@ -613,5 +612,630 @@
         "targetHandle": "left"
       }
     }
+  },
+  "postSelectionCloud": {
+    "revision": "2026-11-10T14:00:48.08+00:00",
+    "content": {
+      "id": "56ad3956-a575-4055-8d81-a3a0c1768458",
+      "name": "AI泳道路由发布验收-20261110",
+      "type": "flowchart",
+      "edges": [
+        {
+          "id": "e-release-start-release-review",
+          "type": "advanced-smart-step",
+          "source": "release-start",
+          "target": "release-review",
+          "metadata": {
+            "manualHandles": false
+          },
+          "markerEnd": {
+            "type": "arrowclosed"
+          }
+        },
+        {
+          "id": "e-release-review-release-done",
+          "type": "advanced-smart-step",
+          "source": "release-review",
+          "target": "release-done",
+          "metadata": {
+            "manualHandles": false
+          },
+          "markerEnd": {
+            "type": "arrowclosed"
+          }
+        }
+      ],
+      "nodes": [
+        {
+          "id": "release-start",
+          "data": {
+            "label": "开始"
+          },
+          "type": "custom",
+          "domain": "orders",
+          "metadata": {
+            "shape": "ellipse",
+            "style": {
+              "width": 97,
+              "height": 60
+            },
+            "width": 97,
+            "height": 60,
+            "parentId": "titlegroup-orders",
+            "sequence": "1",
+            "canvasNodeType": "flowchart",
+            "canvasPosition": {
+              "x": 96,
+              "y": 88
+            }
+          },
+          "description": "开始",
+          "domainClass": "mid"
+        },
+        {
+          "id": "release-done",
+          "data": {
+            "label": "完成"
+          },
+          "type": "custom",
+          "domain": "orders",
+          "metadata": {
+            "shape": "ellipse",
+            "style": {
+              "width": 97,
+              "height": 60
+            },
+            "width": 97,
+            "height": 60,
+            "parentId": "titlegroup-orders",
+            "sequence": "1",
+            "canvasNodeType": "flowchart",
+            "canvasPosition": {
+              "x": 676,
+              "y": 88
+            }
+          },
+          "description": "完成",
+          "domainClass": "mid"
+        },
+        {
+          "id": "release-review",
+          "data": {
+            "label": "审核（泳道设置与AI流程验收通过）"
+          },
+          "type": "custom",
+          "domain": "orders",
+          "metadata": {
+            "shape": "rectangle",
+            "style": {
+              "width": 291,
+              "height": 60,
+              "zIndex": 10
+            },
+            "width": 291,
+            "height": 60,
+            "parentId": "titlegroup-orders",
+            "sequence": 1,
+            "canvasNodeType": "flowchart",
+            "canvasPosition": {
+              "x": 289,
+              "y": 88
+            }
+          },
+          "description": "审核（泳道设置与AI流程验收通过）",
+          "domainClass": "mid"
+        }
+      ],
+      "theme": {
+        "name": "manual",
+        "domains": {},
+        "isCustom": true,
+        "displayName": "Manual Theme"
+      },
+      "groups": [
+        {
+          "id": "titlegroup-orders",
+          "data": {
+            "domain": "orders",
+            "hidden": false,
+            "baseZIndex": -10,
+            "description": "orders",
+            "domainClass": "mid",
+            "titleBarHeight": 50
+          },
+          "type": "group",
+          "label": "orders",
+          "domain": "orders",
+          "isGroup": true,
+          "measured": {
+            "width": 805,
+            "height": 180
+          },
+          "metadata": {
+            "style": {
+              "width": 805,
+              "height": 180,
+              "zIndex": -10
+            },
+            "width": 805,
+            "height": 180,
+            "sequence": "1",
+            "canvasNodeType": "titleGroup",
+            "canvasPosition": {
+              "x": 0,
+              "y": 0
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "description": "orders",
+          "domainClass": "mid"
+        }
+      ],
+      "layout": {
+        "type": "custom",
+        "padding": {
+          "top": 20,
+          "left": 20,
+          "right": 20,
+          "bottom": 20,
+          "vertical": 20,
+          "horizontal": 20
+        },
+        "spacing": {
+          "vertical": 50,
+          "horizontal": 50
+        },
+        "direction": "LR",
+        "autoDirection": true,
+        "fitDomainContent": true
+      },
+      "version": "1.0.0",
+      "metadata": {
+        "title": "AI泳道路由发布验收-20261110",
+        "layoutSelection": {
+          "version": 2,
+          "strategy": "domain-lanes",
+          "direction": "LR",
+          "nodeLayout": "dagre",
+          "laneRankDecision": {
+            "score": 0,
+            "margin": 257,
+            "reason": "global-preserved",
+            "applied": "global",
+            "metrics": {
+              "global": {
+                "flowLength": 805,
+                "backwardTravel": 0,
+                "whitespaceRatio": 0.7991718426501035,
+                "backwardEdgeCount": 0
+              },
+              "compact": {
+                "flowLength": 805,
+                "backwardTravel": 0,
+                "whitespaceRatio": 0.7991718426501035,
+                "backwardEdgeCount": 0
+              }
+            },
+            "version": 1,
+            "direction": "LR",
+            "requested": "auto",
+            "policyVersion": 1,
+            "additionalBacktrackTravel": 0,
+            "connectedInputFingerprint": "lane-v1-1ae7b670-22f4881a-159"
+          },
+          "laneRankPreference": "auto"
+        }
+      },
+      "routingSnapshot": null
+    }
+  },
+  "postSelectionRetained": {
+    "base": {
+      "flowchart-nodes": {
+        "titlegroup-orders": {
+          "id": "titlegroup-orders",
+          "type": "titleGroup",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "data": {
+            "domain": "orders",
+            "hidden": false,
+            "baseZIndex": -10,
+            "description": "orders",
+            "domainClass": "mid",
+            "titleBarHeight": 50,
+            "label": "orders"
+          },
+          "style": {
+            "width": 805,
+            "height": 180,
+            "zIndex": -10
+          },
+          "zIndex": -10,
+          "width": 805,
+          "height": 180
+        },
+        "release-start": {
+          "id": "release-start",
+          "type": "flowchart",
+          "position": {
+            "x": 96,
+            "y": 88
+          },
+          "parentId": "titlegroup-orders",
+          "extent": "parent",
+          "data": {
+            "label": "开始",
+            "domain": "orders",
+            "domainClass": "mid",
+            "sequence": "1",
+            "description": "开始",
+            "shape": "ellipse"
+          },
+          "style": {
+            "width": 97,
+            "height": 60
+          },
+          "width": 97,
+          "height": 60
+        },
+        "release-done": {
+          "id": "release-done",
+          "type": "flowchart",
+          "position": {
+            "x": 676,
+            "y": 88
+          },
+          "parentId": "titlegroup-orders",
+          "extent": "parent",
+          "data": {
+            "label": "完成",
+            "domain": "orders",
+            "domainClass": "mid",
+            "sequence": "1",
+            "description": "完成",
+            "shape": "ellipse"
+          },
+          "style": {
+            "width": 97,
+            "height": 60
+          },
+          "width": 97,
+          "height": 60
+        },
+        "release-review": {
+          "id": "release-review",
+          "type": "flowchart",
+          "position": {
+            "x": 289,
+            "y": 88
+          },
+          "parentId": "titlegroup-orders",
+          "extent": "parent",
+          "data": {
+            "label": "审核（泳道设置与AI流程验收通过）",
+            "domain": "orders",
+            "domainClass": "mid",
+            "sequence": 1,
+            "description": "审核（泳道设置与AI流程验收通过）",
+            "shape": "rectangle"
+          },
+          "style": {
+            "width": 291,
+            "height": 60,
+            "zIndex": 10
+          },
+          "width": 291,
+          "height": 60,
+          "zIndex": 10
+        }
+      },
+      "flowchart-edges": {
+        "e-release-start-release-review": {
+          "id": "e-release-start-release-review",
+          "source": "release-start",
+          "target": "release-review",
+          "type": "advanced-smart-step",
+          "markerEnd": {
+            "type": "arrowclosed"
+          },
+          "data": {}
+        },
+        "e-release-review-release-done": {
+          "id": "e-release-review-release-done",
+          "source": "release-review",
+          "target": "release-done",
+          "type": "advanced-smart-step",
+          "markerEnd": {
+            "type": "arrowclosed"
+          },
+          "data": {}
+        }
+      }
+    },
+    "live": {
+      "flowchart-nodes": {
+        "release-start": {
+          "id": "release-start",
+          "type": "flowchart",
+          "position": {
+            "x": 96,
+            "y": 88
+          },
+          "parentId": "titlegroup-orders",
+          "extent": "parent",
+          "data": {
+            "label": "开始",
+            "domain": "orders",
+            "domainClass": "mid",
+            "sequence": "1",
+            "description": "开始",
+            "shape": "ellipse"
+          },
+          "style": {
+            "width": 97,
+            "height": 60
+          },
+          "width": 97,
+          "height": 60,
+          "hidden": false
+        },
+        "release-done": {
+          "id": "release-done",
+          "type": "flowchart",
+          "position": {
+            "x": 676,
+            "y": 88
+          },
+          "parentId": "titlegroup-orders",
+          "extent": "parent",
+          "data": {
+            "label": "完成",
+            "domain": "orders",
+            "domainClass": "mid",
+            "sequence": "1",
+            "description": "完成",
+            "shape": "ellipse"
+          },
+          "style": {
+            "width": 97,
+            "height": 60
+          },
+          "width": 97,
+          "height": 60,
+          "hidden": false
+        },
+        "release-review": {
+          "id": "release-review",
+          "type": "flowchart",
+          "position": {
+            "x": 289,
+            "y": 88
+          },
+          "parentId": "titlegroup-orders",
+          "extent": "parent",
+          "data": {
+            "label": "审核（泳道设置与AI流程验收通过）",
+            "domain": "orders",
+            "domainClass": "mid",
+            "sequence": 1,
+            "description": "审核（泳道设置与AI流程验收通过）",
+            "shape": "rectangle"
+          },
+          "style": {
+            "width": 291,
+            "height": 60,
+            "zIndex": 10
+          },
+          "width": 291,
+          "height": 60,
+          "hidden": false,
+          "zIndex": 10
+        },
+        "titlegroup-orders": {
+          "id": "titlegroup-orders",
+          "type": "titleGroup",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "style": {
+            "width": 805,
+            "height": 180,
+            "zIndex": -10
+          },
+          "data": {
+            "description": "orders",
+            "domain": "orders",
+            "domainClass": "mid",
+            "titleBarHeight": 50,
+            "baseZIndex": -10,
+            "hidden": false
+          },
+          "zIndex": -10,
+          "draggable": false,
+          "hidden": false,
+          "width": 805,
+          "height": 180
+        }
+      },
+      "flowchart-edges": {
+        "e-release-start-release-review": {
+          "id": "e-release-start-release-review",
+          "source": "release-start",
+          "target": "release-review",
+          "type": "advanced-smart-step",
+          "markerEnd": {
+            "type": "arrowclosed"
+          },
+          "data": {
+            "trunkPolishVersion": 2,
+            "waypoints": [],
+            "intraContainerNoObstacle": true,
+            "obstacleScope": "corridor",
+            "obstaclePadding": 24,
+            "pathOptions": {
+              "gridRatio": 1.04,
+              "borderRadius": 4
+            },
+            "layoutDirection": "LR"
+          }
+        },
+        "e-release-review-release-done": {
+          "id": "e-release-review-release-done",
+          "source": "release-review",
+          "target": "release-done",
+          "type": "advanced-smart-step",
+          "markerEnd": {
+            "type": "arrowclosed"
+          },
+          "data": {
+            "trunkPolishVersion": 2,
+            "waypoints": [],
+            "intraContainerNoObstacle": true,
+            "obstacleScope": "corridor",
+            "obstaclePadding": 24,
+            "pathOptions": {
+              "gridRatio": 1.04,
+              "borderRadius": 4
+            },
+            "layoutDirection": "LR"
+          }
+        }
+      }
+    }
+  },
+  "postSelectionPreviousBackendCloud": {
+    "flowchart-nodes": {
+      "titlegroup-orders": {
+        "id": "titlegroup-orders",
+        "type": "titleGroup",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "data": {
+          "domain": "orders",
+          "hidden": false,
+          "baseZIndex": -10,
+          "description": "orders",
+          "domainClass": "mid",
+          "titleBarHeight": 50,
+          "label": "orders"
+        },
+        "style": {
+          "width": 805,
+          "height": 180,
+          "zIndex": -10
+        },
+        "zIndex": -1,
+        "width": 805,
+        "height": 180
+      },
+      "release-start": {
+        "id": "release-start",
+        "type": "flowchart",
+        "position": {
+          "x": 96,
+          "y": 88
+        },
+        "parentId": "titlegroup-orders",
+        "extent": "parent",
+        "data": {
+          "label": "开始",
+          "domain": "orders",
+          "domainClass": "mid",
+          "sequence": "1",
+          "description": "开始",
+          "shape": "ellipse"
+        },
+        "style": {
+          "width": 97,
+          "height": 60
+        },
+        "width": 97,
+        "height": 60
+      },
+      "release-done": {
+        "id": "release-done",
+        "type": "flowchart",
+        "position": {
+          "x": 676,
+          "y": 88
+        },
+        "parentId": "titlegroup-orders",
+        "extent": "parent",
+        "data": {
+          "label": "完成",
+          "domain": "orders",
+          "domainClass": "mid",
+          "sequence": "1",
+          "description": "完成",
+          "shape": "ellipse"
+        },
+        "style": {
+          "width": 97,
+          "height": 60
+        },
+        "width": 97,
+        "height": 60
+      },
+      "release-review": {
+        "id": "release-review",
+        "type": "flowchart",
+        "position": {
+          "x": 289,
+          "y": 88
+        },
+        "parentId": "titlegroup-orders",
+        "extent": "parent",
+        "data": {
+          "label": "审核（泳道设置与AI流程验收通过）",
+          "domain": "orders",
+          "domainClass": "mid",
+          "sequence": 1,
+          "description": "审核（泳道设置与AI流程验收通过）",
+          "shape": "rectangle"
+        },
+        "style": {
+          "width": 291,
+          "height": 60,
+          "zIndex": 10
+        },
+        "width": 291,
+        "height": 60
+      }
+    },
+    "flowchart-edges": {
+      "e-release-start-release-review": {
+        "id": "e-release-start-release-review",
+        "source": "release-start",
+        "target": "release-review",
+        "type": "advanced-smart-step",
+        "markerEnd": {
+          "type": "arrowclosed"
+        },
+        "data": {}
+      },
+      "e-release-review-release-done": {
+        "id": "e-release-review-release-done",
+        "source": "release-review",
+        "target": "release-done",
+        "type": "advanced-smart-step",
+        "markerEnd": {
+          "type": "arrowclosed"
+        },
+        "data": {}
+      }
+    }
+  },
+  "previousBackendProvenance": {
+    "source": "2688b7ddc4a83545d2e39dac6766f26a668d76bf",
+    "sdkSha256": "b6471ac204ecf38d081701f18284e078141bcbf3adce4082979d85e88af58577"
   }
 }

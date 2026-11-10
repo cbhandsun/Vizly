@@ -121,3 +121,57 @@ it('rejects a changed cloud label at the same revision even with automatic-port 
     })).toThrow(CloudRoomConflictError);
   } finally { tampered.destroy(); }
 });
+
+it('retains saved layer order while writing a baseline readable by the actual previous backend', async () => {
+  const source: ReturnType<typeof createCloudRoomSource> = async () => ({
+    ...captured.postSelectionCloud, diagramId: captured.postSelectionCloud.content.id,
+  });
+  const cloud = await createCloudRoomCheckpoint(source, standardDataToCanvas)({
+    token: 'unused-fixture', diagramId: captured.postSelectionCloud.content.id, userId: 'unused-fixture',
+  });
+  const accepted = reconcileRoomCheckpoint({ state: state(captured.postSelectionRetained.live), checkpoint: {
+    revision: cloud.revision, base: state(captured.postSelectionRetained.base),
+  } }, cloud);
+  const doc = new Y.Doc();
+  try {
+    Y.applyUpdate(doc, accepted.state);
+    expect(readCollaborationElement(doc.getMap('flowchart-nodes').get('titlegroup-orders'))?.zIndex).toBe(-10);
+    expect(readCollaborationElement(doc.getMap('flowchart-nodes').get('release-review'))?.zIndex).toBe(10);
+    const previousState = state(captured.postSelectionPreviousBackendCloud);
+    expect(() => reconcileRoomCheckpoint(decodeRoomRecord(encodeRoomCheckpoint(accepted)), {
+      revision: cloud.revision, base: previousState, state: previousState,
+    })).not.toThrow();
+  } finally { doc.destroy(); }
+});
+
+it('rejects a saved layer change at the same revision instead of ignoring rendering order', async () => {
+  const changed = structuredClone(captured.postSelectionCloud);
+  changed.content.groups[0].metadata.style.zIndex = -20;
+  const source: ReturnType<typeof createCloudRoomSource> = async () => ({ ...changed, diagramId: changed.content.id });
+  const cloud = await createCloudRoomCheckpoint(source, standardDataToCanvas)({
+    token: 'unused-fixture', diagramId: changed.content.id, userId: 'unused-fixture',
+  });
+  expect(() => reconcileRoomCheckpoint({ state: state(captured.postSelectionRetained.live), checkpoint: {
+    revision: cloud.revision, base: state(captured.postSelectionRetained.base),
+  } }, cloud)).toThrow(CloudRoomConflictError);
+});
+
+it('accepts a later cloud layer edit when the live rendered order has not changed', async () => {
+  const identity = { token: 'unused-fixture', diagramId: captured.postSelectionCloud.content.id, userId: 'unused-fixture' };
+  const source: ReturnType<typeof createCloudRoomSource> = async () => ({
+    ...captured.postSelectionCloud, diagramId: identity.diagramId,
+  });
+  const cloud = await createCloudRoomCheckpoint(source, standardDataToCanvas)(identity);
+  const accepted = reconcileRoomCheckpoint(null, cloud);
+  const changed = structuredClone(captured.postSelectionCloud);
+  changed.revision = '2026-11-10T14:00:48.09+00:00';
+  changed.content.groups[0].metadata.style.zIndex = -20;
+  const nextSource: ReturnType<typeof createCloudRoomSource> = async () => ({ ...changed, diagramId: identity.diagramId });
+  const nextCloud = await createCloudRoomCheckpoint(nextSource, standardDataToCanvas)(identity);
+  const next = reconcileRoomCheckpoint(decodeRoomRecord(encodeRoomCheckpoint(accepted)), nextCloud);
+  const doc = new Y.Doc();
+  try {
+    Y.applyUpdate(doc, next.state);
+    expect(readCollaborationElement(doc.getMap('flowchart-nodes').get('titlegroup-orders'))?.zIndex).toBe(-20);
+  } finally { doc.destroy(); }
+});
