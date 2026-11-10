@@ -8,14 +8,14 @@ async function openProvider(page: Page) {
   return dialog;
 }
 
-test('browser-direct transport is opt-in and persists without credentials', async ({ page }) => {
+test('browser-direct transport is the default without persisting session credentials', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('i18nextLng', 'zh'));
   await page.goto('/?precompiledCapture=wms-process-flow-v1#/?diagram=wms-process-flow-v1');
   let dialog = await openProvider(page);
   const toggle = dialog.getByRole('switch', { name: '浏览器直连' });
-  await expect(toggle).not.toBeChecked();
+  await expect(toggle).toBeChecked();
+  await expect(toggle).toBeDisabled();
   await dialog.getByLabel('API Key', { exact: true }).fill('synthetic-direct-transport-key');
-  await toggle.click();
   await dialog.getByRole('button', { name: '保存全部', exact: true }).click();
   await expect(dialog).not.toBeVisible();
   expect(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))).not.toContain('synthetic-direct-transport-key');
