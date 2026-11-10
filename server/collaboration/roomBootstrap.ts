@@ -4,6 +4,7 @@ import { publishCollaborationElement, readCollaborationElement } from './documen
 import type { createCloudRoomSource } from './cloudRoomSource.js';
 import { readPersistedCanvasZIndex, restorePersistedCanvasGeometry } from './persistedCanvasGeometry.js';
 import { readPersistedAutomaticHandleRoles, type HandleRole } from './persistedEdgeHandlePolicy.js';
+import { reconcileRoomCheckpoint } from './roomCheckpointCoordination.js';
 
 export interface BootstrapIdentity { token: string; diagramId: string; userId: string }
 type Source = ReturnType<typeof createCloudRoomSource>;
@@ -57,5 +58,5 @@ export const createCloudRoomCheckpoint = (source: Source, convert: (content: Con
 
 export const createRoomBootstrap = (source: Source, convert: (content: Content) => Promise<unknown>) => {
   const load = createCloudRoomCheckpoint(source, convert);
-  return async (identity: BootstrapIdentity) => (await load(identity)).state;
+  return async (identity: BootstrapIdentity) => reconcileRoomCheckpoint(null, await load(identity)).state;
 };

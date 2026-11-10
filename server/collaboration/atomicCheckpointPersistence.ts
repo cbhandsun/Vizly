@@ -8,6 +8,15 @@ import { mergeCheckpointProposal } from './checkpointProposal.js';
 import { acceptPersistedRoomState } from './acceptedRoomState.js';
 import { CloudRoomConflictError } from './cloudRoomReconciliation.js';
 
+// The binary format deliberately excludes cloud-only merge hints. Snapshot
+// them separately before storage awaits, including each mutable role array.
+const cloneCloudMergeHints = (checkpoint: RoomCheckpoint) => ({
+  ...(checkpoint.automaticHandleRoles ? { automaticHandleRoles: new Map(
+    [...checkpoint.automaticHandleRoles].map(([id, roles]) => [id, [...roles]] as const),
+  ) } : {}),
+  ...(checkpoint.canvasNodeZIndexes ? { canvasNodeZIndexes: new Map(checkpoint.canvasNodeZIndexes) } : {}),
+});
+
 /** Bind persistence to one admitted room and its immutable generation. */
 export const createAtomicCheckpointPersistence = (id: string, lease: DistributedRoomLease, store: AtomicRoomStore): CheckpointPersistence => {
   if (!isRoomGeneration(id) || !isRoomGeneration(lease.generation)) throw new Error('Invalid checkpoint room identity');
@@ -52,14 +61,14 @@ export const createAtomicCheckpointPersistence = (id: string, lease: Distributed
       guard(key);
       const copied = decodeRoomRecord(encodeRoomCheckpoint(proposed));
       if (!copied.checkpoint) throw new Error('Missing checkpoint metadata');
-      const checkpoint = { ...copied.checkpoint, state: copied.state };
+      const checkpoint = { ...copied.checkpoint, state: copied.state, ...cloneCloudMergeHints(proposed) };
       return write(key, current => mergeCheckpointProposal(current, checkpoint));
     },
     async coordinateCheckpoint(key, cloud, liveState) {
       guard(key);
       const copied = decodeRoomRecord(encodeRoomCheckpoint(cloud));
       if (!copied.checkpoint || !Buffer.from(copied.state).equals(Buffer.from(copied.checkpoint.base))) throw new Error('Invalid cloud checkpoint');
-      const checkpoint = { ...copied.checkpoint, state: copied.state };
+      const checkpoint = { ...copied.checkpoint, state: copied.state, ...cloneCloudMergeHints(cloud) };
       const live = liveState === undefined ? undefined : acceptPersistedRoomState(liveState, undefined);
       return write(key, current => {
         if (live) {

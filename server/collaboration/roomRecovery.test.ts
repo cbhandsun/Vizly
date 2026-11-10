@@ -2,13 +2,16 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { RecoverableCheckpointPersistence } from './persistence.js';
 import { createRoomRecovery, parseRecoveryConfirmation } from './roomRecovery.js';
+import * as Y from 'yjs';
+import type { RoomCheckpoint } from './roomCheckpoint.js';
+import { publishCollaborationElement, readCollaborationElement } from './documentModel.js';
 
 const identity = { diagramId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', token: 'synthetic-owner', userId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' };
 const sha256 = 'a'.repeat(64);
-const checkpoint = { revision: '2026-10-09T02:04:07.212Z', base: new Uint8Array([0, 0]), state: new Uint8Array([0, 0]) };
+const checkpoint: RoomCheckpoint = { revision: '2026-10-09T02:04:07.212Z', base: new Uint8Array([0, 0]), state: new Uint8Array([0, 0]) };
 const fixture = () => {
   const authorizeOwner = vi.fn(async () => ({ userId: identity.userId, role: 'editor' as const }));
-  const recoverCheckpoint = vi.fn(async () => ({ backupId: 'synthetic-backup', previousSha256: sha256, revision: checkpoint.revision }));
+  const recoverCheckpoint = vi.fn(async (_id: string, _sha: unknown, _checkpoint: RoomCheckpoint) => ({ backupId: 'synthetic-backup', previousSha256: sha256, revision: checkpoint.revision }));
   const persistence: RecoverableCheckpointPersistence = {
     load: vi.fn(async () => null), save: vi.fn(async () => undefined), loadRecord: vi.fn(async () => null),
     saveCheckpoint: vi.fn(async () => undefined), inspectRecovery: vi.fn(async () => ({ sha256, bytes: 2 })), recoverCheckpoint,
@@ -18,6 +21,23 @@ const fixture = () => {
   return { authorizeOwner, persistence, readCloud, readRevision, recoverCheckpoint };
 };
 describe('owner-authorized cloud checkpoint recovery', () => {
+  it('restores server-read rendering and automatic-port projections without changing the rollback baseline', async () => {
+    const f = fixture(); const source = new Y.Doc(); const restored = new Y.Doc();
+    try {
+      for (const [id, x] of [['a', 0], ['b', 200]] as const) publishCollaborationElement(source.getMap('flowchart-nodes'), id, { id, position: { x, y: 0 }, data: { label: id } });
+      publishCollaborationElement(source.getMap('flowchart-edges'), 'ab', { id: 'ab', source: 'a', target: 'b', sourceHandle: 'right', targetHandle: 'left', data: { manualHandleSides: ['source', 'target'] } });
+      const raw = Y.encodeStateAsUpdate(source);
+      f.readCloud.mockResolvedValue({ ...checkpoint, base: raw, state: raw, canvasNodeZIndexes: new Map([['a', 9]]), automaticHandleRoles: new Map([['ab', ['source', 'target']]]) });
+      await createRoomRecovery(f).recover(identity, { sha256, revision: checkpoint.revision });
+      const accepted = f.recoverCheckpoint.mock.calls[0][2];
+      expect(Buffer.from(accepted.base)).toEqual(Buffer.from(raw));
+      Y.applyUpdate(restored, accepted.state);
+      expect(readCollaborationElement(restored.getMap('flowchart-nodes').get('a'))?.zIndex).toBe(9);
+      expect(readCollaborationElement(restored.getMap('flowchart-edges').get('ab'))?.sourceHandle).toBeUndefined();
+      expect(readCollaborationElement(restored.getMap('flowchart-edges').get('ab'))?.targetHandle).toBeUndefined();
+      expect(accepted.automaticHandleRoles).toBeUndefined();
+    } finally { source.destroy(); restored.destroy(); }
+  });
   it('inspects without writing and recovers only server-read content after fresh owner and revision checks', async () => {
     const f = fixture(); const recovery = createRoomRecovery(f);
     expect(await recovery.inspect(identity)).toEqual({ sha256, bytes: 2, revision: checkpoint.revision });
