@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import platform
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -15,6 +16,7 @@ sys.dont_write_bytecode = True
 from native_ci import clean_environment, platform_lock, source_snapshot
 from browser_evidence import read_browser_evidence, sanitize_browser_evidence
 from browser_diagnostics import retain_browser_diagnostics, sanitize_browser_diagnostics
+from owned_process import run_owned
 
 GATES = {
     'integration': [
@@ -124,10 +126,13 @@ def main():
                 report_dir = Path(tempfile.mkdtemp(prefix='browser-report-', dir=state))
                 path = report_dir / 'report.json'
                 child_env = {**env, 'PLAYWRIGHT_JSON_OUTPUT_FILE': str(path), 'VIZLY_S3_BROWSER_REPORT': str(path)}
+                with socket.socket() as listener:
+                    listener.bind(('127.0.0.1', 0))
+                    child_env['VIZLY_E2E_PORT'] = str(listener.getsockname()[1])
                 argv = [node, str(npm), 'run', command]
                 if command != 'test:e2e:s3':
                     argv += ['--', '--reporter=json']
-                code = subprocess.run(argv, cwd=root, env=child_env).returncode
+                code = run_owned(argv, cwd=root, env=child_env)
                 try:
                     diagnostics = retain_browser_diagnostics(root, path)
                 except (OSError, ValueError, TypeError, KeyError, AttributeError):
@@ -141,17 +146,18 @@ def main():
                 return {'exit_code': code if diagnostics['complete'] else code or 1,
                         'browser': evidence, 'browser_diagnostics': diagnostics}
             if command == 'playwright:install':
-                code = subprocess.run([sys.executable, '-B', '-m', 'unittest', 'discover', '-s', '.devfleet',
-                                       '-p', 'test_browser_evidence.py'], cwd=root, env=env).returncode
-                if code != 0:
-                    return code
+                for pattern in ('test_browser_evidence.py', 'test_owned_process.py'):
+                    code = run_owned([sys.executable, '-B', '-m', 'unittest', 'discover', '-s', '.devfleet',
+                                      '-p', pattern], cwd=root, env=env)
+                    if code != 0:
+                        return code
             argv = ([node, 'node_modules/@playwright/test/cli.js', 'install', 'chromium', 'firefox', 'webkit']
                     if command == 'playwright:install' else
                     [node, str(npm), 'ci', '--no-audit', '--no-fund'] if command == 'install'
                     else [node, str(npm), 'run', command])
-            code = subprocess.run(argv, cwd=root, env=env).returncode
+            code = run_owned(argv, cwd=root, env=env)
             if command == 'playwright:install' and code == 0:
-                code = subprocess.run([node, 'scripts/check-ci-browser-runtime.mjs'], cwd=root, env=env).returncode
+                code = run_owned([node, 'scripts/check-ci-browser-runtime.mjs'], cwd=root, env=env)
             return code
 
         report = run_checks(root, output, run, args.profile)
