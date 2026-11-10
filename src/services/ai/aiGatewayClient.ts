@@ -8,7 +8,11 @@ import {
     type AIProviderRequestOptions,
 } from './aiProviderClient';
 
-const AI_GATEWAY_FUNCTION_NAME = 'ai-gateway';
+export const resolveAIGatewayFunctionName = (value: unknown): string => (
+    typeof value === 'string' && /^ai-gateway(?:-[a-z0-9]+)*$/.test(value) && value.length <= 64
+        ? value : 'ai-gateway'
+);
+const AI_GATEWAY_FUNCTION_NAME = resolveAIGatewayFunctionName(import.meta.env.VITE_AI_GATEWAY_FUNCTION_NAME);
 const AI_GATEWAY_PROTOCOL = 'vizly-ai-gateway-v1';
 const MAX_JWT_CHARS = 16 * 1024;
 
@@ -87,7 +91,7 @@ export async function requestAIGatewayChatCompletion(
         },
         model: chatBody.model,
         messages: chatBody.messages,
-        toolMode: 'diagram',
+        toolMode: options.toolMode === 'none' ? undefined : 'diagram',
     });
 
     const response = await fetchWithTimeout(endpoint, {

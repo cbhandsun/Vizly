@@ -18,7 +18,7 @@ const NEGATIVE_PROBE_TTL_MS = 60_000;
 let gatewayProbeCache: { available: boolean; expiresAt: number } | null = null;
 
 export const coerceAIGatewayMode = (value: unknown): AIGatewayMode => (
-    value === 'off' || value === 'required' ? value : 'auto'
+    value === 'auto' || value === 'required' ? value : 'off'
 );
 
 export const isRemoteAIProvider = (baseUrl: string): boolean => {

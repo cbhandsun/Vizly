@@ -24,6 +24,8 @@ describe('areAIConfigDraftsEqual', () => {
     it.each([
         ['system prompt', (config: AIConfigState) => { config.systemPrompt = 'changed'; }],
         ['active model', (config: AIConfigState) => { config.activeModelKey = ''; }],
+        ['local key storage preference', (config: AIConfigState) => { config.providers[0].rememberKey = true; }],
+        ['provider transport', (config: AIConfigState) => { config.providers[0].transport = 'direct'; }],
         ['provider secret', (config: AIConfigState) => { config.providers[0].apiKey = 'changed'; }],
         ['provider order', (config: AIConfigState) => { config.providers.unshift({ ...config.providers[0], id: 'other' }); }],
         ['model state', (config: AIConfigState) => { config.providers[0].models[0].enabled = false; }],

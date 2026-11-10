@@ -1,3 +1,7 @@
+import { forgetRememberedAIKey, saveRememberedAIKeys } from './aiCredentialVault';
+import { coerceAIGatewayMode, requestAIChatCompletionRouted } from '@/services/ai/aiRequestRouter';
+import { consumeAIChatStream } from './aiChatRequestFlow';
+import { parseAIStreamDelta } from './aiStreamParsing';
 import React, { useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import Modal from 'antd/es/modal';
@@ -24,13 +28,16 @@ import { appMessage } from '@vizly/core/antd';
 import { normalizeProviderBaseUrl } from '@/services/ai/providerSecurity';
 import {
     normalizeAIModelsResponse,
-    requestAIChatCompletion,
+    classifyAIProviderFailure,
+    readAIProviderJson,
     requestAIModels,
     resolveAIProviderEndpoint,
 } from '@/services/ai/aiProviderClient';
 import {
     AI_CONFIG_NAME_MAX_LENGTH,
     persistAIConfig,
+    coerceAIConfig,
+    getAIConfig,
     saveCloudAIConfig,
     type AIModel,
     type AIProviderConfig,
@@ -86,6 +93,7 @@ interface AIConfigModalProps {
 }
 
 const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, onCancel, onSave }) => {
+    const gatewayMode = coerceAIGatewayMode(import.meta.env.VITE_AI_GATEWAY_MODE);
     const { t } = useTranslation();
     const { user } = useAuth();
     const [config, setConfig, { isDirty, markSaved, replaceConfigIfPristine }] = useAIConfigModalConfig(open, user?.id);
@@ -129,20 +137,32 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
             return;
         }
 
-        // Only non-sensitive settings are persisted; credentials stay in this session.
+        // Persist credentials only after the user explicitly opts in on this device.
+        try {
+            if (savedConfig.providers.some(provider => provider.rememberKey)
+                || getAIConfig(user?.id).providers.some(provider => provider.rememberKey)) {
+                await saveRememberedAIKeys(user?.id, coerceAIConfig(savedConfig).providers);
+            }
+        } catch {
+            if (session.isCurrent()) appMessage.error(t('aiConfig.vault.saveFailed'));
+            return;
+        }
+        if (!session.isCurrent()) return;
         persistAIConfig(user?.id, savedConfig);
 
         if (user) {
             try {
                 if (!await saveCloudAIConfig(user.id, savedConfig) || !session.isCurrent()) return;
-                appMessage.success(t('aiConfig.saveSuccessCloud'));
+                appMessage.success(t(savedConfig.providers.some(provider => provider.rememberKey && provider.apiKey)
+                    ? 'aiConfig.vault.savedCloud' : 'aiConfig.saveSuccessCloud'));
             } catch (err) {
                 if (!session.isCurrent()) return;
                 logAIConfigCloudSaveFailure(err);
                 appMessage.warning(t('aiConfig.cloudSyncFail'));
             }
         } else {
-            appMessage.success(t('aiConfig.saveSuccess'));
+            appMessage.success(t(savedConfig.providers.some(provider => provider.rememberKey && provider.apiKey)
+                ? 'aiConfig.vault.saved' : 'aiConfig.saveSuccess'));
         }
 
         window.dispatchEvent(new Event('aiConfigChanged'));
@@ -305,10 +325,25 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
         updateConnectionStatus(provider.id, { kind: 'testing', operation: 'test-connection' });
         setIsTesting(true);
         try {
-            await requestAIChatCompletion(provider, {
-                model: provider.models[0]?.id || 'test-model',
-                messages: [{ role: 'user', content: 'Hello, please reply with "OK".' }]
-            }, { timeoutMs: 30_000, signal: session.signal });
+            const model = provider.models.find(candidate => candidate.enabled && `${provider.id}:${candidate.id}` === config.activeModelKey)
+                ?? provider.models.find(candidate => candidate.enabled);
+            if (!model) throw new Error(t('aiChat.noModels'));
+            const response = await requestAIChatCompletionRouted(provider, {
+                model: model.id, stream: true,
+                messages: [{ role: 'user', content: 'Hello, please reply with "OK".' }],
+            }, { timeoutMs: 30_000, signal: session.signal, toolMode: 'none' });
+            if (response.headers.get('Content-Type')?.includes('text/event-stream')) {
+                const reader = response.body?.getReader();
+                if (!reader) throw new Error('Empty AI response');
+                const result = await consumeAIChatStream({ reader, signal: session.signal, parseDelta: parseAIStreamDelta,
+                    totalTimeoutMs: 30_000, onAbortReader: () => { void reader.cancel().catch(() => undefined); } });
+                if (!result.content.trim()) throw new Error('Empty AI response');
+            } else {
+                const result = await readAIProviderJson(response) as { choices?: { message?: { content?: unknown } }[] };
+                if (typeof result?.choices?.[0]?.message?.content !== 'string' || !result.choices[0].message.content.trim()) {
+                    throw new Error('AI service did not return a valid message.');
+                }
+            }
             if (!session.isCurrent()) return;
             updateConnectionStatus(provider.id, { kind: 'success', operation: 'test-connection' });
             appMessage.success(t('aiConfig.testSuccess'));
@@ -316,8 +351,9 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
             if (!session.isCurrent()) return;
             logAIConfigRequestFailure('testConnection', provider.name, error);
             const message = t('aiConfig.connection.failureNotice');
-            updateConnectionStatus(provider.id, createAIProviderConnectionFailure('test-connection', message));
-            appMessage.error(t('aiConfig.testError', { message }));
+            const detail = t(`aiConfig.connection.failureDetails.${classifyAIProviderFailure(error)}`);
+            updateConnectionStatus(provider.id, createAIProviderConnectionFailure('test-connection', `${message} ${detail}`));
+            appMessage.error(t('aiConfig.testError', { message: `${message} ${detail}` }));
         } finally {
             if (session.isCurrent()) setIsTesting(false);
         }
@@ -431,8 +467,9 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
             if (!session.isCurrent()) return;
             logAIConfigRequestFailure('fetchModels', provider.name, error);
             const message = t('aiConfig.connection.failureNotice');
-            updateConnectionStatus(provider.id, createAIProviderConnectionFailure('model-sync', message));
-            appMessage.error(t('aiConfig.testError', { message }));
+            const detail = t(`aiConfig.connection.failureDetails.${classifyAIProviderFailure(error)}`);
+            updateConnectionStatus(provider.id, createAIProviderConnectionFailure('model-sync', `${message} ${detail}`));
+            appMessage.error(t('aiConfig.testError', { message: `${message} ${detail}` }));
         } finally {
             if (session.isCurrent()) setIsFetchingModels(false);
         }
@@ -513,8 +550,8 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
                                             placeholder="https://..."
                                         />
                                     </Form.Item>
-                                    <Form.Item label={t('aiConfig.directTransportLabel')} extra={t('aiConfig.directTransportHint')}>
-                                        <Switch aria-label={t('aiConfig.directTransportLabel')} checked={selectedProvider.transport === 'direct'} onChange={checked => updateProvider(selectedProvider.id, { transport: checked ? 'direct' : undefined })} />
+                                    <Form.Item label={t('aiConfig.directTransportLabel')} extra={t(`aiConfig.${gatewayMode === 'auto' ? 'directTransportHint' : gatewayMode === 'off' ? 'directTransportDeploymentHint' : 'requiredGatewayDeploymentHint'}`)}>
+                                        <Switch aria-label={t('aiConfig.directTransportLabel')} disabled={gatewayMode !== 'auto'} checked={gatewayMode === 'off' || (gatewayMode === 'auto' && selectedProvider.transport === 'direct')} onChange={checked => updateProvider(selectedProvider.id, { transport: checked ? 'direct' : undefined })} />
                                     </Form.Item>
                                     <Form.Item
                                         label={t('aiConfig.apiKeyLabel')}
@@ -539,6 +576,27 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
                                                 onClick={() => setIsApiKeyVisible(visible => !visible)}
                                             />
                                         </Space.Compact>
+                                    </Form.Item>
+                                    <Form.Item>
+                                        <Switch aria-label={t('aiConfig.vault.remember')} checked={selectedProvider.rememberKey === true}
+                                            disabled={isTesting || isFetchingModels}
+                                            onChange={checked => updateProvider(selectedProvider.id, { rememberKey: checked })} />
+                                        <span style={{ marginLeft: 8 }}>{t('aiConfig.vault.remember')}</span>
+                                        <Typography.Paragraph type="secondary">{t('aiConfig.vault.notice')}</Typography.Paragraph>
+                                        {selectedProvider.rememberKey && <Button danger size="small" onClick={async () => {
+                                            const session = captureAuthSession(user?.id);
+                                            const providerId = selectedProvider.id;
+                                            try {
+                                                await forgetRememberedAIKey(user?.id, providerId);
+                                                if (!session.isCurrent()) return;
+                                                const runtime = getAIConfig(user?.id);
+                                                persistAIConfig(user?.id, { ...runtime, providers: runtime.providers.map(provider => provider.id === providerId
+                                                    ? { ...provider, apiKey: '', rememberKey: false, credentialState: 'unconfigured' } : provider) });
+                                                updateProvider(providerId, { apiKey: '', rememberKey: false, credentialState: 'unconfigured' });
+                                                window.dispatchEvent(new Event('aiConfigChanged'));
+                                                appMessage.success(t('aiConfig.vault.forgotten'));
+                                            } catch { appMessage.error(t('aiConfig.vault.saveFailed')); }
+                                        }}>{t('aiConfig.vault.forget')}</Button>}
                                     </Form.Item>
                                     {selectedProviderReadiness && (
                                         <AIConfigConnectionStatusAlert

@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react';
+import { captureAuthSession, getAuthSessionRevision, onAuthSessionInvalidated } from '@/context/authSessionBoundary';
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { TFunction } from 'i18next';
 
 import { dataRegistry } from '@/data/DataRegistry';
@@ -33,8 +34,20 @@ export function useAIChatDiagramSave({ t, userId }: UseAIChatDiagramSaveOptions)
     const [saveTarget, setSaveTarget] = useState<AIChatSaveTarget | null>(null);
     const [saveTitle, setSaveTitle] = useState('');
     const [saveJson, setSaveJson] = useState('');
+    const [saving, setSaving] = useState(false);
+    const [saveError, setSaveError] = useState('');
+    const savingRef = useRef<{ session: object } | null>(null);
+    const revision = useSyncExternalStore(onAuthSessionInvalidated, getAuthSessionRevision, getAuthSessionRevision);
+    const [draftOwner, setDraftOwner] = useState({ userId, revision });
+    const ownsDraft = draftOwner.userId === userId && draftOwner.revision === revision;
+    const session = useMemo(() => ({ revision, ...captureAuthSession(userId) }), [userId, revision]);
+    if (!ownsDraft) {
+        setSaveModalVisible(false); setSaveJson(''); setSaveTitle(''); setSaveError(''); setSaving(false);
+        setDraftOwner({ userId, revision });
+    }
 
     const handleSaveDiagramTo = useCallback((jsonContent: string, target: AIChatSaveTarget) => {
+        if (!session.isCurrent()) return;
         try {
             const preparedSave = prepareAIChatDiagramSave({
                 jsonContent,
@@ -43,6 +56,7 @@ export function useAIChatDiagramSave({ t, userId }: UseAIChatDiagramSaveOptions)
                 getDiagramTitle: getAIDiagramTitle,
                 serializeDiagram: serializeAIDiagram,
             });
+            setSaveError('');
             setSaveTitle(preparedSave.saveTitle);
             setSaveJson(preparedSave.saveJson);
             setSaveTarget(preparedSave.saveTarget);
@@ -51,11 +65,14 @@ export function useAIChatDiagramSave({ t, userId }: UseAIChatDiagramSaveOptions)
             logAIChatInvalidDiagramSavePayload(error);
             appMessage.error(t('aiChat.invalidDiagram'));
         }
-    }, [t]);
+    }, [t, session]);
 
     const executeSave = useCallback(async () => {
-        if (!saveTarget || !saveJson) return;
-        setSaveModalVisible(false);
+        if (!ownsDraft || !saveTarget || !saveJson || savingRef.current?.session === session || !session.isCurrent()) return;
+        const request = { session };
+        savingRef.current = request;
+        setSaving(true);
+        setSaveError('');
 
         try {
             const targetLabel = saveTarget === 'local'
@@ -81,17 +98,29 @@ export function useAIChatDiagramSave({ t, userId }: UseAIChatDiagramSaveOptions)
                     },
                     loadUnifiedStorage,
                 });
+                if (!session.isCurrent() || savingRef.current !== request) return;
+                setSaveModalVisible(false);
                 appMessage.success(t('aiChat.status.saveSuccess', { target: targetLabel, title: result.title }));
             } finally {
                 hideLoading();
             }
         } catch (error) {
-            appMessage.error(t('aiChat.status.saveFailed', { error: sanitizeAIProviderError(error) }));
+            if (!session.isCurrent() || savingRef.current !== request) return;
+            const message = t('aiChat.status.saveFailed', { error: sanitizeAIProviderError(error) });
+            setSaveError(message);
+            appMessage.error(message);
+        } finally {
+            if (savingRef.current === request) {
+                savingRef.current = null;
+                setSaving(false);
+            }
         }
-    }, [saveJson, saveTarget, saveTitle, t, userId]);
+    }, [saveJson, saveTarget, saveTitle, t, userId, session, ownsDraft]);
 
     return {
-        saveModalVisible,
+        saveModalVisible: ownsDraft && saveModalVisible,
+        saving: ownsDraft && saving,
+        saveError: ownsDraft ? saveError : '',
         setSaveModalVisible,
         saveTarget,
         saveTitle,

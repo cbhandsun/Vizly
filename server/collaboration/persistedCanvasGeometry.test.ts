@@ -3,6 +3,19 @@ import { describe, expect, it } from 'vitest';
 import { restorePersistedCanvasGeometry } from './persistedCanvasGeometry.js';
 
 describe('saved collaboration canvas geometry', () => {
+  it('restores saved container stacking order instead of the converter default', () => {
+    const input = { id: 'group', type: 'titleGroup', zIndex: -1, style: { zIndex: -10 } };
+    expect(restorePersistedCanvasGeometry(input, { metadata: {
+      canvasPosition: { x: 0, y: 0 }, style: { zIndex: -10 },
+    } })).toEqual({ ...input, zIndex: -10 });
+    expect(input.zIndex).toBe(-1);
+  });
+  it.each([NaN, Infinity, '10', 1.5, 1_000_001])('ignores an invalid saved stacking order: %s', zIndex => {
+    const input = { id: 'group', zIndex: -1 };
+    expect(restorePersistedCanvasGeometry(input, { metadata: {
+      canvasPosition: { x: 0, y: 0 }, style: { zIndex },
+    } })).toEqual(input);
+  });
   const converted = { id: 'a', position: { x: 1, y: 2 }, data: { label: 'A' }, style: { width: 352, height: 90 }, width: 352, height: 90 };
   it('preserves fractional rendering sizes separately from measured integer sizes', () => {
     expect(restorePersistedCanvasGeometry(converted, { metadata: { canvasPosition: { x: 1, y: 2 }, style: { width: 150.4, height: 60 }, width: 150, height: 60 } }))

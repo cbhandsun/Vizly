@@ -126,8 +126,37 @@ describe('AIConversationService', () => {
         expect(saved).toHaveLength(25);
         expect(saved[0].id).toBe('conv-54');
         expect(saved[0].messages).toHaveLength(40);
-        expect(saved[0].messages.at(-1)?.content).toHaveLength(4000);
-        expect(saved[0].messages.at(-1)?.jsonContent).toHaveLength(12000);
+        expect(saved[0].messages.at(-1)?.content).toHaveLength(5000);
+        expect(saved[0].messages.at(-1)?.jsonContent).toBeUndefined();
+        expect(saved[0].messages.at(-1)?.hasJson).toBe(false);
+    });
+
+    it('preserves a generated diagram larger than 12000 characters across storage reloads', async () => {
+        const jsonContent = JSON.stringify({ nodes: Array.from({ length: 80 }, (_, i) => ({
+            id: `node-${i}`, description: '业务步骤'.repeat(60),
+        })), edges: [] });
+        expect(jsonContent.length).toBeGreaterThan(12000);
+        const content = `生成的流程图：\n\`\`\`json\n${jsonContent}\n\`\`\``;
+        module.aiConversationService.saveConversations([makeConversation('generated', {
+            messages: [makeMessage('diagram', { role: 'assistant', content, hasJson: true, jsonContent })],
+        })]);
+        const reloaded = (await importFreshService()).aiConversationService.getConversations()[0].messages[0];
+        expect(reloaded.content).toBe(content);
+        expect(reloaded.jsonContent).toBe(jsonContent);
+        expect(JSON.parse(reloaded.jsonContent!).nodes).toHaveLength(80);
+    });
+
+    it('keeps the newest complete diagram within the same total storage budget used by reads', async () => {
+        const conversations = Array.from({ length: 25 }, (_, i) => makeConversation(`large-${i}`, {
+            updatedAt: i + 1,
+            messages: Array.from({ length: 40 }, (_, j) => makeMessage(`large-${i}-${j}`, { content: 'x'.repeat(60000) })),
+        }));
+        module.aiConversationService.saveConversations(conversations);
+        const raw = localStorage.getItem('AIChatPanel.conversations_anonymous')!;
+        expect(raw.length).toBeLessThanOrEqual(2 * 1024 * 1024);
+        const reloaded = (await importFreshService()).aiConversationService.getConversations();
+        expect(reloaded[0].id).toBe('large-24');
+        expect(reloaded[0].messages.at(-1)?.id).toBe('large-24-39');
     });
 
     it('rejects malformed stored data and unsafe active ids', () => {
@@ -322,4 +351,102 @@ describe('AIConversationService', () => {
         expect(JSON.stringify(safeLogState.error.mock.calls[0]?.[1])).toContain('[redacted]');
         expect(JSON.stringify(safeLogState.error.mock.calls[0]?.[1])).not.toContain('sk-live-secret');
     });
+    const cloudRow = (conversation: Conversation) => ({ id: conversation.id, title: conversation.title,
+        messages: conversation.messages, created_at: new Date(conversation.createdAt).toISOString(),
+        updated_at: new Date(conversation.updatedAt).toISOString() });
+
+    const deferCloudRead = () => {
+        let resolve!: (value: { data: ReturnType<typeof cloudRow>[]; error: null }) => void;
+        const pending = new Promise<{ data: ReturnType<typeof cloudRow>[]; error: null }>(done => { resolve = done; });
+        const query = { select: vi.fn(() => query), eq: vi.fn(() => query), order: vi.fn(() => pending) };
+        mockSupabaseState.value = { from: vi.fn(() => query) };
+        return resolve;
+    };
+
+    it('discards an old account response, including switching away and back', async () => {
+        const resolve = deferCloudRead();
+        const service = module.aiConversationService;
+        service.setUserId('a');
+        const pending = service.syncFromCloud();
+        service.setUserId('b');
+        service.saveConversations([makeConversation('b-private')]);
+        service.setUserId('a');
+        service.saveConversations([makeConversation('a-new-session')]);
+        resolve({ data: [cloudRow(makeConversation('a-stale'))], error: null });
+        expect(await pending).toEqual([]);
+        expect(service.getConversations().map(c => c.id)).toEqual(['a-new-session']);
+        expect(localStorage.getItem('AIChatPanel.conversations_b')).not.toContain('a-stale');
+    });
+
+    it('merges cloud history while protecting local work created during a read', async () => {
+        const resolve = deferCloudRead();
+        const service = module.aiConversationService;
+        service.setUserId('a');
+        const pending = service.syncFromCloud();
+        service.saveConversations([makeConversation('local-new')]);
+        resolve({ data: [cloudRow(makeConversation('cloud-old'))], error: null });
+        expect((await pending).map(c => c.id).sort()).toEqual(['cloud-old', 'local-new']);
+    });
+
+    it('protects concurrent local edits even when the cloud clock is ahead', async () => {
+        const resolve = deferCloudRead();
+        const service = module.aiConversationService;
+        service.setUserId('a');
+        service.saveConversations([makeConversation('same')]);
+        const pending = service.syncFromCloud();
+        service.saveConversations([makeConversation('same', { title: 'local edited', updatedAt: 1001 })]);
+        resolve({ data: [cloudRow(makeConversation('same', { title: 'stale', updatedAt: 999999 }))], error: null });
+        expect((await pending)[0].title).toBe('local edited');
+    });
+
+    it('does not resurrect local deletes when a cloud read arrives late', async () => {
+        const resolve = deferCloudRead();
+        const service = module.aiConversationService;
+        service.setUserId('a');
+        service.saveConversations([makeConversation('deleted')]);
+        const pending = service.syncFromCloud();
+        // Isolate the failed/offline delete from the already-running read.
+        mockSupabaseState.value = null;
+        await service.deleteConversation('deleted');
+        resolve({ data: [cloudRow(makeConversation('deleted'))], error: null });
+        expect(await pending).toEqual([]);
+    });
+
+    it('an old account delete cannot change the new account active conversation', async () => {
+        let resolve!: (value: { data: { id: string }[]; error: null }) => void;
+        const query = { delete: vi.fn(() => query), eq: vi.fn(() => query),
+            select: vi.fn(() => new Promise(done => { resolve = done; })) };
+        mockSupabaseState.value = { from: vi.fn(() => query) };
+        const service = module.aiConversationService;
+        service.setUserId('a');
+        service.saveConversations([makeConversation('same')]);
+        service.setActiveConversationId('same');
+        const pending = service.deleteConversation('same');
+        service.setUserId('b');
+        service.saveConversations([makeConversation('same')]);
+        service.setActiveConversationId('same');
+        resolve({ data: [{ id: 'same' }], error: null });
+        await pending;
+        expect(service.getActiveConversationId()).toBe('same');
+        expect(service.getConversations()).toHaveLength(1);
+    });
+
+    it('serializes updates and skips queued writes after an account switch', async () => {
+        const completions: (() => void)[] = [];
+        const upsert = vi.fn(() => new Promise<{ error: null }>(resolve => { completions.push(() => resolve({ error: null })); }));
+        mockSupabaseState.value = { from: vi.fn(() => ({ upsert })) };
+        const service = module.aiConversationService;
+        service.setUserId('a');
+        const first = service.syncToCloud(makeConversation('same', { title: 'First' }));
+        const second = service.syncToCloud(makeConversation('same', { title: 'Second' }));
+        expect(upsert).toHaveBeenCalledOnce();
+        completions[0](); await first;
+        expect(upsert).toHaveBeenCalledTimes(2);
+        const third = service.syncToCloud(makeConversation('same', { title: 'Never write under B' }));
+        service.setUserId('b');
+        completions[1](); await second; await third;
+        expect(upsert).toHaveBeenCalledTimes(2);
+        expect(upsert.mock.calls.every(call => (call as unknown as [{ user_id: string }])[0].user_id === 'a')).toBe(true);
+    });
+
 });

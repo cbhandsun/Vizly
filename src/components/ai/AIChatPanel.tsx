@@ -1,6 +1,7 @@
+import type { AIEditScope } from './aiCanvasEdit';
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { TextAreaRef } from 'antd/es/input/TextArea';
-import { getAIConfig, loadCloudAIConfig, persistAIConfig, setRuntimeAIConfig } from './aiConfigStorage';
+import { getAIConfig, restoreRememberedAIConfig, loadCloudAIConfig, persistAIConfig, setRuntimeAIConfig } from './aiConfigStorage';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/useAuth';
 import { PluginRegistry } from '@vizly/core/plugin-registry';
@@ -36,6 +37,7 @@ import {
 export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, onOpenConfig, onApplyJson, onPreviewJson, diagramNodesRef, diagramEdgesRef, canvasOps, pluginId, diagramId }) => {
     const { t } = useTranslation();
     const { user } = useAuth();
+    const [editScope, setEditScope] = useState<AIEditScope>('generate');
     const copyKeys = resolveAIChatCopyKeys(pluginId);
     const welcomeMessage = t(copyKeys.welcomeMessage);
 
@@ -82,7 +84,7 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Default to closed overlay
     const [filteredCommands, setFilteredCommands] = useState(SLASH_COMMANDS);
     const [isListening, setIsListening] = useState(false); // Voice UI Feedback state
-    const canSubmitWithoutConfiguration = isConfigurationIndependentAIChatInput(inputValue);
+    const canSubmitWithoutConfiguration = isConfigurationIndependentAIChatInput(inputValue, canvasOps);
 
     const [aiConfig, setAiConfig] = useState(() => getAIConfig(user?.id));
 
@@ -92,6 +94,7 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
             if (!cancelled) setAiConfig(getAIConfig(user?.id));
         };
         const refreshTimer = window.setTimeout(handleConfigChange, 0);
+        void restoreRememberedAIConfig(user?.id).then(handleConfigChange).catch(logAIChatCloudConfigLoadFailure);
         window.addEventListener('storage', handleConfigChange);
         window.addEventListener('aiConfigChanged', handleConfigChange);
         return () => {
@@ -269,12 +272,11 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
     // --- Handle Slash Commands ---
     const handleSlashCommand = (command: string): boolean => {
         const trimmed = command.trim();
-        const lower = trimmed.toLowerCase();
         const parts = trimmed.split(/\s+/);
         const cmd = parts[0].toLowerCase();
         const args = parts.slice(1).join(' ');
 
-        if (lower === '/clear') {
+        if (cmd === '/clear') {
             const welcomeMsg: Message = { id: createAIChatMessageId(), role: 'assistant', content: t('aiChat.clearedMsg') };
             if (activeId) {
                 aiConversationService.updateConversation(activeId, { messages: [welcomeMsg] });
@@ -283,7 +285,7 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
             return true;
         }
 
-        if (lower === '/help') {
+        if (cmd === '/help') {
             const categories = {
                 general: SLASH_COMMANDS.filter(c => !['/brainstorm'].includes(c.key)),
                 ai: [
@@ -306,14 +308,8 @@ ${renderCategory(t('aiChat.help.aiTitle'), categories.ai)}
             return true;
         }
 
-        if (lower.startsWith('/brainstorm')) {
-            if (pluginId !== 'mindmap') {
-                addLocalMessage('assistant', t('aiChat.status.cmdBrainstormOnlyMindmap'));
-                return true;
-            }
-            // 劫持输入，注入特定的 brainstorm prompt
-            setInputValue('请帮我针对当前画布上的核心节点进行头脑风暴，发散 3-5 个有创意的子主题。');
-            setTimeout(() => handleSendMessage(), 10);
+        if (cmd === '/brainstorm' && pluginId !== 'mindmap') {
+            addLocalMessage('assistant', t('aiChat.status.cmdBrainstormOnlyMindmap'));
             return true;
         }
 
@@ -445,51 +441,8 @@ ${renderCategory(t('aiChat.help.aiTitle'), categories.ai)}
             }
         }
 
-        // ⚡ /animate — 演练链路
-        if (cmd === '/animate') {
-            addLocalMessage('user', trimmed);
-            addLocalMessage('assistant', t('aiChat.status.cmdAnimate'));
-            // AI 会通过增强 prompt 生成 animatePath 指令
-            return true;
-        }
-
-        // ⚡ /flow — 开启流量模拟
-        if (cmd === '/flow') {
-            addLocalMessage('user', trimmed);
-            addLocalMessage('assistant', '🌊 正在开启全局流量仿真模拟...');
-            // AI 会决定开启哪些核心链路的动画
-            return true;
-        }
-
-        // ⚡ /style — 样式实验室
-        if (cmd === '/style') {
-            addLocalMessage('user', trimmed);
-            addLocalMessage('assistant', t('aiChat.status.cmdStyle'));
-            // AI 会通过增强 prompt 生成 updateTheme 指令
-            return true;
-        }
-
-        // ⚡ /analyze — 架构巡检
-        if (cmd === '/analyze') {
-            addLocalMessage('user', trimmed);
-            addLocalMessage('assistant', t('aiChat.status.cmdAnalyze'));
-            return false; // 继续发送给 AI
-        }
-
-        // ⚡ /suggest — 补全建议
-        if (cmd === '/suggest') {
-            addLocalMessage('user', trimmed);
-            addLocalMessage('assistant', t('aiChat.status.cmdSuggest'));
-            return false; // 继续发送给 AI
-        }
-
-        // ⚡ /doc — 生成文档
-        if (cmd === '/doc') {
-            addLocalMessage('user', trimmed);
-            addLocalMessage('assistant', t('aiChat.status.cmdDoc'));
-            return false;
-        }
-
+        // AI-backed commands must reach the request lifecycle. Local placeholder
+        // replies would otherwise swallow the request or duplicate the user turn.
         // Other commands will be sent to AI with context
         return false;
     };
@@ -539,6 +492,8 @@ ${renderCategory(t('aiChat.help.aiTitle'), categories.ai)}
         messages,
         setConversations,
         pluginId,
+        diagramId,
+        editScope,
         diagramNodesRef,
         diagramEdgesRef,
         canvasOps,
@@ -548,7 +503,7 @@ ${renderCategory(t('aiChat.help.aiTitle'), categories.ai)}
 
     const handleSendMessage = async () => {
         if (loading || !inputValue.trim()) return;
-        if (inputValue.startsWith('/') && handleSlashCommand(inputValue)) {
+        if (inputValue.trim().startsWith('/') && handleSlashCommand(inputValue)) {
             setInputValue('');
             setShowCommands(false);
             return;
@@ -558,6 +513,8 @@ ${renderCategory(t('aiChat.help.aiTitle'), categories.ai)}
 
     const {
         saveModalVisible,
+        saving,
+        saveError,
         setSaveModalVisible,
         saveTarget,
         saveTitle,
@@ -603,6 +560,10 @@ ${renderCategory(t('aiChat.help.aiTitle'), categories.ai)}
             onClose={onClose}
             onPreviewJson={onPreviewJson}
             onApplyJson={onApplyJson}
+            onSaveCurrentCanvas={canvasOps?.onSave}
+            editScope={editScope}
+            setEditScope={setEditScope}
+            canEditCanvas={!!diagramNodesRef && pluginId !== 'mindmap'}
             handleSaveDiagramTo={handleSaveDiagramTo}
             messagesEndRef={messagesEndRef}
             showCommands={showCommands}
@@ -617,6 +578,8 @@ ${renderCategory(t('aiChat.help.aiTitle'), categories.ai)}
             handleVoiceToggle={handleVoiceToggle}
             handleStopGeneration={handleStopGeneration}
             saveModalVisible={saveModalVisible}
+            saving={saving}
+            saveError={saveError}
             setSaveModalVisible={setSaveModalVisible}
             executeSave={executeSave}
             saveTitle={saveTitle}

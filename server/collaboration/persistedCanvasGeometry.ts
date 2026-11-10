@@ -10,6 +10,15 @@ export const restorePersistedCanvasGeometry = (element: Record<string, unknown>,
   const style = record(element.style) ? { ...element.style } : {};
   const restored = { ...element };
   let changed = false;
+  // Container conversion supplies a default z-index. The saved rendering
+  // order must win, otherwise a newly laid-out group conflicts with its own
+  // cloud save (-10 in the live canvas, -1 after conversion).
+  if (typeof savedStyle.zIndex === 'number' && Number.isSafeInteger(savedStyle.zIndex)
+    && Math.abs(savedStyle.zIndex) <= 1_000_000) {
+    restored.zIndex = savedStyle.zIndex;
+    style.zIndex = savedStyle.zIndex;
+    changed = true;
+  }
   for (const name of ['width', 'height'] as const) {
     const measured = dimension(metadata[name]) ? metadata[name] : savedStyle[name];
     const rendered = dimension(savedStyle[name]) ? savedStyle[name] : metadata[name];

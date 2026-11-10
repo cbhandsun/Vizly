@@ -1,3 +1,4 @@
+import { loadRememberedAIKeys } from './aiCredentialVault';
 import { captureAuthSession, invalidateAuthSessionWork, onAuthSessionInvalidated } from '@/context/authSessionBoundary';
 import { normalizeProviderBaseUrl } from '@/services/ai/providerSecurity';
 import { logAIConfigStorageFailure } from './aiLogging';
@@ -17,6 +18,7 @@ export interface AIProviderConfig {
     baseUrl: string;
     transport?: 'direct';
     apiKey: string;
+    rememberKey?: boolean;
     credentialState?: 'unconfigured' | 'required' | 'legacy-unavailable' | 'ready';
     icon?: string;
     models: AIModel[];
@@ -177,6 +179,7 @@ export const coerceAIConfig = (value: unknown): AIConfigState => {
                     baseUrl,
                     ...(rawProvider.transport === 'direct' ? { transport: 'direct' as const } : {}),
                     apiKey,
+                    ...(rawProvider.rememberKey === true ? { rememberKey: true } : {}),
                     credentialState: apiKey ? 'ready' : (rawProvider.credentialState === 'required' || rawProvider.credentialState === 'legacy-unavailable' ? rawProvider.credentialState : 'unconfigured'),
                     ...(typeof rawProvider.icon === 'string' ? { icon: normalizeAIText(rawProvider.icon, '') } : {}),
                     models,
@@ -229,6 +232,20 @@ export const setRuntimeAIConfig = (userId: string | null | undefined, config: AI
     if (!captureAuthSession(userId).isCurrent()) return;
     revision += 1;
     runtimeAIConfigs.set(getAIConfigKey(userId), coerceAIConfig(config));
+};
+
+export const restoreRememberedAIConfig = async (userId?: string | null): Promise<AIConfigState> => {
+    const owner = userId === undefined && typeof window !== 'undefined' ? window.__currentUserId ?? null : userId;
+    const session = captureAuthSession(owner);
+    const capturedRevision = revision;
+    const current = getAIConfig(owner);
+    const keys = await loadRememberedAIKeys(owner, current.providers);
+    if (!keys.size || !session.isCurrent() || revision !== capturedRevision) return getAIConfig(owner);
+    const restored = { ...current, providers: current.providers.map(provider => keys.has(provider.id)
+        ? { ...provider, apiKey: keys.get(provider.id)!, credentialState: 'ready' as const } : provider) };
+    setRuntimeAIConfig(owner, restored);
+    window.dispatchEvent(new Event('aiConfigChanged'));
+    return restored;
 };
 
 export const clearRuntimeAIConfig = (userId?: string | null): void => {
@@ -323,6 +340,8 @@ const loadStorageService = async () => (await import('@/services/SupabaseStorage
 
 export const loadCloudAIConfig = async (userId: string): Promise<AIConfigState | null> => {
     const session = captureAuthSession(userId);
+    if (!session.isCurrent()) return null;
+    await restoreRememberedAIConfig(userId);
     const startedRevision = revision;
     if (!session.isCurrent()) return null;
     const storageService = await loadStorageService();
@@ -335,7 +354,8 @@ export const loadCloudAIConfig = async (userId: string): Promise<AIConfigState |
     const current = runtimeAIConfigs.get(getAIConfigKey(userId));
     return { ...normalized, providers: normalized.providers.map(provider => {
         const local = current?.providers.find(item => item.id === provider.id && item.baseUrl === provider.baseUrl);
-        return local?.apiKey ? { ...provider, apiKey: local.apiKey, credentialState: 'ready' } : provider;
+        return local ? { ...provider, rememberKey: local.rememberKey, apiKey: local.apiKey,
+            credentialState: local.apiKey ? 'ready' : provider.credentialState } : provider;
     }) };
 };
 
@@ -344,6 +364,8 @@ export const saveCloudAIConfig = async (userId: string, config: AIConfigState): 
     if (!session.isCurrent()) return false;
     const storageService = await loadStorageService();
     if (!session.isCurrent()) return false;
-    await storageService.saveConfig(AI_CLOUD_CONFIG_KEY, { ...stripAIConfigSecrets(config), version: 3 }, userId);
+    const cloud = stripAIConfigSecrets(config);
+    cloud.providers = cloud.providers.map(({ rememberKey: _localPreference, ...provider }) => provider);
+    await storageService.saveConfig(AI_CLOUD_CONFIG_KEY, { ...cloud, version: 3 }, userId);
     return session.isCurrent();
 };

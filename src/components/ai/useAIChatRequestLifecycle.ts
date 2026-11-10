@@ -1,3 +1,4 @@
+import { buildAIEditPrompt, createAIEditContext, type AIEditScope } from './aiCanvasEdit';
 import { useEffect, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from 'react';
 import { captureAuthSession, getAuthSessionRevision, onAuthSessionInvalidated } from '@/context/authSessionBoundary';
 import type { TFunction } from 'i18next';
@@ -16,6 +17,7 @@ import {
 } from '@/services/ai/diagramPrompts';
 import {
     formatAIProviderRequestError,
+    AIProviderInvalidResponseError,
     resolveAIProviderEndpoint,
 } from '@/services/ai/aiProviderClient';
 import { requestAIChatCompletionRouted } from '@/services/ai/aiRequestRouter';
@@ -53,6 +55,8 @@ interface UseAIChatRequestLifecycleOptions {
     messages: Message[];
     setConversations: Dispatch<SetStateAction<Conversation[]>>;
     pluginId?: string;
+    diagramId?: string;
+    editScope?: AIEditScope;
     diagramNodesRef: AIChatPanelProps['diagramNodesRef'];
     diagramEdgesRef: AIChatPanelProps['diagramEdgesRef'];
     canvasOps: AIChatPanelProps['canvasOps'];
@@ -74,6 +78,8 @@ export function useAIChatRequestLifecycle({
     messages,
     setConversations,
     pluginId,
+    diagramId,
+    editScope = 'generate',
     diagramNodesRef,
     diagramEdgesRef,
     canvasOps,
@@ -81,15 +87,16 @@ export function useAIChatRequestLifecycle({
     processCommands,
 }: UseAIChatRequestLifecycleOptions) {
     const revision = useSyncExternalStore(onAuthSessionInvalidated, getAuthSessionRevision, getAuthSessionRevision);
-    const [requestState, setRequestState] = useState({ owner: userId, revision, loading: false });
-    const loading = requestState.owner === userId && requestState.revision === revision && requestState.loading;
-    const setLoading = (value: boolean) => setRequestState({ owner: userId, revision, loading: value });
+    const [requestState, setRequestState] = useState({ owner: userId, revision, activeId, diagramId, loading: false });
+    const loading = requestState.owner === userId && requestState.revision === revision
+        && requestState.activeId === activeId && requestState.diagramId === diagramId && requestState.loading;
+    const setLoading = (value: boolean) => setRequestState({ owner: userId, revision, activeId, diagramId, loading: value });
     const activeRequestControllerRef = useRef<AbortController | null>(null);
 
     useEffect(() => () => {
         activeRequestControllerRef.current?.abort(new DOMException('AI chat panel unmounted', 'AbortError'));
         activeRequestControllerRef.current = null;
-    }, [userId, revision]);
+    }, [userId, revision, activeId, diagramId]);
 
     const handleStopGeneration = () => {
         activeRequestControllerRef.current?.abort(new DOMException('用户已停止生成', 'AbortError'));
@@ -97,7 +104,7 @@ export function useAIChatRequestLifecycle({
 
     const sendAIMessage = async () => {
         const session = captureAuthSession(userId);
-        if (loading || !inputValue.trim() || !session.isCurrent()) return;
+        if (loading || activeRequestControllerRef.current || !inputValue.trim() || !session.isCurrent()) return;
 
         let config = getAIConfig(userId);
         const modelSelection = resolveAIChatActiveModelSelection(config);
@@ -126,7 +133,18 @@ export function useAIChatRequestLifecycle({
             return;
         }
 
+        const graph = { nodes: diagramNodesRef?.current || [], edges: diagramEdgesRef?.current || [] };
+        let editContext;
+        let editPrompt = '';
+        try {
+            editContext = createAIEditContext(graph, diagramId || '', editScope);
+            if (editContext) editPrompt = buildAIEditPrompt(graph, editContext);
+        } catch (error) {
+            appMessage.warning(t(error instanceof Error ? error.message : 'aiChat.edit.invalid'));
+            return;
+        }
         const pending = createAIChatPendingMessageState(messages, inputValue, createAIChatMessageId);
+        pending.newAssistantMessage.editContext = editContext;
         const newUserMessage = pending.newUserMessage;
         const assistantMessageId = pending.newAssistantMessage.id;
 
@@ -159,7 +177,7 @@ export function useAIChatRequestLifecycle({
                 pluginId,
                 historyMessages: messages,
                 userContent: enhanceWithSlashCommand(newUserMessage.content)
-                    + buildDiagramContext(diagramNodes, diagramEdges)
+                    + (editContext ? editPrompt : buildDiagramContext(diagramNodes, diagramEdges))
                     + (newUserMessage.content.trim().startsWith('/analyze')
                         ? (canvasOps?.onAnalyze
                             ? `\n\n[实时图表巡检报告]\n${canvasOps.onAnalyze().summary}`
@@ -170,7 +188,7 @@ export function useAIChatRequestLifecycle({
                 model: validation.model.id,
                 messages: requestMessages,
                 stream: true,
-            }, { signal: AbortSignal.any([requestController.signal, session.signal]), timeoutMs: 120_000 });
+            }, { signal: AbortSignal.any([requestController.signal, session.signal]), timeoutMs: 120_000, toolMode: editContext ? 'none' : 'diagram' });
 
             if (!session.isCurrent()) {
                 await response.body?.cancel();
@@ -207,10 +225,14 @@ export function useAIChatRequestLifecycle({
             }
 
             if (!session.isCurrent()) return;
+            requestController.signal.throwIfAborted();
+            if (!accumulatedContent && !accumulatedReasoning && !structuredToolCalls.length) {
+                throw new AIProviderInvalidResponseError('AI 服务未返回有效内容，请重试或检查模型的流式响应支持。');
+            }
             const structuredCommandContent = structuredToolCalls
                 .map(command => `[COMMAND: ${JSON.stringify(command)}]`)
                 .join('\n');
-            await processCommands(
+            if (!editContext) await processCommands(
                 structuredCommandContent
                     ? `${accumulatedContent}\n${structuredCommandContent}`
                     : accumulatedContent,
@@ -254,8 +276,8 @@ export function useAIChatRequestLifecycle({
         } finally {
             if (activeRequestControllerRef.current === requestController) {
                 activeRequestControllerRef.current = null;
+                if (session.isCurrent()) setLoading(false);
             }
-            if (session.isCurrent()) setLoading(false);
         }
     };
 

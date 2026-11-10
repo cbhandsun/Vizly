@@ -262,7 +262,15 @@ vi.mock('@vizly/core/storage', async (importOriginal) => ({
 }));
 
 vi.mock('@vizly/core/diagram-data', () => ({
-    getFlowDataBridge: vi.fn(),
+    getFlowDataBridge: vi.fn(() => ({
+        getCanvasSnapshot: () => ({
+            nodes: [
+                { id: 'node-1', position: { x: 0, y: 0 }, data: { label: 'A' } },
+                { id: 'node-2', position: { x: 120, y: 0 }, data: { label: 'B' } },
+            ],
+            edges: [{ id: 'edge-1', source: 'node-1', target: 'node-2' }],
+        }),
+    })),
     getFlowDataBridgeEdges: vi.fn(() => [
         { id: 'edge-1', source: 'node-1', target: 'node-2' },
     ]),

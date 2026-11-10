@@ -48,21 +48,33 @@ cloud function. Local Ollama continues to use browser-direct transport.
 Custom providers can select either OpenAI-compatible Chat Completions or the
 OpenAI Responses API. The browser uses `/chat/completions` or `/responses`
 accordingly. Loopback HTTP endpoints (`localhost`, `127.0.0.1`, and `[::1]`)
-always remain browser-direct; remote HTTPS Responses providers use the same
-authenticated gateway and must still pass the provider-origin allowlist.
+always remain browser-direct. When gateway routing is explicitly enabled, remote
+HTTPS Responses providers use the authenticated gateway and provider-origin allowlist.
 
 The frontend route mode is controlled at build time:
 
 ```text
-VITE_AI_GATEWAY_MODE=auto
+VITE_AI_GATEWAY_MODE=off
 ```
 
 - `auto` probes the gateway and falls back to direct transport only when the
   function is absent.
 - `required` fails closed when the gateway or authenticated session is missing.
-- `off` keeps all requests on the legacy direct transport.
+- `off` sends model requests directly from the browser to the configured provider. Cloud document and configuration persistence still use Supabase.
 
-`auto` is the default.
+`off` is the default, including when the setting is absent or unrecognized. Set `auto` or `required` explicitly to enable gateway routing.
+
+## Remembering BYOK keys on this device
+
+Without opt-in, provider keys live only in page memory. “Remember key encrypted
+in this browser” saves an AES-GCM encrypted record in the browser's
+`VizlyAICredentials` IndexedDB database, with a non-extractable CryptoKey stored
+on the same device. Records are bound to the account, provider ID and Base URL;
+reload restores matching records. The key and this device preference are
+excluded from cloud configuration sync. “Delete key saved on this device”
+removes the encrypted record and clears the current runtime key. This protects
+against plaintext storage inspection, but scripts controlling the website can
+still use credentials available to that website.
 
 ## Deployment
 

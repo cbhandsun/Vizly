@@ -236,14 +236,14 @@
   "designer": {
     "hierarchyRecovery": {
       "download": "下载原始数据",
-        "title": "此图表需要恢复",
-        "description": "部分父子关系异常，已暂停加载和自动保存。恢复将仅断开下列父关系，保留节点及有效连线。节点保留原先存储的坐标，因此恢复后位置可能变化。",
-        "backup": "恢复前会在当前浏览器保留一份原始数据备份。如果备份无法保存，将停止恢复。取消不会修改原文档。",
-        "backupFailed": "无法备份原始数据，尚未执行恢复。请检查浏览器存储后重试。",
-        "recover": "备份并恢复",
-        "missing-node-parent": "父节点不存在",
-        "self-node-parent": "节点以自身为父节点",
-        "cyclic-node-parent": "父子关系形成循环"
+      "title": "此图表需要恢复",
+      "description": "部分父子关系异常，已暂停加载和自动保存。恢复将仅断开下列父关系，保留节点及有效连线。节点保留原先存储的坐标，因此恢复后位置可能变化。",
+      "backup": "恢复前会在当前浏览器保留一份原始数据备份。如果备份无法保存，将停止恢复。取消不会修改原文档。",
+      "backupFailed": "无法备份原始数据，尚未执行恢复。请检查浏览器存储后重试。",
+      "recover": "备份并恢复",
+      "missing-node-parent": "父节点不存在",
+      "self-node-parent": "节点以自身为父节点",
+      "cyclic-node-parent": "父子关系形成循环"
     },
     "connection": {
       "keyboardPending": "已选择起点。Tab 移到目标连接点，按 Enter 连接；Esc 取消。",
@@ -1250,28 +1250,28 @@
     },
     "versionHistoryPanel": {
       "exportFailed": "本地副本导出失败，请重试。",
-"cloudSaved": "已保存到云端",
-  "localSaved": "仅本机保存，尚未同步",
-  "automaticSync": {
-    "queued": "等待自动同步；联网并登录原账号后继续。",
-    "retrying": "已尝试 {{count}} 次，将自动重试。",
-    "blocked": "自动重试已停止；请处理下方问题后手动重试，本地副本已保留。",
-    "capacity": "同步队列已满；本地副本已保留，请手动同步。",
-    "paused": "自动同步已暂停；本地副本已保留，仍可手动同步。"
-  },
-  "nextSyncAttempt": "下次尝试：{{time}}",
-  "legacyLocal": "旧本地记录：归属未知，不会自动上传",
-  "retrySync": "重试云同步",
-  "exportLocal": "导出本地副本",
-  "retryFailed": "同步未完成，本地副本仍保留，请查看原因后重试。",
-  "failure": {
-    "authentication": "需要重新登录后重试。",
-    "permission": "权限不足，请联系图表所有者授权。",
-    "configuration": "请先配置所选存储服务。",
-    "data": "图表或数据不符合云存储要求，请先保存为云端图表。",
-    "network": "网络或服务暂时不可用，可稍后手动重试。",
-    "unknown": "云端结果未确认，请先检查云端版本；重试可能产生重复版本。"
-  },
+      "cloudSaved": "已保存到云端",
+      "localSaved": "仅本机保存，尚未同步",
+      "automaticSync": {
+        "queued": "等待自动同步；联网并登录原账号后继续。",
+        "retrying": "已尝试 {{count}} 次，将自动重试。",
+        "blocked": "自动重试已停止；请处理下方问题后手动重试，本地副本已保留。",
+        "capacity": "同步队列已满；本地副本已保留，请手动同步。",
+        "paused": "自动同步已暂停；本地副本已保留，仍可手动同步。"
+      },
+      "nextSyncAttempt": "下次尝试：{{time}}",
+      "legacyLocal": "旧本地记录：归属未知，不会自动上传",
+      "retrySync": "重试云同步",
+      "exportLocal": "导出本地副本",
+      "retryFailed": "同步未完成，本地副本仍保留，请查看原因后重试。",
+      "failure": {
+        "authentication": "需要重新登录后重试。",
+        "permission": "权限不足，请联系图表所有者授权。",
+        "configuration": "请先配置所选存储服务。",
+        "data": "图表或数据不符合云存储要求，请先保存为云端图表。",
+        "network": "网络或服务暂时不可用，可稍后手动重试。",
+        "unknown": "云端结果未确认，请先检查云端版本；重试可能产生重复版本。"
+      },
       "title": "版本历史",
       "close": "关闭版本历史",
       "createTitle": "创建新快照",
@@ -1757,13 +1757,20 @@
     "apiConfig": "API 连接配置",
     "testConnection": "测试连接",
     "baseUrlLabel": "API Base URL",
+    "directTransportDeploymentHint": "当前部署由浏览器直连已配置的模型服务；云端保存仍使用 Supabase。",
+    "requiredGatewayDeploymentHint": "当前部署要求通过 AI 网关调用模型。",
     "directTransportLabel": "浏览器直连",
     "directTransportHint": "由浏览器直接访问此平台，不经过 Vizly AI 网关及其限流。强制网关模式下此选项不生效。",
     "baseUrlHint": "仅允许 HTTPS，或本机 localhost/127.0.0.1 HTTP",
     "invalidProviderBaseUrl": "{{name}}：Base URL 必须使用 HTTPS，或本机 HTTP（localhost/127.0.0.1）。",
     "apiKeyLabel": "API Key",
-    "sessionKeyNotice": "API Key 仅保存在当前页面内存中，刷新、退出或切换账号后需要重新输入。云端仅同步非敏感设置。",
-    "credentialState": {"unconfigured": "尚未配置密钥", "required": "请重新输入当前会话的密钥", "legacy-unavailable": "旧凭证未恢复，请重新输入；旧记录保持不变", "ready": "当前会话密钥已就绪"},
+    "sessionKeyNotice": "未勾选“本机加密记住”时，密钥仅在本次页面有效，刷新或退出后需重新输入。",
+    "credentialState": {
+      "unconfigured": "尚未配置密钥",
+      "required": "请重新输入当前会话的密钥",
+      "legacy-unavailable": "旧凭证未恢复，请重新输入；旧记录保持不变",
+      "ready": "当前会话密钥已就绪"
+    },
     "showApiKey": "显示 API Key",
     "hideApiKey": "隐藏 API Key",
     "platformName": "平台名称",
@@ -1782,7 +1789,7 @@
     "currentActive": "当前使用",
     "selectProvider": "请选择左侧平台进行配置",
     "newProviderName": "新建平台",
-    "saveSuccess": "配置已保存 (本地)",
+    "saveSuccess": "配置已保存；密钥仅本次页面有效。",
     "saveSuccessCloud": "非敏感设置已同步，密钥仅保留在当前页面",
     "saveAgainForLatestChanges": "较早的修改已保存；保存期间产生的新修改需要再次选择“保存全部”。",
     "cloudSyncFail": "已保存到本地，但云端同步失败",
@@ -1829,7 +1836,26 @@
       "localNotice": "本机服务可以不填写密钥；请求只会发送到当前本机地址。",
       "remoteNotice": "测试或同步时，请求会发送到当前 Base URL；密钥不会写入日志。",
       "verifiedNotice": "已使用当前 Base URL 和凭据完成真实请求；修改连接配置后需要重新测试。",
-      "failureNotice": "请求未完成，请检查网络、Base URL 和凭据后重新测试。"
+      "failureNotice": "请求未完成，请检查网络、Base URL 和凭据后重新测试。",
+      "failureDetails": {
+        "network": "网络或跨域请求失败。请检查服务地址、网络，以及服务端是否允许当前网站的跨域请求（CORS）。",
+        "unauthorized": "服务拒绝访问，请检查密钥及模型权限。",
+        "rateLimited": "服务限流或额度不足，请稍后重试并检查用量。",
+        "unavailable": "模型服务暂不可用，请稍后重试。",
+        "invalidResponse": "服务未返回有效的模型响应，请检查模型兼容性。",
+        "timeout": "模型响应超时，请检查服务状态后重试。",
+        "unknown": "请检查模型是否可用及服务配置。"
+      }
+    },
+    "vault": {
+      "remember": "在此浏览器加密记住密钥",
+      "notice": "勾选并保存后，密钥加密存放在当前浏览器，按账号和服务地址隔离，刷新后恢复；不会同步到云端。已控制本网站页面的恶意脚本仍可能使用密钥。",
+      "forget": "删除本机保存的密钥",
+      "forgotten": "本机密钥及当前会话密钥已清除。",
+      "saved": "配置已保存，密钥已在此浏览器加密保存。",
+      "savedCloud": "配置已同步；密钥仅在此浏览器加密保存。",
+      "saveFailed": "本机密钥保存或删除失败，请检查浏览器存储权限后重试。",
+      "unavailable": "当前浏览器不支持本机加密保存。"
     }
   },
   "header": {
@@ -1953,6 +1979,7 @@
       "analyzing": "正在进行架构巡检...",
       "nodeNotFound": "未找到节点「{{name}}」",
       "noMatchFound": "未找到匹配「{{query}}」的节点",
+      "saveFailed": "保存失败：{{error}}",
       "savingTo": "正在保存到 {{target}}...",
       "saveSuccess": "已保存到 {{target}}: {{title}}",
       "smartLayout": "智能布局",
@@ -1980,6 +2007,38 @@
       "analyzeDescription": "分析当前图表并返回结构化报告",
       "brainstormDescription": "围绕选中节点扩展相关想法（仅思维导图）",
       "tip": "提示：按 Alt + / 可切换面板，输入 / 可浏览命令。"
+    },
+    "edit": {
+      "mode": "AI 工作模式",
+      "nodes": "个节点",
+      "scope": {
+        "generate": "生成新内容",
+        "selection": "仅修改选中部分",
+        "diagram": "修改整张图"
+      },
+      "emptySelection": "请先在画布中选择需要修改的节点。",
+      "tooLarge": "编辑范围过大，请选择较小的部分后重试。",
+      "stale": "图表或登录状态已变化，请基于当前画布重新生成变更。",
+      "outOfScope": "AI 返回了范围外的修改，未应用。请重新生成。",
+      "invalid": "无法生成有效变更，请检查 AI 返回的图表。",
+      "readonly": "当前图表不可编辑，或不支持此编辑方式。",
+      "preview": "AI 变更预览",
+      "strategy": "应用方式",
+      "strategyAppend": "追加到当前画布",
+      "strategyReplace": "替换整张图",
+      "summary": "新增 {{added}} 项 · 修改 {{updated}} 项 · 删除 {{removed}} 项",
+      "action": "变更",
+      "before": "修改前",
+      "after": "修改后",
+      "add": "新增",
+      "update": "修改",
+      "remove": "删除",
+      "node": "节点",
+      "edge": "连线",
+      "undoHint": "确认前不会修改画布。应用后可通过画布的“撤销”一次恢复整批变更。",
+      "confirm": "确认应用变更",
+      "applied": "变更已应用，可通过画布撤销整批修改。",
+      "saveCanvas": "保存当前画布"
     }
   },
   "export": {

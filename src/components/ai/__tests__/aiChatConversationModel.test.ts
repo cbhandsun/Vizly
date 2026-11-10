@@ -107,6 +107,10 @@ describe('aiChatConversationModel', () => {
         expect(isConfigurationIndependentAIChatInput('/help')).toBe(true);
         expect(isConfigurationIndependentAIChatInput('  /CLEAR  ')).toBe(true);
         expect(isConfigurationIndependentAIChatInput('/present now')).toBe(true);
+        expect(isConfigurationIndependentAIChatInput('/add API')).toBe(false);
+        expect(isConfigurationIndependentAIChatInput('/add API', { onAddNode: () => 'api' })).toBe(true);
+        expect(isConfigurationIndependentAIChatInput('/layout', { onAutoLayout: () => {} })).toBe(true);
+        expect(isConfigurationIndependentAIChatInput('/delete API', {})).toBe(false);
         expect(isConfigurationIndependentAIChatInput('/analyze')).toBe(false);
         expect(isConfigurationIndependentAIChatInput('create a diagram')).toBe(false);
         expect(isConfigurationIndependentAIChatInput('')).toBe(false);

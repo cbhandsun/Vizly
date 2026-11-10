@@ -233,6 +233,18 @@ describe('AIChatViewLayout commercial interactions', () => {
         expect(handleSendMessage).toHaveBeenCalledTimes(1);
     });
 
+    it('does not send while Enter confirms a Chinese IME composition or adds a newline', () => {
+        const handleSendMessage = vi.fn(async () => undefined);
+        render(<AIChatViewLayout {...createProps({ handleSendMessage })} />);
+        const composer = screen.getByRole('textbox', { name: 'aiChat.inputLabel' });
+        fireEvent.keyDown(composer, { key: 'Enter', isComposing: true });
+        fireEvent.keyDown(composer, { key: 'Enter', keyCode: 229 });
+        fireEvent.keyDown(composer, { key: 'Enter', shiftKey: true });
+        expect(handleSendMessage).not.toHaveBeenCalled();
+        fireEvent.keyDown(composer, { key: 'Enter' });
+        expect(handleSendMessage).toHaveBeenCalledOnce();
+    });
+
     it('opens the provider responsible for the readiness warning', () => {
         const onOpenConfig = vi.fn();
         render(<AIChatViewLayout {...createProps({

@@ -81,11 +81,19 @@ describe('parseAIStreamDelta', () => {
         parseSpy.mockRestore();
     });
 
-    it('truncates oversized delta strings', () => {
-        const parsed = parseAIStreamDelta(makeChunk({
-            content: 'x'.repeat(AI_STREAM_DELTA_TEXT_MAX_CHARS + 100),
-        }));
-
-        expect(parsed?.content).toHaveLength(AI_STREAM_DELTA_TEXT_MAX_CHARS);
+    it('preserves large complete deltas instead of truncating generated diagrams', () => {
+        const content = 'x'.repeat(30_000);
+        const parsed = parseAIStreamDelta(makeChunk({ content }));
+        expect(parsed?.content).toBe(content);
+        expect(AI_STREAM_DELTA_TEXT_MAX_CHARS).toBeGreaterThan(content.length);
     });
+    it('shows only allowlisted gateway failure diagnostics', () => {
+        expect(() => parseAIStreamDelta(JSON.stringify({ vizly: { type: 'error', code: 'upstream-route', status: 404,
+            message: 'private token' } }))).toThrow('请检查服务地址及公网转发配置');
+        expect(() => parseAIStreamDelta(JSON.stringify({ vizly: { type: 'error', code: 'upstream-auth', status: 403,
+            message: 'private token', responseBody: 'private response' } }))).toThrow('(403)');
+        expect(() => parseAIStreamDelta(JSON.stringify({ vizly: { type: 'error', code: 'private token', status: 'secret' } })))
+            .toThrow('AI Gateway 流式响应失败。');
+    });
+
 });

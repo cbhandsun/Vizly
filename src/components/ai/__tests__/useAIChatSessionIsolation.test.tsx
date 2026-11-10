@@ -58,6 +58,41 @@ describe('AI request session isolation', () => {
         await act(async () => { resolve(new Response(null)); await pending; });
         expect(props.processCommands).not.toHaveBeenCalled();
     });
+    it('cancels on conversation changes and keeps a newer request loading after a late response', async () => {
+        const resolve: ((response: Response) => void)[] = [];
+        mocks.request.mockImplementation(() => new Promise<Response>(done => { resolve.push(done); }));
+        const props = options();
+        const { result, rerender } = renderHook(({ activeId }) => useAIChatRequestLifecycle({ ...props, activeId }), {
+            initialProps: { activeId: 'old-chat' },
+        });
+        let oldRequest!: Promise<void>;
+        act(() => { oldRequest = result.current.sendAIMessage(); });
+        const oldSignal = mocks.request.mock.calls[0][2].signal as AbortSignal;
+        rerender({ activeId: 'new-chat' });
+        expect(oldSignal.aborted).toBe(true);
+        let newRequest!: Promise<void>;
+        act(() => { newRequest = result.current.sendAIMessage(); });
+        await act(async () => { resolve[0](new Response(null)); await oldRequest; });
+        expect(props.processCommands).not.toHaveBeenCalled();
+        expect(result.current.loading).toBe(true);
+        await act(async () => { resolve[1](new Response('data: {"choices":[{"delta":{"content":"new reply"}}]}\n\ndata: [DONE]\n\n')); await newRequest; });
+        expect(props.processCommands).toHaveBeenCalledWith('new reply', expect.any(AbortSignal));
+        expect(result.current.loading).toBe(false);
+    });
+    it('cancels pending commands when the displayed diagram changes', async () => {
+        let resolve!: (response: Response) => void;
+        mocks.request.mockImplementation(() => new Promise<Response>(done => { resolve = done; }));
+        const props = options();
+        const { result, rerender } = renderHook(({ diagramId }) => useAIChatRequestLifecycle({ ...props, diagramId }), {
+            initialProps: { diagramId: 'old-diagram' },
+        });
+        let pending!: Promise<void>;
+        act(() => { pending = result.current.sendAIMessage(); });
+        rerender({ diagramId: 'new-diagram' });
+        await act(async () => { resolve(new Response(null)); await pending; });
+        expect(props.processCommands).not.toHaveBeenCalled();
+        expect(result.current.loading).toBe(false);
+    });
     it('allows a current-session response through the same path', async () => {
         mocks.request.mockResolvedValue(new Response('data: {"choices":[{"delta":{"content":"current reply"}}]}\n\ndata: [DONE]\n\n'));
         const props = options(); const { result } = renderHook(() => useAIChatRequestLifecycle(props));
