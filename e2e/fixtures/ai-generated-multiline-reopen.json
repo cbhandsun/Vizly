@@ -1,0 +1,184 @@
+{
+  "id": "ai-multiline-reopen",
+  "name": "AI multiline label recovery",
+  "type": "flowchart",
+  "edges": [
+    {
+      "id": "e-release-start-release-review",
+      "type": "advanced-smart-step",
+      "source": "release-start",
+      "target": "release-review",
+      "metadata": {
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "manualHandles": false
+      },
+      "markerEnd": {
+        "type": "arrowclosed"
+      }
+    },
+    {
+      "id": "e-release-review-release-done",
+      "type": "advanced-smart-step",
+      "source": "release-review",
+      "target": "release-done",
+      "metadata": {
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "manualHandles": false
+      },
+      "markerEnd": {
+        "type": "arrowclosed"
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "id": "release-start",
+      "data": {
+        "label": "开始"
+      },
+      "type": "custom",
+      "domain": "orders",
+      "metadata": {
+        "shape": "ellipse",
+        "style": {
+          "width": 97,
+          "height": 60
+        },
+        "width": 97,
+        "height": 60,
+        "parentId": "group-orders",
+        "sequence": "1",
+        "canvasNodeType": "flowchart",
+        "canvasPosition": {
+          "x": 50,
+          "y": 60
+        }
+      },
+      "description": "开始",
+      "domainClass": "mid"
+    },
+    {
+      "id": "release-done",
+      "data": {
+        "label": "完成"
+      },
+      "type": "custom",
+      "domain": "orders",
+      "metadata": {
+        "shape": "ellipse",
+        "style": {
+          "width": 97,
+          "height": 60
+        },
+        "width": 97,
+        "height": 60,
+        "parentId": "group-orders",
+        "sequence": "1",
+        "canvasNodeType": "flowchart",
+        "canvasPosition": {
+          "x": 50,
+          "y": 300
+        }
+      },
+      "description": "完成",
+      "domainClass": "mid"
+    },
+    {
+      "id": "release-review",
+      "data": {
+        "label": "审核（泳道和路由验收通过）"
+      },
+      "type": "custom",
+      "domain": "orders",
+      "metadata": {
+        "shape": "rectangle",
+        "style": {
+          "width": 97,
+          "height": 79,
+          "zIndex": 10
+        },
+        "width": 97,
+        "height": 79,
+        "parentId": "group-orders",
+        "sequence": "1",
+        "canvasNodeType": "flowchart",
+        "canvasPosition": {
+          "x": 50,
+          "y": 180
+        }
+      },
+      "description": "审核（泳道和路由验收通过）",
+      "domainClass": "mid"
+    }
+  ],
+  "theme": {
+    "name": "manual",
+    "domains": {},
+    "isCustom": true,
+    "displayName": "Manual Theme"
+  },
+  "groups": [
+    {
+      "id": "group-orders",
+      "data": {
+        "label": "orders",
+        "domain": "orders",
+        "description": "orders",
+        "domainClass": "mid"
+      },
+      "type": "group",
+      "label": "orders",
+      "domain": "orders",
+      "isGroup": true,
+      "measured": {
+        "width": 300,
+        "height": 410
+      },
+      "metadata": {
+        "style": {
+          "width": 300,
+          "height": 410
+        },
+        "width": 300,
+        "height": 410,
+        "sequence": "1",
+        "canvasNodeType": "titleGroup",
+        "canvasPosition": {
+          "x": -50,
+          "y": -60
+        }
+      },
+      "position": {
+        "x": -50,
+        "y": -60
+      },
+      "description": "orders",
+      "domainClass": "mid"
+    }
+  ],
+  "layout": {
+    "type": "custom",
+    "padding": {
+      "top": 20,
+      "left": 20,
+      "right": 20,
+      "bottom": 20,
+      "vertical": 20,
+      "horizontal": 20
+    },
+    "spacing": {
+      "vertical": 50,
+      "horizontal": 50
+    },
+    "direction": "LR",
+    "autoDirection": true,
+    "fitDomainContent": true
+  },
+  "version": "1.0.0",
+  "metadata": {
+    "title": "AI multiline label recovery"
+  },
+  "routingSnapshot": null
+}
