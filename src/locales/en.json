@@ -3693,7 +3693,8 @@
       "unconfigured": "No key configured",
       "required": "Re-enter the key for this session",
       "legacy-unavailable": "Legacy credential not restored. Re-enter your key; the old record is unchanged.",
-      "ready": "Key ready for this session"
+      "ready": "Key ready for this session",
+      "draft": "This key has not been saved. You can test it; Save All before using it in the AI workbench."
     },
     "showApiKey": "Show API Key",
     "hideApiKey": "Hide API Key",

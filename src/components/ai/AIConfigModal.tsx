@@ -73,6 +73,7 @@ import { AIConfigDeletionConfirmModal } from './AIConfigDeletionConfirmModal';
 import { AIConfigModelDeleteButton, AIConfigProviderHeader } from './AIConfigDeletionTriggers';
 import { useAIConfigDeletion } from './useAIConfigDeletion';
 import { useAIConfigModalConfig } from './useAIConfigModalConfig';
+import { getAIProviderCredentialDisplayState } from './aiConfigDraftState';
 import { useAIConfigNewModelDraft } from './useAIConfigNewModelDraft';
 import { useAIConfigCloudDraftSync } from './useAIConfigCloudDraftSync';
 import {
@@ -555,14 +556,15 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
                                     </Form.Item>
                                     <Form.Item
                                         label={t('aiConfig.apiKeyLabel')}
-                                        extra={<><div>{t('aiConfig.sessionKeyNotice')}</div><div role="status">{t(`aiConfig.credentialState.${selectedProvider.apiKey.trim() ? 'ready' : selectedProvider.credentialState ?? 'unconfigured'}`)}</div></>}
+                                        extra={<><div>{t('aiConfig.sessionKeyNotice')}</div><div role="status">{t(`aiConfig.credentialState.${getAIProviderCredentialDisplayState(selectedProvider, getAIConfig(user?.id))}`)}</div></>}
                                         required={selectedProviderReadiness?.authMode === 'bearer-required'}
                                     >
                                         <Space.Compact block>
                                             <Input
                                                 aria-label={t('aiConfig.apiKeyLabel')}
                                                 type={isApiKeyVisible ? 'text' : 'password'}
-                                                autoComplete="off"
+                                                name="ai-provider-api-token"
+                                                autoComplete="new-password"
                                                 value={selectedProvider.apiKey}
                                                 disabled={isTesting || isFetchingModels}
                                                 onChange={e => updateProvider(selectedProvider.id, { apiKey: e.target.value })}
