@@ -45,7 +45,22 @@ try:
     report['images'] = images
     suffix = uuid.uuid4().hex[:12]
     network = 'vizly-telemetry-' + suffix
-    docker(['network', 'create', '--internal', '--label', 'vizly.telemetry=' + suffix, network])
+    stage = 'network'
+    # A shared runner can exhaust Docker's default /16 address pools without
+    # exhausting addresses. Use a small internal-only benchmark subnet; Docker
+    # checks overlap atomically, including other concurrently starting fixtures.
+    for attempt in range(16):
+        slot = secrets.randbelow(8192)
+        subnet = '198.{}.{}.{}/28'.format(18 + slot // 4096, (slot // 16) % 256, (slot % 16) * 16)
+        created = docker(['network', 'create', '--internal', '--subnet', subnet,
+                          '--label', 'vizly.telemetry=' + suffix, network], check=False)
+        if created.returncode == 0:
+            report['networkSubnet'] = subnet
+            break
+        if 'overlap' not in created.stderr.lower():
+            raise RuntimeError('Owned internal network allocation failed')
+    else:
+        raise RuntimeError('Owned internal subnet allocation exhausted')
     password, jwt_secret = secrets.token_hex(24), secrets.token_hex(32)
     database = 'vizly-telemetry-db-' + suffix
     owned.append(database)
