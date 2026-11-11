@@ -1,4 +1,3 @@
-import type { AIEditScope } from './aiCanvasEdit';
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { TextAreaRef } from 'antd/es/input/TextArea';
 import { getAIConfig, restoreRememberedAIConfig, loadCloudAIConfig, persistAIConfig, setRuntimeAIConfig } from './aiConfigStorage';
@@ -24,6 +23,7 @@ import { AIChatViewLayout, type AIChatSlashCommand } from './AIChatViewLayout';
 import { useAIChatRequestLifecycle } from './useAIChatRequestLifecycle';
 import { getAIChatConfigurationState } from './aiChatRequestConfig';
 import { shouldCloseAIChatOnKeyDown } from './aiChatEscape';
+import { useAIWorkbenchDraft } from './useAIWorkbenchDraft';
 import {
     isConfigurationIndependentAIChatInput,
     resolveAIChatCopyKeys,
@@ -37,7 +37,7 @@ import {
 export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, onOpenConfig, onApplyJson, onPreviewJson, diagramNodesRef, diagramEdgesRef, canvasOps, pluginId, diagramId }) => {
     const { t } = useTranslation();
     const { user } = useAuth();
-    const [editScope, setEditScope] = useState<AIEditScope>('generate');
+    const { editScope, setEditScope, inputValue, setInputValue } = useAIWorkbenchDraft(user?.id, diagramId);
     const copyKeys = resolveAIChatCopyKeys(pluginId);
     const welcomeMessage = t(copyKeys.welcomeMessage);
 
@@ -79,7 +79,6 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
         welcomeMessage,
         newConversationTitle: t('aiChat.newConversationTitle'),
     });
-    const [inputValue, setInputValue] = useState('');
     const [showCommands, setShowCommands] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Default to closed overlay
     const [filteredCommands, setFilteredCommands] = useState(SLASH_COMMANDS);
