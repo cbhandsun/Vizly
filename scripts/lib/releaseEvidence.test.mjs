@@ -7,14 +7,14 @@ import { createHash } from 'node:crypto';
 import { afterEach, expect, it } from 'vitest';
 import { prepareVercelStaticArtifact } from './vercel-static-artifact.mjs';
 import { verifyPreparedVercelDeployment } from './preparedVercelDeployment.mjs';
-import { verifyReleaseEvidence, ENGINEERING_GATES, PROMOTION_GATES } from './releaseEvidence.mjs';
+import { verifyReleaseEvidence, ENGINEERING_GATES, LEGACY_ENGINEERING_GATES, PROMOTION_GATES } from './releaseEvidence.mjs';
 import { syntheticReleaseFixture } from './releaseEvidenceFixture.mjs';
 import { CORE_HOST_GATES } from './coreHostReleaseEvidence.mjs';
 import { CORE_QUALITY_GATES } from './coreQualityReleaseEvidence.mjs';
 const roots = [], run = promisify(execFile), projectId = 'prj_Test', teamId = 'team_Test';
 const launcher = join(process.cwd(), 'scripts/deploy-prepared-vercel-static.mjs');
 afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
-async function fixture(promotion = false, production = promotion) {
+async function fixture(promotion = false, production = promotion, legacy = false) {
   const root = await mkdtemp(join(tmpdir(), 'vizly-release-gates-')); roots.push(root);
   await mkdir(join(root, 'build')); await writeFile(join(root, 'build/index.html'), '<div id="root"></div>');
   if (production) await writeFile(join(root, 'build/app.js'), 'const endpoint="wss://collab.example.com";');
@@ -22,7 +22,7 @@ async function fixture(promotion = false, production = promotion) {
   await prepareVercelStaticArtifact({ workspace: root, buildDirectory: 'build', outputDirectory: 'stage', projectId, teamId, environment,
     ...(production ? { productionWebSocketUrl: 'wss://collab.example.com', telemetryIngestUrl: 'https://collab.example.com/telemetry' } : {}) });
   const prepared = await verifyPreparedVercelDeployment({ artifactDirectory: join(root, 'stage'), projectId, teamId, environment });
-  const release = await syntheticReleaseFixture(root, prepared, promotion);
+  const release = await syntheticReleaseFixture(root, prepared, promotion, legacy);
   return { root, prepared, ...release, save: () => writeFile(release.manifestPath, JSON.stringify(release.manifest)) };
 }
 it('accepts exactly bound engineering evidence; promotion requires separate real-service and rollback receipts', async () => {
@@ -169,3 +169,18 @@ it.each(['sdk', 'app-source', 'budget'])(
     await expect(verifyReleaseEvidence(f)).rejects.toThrow('Core host release evidence');
   },
 );
+
+it('retains historical three-platform release verification without relaxing old evidence', async () => {
+  const f=await fixture(false,false,true);
+  expect((await verifyReleaseEvidence(f)).gates).toBe(LEGACY_ENGINEERING_GATES.length);
+  f.manifest.gates=f.manifest.gates.filter(g=>g.id!=='app-gitea-windows');await f.save();
+  await expect(verifyReleaseEvidence(f)).rejects.toThrow('missing gate app-gitea-windows');
+});
+it('rejects unsupported policy even if every supplied report succeeded', async () => {
+  const f=await fixture();f.manifest.nativePolicy='skip-linux';await f.save();
+  await expect(verifyReleaseEvidence(f)).rejects.toThrow('native policy');
+});
+it('does not claim current two-platform policy using historical release evidence', async () => {
+  const f=await fixture(false,false,true);f.manifest.schema='vizly-release-v2';f.manifest.nativePolicy='linux-macos-v1';await f.save();
+  await expect(verifyReleaseEvidence(f)).rejects.toThrow('native policy');
+});

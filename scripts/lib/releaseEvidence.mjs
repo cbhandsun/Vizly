@@ -1,4 +1,4 @@
-import { nativeReleaseFacts } from './nativeReleaseEvidence.mjs';
+import { nativeReleaseFacts, NATIVE_POLICY, NATIVE_PLATFORMS, LEGACY_NATIVE_POLICY } from './nativeReleaseEvidence.mjs';
 import { CORE_QUALITY_GATES, coreQualityReleaseFacts } from './coreQualityReleaseEvidence.mjs';
 import { CORE_HOST_GATES, coreHostReleaseFacts } from './coreHostReleaseEvidence.mjs';
 import { REQUIRED_BUSINESS_GATES, BUSINESS_RELEASE_GATES, businessReleaseFacts } from './businessReleaseEvidence.mjs';
@@ -14,8 +14,9 @@ export const ENGINEERING_GATES = Object.freeze([
   'app-typecheck', 'app-lint', 'app-negative-gates', 'app-unit', 'app-build', 'app-collaboration-build', 'app-security',
   'app-browser-main', 'app-browser-recovery', 'app-rls', 'app-s3', 'app-browser-s3',
   ...REQUIRED_BUSINESS_GATES,
-  ...['app', 'core'].flatMap(repo => ['macos', 'windows', 'linux', 'aggregate'].map(os => `${repo}-gitea-${os}`)),
+  ...['app', 'core'].flatMap(repo => [...NATIVE_PLATFORMS, 'aggregate'].map(os => `${repo}-gitea-${os}`)),
 ]);
+export const LEGACY_ENGINEERING_GATES = Object.freeze([...ENGINEERING_GATES, 'app-gitea-windows', 'core-gitea-windows']);
 export const PROMOTION_GATES = Object.freeze(['staging-real-accounts', 'staging-multi-instance', 'staging-lifecycle',
   'staging-telemetry', 'rollback-save-reopen-collaboration']);
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -72,7 +73,11 @@ export async function verifyReleaseEvidence({ manifestPath, prepared, phase = 'c
   if (phase === 'promotion' && prepared.deploymentEnvironment !== 'production') fail('production artifact required for promotion');
   const absolute = resolve(manifestPath), root = await realpath(dirname(absolute));
   const manifest = await json(root, absolute.slice(dirname(absolute).length + 1));
-  if (manifest?.schema !== 'vizly-release-v1' || !manifest.identity || !Array.isArray(manifest.gates)) fail('schema');
+  if (!['vizly-release-v1', 'vizly-release-v2'].includes(manifest?.schema) || !manifest.identity || !Array.isArray(manifest.gates)) fail('schema');
+  const modern = manifest.schema === 'vizly-release-v2';
+  if ((modern && manifest.nativePolicy !== NATIVE_POLICY) || (!modern && manifest.nativePolicy !== undefined)) fail('native policy');
+  const nativePolicy = modern ? NATIVE_POLICY : LEGACY_NATIVE_POLICY;
+  const engineeringGates = modern ? ENGINEERING_GATES : LEGACY_ENGINEERING_GATES;
   const identity = manifest.identity;
   for (const repo of ['app', 'core']) {
     const source = identity[repo];
@@ -127,14 +132,15 @@ export async function verifyReleaseEvidence({ manifestPath, prepared, phase = 'c
     if (reference.id.includes('-gitea-')) {
       const repo = reference.id.startsWith('core-') ? 'core' : 'app';
       let raw; try { raw = JSON.parse(rawBytes.toString('utf8')); } catch { fail('native report JSON'); }
-      const fact = nativeReleaseFacts(raw, { identity, repo }).find(item => item.id === reference.id);
+      const fact = nativeReleaseFacts(raw, { identity, repo, nativePolicy }).find(item => item.id === reference.id);
+      if (modern && report.nativePolicy !== NATIVE_POLICY) fail('native policy provenance');
       if (!fact || report.runId !== fact.runId || report.jobId !== fact.jobId || report.workflow !== fact.workflow) fail('native run/job mismatch');
       if (report.provider !== 'gitea' || report.repository !== identity[repo].repository
         || report.commit !== identity[repo].commit || typeof report.runId !== 'string' || !/^\d+$/.test(report.runId)
         || typeof report.workflow !== 'string' || !/^[A-Za-z0-9_.-]+\.ya?ml$/.test(report.workflow)) fail('CI provenance');
     }
   }
-  for (const id of [...ENGINEERING_GATES, ...(phase === 'promotion' ? PROMOTION_GATES : [])]) {
+  for (const id of [...engineeringGates, ...(phase === 'promotion' ? PROMOTION_GATES : [])]) {
     if (!seen.has(id)) fail(`missing gate ${id}`);
   }
   if (phase === 'promotion') {
@@ -142,6 +148,6 @@ export async function verifyReleaseEvidence({ manifestPath, prepared, phase = 'c
     if (!previous || !/^dpl_[A-Za-z0-9]+$/.test(previous.deploymentId) || !hex(previous.releaseIdentitySha256)
       || previous.releaseIdentitySha256 === binding || previous.databaseRollback !== 'additive-compatible') fail('compatible rollback reference');
   }
-  return { identitySha256: binding, phase, gates: seen.size, source: { app: identity.app.commit, core: identity.core.commit },
+  return { identitySha256: binding, phase, nativePolicy, gates: seen.size, source: { app: identity.app.commit, core: identity.core.commit },
     sdkSha256: identity.sdkSha256, frontendSha256: identity.frontendSha256, backendSha256: identity.backendSha256 };
 }

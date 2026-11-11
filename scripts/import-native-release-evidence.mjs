@@ -29,5 +29,5 @@ for (const fact of facts) {
   await writeFile(join(output, name), content, { flag: 'wx' });
   gates.push({ id: fact.id, path: name, sha256: sha(content) });
 }
-await writeFile(join(output, `${repo}-import.json`), JSON.stringify({ schema: 'vizly-native-import-v1', identitySha256: digest(identity), gates }, null, 2) + '\n', { flag: 'wx' });
+await writeFile(join(output, `${repo}-import.json`), JSON.stringify({ schema: raw.data.schema === 'vizly-gitea-native-v2' ? 'vizly-native-import-v2' : 'vizly-native-import-v1', ...(raw.data.nativePolicy ? { nativePolicy: raw.data.nativePolicy } : {}), identitySha256: digest(identity), gates }, null, 2) + '\n', { flag: 'wx' });
 process.stdout.write(JSON.stringify({ status: 'imported-native-only', gates: facts.length, repository: facts[0].repository, commit: facts[0].commit, runId: facts[0].runId }) + '\n');

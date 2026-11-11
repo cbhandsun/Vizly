@@ -1,4 +1,4 @@
-import { NATIVE_CHECKS } from './nativeReleaseEvidence.mjs';
+import { NATIVE_CHECKS, NATIVE_POLICY, NATIVE_PLATFORMS } from './nativeReleaseEvidence.mjs';
 import { CORE_QUALITY_GATES, CORE_QUALITY_CHECKS } from './coreQualityReleaseEvidence.mjs';
 import { CORE_HOST_GATES, CORE_HOST_CHECKS } from './coreHostReleaseEvidence.mjs';
 import { BUSINESS_CHECKS, BUSINESS_RELEASE_GATES, BROWSER_CHECKS, businessProfile } from './businessReleaseEvidence.mjs';
@@ -6,9 +6,9 @@ import { BUSINESS_CHECKS, BUSINESS_RELEASE_GATES, BROWSER_CHECKS, businessProfil
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { compiledTreeDigest, digest, ENGINEERING_GATES, PROMOTION_GATES } from './releaseEvidence.mjs';
+import { compiledTreeDigest, digest, ENGINEERING_GATES, LEGACY_ENGINEERING_GATES, PROMOTION_GATES } from './releaseEvidence.mjs';
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
-export async function syntheticReleaseFixture(root, prepared, promotion = false) {
+export async function syntheticReleaseFixture(root, prepared, promotion = false, legacy = false) {
   const evidence = join(root, `evidence-${prepared.deploymentEnvironment}`); await mkdir(evidence);
   await mkdir(join(evidence, 'backend')); await writeFile(join(evidence, 'backend/index.js'), 'export const synthetic = true;');
   await writeFile(join(evidence, 'sdk.tgz'), 'SYNTHETIC TEST PACKAGE');
@@ -22,9 +22,9 @@ export async function syntheticReleaseFixture(root, prepared, promotion = false)
     projectId: prepared.projectId, teamId: prepared.teamId, environment: prepared.deploymentEnvironment };
   const previousCompatible = { deploymentId: 'dpl_Synthetic', releaseIdentitySha256: '1'.repeat(64), databaseRollback: 'additive-compatible' };
   const gates = [];
-  for (const id of [...ENGINEERING_GATES, ...(promotion ? PROMOTION_GATES : [])]) {
+  for (const id of [...(legacy ? LEGACY_ENGINEERING_GATES : ENGINEERING_GATES), ...(promotion ? PROMOTION_GATES : [])]) {
     const repo = id.startsWith('core-') ? 'core' : 'app';
-    const native = syntheticNativeReport(identity, repo);
+    const native = syntheticNativeReport(identity, repo, { legacy });
     const business = syntheticBusinessCiReport(identity);
     const quality = syntheticCoreQualityReport(identity);
     const host = syntheticCoreHostReport(identity);
@@ -35,7 +35,7 @@ export async function syntheticReleaseFixture(root, prepared, promotion = false)
     const report = { schema: 'vizly-release-gate-v1', id, status: 'passed', exitCode: 0, identitySha256: digest(identity),
       evidence: { path: `${id}.log`, sha256: sha(raw) },
       ...(id === 'rollback-save-reopen-collaboration' ? { rollbackIdentitySha256: digest(previousCompatible) } : {}),
-      ...(id.includes('-gitea-') ? { provider: 'gitea', repository: identity[repo].repository, commit: identity[repo].commit, runId: '123', workflow: 'devfleet-native.yaml', jobId: native.jobs.find(job => id.endsWith(job.name === 'native-complete' ? 'aggregate' : job.name)).id } : {}),
+      ...(id.includes('-gitea-') ? { ...(!legacy ? { nativePolicy: NATIVE_POLICY } : {}), provider: 'gitea', repository: identity[repo].repository, commit: identity[repo].commit, runId: '123', workflow: 'devfleet-native.yaml', jobId: native.jobs.find(job => id.endsWith(job.name === 'native-complete' ? 'aggregate' : job.name)).id } : {}),
       ...(CORE_QUALITY_GATES.includes(id) ? { provider: 'gitea', repository: identity.core.repository, commit: identity.core.commit,
         runId: quality.run.id, workflow: quality.workflow, jobId: '31' } : {}),
       ...(CORE_HOST_GATES.includes(id) ? { provider: 'gitea', repository: identity.core.repository, commit: identity.core.commit,
@@ -46,7 +46,7 @@ export async function syntheticReleaseFixture(root, prepared, promotion = false)
     const bytes = JSON.stringify(report); await writeFile(join(evidence, `${id}.json`), bytes);
     gates.push({ id, path: `${id}.json`, sha256: sha(bytes) });
   }
-  const manifest = { schema: 'vizly-release-v1', identity, sdkArtifact: 'sdk.tgz', backendDirectory: 'backend', configuration, migrations, gates,
+  const manifest = { schema: legacy ? 'vizly-release-v1' : 'vizly-release-v2', ...(!legacy ? { nativePolicy: NATIVE_POLICY } : {}), identity, sdkArtifact: 'sdk.tgz', backendDirectory: 'backend', configuration, migrations, gates,
     ...(promotion ? { previousCompatible } : {}) };
   const manifestPath = join(evidence, 'release.json'); await writeFile(manifestPath, JSON.stringify(manifest));
   return { manifestPath, manifest, evidence };
@@ -81,13 +81,13 @@ export function syntheticBusinessCiReport(identity) {
     ] };
 }
 
-export function syntheticNativeReport(identity, repo) {
+export function syntheticNativeReport(identity, repo, { legacy = false } = {}) {
   const source = identity[repo];
-  return { schema: 'vizly-gitea-native-v1', synthetic: true, provider: 'gitea', repository: source.repository, workflow: 'devfleet-native.yaml',
+  return { schema: legacy ? 'vizly-gitea-native-v1' : 'vizly-gitea-native-v2', ...(!legacy ? { nativePolicy: NATIVE_POLICY } : {}), synthetic: true, provider: 'gitea', repository: source.repository, workflow: 'devfleet-native.yaml',
     run: { id: '123', head_sha: source.commit, status: 'completed', conclusion: 'success' },
-    jobs: ['macos', 'windows', 'linux', 'native-complete'].map((name, index) => ({ id: String(index + 1), name,
+    jobs: [...(legacy ? ['macos', 'windows', 'linux'] : NATIVE_PLATFORMS), 'native-complete'].map((name, index) => ({ id: String(index + 1), name,
       status: 'completed', conclusion: 'success', ...(name === 'native-complete' ? {} : { native_result: {
-        schema: 'vizly-native-v2', status: 'passed', installation_exit_code: 0, project: repo, scope: 'native-only', deployment: false,
+        schema: 'vizly-native-v2', ...(!legacy ? { native_policy: NATIVE_POLICY } : {}), status: 'passed', installation_exit_code: 0, project: repo, scope: 'native-only', deployment: false,
         os: { macos: 'Darwin', windows: 'Windows', linux: 'Linux' }[name], node: '22.23.4', npm: '12.0.1',
         source: source.commit, source_after: source.commit, tree: source.tree, tree_after: source.tree,
         lock_sha256: source.lockSha256, lock_sha256_after: source.lockSha256, working_tree_before: [], working_tree_after: [],

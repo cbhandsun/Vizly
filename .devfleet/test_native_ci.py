@@ -54,6 +54,17 @@ class NativeReceiptTests(unittest.TestCase):
             self.assertEqual(report['lock_sha256'], report['lock_sha256_after'])
             self.assertEqual(self.calls, ['install'] + module.GATES[project])
 
+    def test_daily_policy_is_explicit_and_manual_windows_is_separate(self):
+        self.assertEqual(self.receipt()['native_policy'], 'linux-macos-v1')
+        report=module.run_checks(self.root,self.output,self.command,'core','Windows',compatibility=True)
+        self.assertEqual(report['native_policy'],'core-windows-compat-v1')
+        self.assertEqual(report['scope'],'windows-compatibility')
+        def reject(message):raise ValueError(message)
+        for project,system,manual in [('app','Windows',False),('app','Windows',True),('core','Windows',False),('core','Linux',True)]:
+            with self.assertRaises(ValueError):module.validate_scope(project,system,manual,reject)
+        module.validate_scope('core','Windows',True,reject)
+        module.validate_scope('app','Linux',False,reject)
+
     def test_dirty_input_never_installs_or_runs_checks(self):
         self.dirty = ' M CANARY-PRIVATE-PATH'
         report = self.receipt()
@@ -136,8 +147,10 @@ class NativeReceiptTests(unittest.TestCase):
         state = self.root / 'runner-state'
         env = dict(module.os.environ, VIZLY_CI_STATE=str(state), VIZLY_CI_LOCK=str(self.root / 'runner.lock'),
                    VIZLY_NPM_CLI=str(cli), PYTHONDONTWRITEBYTECODE='1')
-        result = subprocess.run([sys.executable, '-B', str(scripts / 'native_ci.py'), '--project', 'app',
-                                 '--expected-os', module.platform.system()], cwd=checkout, env=env,
+        project = 'core' if module.platform.system() == 'Windows' else 'app'
+        arguments = [sys.executable, '-B', str(scripts / 'native_ci.py'), '--project', project, '--expected-os', module.platform.system()]
+        if project == 'core': arguments.append('--compatibility')
+        result = subprocess.run(arguments, cwd=checkout, env=env,
                                 text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         self.assertEqual(result.returncode, 0, result.stderr)
         marker = 'VIZLY_NATIVE_RESULT='
@@ -146,7 +159,7 @@ class NativeReceiptTests(unittest.TestCase):
         self.assertEqual(receipt['source'], git('rev-parse', 'HEAD'))
         self.assertEqual(receipt['tree'], git('rev-parse', 'HEAD^{tree}'))
         self.assertEqual(git('status', '--porcelain'), '')
-        stored = list(state.glob('native-app-*.json'))
+        stored = list(state.glob('native-' + project + '-*.json'))
         self.assertEqual(len(stored), 1)
         self.assertEqual(json.loads(stored[0].read_text()), receipt)
 

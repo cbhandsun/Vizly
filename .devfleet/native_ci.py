@@ -84,13 +84,14 @@ def source_snapshot(root, output):
     }
 
 
-def run_checks(root, output, run, project, system, clock=time.monotonic):
+def run_checks(root, output, run, project, system, clock=time.monotonic, *, compatibility=False):
     """Native-only evidence. Failed installation/checks and source drift never become a passing receipt."""
     before = source_snapshot(root, output)
     report = {'schema': 'vizly-native-v2', 'source': before['source'], 'tree': before['tree'],
               'lock_sha256': before['lock_sha256'], 'working_tree_before': before['working_tree'],
               'os': system, 'arch': platform.machine(), 'node': '22.23.4', 'npm': '12.0.1',
-              'project': project, 'scope': 'native-only', 'deployment': False,
+              'project': project, 'scope': 'windows-compatibility' if compatibility else 'native-only',
+              'native_policy': 'core-windows-compat-v1' if compatibility else 'linux-macos-v1', 'deployment': False,
               'installation_exit_code': None, 'gates': [], 'status': 'failed'}
     try:
         if before['working_tree']:
@@ -121,13 +122,23 @@ def run_checks(root, output, run, project, system, clock=time.monotonic):
     return report
 
 
+def validate_scope(project, system, compatibility, reject):
+    if system == 'Windows':
+        if project != 'core' or compatibility is not True:
+            reject('Windows is supported only by the manual Core compatibility workflow')
+    elif compatibility:
+        reject('Compatibility mode requires Core on Windows')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--project', choices=list(GATES), required=True)
     parser.add_argument('--expected-os', choices=['Darwin', 'Windows', 'Linux'], required=True)
+    parser.add_argument('--compatibility', action='store_true', help='Manual Core Windows workflow only')
     args = parser.parse_args()
     if platform.system() != args.expected_os:
         parser.error('Native OS does not match the requested platform')
+    validate_scope(args.project, args.expected_os, args.compatibility, parser.error)
     root = Path(__file__).resolve().parents[1]
     state = Path(os.environ['VIZLY_CI_STATE']).resolve()
     lock = Path(os.environ['VIZLY_CI_LOCK']).resolve()
@@ -152,7 +163,7 @@ def main():
             else:
                 argv = [node, str(npm), 'run', gate]
             return subprocess.run(argv, cwd=root, env=env).returncode
-        report = run_checks(root, output, run, args.project, platform.system())
+        report = run_checks(root, output, run, args.project, platform.system(), compatibility=args.compatibility)
         # Evidence is outside Git input; unique files preserve earlier failed attempts.
         name = 'native-' + args.project + '-' + str(time.time_ns()) + '.json'
         with (state / name).open('x') as stream:

@@ -11,9 +11,9 @@ const identity = { app: { repository: 'test/app', commit: 'a'.repeat(40), tree: 
 const roots = [], run = promisify(execFile);
 const cli = join(process.cwd(), 'scripts/import-native-release-evidence.mjs');
 afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
-it.each(['app', 'core'])('derives four native facts from complete %s API and runner evidence', repo => {
+it.each(['app', 'core'])('derives three daily native facts from complete %s API and runner evidence', repo => {
   const facts = nativeReleaseFacts(syntheticNativeReport(identity, repo), { identity, repo });
-  expect(facts.map(fact => fact.id)).toEqual(['macos', 'windows', 'linux', 'aggregate'].map(os => `${repo}-gitea-${os}`));
+  expect(facts.map(fact => fact.id)).toEqual(['macos', 'linux', 'aggregate'].map(os => `${repo}-gitea-${os}`));
   expect(facts.every(fact => fact.commit === identity[repo].commit && fact.runId === '123')).toBe(true);
 });
 it.each(['failed-run', 'queued-job', 'missing-job', 'duplicate-job', 'old-source', 'dirty', 'drift', 'lock-drift', 'old-node', 'legacy-receipt', 'missing-check', 'failed-check', 'invalid-duration', 'wrong-os'])('rejects incomplete or incompatible evidence: %s', scenario => {
@@ -42,9 +42,9 @@ it('imports validated reports without overwriting an earlier attempt', async () 
   await writeFile(join(root, 'identity.json'), JSON.stringify(identity));
   await writeFile(join(root, 'raw.json'), JSON.stringify(syntheticNativeReport(identity, 'app')));
   const args = [cli, 'app', join(root, 'identity.json'), join(root, 'raw.json'), join(root, 'out')];
-  expect(JSON.parse((await run(process.execPath, args)).stdout)).toMatchObject({ status: 'imported-native-only', gates: 4 });
+  expect(JSON.parse((await run(process.execPath, args)).stdout)).toMatchObject({ status: 'imported-native-only', gates: 3 });
   const receipt = JSON.parse(await readFile(join(root, 'out/app-import.json'), 'utf8'));
-  expect(receipt.gates).toHaveLength(4);
+  expect(receipt.gates).toHaveLength(3);
   await expect(run(process.execPath, args)).rejects.toThrow();
 });
 it('does not write successful output for a failed native run', async () => {
@@ -54,4 +54,33 @@ it('does not write successful output for a failed native run', async () => {
   await writeFile(join(root, 'raw.json'), JSON.stringify(raw));
   await expect(run(process.execPath, [cli, 'app', join(root, 'identity.json'), join(root, 'raw.json'), join(root, 'out')])).rejects.toThrow();
   await expect(readFile(join(root, 'out/app-import.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+});
+
+it('does not relabel legacy evidence or a manual Windows run as daily coverage', () => {
+  const raw = syntheticNativeReport(identity, 'core');
+  delete raw.jobs[0].native_result.native_policy;
+  expect(() => nativeReleaseFacts(raw, {identity, repo:'core'})).toThrow('runner policy mismatch');
+  const manual = syntheticNativeReport(identity, 'core');
+  manual.workflow = 'devfleet-windows-compat.yaml';
+  expect(() => nativeReleaseFacts(manual, {identity, repo:'core'})).toThrow();
+});
+it('rejects unsupported policies, unexpected Windows jobs, and failed mandatory Linux checks', () => {
+  const raw = syntheticNativeReport(identity, 'app');
+  raw.nativePolicy = 'skip-linux';
+  expect(() => nativeReleaseFacts(raw, {identity, repo:'app'})).toThrow('policy');
+  const extra = syntheticNativeReport(identity, 'app');
+  extra.jobs.push({...extra.jobs[0], id:'99', name:'windows'});
+  expect(() => nativeReleaseFacts(extra,{identity,repo:'app'})).toThrow('job set');
+  const failed = syntheticNativeReport(identity,'app');
+  failed.jobs.find(job=>job.name==='linux').native_result.gates[0].exit_code = 1;
+  expect(()=>nativeReleaseFacts(failed,{identity,repo:'app'})).toThrow('check');
+});
+it('continues to require all three platforms for historical v1 evidence', () => {
+  const legacy=syntheticNativeReport(identity,'app');
+  legacy.schema='vizly-gitea-native-v1';delete legacy.nativePolicy;
+  for(const job of legacy.jobs) if(job.native_result) delete job.native_result.native_policy;
+  expect(()=>nativeReleaseFacts(legacy,{identity,repo:'app'})).toThrow('job set');
+  const win=structuredClone(legacy.jobs[0]);win.name='windows';win.id='9';win.native_result.os='Windows';legacy.jobs.push(win);
+  expect(nativeReleaseFacts(legacy,{identity,repo:'app'})).toHaveLength(4);
+  expect(()=>nativeReleaseFacts(legacy,{identity,repo:'app',nativePolicy:'linux-macos-v1'})).toThrow('policy');
 });
