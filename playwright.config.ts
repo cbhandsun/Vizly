@@ -10,7 +10,7 @@ export default defineConfig({
   // Independent invocations must not remove another run's traces on startup.
   outputDir: `./test-results/run-${process.pid}`,
   fullyParallel: false,
-  workers: 1,
+  workers: process.env.CI ? 2 : 1,
   timeout: 60_000,
   expect: { timeout: 30_000 },
   reporter: [['list'], ['html', { open: 'never' }]],
