@@ -300,6 +300,9 @@ export class S3FetchClient {
         headers: signed.headers,
         method: signed.method,
         signal: combinedSignal,
+        // Cloud objects and listings can change in another tab or client. A
+        // cached body/ETag must not become the next read or write precondition.
+        cache: 'no-store',
       });
       if (!response.ok) {
         await response.body?.cancel();

@@ -7,12 +7,14 @@ export interface AIProviderRequestConfig {
     id?: string;
     name?: string;
     baseUrl: string;
+    transport?: 'direct';
     apiKey?: string;
 }
 
 export interface AIProviderRequestOptions {
     signal?: AbortSignal;
     timeoutMs?: number;
+    toolMode?: 'diagram' | 'none';
 }
 
 const DEFAULT_TIMEOUT_MS = 60_000;
@@ -154,7 +156,7 @@ export async function assertAIProviderResponseOk(response: Response): Promise<vo
     throw new AIProviderHttpError(response.status, sanitizeAIProviderError(errText));
 }
 
-async function readAIProviderJson(response: Response): Promise<unknown> {
+export async function readAIProviderJson(response: Response): Promise<unknown> {
     const contentType = response.headers.get('Content-Type') || '';
     const rawText = await readResponseTextWithLimit(response, MAX_AI_JSON_RESPONSE_CHARS);
     const trimmed = rawText.trim();
@@ -245,16 +247,47 @@ async function withRequestTimeout<T>(
         controller.abort(new AIProviderTimeoutError(timeoutMs));
     }, timeoutMs);
 
+    let ownsResponseBody = false;
+    let finishBody = () => {};
+    const cleanup = () => {
+        window.clearTimeout(timeoutId);
+        options.signal?.removeEventListener('abort', onExternalAbort);
+    };
     try {
-        return await request(controller.signal);
+        const result = await request(controller.signal);
+        if (!(result instanceof Response) || !result.body) return result;
+        const reader = result.body.getReader();
+        const body = new ReadableStream<Uint8Array>({
+            start(streamController) {
+                const onAbort = () => {
+                    streamController.error(controller.signal.reason);
+                    void reader.cancel(controller.signal.reason).catch(() => undefined);
+                    cleanup();
+                };
+                controller.signal.addEventListener('abort', onAbort, { once: true });
+                const release = () => { controller.signal.removeEventListener('abort', onAbort); cleanup(); };
+                // Save cleanup on the stream's closure, not on receipt of headers.
+                finishBody = release;
+                if (controller.signal.aborted) onAbort();
+            },
+            async pull(streamController) {
+                try {
+                    const { done, value } = await reader.read();
+                    if (done) { streamController.close(); finishBody(); }
+                    else streamController.enqueue(value);
+                } catch (error) { streamController.error(error); finishBody(); }
+            },
+            async cancel(reason) { finishBody(); await reader.cancel(reason); },
+        });
+        ownsResponseBody = true;
+        return new Response(body, { status: result.status, statusText: result.statusText, headers: result.headers }) as T;
     } catch (error) {
         if (timedOut) {
             throw new AIProviderTimeoutError(timeoutMs);
         }
         throw error;
     } finally {
-        window.clearTimeout(timeoutId);
-        options.signal?.removeEventListener('abort', onExternalAbort);
+        if (!ownsResponseBody) cleanup();
     }
 }
 
@@ -302,7 +335,23 @@ export async function requestAIChatCompletionJson<T = unknown>(
     return readAIProviderJson(response) as Promise<T>;
 }
 
+// Only allowlisted diagnostic codes cross the configuration UI boundary.
+export function classifyAIProviderFailure(error: unknown): 'network' | 'unauthorized' | 'rateLimited' | 'unavailable' | 'invalidResponse' | 'timeout' | 'unknown' {
+    if (error instanceof AIProviderTimeoutError) return 'timeout';
+    if (error instanceof AIProviderHttpError) {
+        if (error.status === 401 || error.status === 403) return 'unauthorized';
+        if (error.status === 429) return 'rateLimited';
+        if (error.status >= 500) return 'unavailable';
+    }
+    if (error instanceof TypeError && /fetch|network/i.test(error.message)) return 'network';
+    if (error instanceof AIProviderInvalidResponseError || (error instanceof Error && error.name === 'AIStreamProtocolError')) return 'invalidResponse';
+    return 'unknown';
+}
+
 export function formatAIProviderRequestError(error: unknown, maxLength = 240): string {
+    if (error instanceof TypeError && /fetch|network/i.test(error.message)) {
+        return '网络请求未能建立。请检查服务地址、网络，以及服务端是否允许当前网站的跨域请求（CORS）。';
+    }
     if (error instanceof AIProviderTimeoutError) {
         const seconds = Math.max(1, Math.round(error.timeoutMs / 1000));
         return `请求超时：AI Provider 在 ${seconds} 秒内没有响应，请稍后重试或检查网络/模型服务状态。`;

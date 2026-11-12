@@ -1,3 +1,5 @@
+import { createOperationTelemetry, type TelemetryBatch } from './operationTelemetry.js';
+import { configureServerTelemetry } from './serverTelemetry.js';
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
@@ -9,6 +11,9 @@ import { CloudRoomConflictError } from './cloudRoomReconciliation.js';
 import type { AtomicRoomSnapshot, AtomicRoomStore } from './atomicRoomCommit.js';
 import type { DistributedRoomLease } from './distributedRoomLease.js';
 import { acceptPersistedRoomState } from './acceptedRoomState.js';
+import { standardDataToCanvas } from '@vizly/core/canvas-conversion';
+import { createCloudRoomCheckpoint } from './roomBootstrap.js';
+import captured from './fixtures/swimlaneSaveReconciliation.json' with { type: 'json' };
 const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const generation = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const first = '2026-10-09T00:00:00Z'; const next = '2026-10-09T00:00:01Z';
@@ -24,9 +29,9 @@ const graph = (label = 'a', x = 10, initial?: Uint8Array) => {
 };
 const cloud = (label = 'a', x = 10, revision = first): RoomCheckpoint => { const state = graph(label, x); return { revision, base: state, state }; };
 const read = (state: Uint8Array) => { const doc = new Y.Doc(); try { Y.applyUpdate(doc, state); return readCollaborationElement(doc.getMap('flowchart-nodes').get('a')); } finally { doc.destroy(); } };
-const fixture = (initial: RoomCheckpoint | null = null) => {
+const fixture = (initial: RoomCheckpoint | null = null, roomId = id) => {
   const controller = new AbortController();
-  const lease: DistributedRoomLease = { leaseId: id, generation, signal: controller.signal,
+  const lease: DistributedRoomLease = { leaseId: roomId, generation, signal: controller.signal,
     assertActive: () => { if (controller.signal.aborted) throw new Error('Synthetic lease lost'); }, close: async () => undefined };
   let snapshot: AtomicRoomSnapshot | null = initial ? { generation, version: '1', record: encodeRoomCheckpoint(initial) } : null;
   const store: AtomicRoomStore = {
@@ -37,9 +42,60 @@ const fixture = (initial: RoomCheckpoint | null = null) => {
     }),
   };
   return { lease, controller, store, current: () => snapshot,
-    replace: (record: AtomicRoomSnapshot) => { snapshot = record; }, persistence: createAtomicCheckpointPersistence(id, lease, store) };
+    replace: (record: AtomicRoomSnapshot) => { snapshot = record; }, persistence: createAtomicCheckpointPersistence(roomId, lease, store) };
+};
+const capturedState = (snapshot: Record<string, Record<string, unknown>>) => {
+  const doc = new Y.Doc();
+  try {
+    for (const [name, elements] of Object.entries(snapshot)) for (const [key, element] of Object.entries(elements)) {
+      if (!publishCollaborationElement(doc.getMap(name), key, element)) throw Error('Invalid captured graph');
+    }
+    return Y.encodeStateAsUpdate(doc);
+  } finally { doc.destroy(); }
 };
 describe('lease-bound atomic checkpoint persistence', () => {
+  it('retains automatic-port and layer projections through the real CAS coordinator, including input mutation while awaiting storage', async () => {
+    const roomId = captured.cloud.content.id;
+    const initial = { revision: captured.baseRevision, base: capturedState(captured.base), state: capturedState(captured.live) };
+    const runtime = fixture(initial, roomId);
+    const cloudCheckpoint = await createCloudRoomCheckpoint(async () => ({ ...captured.cloud, diagramId: roomId }), standardDataToCanvas)({
+      diagramId: roomId, userId: generation, token: 'unused-fixture',
+    });
+    const exchange = runtime.store.compareExchange;
+    runtime.store.compareExchange = vi.fn<AtomicRoomStore['compareExchange']>().mockResolvedValueOnce(false).mockImplementation(exchange);
+    runtime.store.read = vi.fn(async () => {
+      for (const roles of cloudCheckpoint.automaticHandleRoles.values()) roles.splice(0);
+      cloudCheckpoint.automaticHandleRoles.clear(); cloudCheckpoint.canvasNodeZIndexes.clear();
+      return runtime.current();
+    });
+    const accepted = await createRoomCoordinator(runtime.persistence, async () => cloudCheckpoint)({ diagramId: roomId, userId: generation, token: 'unused-fixture' });
+    const doc = new Y.Doc();
+    try {
+      Y.applyUpdate(doc, accepted);
+      expect(doc.getMap('flowchart-nodes').size).toBe(4);
+      expect(doc.getMap('flowchart-edges').size).toBe(2);
+      expect(runtime.store.compareExchange).toHaveBeenCalledTimes(2);
+      for (const edge of doc.getMap('flowchart-edges').values()) {
+        expect(readCollaborationElement(edge)?.sourceHandle).toBeUndefined();
+        expect(readCollaborationElement(edge)?.targetHandle).toBeUndefined();
+      }
+    } finally { doc.destroy(); }
+  });
+  it('initializes saved rendering layers in an empty atomic room while keeping the historical baseline', async () => {
+    const roomId = captured.postSelectionCloud.content.id;
+    const runtime = fixture(null, roomId);
+    const checkpoint = await createCloudRoomCheckpoint(async () => ({ ...captured.postSelectionCloud, diagramId: roomId }), standardDataToCanvas)({
+      diagramId: roomId, userId: generation, token: 'unused-fixture',
+    });
+    const accepted = await createRoomCoordinator(runtime.persistence, async () => checkpoint)({ diagramId: roomId, userId: generation, token: 'unused-fixture' });
+    const doc = new Y.Doc(); const base = new Y.Doc();
+    try {
+      Y.applyUpdate(doc, accepted); Y.applyUpdate(base, (await runtime.persistence.loadRecord(roomId))!.checkpoint!.base);
+      expect(readCollaborationElement(doc.getMap('flowchart-nodes').get('titlegroup-orders'))?.zIndex).toBe(-10);
+      expect(readCollaborationElement(doc.getMap('flowchart-nodes').get('release-review'))?.zIndex).toBe(10);
+      expect(readCollaborationElement(base.getMap('flowchart-nodes').get('titlegroup-orders'))?.zIndex).toBe(-1);
+    } finally { doc.destroy(); base.destroy(); }
+  });
   it('initializes through the actual coordinator and persists subsequent room edits', async () => {
     const runtime = fixture(); const checkpoint = cloud();
     const coordinate = createRoomCoordinator(runtime.persistence, async () => checkpoint);
@@ -132,4 +188,20 @@ describe('lease-bound atomic checkpoint persistence', () => {
     if (!stored) throw new Error('Missing test checkpoint');
     expect(await runtime.persistence.loadRecord(id)).toEqual(decodeRoomRecord(stored.record));
   });
+});
+
+it('reports real CAS contention and success without serializing room identities or payloads', async () => {
+  const batches: TelemetryBatch[] = [];
+  const telemetry = createOperationTelemetry({ releaseId: 'a'.repeat(40), transport: async b => { batches.push(b); } });
+  const stop = configureServerTelemetry(telemetry);
+  try {
+    const runtime = fixture();
+    vi.mocked(runtime.store.compareExchange).mockResolvedValueOnce(false);
+    await runtime.persistence.saveCheckpoint(id, cloud('CANARY-DOCUMENT'));
+    await telemetry.flush();
+    expect(batches[0].metrics.cas).toEqual({ started: 2, success: 1, failure: 1, cancelled: 0 });
+    expect(batches[0].events.map(e => e.code)).toEqual(['conflict', null]);
+    expect(JSON.stringify(batches)).not.toContain('CANARY');
+    expect(JSON.stringify(batches)).not.toContain(id);
+  } finally { stop(); }
 });

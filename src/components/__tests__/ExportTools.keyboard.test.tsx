@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
 
 import React from 'react';
+import { configureApplicationTelemetry } from '@/observability/applicationTelemetry';
+import { createOperationTelemetry, type TelemetryBatch } from '@/observability/operationTelemetry';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { exportToPNG, appMessageMocks, subscriptionMocks, saveReadinessMocks } = vi.hoisted(() => ({
-  saveReadinessMocks: { getBridge: vi.fn<() => unknown>(() => null), save: vi.fn(), getDiagram: vi.fn() },
+  saveReadinessMocks: { getBridge: vi.fn<() => unknown>(() => null), save: vi.fn(), getDiagram: vi.fn(), getStandard: vi.fn() },
   exportToPNG: vi.fn<(signal?: AbortSignal) => Promise<void>>(async () => undefined),
   appMessageMocks: {
     error: vi.fn(),
@@ -87,7 +89,7 @@ vi.mock('@/context/useSubscription', () => ({
 vi.mock('@vizly/core/diagram-data', () => ({
   getFlowDataBridge: saveReadinessMocks.getBridge,
   getFlowDataBridgeNodes: () => [],
-  getStandardFlowDataBridge: () => null,
+  getStandardFlowDataBridge: saveReadinessMocks.getStandard,
 }));
 vi.mock('@/services/UnifiedStorageService', () => ({ unifiedStorage: {
   isConfigured: () => true, activeProvider: { name: 'supabase', id: 'supabase', saveDiagram: saveReadinessMocks.save },
@@ -109,6 +111,7 @@ describe('ExportTools keyboard menu', () => {
   beforeEach(() => {
     saveReadinessMocks.getBridge.mockReset().mockReturnValue(null);
     saveReadinessMocks.save.mockReset();
+    saveReadinessMocks.getStandard.mockReset().mockReturnValue(undefined);
     saveReadinessMocks.getDiagram.mockReset();
     exportToPNG.mockClear();
     exportToPNG.mockResolvedValue(undefined);
@@ -137,6 +140,28 @@ describe('ExportTools keyboard menu', () => {
       })),
     });
   });
+  it.each(['success', 'failure'] as const)('records toolbar cloud-save %s without document or error content', async outcome => {
+    const batches: TelemetryBatch[] = [];
+    const telemetry = createOperationTelemetry({ releaseId: 'b'.repeat(64), transport: async batch => { batches.push(batch); } });
+    const stop = configureApplicationTelemetry(telemetry);
+    const canary = 'PRIVATE_CONTENT_CANARY';
+    saveReadinessMocks.getBridge.mockReturnValue({ id: 'diagram-1', metadata: {}, isCanvasReady: () => true });
+    saveReadinessMocks.getStandard.mockReturnValue({ id: 'diagram-1', name: canary, nodes: [{ id: 'a', description: canary }], edges: [] });
+    if (outcome === 'success') saveReadinessMocks.save.mockResolvedValue({ id: '12345678-1234-1234-1234-123456789abc', updated_at: '2026-10-14T01:00:00.000Z' });
+    else saveReadinessMocks.save.mockRejectedValue(Object.assign(new Error(canary), { status: 403 }));
+    try {
+      render(<ExportTools diagramId="diagram-1" diagramName={canary} showControls={false} variant="compact" />);
+      fireEvent.click(screen.getByRole('button', { name: '导出' }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: '保存到云端' }));
+      await waitFor(() => expect(outcome === 'success' ? appMessageMocks.success : appMessageMocks.error).toHaveBeenCalled());
+      await telemetry.flush();
+      const batch = batches.at(-1)!;
+      expect(batch.metrics.save).toEqual({ started: 1, success: outcome === 'success' ? 1 : 0, failure: outcome === 'failure' ? 1 : 0, cancelled: 0 });
+      expect(batches.flatMap(batch => batch.events)).toEqual([expect.objectContaining({ operation: 'save', outcome, code: outcome === 'success' ? null : 'denied' })]);
+      expect(JSON.stringify(batches)).not.toContain(canary);
+    } finally { stop(); }
+  });
+
   it('blocks cloud export fallback while the active designer has not loaded', async () => {
     saveReadinessMocks.getBridge.mockReturnValue({ nodes: [], isCanvasReady: () => false });
     render(<ExportTools diagramId="diagram-1" diagramName="Diagram" showControls={false} variant="compact" />);
@@ -153,6 +178,7 @@ describe('ExportTools keyboard menu', () => {
     saveReadinessMocks.getBridge.mockReturnValue(bridge);
     saveReadinessMocks.getDiagram.mockReturnValue({ id: 'diagram-1', name: 'Diagram', nodes: [{ id: 'node-1' }], edges: [] });
     saveReadinessMocks.save.mockResolvedValue({ id: '12345678-1234-1234-1234-123456789abc', updated_at: '2026-10-14T01:00:00.000Z' });
+    saveReadinessMocks.getStandard.mockReturnValue({ id: 'diagram-1', name: 'Diagram', nodes: [{ id: 'node-1' }], edges: [] });
     const notified = vi.fn();
     window.addEventListener('vizly:flow-data-bridge-identity', notified);
     try {
@@ -165,6 +191,31 @@ describe('ExportTools keyboard menu', () => {
     } finally {
       window.removeEventListener('vizly:flow-data-bridge-identity', notified);
     }
+  });
+
+  it.each([false, true])('saves the live designer instead of the loaded registry, including empty canvas=%s', async empty => {
+    const bridge = { id: 'diagram-1', metadata: {}, isCanvasReady: () => true };
+    const current = { id: 'diagram-1', name: 'Diagram', nodes: empty ? [] : [{ id: 'node-1', description: 'Current edit' }], edges: [] };
+    saveReadinessMocks.getBridge.mockReturnValue(bridge);
+    saveReadinessMocks.getStandard.mockReturnValue(current);
+    saveReadinessMocks.getDiagram.mockReturnValue({ ...current, nodes: [{ id: 'node-1', description: 'Stale loaded text' }] });
+    saveReadinessMocks.save.mockResolvedValue({ id: '12345678-1234-1234-1234-123456789abc', updated_at: '2026-10-14T01:00:00.000Z' });
+    render(<ExportTools diagramId="diagram-1" diagramName="Diagram" showControls={false} variant="compact" />);
+    fireEvent.click(screen.getByRole('button', { name: '导出' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: '保存到云端' }));
+    await waitFor(() => expect(appMessageMocks.success).toHaveBeenCalled());
+    expect(saveReadinessMocks.save).toHaveBeenCalledWith(expect.objectContaining({ content: expect.objectContaining({ nodes: current.nodes, edges: [] }) }));
+  });
+
+  it('refuses a failed live conversion rather than saving the stale registry', async () => {
+    saveReadinessMocks.getBridge.mockReturnValue({ id: 'diagram-1', metadata: {}, isCanvasReady: () => true });
+    saveReadinessMocks.getDiagram.mockReturnValue({ id: 'diagram-1', nodes: [{ id: 'stale' }], edges: [] });
+    render(<ExportTools diagramId="diagram-1" diagramName="Diagram" showControls={false} variant="compact" />);
+    fireEvent.click(screen.getByRole('button', { name: '导出' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: '保存到云端' }));
+    await waitFor(() => expect(appMessageMocks.error).toHaveBeenCalled());
+    expect(saveReadinessMocks.save).not.toHaveBeenCalled();
+    expect(appMessageMocks.success).not.toHaveBeenCalled();
   });
 
   it('keeps the export menu visually isolated and clear of the mobile dock', () => {

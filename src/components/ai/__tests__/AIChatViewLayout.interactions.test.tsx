@@ -151,19 +151,24 @@ describe('AIChatViewLayout commercial interactions', () => {
 
         render(<StatefulRenameLayout />);
 
-        const renameTrigger = screen.getByRole('button', {
+        const history = within(screen.getByRole('dialog', { name: 'aiChat.historyTitle' }));
+        const newConversation = history.getByRole('button', { name: 'aiChat.newConversation' });
+        await waitFor(() => expect(document.activeElement).toBe(newConversation));
+
+        const renameTrigger = history.getByRole('button', {
             name: `aiChat.renameConversation: ${conversation.title}`,
         });
         fireEvent.click(renameTrigger);
 
-        const renameInput = screen.getByRole('textbox', {
+        const renameInput = history.getByRole('textbox', {
             name: `aiChat.renameConversation: ${conversation.title}`,
         });
         await waitFor(() => expect(document.activeElement).toBe(renameInput));
+        expect(document.activeElement).toBe(renameInput);
         fireEvent.keyDown(renameInput, { key: 'Escape' });
 
         expect(screen.getByRole('dialog', { name: 'aiChat.historyTitle' })).not.toBeNull();
-        await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', {
+        await waitFor(() => expect(document.activeElement).toBe(history.getByRole('button', {
             name: `aiChat.renameConversation: ${conversation.title}`,
         })));
     });
@@ -206,6 +211,20 @@ describe('AIChatViewLayout commercial interactions', () => {
         expect(handleSendMessage).not.toHaveBeenCalled();
     });
 
+    it('waits for key restoration without telling the user to configure another key', () => {
+        const handleSendMessage = vi.fn(async () => undefined);
+        render(<AIChatViewLayout {...createProps({
+            configurationState: { ready: false, reason: 'restoring-api-key', providerName: 'Provider' },
+            inputValue: 'Preserved draft',
+            handleSendMessage,
+        })} />);
+        expect(screen.getByRole('status').textContent).toContain('aiChat.restoringKeyTitle');
+        expect(screen.queryByRole('button', { name: 'aiChat.configureNow' })).toBeNull();
+        expect((screen.getByRole('button', { name: /aiChat.sendMessage/ }) as HTMLButtonElement).disabled).toBe(true);
+        fireEvent.keyDown(screen.getByRole('textbox', { name: 'aiChat.inputLabel' }), { key: 'Enter' });
+        expect(handleSendMessage).not.toHaveBeenCalled();
+    });
+
     it('allows configuration-independent help commands while the provider is not ready', () => {
         const handleSendMessage = vi.fn(async () => undefined);
         render(<AIChatViewLayout {...createProps({
@@ -226,6 +245,18 @@ describe('AIChatViewLayout commercial interactions', () => {
         expect((sendButton as HTMLButtonElement).disabled).toBe(false);
         fireEvent.keyDown(composer, { key: 'Enter' });
         expect(handleSendMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not send while Enter confirms a Chinese IME composition or adds a newline', () => {
+        const handleSendMessage = vi.fn(async () => undefined);
+        render(<AIChatViewLayout {...createProps({ handleSendMessage })} />);
+        const composer = screen.getByRole('textbox', { name: 'aiChat.inputLabel' });
+        fireEvent.keyDown(composer, { key: 'Enter', isComposing: true });
+        fireEvent.keyDown(composer, { key: 'Enter', keyCode: 229 });
+        fireEvent.keyDown(composer, { key: 'Enter', shiftKey: true });
+        expect(handleSendMessage).not.toHaveBeenCalled();
+        fireEvent.keyDown(composer, { key: 'Enter' });
+        expect(handleSendMessage).toHaveBeenCalledOnce();
     });
 
     it('opens the provider responsible for the readiness warning', () => {

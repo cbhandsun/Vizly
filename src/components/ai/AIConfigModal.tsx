@@ -1,4 +1,8 @@
-import React, { useMemo, useRef, useState } from 'react';
+import { forgetRememberedAIKey, saveRememberedAIKeys } from './aiCredentialVault';
+import { coerceAIGatewayMode, requestAIChatCompletionRouted } from '@/services/ai/aiRequestRouter';
+import { consumeAIChatStream } from './aiChatRequestFlow';
+import { parseAIStreamDelta } from './aiStreamParsing';
+import React, { useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import Modal from 'antd/es/modal';
 import Form from 'antd/es/form';
@@ -19,18 +23,22 @@ import {
     EyeOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '@/context/useAuth';
-import { CryptoService } from '@vizly/core/security';
+import { captureAuthSession, getAuthSessionRevision, onAuthSessionInvalidated } from '@/context/authSessionBoundary';
 import { appMessage } from '@vizly/core/antd';
 import { normalizeProviderBaseUrl } from '@/services/ai/providerSecurity';
 import {
     normalizeAIModelsResponse,
-    requestAIChatCompletion,
+    classifyAIProviderFailure,
+    readAIProviderJson,
     requestAIModels,
     resolveAIProviderEndpoint,
 } from '@/services/ai/aiProviderClient';
 import {
     AI_CONFIG_NAME_MAX_LENGTH,
     persistAIConfig,
+    coerceAIConfig,
+    getAIConfig,
+    saveCloudAIConfig,
     type AIModel,
     type AIProviderConfig,
 } from './aiConfigStorage';
@@ -65,6 +73,7 @@ import { AIConfigDeletionConfirmModal } from './AIConfigDeletionConfirmModal';
 import { AIConfigModelDeleteButton, AIConfigProviderHeader } from './AIConfigDeletionTriggers';
 import { useAIConfigDeletion } from './useAIConfigDeletion';
 import { useAIConfigModalConfig } from './useAIConfigModalConfig';
+import { getAIProviderCredentialDisplayState } from './aiConfigDraftState';
 import { useAIConfigNewModelDraft } from './useAIConfigNewModelDraft';
 import { useAIConfigCloudDraftSync } from './useAIConfigCloudDraftSync';
 import {
@@ -75,7 +84,7 @@ import {
 import './AIConfigModal.css';
 
 const { Text } = Typography;
-const loadStorageService = async () => (await import('@/services/SupabaseStorage')).storageService;
+
 
 interface AIConfigModalProps {
     open: boolean;
@@ -85,6 +94,7 @@ interface AIConfigModalProps {
 }
 
 const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, onCancel, onSave }) => {
+    const gatewayMode = coerceAIGatewayMode(import.meta.env.VITE_AI_GATEWAY_MODE);
     const { t } = useTranslation();
     const { user } = useAuth();
     const [config, setConfig, { isDirty, markSaved, replaceConfigIfPristine }] = useAIConfigModalConfig(open, user?.id);
@@ -119,6 +129,8 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
     useAIConfigCloudDraftSync(open, user?.id, replaceConfigIfPristine);
 
     const handleSave = async () => {
+        const session = captureAuthSession(user?.id);
+        if (!session.isCurrent()) return;
         const savedConfig = config;
         const invalidProvider = savedConfig.providers.find(p => p.enabled && p.baseUrl && !normalizeProviderBaseUrl(p.baseUrl));
         if (invalidProvider) {
@@ -126,31 +138,32 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
             return;
         }
 
-        // Keep logged-in secrets in memory and encrypted cloud storage only.
+        // Persist credentials only after the user explicitly opts in on this device.
+        try {
+            if (savedConfig.providers.some(provider => provider.rememberKey)
+                || getAIConfig(user?.id).providers.some(provider => provider.rememberKey)) {
+                await saveRememberedAIKeys(user?.id, coerceAIConfig(savedConfig).providers);
+            }
+        } catch {
+            if (session.isCurrent()) appMessage.error(t('aiConfig.vault.saveFailed'));
+            return;
+        }
+        if (!session.isCurrent()) return;
         persistAIConfig(user?.id, savedConfig);
 
         if (user) {
             try {
-                // Clone and encrypt keys
-                const encryptedProviders = await Promise.all(savedConfig.providers.map(async (p) => {
-                    if (p.apiKey) {
-                        const encryptedKey = await CryptoService.encrypt(p.apiKey, user.id);
-                        return { ...p, apiKey: encryptedKey };
-                    }
-                    return p;
-                }));
-
-                const cloudConfig = { ...savedConfig, providers: encryptedProviders };
-
-                const storageService = await loadStorageService();
-                await storageService.saveConfig('ai_config', cloudConfig, user.id);
-                appMessage.success(t('aiConfig.saveSuccessCloud'));
+                if (!await saveCloudAIConfig(user.id, savedConfig) || !session.isCurrent()) return;
+                appMessage.success(t(savedConfig.providers.some(provider => provider.rememberKey && provider.apiKey)
+                    ? 'aiConfig.vault.savedCloud' : 'aiConfig.saveSuccessCloud'));
             } catch (err) {
+                if (!session.isCurrent()) return;
                 logAIConfigCloudSaveFailure(err);
                 appMessage.warning(t('aiConfig.cloudSyncFail'));
             }
         } else {
-            appMessage.success(t('aiConfig.saveSuccess'));
+            appMessage.success(t(savedConfig.providers.some(provider => provider.rememberKey && provider.apiKey)
+                ? 'aiConfig.vault.saved' : 'aiConfig.saveSuccess'));
         }
 
         window.dispatchEvent(new Event('aiConfigChanged'));
@@ -208,7 +221,9 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
         }
         setConfig(prev => ({
             ...prev,
-            providers: prev.providers.map(p => p.id === id ? { ...p, ...updates } : p)
+            providers: prev.providers.map(p => p.id === id ? { ...p, ...updates,
+                ...('apiKey' in updates ? { credentialState: updates.apiKey?.trim() ? 'ready' as const : 'unconfigured' as const } : {}),
+            } : p)
         }));
     };
 
@@ -290,6 +305,8 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
     const [isTesting, setIsTesting] = useState(false);
 
     const handleTestConnection = async (provider: AIProviderConfig) => {
+        const session = captureAuthSession(user?.id);
+        if (!session.isCurrent()) return;
         const readiness = getAIProviderConnectionReadiness(provider);
         if (!readiness.ready) {
             appMessage.warning(t(`aiConfig.connection.${readiness.issue}`));
@@ -309,19 +326,37 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
         updateConnectionStatus(provider.id, { kind: 'testing', operation: 'test-connection' });
         setIsTesting(true);
         try {
-            await requestAIChatCompletion(provider, {
-                model: provider.models[0]?.id || 'test-model',
-                messages: [{ role: 'user', content: 'Hello, please reply with "OK".' }]
-            }, { timeoutMs: 30_000 });
+            const model = provider.models.find(candidate => candidate.enabled && `${provider.id}:${candidate.id}` === config.activeModelKey)
+                ?? provider.models.find(candidate => candidate.enabled);
+            if (!model) throw new Error(t('aiChat.noModels'));
+            const response = await requestAIChatCompletionRouted(provider, {
+                model: model.id, stream: true,
+                messages: [{ role: 'user', content: 'Hello, please reply with "OK".' }],
+            }, { timeoutMs: 30_000, signal: session.signal, toolMode: 'none' });
+            if (response.headers.get('Content-Type')?.includes('text/event-stream')) {
+                const reader = response.body?.getReader();
+                if (!reader) throw new Error('Empty AI response');
+                const result = await consumeAIChatStream({ reader, signal: session.signal, parseDelta: parseAIStreamDelta,
+                    totalTimeoutMs: 30_000, onAbortReader: () => { void reader.cancel().catch(() => undefined); } });
+                if (!result.content.trim()) throw new Error('Empty AI response');
+            } else {
+                const result = await readAIProviderJson(response) as { choices?: { message?: { content?: unknown } }[] };
+                if (typeof result?.choices?.[0]?.message?.content !== 'string' || !result.choices[0].message.content.trim()) {
+                    throw new Error('AI service did not return a valid message.');
+                }
+            }
+            if (!session.isCurrent()) return;
             updateConnectionStatus(provider.id, { kind: 'success', operation: 'test-connection' });
             appMessage.success(t('aiConfig.testSuccess'));
         } catch (error) {
+            if (!session.isCurrent()) return;
             logAIConfigRequestFailure('testConnection', provider.name, error);
             const message = t('aiConfig.connection.failureNotice');
-            updateConnectionStatus(provider.id, createAIProviderConnectionFailure('test-connection', message));
-            appMessage.error(t('aiConfig.testError', { message }));
+            const detail = t(`aiConfig.connection.failureDetails.${classifyAIProviderFailure(error)}`);
+            updateConnectionStatus(provider.id, createAIProviderConnectionFailure('test-connection', `${message} ${detail}`));
+            appMessage.error(t('aiConfig.testError', { message: `${message} ${detail}` }));
         } finally {
-            setIsTesting(false);
+            if (session.isCurrent()) setIsTesting(false);
         }
     };
 
@@ -370,6 +405,8 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
     }, [discoveredModels, discoverySearchText]);
 
     const handleFetchModels = async (provider: AIProviderConfig) => {
+        const session = captureAuthSession(user?.id);
+        if (!session.isCurrent()) return;
         const readiness = getAIProviderConnectionReadiness(provider);
         if (!readiness.ready) {
             appMessage.warning(t(`aiConfig.connection.${readiness.issue}`));
@@ -389,7 +426,8 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
         updateConnectionStatus(provider.id, { kind: 'testing', operation: 'model-sync' });
         setIsFetchingModels(true);
         try {
-            const models = normalizeAIModelsResponse(await requestAIModels(provider, { timeoutMs: 30_000 }));
+            const models = normalizeAIModelsResponse(await requestAIModels(provider, { timeoutMs: 30_000, signal: session.signal }));
+            if (!session.isCurrent()) return;
             if (models.length > 0) {
                 updateConnectionStatus(provider.id, { kind: 'success', operation: 'model-sync' });
                 const existingModelIds = new Set(provider.models.map(m => m.id));
@@ -427,12 +465,14 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
                 appMessage.error(t('aiConfig.fetchModelsInvalidData'));
             }
         } catch (error) {
+            if (!session.isCurrent()) return;
             logAIConfigRequestFailure('fetchModels', provider.name, error);
             const message = t('aiConfig.connection.failureNotice');
-            updateConnectionStatus(provider.id, createAIProviderConnectionFailure('model-sync', message));
-            appMessage.error(t('aiConfig.testError', { message }));
+            const detail = t(`aiConfig.connection.failureDetails.${classifyAIProviderFailure(error)}`);
+            updateConnectionStatus(provider.id, createAIProviderConnectionFailure('model-sync', `${message} ${detail}`));
+            appMessage.error(t('aiConfig.testError', { message: `${message} ${detail}` }));
         } finally {
-            setIsFetchingModels(false);
+            if (session.isCurrent()) setIsFetchingModels(false);
         }
     };
 
@@ -511,15 +551,20 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
                                             placeholder="https://..."
                                         />
                                     </Form.Item>
+                                    <Form.Item label={t('aiConfig.directTransportLabel')} extra={t(`aiConfig.${gatewayMode === 'auto' ? 'directTransportHint' : gatewayMode === 'off' ? 'directTransportDeploymentHint' : 'requiredGatewayDeploymentHint'}`)}>
+                                        <Switch aria-label={t('aiConfig.directTransportLabel')} disabled={gatewayMode !== 'auto'} checked={gatewayMode === 'off' || (gatewayMode === 'auto' && selectedProvider.transport === 'direct')} onChange={checked => updateProvider(selectedProvider.id, { transport: checked ? 'direct' : undefined })} />
+                                    </Form.Item>
                                     <Form.Item
                                         label={t('aiConfig.apiKeyLabel')}
+                                        extra={<><div>{t('aiConfig.sessionKeyNotice')}</div><div role="status">{t(`aiConfig.credentialState.${getAIProviderCredentialDisplayState(selectedProvider, getAIConfig(user?.id))}`)}</div></>}
                                         required={selectedProviderReadiness?.authMode === 'bearer-required'}
                                     >
                                         <Space.Compact block>
                                             <Input
                                                 aria-label={t('aiConfig.apiKeyLabel')}
                                                 type={isApiKeyVisible ? 'text' : 'password'}
-                                                autoComplete="off"
+                                                name="ai-provider-api-token"
+                                                autoComplete="new-password"
                                                 value={selectedProvider.apiKey}
                                                 disabled={isTesting || isFetchingModels}
                                                 onChange={e => updateProvider(selectedProvider.id, { apiKey: e.target.value })}
@@ -533,6 +578,27 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
                                                 onClick={() => setIsApiKeyVisible(visible => !visible)}
                                             />
                                         </Space.Compact>
+                                    </Form.Item>
+                                    <Form.Item>
+                                        <Switch aria-label={t('aiConfig.vault.remember')} checked={selectedProvider.rememberKey === true}
+                                            disabled={isTesting || isFetchingModels}
+                                            onChange={checked => updateProvider(selectedProvider.id, { rememberKey: checked })} />
+                                        <span style={{ marginLeft: 8 }}>{t('aiConfig.vault.remember')}</span>
+                                        <Typography.Paragraph type="secondary">{t('aiConfig.vault.notice')}</Typography.Paragraph>
+                                        {selectedProvider.rememberKey && <Button danger size="small" onClick={async () => {
+                                            const session = captureAuthSession(user?.id);
+                                            const providerId = selectedProvider.id;
+                                            try {
+                                                await forgetRememberedAIKey(user?.id, providerId);
+                                                if (!session.isCurrent()) return;
+                                                const runtime = getAIConfig(user?.id);
+                                                persistAIConfig(user?.id, { ...runtime, providers: runtime.providers.map(provider => provider.id === providerId
+                                                    ? { ...provider, apiKey: '', rememberKey: false, credentialState: 'unconfigured' } : provider) });
+                                                updateProvider(providerId, { apiKey: '', rememberKey: false, credentialState: 'unconfigured' });
+                                                window.dispatchEvent(new Event('aiConfigChanged'));
+                                                appMessage.success(t('aiConfig.vault.forgotten'));
+                                            } catch { appMessage.error(t('aiConfig.vault.saveFailed')); }
+                                        }}>{t('aiConfig.vault.forget')}</Button>}
                                     </Form.Item>
                                     {selectedProviderReadiness && (
                                         <AIConfigConnectionStatusAlert
@@ -676,4 +742,10 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, initialProviderId, 
     );
 };
 
-export default AIConfigModal;
+const SessionAIConfigModal: React.FC<AIConfigModalProps> = props => {
+    const { user } = useAuth();
+    const revision = useSyncExternalStore(onAuthSessionInvalidated, getAuthSessionRevision, getAuthSessionRevision);
+    return <AIConfigModal key={`${user?.id ?? '__anonymous__'}:${revision}`} {...props} />;
+};
+
+export default SessionAIConfigModal;

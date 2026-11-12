@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { beginServerOperation } from './serverTelemetry.js';
+import type { FailureCode } from './operationTelemetry.js';
 import { isRoomGeneration } from './atomicRoomCommit.js';
 
 export type RoomLeaseKind = 'edit' | 'recovery';
@@ -34,13 +36,20 @@ export const acquireDistributedRoomLease = async (
   let heartbeat: ReturnType<typeof setTimeout> | undefined;
   let expiration: ReturnType<typeof setTimeout> | undefined;
   let closePromise: Promise<void> | undefined;
-  const invalidate = () => {
+  let renewalFinish: ReturnType<typeof beginServerOperation> | undefined;
+  const invalidate = (code?: FailureCode) => {
+    if (!controller.signal.aborted) {
+      // A hanging renewal terminates at the lease deadline, even if its promise never settles.
+      const finish = renewalFinish ?? (code ? beginServerOperation('lease') : undefined);
+      finish?.(code ? 'failure' : 'cancelled', code);
+      renewalFinish = undefined;
+    }
     if (heartbeat) clearTimeout(heartbeat);
     if (expiration) clearTimeout(expiration);
     if (!controller.signal.aborted) controller.abort(new Error('Room lease inactive'));
   };
   const active = () => {
-    if (now() >= deadline) invalidate();
+    if (now() >= deadline) invalidate('timeout');
     if (controller.signal.aborted) throw new Error('Room lease inactive');
   };
   const close = () => {
@@ -53,7 +62,7 @@ export const acquireDistributedRoomLease = async (
   };
   const armExpiry = () => {
     if (expiration) clearTimeout(expiration);
-    expiration = setTimeout(invalidate, Math.max(0, deadline - now()));
+    expiration = setTimeout(() => invalidate('timeout'), Math.max(0, deadline - now()));
     expiration.unref?.();
   };
   const schedule = (delay: number) => {
@@ -64,13 +73,15 @@ export const acquireDistributedRoomLease = async (
     const requestStarted = now();
     try {
       active();
+      renewalFinish = beginServerOperation('lease');
       const renewed: unknown = await store.renew(key, leaseId, generation);
       active();
-      if (renewed !== true) { invalidate(); return; }
+      if (renewed !== true) { invalidate(renewed === false ? 'conflict' : 'invalid'); return; }
+      renewalFinish?.('success'); renewalFinish = undefined;
       deadline = requestStarted + 20_000;
       armExpiry();
       schedule(Math.max(0, 8000 - (now() - requestStarted)));
-    } catch { invalidate(); }
+    } catch { invalidate('unavailable'); }
   };
   try { active(); }
   catch { await close(); throw new Error('Room lease admission expired'); }

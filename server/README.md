@@ -1,7 +1,8 @@
 # 本地协同服务
 
 独立 Node 服务，仅监听 `127.0.0.1`。它不是公共演示服务，也尚未成为生产部署。
-不使用 service-role 权限；Auth 验证身份后，用该用户的令牌查询图表和协作者，保留 RLS。
+业务鉴权在 Auth 验证身份后，用该用户的令牌查询图表和协作者，保留 RLS。
+分布式生产状态和可选云端诊断使用的 server key 只供后端适配器使用。
 
 1. `npm run collaboration:build`
 2. 在已忽略的 `.env.collaboration.local` 配置 `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`、
@@ -64,3 +65,94 @@ POST同地址只接受确认的sha256及revision，不接受客户端替换内�
 通过真实公开SDK和IndexedDB验证编辑副本、恢复顺序、失败保留及重新打开；
 构建输出为 `dist/recovery-fixture`，不覆盖主预览文件。可单独运行
 `npx playwright test --config playwright.recovery.config.ts`。此门禁不替代真实双账号验收。
+
+## 诊断事件接收（T07，进行中）
+
+浏览器构建仅在 `VITE_TELEMETRY_ENABLED=true` 且 `VITE_RELEASE_ID` 为 40/64 位小写十六进制构建哈希时启用采集。它向同源 `/telemetry` POST，不携带 cookie、认证头或 referrer，不跟随重定向。静态产物准备入口用 `--telemetry-url https://collab.example.com/telemetry` 显式指定接收服务，在资源与 SPA 回退之前生成仅限 POST 的转发路由；生产产物必须提供此参数，预览未配置时 POST 返回 503，其他方法返回 405。URL 只接受 HTTPS 的 `/telemetry` 路径，拒绝本机地址、凭据、查询串和片段。
+
+发布前校验将接收地址与准备收据和完整路由配置对应，拒绝路由缺失、改变目标、重排、SPA 遮挡或额外配置。旧准备产物需重新生成，原目录保留。准备和校验本身不访问接收服务；实际部署仍须启用前后端采集、配置正确的来源白名单，并用 staging canary 验证真实投递、检索和告警，不能用配置检查代替。
+
+独立协作服务和生产运行时入口均使用 `VIZLY_TELEMETRY_ENABLED=true` 及合法的 `VIZLY_RELEASE_ID` 启用接收；`VIZLY_TELEMETRY_DATA_DIR` 指定专用私有日志目录（默认 `.telemetry-data`）。一个目录只允许一个服务写入，多实例必须使用各自目录。来源必须在既有 `VIZLY_COLLABORATION_ORIGINS` 白名单中。浏览器诊断属于不可信信号，不能用于鉴权或计费。
+
+接收器限制每分钟 240 次请求、8 个并发请求、32 KiB 请求体和 5 秒处理时间。日志轮转保留 4 个至多 1 MiB 的文件，文件权限为 0600；超过保留窗口的历史会丢弃。`queryTelemetryJournal` 提供仅供运维调用的本地版本／requestId 查询，不提供公开查询接口。`streamId + sequence` 标识一次累计计数快照；统计时取每个 stream 的最新快照，不能把所有快照的累计值相加。保留窗口内的样本也不代表完整长期 SLO。
+
+已接线：启动（成功定义为提交挂载）、云保存操作、协作首次同步与重连。启动成功不等于首屏绘制，保存成功不等于异设备回读。现已接通权限、CAS、lease、主工具栏导出和路由事件，以及可选告警适配器。剩余：部署代理及真实 staging 故障检索与告警投递验收。日志持久化与本机 HTTP 测试通过不能替代这些验收。
+
+
+服务端鉴权、租约获取和原子 CAS 事件使用 `VIZLY_RELEASE_ID` 关联服务构建（同样要求 40/64 位哈希）。没有合法哈希时不启用服务端事件采集及 HTTP 接收。CAS 统计覆盖真实 compare/exchange 尝试，冲突重试分别计数；鉴权成功代表权限检查返回许可，不代表文档写入成功。
+
+可选 `VIZLY_TELEMETRY_ALERT_URL` 为运维预先配置的接收路径：只接受 HTTPS，或用于本机验证的 loopback HTTP；拒绝 URL 用户信息、查询参数和片段。投递字段只有 schema、releaseId、requestId、operation 和固定错误码。单次最多一条在途、每分钟最多六条，同一版本／操作／错误一分钟内去重，3 秒超时后熔断，避免监控故障累积任务。告警失败不影响已经持久化的事件或编辑；这不是保证送达队列。当前仅验证了本机 HTTP 接收，尚未向真实运维告警路径投递或取得 staging 回执。
+
+### 飞书机器人告警
+
+`VIZLY_TELEMETRY_ALERT_PROVIDER` 默认 `http`，保留上述通用 JSON 接口。选择 `feishu` 后直接发送飞书文本消息，并要求签名校验；无需另建转发服务。飞书适配只允许 `https://open.feishu.cn/open-apis/bot/v2/hook/<机器人标识>`，拒绝其他主机、端口、用户信息、查询参数或片段。
+
+1. 在专用飞书测试群打开群设置 → 群机器人 → 添加机器人 → 自定义机器人，命名“Vizly 告警”，开启“签名校验”。若同时启用关键词，配置 `Vizly 运维告警`，它是消息首行。保存 webhook 和签名密钥。
+2. 在 Vercel 后端项目 `vizly-collaboration` 的 Settings → Environment Variables 中，仅为 Preview 配置以下变量。webhook 本身也是凭据，应作为 Secret 保存；不要加 `VITE_` 前缀，不要进入浏览器构建或 Git。
+
+| 变量 | 值 |
+| --- | --- |
+| `VIZLY_TELEMETRY_ALERT_PROVIDER` | `feishu` |
+| `VIZLY_TELEMETRY_ALERT_URL` | 机器人的完整 webhook |
+| `VIZLY_TELEMETRY_FEISHU_SIGNING_SECRET` | 签名校验密钥 |
+
+现有 `VIZLY_TELEMETRY_ENABLED=true`、合法 `VIZLY_RELEASE_ID` 和诊断持久化配置仍须有效。变量只对之后的新部署生效；当前部署不会自动接入机器人。无需修改 Supabase 数据库密码、AI Key 或前端环境变量。
+
+3. 新 Preview 完成后，用受控故障触发告警，核对实际发布版本／请求标识、诊断存储原件、飞书 API 的 HTTP 成功与业务 `code=0`，并在群内确认收到相同消息。HTTP 200 但业务码非零、仅本机模拟请求或单元测试通过，都不能计为真实投递验收。
+
+消息仅包含固定标题、版本、请求标识、操作和错误码，不含图表正文、账号、聊天内容、Key 或 webhook。签名按秒级时间戳及飞书规定的 HMAC-SHA256 算法生成；异常不记录原始网络错误或响应正文，以防泄露 webhook。现有并发、去重、限频和三秒熔断继续生效；这是尽力投递，不能作为保证送达队列。
+
+停用时移除 Preview 的告警 URL 并重新部署；如凭据泄露，在飞书重置 webhook／签名密钥，再更新后端配置。未配置 Production 即不会启用生产通知。适配与受控测试不代表真实飞书渠道已验收。
+
+接口与群设置参考：[飞书自定义机器人官方指南](https://open.feishu.cn/document/client-docs/bot-v3/add-custom-bot?lang=zh-CN)。
+
+
+生产入口与独立服务复用同一诊断生命周期。每个运行时持有独立采集器，HTTP、WebSocket 和定期权限检查在其所属异步上下文中执行；关闭时先停止业务，再刷新事件、等待日志与告警并释放采集器。`lease` 计数单位是获取／续期尝试，此外无在途续期的过期也记录一次失败；它不是唯一租约数。续期拒绝记为 conflict，非法回执记为 invalid，异常记为 unavailable，租约到期记为 timeout；正常关闭取消未完成续期，不记故障。
+
+文件模式须显式提供每实例独立、可写且私有的日志目录。运行时接线的本机与隔离测试不证明云端磁盘、代理、账号或告警路径已配置。
+
+Windows 的 `mode: 0o700/0o600` 不提供 POSIX 的 owner／group／other 隔离，部署前须为专用目录配置并核对 NTFS ACL，限定服务账号及受信任的 SYSTEM／Administrators；默认 TEMP 或工作目录的继承权限不能直接作为私有目录证明。测试只给其新建夹具设置独立 ACL，并同时检查额外读取授权会被拒绝，不修改系统 TEMP 或已有目录。其他平台继续核对文件权限位。
+
+### 可替换实例上的云端诊断日志（T07，验证中）
+
+受 Vercel Deployment Protection 保护的 Preview 后端还需要服务间认证。
+单纯把静态站点的 `/telemetry` 转发到另一个受保护的项目，并不能证明诊断已到达应用；
+平台返回的认证 401 与 Supabase Key 的有效性是两个独立边界。
+
+为此，Preview 打包可显式添加
+`--telemetry-auth vercel-oidc --telemetry-origin https://<实际前端Preview域名>`，
+并同时传入原有 `--telemetry-url https://<实际后端Preview域名>/telemetry`。
+该模式生成独立 Node 24 服务函数和版本2收据；公开静态目录仍只包含浏览器资源。
+服务函数从 `@vercel/oidc` 获取当前工作负载的短期身份，不接收或转发浏览器的 Cookie、
+Authorization 或身份覆盖头。它复用现有接收器的来源校验、载荷投影、32 KiB／8并发／
+每分钟240次／5秒限制；浏览器断开会取消所属上游请求，不跟随上游重定向，不返回上游内容。
+收据绑定编译后函数、Node运行时配置、模块格式和路由；上传校验同时拒绝未列出的函数或私有文件。
+
+实际部署前须确认调用方启用 Secure Backend Access with OIDC Federation，
+并在后端项目的 Trusted Sources 中授权当前前端项目 `preview → preview`。
+该访问控制变更需单独明确授权；不添加 production 访问，也不关闭部署保护。
+未授权或上游失败时返回不可用状态，不能声称诊断已持久化。
+该可选模式目前仅接受 Preview；原有公开接收端的静态转发路径不变。
+完成本地验证后仍须验收真实浏览器投递、云端关联ID检索及告警回执。
+
+`VIZLY_TELEMETRY_STORAGE=supabase` 使用与后端相同的 `SUPABASE_URL` 和 `SUPABASE_SERVER_KEY`，通过服务端专用 RPC 保存已投影的诊断快照。`VERCEL=1` 时默认选择此模式，显式选择文件模式会拒绝启动。其他 Node 环境默认保留文件模式。采集仍须由 `VIZLY_TELEMETRY_ENABLED=true` 和合法 `VIZLY_RELEASE_ID` 启用。
+
+在授权目标完成 `20261027211956_bounded_telemetry_journal.sql` 迁移后才能使用此适配器；空库与既有环境继续按 `scripts/database-path.mjs` 生成的审核事务执行。迁移追加私有 `vizly_telemetry` schema，表启用 RLS；schema、表及 RPC 不向匿名或普通登录角色授权。两个公开 RPC 使用 invoker 权限，server key 不进入浏览器。未带匹配路径收据的已有同名 schema 会被升级路径拒绝。
+
+数据库重新投影字段，只保留版本／随机关联 ID、固定事件枚举、耗时和累计计数。相同版本／stream／sequence 的同内容重试不增加记录，冲突内容被拒绝。跨实例写入共用事务锁，锁等待最多 250ms；每实例最多 8 个请求在途，外部请求有 4.5 秒截止和有界响应体，禁止重定向及自动重试。存储不可用不使业务编辑获得虚假的诊断成功回执。
+
+保留有效载荷最多 4 MiB、1000 条记录；这不包含数据库索引、WAL、死元组和其他项目数据的占用。查询只返回七天窗口内至多 1000 条快照，达到容量时会更早淘汰旧数据。写入会清理过期记录；没有新写入时，物理删除须按部署的保留策略另行安排。此有限窗口不用于承诺长期完整成功率。
+
+运维查询先编译服务：`npm run collaboration:build`。文件模式使用
+`node scripts/query-telemetry.mjs --storage file --directory /private/log-directory --release HASH`。
+云端模式在私有后端环境中执行
+`node scripts/query-telemetry.mjs --storage supabase --release HASH --request UUID`。
+
+`npm run test:telemetry` 是 Linux 专用存储集成门禁，使用固定 Node 22.23.4、已有镜像摘要、三个新建且受限的容器及内部网络；不访问云项目或发布端口。它编译实际生产运行时和运维查询 CLI，验证 HTTPS／真实 PostgREST／SQL 的存储链路、换进程后查询、匿名及登录角色拒绝、丢失回执重试、取消和截止路径，并独立核对 SQL 与原容器身份。TLS 与 opaque key 转换属于受控测试夹具，JWT 为临时角色夹具，不代表真实 GoTrue 登录或已连接云网关验收。CI 的 `app-telemetry-storage` 门禁为必需项，缺少该项的旧集成报告不能通过当前发布证据校验。
+密钥通过已有后端环境配置提供，不作为命令参数或输出；没有公开 HTTP 查询入口。返回 `query-complete` 只代表查询执行完成，零条结果不等于 canary 验收通过。累计计数须取每个 stream 的最高 sequence，不能把全部快照相加。
+
+此改动仍需完整双路径迁移、真实 PostgREST／HTTPS、最新提交全量回归，以及授权 staging 的实际投递、重连／实例替换查询和告警回执；不能以本地适配器测试作为生产已启用的证明。
+
+### 协作会话及跨实例告警去重
+
+后台标签页暂停协作传输，前台恢复和每次重连先读取当前会话；令牌轮换保留同一 Y.Doc，拒绝权限后停止自动重试。云端告警须先应用 `20261102030403_telemetry_alert_claims.sql`，按 operation/code 跨实例、跨版本冷却十分钟，所有实例滚动一分钟最多六次领取，诊断事件继续持久化。领取在投递之前，通知失败不会无限重试。详见 `docs/collaboration-session-recovery.md`。

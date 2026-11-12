@@ -1,4 +1,5 @@
-import { CryptoService } from '@vizly/core/security';
+import { loadRememberedAIKeys } from './aiCredentialVault';
+import { captureAuthSession, invalidateAuthSessionWork, onAuthSessionInvalidated } from '@/context/authSessionBoundary';
 import { normalizeProviderBaseUrl } from '@/services/ai/providerSecurity';
 import { logAIConfigStorageFailure } from './aiLogging';
 
@@ -15,7 +16,10 @@ export interface AIProviderConfig {
     name: string;
     enabled: boolean;
     baseUrl: string;
+    transport?: 'direct';
     apiKey: string;
+    rememberKey?: boolean;
+    credentialState?: 'unconfigured' | 'required' | 'legacy-unavailable' | 'ready';
     icon?: string;
     models: AIModel[];
 }
@@ -26,7 +30,9 @@ export interface AIConfigState {
     providers: AIProviderConfig[];
 }
 
-export const AI_CONFIG_KEY = 'DiagramView.AIConfig_V2_Advanced';
+export const AI_CONFIG_KEY = 'DiagramView.AIConfig_V3_Session';
+export const AI_CLOUD_CONFIG_KEY = 'ai_config_v3';
+const LEGACY_CONFIG_KEY = 'DiagramView.AIConfig_V2_Advanced';
 
 const DEFAULT_SYSTEM_PROMPT = '';
 
@@ -87,6 +93,12 @@ export const getAIConfigKey = (userId?: string | null): string => {
 };
 
 const runtimeAIConfigs = new Map<string, AIConfigState>();
+let revision = 0;
+onAuthSessionInvalidated(() => {
+    runtimeAIConfigs.clear();
+    revision += 1;
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('aiConfigChanged'));
+});
 
 const MAX_PROVIDERS = 20;
 const MAX_MODELS_PER_PROVIDER = 200;
@@ -165,7 +177,10 @@ export const coerceAIConfig = (value: unknown): AIConfigState => {
                     name,
                     enabled: rawProvider.enabled === true,
                     baseUrl,
+                    ...(rawProvider.transport === 'direct' ? { transport: 'direct' as const } : {}),
                     apiKey,
+                    ...(rawProvider.rememberKey === true ? { rememberKey: true } : {}),
+                    credentialState: apiKey ? 'ready' : (rawProvider.credentialState === 'required' || rawProvider.credentialState === 'legacy-unavailable' ? rawProvider.credentialState : 'unconfigured'),
                     ...(typeof rawProvider.icon === 'string' ? { icon: normalizeAIText(rawProvider.icon, '') } : {}),
                     models,
                 };
@@ -201,26 +216,44 @@ export const parseStoredAIConfig = (raw: string | null | undefined): unknown | n
     }
 };
 
-const stripAIConfigSecrets = (config: AIConfigState): AIConfigState => {
+export const stripAIConfigSecrets = (config: AIConfigState): AIConfigState => {
     const cloned = coerceAIConfig(config);
     return {
         ...cloned,
         providers: cloned.providers.map(provider => ({
             ...provider,
-            apiKey: ''
+            apiKey: '',
+            credentialState: provider.apiKey ? 'required' as const : provider.credentialState,
         }))
     };
 };
 
 export const setRuntimeAIConfig = (userId: string | null | undefined, config: AIConfigState): void => {
+    if (!captureAuthSession(userId).isCurrent()) return;
+    revision += 1;
     runtimeAIConfigs.set(getAIConfigKey(userId), coerceAIConfig(config));
+};
+
+export const restoreRememberedAIConfig = async (userId?: string | null): Promise<AIConfigState> => {
+    const owner = userId === undefined && typeof window !== 'undefined' ? window.__currentUserId ?? null : userId;
+    const session = captureAuthSession(owner);
+    const capturedRevision = revision;
+    const current = getAIConfig(owner);
+    const keys = await loadRememberedAIKeys(owner, current.providers);
+    if (!keys.size || !session.isCurrent() || revision !== capturedRevision) return getAIConfig(owner);
+    const restored = { ...current, providers: current.providers.map(provider => keys.has(provider.id)
+        ? { ...provider, apiKey: keys.get(provider.id)!, credentialState: 'ready' as const } : provider) };
+    setRuntimeAIConfig(owner, restored);
+    window.dispatchEvent(new Event('aiConfigChanged'));
+    return restored;
 };
 
 export const clearRuntimeAIConfig = (userId?: string | null): void => {
     if (userId) {
+        revision += 1;
         runtimeAIConfigs.delete(getAIConfigKey(userId));
     } else {
-        runtimeAIConfigs.clear();
+        invalidateAuthSessionWork();
     }
     if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('aiConfigChanged'));
@@ -228,9 +261,10 @@ export const clearRuntimeAIConfig = (userId?: string | null): void => {
 };
 
 export const persistAIConfig = (userId: string | null | undefined, config: AIConfigState): void => {
+    if (!captureAuthSession(userId).isCurrent()) return;
     const normalized = coerceAIConfig(config);
     setRuntimeAIConfig(userId, normalized);
-    const localConfig = userId ? stripAIConfigSecrets(normalized) : normalized;
+    const localConfig = { ...stripAIConfigSecrets(normalized), version: 3 };
     try {
         localStorage.setItem(getAIConfigKey(userId), JSON.stringify(localConfig));
     } catch (error) {
@@ -241,7 +275,7 @@ export const persistAIConfig = (userId: string | null | undefined, config: AICon
 export const getAIConfig = (userId?: string | null): AIConfigState => {
     try {
         let keyToUse = getAIConfigKey(userId);
-        if (!userId) {
+        if (userId === undefined) {
             if (typeof window !== 'undefined' && window.__currentUserId) {
                 keyToUse = getAIConfigKey(window.__currentUserId);
             }
@@ -257,9 +291,13 @@ export const getAIConfig = (userId?: string | null): AIConfigState => {
             logAIConfigStorageFailure('getAIConfig.readScopedConfig', error);
         }
         if (parsed) {
-            const normalized = coerceAIConfig(parsed);
+            const normalized = readPersistedAIConfig(parsed);
             if (normalized.providers.length > 0) return normalized;
         }
+
+        const legacyOwner = keyToUse.slice(AI_CONFIG_KEY.length);
+        const legacy = parseStoredAIConfig(localStorage.getItem(LEGACY_CONFIG_KEY + legacyOwner));
+        if (legacy) return readPersistedAIConfig(legacy);
 
         let v1: unknown | null = null;
         try {
@@ -275,7 +313,7 @@ export const getAIConfig = (userId?: string | null): AIConfigState => {
             const gemini = providers.find(p => p.id === 'gemini');
             if (gemini) {
                 if (typeof v1.baseUrl === 'string') gemini.baseUrl = v1.baseUrl;
-                if (typeof v1.apiKey === 'string') gemini.apiKey = v1.apiKey;
+                if (typeof v1.apiKey === 'string' && v1.apiKey) gemini.credentialState = 'legacy-unavailable';
             }
             return coerceAIConfig({
                 activeModelKey: 'gemini:gemini-2.0-flash-exp',
@@ -290,22 +328,44 @@ export const getAIConfig = (userId?: string | null): AIConfigState => {
     return getDefaultAIConfig();
 };
 
+const readPersistedAIConfig = (value: unknown): AIConfigState => {
+    const normalized = coerceAIConfig(value);
+    return { ...normalized, providers: normalized.providers.map(provider => ({
+        ...provider, apiKey: '',
+        credentialState: provider.apiKey ? 'legacy-unavailable' : provider.credentialState,
+    })) };
+};
+
 const loadStorageService = async () => (await import('@/services/SupabaseStorage')).storageService;
 
 export const loadCloudAIConfig = async (userId: string): Promise<AIConfigState | null> => {
+    const session = captureAuthSession(userId);
+    if (!session.isCurrent()) return null;
+    await restoreRememberedAIConfig(userId);
+    const startedRevision = revision;
+    if (!session.isCurrent()) return null;
     const storageService = await loadStorageService();
-    const cloudConfig = await storageService.loadConfig('ai_config');
-    if (!isRecord(cloudConfig) || !Array.isArray(cloudConfig.providers)) return null;
+    if (!session.isCurrent()) return null;
+    let cloudConfig = await storageService.loadConfig(AI_CLOUD_CONFIG_KEY, userId);
+    if (!session.isCurrent() || revision !== startedRevision) return null;
+    if (!cloudConfig) cloudConfig = await storageService.loadConfig('ai_config', userId);
+    if (!session.isCurrent() || revision !== startedRevision || !isRecord(cloudConfig) || !Array.isArray(cloudConfig.providers)) return null;
+    const normalized = readPersistedAIConfig(cloudConfig);
+    const current = runtimeAIConfigs.get(getAIConfigKey(userId));
+    return { ...normalized, providers: normalized.providers.map(provider => {
+        const local = current?.providers.find(item => item.id === provider.id && item.baseUrl === provider.baseUrl);
+        return local ? { ...provider, rememberKey: local.rememberKey, apiKey: local.apiKey,
+            credentialState: local.apiKey ? 'ready' : provider.credentialState } : provider;
+    }) };
+};
 
-    const decryptedProviders = await Promise.all(cloudConfig.providers.map(async (provider: AIProviderConfig) => {
-        if (provider.apiKey && (provider.apiKey.startsWith('ENC2:') || provider.apiKey.startsWith('ENC:'))) {
-            const decryptedKey = await CryptoService.decrypt(provider.apiKey, userId);
-            return { ...provider, apiKey: decryptedKey };
-        }
-        return provider;
-    }));
-
-    const mergedConfig = coerceAIConfig({ ...cloudConfig, providers: decryptedProviders });
-    setRuntimeAIConfig(userId, mergedConfig);
-    return mergedConfig;
+export const saveCloudAIConfig = async (userId: string, config: AIConfigState): Promise<boolean> => {
+    const session = captureAuthSession(userId);
+    if (!session.isCurrent()) return false;
+    const storageService = await loadStorageService();
+    if (!session.isCurrent()) return false;
+    const cloud = stripAIConfigSecrets(config);
+    cloud.providers = cloud.providers.map(({ rememberKey: _localPreference, ...provider }) => provider);
+    await storageService.saveConfig(AI_CLOUD_CONFIG_KEY, { ...cloud, version: 3 }, userId);
+    return session.isCurrent();
 };

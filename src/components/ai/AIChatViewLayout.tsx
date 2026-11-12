@@ -1,8 +1,10 @@
+import type { AIEditContext, AIEditScope } from './aiCanvasEdit';
 import React from 'react';
 import { createPortal } from 'react-dom';
 import type { TFunction } from 'i18next';
 import type { TextAreaRef } from 'antd/es/input/TextArea';
 import Modal from 'antd/es/modal';
+import Alert from 'antd/es/alert';
 import Input from 'antd/es/input';
 import Button from 'antd/es/button';
 import Select from 'antd/es/select';
@@ -88,7 +90,11 @@ interface AIChatViewLayoutProps {
     onOpenConfig: (providerId?: string) => void;
     onClose: () => void;
     onPreviewJson?: (json: string) => void;
-    onApplyJson?: (json: string) => void;
+    onApplyJson?: (json: string, context?: AIEditContext) => void;
+    onSaveCurrentCanvas?: () => void;
+    editScope?: AIEditScope;
+    setEditScope?: (scope: AIEditScope) => void;
+    canEditCanvas?: boolean;
     handleSaveDiagramTo: (json: string, target: AIChatSaveTarget) => void;
     messagesEndRef: React.RefObject<HTMLDivElement | null>;
     showCommands: boolean;
@@ -103,6 +109,8 @@ interface AIChatViewLayoutProps {
     handleVoiceToggle: () => void;
     handleStopGeneration: () => void;
     saveModalVisible: boolean;
+    saving?: boolean;
+    saveError?: string;
     setSaveModalVisible: (visible: boolean) => void;
     executeSave: () => Promise<void>;
     saveTitle: string;
@@ -139,6 +147,10 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
     onClose,
     onPreviewJson,
     onApplyJson,
+    onSaveCurrentCanvas,
+    editScope = 'generate',
+    setEditScope,
+    canEditCanvas = false,
     handleSaveDiagramTo,
     messagesEndRef,
     showCommands,
@@ -153,6 +165,8 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
     handleVoiceToggle,
     handleStopGeneration,
     saveModalVisible,
+    saving = false,
+    saveError = '',
     setSaveModalVisible,
     executeSave,
     saveTitle,
@@ -301,7 +315,11 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                                             size="small"
                                             value={editingTitle}
                                             onChange={e => setEditingTitle(e.target.value)}
-                                            onPressEnter={() => handleSaveRename(conv.id)}
+                                            onPressEnter={(event) => {
+                                                event.preventDefault();
+                                                event.stopPropagation();
+                                                handleSaveRename(conv.id);
+                                            }}
                                             onBlur={() => handleSaveRename(conv.id)}
                                             onKeyDown={handleRenameKeyDown}
                                             autoFocus
@@ -451,16 +469,17 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
             {!configurationState.ready && (
                 <div className="ai-chat-configuration-status" role="status">
                     <div className="ai-chat-configuration-copy">
-                        <Typography.Text strong>{t('aiChat.configStatusTitle')}</Typography.Text>
+                        <Typography.Text strong>{configurationState.reason === 'restoring-api-key'
+                            ? t('aiChat.restoringKeyTitle') : t('aiChat.configStatusTitle')}</Typography.Text>
                         <Typography.Text type="secondary">
                             {t(`aiChat.configReason.${configurationState.reason}`, {
                                 provider: configurationState.providerName ?? '',
                             })}
                         </Typography.Text>
                     </div>
-                    <Button type="link" onClick={() => onOpenConfig(configurationState.providerId)}>
+                    {configurationState.reason !== 'restoring-api-key' && <Button type="link" onClick={() => onOpenConfig(configurationState.providerId)}>
                         {t('aiChat.configureNow')}
-                    </Button>
+                    </Button>}
                 </div>
             )}
 
@@ -473,6 +492,7 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                         t={t}
                         onPreviewJson={onPreviewJson}
                         onApplyJson={onApplyJson}
+                        onSaveCurrentCanvas={onSaveCurrentCanvas}
                         handleSaveDiagramTo={handleSaveDiagramTo}
                     />
                 ))}
@@ -498,13 +518,19 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
 
             {/* Input */}
             <div className="ai-chat-input-area">
+                {canEditCanvas && <Select
+                    aria-label={t('aiChat.edit.mode')}
+                    value={editScope} onChange={setEditScope} disabled={loading}
+                    style={{ width: '100%', marginBottom: 8 }}
+                    options={['generate', 'selection', 'diagram'].map(value => ({ value, label: t(`aiChat.edit.scope.${value}`) }))}
+                />}
                 <div className="ai-chat-input-row">
                     <Input.TextArea
                         ref={inputRef}
                         value={inputValue}
                         onChange={e => handleInputChange(e.target.value)}
                         onPressEnter={(e) => {
-                            if (!e.shiftKey) {
+                            if (!e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229) {
                                 e.preventDefault();
                                 if (canSubmit) {
                                     handleSendMessage();
@@ -560,16 +586,21 @@ export const AIChatViewLayout: React.FC<AIChatViewLayoutProps> = ({
                 title={t('aiChat.saveDialogTitle')}
                 open={saveModalVisible}
                 onOk={executeSave}
-                onCancel={() => setSaveModalVisible(false)}
+                onCancel={() => { if (!saving) setSaveModalVisible(false); }}
+                confirmLoading={saving}
+                closable={!saving}
+                cancelButtonProps={{ disabled: saving }}
                 okText={t('aiChat.confirmSave')}
                 cancelText={t('aiChat.cancel')}
             >
                 <div style={{ padding: '10px 0' }}>
+                    {saveError && <Alert type="error" showIcon title={saveError} role="alert" style={{ marginBottom: 12 }} />}
                     <label className="ai-chat-save-label" htmlFor="ai-chat-save-title">
                         {t('aiChat.nameLabel')}
                     </label>
                     <Input
                         id="ai-chat-save-title"
+                        disabled={saving}
                         value={saveTitle}
                         onChange={e => setSaveTitle(e.target.value)}
                         placeholder={t('aiChat.namePlaceholder')}

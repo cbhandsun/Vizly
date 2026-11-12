@@ -1,7 +1,10 @@
 import { createHash } from 'node:crypto';
 import { copyFile, mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
-import { containsCompiledEndpoint, parseDeploymentEnvironment, parseProductionWebSocketUrl } from './vercelDeploymentEnvironment.mjs';
+import { containsCompiledEndpoint, parseDeploymentEnvironment, parseProductionWebSocketUrl,
+  parseTelemetryIngestUrl, staticDeploymentRoutes } from './vercelDeploymentEnvironment.mjs';
+import { parseTelemetryRelayOptions, prepareTelemetryRelay } from './vercelTelemetryRelayArtifact.mjs';
+import { STATIC_ASSET_CACHE_POLICY } from './staticAssetCache.mjs';
 
 const allowedExtensions = /\.(?:html|js|css|json|svg|png|jpe?g|webp|gif|ico|woff2?|ttf|otf|wasm)$/i;
 const localWebSocket = /wss?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?=[:/"'\s]|$)/i;
@@ -12,10 +15,14 @@ const contained = (parent, child) => {
 };
 
 /** Stage compiled assets only; never upload source, local packages or credentials. */
-export async function prepareVercelStaticArtifact({ workspace, buildDirectory, outputDirectory, projectId, teamId, environment = 'preview', productionWebSocketUrl }) {
+export async function prepareVercelStaticArtifact({ workspace, buildDirectory, outputDirectory, projectId, teamId, environment = 'preview', productionWebSocketUrl, telemetryIngestUrl, telemetryAuthentication = 'none', telemetryOrigin }) {
   const deploymentEnvironment = parseDeploymentEnvironment(environment);
   const endpoint = deploymentEnvironment === 'production' ? parseProductionWebSocketUrl(productionWebSocketUrl) : undefined;
   if (deploymentEnvironment === 'preview' && productionWebSocketUrl !== undefined) throw new Error('Production endpoint supplied for preview artifact');
+  const ingest = telemetryIngestUrl === undefined && deploymentEnvironment === 'preview'
+    ? undefined : parseTelemetryIngestUrl(telemetryIngestUrl);
+  const relayOptions = parseTelemetryRelayOptions({ environment: deploymentEnvironment,
+    authentication: telemetryAuthentication, origin: telemetryOrigin, ingestUrl: ingest });
   if (typeof workspace !== 'string' || typeof buildDirectory !== 'string' || typeof outputDirectory !== 'string') throw new Error('Artifact paths must be strings');
   if (typeof projectId !== 'string' || !/^prj_[A-Za-z0-9]+$/.test(projectId)) throw new Error('Invalid Vercel project ID');
   if (typeof teamId !== 'string' || !/^team_[A-Za-z0-9]+$/.test(teamId)) throw new Error('Invalid Vercel team ID');
@@ -66,11 +73,14 @@ export async function prepareVercelStaticArtifact({ workspace, buildDirectory, o
     if (hash(await readFile(destination)) !== file.sha256) throw new Error('Build changed during artifact staging');
   }
   await writeFile(join(vercel, 'project.json'), JSON.stringify({ projectId, orgId: teamId }, null, 2), { flag: 'wx' });
-  await writeFile(join(vercel, 'output/config.json'), JSON.stringify({ version: 3, routes: [
-    { handle: 'filesystem' }, { src: '/assets/(.*)', status: 404 }, { src: '/(.*)', dest: '/index.html' },
-  ] }, null, 2), { flag: 'wx' });
-  const receipt = { version: 1, projectId, teamId, source: 'compiled-static-assets', deploymentEnvironment,
-    ...(endpoint ? { productionWebSocketUrl: endpoint } : {}), files: files.map(({name,sha256})=>({name,sha256})), totalBytes };
+  await writeFile(join(vercel, 'output/config.json'), JSON.stringify({ version: 3, routes: staticDeploymentRoutes(ingest, !!relayOptions, files.map(file => file.name)) }, null, 2), { flag: 'wx' });
+  const telemetryRelay = relayOptions ? await prepareTelemetryRelay(output, relayOptions) : undefined;
+  const receipt = { version: relayOptions ? 2 : 1, projectId, teamId,
+    source: relayOptions ? 'compiled-static-assets-and-telemetry-relay' : 'compiled-static-assets', deploymentEnvironment,
+    staticCachePolicy: STATIC_ASSET_CACHE_POLICY,
+    ...(endpoint ? { productionWebSocketUrl: endpoint } : {}), ...(ingest ? { telemetryIngestUrl: ingest } : {}),
+    ...(telemetryRelay ? { telemetryRelay } : {}),
+    files: files.map(({name,sha256})=>({name,sha256})), totalBytes };
   await writeFile(join(output, 'artifact-receipt.json'), JSON.stringify(receipt, null, 2), { flag: 'wx' });
   return { output, files: files.length, totalBytes, projectId, teamId };
 }

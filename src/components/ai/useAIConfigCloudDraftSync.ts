@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { loadCloudAIConfig, setRuntimeAIConfig, type AIConfigState } from './aiConfigStorage';
+import { loadCloudAIConfig, restoreRememberedAIConfig, setRuntimeAIConfig, type AIConfigState } from './aiConfigStorage';
 import { logAIConfigModalCloudLoadFailure } from './aiLogging';
 
 export const useAIConfigCloudDraftSync = (
@@ -8,10 +8,10 @@ export const useAIConfigCloudDraftSync = (
     replaceConfigIfPristine: (config: AIConfigState) => boolean,
 ) => {
     useEffect(() => {
-        if (!open || !userId) return undefined;
+        if (!open) return undefined;
         let active = true;
 
-        loadCloudAIConfig(userId).then((mergedConfig) => {
+        (userId ? loadCloudAIConfig(userId) : restoreRememberedAIConfig(userId)).then((mergedConfig) => {
             if (active && mergedConfig && replaceConfigIfPristine(mergedConfig)) {
                 setRuntimeAIConfig(userId, mergedConfig);
                 window.dispatchEvent(new Event('aiConfigChanged'));

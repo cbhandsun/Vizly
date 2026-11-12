@@ -1,4 +1,4 @@
-import type { DiagramVersion } from './storage/types';
+import type { DiagramVersion, VersionStorageState } from './storage/types';
 import { coerceClipboardData } from '@vizly/core/diagram-import';
 
 const MAX_VERSION_DIAGRAM_ID_LENGTH = 180;
@@ -57,9 +57,35 @@ export const coerceVersionSnapshotData = (snapshotData: unknown) => {
     return snapshot;
 };
 
+export const coerceVersionStorageState = (value: unknown): VersionStorageState | undefined => {
+    if (!isRecord(value) || !['local', 'cloud'].includes(String(value.location))
+        || !['pending', 'synced', 'legacy'].includes(String(value.syncStatus))
+        || !['supabase', 's3'].includes(String(value.provider))
+        || !(value.ownerId === null || isSafeVersionId(value.ownerId))
+        || typeof value.localCreated !== 'boolean') return undefined;
+    return {
+        location: value.location as VersionStorageState['location'],
+        syncStatus: value.syncStatus as VersionStorageState['syncStatus'],
+        provider: value.provider as VersionStorageState['provider'],
+        ownerId: value.ownerId as string | null,
+        localCreated: value.localCreated,
+        ...(['authentication', 'permission', 'configuration', 'data', 'network', 'unknown'].includes(String(value.failure))
+            ? { failure: value.failure as VersionStorageState['failure'] } : {}),
+        ...(isSafeVersionId(value.remoteVersionId) ? { remoteVersionId: value.remoteVersionId } : {}),
+        ...(['queued', 'retrying', 'blocked', 'capacity'].includes(String(value.automaticSync))
+            ? { automaticSync: value.automaticSync as VersionStorageState['automaticSync'] } : {}),
+        ...(typeof value.syncAttempts === 'number' && Number.isInteger(value.syncAttempts) && value.syncAttempts >= 0 && value.syncAttempts <= 8
+            ? { syncAttempts: value.syncAttempts } : {}),
+        ...(typeof value.nextSyncAttemptAt === 'number' && Number.isSafeInteger(value.nextSyncAttemptAt)
+            && value.nextSyncAttemptAt > 0 && value.nextSyncAttemptAt <= MAX_DATE_MS
+            ? { nextSyncAttemptAt: value.nextSyncAttemptAt } : {}),
+    };
+};
+
 export const coerceDiagramVersion = (value: unknown): DiagramVersion | null => {
     try {
         if (!isRecord(value)) return null;
+        if (value.storage !== undefined && !coerceVersionStorageState(value.storage)) return null;
         if (!isSafeVersionId(value.diagramId) || !isSafeVersionId(value.id)) return null;
         if (
             typeof value.createdAt !== 'number'
@@ -70,6 +96,7 @@ export const coerceDiagramVersion = (value: unknown): DiagramVersion | null => {
         const authorId = normalizeDisplayText(value.authorId, MAX_VERSION_AUTHOR_LENGTH);
         return {
             id: value.id.trim(),
+            ...(coerceVersionStorageState(value.storage) ? { storage: coerceVersionStorageState(value.storage) } : {}),
             diagramId: value.diagramId.trim(),
             snapshotData: value.snapshotData == null
                 ? null

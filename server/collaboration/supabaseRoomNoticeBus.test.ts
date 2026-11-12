@@ -6,6 +6,34 @@ import { classifyPrivateSubscription, createSupabaseRoomNoticeBus } from './supa
 const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const notice = { source: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', generation: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', version: '1' };
 describe('Supabase private notification adapter configuration', () => {
+  it('does not restart SDK disconnect when the transport is already closed and no channels remain', async () => {
+    const client = { getChannels: vi.fn(() => []), realtime: { connectionState: vi.fn(() => 'closed'), disconnect: vi.fn(async () => 'ok') } };
+    sdk.createClient.mockReturnValue(client);
+    const bus = createSupabaseRoomNoticeBus('https://example.supabase.co', 'sb_secret_SYNTHETIC_ONLY');
+    await bus.stop();
+    expect(client.realtime.disconnect).not.toHaveBeenCalled();
+  });
+
+
+  it('still disconnects a closed transport with outstanding channels', async () => {
+    const client = { getChannels: vi.fn(() => [{}]), realtime: { connectionState: vi.fn(() => 'closed'), disconnect: vi.fn(async () => 'ok') } };
+    sdk.createClient.mockReturnValue(client);
+    const bus = createSupabaseRoomNoticeBus('https://example.supabase.co', 'sb_secret_SYNTHETIC_ONLY');
+    await bus.stop(); expect(client.realtime.disconnect).toHaveBeenCalledTimes(1);
+  });
+  it.each(['timeout', undefined])('refuses a missing or unsuccessful SDK disconnect receipt %s', async receipt => {
+    const client = { realtime: { connectionState: () => 'open', disconnect: vi.fn(async () => receipt) } };
+    sdk.createClient.mockReturnValue(client);
+    const bus = createSupabaseRoomNoticeBus('https://example.supabase.co', 'sb_secret_SYNTHETIC_ONLY');
+    await expect(bus.stop()).rejects.toThrow(/^Private room notification disposal failed$/);
+    expect(client.realtime.disconnect).toHaveBeenCalledTimes(1);
+  });
+  it('sanitizes an asynchronous SDK disconnect exception', async () => {
+    sdk.createClient.mockReturnValue({ realtime: { connectionState: () => 'open', disconnect: vi.fn(async () => { throw new Error('Synthetic credential must not escape'); }) } });
+    const bus = createSupabaseRoomNoticeBus('https://example.supabase.co', 'sb_secret_SYNTHETIC_ONLY');
+    await expect(bus.stop()).rejects.toThrow(/^Private room notification disposal failed$/);
+  });
+
   it.each([
     ['SUBSCRIBED', undefined, 'SUBSCRIBED', 'none'],
     ['CHANNEL_ERROR', new Error('Invalid JWT sb_secret_SYNTHETIC_ONLY'), 'CHANNEL_ERROR', 'authentication'],
@@ -20,7 +48,7 @@ describe('Supabase private notification adapter configuration', () => {
   });
   it('isolates diagnostic callback failures from channel admission', async () => {
     const channel = { on: vi.fn(), subscribe: vi.fn((callback: (status: string) => void) => callback('SUBSCRIBED')), send: vi.fn(async () => 'ok') };
-    const client = { channel: vi.fn(() => channel), removeChannel: vi.fn(async () => 'ok'), realtime: { disconnect: vi.fn() } };
+    const client = { channel: vi.fn(() => channel), removeChannel: vi.fn(async () => 'ok'), realtime: { connectionState: () => 'open', disconnect: vi.fn(async () => 'ok') } };
     sdk.createClient.mockReturnValue(client);
     const bus = createSupabaseRoomNoticeBus('https://example.supabase.co', 'sb_secret_SYNTHETIC_ONLY', () => { throw new Error('observer failed'); });
     try { const subscription = await bus.subscribe(id, vi.fn(), vi.fn()); await subscription.publish(notice); }
@@ -30,7 +58,7 @@ describe('Supabase private notification adapter configuration', () => {
     const listeners = new Map<string, (message: unknown) => void>();
     const channel = { on: vi.fn((_type: string, filter: { event: string }, callback: (message: unknown) => void) => listeners.set(filter.event, callback)),
       subscribe: vi.fn((callback: (status: string) => void) => callback('SUBSCRIBED')), send: vi.fn(async () => 'ok') };
-    const client = { channel: vi.fn(() => channel), removeChannel: vi.fn(async () => 'ok'), realtime: { disconnect: vi.fn() } };
+    const client = { channel: vi.fn(() => channel), removeChannel: vi.fn(async () => 'ok'), realtime: { connectionState: () => 'open', disconnect: vi.fn(async () => 'ok') } };
     sdk.createClient.mockReturnValue(client);
     const bus = createSupabaseRoomNoticeBus('https://example.supabase.co', 'sb_secret_SYNTHETIC_ONLY');
     try {
@@ -61,7 +89,7 @@ describe('Supabase private notification adapter configuration', () => {
     const channel = { on: vi.fn((_type: string, _filter: unknown, callback: (message: unknown) => void) => { receive = callback; }),
       subscribe: vi.fn((callback: (status: string) => void) => callback('SUBSCRIBED')),
       send: vi.fn(async () => 'ok') };
-    const client = { channel: vi.fn(() => channel), removeChannel: vi.fn(async () => 'ok'), realtime: { disconnect: vi.fn() } };
+    const client = { channel: vi.fn(() => channel), removeChannel: vi.fn(async () => 'ok'), realtime: { connectionState: () => 'open', disconnect: vi.fn(async () => 'ok') } };
     sdk.createClient.mockReturnValue(client);
     const bus = createSupabaseRoomNoticeBus('https://example.supabase.co', 'sb_secret_SYNTHETIC_ONLY');
     try {

@@ -1,0 +1,236 @@
+{
+  "id": "ai-generated-label-reopen",
+  "name": "AI saved label expansion",
+  "type": "flowchart",
+  "edges": [
+    {
+      "id": "e-candidate-submit-review",
+      "type": "advanced-smart-step",
+      "source": "candidate-submit",
+      "target": "candidate-review",
+      "metadata": {
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "manualHandles": false
+      },
+      "markerEnd": {
+        "type": "arrowclosed"
+      }
+    },
+    {
+      "id": "e-candidate-review-done",
+      "type": "advanced-smart-step",
+      "source": "candidate-review",
+      "target": "candidate-done",
+      "metadata": {
+        "sourceHandle": "bottom",
+        "targetHandle": "top",
+        "manualHandles": false
+      },
+      "markerEnd": {
+        "type": "arrowclosed"
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "id": "candidate-submit",
+      "data": {
+        "label": "候选提交"
+      },
+      "type": "custom",
+      "domain": "orders",
+      "metadata": {
+        "shape": "ellipse",
+        "style": {
+          "width": 129,
+          "height": 60
+        },
+        "width": 129,
+        "height": 60,
+        "parentId": "group-orders",
+        "sequence": "1",
+        "canvasNodeType": "flowchart",
+        "canvasPosition": {
+          "x": 50,
+          "y": 60
+        }
+      },
+      "description": "候选提交",
+      "domainClass": "ch"
+    },
+    {
+      "id": "candidate-done",
+      "data": {
+        "label": "候选完成"
+      },
+      "type": "custom",
+      "domain": "orders",
+      "metadata": {
+        "shape": "ellipse",
+        "style": {
+          "width": 129,
+          "height": 60
+        },
+        "width": 129,
+        "height": 60,
+        "parentId": "group-orders",
+        "sequence": "1",
+        "canvasNodeType": "flowchart",
+        "canvasPosition": {
+          "x": 50,
+          "y": 300
+        }
+      },
+      "description": "候选完成",
+      "domainClass": "data"
+    },
+    {
+      "id": "candidate-review",
+      "data": {
+        "label": "候选审核（发布验证）"
+      },
+      "type": "custom",
+      "domain": "orders",
+      "metadata": {
+        "shape": "rectangle",
+        "style": {
+          "width": 129,
+          "height": 60
+        },
+        "width": 129,
+        "height": 60,
+        "parentId": "group-orders",
+        "sequence": "1",
+        "canvasNodeType": "flowchart",
+        "canvasPosition": {
+          "x": 50,
+          "y": 180
+        }
+      },
+      "description": "候选审核（发布验证）",
+      "domainClass": "mid"
+    }
+  ],
+  "theme": {
+    "name": "manual",
+    "domains": {},
+    "isCustom": true,
+    "displayName": "Manual Theme"
+  },
+  "groups": [
+    {
+      "id": "group-orders",
+      "data": {
+        "label": "orders",
+        "domain": "orders",
+        "description": "orders",
+        "domainClass": "ch"
+      },
+      "type": "group",
+      "label": "orders",
+      "domain": "orders",
+      "isGroup": true,
+      "measured": {
+        "width": 300,
+        "height": 410
+      },
+      "metadata": {
+        "style": {
+          "width": 300,
+          "height": 410
+        },
+        "width": 300,
+        "height": 410,
+        "sequence": "1",
+        "canvasNodeType": "titleGroup",
+        "canvasPosition": {
+          "x": -50,
+          "y": -60
+        }
+      },
+      "position": {
+        "x": -50,
+        "y": -60
+      },
+      "description": "orders",
+      "domainClass": "ch"
+    }
+  ],
+  "layout": {
+    "type": "custom",
+    "padding": {
+      "top": 20,
+      "left": 20,
+      "right": 20,
+      "bottom": 20,
+      "vertical": 20,
+      "horizontal": 20
+    },
+    "spacing": {
+      "vertical": 50,
+      "horizontal": 50
+    },
+    "direction": "LR",
+    "autoDirection": true,
+    "fitDomainContent": true
+  },
+  "version": "1.0.0",
+  "metadata": {
+    "title": "AI saved label expansion"
+  },
+  "routingSnapshot": {
+    "schema": "vizly-routing-only-document-v2",
+    "candidate": {
+      "schema": "vizly-routing-only-candidate-v2",
+      "patches": [
+        {
+          "id": "e-candidate-submit-review",
+          "data": {
+            "computedPath": [
+              {
+                "x": 64.5,
+                "y": 60
+              },
+              {
+                "x": 64.5,
+                "y": 120
+              }
+            ]
+          },
+          "type": "stablePath",
+          "source": "candidate-submit",
+          "target": "candidate-review",
+          "sourceHandle": "bottom",
+          "targetHandle": "top"
+        },
+        {
+          "id": "e-candidate-review-done",
+          "data": {
+            "computedPath": [
+              {
+                "x": 64.5,
+                "y": 180
+              },
+              {
+                "x": 64.5,
+                "y": 240
+              }
+            ]
+          },
+          "type": "stablePath",
+          "source": "candidate-review",
+          "target": "candidate-done",
+          "sourceHandle": "bottom",
+          "targetHandle": "top"
+        }
+      ],
+      "hardClean": true,
+      "writtenAt": 1794295608301,
+      "inputSignature": "1967998428",
+      "routingVersion": "34",
+      "inputGeometryDigest": "geometry-v1:ffe86b65ba66a0a990f7d147c07ecfa5",
+      "outputRouteSignature": "route-v2:2:4:654982e506954f4f"
+    }
+  }
+}

@@ -45,6 +45,11 @@ describe('DataRegistry local diagram normalization', () => {
     await dataRegistry.initialize();
     expect(read).toHaveBeenCalledTimes(2);
   });
+  it.each([true, false])('preserves local read-only=%s across normalization', (isReadonly) => {
+    const diagram = normalizeLocalDiagramForRegistry(makeLocalDiagram({ isReadonly }));
+    expect(diagram.isReadonly).toBe(isReadonly);
+  });
+
   it('sanitizes persisted local diagrams before registry insertion', () => {
     const diagram = normalizeLocalDiagramForRegistry(makeLocalDiagram());
 

@@ -1,16 +1,26 @@
-import { expect, test } from '@playwright/test';
+import { expect, test as base, type Locator } from '@playwright/test';
 import en from '../src/locales/en.json' with { type: 'json' };
 
+const test = base.extend<{ authDialog: Locator }>({
+  authDialog: [async ({ page }, use) => {
+    await page.addInitScript(() => localStorage.setItem('i18nextLng', 'en'));
+    await page.goto('/#/manage');
+    await page.getByRole('button', { name: en.workspace.settings, exact: true }).click();
+    await page.getByRole('menuitem', { name: en.workspace.signIn, exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: en.auth.login, exact: true });
+    await expect(dialog).toBeVisible();
+    await use(dialog);
+  }, { timeout: 30_000 }],
+});
+
+// Cold workspace/modal setup has its own bounded fixture budget. Keep the
+// existing five-second interaction/alignment budget after the dialog is ready.
 test.describe.configure({ timeout: 5000 });
 for (const width of [390, 1280]) {
+ test.describe(() => {
+  test.use({ viewport: { width, height: 900 } });
   for (const method of ['password', 'magiclink', 'register'] as const) {
-    test(`authentication labels remain centered in the scrolling body / ${method} / ${width}px`, async ({ page }, testInfo) => {
-      await page.setViewportSize({ width, height: 900 });
-      await page.addInitScript(() => localStorage.setItem('i18nextLng', 'en'));
-      await page.goto('/#/manage');
-      await page.getByRole('button', { name: en.workspace.settings, exact: true }).click();
-      await page.getByRole('menuitem', { name: en.workspace.signIn, exact: true }).click();
-      const dialog = page.getByRole('dialog', { name: en.auth.login, exact: true });
+    test(`authentication labels remain centered in the scrolling body / ${method} / ${width}px`, async ({ authDialog: dialog }, testInfo) => {
       const activeTab = dialog.getByRole('tab', { name: en.auth.modal.tabs[method], exact: true });
       await activeTab.click();
       await expect(activeTab).toHaveAttribute('aria-selected', 'true');
@@ -57,5 +67,6 @@ for (const width of [390, 1280]) {
       await testInfo.attach('authentication alignment', { body: await dialog.screenshot(), contentType: 'image/png' });
     });
   }
+ });
 }
 

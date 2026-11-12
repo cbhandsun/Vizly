@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { build, type Rollup } from 'vite';
@@ -14,15 +14,20 @@ const fixtureDocument = {
   edges: [{ id: 'e1', source: 'n1', target: 'n1', type: 'dependency', label: 'self', custom: true }],
 };
 
-async function buildFixture(assets: Record<string, string | Uint8Array>, base = '/nested/') {
-  const root = await mkdtemp(join(tmpdir(), 'vizly-json-assets-'));
+async function buildFixture(assets: Record<string, string | Uint8Array>, base = '/') {
+  // Keep the fixture root consistent with Vite's resolved source paths on macOS.
+  const root = await mkdtemp(join(await realpath(tmpdir()), 'vizly-json-assets-'));
   try {
     for (const [file, source] of Object.entries(assets)) {
       const absolute = join(root, 'src', file);
       await mkdir(resolve(absolute, '..'), { recursive: true });
       await writeFile(absolute, source);
     }
-    await writeFile(join(root, 'index.html'), '<script type="module" src="/src/main.ts"></script>');
+    // Match the root-mounted production HTML contract, including its independent guard.
+    await mkdir(join(root, 'public/assets'), { recursive: true });
+    await writeFile(join(root, 'public/assets/startup-resource-guard.v1.js'),
+      await readFile(join(appRoot, 'public/assets/startup-resource-guard.v1.js')));
+    await writeFile(join(root, 'index.html'), '<!doctype html><html><head><script src="/assets/startup-resource-guard.v1.js"></script></head><body><script type="module" src="/src/main.ts"></script></body></html>');
     await writeFile(join(root, 'src/main.ts'), Object.keys(assets).map((file, index) =>
       `import url${index} from './${file}?url&no-inline'; globalThis.asset${index} = url${index};`).join('\n'));
     const result = await build({ root, base, configFile: join(appRoot, 'vite.config.ts'), logLevel: 'silent',

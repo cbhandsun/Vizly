@@ -21,7 +21,8 @@ const cleanup: Array<() => void | Promise<void>> = [];
 afterEach(async () => { for (const dispose of cleanup.splice(0).reverse()) await dispose(); });
 
 const setup = async (overrides: Partial<RoomPersistence> = {}, authorizationDelayMs = 0,
-  acquireRoomLease?: CollaborationServerOptions['acquireRoomLease']) => {
+  acquireRoomLease?: CollaborationServerOptions['acquireRoomLease'],
+  observeMessageQueue?: CollaborationServerOptions['observeMessageQueue']) => {
   const permissions = new Map<string, DiagramPermission>([
     ['owner-test', { userId: 'owner-verified', role: 'editor' }],
     ['editor-test', { userId: 'editor-verified', role: 'editor' }],
@@ -38,7 +39,7 @@ const setup = async (overrides: Partial<RoomPersistence> = {}, authorizationDela
     return id === diagram || id === otherDiagram ? permissions.get(token) ?? null : null;
   });
   const log = vi.fn();
-  const server = createCollaborationServer({ authorize, persistence, acquireRoomLease, origins: new Set([origin]), recheckMs: 40, log });
+  const server = createCollaborationServer({ authorize, persistence, acquireRoomLease, observeMessageQueue, origins: new Set([origin]), recheckMs: 40, log });
   const address = await server.listen();
   cleanup.push(() => server.stop());
   return { ...address, server, permissions, stored, authorize, log };
@@ -83,6 +84,61 @@ const setPeerElement = (client: Awaited<ReturnType<typeof peer>>, kind: 'nodes' 
 };
 
 describe('authenticated collaboration over actual loopback WebSockets', () => {
+  it('authorizes each immediate read reply once and freshly denies the next request after revocation', async () => {
+    let revoked = false;
+    const authorize = vi.fn(async () => revoked ? null : { userId: 'verified-reader', role: 'viewer' as const });
+    const server = createCollaborationServer({ authorize, origins: new Set([origin]), recheckMs: 60_000,
+      persistence: { load: async () => null, save: async () => { throw new Error('Unexpected write'); } } });
+    const { url } = await server.listen();
+    cleanup.push(() => server.stop());
+    // Register before opening: fast synthetic authorization can complete in
+    // the same packet as the WebSocket upgrade.
+    const socket = new WebSocket(`${url}/vizly-room-${diagram}?token=synthetic-reader`, { origin });
+    cleanup.push(() => socket.terminate());
+    const kinds: number[] = [];
+    socket.on('message', data => kinds.push(new Uint8Array(data as Buffer)[0]));
+    await vi.waitFor(() => expect(kinds).toContain(0));
+    authorize.mockClear(); kinds.length = 0;
+    socket.send(Uint8Array.of(3));
+    await vi.waitFor(() => expect(kinds).toEqual([1]));
+    expect(authorize).toHaveBeenCalledTimes(1);
+    const doc = new Y.Doc();
+    try {
+      const encoder = encoding.createEncoder(); encoding.writeVarUint(encoder, 0); sync.writeSyncStep1(encoder, doc);
+      socket.send(encoding.toUint8Array(encoder));
+      await vi.waitFor(() => expect(kinds).toEqual([1, 0]));
+      expect(authorize).toHaveBeenCalledTimes(2);
+      revoked = true;
+      const closed = new Promise<number>(resolve => socket.once('close', resolve));
+      socket.send(Uint8Array.of(3));
+      expect(await closed).toBe(1008);
+      expect(authorize).toHaveBeenCalledTimes(3);
+      expect(kinds).toEqual([1, 0]);
+    } finally { doc.destroy(); }
+  });
+  it('observes bounded content-free queue delay without allowing observer failures to reject messages', async () => {
+    const samples: Array<Readonly<{ waitMs: number; connectionPending: number }>> = [];
+    const runtime = await setup({}, 10, undefined, sample => {
+      samples.push(sample);
+      throw new Error('Synthetic diagnostic adapter failure');
+    });
+    const socket = await raw(runtime.url, 'editor-test');
+    let responses = 0;
+    socket.on('message', data => { if (new Uint8Array(data as Buffer)[0] === 1) responses++; });
+    for (let i = 0; i < 8; i++) socket.send(Uint8Array.of(3));
+    await vi.waitFor(() => expect(responses).toBe(8), { timeout: 3000 });
+    expect(socket.readyState).toBe(WebSocket.OPEN);
+    expect(samples).toHaveLength(8);
+    for (const sample of samples) {
+      expect(Object.keys(sample).sort()).toEqual(['connectionPending', 'waitMs']);
+      expect(Object.isFrozen(sample)).toBe(true);
+      expect(Number.isFinite(sample.waitMs) && sample.waitMs >= 0).toBe(true);
+      expect(sample.connectionPending).toBeGreaterThanOrEqual(1);
+      expect(sample.connectionPending).toBeLessThanOrEqual(16);
+    }
+    expect(samples.at(-1)!.waitMs).toBeGreaterThan(samples[0].waitMs);
+    expect(runtime.stored.size).toBe(0);
+  });
   const externalLease = () => {
     const controller = new AbortController();
     const lease: DistributedRoomLease = {
@@ -515,7 +571,7 @@ describe('authenticated collaboration over actual loopback WebSockets', () => {
     const runtime = await setup({ load: async () => Uint8Array.from([255]) });
     await expect(raw(runtime.url, 'owner-test')).rejects.toThrow('403');
     runtime.authorize.mockRejectedValueOnce(new Error('Synthetic credential error'));
-    await expect(raw(runtime.url, 'owner-test')).rejects.toThrow('403');
+    await expect(raw(runtime.url, 'owner-test')).rejects.toThrow('503');
     expect(runtime.log).toHaveBeenCalledWith('authorization-failed');
   });
 });

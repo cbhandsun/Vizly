@@ -1,0 +1,47 @@
+# Native Linux/macOS compatibility; other engineering and business gates remain mandatory.
+name: Vizly native CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  macos:
+    runs-on: vizly-app-macos
+    timeout-minutes: 120
+    steps:
+      - uses: builtin:checkout
+        with:
+          persist-credentials: false
+      - name: Native Darwin compatibility
+        shell: python
+        run: |
+          import subprocess, sys
+          subprocess.run([sys.executable, "-B", "-m", "unittest", "discover", "-s", ".devfleet", "-p", "test_native_ci.py"], check=True)
+          subprocess.run([sys.executable, ".devfleet/native_ci.py", "--project", "app", "--expected-os", "Darwin"], check=True)
+  linux:
+    runs-on: vizly-app-linux
+    timeout-minutes: 120
+    steps:
+      - uses: builtin:checkout
+        with:
+          persist-credentials: false
+      - name: Native Linux compatibility
+        shell: python
+        run: |
+          import subprocess, sys
+          subprocess.run([sys.executable, "-B", "-m", "unittest", "discover", "-s", ".devfleet", "-p", "test_native_ci.py"], check=True)
+          subprocess.run([sys.executable, ".devfleet/native_ci.py", "--project", "app", "--expected-os", "Linux"], check=True)
+  native-complete:
+    if: always()
+    needs: [macos, linux]
+    runs-on: vizly-app-linux
+    steps:
+      - name: Require every daily native job
+        shell: python
+        run: |
+          results = ["${{ needs.macos.result }}", "${{ needs.linux.result }}"]
+          if results != ["success", "success"]:
+              raise SystemExit("Every Linux/macOS native job must succeed")
+          print("Native policy linux-macos-v1 passed; Windows compatibility is separate, not verified by this workflow.")

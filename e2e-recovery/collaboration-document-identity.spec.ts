@@ -28,7 +28,7 @@ const prepare = async (page: Page, provider: 'local' | 's3') => {
   await page.goto('/#/manage');
   await expect.poll(() => page.evaluate(() => window.__currentUserId)).toBe(userId);
   await page.evaluate(async ({ id, provider, nodeLabel }) => {
-    const request = indexedDB.open('VizlyLocalDB', 2);
+    const request = indexedDB.open('VizlyLocalDB');
     request.onupgradeneeded = () => {
       const versions = request.result.createObjectStore('diagram_versions', { keyPath: 'id' });
       versions.createIndex('diagramId', 'diagramId'); versions.createIndex('createdAt', 'createdAt');

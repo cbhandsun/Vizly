@@ -74,7 +74,15 @@ export const useDiagramViewerCollaboration = ({
   }, [selectedDiagramId, recoveryContext]);
   const isLocalSnapshotReady = useCallback(() => getFlowDataBridge(selectedDiagramId)?.isCanvasReady?.() === true, [selectedDiagramId]);
   const collaborationEnabled = Boolean(serverUrl) && wantsCollaboration && roomBinding.valid;
+  const resolveToken = useCallback(async () => {
+    const { resolveCollaborationSessionToken } = await import('@/services/collaborationSession');
+    return resolveCollaborationSessionToken(userId);
+  }, [userId]);
+  // A configured Auth backend must also fence the initial session-loading gap.
+  // Optional-token transports remain available when Auth is unconfigured.
+  const requiresSession = Boolean(import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_ANON_KEY);
   const collaboration = useDeferredYjsCollaboration({
+    resolveToken: requiresSession ? resolveToken : undefined,
     userId,
     roomName,
     serverUrl,
@@ -132,6 +140,7 @@ export const useDiagramViewerCollaboration = ({
     ...collaboration,
     collaborationStatus,
     pushLocalChangesToYjs,
+    hasVerifiedEditingAccess: collaborationEnabled && collaboration.accessRole === 'editor',
     isCollaborationReadOnly: (collaborationEnabled && collaboration.accessRole !== 'editor') || previewReadOnly || recoveryReadOnly,
     restoreCloudRoom,
     canPersistCanvas,

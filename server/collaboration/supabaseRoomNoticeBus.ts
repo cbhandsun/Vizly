@@ -48,7 +48,12 @@ export const createSupabaseRoomNoticeBus = (url: string, serverKey: string,
         async close() { return await client.removeChannel(channel) === 'ok'; },
       };
     },
-    disconnect() { client.realtime.disconnect(); },
+    async disconnect() {
+      // The SDK starts a fallback timer even for an already-closed socket.
+      // A closed transport with no channels has nothing left to disconnect.
+      if (client.realtime.connectionState() === 'closed' && client.getChannels().length === 0) return;
+      if (await client.realtime.disconnect() !== 'ok') throw new Error('Private notification disconnect failed');
+    },
   };
   return createPrivateRoomNoticeBus(realtime);
 };

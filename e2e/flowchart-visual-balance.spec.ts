@@ -73,7 +73,9 @@ async function capturePaintAndGeometry(page: Page) {
                 const marker = path.getAttribute('marker-end');
                 const markerId = marker?.match(/#([^)'"]+)/u)?.[1];
                 const markerNode = markerId ? document.getElementById(markerId) : null;
-                return { d: path.getAttribute('d'), marker, markerWidth: markerNode?.getAttribute('markerWidth'), markerHeight: markerNode?.getAttribute('markerHeight'), stroke: style.stroke, width: style.strokeWidth, dash: style.strokeDasharray, filter: style.filter };
+                const markerShape = markerNode?.querySelector('path, polyline, polygon');
+                const markerFill = markerShape ? getComputedStyle(markerShape).fill : null;
+                return { d: path.getAttribute('d'), marker, markerFill, markerWidth: markerNode?.getAttribute('markerWidth'), markerHeight: markerNode?.getAttribute('markerHeight'), stroke: style.stroke, width: style.strokeWidth, dash: style.strokeDasharray, filter: style.filter };
             }),
             // Selecting the edge opens the inspector and recenters the entire
             // viewport. Keep label geometry relative to that viewport so this
@@ -104,7 +106,9 @@ for (const theme of ['light', 'dark']) {
         await expect(source.locator('.flowchart-node-title')).toHaveCSS('margin-bottom', '0px');
         await expect(trace).toHaveCSS('opacity', '0');
         const before = await capturePaintAndGeometry(page);
-        expect(before.routes[0]).toMatchObject({ stroke: 'rgb(251, 191, 36)', width: '2px', markerWidth: '20', markerHeight: '20' });
+        const paintColor = theme === 'light' ? 'rgb(187, 142, 27)' : 'rgb(251, 191, 36)';
+        expect(before.routes).toHaveLength(1);
+        expect(before.routes[0]).toMatchObject({ stroke: paintColor, markerFill: paintColor, width: '2px', dash: '7px, 3px', markerWidth: '20', markerHeight: '20', filter: 'none' });
 
         await label.hover();
         await expect(trace).toHaveCSS('opacity', '1');
@@ -113,12 +117,13 @@ for (const theme of ['light', 'dark']) {
         await expect(unrelated).not.toHaveAttribute('data-edge-trace-role');
         await expect(source.locator('.flowchart-node')).toHaveCSS('outline-width', '2px');
         expect(await capturePaintAndGeometry(page)).toEqual(before);
-        // Contrast protection remains visible underneath the low contrast authored route.
-        const underlays = await edge.locator('.vizly-edge-contrast-underlay:not(.shared-trunk-accent-trace-underlay)').evaluateAll(paths => paths.map(path => ({ opacity: getComputedStyle(path).opacity, ratio: Number(path.getAttribute('data-edge-contrast-underlay-ratio')) })));
-        if (theme === 'light') expect(underlays.length).toBeGreaterThan(0);
-        for (const underlay of underlays) {
-            expect(underlay.opacity).toBe('1');
-            expect(underlay.ratio).toBeGreaterThanOrEqual(3);
+        // Contrast uses one shade on the semantic path and arrow, never a
+        // second dashed stroke or halo, including during active tracing.
+        await expect(edge.locator('.vizly-edge-contrast-underlay, [class*="marker-outline"]')).toHaveCount(0);
+        await expect(edge.locator('.stable-path-semantic-fragment')).toHaveCount(1);
+        if (theme === 'light') {
+            const ratio = Number(await edge.locator('.stable-path-semantic-fragment').getAttribute('data-edge-paint-contrast-ratio'));
+            expect(ratio).toBeGreaterThanOrEqual(3);
         }
         await testInfo.attach('label hover', { body: await page.screenshot(), contentType: 'image/png' });
         await page.mouse.move(10, 10);

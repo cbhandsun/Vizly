@@ -42,6 +42,8 @@ export async function runCollaborationAtomicStoreRegression(runDocker, container
     loser = asyncSql("set application_name = 'vizly_cas_loser'; set role service_role;\n" + exchange);
     const observe = asyncSql(`DO $$ DECLARE deadline timestamptz := clock_timestamp() + interval '2 seconds'; BEGIN
       LOOP
+        -- This DO transaction otherwise keeps its first activity snapshot.
+        PERFORM pg_stat_clear_snapshot();
         EXIT WHEN EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname = current_database()
           AND application_name = 'vizly_cas_loser' AND wait_event_type = 'Lock'
           AND wait_event = 'advisory' AND cardinality(pg_blocking_pids(pid)) > 0);

@@ -8,6 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ docs: [] as Y.Doc[] }));
 vi.mock('y-websocket', () => ({
   WebsocketProvider: class {
+    connect = vi.fn();
+    disconnect = vi.fn();
     messageHandlers = [];
     awareness = { clientID: 1, setLocalStateField: vi.fn(), getStates: () => new Map(), on: vi.fn(), off: vi.fn() };
     on = vi.fn();

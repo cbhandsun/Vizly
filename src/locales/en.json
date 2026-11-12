@@ -235,6 +235,17 @@
     }
   },
   "designer": {
+    "hierarchyRecovery": {
+      "download": "Download original data",
+      "title": "This diagram needs recovery",
+      "description": "Some parent relationships are invalid. Loading and automatic saving are paused. Recovery will disconnect only the relationships listed below and keep the nodes and valid connections. Stored coordinates are retained, so some nodes may move.",
+      "backup": "Before recovery, an exact local backup will be kept in this browser. If the backup cannot be saved, recovery will stop. Cancel leaves the original document unchanged.",
+      "backupFailed": "The original data could not be backed up. Nothing was restored. Check browser storage and try again.",
+      "recover": "Back up and recover",
+      "missing-node-parent": "Parent is missing",
+      "self-node-parent": "Node is its own parent",
+      "cyclic-node-parent": "Parent relationship forms a cycle"
+    },
     "connection": {
       "keyboardPending": "Source selected. Tab to a target port and press Enter to connect; Escape cancels.",
       "keyboardInvalid": "Cannot connect to this target. Choose another port or press Escape to cancel.",
@@ -589,7 +600,7 @@
       "diffView": "Diff View",
       "historyPanel": "History",
       "operationHistory": "Operation history",
-      "versionHistory": "Version snapshots",
+      "versionHistory": "Version history",
       "smartOptimize": "Smart Optimize (resolve overlaps & align)",
       "pluginManager": "Plugin Manager",
       "commentMode": "Comment Mode (C)",
@@ -1236,6 +1247,29 @@
       "beforeUngroup": "Before ungrouping — Groups {{groups}}, nodes {{nodes}}"
     },
     "versionHistoryPanel": {
+      "exportFailed": "Could not export the local copy. Please retry.",
+      "cloudSaved": "Saved to cloud",
+      "localSaved": "Saved on this device only; not synced",
+      "automaticSync": {
+        "queued": "Waiting to sync automatically when online and signed in to the original account.",
+        "retrying": "Attempted {{count}} times; automatic retry scheduled.",
+        "blocked": "Automatic retries stopped. Resolve the issue below and retry manually. Your local copy is retained.",
+        "capacity": "The sync queue is full. Your local copy is retained; sync it manually.",
+        "paused": "Automatic sync is paused. Your local copy is retained and manual sync is available."
+      },
+      "nextSyncAttempt": "Next attempt: {{time}}",
+      "legacyLocal": "Legacy local record: unknown owner; no automatic upload",
+      "retrySync": "Retry cloud sync",
+      "exportLocal": "Export local copy",
+      "retryFailed": "Sync incomplete. The local copy is retained; check the reason before retrying.",
+      "failure": {
+        "authentication": "Sign in again before retrying.",
+        "permission": "Permission denied. Ask the diagram owner for access.",
+        "configuration": "Configure the selected storage service first.",
+        "data": "The diagram or data does not meet cloud requirements. Save as a cloud diagram first.",
+        "network": "Network or service unavailable. Retry manually later.",
+        "unknown": "Cloud result unconfirmed. Check cloud versions first; retrying may create duplicates."
+      },
       "title": "Version history",
       "close": "Close version history",
       "createTitle": "Create snapshot",
@@ -1654,8 +1688,10 @@
     "autoSwitched": "Auto-switched to: {{name}}",
     "modelSwitched": "Switched to: {{name}}",
     "configStatusTitle": "AI connection is not ready",
+    "restoringKeyTitle": "Restoring your saved AI key",
     "configureNow": "Configure now",
     "configReason": {
+      "restoring-api-key": "Restoring the encrypted key saved in this browser. You do not need to enter it again.",
       "missing-model": "Enable at least one provider and model.",
       "missing-base-url": "{{provider}} needs a Base URL.",
       "invalid-base-url": "{{provider}} must use HTTPS or a local HTTP address.",
@@ -1716,6 +1752,7 @@
       "analyzing": "Analyzing...",
       "nodeNotFound": "Node not found: {{label}}",
       "noMatchFound": "No match: {{keyword}}",
+      "saveFailed": "Save failed: {{error}}",
       "savingTo": "Saving to {{target}}...",
       "saveSuccess": "Saved",
       "smartLayout": "Smart layout applied",
@@ -1743,6 +1780,38 @@
       "analyzeDescription": "Analyze the current diagram and return a structured report",
       "brainstormDescription": "Expand the selected node with related ideas (mind maps only)",
       "tip": "Tip: press Alt + / to toggle the panel, or type / to browse commands."
+    },
+    "edit": {
+      "mode": "AI work mode",
+      "nodes": "nodes",
+      "scope": {
+        "generate": "Generate new content",
+        "selection": "Edit selected nodes only",
+        "diagram": "Edit the whole diagram"
+      },
+      "emptySelection": "Select the nodes you want to edit first.",
+      "tooLarge": "This scope is too large. Select a smaller part and try again.",
+      "stale": "The diagram or session changed. Generate a new proposal from the current canvas.",
+      "outOfScope": "The AI proposed changes outside the selected scope. Nothing was applied.",
+      "invalid": "Unable to prepare valid diagram changes. Check the AI output.",
+      "readonly": "This diagram is read-only or does not support this editing method.",
+      "preview": "AI change preview",
+      "strategy": "Apply mode",
+      "strategyAppend": "Append to canvas",
+      "strategyReplace": "Replace the whole diagram",
+      "summary": "{{added}} additions · {{updated}} updates · {{removed}} removals",
+      "action": "Change",
+      "before": "Before",
+      "after": "After",
+      "add": "Add",
+      "update": "Update",
+      "remove": "Remove",
+      "node": "node",
+      "edge": "edge",
+      "undoHint": "The canvas stays unchanged until you confirm. Use canvas Undo once to restore the entire batch.",
+      "confirm": "Apply changes",
+      "applied": "Changes applied. Use canvas Undo to restore the entire batch.",
+      "saveCanvas": "Save current canvas"
     }
   },
   "export": {
@@ -3612,9 +3681,21 @@
     "apiConfig": "API Connection Config",
     "testConnection": "Test Connection",
     "baseUrlLabel": "API Base URL",
+    "directTransportDeploymentHint": "This deployment connects directly to your configured model service. Cloud saves still use Supabase.",
+    "requiredGatewayDeploymentHint": "This deployment requires model requests to use the AI gateway.",
+    "directTransportLabel": "Connect directly from browser",
+    "directTransportHint": "Connect to this provider from your browser without the Vizly AI gateway or its rate limits. Required gateway mode takes precedence.",
     "baseUrlHint": "Use HTTPS, or HTTP for localhost/127.0.0.1 only",
     "invalidProviderBaseUrl": "{{name}}: Base URL must use HTTPS or local HTTP (localhost/127.0.0.1).",
     "apiKeyLabel": "API Key",
+    "sessionKeyNotice": "Without encrypted local storage enabled, the key is valid only in this page and must be re-entered after reload or sign-out.",
+    "credentialState": {
+      "unconfigured": "No key configured",
+      "required": "Re-enter the key for this session",
+      "legacy-unavailable": "Legacy credential not restored. Re-enter your key; the old record is unchanged.",
+      "ready": "Key ready for this session",
+      "draft": "This key has not been saved. You can test it; Save All before using it in the AI workbench."
+    },
     "showApiKey": "Show API Key",
     "hideApiKey": "Hide API Key",
     "platformName": "Platform Name",
@@ -3644,8 +3725,8 @@
     "currentActive": "Active: {{name}}",
     "selectProvider": "Select provider",
     "newProviderName": "New Provider",
-    "saveSuccess": "Saved locally",
-    "saveSuccessCloud": "Saved to cloud",
+    "saveSuccess": "Settings saved; key valid only in this page.",
+    "saveSuccessCloud": "Settings synced; key kept in this page only",
     "saveAgainForLatestChanges": "Earlier changes were saved. Choose Save All again for edits made during saving.",
     "cloudSyncFail": "Cloud sync failed, saved locally",
     "switchedTo": "Switched to: {{name}}",
@@ -3689,7 +3770,26 @@
       "localNotice": "Local services can omit the key; requests are sent only to the current local address.",
       "remoteNotice": "Tests and model sync send requests to the current Base URL; keys are not written to logs.",
       "verifiedNotice": "A real request succeeded with the current Base URL and credentials; test again after changing connection settings.",
-      "failureNotice": "The request did not complete. Check the network, Base URL, and credentials, then retry."
+      "failureNotice": "The request did not complete. Check the network, Base URL, and credentials, then retry.",
+      "failureDetails": {
+        "network": "Network or CORS failure. Check the service address, network, and whether the service allows cross-origin requests from this website.",
+        "unauthorized": "Access denied. Check the API key and model permissions.",
+        "rateLimited": "Rate or quota limit reached. Check usage and retry later.",
+        "unavailable": "The model service is temporarily unavailable.",
+        "invalidResponse": "The service did not return a valid model response. Check model compatibility.",
+        "timeout": "The model response timed out. Check the service and retry.",
+        "unknown": "Check model availability and service configuration."
+      }
+    },
+    "vault": {
+      "remember": "Remember key encrypted in this browser",
+      "notice": "Opt in and save to encrypt the key in this browser, scoped to your account and service address, and restore it after reload. Keys never sync to the cloud. Malicious scripts controlling this website could still use them.",
+      "forget": "Delete key saved on this device",
+      "forgotten": "The saved and current-session key were cleared.",
+      "saved": "Settings saved. Key encrypted in this browser.",
+      "savedCloud": "Settings synced. Key encrypted only in this browser.",
+      "saveFailed": "Unable to save or delete the local key. Check browser storage permissions and retry.",
+      "unavailable": "Encrypted key storage is unavailable in this browser."
     }
   },
   "storageConfig": {

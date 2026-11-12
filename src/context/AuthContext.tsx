@@ -8,6 +8,7 @@ import {
     logAuthRuntimeStateClearFailure,
     logCloudAdapterConfigurationFailure,
 } from './authLogging';
+import { getAuthSessionBoundaryId, updateAuthSessionOwner } from './authSessionBoundary';
 import { clearAuthSensitiveRuntimeState } from './authSensitiveRuntime';
 
 declare global {
@@ -113,6 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const applySession = useCallback((session: Session | null) => {
         const nextUserId = session?.user?.id ?? null;
         const previousUserId = lastUserIdRef.current;
+        updateAuthSessionOwner(nextUserId, getAuthSessionBoundaryId(session?.access_token));
         if (previousUserId && previousUserId !== nextUserId) {
             void clearSensitiveRuntimeState(previousUserId);
         }

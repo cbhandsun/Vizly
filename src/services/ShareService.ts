@@ -322,6 +322,10 @@ class ShareService {
             };
         }
 
+        // A successful RPC is authoritative, including a revoked/missing share.
+        // Querying legacy tables here can turn that result into a permission error.
+        if (!rpcError) return null;
+
         // Older databases may not have the hardened RPC yet. Keep the legacy
         // path as a compatibility fallback; RLS will still decide access.
         if (rpcError && !isMissingRpcError(rpcError)) throwShareLookupFailure();

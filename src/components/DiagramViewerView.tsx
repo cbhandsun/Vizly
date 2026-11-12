@@ -21,11 +21,6 @@ import { shouldHideDiagramViewerCenterIsland } from './diagramViewerChrome';
 import { SettingsPanelBoundary } from './ui/SettingsPanelBoundary';
 import { DraggableSettingsPanel } from './ui/DraggableSettingsPanel';
 import { DeferredCommandPalette } from './ui/DeferredCommandPalette';
-import { readRegisteredReactFlowSnapshot } from '@vizly/core/rendering';
-import {
-    migrateStaleDesktopViewportSessionStorage,
-    useDiagramTopControlInterceptor,
-} from './diagramTopViewport';
 import type { CoordinationProblem } from '../../server/collaboration/coordinationStatus';
 
 const CollaborationRecoveryBanner = lazy(() => import('./diagrams/ui/CollaborationRecoveryBanner').then(module => ({
@@ -73,12 +68,13 @@ interface DiagramViewerViewProps {
     mainFlowAnimationEnabled: boolean;
     setMainFlowAnimationEnabled: (value: boolean) => void;
     isReadonly: boolean;
-    onReadonlyChange: (value: boolean) => void;
+    onReadonlyChange?: (value: boolean) => void;
     isPresentationMode: boolean;
     onExitPresentation: () => void;
     isFullscreen: boolean;
     handleToggleFullscreen: () => void;
     resolvedPluginId?: string;
+    aiPluginId?: string;
     handleTemplateChange: (value: string[], leafKey: string, rootGroup: string) => void;
     commandItems: CommandItem[];
     isCommandOpen: boolean;
@@ -157,6 +153,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
     isFullscreen,
     handleToggleFullscreen,
     resolvedPluginId,
+    aiPluginId,
     handleTemplateChange,
     commandItems,
     isCommandOpen,
@@ -229,15 +226,6 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
         setHasMountedAIConfig(true);
         setAiConfigVisible(true);
     }, [setAiConfigVisible]);
-
-    if (typeof window !== 'undefined') {
-        migrateStaleDesktopViewportSessionStorage(window.sessionStorage);
-    }
-    const readActiveDiagramSnapshot = useCallback(
-        () => readRegisteredReactFlowSnapshot(selectedDiagramId),
-        [selectedDiagramId],
-    );
-    useDiagramTopControlInterceptor(selectedDiagramId, readActiveDiagramSnapshot);
 
     useEffect(() => subscribeMindMapAIConfigRequest(openAIConfig), [openAIConfig]);
 
@@ -364,6 +352,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                                                 onReadonlyChange={onReadonlyChange}
                                                 onExportPermissionCheck={onExportPermissionCheck}
                                                 isYjsSynced={isYjsSynced}
+                                                collaborationMode="host"
                                                 collaborationStatus={collaborationStatus}
                                                 canPersistCanvas={canPersistCanvas}
                                                 onOpenCollaboration={openCollaborationModal}
@@ -386,7 +375,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                                                     <Suspense fallback={<div className="p-4 text-center text-gray-500">Loading AI...</div>}>
                                                         <AIChatView
                                                             onOpenConfig={openAIConfig}
-                                                            pluginId={resolvedPluginId || 'flowchart-diagram'}
+                                                            pluginId={aiPluginId || resolvedPluginId || 'flowchart'}
                                                             diagramId={selectedDiagramId}
                                                             onPreviewJson={handlePreviewAIJson}
                                                             onApplyJson={handleApplyAIJson}

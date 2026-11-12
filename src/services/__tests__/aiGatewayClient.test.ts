@@ -2,8 +2,16 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   probeAIGateway,
   requestAIGatewayChatCompletion,
+  resolveAIGatewayFunctionName,
 } from '../ai/aiGatewayClient';
 import { AIProviderInvalidRequestError } from '../ai/aiProviderClient';
+
+it('keeps candidate selection within gateway function names', () => {
+  expect(resolveAIGatewayFunctionName('ai-gateway-candidate')).toBe('ai-gateway-candidate');
+  for (const input of [undefined, '', 'https://other.example', '../other', 'ai-gateway?token=private', 'other-function']) {
+    expect(resolveAIGatewayFunctionName(input)).toBe('ai-gateway');
+  }
+});
 
 const PROVIDER_KEY_CANARY = ['provider', 'key', 'canary'].join('-');
 const JWT_CANARY = ['header', 'payload', 'signature'].join('.');
@@ -78,4 +86,12 @@ describe('aiGatewayClient', () => {
     })).rejects.toBeInstanceOf(AIProviderInvalidRequestError);
     expect(fetchImplementation).not.toHaveBeenCalled();
   });
+  it('does not enable autonomous tools for a preview-only edit or connection check', async () => {
+    const fetchImplementation = vi.fn().mockResolvedValue(new Response('data: [DONE]\n\n'));
+    await requestAIGatewayChatCompletion(provider, { model: 'deepseek-chat', messages: [{ role: 'user', content: 'edit' }] },
+      { ...gatewayOptions, fetchImplementation, toolMode: 'none' });
+    expect(JSON.parse(String(fetchImplementation.mock.calls[0][1].body))).not.toHaveProperty('toolMode');
+  });
+
+
 });

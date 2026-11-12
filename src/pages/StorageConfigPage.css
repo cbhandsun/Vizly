@@ -133,11 +133,20 @@
     margin-top: 20px;
 }
 
-.storage-config-card {
+/* Keep the surface in sync with page labels while AntD initializes its theme. */
+.storage-config-page .storage-config-card {
     border-radius: 12px;
     background: var(--vz-storage-surface);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 16px 32px -8px rgba(0, 0, 0, 0.05);
     backdrop-filter: blur(20px);
+}
+
+/* Theme foregrounds and surfaces must switch together without a low-contrast frame. */
+.storage-config-page .storage-config-card,
+.storage-config-card .ant-card-head-title,
+.storage-config-card .ant-form-item-label > label,
+.storage-config-card .ant-form-item-explain-error {
+    transition: none;
 }
 
 .storage-config-card .ant-card-head-title {
@@ -228,6 +237,6 @@
     .storage-config-page *::before,
     .storage-config-page *::after {
         scroll-behavior: auto !important;
-        transition-duration: 0.01ms !important;
+        transition: none !important;
     }
 }

@@ -40,6 +40,28 @@ const liveState = (cloud: RoomCheckpoint, width: number, height: number, styleWi
 };
 
 describe('cloud saves of collaborative geometry', () => {
+  it('reconciles a newly laid-out group with its own cloud save', async () => {
+    const baseline = await cloudCheckpoint(firstRevision, 150, 60, 150, 60);
+    const cloud = await createCloudRoomCheckpoint(async () => ({ diagramId: id, revision: nextRevision,
+      content: { id, name: 'Synthetic', type: 'flowchart', version: '1.0.0',
+        nodes: [], edges: [], groups: [{ id: 'titlegroup-orders', type: 'group', label: 'Orders',
+          metadata: { canvasPosition: { x: 0, y: 0 }, width: 362, height: 672,
+            style: { width: 362, height: 672, zIndex: -10 } } }] },
+    }), standardDataToCanvas)({ diagramId: id, userId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', token: 'synthetic-unused' });
+    expect(readCollaborationElement(document(cloud.base).getMap('flowchart-nodes').get('titlegroup-orders')))
+      .toMatchObject({ zIndex: -1 }); // Historical converter baseline stays readable on rollback.
+    const live = document(reconcileRoomCheckpoint(null, cloud).state);
+    const group = readCollaborationElement(live.getMap('flowchart-nodes').get('titlegroup-orders'));
+    expect(group).toMatchObject({ zIndex: -10 });
+    publishCollaborationElement(live.getMap('flowchart-nodes'), 'titlegroup-orders', { ...group, zIndex: -10 });
+    const state = Y.encodeStateAsUpdate(live);
+    expect(reconcileRoomCheckpoint({ state, checkpoint: { revision: firstRevision, base: baseline.base } }, cloud).revision)
+      .toBe(nextRevision);
+    // A genuinely different concurrent stacking edit must still be rejected.
+    publishCollaborationElement(live.getMap('flowchart-nodes'), 'titlegroup-orders', { ...group, zIndex: -20 });
+    expect(() => reconcileRoomCheckpoint({ state: Y.encodeStateAsUpdate(live),
+      checkpoint: { revision: firstRevision, base: baseline.base } }, cloud)).toThrow(CloudRoomConflictError);
+  });
   it('accepts the same saved canvas without confusing measured dimensions and rendering styles', async () => {
     const baseline = await cloudCheckpoint(firstRevision, 83, 81, 83, 81);
     const cloud = await cloudCheckpoint(nextRevision, 143, 75, 83, 111);

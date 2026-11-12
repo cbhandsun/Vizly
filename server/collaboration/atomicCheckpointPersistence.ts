@@ -1,3 +1,4 @@
+import { observeServerOperation } from './serverTelemetry.js';
 import { createAtomicRoomCommitter, isRoomGeneration, parseAtomicRoomSnapshot, type AtomicRoomStore } from './atomicRoomCommit.js';
 import type { DistributedRoomLease } from './distributedRoomLease.js';
 import type { CheckpointPersistence } from './persistence.js';
@@ -6,6 +7,15 @@ import { reconcileRoomCheckpoint } from './roomCheckpointCoordination.js';
 import { mergeCheckpointProposal } from './checkpointProposal.js';
 import { acceptPersistedRoomState } from './acceptedRoomState.js';
 import { CloudRoomConflictError } from './cloudRoomReconciliation.js';
+
+// The binary format deliberately excludes cloud-only merge hints. Snapshot
+// them separately before storage awaits, including each mutable role array.
+const cloneCloudMergeHints = (checkpoint: RoomCheckpoint) => ({
+  ...(checkpoint.automaticHandleRoles ? { automaticHandleRoles: new Map(
+    [...checkpoint.automaticHandleRoles].map(([id, roles]) => [id, [...roles]] as const),
+  ) } : {}),
+  ...(checkpoint.canvasNodeZIndexes ? { canvasNodeZIndexes: new Map(checkpoint.canvasNodeZIndexes) } : {}),
+});
 
 /** Bind persistence to one admitted room and its immutable generation. */
 export const createAtomicCheckpointPersistence = (id: string, lease: DistributedRoomLease, store: AtomicRoomStore): CheckpointPersistence => {
@@ -26,7 +36,8 @@ export const createAtomicCheckpointPersistence = (id: string, lease: Distributed
     async compareExchange(key, nextGeneration, version, record) {
       guard(key);
       if (nextGeneration !== generation) throw new Error('Checkpoint room generation changed');
-      const exchanged = await store.compareExchange(roomId, generation, version, record);
+      const exchanged = await observeServerOperation('cas', () => store.compareExchange(roomId, generation, version, record),
+        result => result === true ? null : result === false ? 'conflict' : 'invalid');
       guard(key); return exchanged;
     },
   };
@@ -50,14 +61,14 @@ export const createAtomicCheckpointPersistence = (id: string, lease: Distributed
       guard(key);
       const copied = decodeRoomRecord(encodeRoomCheckpoint(proposed));
       if (!copied.checkpoint) throw new Error('Missing checkpoint metadata');
-      const checkpoint = { ...copied.checkpoint, state: copied.state };
+      const checkpoint = { ...copied.checkpoint, state: copied.state, ...cloneCloudMergeHints(proposed) };
       return write(key, current => mergeCheckpointProposal(current, checkpoint));
     },
     async coordinateCheckpoint(key, cloud, liveState) {
       guard(key);
       const copied = decodeRoomRecord(encodeRoomCheckpoint(cloud));
       if (!copied.checkpoint || !Buffer.from(copied.state).equals(Buffer.from(copied.checkpoint.base))) throw new Error('Invalid cloud checkpoint');
-      const checkpoint = { ...copied.checkpoint, state: copied.state };
+      const checkpoint = { ...copied.checkpoint, state: copied.state, ...cloneCloudMergeHints(cloud) };
       const live = liveState === undefined ? undefined : acceptPersistedRoomState(liveState, undefined);
       return write(key, current => {
         if (live) {

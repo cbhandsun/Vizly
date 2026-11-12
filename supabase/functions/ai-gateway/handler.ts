@@ -14,11 +14,18 @@ import {
 import { createGatewayStreamResponse } from './streamResponse.ts';
 import type { AIGatewayUserAuthenticator } from './userAuthentication.ts';
 import { BodyLimitError, readBoundedBody } from '../_shared/boundedBody.ts';
+import { parseGatewayOutputTokenLimit } from './resourcePolicy.ts';
+import type { GatewayResourceStore, GatewayAdmission } from './resourceStore.ts';
+import { createGatewayUsageRecorder, type GatewayUsageRecord } from './usageRecord.ts';
 
 export interface AIGatewayEnvironment {
   allowedOrigins?: string;
   allowedProviderOrigins?: string;
+  maxOutputTokens?: string;
   authenticateUser: AIGatewayUserAuthenticator;
+  resourceStore?: GatewayResourceStore;
+  waitUntil?: (task: Promise<void>) => void;
+  recordUsage?: (record: Readonly<GatewayUsageRecord>) => void | Promise<void>;
 }
 
 const jsonResponse = (
@@ -102,25 +109,68 @@ export const handleAIGatewayRequest = async (
     );
   }
 
-  const result = streamText({
-    model: createGatewayLanguageModel({
-      id: parsed.value.provider.id,
-      apiKey: parsed.value.provider.apiKey,
-      baseURL: baseUrlResult.baseURL,
-      modelId: parsed.value.model,
-      apiMode: parsed.value.provider.apiMode,
-    }),
-    messages: parsed.value.messages.map((message, index) => (
-      index === 0 && message.role === 'system' && parsed.value.toolMode === 'diagram'
-        ? {
-          ...message,
-          content: `${message.content}\n\n当平台提供图表工具时，原子化画布操作必须调用对应工具，不要输出 [COMMAND: ...] 文本；完整图表生成仍可返回 JSON。`,
-        }
-        : message
-    )),
-    tools: parsed.value.toolMode === 'diagram' ? diagramTools : undefined,
-    abortSignal: request.signal,
-    timeout: { totalMs: 120_000, firstChunkMs: 30_000, chunkMs: 30_000 },
-  });
-  return createGatewayStreamResponse(result.stream, corsHeaders);
+  const streamCancellation = new AbortController();
+  const usage = createGatewayUsageRecorder(authentication.userId, environment.recordUsage, environment.waitUntil);
+  let maxOutputTokens: number;
+  try { maxOutputTokens = parseGatewayOutputTokenLimit(environment.maxOutputTokens); }
+  catch { usage.finish('unavailable'); return jsonResponse(503, 'AI gateway resource configuration is unavailable.', corsHeaders); }
+  let admission: GatewayAdmission;
+  try {
+    if (!environment.resourceStore) throw new Error('Resource store not configured');
+    admission = await environment.resourceStore.acquire(authentication.userId, request.signal);
+  } catch { usage.finish('unavailable'); return jsonResponse(503, 'AI gateway resource service is unavailable.', corsHeaders); }
+  if (!admission.admitted) {
+    usage.finish('limited');
+    const headers = new Headers(corsHeaders);
+    headers.set('Retry-After', String(admission.retryAfterSeconds));
+    return jsonResponse(429, 'AI request limit reached. Retry later.', headers);
+  }
+  let released = false;
+  const lease = admission;
+  const release = () => {
+    if (released) return;
+    released = true;
+    clearTimeout(timer);
+    request.signal.removeEventListener('abort', cancel);
+    // Failed cleanup remains bounded by the database's 150-second lease TTL.
+    const task = Promise.resolve().then(() => lease.release()).catch(() => undefined);
+    try { environment.waitUntil?.(task); } catch { /* The task is still observed. */ }
+  };
+  const cancel = () => { usage.finish('cancelled'); streamCancellation.abort(); release(); };
+  const timer = setTimeout(() => { usage.finish('timeout'); cancel(); }, 120_000);
+  request.signal.addEventListener('abort', cancel, { once: true });
+  if (request.signal.aborted) { cancel(); return jsonResponse(408, 'AI request was cancelled.', corsHeaders); }
+  try {
+    const instructions = parsed.value.messages
+      .filter(message => message.role === 'system')
+      .map(message => ({ role: 'system' as const, content: message.content }));
+    if (instructions.length > 0 && parsed.value.toolMode === 'diagram') {
+      instructions[0].content += '\n\n当平台提供图表工具时，原子化画布操作必须调用对应工具，不要输出 [COMMAND: ...] 文本；完整图表生成仍可返回 JSON。';
+    }
+    const result = streamText({
+      model: createGatewayLanguageModel({
+        id: parsed.value.provider.id,
+        apiKey: parsed.value.provider.apiKey,
+        baseURL: baseUrlResult.baseURL,
+        modelId: parsed.value.model,
+        apiMode: parsed.value.provider.apiMode,
+      }),
+      instructions: instructions.length > 0 ? instructions : undefined,
+      messages: parsed.value.messages.flatMap(({ role, content }) => (
+        role === 'system' ? [] : [{ role, content }]
+      )),
+      tools: parsed.value.toolMode === 'diagram' ? diagramTools : undefined,
+      maxOutputTokens,
+      // The SDK default prints raw provider errors, which can include request
+      // bodies and credentials. The bounded stream emits sanitized outcomes.
+      onError: () => {},
+      abortSignal: AbortSignal.any([request.signal, streamCancellation.signal]),
+      timeout: { totalMs: 120_000, firstChunkMs: 30_000, chunkMs: 30_000 },
+    });
+    return createGatewayStreamResponse(result.stream, corsHeaders, cancel, release, usage);
+  } catch {
+    usage.finish('failed');
+    cancel();
+    return jsonResponse(502, 'AI generation is unavailable.', corsHeaders);
+  }
 };

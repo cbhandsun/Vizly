@@ -3,7 +3,39 @@ import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { gateProbeGroups, probeRelativePath, verifyCiNegativeGates } from './ciNegativeGateProbe.mjs';
+import { assertGateProcessCompleted, gateProbeGroups, probeRelativePath, verifyCiNegativeGates } from './ciNegativeGateProbe.mjs';
+
+describe('abnormal gate process diagnostics', () => {
+  it.each([
+    [{ error: { code: 'ETIMEDOUT' }, status: null, signal: 'SIGTERM' }, 'ETIMEDOUT'],
+    [{ error: { code: 'ENOBUFS' }, status: null, signal: null }, 'ENOBUFS'],
+    [{ status: null, signal: 'SIGKILL' }, 'SIGKILL'],
+    [{ status: null, signal: null }, '"exitCode":null'],
+  ])('rejects abnormal termination with a bounded cause instead of accepting a negative fixture', (processResult, cause) => {
+    expect(() => assertGateProcessCompleted({ ...processResult, stdout: '中文', stderr: 'error' }, 'typecheck', 120123.6))
+      .toThrow(cause);
+    expect(() => assertGateProcessCompleted({ ...processResult, stdout: '中文', stderr: 'error' }, 'typecheck', 120123.6))
+      .toThrow('"elapsedMs":120124');
+  });
+
+  it('does not disclose raw errors, output or unrecognized metadata', () => {
+    try {
+      assertGateProcessCompleted({ status: null, signal: 'PRIVATE_SIGNAL',
+        error: { code: 'PRIVATE_CODE', message: 'private credentials', path: '/private/path' },
+        stdout: 'private stdout', stderr: 'private stderr' }, 'private command', 10);
+      expect.fail('Abnormal process was accepted');
+    } catch (error) {
+      expect(error.message).toContain('"gate":"unknown"');
+      expect(error.message).toContain('"signal":"other"');
+      expect(error.message).toContain('"errorCode":"other"');
+      expect(error.message).not.toMatch(/PRIVATE|private/);
+    }
+  });
+
+  it.each([0, 1, 2])('leaves normally completed exit %s to the existing positive and negative assertions', status => {
+    expect(() => assertGateProcessCompleted({ status, signal: null }, 'lint', 10)).not.toThrow();
+  });
+});
 
 let root;
 const fixture = () => join(root, probeRelativePath);

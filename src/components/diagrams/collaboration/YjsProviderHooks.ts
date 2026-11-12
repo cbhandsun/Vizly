@@ -1,3 +1,5 @@
+import { createCollaborationSessionLifecycle } from './collaborationSessionLifecycle';
+import { createConnectionTelemetry } from '../../../observability/connectionTelemetry';
 import { useCallback, useEffect, useMemo, useState, useRef, useSyncExternalStore } from 'react';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
@@ -91,6 +93,7 @@ export interface YjsCollaborationOptions {
     roomName: string;
     serverUrl: string;
     token?: string;
+    resolveToken?: () => Promise<string | null>;
     enabled?: boolean;
     onRemoteSnapshot?: (snapshot: { nodes: Node[]; edges: Edge[] }, cloudRevision?: string) => boolean;
     isLocalSnapshotReady?: () => boolean;
@@ -98,6 +101,10 @@ export interface YjsCollaborationOptions {
 
 export function useYjsCollaboration(options: YjsCollaborationOptions) {
     const { roomName, serverUrl, token, userId, enabled = true, onRemoteSnapshot, isLocalSnapshotReady } = options;
+    const credentials = useRef({ token, resolveToken: options.resolveToken });
+    credentials.current = { token, resolveToken: options.resolveToken };
+    const lifecycleRef = useRef<ReturnType<typeof createCollaborationSessionLifecycle> | null>(null);
+    useEffect(() => { lifecycleRef.current?.credentialsChanged(token); }, [token]);
     const reactFlowInstance = useReactFlow();
     
     const [connectionState] = useState(createCollaborationConnectionState);
@@ -191,14 +198,14 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         
         const ydoc = new Y.Doc();
         const awareness = createCollaborationAwareness(ydoc);
-        const safeToken = normalizeCollaborationToken(token);
+        const safeToken = normalizeCollaborationToken(credentials.current.token);
         const safeRoomName = normalizeCollaborationRoomName(roomName);
         const wsParams = safeToken ? { params: { token: safeToken } } : {};
         
         let provider: WebsocketProvider;
         try {
             provider = new WebsocketProvider(safeServerUrl, safeRoomName, ydoc, {
-                connect: true,
+                connect: false,
                 disableBc: true,
                 awareness,
                 WebSocketPolyfill: createCollaborationSocket(),
@@ -213,6 +220,22 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         const yEdges = ydoc.getMap<unknown>('flowchart-edges');
         connectionRef.current = { doc: ydoc, yNodes, yEdges, hasSynced: false };
         connectionState.update({ provider, wsStatus: 'connecting' });
+        const connectionTelemetry = createConnectionTelemetry();
+        const lifecycle = createCollaborationSessionLifecycle({
+            unavailable: () => {
+                connectionTelemetry.status('disconnected');
+                connectionState.update({ canWrite: false, synced: false, wsStatus: 'disconnected' });
+            },
+            resolveToken: async () => credentials.current.resolveToken
+                ? credentials.current.resolveToken() : normalizeCollaborationToken(credentials.current.token) ?? '',
+            visible: () => typeof document === 'undefined' || document.visibilityState !== 'hidden',
+            connect: next => { provider.params = next ? { token: next } : {}; provider.connect(); },
+            disconnect: () => { connectionTelemetry.pause(); provider.disconnect(); },
+        });
+        lifecycleRef.current = lifecycle;
+        const visibilityChanged = () => lifecycle.visibilityChanged();
+        if (typeof document !== 'undefined') document.addEventListener('visibilitychange', visibilityChanged);
+        if (typeof window !== 'undefined') window.addEventListener('online', visibilityChanged);
 
         provider.awareness.setLocalStateField('user', {
             name: localUser.name,
@@ -252,6 +275,7 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
             if (!problem) return;
             // Preserve the current canvas/document, but stop automatic retries
             // and publication until the user explicitly chooses recovery.
+            lifecycle.suspend();
             provider.shouldConnect = false;
             pendingRemoteSnapshotRef.current = null;
             if (pendingRetryTimerRef.current !== null) clearTimeout(pendingRetryTimerRef.current);
@@ -260,7 +284,7 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         };
         const handleSync = (isSynced: boolean) => {
             if (!isCurrentConnection() || connectionState.getSnapshot().coordinationProblem) return;
-            if (isSynced && connectionRef.current) connectionRef.current.hasSynced = true;
+            if (isSynced && connectionRef.current) { connectionRef.current.hasSynced = true; connectionTelemetry.synced(); lifecycle.synced(); }
             // A document with deletion history is authoritative even when its
             // maps are empty. An untouched new room can still be seeded locally.
             if (isSynced && Y.decodeStateVector(Y.encodeStateVector(ydoc)).size > 0) applyRemoteSnapshot();
@@ -269,6 +293,7 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         provider.on('sync', handleSync);
 
         const handleStatus = (event: { status: 'connecting' | 'connected' | 'disconnected' }) => {
+            if (isCurrentConnection()) connectionTelemetry.status(event.status);
             if (isCurrentConnection() && connectionState.getSnapshot().coordinationProblem) {
                 connectionState.update({ wsStatus: 'disconnected', canWrite: false, synced: false });
                 return;
@@ -278,6 +303,22 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
                 : { wsStatus: event.status, canWrite: false, synced: false });
         };
         provider.on('status', handleStatus);
+
+        const handleConnectionClose = (event: CloseEvent | null) => {
+            if (!isCurrentConnection()) return;
+            // Failed handshakes close before y-websocket emits a disconnected status.
+            provider.shouldConnect = false;
+            connectionTelemetry.status('disconnected');
+            lifecycle.closed(event?.code);
+            // Failed HTTP upgrades never emit y-websocket's disconnected status.
+            connectionState.update({ canWrite: false, synced: false, wsStatus: 'disconnected' });
+            if (event?.code !== 1008) return;
+            // A server policy rejection invalidates the prior edit grant. Ordinary
+            // transport outages still retain authorized offline work for reconnect.
+            const accessRole = connectionState.getSnapshot().accessRole === 'viewer' ? 'viewer' : null;
+            connectionState.update({ accessRole, canWrite: false, synced: false, wsStatus: 'disconnected' });
+        };
+        provider.on('connection-close', handleConnectionClose);
 
         const handleAwarenessChange = () => {
             if (!isCurrentConnection()) return;
@@ -303,9 +344,16 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         yNodes.observeDeep(handleRemoteElementChange);
         yEdges.observeDeep(handleRemoteElementChange);
 
+        lifecycle.start();
         return () => {
+            lifecycle.stop();
+            if (lifecycleRef.current === lifecycle) lifecycleRef.current = null;
+            if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', visibilityChanged);
+            if (typeof window !== 'undefined') window.removeEventListener('online', visibilityChanged);
+            connectionTelemetry.dispose();
             provider.off('sync', handleSync);
             provider.off('status', handleStatus);
+            provider.off('connection-close', handleConnectionClose);
             provider.awareness.off('change', handleAwarenessChange);
             yNodes.unobserveDeep(handleRemoteElementChange);
             yEdges.unobserveDeep(handleRemoteElementChange);
@@ -316,7 +364,7 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
             provider.destroy();
             ydoc.destroy();
         };
-    }, [roomName, serverUrl, token, enabled, localUser, connectionState, retryPendingRemoteSnapshot, connectionAttempt, localSnapshotCache]);
+    }, [roomName, serverUrl, enabled, localUser, connectionState, retryPendingRemoteSnapshot, connectionAttempt, localSnapshotCache]);
 
     const pushLocalChangesToYjs = (nodes: Node[], edges: Edge[]) => {
         const connection = connectionRef.current;

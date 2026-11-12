@@ -1,4 +1,5 @@
 import { mergeUpdates } from 'yjs';
+import { COLLABORATION_RESUME_PROTOCOL } from '../../../../server/collaboration/coordinationStatus.js';
 import * as decoding from 'lib0/decoding';
 import * as encoding from 'lib0/encoding';
 
@@ -60,7 +61,7 @@ export const createCollaborationSocket = (BaseSocket: typeof WebSocket = globalT
       else super.send(Uint8Array.from(new Uint8Array(data)));
     }, () => this.readyState === BaseSocket.OPEN);
     constructor(url: string | URL, protocols?: string | string[]) {
-      super(url, protocols);
+      super(url, protocols ?? COLLABORATION_RESUME_PROTOCOL);
       this.addEventListener('close', () => this.documentQueue.cancel());
     }
     override send(data: SocketData): void { this.documentQueue.send(data); }

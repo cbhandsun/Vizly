@@ -1,3 +1,4 @@
+import type { AIEditContext } from './aiCanvasEdit';
 import React from 'react';
 import Button from 'antd/es/button';
 import Collapse from 'antd/es/collapse';
@@ -24,7 +25,8 @@ interface MessageItemProps {
     item: Message;
     t: (key: string) => string;
     onPreviewJson?: (json: string) => void;
-    onApplyJson?: (json: string) => void;
+    onApplyJson?: (json: string, context?: AIEditContext) => void;
+    onSaveCurrentCanvas?: () => void;
     handleSaveDiagramTo?: (json: string, target: 'local' | 's3' | 'supabase') => void;
 }
 
@@ -33,6 +35,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
     t,
     onPreviewJson,
     onApplyJson,
+    onSaveCurrentCanvas,
     handleSaveDiagramTo
 }) => {
     const isAi = item.role === 'assistant';
@@ -88,12 +91,14 @@ const MessageItem: React.FC<MessageItemProps> = ({
                                 />
                             </Tooltip>
 
-                            <Dropdown
+                            {item.editContext ? <Button type="text" size="small" icon={<CloudOutlined />}
+                                onClick={onSaveCurrentCanvas} disabled={!onSaveCurrentCanvas} aria-label={t('aiChat.edit.saveCanvas')}>{t('aiChat.edit.saveCanvas')}</Button> : <Dropdown
+                                trigger={['click']}
                                 menu={{
                                     items: [
-                                        { key: 'local', label: t('aiChat.saveToLocal'), icon: <DatabaseOutlined /> },
-                                        { key: 'supabase', label: t('aiChat.saveToSupabase'), icon: <CloudOutlined /> },
-                                        { key: 's3', label: t('aiChat.saveToS3'), icon: <CloudServerOutlined /> },
+                                        { key: 'local', label: t('aiChat.saveLocal'), icon: <DatabaseOutlined /> },
+                                        { key: 'supabase', label: t('aiChat.saveCloud'), icon: <CloudOutlined /> },
+                                        { key: 's3', label: t('aiChat.saveS3'), icon: <CloudServerOutlined /> },
                                     ],
                                     onClick: ({ key }) => {
                                         if (key === 'local' || key === 's3' || key === 'supabase') {
@@ -111,17 +116,18 @@ const MessageItem: React.FC<MessageItemProps> = ({
                                         aria-label={t('aiChat.saveDiagram')}
                                     />
                                 </Tooltip>
-                            </Dropdown>
+                            </Dropdown>}
 
                             <Tooltip title={t('aiChat.applyToCanvas')}>
                                 <Button
                                     size="small"
                                     type="primary"
                                     className="action-btn-apply-capsule"
+                                    aria-label={t('aiChat.applyToCanvas')}
                                     icon={<CheckCircleOutlined />}
-                                    onClick={() => onApplyJson?.(item.jsonContent!)}
+                                    onClick={() => item.editContext ? onApplyJson?.(item.jsonContent!, item.editContext) : onApplyJson?.(item.jsonContent!)}
                                 >
-                                    应用图表
+                                    {t('aiChat.applyToCanvas')}
                                 </Button>
                             </Tooltip>
                         </Space>
@@ -139,6 +145,8 @@ export const MemoizedMessageItem = React.memo(MessageItem, (prev, next) => {
            prev.item.hasJson === next.item.hasJson &&
            prev.item.jsonContent === next.item.jsonContent &&
            prev.item.role === next.item.role &&
+           prev.item.editContext === next.item.editContext &&
+           prev.onSaveCurrentCanvas === next.onSaveCurrentCanvas &&
            prev.t === next.t &&
            prev.onPreviewJson === next.onPreviewJson &&
            prev.onApplyJson === next.onApplyJson &&

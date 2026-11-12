@@ -13,7 +13,6 @@ import {
     createSharedDiagramLocalId,
     runShareViewRequest,
 } from './shareViewBoundary';
-import { useDiagramTopControlInterceptor } from '@/components/diagramTopViewport';
 import './ShareViewPage.css';
 
 const { Text } = Typography;
@@ -96,7 +95,6 @@ const ShareViewPage: React.FC = () => {
         : loadResult?.token === shareToken && loadResult.revision === requestRevision
             ? loadResult.state
             : { status: 'loading' };
-    useDiagramTopControlInterceptor(state.status === 'success' ? state.diagramId : '');
 
     useEffect(() => {
         if (!shareToken) return;

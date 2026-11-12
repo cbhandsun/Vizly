@@ -12,6 +12,7 @@ export type AICommandExecutionSuccess =
 
 export interface ExecuteAICommandContentOptions {
     content: string;
+    signal?: AbortSignal;
     canvasOps?: CanvasOperations;
     pluginId?: string;
     resolvePluginContext?: () => unknown | null;
@@ -91,6 +92,7 @@ const executeCanvasFallback = (
 
 export const executeAICommandContent = async ({
     content,
+    signal,
     canvasOps,
     pluginId,
     resolvePluginContext,
@@ -100,7 +102,7 @@ export const executeAICommandContent = async ({
     onExecutionError,
     pause = pauseForCanvasState,
 }: ExecuteAICommandContentOptions): Promise<void> => {
-    if (!canvasOps) return;
+    if (!canvasOps || signal?.aborted) return;
 
     const extraction = extractValidatedAICommands(content);
     extraction.rejected.slice(0, 3).forEach(({ action, reason }) => {
@@ -108,17 +110,21 @@ export const executeAICommandContent = async ({
     });
 
     for (const command of extraction.commands) {
+        if (signal?.aborted) return;
         try {
             if (pluginId && executePluginAction && resolvePluginContext) {
                 const context = resolvePluginContext();
-                if (context && await executePluginAction(pluginId, command, context)) {
-                    continue;
+                if (context) {
+                    const handled = await executePluginAction(pluginId, command, context);
+                    if (signal?.aborted) return;
+                    if (handled) continue;
                 }
             }
 
             executeCanvasFallback(command, canvasOps, onSuccess);
             await pause();
         } catch (error) {
+            if (signal?.aborted) return;
             onExecutionError?.(error, command);
         }
     }

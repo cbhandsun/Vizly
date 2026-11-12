@@ -1,3 +1,4 @@
+import type { CanvasOperations } from './types';
 import type { Conversation } from '@/services/ai/AIConversationService';
 
 export interface AIChatCopyKeys {
@@ -27,10 +28,19 @@ export const resolveAIChatCopyKeys = (pluginId: string | undefined): AIChatCopyK
         }
 );
 
-export const isConfigurationIndependentAIChatInput = (value: unknown): boolean => {
+const LOCAL_CANVAS_COMMANDS: Record<string, keyof CanvasOperations> = {
+    '/add': 'onAddNode',
+    '/delete': 'onDeleteNodes',
+    '/group': 'onGroupNodes',
+    '/connect': 'onConnectNodes',
+    '/layout': 'onAutoLayout',
+};
+
+export const isConfigurationIndependentAIChatInput = (value: unknown, canvasOps?: CanvasOperations): boolean => {
     if (typeof value !== 'string') return false;
     const command = value.trim().split(/\s+/, 1)[0]?.toLowerCase();
-    return Boolean(command && CONFIGURATION_INDEPENDENT_COMMANDS.has(command));
+    return Boolean(command && (CONFIGURATION_INDEPENDENT_COMMANDS.has(command)
+        || canvasOps?.[LOCAL_CANVAS_COMMANDS[command]]));
 };
 
 export const localizePristineAIChatConversations = (
