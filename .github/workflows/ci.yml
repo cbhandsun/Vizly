@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   health:
     name: Types, lint, storage and builds
@@ -64,7 +68,7 @@ jobs:
         run: npm run test:ci -- --shard=${{ matrix.shard }}/4
 
   browser:
-    name: Browser acceptance (${{ matrix.phase }})
+    name: Browser acceptance (${{ matrix.name }})
     runs-on: ubuntu-latest
     env:
       LANG: C.UTF-8
@@ -73,7 +77,29 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        phase: [main, recovery, s3]
+        include:
+          - phase: main
+            shard: 1/4
+            name: main (1/4)
+            artifact: browser-evidence-main-shard-1-4
+          - phase: main
+            shard: 2/4
+            name: main (2/4)
+            artifact: browser-evidence-main-shard-2-4
+          - phase: main
+            shard: 3/4
+            name: main (3/4)
+            artifact: browser-evidence-main-shard-3-4
+          - phase: main
+            shard: 4/4
+            name: main (4/4)
+            artifact: browser-evidence-main-shard-4-4
+          - phase: recovery
+            name: recovery
+            artifact: browser-evidence-recovery
+          - phase: s3
+            name: s3
+            artifact: browser-evidence-s3
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -89,12 +115,17 @@ jobs:
       - name: Install browser
         run: npx playwright install --with-deps chromium
       - name: Browser regression
-        run: npm run test:e2e:${{ matrix.phase }}
+        run: |
+          if [ -n "${{ matrix.shard }}" ]; then
+            npm run test:e2e:${{ matrix.phase }} -- --shard=${{ matrix.shard }}
+          else
+            npm run test:e2e:${{ matrix.phase }}
+          fi
       - name: Upload browser evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: browser-evidence-${{ matrix.phase }}
+          name: ${{ matrix.artifact }}
           path: |
             playwright-report/
             test-results/
