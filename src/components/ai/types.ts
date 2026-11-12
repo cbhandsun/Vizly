@@ -1,3 +1,4 @@
+import type { AIEditContext } from './aiCanvasEdit';
 import { Node, Edge } from '@xyflow/react';
 import { AnalysisResult } from '@/utils/diagramAnalyzer';
 import { Message, Conversation } from '@/services/ai/AIConversationService';
@@ -35,7 +36,7 @@ export interface AIChatPanelProps {
     open: boolean;
     onClose: () => void;
     onOpenConfig: (providerId?: string) => void;
-    onApplyJson: (json: string) => void;
+    onApplyJson: (json: string, context?: AIEditContext) => void;
     onPreviewJson: (json: string) => void;
     /** 当前画布节点引用 */
     diagramNodesRef?: React.RefObject<Node[]>;

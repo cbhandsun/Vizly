@@ -13,7 +13,7 @@ for (const provider of ['supabase', 's3'] as const) {
     await page.evaluate(async ({ id, autosave, provider, revision }) => {
       const cloud = { provider, id, title: 'Identity regression cloud', revision };
       const metadata = { title: 'Identity regression cloud', cloud };
-      const request = indexedDB.open('VizlyLocalDB', 2);
+      const request = indexedDB.open('VizlyLocalDB');
       request.onupgradeneeded = () => {
         const versions = request.result.createObjectStore('diagram_versions', { keyPath: 'id' });
         versions.createIndex('diagramId', 'diagramId');

@@ -22,6 +22,16 @@ export const parseConnection = (rawUrl: unknown, origin: unknown, origins: Reado
   } catch { return null; }
 };
 
+// A decoded deadline can stop retries early. It never grants access.
+export const collaborationCredentialExpiry = (token: string): number | undefined => {
+  if (token.split('.').length !== 3) return undefined;
+  try {
+    const claims: unknown = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
+    return isRecord(claims) && typeof claims.exp === 'number' && Number.isFinite(claims.exp)
+      ? claims.exp * 1000 : undefined;
+  } catch { return undefined; }
+};
+
 const validJson = (value: unknown, budget: { bytes: number }, depth = 0): boolean => {
   if (depth > 8) return false;
   if (value === null || value === undefined || typeof value === 'boolean') return true;

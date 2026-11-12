@@ -14,7 +14,7 @@ const fixtureDocument = {
   edges: [{ id: 'e1', source: 'n1', target: 'n1', type: 'dependency', label: 'self', custom: true }],
 };
 
-async function buildFixture(assets: Record<string, string | Uint8Array>, base = '/nested/') {
+async function buildFixture(assets: Record<string, string | Uint8Array>, base = '/') {
   // Keep the fixture root consistent with Vite's resolved source paths on macOS.
   const root = await mkdtemp(join(await realpath(tmpdir()), 'vizly-json-assets-'));
   try {
@@ -23,7 +23,11 @@ async function buildFixture(assets: Record<string, string | Uint8Array>, base = 
       await mkdir(resolve(absolute, '..'), { recursive: true });
       await writeFile(absolute, source);
     }
-    await writeFile(join(root, 'index.html'), '<script type="module" src="/src/main.ts"></script>');
+    // Match the root-mounted production HTML contract, including its independent guard.
+    await mkdir(join(root, 'public/assets'), { recursive: true });
+    await writeFile(join(root, 'public/assets/startup-resource-guard.v1.js'),
+      await readFile(join(appRoot, 'public/assets/startup-resource-guard.v1.js')));
+    await writeFile(join(root, 'index.html'), '<!doctype html><html><head><script src="/assets/startup-resource-guard.v1.js"></script></head><body><script type="module" src="/src/main.ts"></script></body></html>');
     await writeFile(join(root, 'src/main.ts'), Object.keys(assets).map((file, index) =>
       `import url${index} from './${file}?url&no-inline'; globalThis.asset${index} = url${index};`).join('\n'));
     const result = await build({ root, base, configFile: join(appRoot, 'vite.config.ts'), logLevel: 'silent',

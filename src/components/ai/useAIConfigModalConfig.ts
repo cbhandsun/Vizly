@@ -18,7 +18,7 @@ export const useAIConfigModalConfig = (
     open: boolean,
     userId: string | undefined,
 ): [AIConfigState, Dispatch<SetStateAction<AIConfigState>>, AIConfigModalDraftControls] => {
-    const configSourceKey = open ? (userId ?? '__anonymous__') : null;
+    const configSourceKey = `${userId ?? '__anonymous__'}:${open ? 'open' : 'closed'}`;
     const [state, setState] = useState<AIConfigModalState>(() => {
         const config = getAIConfig(userId);
         return { sourceKey: configSourceKey, config, baseline: config };
@@ -27,11 +27,11 @@ export const useAIConfigModalConfig = (
     let currentState = state;
 
     if (state.sourceKey !== configSourceKey) {
-        const config = configSourceKey === null ? state.config : getAIConfig(userId);
+        const config = getAIConfig(userId);
         currentState = {
             sourceKey: configSourceKey,
             config,
-            baseline: configSourceKey === null ? state.baseline : config,
+            baseline: config,
         };
         setState(currentState);
     }

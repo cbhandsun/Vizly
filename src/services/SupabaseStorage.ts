@@ -1,6 +1,8 @@
+import { captureAuthSession, getAuthSessionOwner } from '../context/authSessionBoundary';
 import { getBrowserSessionUser } from './browserSessionUser';
 import { supabase } from './supabase';
-import { IStorageProvider, DiagramMetadata, SavedDiagram, DiagramVersion } from './storage/types';
+import { IStorageProvider, DiagramMetadata, SavedDiagram, DiagramVersion, IdempotentVersionWrite } from './storage/types';
+import { hashVersionPayload } from './versionOutbox';
 import { coerceRemoteDiagramContent } from './remoteDiagramContent';
 import { coerceCloudConfigRows, coerceCloudConfigValue, normalizeCloudConfigKey } from './cloudConfigSecurity';
 import { coerceVersionMessage, coerceVersionSnapshotData } from './versionSnapshotSecurity';
@@ -67,10 +69,19 @@ export class SupabaseStorageProvider implements IStorageProvider {
         const query = revision === undefined
             ? supabase!.from('diagrams').insert({ ...payload, id: diagram.id, user_id: authenticatedUserId })
             : supabase!.from('diagrams').update(payload).eq('id', diagram.id).eq('updated_at', revision);
-        const { data, error } = await query.select().maybeSingle();
+        const { data, error, status } = await query.select().maybeSingle();
 
         if (error?.code === '23505') throw new CloudSaveVersionError('云端已存在同 ID 图表，请另存为副本；本地编辑已保留');
-        if (error) throw error;
+        if (error) {
+            // HTTP status belongs to the response, not PostgREST's error payload.
+            // Keep the protocol classification without forwarding arbitrary body content.
+            if (Number.isInteger(status) && status >= 400 && status <= 599) {
+                throw Object.assign(new Error('Cloud storage save request failed.'), {
+                    name: 'CloudStorageRequestError', status,
+                });
+            }
+            throw error;
+        }
         if (!data) throw new CloudSaveVersionError('云端图表已更新或编辑权限已撤销；本地编辑已保留，请重新打开或另存为副本');
         return this.normalizeSavedDiagram(data);
     }
@@ -117,7 +128,58 @@ export class SupabaseStorageProvider implements IStorageProvider {
     }
 
     // === Version History (GAP-05) ===
+    async saveVersionIdempotent(diagramId: string, data: unknown, message: string | undefined, operation: IdempotentVersionWrite): Promise<DiagramVersion> {
+        // Copy caller-owned metadata before any await. Never persist the bearer token.
+        const { ownerId, operationId, payloadHash, signal } = operation;
+        if (!UUID_REGEX.test(diagramId) || !UUID_REGEX.test(operationId) || !UUID_REGEX.test(ownerId)
+            || !/^[a-f0-9]{64}$/.test(payloadHash)) throw new Error('Invalid version operation');
+        const boundary = captureAuthSession(ownerId);
+        const requestSignal = signal ? AbortSignal.any([boundary.signal, signal]) : boundary.signal;
+        const assertCurrent = () => {
+            if (requestSignal.aborted || getAuthSessionOwner() !== ownerId || !boundary.isCurrent()) throw new Error('Storage session changed');
+        };
+        assertCurrent();
+        const snapshotData = coerceVersionSnapshotData(data);
+        const safeMessage = coerceVersionMessage(message);
+        const expected: DiagramVersion = { id: operationId, diagramId, snapshotData, message: safeMessage, createdAt: 0 };
+        if (await hashVersionPayload(expected) !== payloadHash) throw new Error('Version operation payload mismatch');
+        assertCurrent();
+        const { data: sessionData, error: sessionError } = await supabase!.auth.getSession();
+        if (sessionError) throw sessionError;
+        assertCurrent();
+        const session = sessionData.session;
+        if (!session?.access_token || session.user.id !== ownerId
+            || (session.expires_at !== undefined && session.expires_at <= Date.now() / 1000))
+            throw new Error('Version history requires the original authenticated user.');
+        // Pin this request to its original account even if the shared SDK session changes.
+        const authorization = `Bearer ${session.access_token}`;
+        const { data: inserted, error } = await supabase!.from('diagram_versions')
+            .insert({ id: operationId, diagram_id: diagramId, snapshot_data: snapshotData, message: safeMessage, author_id: ownerId })
+            .select().abortSignal(requestSignal).setHeader('Authorization', authorization).single();
+        assertCurrent();
+        if (error && error.code !== '23505') throw error;
+        let row: unknown = inserted;
+        if (error) {
+            // The immutable primary key is the server-side deduplication constraint.
+            // A duplicate is only success after an authorized, full-content readback.
+            const existing = await supabase!.from('diagram_versions').select('*')
+                .eq('id', operationId).eq('diagram_id', diagramId).eq('author_id', ownerId)
+                .abortSignal(requestSignal).setHeader('Authorization', authorization).single();
+            assertCurrent();
+            if (existing.error) throw existing.error;
+            row = existing.data;
+        }
+        const version = this.coerceDiagramVersion(row, { includeSnapshot: true, requireSnapshot: true });
+        if (!version || version.id !== operationId || version.diagramId !== diagramId || version.authorId !== ownerId
+            || !isRecord(row) || await hashVersionPayload({ ...version, snapshotData: row.snapshot_data as DiagramVersion['snapshotData'], message: row.message as string }) !== payloadHash)
+            throw new Error('Version operation conflicts with remote content');
+        assertCurrent();
+        return version;
+    }
+
     async saveVersion(diagramId: string, data: unknown, message?: string) {
+        const owner = getAuthSessionOwner();
+        const session = captureAuthSession(owner);
         // Prevent UUID errors for string-based standard template IDs
         if (!UUID_REGEX.test(diagramId)) {
              throw new Error("Version history requires a saved Cloud Diagram (UUID format required).");
@@ -125,6 +187,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
 
         const { data: { user }, error: userError } = await getBrowserSessionUser(supabase!);
         if (userError) throw userError;
+        if (!session.isCurrent() || (owner !== null && user?.id !== owner)) throw new Error('Storage session changed');
         if (!user?.id) {
             throw new Error('Version history requires an authenticated user.');
         }
@@ -192,6 +255,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
         const userId = await this.requireAuthenticatedUser(user_id);
         const normalizedKey = normalizeCloudConfigKey(key);
         if (!normalizedKey) throw new Error('Unsupported cloud config key');
+        if (normalizedKey === 'ai_config') throw new Error('Legacy AI configuration is read-only.');
         const normalizedValue = coerceCloudConfigValue(normalizedKey, value);
 
         const { data, error } = await supabase!
@@ -217,8 +281,8 @@ export class SupabaseStorageProvider implements IStorageProvider {
         };
     }
 
-    async loadConfig(key: string) {
-        const userId = await this.requireAuthenticatedUser();
+    async loadConfig(key: string, expectedUserId?: string) {
+        const userId = await this.requireAuthenticatedUser(expectedUserId);
         const normalizedKey = normalizeCloudConfigKey(key);
         if (!normalizedKey) throw new Error('Unsupported cloud config key');
 

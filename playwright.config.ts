@@ -25,7 +25,13 @@ export default defineConfig({
   webServer: {
     // Collaboration tests intercept this transport and send protocol fixtures;
     // no production identity or live collaboration server is needed by CI.
-    env: { VITE_YJS_WEBSOCKET_URL: 'ws://127.0.0.1:5422' },
+    env: {
+      VITE_YJS_WEBSOCKET_URL: 'ws://127.0.0.1:5422',
+      // Main fixtures exercise local storage and must not inherit a developer's
+      // cloud configuration. Real cloud/recovery tests use dedicated builds.
+      VITE_SUPABASE_URL: '',
+      VITE_SUPABASE_ANON_KEY: '',
+    },
     // Keep active user previews and other test invocations on their own assets.
     command: `npm run build -- --outDir ${buildDirectory} && npm run preview -- --outDir ${buildDirectory} --host 127.0.0.1 --port ${port} --strictPort`,
     url: baseURL,

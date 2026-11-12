@@ -1,3 +1,4 @@
+import { retryTransientFetch } from './retryTransientFetch.js';
 import { createClient } from '@supabase/supabase-js';
 import { MAX_CHECKPOINT_BYTES } from './roomCheckpoint.js';
 const maxResponseBytes = 4 * Math.ceil(MAX_CHECKPOINT_BYTES / 3) + 1024;
@@ -44,9 +45,12 @@ export const createSupabaseRoomRpc = (url: string, serverKey: string, transport:
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     global: { fetch: async (input, init) => {
       const deadline = AbortSignal.timeout(8000);
-      return boundedResponse(await transport(input, {
-        ...init, signal: init?.signal ? AbortSignal.any([init.signal, deadline]) : deadline,
-      }));
+      const signal = init?.signal ? AbortSignal.any([init.signal, deadline]) : deadline;
+      const endpoint = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
+      const response = endpoint.pathname === '/rest/v1/rpc/vizly_renew_room_lease'
+        ? await retryTransientFetch(transport, input, init ?? {}, signal)
+        : await transport(input, { ...init, signal });
+      return boundedResponse(response);
     } },
   });
   return async (name: string, parameters: Record<string, unknown>): Promise<unknown> => {

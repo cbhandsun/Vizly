@@ -24,6 +24,8 @@ const fixture = vi.hoisted(() => ({
 vi.mock('@xyflow/react', () => ({ useReactFlow: () => fixture.flow }));
 vi.mock('y-websocket', () => ({
   WebsocketProvider: class {
+    connect = vi.fn();
+    disconnect = vi.fn();
     destroyed = false;
     messageHandlers: Array<(_encoder: unknown, decoder: decoding.Decoder, _provider: unknown, server: boolean) => void> = [];
     on = vi.fn();
@@ -59,6 +61,15 @@ const grantServerAccess = (role = 'editor', server = true) => {
 };
 
 describe('collaboration connection ownership', () => {
+  it('exposes failed HTTP upgrade as disconnected without waiting for an open socket', () => {
+    const hook = renderHook(() => useYjsCollaboration(options));
+    const current = fixture.providers.at(-1)!;
+    expect(hook.result.current.wsStatus).toBe('connecting');
+    act(() => current.on.mock.calls.find(call => call[0] === 'connection-close')?.[1]({ code: 1006 }));
+    expect(hook.result.current.wsStatus).toBe('disconnected');
+    expect(hook.result.current.isSynced).toBe(false);
+    hook.unmount();
+  });
   it('accepts revision only from the current server after the matching state, and retains it on failed canvas commit', () => {
     const commit = vi.fn(() => false);
     const hook = renderHook(() => useYjsCollaboration({ ...options, onRemoteSnapshot: commit }));
@@ -248,6 +259,21 @@ describe('collaboration connection ownership', () => {
     expect(hook.result.current.accessRole).toBeNull();
     grantServerAccess();
     expect(hook.result.current.accessRole).toBe('editor');
+    hook.unmount();
+  });
+
+  it.each([1008, 1006])('handles transport close code %i without confusing denial and temporary outage', (code) => {
+    const hook = renderHook(() => useYjsCollaboration(options));
+    grantServerAccess();
+    const provider = fixture.providers[0];
+    const node: Node = { id: 'after-close', position: { x: 0, y: 0 }, data: {} };
+    act(() => {
+      provider.on.mock.calls.find(call => call[0] === 'connection-close')?.[1]({ code });
+      provider.on.mock.calls.find(call => call[0] === 'status')?.[1]({ status: 'disconnected' });
+    });
+    expect(hook.result.current.accessRole).toBe(code === 1008 ? null : 'editor');
+    act(() => hook.result.current.pushLocalChangesToYjs([node], []));
+    expect(provider.doc.getMap('flowchart-nodes').has(node.id)).toBe(code !== 1008);
     hook.unmount();
   });
 

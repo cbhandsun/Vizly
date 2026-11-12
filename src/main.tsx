@@ -15,6 +15,14 @@ import './index.css'; // Tailwind CSS
 import './main.css'; // 保留您项目全局的基础CSS
 import { startApplication } from './main/applicationStartup';
 import { showStartupFailure } from './main/startupFailureView';
+import { installApplicationTelemetry } from './main/configureTelemetry';
+import { bootstrapVersionOutbox } from './main/bootstrapVersionOutbox';
+const stopVersionOutbox = bootstrapVersionOutbox();
+if (import.meta.hot) import.meta.hot.dispose(stopVersionOutbox);
+const stopTelemetry = installApplicationTelemetry({
+  enabled: import.meta.env.VITE_TELEMETRY_ENABLED, releaseId: import.meta.env.VITE_RELEASE_ID,
+});
+if (import.meta.hot) import.meta.hot.dispose(stopTelemetry);
 window.dispatchEvent(new Event('vizly:entry-ready'));
 /**
  * 函数级注释：应用入口渲染

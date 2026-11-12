@@ -12,6 +12,8 @@ const fixture = vi.hoisted(() => ({ providers: [] as Array<{ doc: Y.Doc; on: Ret
   messageHandlers: Array<(_encoder: unknown, decoder: decoding.Decoder, _provider: unknown, server: boolean) => void> }> }));
 vi.mock('@xyflow/react', () => ({ useReactFlow: () => ({ setNodes: vi.fn(), setEdges: vi.fn() }) }));
 vi.mock('y-websocket', () => ({ WebsocketProvider: class {
+    connect = vi.fn();
+    disconnect = vi.fn();
   on = vi.fn(); off = vi.fn(); destroy = vi.fn(); messageHandlers = [];
   awareness = { clientID: 1, setLocalStateField: vi.fn(), getStates: () => new Map(), on: vi.fn(), off: vi.fn() };
   constructor(_url: string, _room: string, public doc: Y.Doc) { fixture.providers.push(this); }

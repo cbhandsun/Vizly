@@ -1,3 +1,4 @@
+import { captureAuthSession } from '@/context/authSessionBoundary';
 import type { StandardDiagramData } from '@vizly/core/types';
 import type { LocalDiagramRegistrationService } from './aiDiagramImport';
 import type { UnifiedStorageService } from '@/services/UnifiedStorageService';
@@ -119,6 +120,11 @@ export const executeAIChatDiagramSave = async ({
     persistLocalIndex,
     loadUnifiedStorage,
 }: ExecuteAIChatDiagramSaveOptions): Promise<ExecutedAIChatDiagramSave> => {
+    const session = captureAuthSession(userId);
+    const assertCurrent = () => {
+        if (!session.isCurrent()) throw new DOMException('Session changed', 'AbortError');
+    };
+    assertCurrent();
     const timestamp = now();
     const trimmedTitle = normalizeAIChatSaveTitle(title, buildFallbackTitle(timestamp));
     const diagram = parseDiagram(jsonContent, {
@@ -133,6 +139,7 @@ export const executeAIChatDiagramSave = async ({
 
     if (target === 'local') {
         const registeredDiagram = await registerLocalDiagram(getLocalDataService(), diagram, trimmedTitle);
+        assertCurrent();
         persistLocalIndex(localStorage, registeredDiagram, trimmedTitle);
         return {
             target,
@@ -142,6 +149,8 @@ export const executeAIChatDiagramSave = async ({
     }
 
     const provider = await getCloudProvider(loadUnifiedStorage, target);
+    assertCurrent();
+    if (target === 'supabase' && !userId) throw new Error('Please sign in before saving to the cloud.');
     if (!provider.isConfigured()) {
         throw new Error(`${provider.name} 未配置，请先在配置面板中设置`);
     }
@@ -157,6 +166,7 @@ export const executeAIChatDiagramSave = async ({
         updated_at: new Date().toISOString(),
     });
 
+    assertCurrent();
     return {
         target,
         title: trimmedTitle,

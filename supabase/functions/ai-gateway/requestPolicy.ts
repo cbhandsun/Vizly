@@ -39,7 +39,7 @@ export const buildGatewayCorsHeaders = (requestOrigin: string | null): Headers =
   const headers = new Headers({
     'Access-Control-Allow-Headers': 'authorization, content-type',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Expose-Headers': 'X-Vizly-AI-Gateway',
+    'Access-Control-Expose-Headers': 'X-Vizly-AI-Gateway, Retry-After',
     'Access-Control-Max-Age': '600',
     Vary: 'Origin',
   });

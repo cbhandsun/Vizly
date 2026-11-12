@@ -44,7 +44,7 @@ test('historical preview remains local and cannot overwrite autosave while peer 
   await page.goto('/#/manage');
   await expect(page.getByRole('button', { name: '新建流程图', exact: true })).toBeVisible();
   await page.evaluate(async ({ id, historical }) => {
-    const request = indexedDB.open('VizlyLocalDB', 2);
+    const request = indexedDB.open('VizlyLocalDB');
     request.onupgradeneeded = () => {
       const versions = request.result.createObjectStore('diagram_versions', { keyPath: 'id' });
       versions.createIndex('diagramId', 'diagramId'); versions.createIndex('createdAt', 'createdAt');
@@ -75,7 +75,7 @@ test('historical preview remains local and cannot overwrite autosave while peer 
     await expect(node).toContainText('Current live');
     await expect.poll(readSaved).toEqual(['Current live']);
     await page.getByRole('button', { name: '文档操作', exact: true }).click();
-    await page.getByRole('menuitem', { name: /版本快照/ }).click();
+    await page.getByRole('menuitem', { name: /版本历史/ }).click();
     await page.getByRole('button', { name: '预览版本：Historical fixture', exact: true }).click();
     await expect(node).toContainText('Historical preview');
     expect(readCollaborationElement(nodes.get(live.id))).toMatchObject({ data: { label: 'Current live' } });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildAnalysisContext, buildDiagramContext } from '../diagramPrompts';
+import { buildAnalysisContext, buildDiagramContext, enhanceWithSlashCommand } from '../diagramPrompts';
 
 describe('diagram prompt context boundaries', () => {
   it('builds bounded context from valid nodes and edges', () => {
@@ -9,7 +9,7 @@ describe('diagram prompt context boundaries', () => {
     );
 
     expect(result).toContain('node-1: "Order Service" (core)');
-    expect(result).toContain('node-1 → node-2 [42]');
+    expect(result).toContain('edge-1: node-1 → node-2 [42]');
   });
 
   it('drops malformed records and flattens oversized or multiline prompt text', () => {
@@ -37,5 +37,18 @@ describe('diagram prompt context boundaries', () => {
       [{ id: 'a', data: { label: 'A' } }, { id: 'b', data: { label: 'B' } }],
       [{ source: 'a', target: 'b' }],
     )).toContain('[图表分析]');
+  });
+});
+
+
+describe('slash command routing', () => {
+  it('matches complete command tokens and preserves unknown commands', () => {
+    expect(enhanceWithSlashCommand('/additional notes')).toBe('/additional notes');
+    expect(enhanceWithSlashCommand('/flowchart example')).toBe('/flowchart example');
+    expect(enhanceWithSlashCommand('  /ADD API  ')).toContain('添加节点：API');
+  });
+  it('provides brainstorm instructions and preserves the topic', () => {
+    expect(enhanceWithSlashCommand('/brainstorm 物流')).toContain('3-5');
+    expect(enhanceWithSlashCommand('/brainstorm 物流')).toContain('物流');
   });
 });

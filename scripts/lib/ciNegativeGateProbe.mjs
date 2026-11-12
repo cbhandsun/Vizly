@@ -6,6 +6,28 @@ export const probeRelativePath = 'src/components/diagrams/hooks/__tests__/ciNega
 const marker = 'CI_GATE_ASSERTION_SENTINEL';
 const fixtureName = 'ciNegativeGateSentinel.test.ts';
 
+/** Keep abnormal child exits distinguishable from expected diagnostic failures.
+ * Do not serialize child output, environment, paths or raw spawn errors.
+ * @param {{error?: Error & {code?: string}, signal?: string | null, status: number | null, stdout?: string | null, stderr?: string | null}} result
+ * @param {string} gate
+ * @param {number} elapsedMs
+ */
+export const assertGateProcessCompleted = (result, gate, elapsedMs) => {
+  if (!result.error && !result.signal && result.status !== null) return;
+  const knownErrors = ['ETIMEDOUT', 'ENOBUFS', 'E2BIG', 'ENOENT', 'EACCES', 'EPERM', 'EIO'];
+  const knownSignals = ['SIGTERM', 'SIGKILL', 'SIGINT', 'SIGABRT', 'SIGSEGV'];
+  const summary = {
+    gate: ['typecheck', 'lint', 'test:ci'].includes(gate) ? gate : 'unknown',
+    elapsedMs: Math.max(0, Math.round(elapsedMs)),
+    exitCode: Number.isInteger(result.status) ? result.status : null,
+    signal: result.signal ? knownSignals.includes(result.signal) ? result.signal : 'other' : null,
+    errorCode: result.error ? knownErrors.includes(result.error.code ?? '') ? result.error.code : 'other' : null,
+    stdoutBytes: Buffer.byteLength(result.stdout ?? ''),
+    stderrBytes: Buffer.byteLength(result.stderr ?? ''),
+  };
+  throw new Error(`Gate process did not complete normally: ${JSON.stringify(summary)}`);
+};
+
 export const gateProbeGroups = [
   { gate: 'typecheck', args: ['run', 'typecheck'], control: 'export const ciGateProbe: number = 1;\n',
     failures: [{ name: 'test-type-error', source: 'export const ciGateProbe: number = "CI_GATE_TYPE_SENTINEL";\n', diagnostic: 'TS2322' }] },

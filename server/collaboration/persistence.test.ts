@@ -16,8 +16,18 @@ vi.mock('node:fs/promises', async importOriginal => {
   } };
 });
 const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-afterEach(async () => { failures.rename = false; for (const directory of folders.splice(0)) await rm(directory, { recursive: true, force: true }); });
+afterEach(async () => { failures.rename = false; for (const directory of folders.splice(0)) await rm(directory, {
+  recursive: true, force: true, maxRetries: 5, retryDelay: 100,
+}); });
 const directory = async () => { const dir = await mkdtemp(join(tmpdir(), 'vizly-collaboration-test-')); folders.push(dir); return dir; };
+async function expectCommittedFiles(dir: string) {
+  // A native Windows probe observed an extra .TMP.tmp directory entry that
+  // disappeared within 200ms. Immediate state/byte assertions remain below;
+  // only the successful-write directory inventory waits for filesystem settling.
+  if (process.platform === 'win32') {
+    await expect.poll(() => readdir(dir), { timeout: 2000, interval: 50 }).toEqual([`${id}.yjs`]);
+  } else { expect(await readdir(dir)).toEqual([`${id}.yjs`]); }
+}
 describe('atomic collaboration room persistence', () => {
   it('returns empty for a new room, restores Yjs state through a new store, and replaces the file atomically', async () => {
     const dir = await directory();
@@ -31,7 +41,7 @@ describe('atomic collaboration room persistence', () => {
     expect(restored.getMap('flowchart-nodes').has('a')).toBe(true);
     doc.getMap('flowchart-nodes').clear();
     await store.save(id, Y.encodeStateAsUpdate(doc));
-    expect(await readdir(dir)).toEqual([`${id}.yjs`]);
+    await expectCommittedFiles(dir);
     doc.destroy(); restored.destroy();
   });
   it('rejects path traversal and excessive state before writing files', async () => {
@@ -63,7 +73,7 @@ describe('atomic collaboration room persistence', () => {
       await store.save(id, live);
       expect(await createFilePersistence(dir).loadRecord(id)).toEqual({ state: live, checkpoint: { revision, base } });
       expect(await createFilePersistence(dir).load(id)).toEqual(live);
-      expect(await readdir(dir)).toEqual([`${id}.yjs`]);
+      await expectCommittedFiles(dir);
     } finally { doc.destroy(); }
   });
   it('migrates an explicitly supplied legacy baseline without changing accepted state', async () => {
@@ -85,7 +95,7 @@ describe('atomic collaboration room persistence', () => {
     await expect(store.save(id, new Uint8Array([255]))).rejects.toThrow();
     await expect(store.saveCheckpoint(id, { revision: 'bad', base: empty, state: empty })).rejects.toThrow();
     expect(await readFile(join(dir, `${id}.yjs`))).toEqual(before);
-    expect(await readdir(dir)).toEqual([`${id}.yjs`]);
+    await expectCommittedFiles(dir);
   });
   it('fails closed on a corrupted checkpoint instead of silently resetting its baseline', async () => {
     const dir = await directory();
@@ -108,7 +118,7 @@ describe('atomic collaboration room persistence', () => {
     failures.rename = true;
     await expect(store.saveCheckpoint(id, { ...previous, revision: '2026-10-08T21:00:00Z' })).rejects.toThrow('Room persistence failed');
     expect(await readFile(join(dir, `${id}.yjs`))).toEqual(bytes);
-    expect(await readdir(dir)).toEqual([`${id}.yjs`]);
+    await expectCommittedFiles(dir);
     expect(await store.loadRecord(id)).toEqual({ state, checkpoint: { revision: previous.revision, base: state } });
   });
   it('normalizes valid storage identities and rejects malformed UUID-shaped inputs', async () => {
@@ -117,7 +127,7 @@ describe('atomic collaboration room persistence', () => {
     const state = new Uint8Array([0, 0]);
     await store.save(id.toUpperCase(), state);
     expect(await store.load(id)).toEqual(state);
-    expect(await readdir(dir)).toEqual([`${id}.yjs`]);
+    await expectCommittedFiles(dir);
     for (const invalid of ['-'.repeat(36), 'a'.repeat(36), '../outside', '', id.replace('-4aaa-', '-0aaa-')]) {
       await expect(store.load(invalid)).rejects.toThrow('identity');
       await expect(store.saveCheckpoint(invalid, { revision: '2026-10-08T20:00:00Z', base: state, state })).rejects.toThrow('identity');

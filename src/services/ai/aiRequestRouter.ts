@@ -18,7 +18,7 @@ const NEGATIVE_PROBE_TTL_MS = 60_000;
 let gatewayProbeCache: { available: boolean; expiresAt: number } | null = null;
 
 export const coerceAIGatewayMode = (value: unknown): AIGatewayMode => (
-    value === 'off' || value === 'required' ? value : 'auto'
+    value === 'auto' || value === 'required' ? value : 'off'
 );
 
 export const isRemoteAIProvider = (baseUrl: string): boolean => {
@@ -73,7 +73,7 @@ export async function requestAIChatCompletionRouted(
     const directRequest = dependencies.directRequest ?? requestAIChatCompletion;
     const mode = dependencies.mode
         ?? coerceAIGatewayMode(import.meta.env.VITE_AI_GATEWAY_MODE);
-    if (mode === 'off' || !isRemoteAIProvider(provider.baseUrl)) {
+    if (mode === 'off' || !isRemoteAIProvider(provider.baseUrl) || (mode === 'auto' && provider.transport === 'direct')) {
         return directRequest(provider, body, options);
     }
 

@@ -1,3 +1,4 @@
+import { createServerTelemetryRuntime } from './telemetryRuntime.js';
 import { resolve } from 'node:path';
 import { createSupabaseAuthorizer, createSupabaseOwnerAuthorizer } from './authorization.js';
 import { createFilePersistence } from './persistence.js';
@@ -18,7 +19,9 @@ const readCloud = createCloudRoomCheckpoint(createCloudRoomSource(process.env.SU
 const coordinate = createRoomCoordinator(persistence, readCloud);
 const readRevision = createCloudRoomRevisionSource(process.env.SUPABASE_URL ?? '', process.env.SUPABASE_PUBLISHABLE_KEY ?? '');
 const authorizeOwner = createSupabaseOwnerAuthorizer(process.env.SUPABASE_URL ?? '', process.env.SUPABASE_PUBLISHABLE_KEY ?? '');
+const telemetry = createServerTelemetryRuntime(process.env);
 const server = createCollaborationServer({
+  telemetry: telemetry.receiver, operationTelemetry: telemetry.collector,
   authorize: createSupabaseAuthorizer(process.env.SUPABASE_URL ?? '', process.env.SUPABASE_PUBLISHABLE_KEY ?? ''),
   persistence,
   recovery: { authorizeOwner, operations: createRoomRecovery({ authorizeOwner, persistence, readCloud,
@@ -37,7 +40,7 @@ let stopping = false;
 const shutdown = () => {
   if (stopping) return;
   stopping = true;
-  void server.stop().catch(() => { process.stderr.write('Collaboration shutdown failed\n'); process.exitCode = 1; });
+  void server.stop().finally(() => telemetry.stop()).catch(() => { process.stderr.write('Collaboration shutdown failed\n'); process.exitCode = 1; });
 };
 process.once('SIGINT', shutdown);
 process.once('SIGTERM', shutdown);

@@ -1,4 +1,5 @@
-import React, { useRef, useState } from 'react';
+import { getAuthSessionRevision, onAuthSessionInvalidated } from '@/context/authSessionBoundary';
+import React, { useRef, useState, useSyncExternalStore } from 'react';
 import { Alert, Drawer, Button, Empty, Input, List, Typography, Space, Tooltip, Badge, Popconfirm } from 'antd';
 import { PlusOutlined, ReloadOutlined, UndoOutlined, EyeOutlined } from '@ant-design/icons';
 import { Clock } from 'lucide-react';
@@ -14,6 +15,7 @@ import {
     getViewportPopupContainer,
 } from '@vizly/core/viewport';
 import './VersionHistoryPanel.css';
+import { VERSION_AUTOSYNC_ENABLED } from '@/services/versionOutboxPolicy';
 
 const { Text, Title } = Typography;
 
@@ -30,7 +32,7 @@ interface VersionHistoryPanelProps {
     onClose: () => void;
 }
 
-export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
+const VersionHistoryPanelContent: React.FC<VersionHistoryPanelProps> = ({
     diagramId,
     isOpen,
     onClose
@@ -46,7 +48,9 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
         saveVersion,
         enterPreview,
         exitPreview,
-        restoreVersion
+        restoreVersion,
+        retryVersion,
+        exportVersion
     } = useVersionHistory(diagramId);
 
     const [commitMessage, setCommitMessage] = useState('');
@@ -313,6 +317,22 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                     return (
                         <List.Item
                             actions={[
+                                ...(item.storage?.location === 'local' ? [
+                                    <Button key="export" className="version-history-action" disabled={activeOperation !== null}
+                                        onClick={() => void exportVersion(item.id)}>
+                                        {t('designer.versionHistoryPanel.exportLocal')}
+                                    </Button>,
+                                    ...(item.storage.syncStatus === 'pending' ? [
+                                        <Button key="sync" className="version-history-action" disabled={activeOperation !== null || Boolean(previewVersion)}
+                                            onClick={async () => {
+                                                const operation: VersionHistoryPanelOperation = { diagramId, kind: 'save' };
+                                                if (!startOperation(operation)) return;
+                                                try { await retryVersion(item.id); } finally { finishOperation(operation); }
+                                            }}>
+                                            {t('designer.versionHistoryPanel.retrySync')}
+                                        </Button>,
+                                    ] : []),
+                                ] : []),
                                 <Button
                                     key="preview"
                                     className="version-history-action"
@@ -356,7 +376,7 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                                     </Tooltip>
                                 </Popconfirm>
                             ]}
-                            className="version-history-list-item"
+                            className={`version-history-list-item ${item.storage?.location === 'local' ? 'version-history-local' : ''}`}
                             style={{
                                 padding: '16px 20px',
                                 background: isPreviewing ? '#f0f5ff' : 'transparent',
@@ -389,6 +409,19 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                                 }
                                 description={
                                     <Space orientation="vertical" size={0}>
+                                        <Text type={item.storage?.location === 'local' && item.storage.syncStatus !== 'synced' ? 'warning' : 'secondary'}>
+                                            {t(`designer.versionHistoryPanel.${!item.storage || item.storage.syncStatus === 'legacy' ? 'legacyLocal' : item.storage.syncStatus === 'synced' ? 'cloudSaved' : 'localSaved'}`)}
+                                        </Text>
+                                        {item.storage?.automaticSync && item.storage.syncStatus === 'pending' && (
+                                            <Text type="secondary">
+                                                {t(`designer.versionHistoryPanel.automaticSync.${VERSION_AUTOSYNC_ENABLED ? item.storage.automaticSync : 'paused'}`, { count: item.storage.syncAttempts ?? 0 })}
+                                                {VERSION_AUTOSYNC_ENABLED && item.storage.automaticSync === 'retrying' && item.storage.nextSyncAttemptAt
+                                                    ? ` · ${t('designer.versionHistoryPanel.nextSyncAttempt', { time: new Date(item.storage.nextSyncAttemptAt).toLocaleTimeString(i18n.resolvedLanguage || i18n.language) })}` : ''}
+                                            </Text>
+                                        )}
+                                        {item.storage?.failure && item.storage.syncStatus === 'pending' && (
+                                            <Text type="secondary">{t(`designer.versionHistoryPanel.failure.${item.storage.failure}`)}</Text>
+                                        )}
                                         <Text type="secondary" style={{ fontSize: 12 }}>
                                             {new Date(item.createdAt).toLocaleString(
                                                 i18n.resolvedLanguage || i18n.language,
@@ -410,4 +443,18 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
             />
         </Drawer>
     );
+};
+
+const subscribeStorage = (listener: () => void) => {
+    window.addEventListener('storage-provider-changed', listener);
+    return () => window.removeEventListener('storage-provider-changed', listener);
+};
+const readStorageProvider = () => {
+    try { return localStorage.getItem('DiagramView.StorageProvider') ?? 'supabase'; }
+    catch { return 'supabase'; }
+};
+export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = props => {
+    const session = useSyncExternalStore(onAuthSessionInvalidated, getAuthSessionRevision);
+    const provider = useSyncExternalStore(subscribeStorage, readStorageProvider);
+    return <VersionHistoryPanelContent key={`${props.diagramId}:${session}:${provider}`} {...props} />;
 };

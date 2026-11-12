@@ -6,14 +6,15 @@ const source = readFileSync('public/assets/startup-resource-guard.v1.js', 'utf8'
 afterEach(() => {
   window.dispatchEvent(new Event('vizly:entry-ready'));
   vi.restoreAllMocks();
+  document.head.replaceChildren();
   document.body.replaceChildren();
 });
-const install = (times = [0, 12]) => {
+const install = (times = [0, 12], locationOverrides: Record<string, unknown> = {}) => {
   const reload = vi.fn();
   const now = vi.fn().mockReturnValueOnce(times[0]).mockReturnValue(times[1]);
-  runInNewContext(source, { document, HTMLScriptElement, performance: { now }, window: {
+  runInNewContext(source, { document, HTMLScriptElement, URLSearchParams, performance: { now }, window: {
     addEventListener: window.addEventListener.bind(window), removeEventListener: window.removeEventListener.bind(window),
-    location: { reload },
+    location: { reload, ...locationOverrides },
   } });
   return reload;
 };
@@ -71,5 +72,33 @@ describe('independent startup resource guard', () => {
     expect(html).toContain("script-src 'self';");
     expect(html).not.toContain("script-src 'self' 'unsafe-inline'");
     expect(readFileSync('src/main.tsx', 'utf8')).toContain("window.dispatchEvent(new Event('vizly:entry-ready'))");
+  });
+
+  it('preloads only the active route chunks from build metadata', () => {
+    const meta = document.createElement('meta');
+    meta.setAttribute('name', 'vizly-route-preloads');
+    meta.setAttribute(
+      'content',
+      'diagram=/assets/canvas-runtime-Abc12345.js,/assets/DiagramViewerRoute-Def67890.js;manage=/assets/DiagramManagementPage-Ghi12345.js',
+    );
+    document.head.append(meta);
+
+    install([0, 12], { pathname: '/', search: '', hash: '#/?diagram=wms-e2e-solution' });
+    const diagramHrefs = [...document.head.querySelectorAll('link[rel="modulepreload"]')]
+      .map(link => link.getAttribute('href'));
+    expect(diagramHrefs).toEqual([
+      '/assets/canvas-runtime-Abc12345.js',
+      '/assets/DiagramViewerRoute-Def67890.js',
+    ]);
+
+    document.head.querySelectorAll('link[rel="modulepreload"]').forEach(link => link.remove());
+    install([0, 12], { pathname: '/', search: '', hash: '' });
+    const manageHrefs = [...document.head.querySelectorAll('link[rel="modulepreload"]')]
+      .map(link => link.getAttribute('href'));
+    expect(manageHrefs).toEqual(['/assets/DiagramManagementPage-Ghi12345.js']);
+
+    document.head.querySelectorAll('link[rel="modulepreload"]').forEach(link => link.remove());
+    install([0, 12], { pathname: '/', search: '', hash: '#/login' });
+    expect(document.head.querySelectorAll('link[rel="modulepreload"]')).toHaveLength(0);
   });
 });

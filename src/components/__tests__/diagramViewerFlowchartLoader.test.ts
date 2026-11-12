@@ -35,4 +35,24 @@ describe('designer component loading boundary', () => {
     mocks.plugins.mockRejectedValueOnce(failure);
     await expect(loadFlowchartDesigner('flowchart')).rejects.toBe(failure);
   });
+  it('makes the renderer available while optional precompiled-route downloading is still pending', async () => {
+    let finishPrefetch!: (value: boolean) => void;
+    mocks.route.mockReturnValueOnce(new Promise<boolean>(resolve => { finishPrefetch = resolve; }));
+    let renderer: unknown;
+    const loaded = loadFlowchartDesigner('flowchart', 'logistics-architecture-v1').then(value => { renderer = value.default; });
+    try {
+      await vi.waitFor(() => expect(renderer).toBeTypeOf('function'), { timeout: 500, interval: 10 });
+      expect(mocks.route).toHaveBeenCalledWith('logistics-architecture-v1');
+      expect(mocks.plugins).toHaveBeenCalledWith('flowchart');
+    } finally {
+      finishPrefetch(true);
+      await loaded;
+    }
+  });
+  it('keeps optional route-cache failures from rejecting a ready renderer', async () => {
+    mocks.route.mockRejectedValueOnce(new Error('controlled optional route-cache failure'));
+    const loaded = await loadFlowchartDesigner('flowchart', 'logistics-architecture-v1');
+    expect(loaded.default).toBeTypeOf('function');
+    expect(mocks.route).toHaveBeenCalledWith('logistics-architecture-v1');
+  });
 });

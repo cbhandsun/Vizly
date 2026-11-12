@@ -4,6 +4,7 @@ import type { RecoverableCheckpointPersistence } from './persistence.js';
 import type { BootstrapIdentity } from './roomBootstrap.js';
 import { compareCloudCheckpointRevisions, encodeRoomCheckpoint, type RoomCheckpoint } from './roomCheckpoint.js';
 import { RecoveryRecordChangedError } from './roomRecoveryStore.js';
+import { reconcileRoomCheckpoint } from './roomCheckpointCoordination.js';
 
 export interface RecoveryConfirmation { sha256: string; revision: string }
 export class RecoveryRejectedError extends Error {
@@ -32,7 +33,8 @@ export const createRoomRecovery = (options: {
     const checkpoint = await options.readCloud(identity);
     encodeRoomCheckpoint(checkpoint);
     if (!Buffer.from(checkpoint.base).equals(Buffer.from(checkpoint.state))) throw new Error('Invalid recovery source');
-    return checkpoint;
+    return checkpoint.automaticHandleRoles?.size || checkpoint.canvasNodeZIndexes?.size
+      ? reconcileRoomCheckpoint(null, checkpoint) : checkpoint;
   };
   return {
     async inspect(identity: BootstrapIdentity, signal?: AbortSignal) {

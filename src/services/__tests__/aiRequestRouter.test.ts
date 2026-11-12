@@ -23,10 +23,27 @@ describe('aiRequestRouter', () => {
   it('coerces modes and distinguishes local from remote providers', () => {
     expect(coerceAIGatewayMode('required')).toBe('required');
     expect(coerceAIGatewayMode('off')).toBe('off');
-    expect(coerceAIGatewayMode('unexpected')).toBe('auto');
+    expect(coerceAIGatewayMode('auto')).toBe('auto');
+    expect(coerceAIGatewayMode(undefined)).toBe('off');
+    expect(coerceAIGatewayMode('unexpected')).toBe('off');
     expect(isRemoteAIProvider('https://api.openai.com/v1')).toBe(true);
     expect(isRemoteAIProvider('http://localhost:11434/v1')).toBe(false);
     expect(isRemoteAIProvider('file:///tmp/model')).toBe(false);
+  });
+
+  it('sends default browser requests only to the configured provider without consulting cloud auth', async () => {
+    const directResponse = new Response('direct');
+    const directRequest = vi.fn().mockResolvedValue(directResponse);
+    const getAccessToken = vi.fn();
+    const gatewayRequest = vi.fn();
+    const probe = vi.fn();
+    await expect(requestAIChatCompletionRouted(remoteProvider, body, {}, {
+      mode: coerceAIGatewayMode(undefined), directRequest, getAccessToken, gatewayRequest, probe,
+    })).resolves.toBe(directResponse);
+    expect(directRequest).toHaveBeenCalledWith(remoteProvider, body, {});
+    expect(getAccessToken).not.toHaveBeenCalled();
+    expect(gatewayRequest).not.toHaveBeenCalled();
+    expect(probe).not.toHaveBeenCalled();
   });
 
   it('keeps local and unauthenticated requests on direct transport', async () => {
@@ -71,6 +88,20 @@ describe('aiRequestRouter', () => {
     expect(probe).toHaveBeenCalledOnce();
     expect(gatewayRequest).toHaveBeenCalledOnce();
     expect(directRequest).not.toHaveBeenCalled();
+  });
+
+  it('uses an explicitly selected browser connection only when the gateway is optional', async () => {
+    const directRequest = vi.fn().mockResolvedValue(new Response('direct'));
+    const gatewayRequest = vi.fn().mockResolvedValue(new Response('gateway'));
+    const probe = vi.fn().mockResolvedValue(true);
+    const dependencies = { supabaseUrl: 'https://project.supabase.co', getAccessToken: async () => JWT_CANARY, directRequest, gatewayRequest, probe };
+    const provider = { ...remoteProvider, transport: 'direct' as const };
+    await requestAIChatCompletionRouted(provider, body, {}, { ...dependencies, mode: 'auto' });
+    expect(directRequest).toHaveBeenCalledOnce();
+    expect(probe).not.toHaveBeenCalled();
+    await requestAIChatCompletionRouted(provider, body, {}, { ...dependencies, mode: 'required' });
+    expect(gatewayRequest).toHaveBeenCalledOnce();
+    expect(directRequest).toHaveBeenCalledOnce();
   });
 
   it('falls back before sending credentials when the optional gateway is absent', async () => {

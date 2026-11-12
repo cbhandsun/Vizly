@@ -12,7 +12,7 @@ describe('AI gateway user authentication', () => {
       error: null,
     });
 
-    await expect(createAIGatewayUserAuthenticator(verify)(request)).resolves.toEqual({ ok: true });
+    await expect(createAIGatewayUserAuthenticator(verify)(request)).resolves.toEqual({ ok: true, userId: 'user-id' });
     expect(verify).toHaveBeenCalledWith(request, { auth: 'user' });
   });
 
@@ -20,6 +20,9 @@ describe('AI gateway user authentication', () => {
     { data: { authMode: 'publishable', userClaims: null }, error: null },
     { data: { authMode: 'user', userClaims: null }, error: null },
     { data: { authMode: 'user', userClaims: { id: '' } }, error: null },
+    { data: { authMode: 'user', userClaims: { id: ' padded ' } }, error: null },
+    { data: { authMode: 'user', userClaims: { id: 'x'.repeat(129) } }, error: null },
+    { data: { authMode: 'user', userClaims: { id: 'anonymous-id' }, jwtClaims: { is_anonymous: true } }, error: null },
     { data: null, error: { status: 401 } },
   ])('rejects anonymous or malformed authentication results', async (outcome) => {
     const authenticate = createAIGatewayUserAuthenticator(
@@ -30,6 +33,18 @@ describe('AI gateway user authentication', () => {
       ok: false,
       reason: 'unauthorized',
     });
+  });
+
+  it('takes the account identity only from verified claims, never caller headers, body or editable metadata', async () => {
+    const verify = vi.fn().mockResolvedValue({ data: { authMode: 'user',
+      userClaims: { id: 'verified-account', userMetadata: { id: 'forged-account' } },
+      jwtClaims: { is_anonymous: false },
+    }, error: null });
+    const forged = new Request(request.url, { method: 'POST',
+      headers: { ...Object.fromEntries(request.headers), 'X-User-Id': 'forged-account' },
+      body: JSON.stringify({ userId: 'forged-account' }),
+    });
+    await expect(createAIGatewayUserAuthenticator(verify)(forged)).resolves.toEqual({ ok: true, userId: 'verified-account' });
   });
 
   it.each([

@@ -13,9 +13,10 @@ import {
   FaBrain,
 } from 'react-icons/fa';
 
-export const diagramDefinitions: DiagramDefinition[] = [
+export const diagramDefinitions: (DiagramDefinition & { pluginId?: string })[] = [
   {
     id: 'generic-standard-diagram',
+    pluginId: 'flowchart',
     name: '通用标准架构图',
     titleKey: 'diagram.title.genericStandard',
     component: lazy(() => loadFlowchartDesigner()),
@@ -34,6 +35,7 @@ export const diagramDefinitions: DiagramDefinition[] = [
   },
   {
     id: 'architecture-diagram-unified',
+    pluginId: 'architecture-diagram',
     name: '🌟 统一架构：企业架构图',
     component: lazy(() => loadFlowchartDesigner('architecture-diagram')),
     category: 'other',
@@ -42,6 +44,7 @@ export const diagramDefinitions: DiagramDefinition[] = [
   },
   {
     id: 'timeline-diagram-v2',
+    pluginId: 'timeline-diagram',
     name: '🌟 统一架构：时间线图',
     component: lazy(() => loadFlowchartDesigner('timeline-diagram')),
     category: 'other',
@@ -50,6 +53,7 @@ export const diagramDefinitions: DiagramDefinition[] = [
   },
   {
     id: 'standard-flow-unified',
+    pluginId: 'standard-flow',
     name: '🌟 统一架构：标准流程图',
     // [Fix] 注册逻辑提升到 .then() 链中：lazy() 的 Promise resolve 前注册完毕，
     // 消除了在渲染路径中 fire-and-forget async 调用导致的竞态窗口。
@@ -76,6 +80,7 @@ export const diagramDefinitions: DiagramDefinition[] = [
   },
   ...(import.meta.env.DEV ? ([{
     id: 'hello-world-unified',
+    pluginId: 'hello-world',
     name: '🌟 统一架构：示例插件 (SDK)',
     // [Fix] 注册逻辑提升到 .then() 链中（同 standard-flow-unified）
     component: lazy(() =>
@@ -98,7 +103,7 @@ export const diagramDefinitions: DiagramDefinition[] = [
     category: 'other',
     tags: ['sdk', 'hello-world', 'unified', 'plugin'],
     icon: FaSitemap,
-  }] satisfies DiagramDefinition[]) : []),
+  }] satisfies (DiagramDefinition & { pluginId?: string })[]) : []),
   ...(import.meta.env.DEV ? ([{
     id: 'theme-color-comparison',
     name: '主题颜色对比',
@@ -138,9 +143,10 @@ export const diagramDefinitions: DiagramDefinition[] = [
     category: 'debug',
     tags: ['performance', 'smart-edge', 'demo'],
     icon: FaCodeBranch,
-  }] satisfies DiagramDefinition[]) : []),
+  }] satisfies (DiagramDefinition & { pluginId?: string })[]) : []),
   {
     id: 'flowchart-designer',
+    pluginId: 'flowchart',
     name: '流程图设计器',
     titleKey: 'diagram.title.flowchartDesigner',
     component: lazy(() => loadFlowchartDesigner()),
@@ -150,6 +156,7 @@ export const diagramDefinitions: DiagramDefinition[] = [
   },
   {
     id: 'network-topology-unified',
+    pluginId: 'network',
     name: '🌟 统一架构：网络拓扑图',
     component: lazy(() => loadFlowchartDesigner('network')),
     category: 'other',
@@ -158,6 +165,7 @@ export const diagramDefinitions: DiagramDefinition[] = [
   },
   {
     id: 'mindmap-unified',
+    pluginId: 'mindmap',
     name: '🌿 统一架构：思维导图',
     component: lazy(() =>
       loadFlowchartDesigner('mindmap')

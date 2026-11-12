@@ -60,10 +60,14 @@ export const normalizeLocalDiagramForRegistry = (
   const mergedMetadata = mergedRecord.metadata && typeof mergedRecord.metadata === 'object'
     ? mergedRecord.metadata as Record<string, unknown>
     : {};
-  return parseRemoteDiagramContent(merged, {
+  const normalized = parseRemoteDiagramContent(merged, {
     id: String(mergedRecord.id || builtInDiagram?.id || 'local-diagram'),
     title: String(mergedRecord.name || mergedMetadata.title || builtInDiagram?.name || 'Local Diagram'),
   }) as StandardDiagramData;
+  // Local access flags are host-owned metadata, excluded by remote-content parsing.
+  // Preserve explicit booleans when rebuilding the registry after a page reload.
+  if (typeof mergedRecord.isReadonly === 'boolean') normalized.isReadonly = mergedRecord.isReadonly;
+  return normalized;
 };
 
 /**
@@ -252,6 +256,23 @@ export class DataRegistry {
    */
   public getDataService(): DataService {
     return this.dataService;
+  }
+
+  /** Resolve IDs persisted after workspace initialization before accepting an empty canvas. */
+  public async loadDiagram(id: string): Promise<StandardDiagramData | null> {
+    const existing = this.dataService.getDiagram(id);
+    if (existing) return existing;
+
+    const persisted = await localDB.loadDiagram(id);
+    // A concurrent opener or edit may have registered a newer in-memory document.
+    const current = this.dataService.getDiagram(id);
+    if (current) return current;
+    if (persisted === null) return null;
+
+    const normalized = normalizeLocalDiagramForRegistry(persisted, this.builtInDiagrams.get(id));
+    if (normalized.id !== id) throw new Error('Persisted diagram identity does not match the requested document.');
+    this.dataService.registerDiagram(normalized, false);
+    return this.dataService.getDiagram(id);
   }
 
   /**

@@ -1,3 +1,4 @@
+import { beginApplicationOperation, classifyOperationFailure } from '@/observability/applicationTelemetry';
 import React, { useCallback, memo, useState, useEffect, useRef } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { createPortal } from 'react-dom';
@@ -355,20 +356,24 @@ const ExportTools: React.FC<ExportToolsProps> = ({
       return undefined;
     }
 
-    const unifiedStorage = await loadUnifiedStorage();
-
-    if (!unifiedStorage.isConfigured()) {
-      appMessage.error(`${unifiedStorage.activeProvider.name} 未配置，无法保存`);
-      return undefined;
-    }
-
-    const hide = appMessage.loading(t('export.savingToCloud'), 0);
+    const finishOperation = beginApplicationOperation('save');
+    let hide: (() => void) | undefined;
     try {
+      const unifiedStorage = await loadUnifiedStorage();
+      if (!unifiedStorage.isConfigured()) {
+        finishOperation('failure', 'unavailable');
+        appMessage.error(`${unifiedStorage.activeProvider.name} 未配置，无法保存`);
+        return undefined;
+      }
+      hide = appMessage.loading(t('export.savingToCloud'), 0);
       const liveBridge = getFlowDataBridge(diagramId);
       if (liveBridge) assertDesignerSaveReady(liveBridge);
       const dataService = await loadDataService();
       const registeredCloudView = dataService.getDiagram(diagramId);
-      let diagram = dataService.getDiagram(diagramId);
+      // The registry is the loaded baseline; a live designer owns subsequent edits,
+      // including deletion of every node. Never replace a failed live conversion with it.
+      let diagram = liveBridge ? getStandardFlowDataBridge(diagramId) : registeredCloudView;
+      if (liveBridge && !diagram) throw new Error('当前画布数据无法转换，请保留编辑后重试');
 
       // Fallback: 当 dataService 中无图表数据时（FlowchartDesigner 场景），从 ReactFlow 实例构造
       if (!diagram && reactFlowInstance) {
@@ -401,6 +406,7 @@ const ExportTools: React.FC<ExportToolsProps> = ({
       }
 
       if (!diagram) {
+        finishOperation('failure', 'invalid');
         appMessage.error('未找到图表数据');
         return undefined;
       }
@@ -457,14 +463,17 @@ const ExportTools: React.FC<ExportToolsProps> = ({
         currentDiagram.metadata = { ...(currentDiagram.metadata || {}), cloud: cloudInfo };
       }
 
+      finishOperation('success');
       appMessage.success(t('export.cloudSaveSuccess'));
       return savedId;
     } catch (error) {
+      const code = classifyOperationFailure(error);
+      finishOperation(code === 'cancelled' ? 'cancelled' : 'failure', code);
       logCloudSaveFailure('ExportTools', error);
       appMessage.error(error instanceof CloudSaveVersionError ? error.message : t('export.cloudSaveFailed'));
       return undefined;
     } finally {
-      hide();
+      hide?.();
     }
   }, [diagramId, diagramName, t, user, hasFeature, showUpgradeModal, reactFlowInstance]);
 

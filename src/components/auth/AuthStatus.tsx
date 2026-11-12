@@ -88,7 +88,7 @@ export const AuthStatus: React.FC<AuthStatusProps> = ({
             key: 'email',
             label: user?.email,
             disabled: true,
-            icon: <UserOutlined />,
+            icon: <UserOutlined aria-hidden="true" />,
         },
         {
             type: 'divider',
@@ -96,22 +96,22 @@ export const AuthStatus: React.FC<AuthStatusProps> = ({
         {
             key: 'cloud_files',
             label: t('auth.menu.myDiagrams'),
-            icon: <CloudOutlined />,
+            icon: <CloudOutlined aria-hidden="true" />,
         },
         {
             key: 'switch_user',
             label: t('auth.menu.switchUser'),
-            icon: <UserOutlined />,
+            icon: <UserOutlined aria-hidden="true" />,
         },
         {
             key: 'set_password',
             label: t('auth.menu.setPassword'),
-            icon: <LockOutlined />,
+            icon: <LockOutlined aria-hidden="true" />,
         },
         {
             key: 'logout',
             label: t('auth.menu.logout'),
-            icon: <LogoutOutlined />,
+            icon: <LogoutOutlined aria-hidden="true" />,
             danger: true,
         },
     ];
@@ -123,7 +123,7 @@ export const AuthStatus: React.FC<AuthStatusProps> = ({
                     <Button
                         type="text"
                         aria-label={t('auth.login')}
-                        icon={<LoginOutlined />}
+                        icon={<LoginOutlined aria-hidden="true" />}
                         onClick={() => setIsModalOpen(true)}
                         className={`auth-compact-login-btn${commercialTouchTarget ? ' auth-compact-login-btn--commercial' : ''}`}
                         style={commercialTouchTarget ? COMMERCIAL_TOUCH_TARGET_STYLE : undefined}
@@ -132,7 +132,7 @@ export const AuthStatus: React.FC<AuthStatusProps> = ({
             ) : (
                 <Button
                     type="text"
-                    icon={<LoginOutlined />}
+                    icon={<LoginOutlined aria-hidden="true" />}
                     onClick={() => setIsModalOpen(true)}
                 >
                     {t('auth.login')}
@@ -168,7 +168,7 @@ export const AuthStatus: React.FC<AuthStatusProps> = ({
                     size={commercialTouchTarget ? 'default' : 'small'}
                     className="auth-account-avatar"
                     style={{ backgroundColor: '#1890ff' }}
-                    icon={<UserOutlined />}
+                    icon={<UserOutlined aria-hidden="true" />}
                 >
                     {user.email?.[0].toUpperCase()}
                 </Avatar>

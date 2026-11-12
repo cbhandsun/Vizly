@@ -1,5 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
+
+vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
+afterAll(() => vi.unstubAllGlobals());
 
 vi.mock('../MarkdownMessage', () => ({
   default: ({ content }: { content: string }) => <span>{content}</span>,
@@ -34,7 +37,7 @@ describe('AIChatMessageItem', () => {
     await screen.findByText('answer');
 
     fireEvent.click(screen.getByRole('button', { name: 'aiChat.previewJson' }));
-    fireEvent.click(screen.getByRole('button', { name: /应用图表/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'aiChat.applyToCanvas' }));
     expect(onPreviewJson).toHaveBeenCalledWith('{"version":1}');
     expect(onApplyJson).toHaveBeenCalledWith('{"version":1}');
     expect(screen.getByRole('button', { name: 'aiChat.saveDiagram' })).not.toBeNull();
@@ -79,4 +82,13 @@ describe('AIChatMessageItem', () => {
 
     expect(screen.queryByRole('button', { name: 'aiChat.previewJson' })).toBeNull();
   });
+  it('opens save destinations on click without requiring pointer hover', async () => {
+    const save = vi.fn();
+    render(<MemoizedMessageItem item={{ id: 'save', role: 'assistant', content: 'answer', hasJson: true, jsonContent: '{"nodes":[]}' }}
+      t={translate} handleSaveDiagramTo={save} />);
+    fireEvent.click(screen.getByRole('button', { name: 'aiChat.saveDiagram' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: /aiChat.saveCloud/ }));
+    expect(save).toHaveBeenCalledWith('{"nodes":[]}', 'supabase');
+  });
+
 });

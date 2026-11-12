@@ -1,4 +1,6 @@
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { captureAuthSession } from '@/context/authSessionBoundary';
+import { fingerprintAIGraph, retainExplicitAIEditNodes, type AIEditContext, type AICanvasGraph } from './ai/aiCanvasEdit';
+import React, { useState, useRef, useEffect, useMemo, useCallback, useLayoutEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useDiagramControls, useUIState } from '@vizly/core/editor-hooks';
@@ -26,7 +28,7 @@ import {
     logDiagramViewerSwitchConfirmationFailure,
 } from './diagramViewerLogging';
 import { clearBlankTemplateLocalState } from './diagramViewerStorage';
-import { appMessage } from '@vizly/core/antd';
+import { appMessage, appModal } from '@vizly/core/antd';
 import { resolvePluginId } from '@vizly/core/plugins';
 import { getStandardPresetDocTypeById } from '@/data/standardized/presetMetadata';
 import {
@@ -36,12 +38,12 @@ import {
 } from '@vizly/core/storage';
 import {
     removeFlowDataBridge,
+    getFlowDataBridge,
 } from '@vizly/core/diagram-data';
 import {
     createDiagramViewerCanvasOps,
-    importAIDiagramJsonToBridge,
 } from './diagramViewerAiBridge';
-import { readDiagramViewerBridgeSnapshot } from './diagramViewerSnapshot';
+import { readDiagramViewerBridgeSnapshot, readDiagramViewerAIContext } from './diagramViewerSnapshot';
 import {
     buildDiagramHashRoute,
     getDiagramViewerRouteParam,
@@ -112,6 +114,7 @@ const DiagramViewer: React.FC = () => {
         retryCollaboration,
         restoreCloudRoom,
         isCollaborationReadOnly,
+        hasVerifiedEditingAccess,
         canPersistCanvas,
         collabModalVisible,
         isSynced: isYjsSynced,
@@ -152,15 +155,15 @@ const DiagramViewer: React.FC = () => {
 
     const aiNodesRef = useMemo(() => ({
         get current() {
-            return readBridgeSnapshot().nodes;
+            return readDiagramViewerAIContext(selectedDiagramId).nodes;
         }
-    }), [readBridgeSnapshot]);
+    }), [selectedDiagramId]);
 
     const aiEdgesRef = useMemo(() => ({
         get current() {
-            return readBridgeSnapshot().edges;
+            return readDiagramViewerAIContext(selectedDiagramId).edges;
         }
-    }), [readBridgeSnapshot]);
+    }), [selectedDiagramId]);
     // =======================================================
 
 
@@ -210,6 +213,7 @@ const DiagramViewer: React.FC = () => {
         diagramId: string;
         type?: string;
         name?: string;
+        isReadonly?: boolean;
     } | null>(null);
 
     useEffect(() => {
@@ -222,26 +226,17 @@ const DiagramViewer: React.FC = () => {
             await dataRegistry.initialize();
             if (cancelled) return;
             try {
-                const dataService = dataRegistry.getDataService();
-                let loadedDiagram = dataService.getDiagram(selectedDiagramId);
-                if (!loadedDiagram) {
-                    const { localDB } = await import('@/services/IndexedDBStorage');
-                    const raw = await localDB.loadDiagram(selectedDiagramId);
-                    if (raw && typeof raw === 'object') {
-                        const { normalizeLocalDiagramForRegistry } = await import('@/data/DataRegistry');
-                        const normalized = normalizeLocalDiagramForRegistry(raw);
-                        dataService.registerDiagram(normalized, false);
-                        loadedDiagram = normalized;
-                    }
-                }
+                const loadedDiagram = await dataRegistry.loadDiagram(selectedDiagramId);
+                if (cancelled) return;
                 setLoadedDocType({
                     diagramId: selectedDiagramId,
                     type: loadedDiagram?.type,
                     name: getPersistedDiagramTitle(loadedDiagram),
+                    isReadonly: loadedDiagram?.isReadonly === true,
                 });
             } catch (error) {
                 logDiagramViewerDocTypeDetectionFailure(selectedDiagramId, error);
-                setLoadedDocType({ diagramId: selectedDiagramId, type: undefined });
+                if (!cancelled) setLoadedDocType({ diagramId: selectedDiagramId, type: undefined });
             }
         }).catch((error) => {
             logDiagramViewerDocTypeDetectionFailure(selectedDiagramId, error);
@@ -284,7 +279,15 @@ const DiagramViewer: React.FC = () => {
         saveToCloud,
         shareDialogOpen,
     } = useCloudSave(selectedDiagramId, diagramTitle);
-    const canRenameDiagram = !selectedDiagram
+    const requiresDocumentPermissions = !selectedDiagram
+        && !PLUGIN_EMPTY_CANVAS_IDS.has(selectedDiagramId)
+        && !getStandardPresetDocTypeById(selectedDiagramId);
+    // Keep custom documents locked until their persisted access flag is loaded.
+    // A viewer remains read-only even when no realtime server is configured.
+    const documentReadOnly = requiresDocumentPermissions && !hasVerifiedEditingAccess
+        && (loadedDocType?.diagramId !== selectedDiagramId
+            || loadedDocType.isReadonly !== false);
+    const canRenameDiagram = !documentReadOnly && !isCollaborationReadOnly && !selectedDiagram
         && loadedDocType?.diagramId === selectedDiagramId
         && Boolean(loadedDocType.name);
     const handleRenameDiagram = useCallback(async (requestedTitle: string) => {
@@ -342,10 +345,15 @@ const DiagramViewer: React.FC = () => {
     // ==========================================
     /** 图表锁定防误触：禁止所有拖拽连线编排 */
     const [manualReadonly, setManualReadonly] = useState<boolean>(false);
-    const isReadonly = manualReadonly || isCollaborationReadOnly;
+    const accessReadOnly = documentReadOnly || isCollaborationReadOnly;
+    const isReadonly = manualReadonly || accessReadOnly;
     const setIsReadonly = useCallback((readonly: boolean) => {
-        if (!isCollaborationReadOnly) setManualReadonly(readonly);
-    }, [isCollaborationReadOnly]);
+        if (!accessReadOnly) setManualReadonly(readonly);
+    }, [accessReadOnly]);
+    const canPersistDocumentCanvas = useCallback(
+        () => !documentReadOnly && canPersistCanvas(),
+        [documentReadOnly, canPersistCanvas],
+    );
 
     /** 沉浸式演示模式：隐藏 UI 侧边栏与工具栏 */
     const [isPresentationMode, setIsPresentationMode] = useState<boolean>(false);
@@ -440,32 +448,55 @@ const DiagramViewer: React.FC = () => {
     }, [selectedDiagramId]);
 
     const handlePreviewAIJson = useCallback((json: string) => {
-        void import('./ai/aiDiagramImport').then(({ parseAIDiagramJson }) => {
-            importAIDiagramJsonToBridge({
-                diagramId: selectedDiagramId,
-                json,
-                mode: 'preview',
-                parseJson: parseAIDiagramJson,
-            });
+        appModal.info({
+            title: t('aiChat.previewJson'),
+            width: 760,
+            content: <pre style={{ maxHeight: '60vh', overflow: 'auto', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{json}</pre>,
+            okText: t('common.close'),
         });
-    }, [selectedDiagramId]);
+    }, [t]);
 
-    const handleApplyAIJson = useCallback((json: string, strategy: 'append' | 'replace' | 'new-diagram' = 'append') => {
-        void import('./ai/aiDiagramImport').then(({ parseAIDiagramJson }) => {
-            importAIDiagramJsonToBridge({
-                diagramId: selectedDiagramId,
-                json,
-                mode: 'apply',
-                applyStrategy: strategy,
-                parseJson: parseAIDiagramJson,
-                onNavigateNewDiagram: (newDiagramId) => {
-                    saveSelectedDiagramId(newDiagramId);
-                    window.location.hash = buildDiagramHashRoute(newDiagramId);
-                    window.location.reload();
-                },
+    const aiViewRef = useRef({ diagramId: selectedDiagramId, readonly: isReadonly });
+    useLayoutEffect(() => {
+        aiViewRef.current = { diagramId: selectedDiagramId, readonly: isReadonly };
+    }, [selectedDiagramId, isReadonly]);
+    const handleApplyAIJson = useCallback((json: string, context?: AIEditContext) => {
+        const session = captureAuthSession(user?.id);
+        const bridge = getFlowDataBridge(selectedDiagramId);
+        const assertCurrent = () => {
+            if (!session.isCurrent() || aiViewRef.current.diagramId !== selectedDiagramId
+                || getFlowDataBridge(selectedDiagramId) !== bridge) throw new Error('aiChat.edit.stale');
+            if (aiViewRef.current.readonly || !canPersistDocumentCanvas() || !bridge?.mutateCanvasSnapshot || !bridge.getCanvasSnapshot) throw new Error('aiChat.edit.readonly');
+            if (context && context.diagramId !== selectedDiagramId) throw new Error('aiChat.edit.stale');
+        };
+        void (async () => {
+            assertCurrent();
+            const [{ parseAIDiagramJson }, { standardDataToCanvas }, { AIChangePreview }] = await Promise.all([
+                import('./ai/aiDiagramImport'), import('@vizly/core/canvas-conversion'), import('./ai/AIChangePreview'),
+            ]);
+            const proposal = parseAIDiagramJson(json, { id: selectedDiagramId, title: 'AI' });
+            const converted = await standardDataToCanvas(proposal);
+            const generated = context?.scope === 'selection'
+                ? retainExplicitAIEditNodes(converted, proposal.nodes.map(node => node.id)) : converted;
+            assertCurrent();
+            const before = bridge!.getCanvasSnapshot!() as AICanvasGraph;
+            const modal = appModal.info({
+                title: t('aiChat.edit.preview'), width: 760, footer: null, closable: true,
+                content: <AIChangePreview before={before} generated={generated} context={context}
+                    onClose={() => modal.destroy()}
+                    onApply={plan => {
+                        assertCurrent();
+                        bridge!.mutateCanvasSnapshot!(current => {
+                            assertCurrent();
+                            if (fingerprintAIGraph(current) !== plan.beforeFingerprint) throw new Error('aiChat.edit.stale');
+                            return plan.next;
+                        });
+                        appMessage.success(t('aiChat.edit.applied'));
+                    }} />,
             });
-        });
-    }, [selectedDiagramId, saveSelectedDiagramId]);
+        })().catch(error => appMessage.error(t(error instanceof Error && error.message.startsWith('aiChat.edit.')
+            ? error.message : 'aiChat.edit.invalid')));
+    }, [selectedDiagramId, user?.id, t, canPersistDocumentCanvas]);
 
     const aiCanvasOps = useMemo(() => createDiagramViewerCanvasOps({
         diagramId: selectedDiagramId,
@@ -651,12 +682,13 @@ const DiagramViewer: React.FC = () => {
             mainFlowAnimationEnabled={mainFlowAnimationEnabled}
             setMainFlowAnimationEnabled={setMainFlowAnimationEnabled}
             isReadonly={isReadonly}
-            onReadonlyChange={setIsReadonly}
+            onReadonlyChange={accessReadOnly ? undefined : setIsReadonly}
             isPresentationMode={isPresentationMode}
             onExitPresentation={exitPresentation}
             isFullscreen={isFullscreen}
             handleToggleFullscreen={handleToggleFullscreen}
             resolvedPluginId={resolvedPluginId}
+            aiPluginId={resolvedPluginId ?? selectedDiagram?.pluginId}
             handleTemplateChange={handleTemplateChange}
             commandItems={commandItems}
             isCommandOpen={isCommandOpen}
@@ -677,7 +709,7 @@ const DiagramViewer: React.FC = () => {
             coordinationProblem={coordinationProblem}
             retryCollaboration={retryCollaboration}
             restoreCloudRoom={restoreCloudRoom}
-            canPersistCanvas={canPersistCanvas}
+            canPersistCanvas={canPersistDocumentCanvas}
             openCollaborationModal={openCollaborationModal}
             pushLocalChangesToYjs={pushLocalChangesToYjs}
             provider={provider ?? null}

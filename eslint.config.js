@@ -9,7 +9,10 @@ export default defineConfig([
   // Lint source and diagnostic fixtures; compiled bundles have separate artifact gates.
   globalIgnores(['dist', 'dist-collaboration', 'coverage', 'node_modules', 'tmp/**/assets/**', 'tmp/vercel-collaboration-production/api/index.js']),
   {
-    files: ['scripts/prepare-vercel-static.mjs', 'scripts/deploy-prepared-vercel-static.mjs',
+    files: ['scripts/database-path.mjs', 'scripts/build-database-paths.mjs', 'scripts/check-database-paths.mjs', 'scripts/prepare-vercel-static.mjs', 'scripts/deploy-prepared-vercel-static.mjs',
+      'scripts/lib/check-telemetry-journal-database.mjs',
+      'scripts/query-telemetry.mjs',
+      'scripts/check-telemetry-storage.mjs', 'scripts/fixtures/telemetry-journal/https-client.mjs',
       'scripts/install-locked-core-artifact.mjs',
       'scripts/verify-ci-negative-gates.mjs', 'scripts/lib/ciNegativeGateProbe.mjs', 'scripts/lib/ciNegativeGateProbe.test.mjs',
       'scripts/lib/isolatedPostgresReadiness.mjs', 'scripts/lib/isolatedPostgresReadiness.test.mjs',
@@ -21,6 +24,12 @@ export default defineConfig([
       'scripts/lib/s3ReadinessProbe.mjs', 'scripts/lib/s3ReadinessProbe.test.mjs',
       'scripts/lib/vercel-static-artifact.mjs', 'scripts/lib/vercel-static-artifact.test.mjs',
       'scripts/lib/preparedVercelDeployment.mjs', 'scripts/lib/preparedVercelDeployment.test.mjs'],
+    extends: [js.configs.recommended],
+    languageOptions: { ecmaVersion: 2023, globals: globals.node, sourceType: 'module' },
+  },
+  {
+    files: ['scripts/import-core-host-release-evidence.mjs', 'scripts/lib/coreHostReleaseEvidence.mjs',
+      'scripts/lib/coreHostReleaseEvidence.test.mjs', 'scripts/lib/releaseEvidenceFixture.mjs', 'scripts/lib/releaseEvidence.mjs'],
     extends: [js.configs.recommended],
     languageOptions: { ecmaVersion: 2023, globals: globals.node, sourceType: 'module' },
   },

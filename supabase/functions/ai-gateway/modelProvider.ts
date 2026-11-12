@@ -3,6 +3,7 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { LanguageModel } from 'ai';
+import { gatewayProviderFetch } from './providerFetch.ts';
 
 export type GatewayProviderKind =
   | 'anthropic'
@@ -45,23 +46,26 @@ export const createGatewayLanguageModel = (
       apiKey: config.apiKey,
       baseURL: config.baseURL,
       name: 'vizly-responses-compatible',
+      fetch: gatewayProviderFetch,
     }).responses(config.modelId);
   }
   if (kind === 'anthropic') {
-    return createAnthropic({ apiKey: config.apiKey, baseURL: config.baseURL })(config.modelId);
+    return createAnthropic({ apiKey: config.apiKey, baseURL: config.baseURL, fetch: gatewayProviderFetch })(config.modelId);
   }
   if (kind === 'google') {
     return createGoogleGenerativeAI({
       apiKey: config.apiKey,
       baseURL: resolveGoogleBaseURL(config.baseURL),
+      fetch: gatewayProviderFetch,
     })(config.modelId);
   }
   if (kind === 'openai') {
-    return createOpenAI({ apiKey: config.apiKey, baseURL: config.baseURL }).chat(config.modelId);
+    return createOpenAI({ apiKey: config.apiKey, baseURL: config.baseURL, fetch: gatewayProviderFetch }).chat(config.modelId);
   }
   return createOpenAICompatible({
     name: 'vizly-compatible',
     apiKey: config.apiKey,
     baseURL: config.baseURL,
+    fetch: gatewayProviderFetch,
   })(config.modelId);
 };

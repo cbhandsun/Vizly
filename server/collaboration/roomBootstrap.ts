@@ -2,7 +2,9 @@ import * as Y from 'yjs';
 import { validateDocument } from './boundary.js';
 import { publishCollaborationElement, readCollaborationElement } from './documentModel.js';
 import type { createCloudRoomSource } from './cloudRoomSource.js';
-import { restorePersistedCanvasGeometry } from './persistedCanvasGeometry.js';
+import { readPersistedCanvasZIndex, restorePersistedCanvasGeometry } from './persistedCanvasGeometry.js';
+import { readPersistedAutomaticHandleRoles, type HandleRole } from './persistedEdgeHandlePolicy.js';
+import { reconcileRoomCheckpoint } from './roomCheckpointCoordination.js';
 
 export interface BootstrapIdentity { token: string; diagramId: string; userId: string }
 type Source = ReturnType<typeof createCloudRoomSource>;
@@ -16,6 +18,13 @@ export const createCloudRoomCheckpoint = (source: Source, convert: (content: Con
   const initialNodes: unknown[] = value.nodes;
   const initialEdges: unknown[] = value.edges;
   const savedNodes = new Map([...cloud.content.nodes, ...(cloud.content.groups ?? [])].map(node => [node.id, node]));
+  const automaticHandleRoles = new Map<string, HandleRole[]>(cloud.content.edges.map((edge: { id: string }) =>
+    [edge.id, readPersistedAutomaticHandleRoles(edge)] as const));
+  const canvasNodeZIndexes = new Map<string, number>();
+  for (const [id, node] of savedNodes) {
+    const zIndex = readPersistedCanvasZIndex(node);
+    if (typeof id === 'string' && zIndex !== undefined) canvasNodeZIndexes.set(id, zIndex);
+  }
   const doc = new Y.Doc();
   try {
     doc.transact(() => {
@@ -24,7 +33,8 @@ export const createCloudRoomCheckpoint = (source: Source, convert: (content: Con
         for (const input of elements) {
           const parsedElement = readCollaborationElement(input);
           const element = parsedElement && name === 'flowchart-nodes' && typeof parsedElement.id === 'string'
-            ? restorePersistedCanvasGeometry(parsedElement, savedNodes.get(parsedElement.id)) : parsedElement;
+            ? restorePersistedCanvasGeometry(parsedElement, savedNodes.get(parsedElement.id), { restoreZIndex: false })
+            : parsedElement;
           if (!element || typeof element.id !== 'string' || map.has(element.id)
             || !publishCollaborationElement(map, element.id, element)) throw new Error('Invalid initial room');
         }
@@ -39,11 +49,14 @@ export const createCloudRoomCheckpoint = (source: Source, convert: (content: Con
     });
     if (!validateDocument(doc)) throw new Error('Invalid initial room');
     const state = Y.encodeStateAsUpdate(doc);
-    return { revision: cloud.revision, base: state, state };
+    // Keep the converter's baseline intact so an older server can still read
+    // this checkpoint after rollback. Rendering order and automatic ports are
+    // projected at merge time, without rewriting that historical representation.
+    return { revision: cloud.revision, base: state, state, automaticHandleRoles, canvasNodeZIndexes };
   } finally { doc.destroy(); }
 };
 
 export const createRoomBootstrap = (source: Source, convert: (content: Content) => Promise<unknown>) => {
   const load = createCloudRoomCheckpoint(source, convert);
-  return async (identity: BootstrapIdentity) => (await load(identity)).state;
+  return async (identity: BootstrapIdentity) => reconcileRoomCheckpoint(null, await load(identity)).state;
 };

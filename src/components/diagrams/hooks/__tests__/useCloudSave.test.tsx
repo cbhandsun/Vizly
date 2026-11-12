@@ -82,6 +82,8 @@ vi.mock('../cloudSaveRecovery', () => ({
 }));
 
 import { useCloudSave } from '../useCloudSave';
+import { configureApplicationTelemetry } from '@/observability/applicationTelemetry';
+import { createOperationTelemetry, type TelemetryBatch } from '@/observability/operationTelemetry';
 import { tryAttachDiagramSnapshot } from '@vizly/core/export';
 import { S3ConditionalWriteConflictError } from '@/services/s3ObjectRevision';
 
@@ -111,6 +113,25 @@ const createBridge = (): TestBridge => ({
 });
 
 describe('useCloudSave', () => {
+    it('records actual save results without leaking document content or storage errors', async () => {
+        const batches: TelemetryBatch[] = [];
+        const telemetry = createOperationTelemetry({ releaseId: 'a'.repeat(40), transport: async batch => { batches.push(batch); } });
+        const stop = configureApplicationTelemetry(telemetry);
+        try {
+            const bridge = createBridge(); bridge.name = 'CANARY-PRIVATE-DOCUMENT';
+            bridgeMocks.get.mockReturnValue(bridge);
+            const { result } = renderHook(() => useCloudSave(bridge.id));
+            await act(async () => { await result.current.saveToCloud(); });
+            storageMocks.provider.saveDiagram.mockRejectedValueOnce(Object.assign(new Error('CANARY-PRIVATE-KEY'), { status: 403 }));
+            await act(async () => { await expect(result.current.saveToCloud()).rejects.toThrow('CANARY-PRIVATE-KEY'); });
+            await telemetry.flush();
+            expect(batches[0].metrics.save).toEqual({ started: 2, success: 1, failure: 1, cancelled: 0 });
+            expect(batches[0].events.map(event => event.code)).toEqual([null, 'denied']);
+            expect(JSON.stringify(batches)).not.toContain('CANARY');
+            expect(JSON.stringify(batches)).not.toContain(bridge.id);
+        } finally { stop(); }
+    });
+
     it('conditionally saves the accepted collaboration revision and then advances to the saved revision', async () => {
         const bridge = createBridge();
         bridge.metadata = { cloud: { provider: 'supabase', id: bridge.id, revision: '2026-10-08T20:00:00.123456Z' } };

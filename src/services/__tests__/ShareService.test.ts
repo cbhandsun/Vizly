@@ -153,6 +153,13 @@ describe('ShareService', () => {
         expect(abortSignal).toHaveBeenCalledWith(controller.signal);
     });
 
+    it.each([null, {}])('does not query legacy tables after a successful RPC returns no usable share: %j', async data => {
+        mockSupabase.rpc.mockReturnValue({ maybeSingle: vi.fn(async () => ({ data, error: null })) });
+        const { shareService } = await import('../ShareService');
+        await expect(shareService.getSharedDiagram('safe-token-123456')).resolves.toBeNull();
+        expect(mockSupabase.from).not.toHaveBeenCalled();
+    });
+
     it('keeps missing legacy share rows distinct from service failures', async () => {
         mockSupabase.rpc.mockReturnValue({
             maybeSingle: vi.fn(() => Promise.resolve({

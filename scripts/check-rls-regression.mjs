@@ -1,3 +1,4 @@
+import { runDatabasePathRegression } from './check-database-paths.mjs';
 import { runDiagramVersionRlsRegression } from './lib/check-diagram-version-rls.mjs';
 import { runTemplatePermissionRlsRegression } from './lib/check-template-permissions-rls.mjs';
 import { runCollaborationAtomicStoreRegression } from './lib/check-collaboration-atomic-store.mjs';
@@ -7,6 +8,8 @@ import { runCollaboratorDuplicateIndexRegression } from './lib/check-collaborato
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { waitForIsolatedPostgres } from './lib/isolatedPostgresReadiness.mjs';
+
+await runDatabasePathRegression();
 
 const container = `vizly-rls-regression-${process.pid}`;
 // Match the production major/minor version and pin the accepted image manifest.

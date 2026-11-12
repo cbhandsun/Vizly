@@ -291,6 +291,9 @@ export const MINDMAP_SYSTEM_PROMPT = `你是一个专业的思维导图 (MindMap
  * Slash 命令上下文增强 — 为 /add /connect /layout 命令提供额外上下文
  */
 export const SLASH_COMMAND_PROMPTS: Record<string, (args: string) => string> = {
+  '/brainstorm': (args: string) => `请针对当前思维导图的核心节点进行头脑风暴，发散 3-5 个有创意的子主题。${args ? `用户补充要求：${args}` : ''}
+请结合当前画布状态给出建议，需要添加节点时使用系统约定的 COMMAND 指令。`,
+
   '/add': (args: string) => `用户要求添加节点：${args}
 请生成原子化加点指令：[COMMAND: {"action":"addNode","label":${promptJsonString(args, '新节点')}}]，并简要回复。`,
 
@@ -403,12 +406,9 @@ ${FULL_DIAGRAM_OUTPUT_RULES}`,
  */
 export function enhanceWithSlashCommand(input: string): string {
   const trimmed = input.trim();
-  for (const [cmd, promptFn] of Object.entries(SLASH_COMMAND_PROMPTS)) {
-    if (trimmed.toLowerCase().startsWith(cmd)) {
-      const args = trimmed.slice(cmd.length).trim();
-      return promptFn(args);
-    }
-  }
+  const command = trimmed.split(/\s+/, 1)[0].toLowerCase();
+  const promptFn = SLASH_COMMAND_PROMPTS[command];
+  if (promptFn) return promptFn(trimmed.slice(command.length).trim());
   return input;
 }
 
@@ -426,14 +426,14 @@ export function buildDiagramContext(
 
   const nodeList = nodes
     .slice(0, 30) // 限制上下文大小
-    .map(n => `  - ${n.id}: "${n.data?.label || n.id}" (${n.data?.domainClass || n.type || 'unknown'})`)
+    .map(n => `  - ${n.id}: "${n.data?.label || n.data?.description || n.id}" (${n.data?.domainClass || n.type || 'unknown'})`)
     .join('\n');
 
   const edgeList = edges
     .slice(0, 30)
     .map(e => {
         const label = typeof e.label === 'string' ? e.label : (typeof e.label === 'number' ? String(e.label) : '');
-        return `  - ${e.source} → ${e.target}${label ? ` [${label}]` : ''}`;
+        return `  - ${e.id}: ${e.source} → ${e.target}${label ? ` [${label}]` : ''}`;
     })
     .join('\n');
 

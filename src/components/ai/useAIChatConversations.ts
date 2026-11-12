@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { captureAuthSession, getAuthSessionRevision, onAuthSessionInvalidated } from '@/context/authSessionBoundary';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import type React from 'react';
 
 import {
@@ -26,6 +27,13 @@ export function useAIChatConversations({
     welcomeMessage,
     newConversationTitle,
 }: UseAIChatConversationsOptions) {
+    const revision = useSyncExternalStore(onAuthSessionInvalidated, getAuthSessionRevision, getAuthSessionRevision);
+    const owner = userId || null;
+    const [stateOwner, setStateOwner] = useState({ owner, revision });
+    const ownsState = stateOwner.owner === owner && stateOwner.revision === revision;
+    const session = useMemo(() => ({ revision, ...captureAuthSession(userId) }), [userId, revision]);
+    const canMutate = useCallback(() => ownsState && aiConversationService.isCurrentUser(owner)
+        && session.isCurrent(), [ownsState, owner, session]);
     const [conversations, setConversations] = useState<Conversation[]>(() => {
         aiConversationService.setUserId(userId || null);
         return aiConversationService.getConversations();
@@ -33,14 +41,15 @@ export function useAIChatConversations({
     const [activeId, setActiveId] = useState<string | null>(() => aiConversationService.getActiveConversationId());
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editingTitle, setEditingTitle] = useState('');
+    const [loadedOwner, setLoadedOwner] = useState<string | null | undefined>(undefined);
 
     const presentedConversations = useMemo(
         () => localizePristineAIChatConversations(
-            conversations,
+            ownsState ? conversations : [],
             welcomeMessage,
             newConversationTitle,
         ),
-        [conversations, newConversationTitle, welcomeMessage],
+        [conversations, newConversationTitle, welcomeMessage, ownsState],
     );
     const activeConversation = useMemo(
         () => presentedConversations.find(conversation => conversation.id === activeId) || null,
@@ -49,6 +58,7 @@ export function useAIChatConversations({
     const messages = useMemo(() => activeConversation?.messages || [], [activeConversation]);
 
     useEffect(() => {
+        if (!canMutate()) return;
         const changed = presentedConversations.filter(
             (conversation, index) => conversation !== conversations[index]
                 && !conversation.messages.some(message => message.isStreaming),
@@ -60,15 +70,28 @@ export function useAIChatConversations({
                 messages: conversation.messages,
             });
         });
-    }, [conversations, presentedConversations]);
+    }, [conversations, presentedConversations, canMutate]);
 
     useEffect(() => {
         let cancelled = false;
-        aiConversationService.setUserId(userId || null);
+        const session = captureAuthSession(userId);
+        aiConversationService.setUserId(owner);
+        // Read local state immediately, but do not create an empty cloud chat
+        // until the initial synchronization has finished.
+        const local = aiConversationService.getConversations();
+        queueMicrotask(() => {
+            if (cancelled || !session.isCurrent()) return;
+            setStateOwner({ owner, revision });
+            setConversations(local);
+            setActiveId(aiConversationService.getActiveConversationId());
+            setEditingId(null);
+            setEditingTitle('');
+        });
 
         const applyConversations = (nextConversations: Conversation[]) => {
-            if (cancelled) return;
+            if (cancelled || !session.isCurrent()) return;
             setConversations(nextConversations);
+            setLoadedOwner(userId || null);
             setActiveId(resolveAIChatActiveConversationId(
                 nextConversations,
                 aiConversationService.getActiveConversationId(),
@@ -84,9 +107,10 @@ export function useAIChatConversations({
         }
 
         return () => { cancelled = true; };
-    }, [userId]);
+    }, [userId, owner, revision]);
 
     const handleNewChat = useCallback(() => {
+        if (!canMutate()) return;
         const reusableConversation = resolvePristineAIChatConversationReuse(
             presentedConversations,
             welcomeMessage,
@@ -110,27 +134,29 @@ export function useAIChatConversations({
         aiConversationService.updateConversation(conversation.id, { title: newConversationTitle });
         setConversations(aiConversationService.getConversations());
         setActiveId(conversation.id);
-    }, [newConversationTitle, presentedConversations, welcomeMessage]);
+    }, [newConversationTitle, presentedConversations, welcomeMessage, canMutate]);
 
     useEffect(() => {
-        if (userId || conversations.length > 0) return;
+        if (loadedOwner !== (userId || null) || conversations.length > 0) return;
         const timer = window.setTimeout(handleNewChat, 0);
         return () => window.clearTimeout(timer);
-    }, [conversations.length, handleNewChat, userId]);
+    }, [conversations.length, handleNewChat, userId, loadedOwner]);
 
     const handleSwitchChat = useCallback((id: string) => {
+        if (!canMutate()) return;
         const nextId = resolveAIChatActiveConversationId(conversations, id);
         setActiveId(nextId);
         aiConversationService.setActiveConversationId(nextId);
-    }, [conversations]);
+    }, [conversations, canMutate]);
 
     const handleDeleteChat = useCallback((id: string, event?: React.MouseEvent) => {
         event?.stopPropagation();
-        aiConversationService.deleteConversation(id);
+        if (!canMutate()) return;
+        void aiConversationService.deleteConversation(id);
         const updated = aiConversationService.getConversations();
         setConversations(updated);
         if (activeId === id) setActiveId(resolveAIChatActiveConversationId(updated, null));
-    }, [activeId]);
+    }, [activeId, canMutate]);
 
     const handleStartRename = useCallback((conversation: Conversation, event: React.MouseEvent) => {
         event.stopPropagation();
@@ -139,6 +165,7 @@ export function useAIChatConversations({
     }, []);
 
     const handleSaveRename = useCallback((id: string) => {
+        if (!canMutate()) return;
         const conversation = conversations.find(candidate => candidate.id === id);
         if (!conversation) {
             setEditingId(null);
@@ -149,7 +176,7 @@ export function useAIChatConversations({
         });
         setConversations(aiConversationService.getConversations());
         setEditingId(null);
-    }, [conversations, editingTitle]);
+    }, [conversations, editingTitle, canMutate]);
 
     const handleCancelRename = useCallback(() => {
         setEditingId(null);
@@ -157,19 +184,19 @@ export function useAIChatConversations({
     }, []);
 
     const addLocalMessage = useCallback((role: 'user' | 'assistant', content: string) => {
-        if (!activeId) return;
+        if (!activeId || !canMutate()) return;
         const message: Message = { id: createAIChatMessageId(), role, content };
         const activeMessages = aiConversationService
             .getConversations()
             .find(conversation => conversation.id === activeId)?.messages || [];
         aiConversationService.updateConversation(activeId, { messages: [...activeMessages, message] });
         setConversations(aiConversationService.getConversations());
-    }, [activeId]);
+    }, [activeId, canMutate]);
 
     return {
         conversations: presentedConversations,
         setConversations,
-        activeId,
+        activeId: ownsState ? activeId : null,
         setActiveId,
         activeConversation,
         messages,

@@ -52,5 +52,17 @@ test('server viewer role disables editing and follows promotion and downgrade', 
   await expect(editor).toHaveCount(0);
   await node.dblclick();
   await expect(editor).toHaveCount(0);
+  sendRole('editor');
+  await expect(page.getByRole('button', { name: /选择.*\(V\)/ })).toBeVisible();
+  await node.dblclick();
+  await expect(editor).toBeVisible();
+  await editor.fill('Draft rejected with revoked access');
+  if (!socket) throw new Error('Collaboration transport has not connected');
+  await socket.close({ code: 1008, reason: 'Access or message rejected' });
+  await expect(editor).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /选择.*\(V\)/ })).toHaveCount(0);
+  await expect(node).not.toContainText('Draft rejected with revoked access');
+  await node.dblclick();
+  await expect(editor).toHaveCount(0);
   expect(pageErrors).toEqual([]);
 });

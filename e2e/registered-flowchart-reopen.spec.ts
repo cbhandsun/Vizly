@@ -8,7 +8,7 @@ test('opens a persisted nonempty flowchart without requiring a canvas autosave',
   await expect(page.getByRole('button', { name: '新建流程图', exact: true })).toBeVisible();
   const id = 'audit-registered-flowchart';
   await page.evaluate(async diagramId => {
-    const request = indexedDB.open('VizlyLocalDB', 2);
+    const request = indexedDB.open('VizlyLocalDB');
     request.onupgradeneeded = () => {
       const versionStore = request.result.createObjectStore('diagram_versions', { keyPath: 'id' });
       versionStore.createIndex('diagramId', 'diagramId', { unique: false });

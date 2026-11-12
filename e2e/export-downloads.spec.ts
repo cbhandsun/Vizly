@@ -1,5 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
+import { pngContainsOpaqueColor } from '../scripts/lib/pngPixelAudit';
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('i18nextLng', 'zh'));
@@ -26,6 +27,13 @@ test('Markdown download preserves displayed standard node names, descriptions an
 
 test('PNG download contains a real raster and restores canvas viewport and controls', async ({ page }, testInfo) => {
   const viewport = page.locator('.react-flow__viewport');
+  const pageTabs = page.locator('.page-tabs');
+  await expect(pageTabs).toBeVisible();
+  // A unique editor-only color makes accidental capture detectable in pixels.
+  await pageTabs.evaluate(element => {
+    element.style.setProperty('background', 'rgb(1, 254, 7)', 'important');
+    element.style.setProperty('min-height', '60px', 'important');
+  });
   // Set a deliberate reading view after the initial auto-fit, as in the viewport recovery fixture.
   await page.waitForTimeout(600);
   await page.evaluate(async () => {
@@ -36,8 +44,10 @@ test('PNG download contains a real raster and restores canvas viewport and contr
     await instance.setViewport({ x: -800, y: 120, zoom: 0.85 });
   });
   await expect(viewport).toHaveAttribute('style', /scale\(0\.85\)/);
-  const transform = await viewport.getAttribute('style');
-  const nodesBefore = await page.locator('.react-flow__node').count();
+  const [transform, nodesBefore] = await Promise.all([
+    viewport.getAttribute('style'),
+    page.locator('.react-flow__node').count(),
+  ]);
   await page.getByRole('button', { name: '导出', exact: true }).click();
   const pending = page.waitForEvent('download');
   await page.locator('#diagram-export-actions-menu').getByText('PNG 格式', { exact: true }).click();
@@ -52,10 +62,16 @@ test('PNG download contains a real raster and restores canvas viewport and contr
   expect(bytes.readUInt32BE(16)).toBeGreaterThan(0);
   expect(bytes.readUInt32BE(20)).toBeGreaterThan(0);
   await testInfo.attach('downloaded-png', { body: bytes, contentType: 'image/png' });
-  await expect(viewport).toHaveAttribute('style', transform ?? '');
-  await expect(page.locator('.react-flow__node')).toHaveCount(nodesBefore);
-  await expect(page.getByRole('button', { name: '导出', exact: true })).toBeEnabled();
-  await expect(page.getByRole('button', { name: '适应屏幕', exact: true })).toBeVisible();
+  expect(pngContainsOpaqueColor(bytes, [1, 254, 7])).toBe(false);
+  // These independent recovery checks share the same post-download state.
+  // Start them together so trace snapshots do not serialize five full DOM reads.
+  await Promise.all([
+    expect(viewport).toHaveAttribute('style', transform ?? ''),
+    expect(page.locator('.react-flow__node')).toHaveCount(nodesBefore),
+    expect(page.getByRole('button', { name: '导出', exact: true })).toBeEnabled(),
+    expect(page.getByRole('button', { name: '适应屏幕', exact: true })).toBeVisible(),
+    expect(pageTabs).toBeVisible(),
+  ]);
 });
 
 test('Markdown download uses edited canvas text instead of the registered template', async ({ page }, testInfo) => {
@@ -88,7 +104,7 @@ test('GIF download produces a complete animation and restores the canvas', async
   });
   const id = '33333333-3333-4333-8333-333333333333';
   await page.evaluate(async id => {
-    const request = indexedDB.open('VizlyLocalDB', 2);
+    const request = indexedDB.open('VizlyLocalDB');
     request.onupgradeneeded = () => {
       const versions = request.result.createObjectStore('diagram_versions', { keyPath: 'id' });
       versions.createIndex('diagramId', 'diagramId');

@@ -1,3 +1,5 @@
+// @vitest-environment node
+import { syntheticReleaseFixture } from './releaseEvidenceFixture.mjs';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -12,19 +14,22 @@ const projectId = 'prj_Audit';
 const teamId = 'team_Audit';
 const run = promisify(execFile);
 const launcher = join(process.cwd(), 'scripts/deploy-prepared-vercel-static.mjs');
-async function fixture() {
+// Cover the existing 10 s child deadline plus fixture setup and cleanup.
+const CLI_TEST_TIMEOUT = 15_000;
+async function fixture({ telemetryIngestUrl } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'vizly-deploy-preflight-')); roots.push(root);
   await mkdir(join(root, 'build'));
   await writeFile(join(root, 'build/index.html'), '<div id="root"></div>');
-  await prepareVercelStaticArtifact({ workspace: root, buildDirectory: 'build', outputDirectory: 'stage', projectId, teamId });
-  return { root, artifactDirectory: join(root, 'stage'), projectId, teamId };
+  await prepareVercelStaticArtifact({ workspace: root, buildDirectory: 'build', outputDirectory: 'stage', projectId, teamId, telemetryIngestUrl });
+  const release = await syntheticReleaseFixture(root, { root: join(root, 'stage'), projectId, teamId, deploymentEnvironment: 'preview' });
+  return { root, artifactDirectory: join(root, 'stage'), projectId, teamId, manifestPath: release.manifestPath };
 }
 async function changeReceipt(input, update) {
   const path = join(input.artifactDirectory, 'artifact-receipt.json');
   const receipt = JSON.parse(await readFile(path, 'utf8')); update(receipt);
   await writeFile(path, JSON.stringify(receipt));
 }
-afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
+afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); });
 
 describe('prepared preview deployment preflight', () => {
   it('accepts legacy receipts for preview only', async () => {
@@ -34,7 +39,7 @@ describe('prepared preview deployment preflight', () => {
     await expect(verifyPreparedVercelDeployment({ ...input, environment: 'production' })).rejects.toThrow('environment mismatch');
   });
   it('does not infer a compiled production endpoint from a modified receipt', async () => {
-    const input = await fixture();
+    const input = await fixture({ telemetryIngestUrl: 'https://collab.example.com/telemetry' });
     await changeReceipt(input, receipt => { receipt.deploymentEnvironment = 'production'; receipt.productionWebSocketUrl = 'wss://collab.example.com'; });
     await expect(verifyPreparedVercelDeployment({ ...input, environment: 'production' })).rejects.toThrow('endpoint missing');
   });
@@ -42,6 +47,42 @@ describe('prepared preview deployment preflight', () => {
     const input = await fixture();
     await expect(verifyPreparedVercelDeployment(input)).resolves.toMatchObject({ projectId, teamId, files: 1, totalBytes: 21 });
   });
+  it('rejects a telemetry rewrite added outside the bound preparation receipt', async () => {
+    const input = await fixture();
+    const path = join(input.artifactDirectory, '.vercel/output/config.json');
+    const config = JSON.parse(await readFile(path, 'utf8'));
+    config.routes.unshift({ src: '^/telemetry/?$', methods: ['POST'], dest: 'https://other.example.com/telemetry' });
+    await writeFile(path, JSON.stringify(config));
+    await expect(verifyPreparedVercelDeployment(input)).rejects.toThrow('routing');
+  });
+  it('accepts the bound telemetry endpoint and rejects a changed receipt destination', async () => {
+    const input = await fixture({ telemetryIngestUrl: 'https://collab.example.com/telemetry' });
+    await expect(verifyPreparedVercelDeployment(input)).resolves.toMatchObject({ telemetryIngestUrl: 'https://collab.example.com/telemetry' });
+    await changeReceipt(input, receipt => { receipt.telemetryIngestUrl = 'https://other.example.com/telemetry'; });
+    await expect(verifyPreparedVercelDeployment(input)).rejects.toThrow('routing');
+  });
+  it.each(['missing', 'reordered', 'shadowed', 'extra-config'])('rejects %s routing even when compiled assets match', async change => {
+    const input = await fixture({ telemetryIngestUrl: 'https://collab.example.com/telemetry' });
+    const path = join(input.artifactDirectory, '.vercel/output/config.json');
+    const config = JSON.parse(await readFile(path, 'utf8'));
+    if (change === 'missing') config.routes.shift();
+    if (change === 'reordered') config.routes.reverse();
+    if (change === 'shadowed') config.routes.unshift({ src: '/(.*)', dest: '/index.html' });
+    if (change === 'extra-config') config.overrides = { 'index.html': { path: '/telemetry' } };
+    await writeFile(path, JSON.stringify(config));
+    await expect(verifyPreparedVercelDeployment(input)).rejects.toThrow('routing');
+  });
+  it('never launches the deployment CLI after the telemetry route is removed', async () => {
+    const input = await fixture({ telemetryIngestUrl: 'https://collab.example.com/telemetry' });
+    const marker = join(input.root, 'telemetry-cli-marker.json');
+    const cli = join(input.root, 'fake-telemetry-cli.mjs');
+    await writeFile(cli, `import { writeFile } from 'node:fs/promises'; await writeFile(${JSON.stringify(marker)}, '{}');`);
+    const path = join(input.artifactDirectory, '.vercel/output/config.json');
+    const config = JSON.parse(await readFile(path, 'utf8')); config.routes.shift();
+    await writeFile(path, JSON.stringify(config));
+    await expect(run(process.execPath, [launcher, input.artifactDirectory, projectId, teamId, 'audit', cli, 'preview', input.manifestPath, '--deploy'], { timeout: 10000 })).rejects.toThrow('routing');
+    await expect(readFile(marker)).rejects.toMatchObject({ code: 'ENOENT' });
+  }, CLI_TEST_TIMEOUT);
   it('rejects an in-progress stage before any CLI project creation', async () => {
     const input = await fixture(); await rm(join(input.artifactDirectory, 'artifact-receipt.json'));
     await expect(verifyPreparedVercelDeployment(input)).rejects.toThrow();
@@ -87,32 +128,33 @@ describe('prepared preview deployment preflight', () => {
     const cli = join(input.root, 'fake-cli.mjs');
     await writeFile(cli, `import { writeFile } from 'node:fs/promises'; await writeFile(${JSON.stringify(marker)}, '{}');`);
     await rm(join(input.artifactDirectory, 'artifact-receipt.json'));
-    await expect(run(process.execPath, [launcher, input.artifactDirectory, projectId, teamId, 'audit', cli], { timeout: 10000 })).rejects.toThrow();
+    await expect(run(process.execPath, [launcher, input.artifactDirectory, projectId, teamId, 'audit', cli, 'preview', input.manifestPath, '--deploy'], { timeout: 10000 })).rejects.toThrow();
     await expect(readFile(marker)).rejects.toMatchObject({ code: 'ENOENT' });
-  });
+  }, CLI_TEST_TIMEOUT);
   it('pins project and team IDs even if inherited deployment variables point elsewhere', async () => {
     const input = await fixture(); const marker = join(input.root, 'cli-marker.json');
     const cli = join(input.root, 'fake-cli.mjs');
     await writeFile(cli, `import { writeFile } from 'node:fs/promises'; await writeFile(${JSON.stringify(marker)}, JSON.stringify({ project: process.env.VERCEL_PROJECT_ID, team: process.env.VERCEL_ORG_ID, args: process.argv.slice(2) }));`);
-    await run(process.execPath, [launcher, input.artifactDirectory, projectId, teamId, 'audit', cli], {
+    await run(process.execPath, [launcher, input.artifactDirectory, projectId, teamId, 'audit', cli, 'preview', input.manifestPath, '--deploy'], {
       timeout: 10000, env: { ...process.env, VERCEL_PROJECT_ID: 'prj_Other', VERCEL_ORG_ID: 'team_Other' },
     });
     expect(JSON.parse(await readFile(marker, 'utf8'))).toEqual({ project: projectId, team: teamId, args: ['deploy', '--prebuilt', '--yes', '--scope', 'audit'] });
-  });
+  }, CLI_TEST_TIMEOUT);
   it('stages a verified production artifact without assigning any domain', async () => {
     const input = await fixture();
     await writeFile(join(input.root, 'build/app.js'), 'const endpoint="wss://collab.example.com";');
     await prepareVercelStaticArtifact({ workspace: input.root, buildDirectory: 'build', outputDirectory: 'production-stage', projectId, teamId,
-      environment: 'production', productionWebSocketUrl: 'wss://collab.example.com' });
+      environment: 'production', productionWebSocketUrl: 'wss://collab.example.com', telemetryIngestUrl: 'https://collab.example.com/telemetry' });
     const stage = join(input.root, 'production-stage');
     const marker = join(input.root, 'production-cli-marker.json');
     const cli = join(input.root, 'fake-production-cli.mjs');
     await writeFile(cli, `import { writeFile } from 'node:fs/promises'; await writeFile(${JSON.stringify(marker)}, JSON.stringify({ project: process.env.VERCEL_PROJECT_ID, team: process.env.VERCEL_ORG_ID, args: process.argv.slice(2) }));`);
-    await run(process.execPath, [launcher, stage, projectId, teamId, 'audit', cli, 'production'], { timeout: 10000 });
+    const release = await syntheticReleaseFixture(input.root, { root: stage, projectId, teamId, deploymentEnvironment: 'production' });
+    await run(process.execPath, [launcher, stage, projectId, teamId, 'audit', cli, 'production', release.manifestPath, '--deploy'], { timeout: 10000 });
     expect(JSON.parse(await readFile(marker, 'utf8'))).toEqual({ project: projectId, team: teamId,
       args: ['deploy', '--prebuilt', '--prod', '--skip-domain', '--yes', '--scope', 'audit'] });
     await expect(verifyPreparedVercelDeployment({ ...input, artifactDirectory: stage })).rejects.toThrow('environment mismatch');
-  });
+  }, CLI_TEST_TIMEOUT);
   it.each(['production', 'invalid'])('never launches a CLI when target %s mismatches the artifact', async environment => {
     const input = await fixture();
     const marker = join(input.root, 'wrong-target-marker.json');
@@ -120,5 +162,5 @@ describe('prepared preview deployment preflight', () => {
     await writeFile(cli, `import { writeFile } from 'node:fs/promises'; await writeFile(${JSON.stringify(marker)}, '{}');`);
     await expect(run(process.execPath, [launcher, input.artifactDirectory, projectId, teamId, 'audit', cli, environment], { timeout: 10000 })).rejects.toThrow();
     await expect(readFile(marker)).rejects.toMatchObject({ code: 'ENOENT' });
-  });
+  }, CLI_TEST_TIMEOUT);
 });

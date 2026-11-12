@@ -1,12 +1,15 @@
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ bridge: undefined as unknown, enabled: false, userId: undefined as string | undefined, role: null as 'editor' | 'viewer' | null }));
+const fixture = vi.hoisted(() => ({ bridge: undefined as unknown, enabled: false, userId: undefined as string | undefined, role: null as 'editor' | 'viewer' | null,
+  resolveToken: undefined as undefined | (() => Promise<string | null>), resolveSession: vi.fn(async (_userId?: string) => null) }));
+vi.mock('@/services/collaborationSession', () => ({ resolveCollaborationSessionToken: fixture.resolveSession }));
 vi.mock('@vizly/core/collaboration', () => ({ resolveDiagramCollaborationStatus: (wanted: boolean) => wanted ? 'connecting' : 'disconnected' }));
 vi.mock('@vizly/core/diagram-data', () => ({ getFlowDataBridge: () => fixture.bridge }));
-vi.mock('../diagrams/collaboration/useDeferredYjsCollaboration', () => ({ useDeferredYjsCollaboration: (options: { enabled?: boolean; userId?: string }) => {
+vi.mock('../diagrams/collaboration/useDeferredYjsCollaboration', () => ({ useDeferredYjsCollaboration: (options: { enabled?: boolean; userId?: string; resolveToken?: () => Promise<string | null> }) => {
   fixture.enabled = options.enabled === true;
   fixture.userId = options.userId;
+  fixture.resolveToken = options.resolveToken;
   return { coordinationProblem: null, isSynced: false, accessRole: fixture.role, wsStatus: 'disconnected', activeUsers: [], provider: null,
     retryCollaboration: vi.fn(), pushLocalChangesToYjs: vi.fn() };
 } }));
@@ -21,6 +24,8 @@ describe('viewer automatic collaboration requires its actual cloud document', ()
   beforeEach(() => {
     vi.useFakeTimers();
     vi.stubEnv('VITE_YJS_WEBSOCKET_URL', 'ws://127.0.0.1:5422');
+    vi.stubEnv('VITE_SUPABASE_URL', ''); vi.stubEnv('VITE_SUPABASE_ANON_KEY', '');
+    fixture.resolveSession.mockClear(); fixture.resolveToken = undefined;
     fixture.bridge = undefined; fixture.enabled = false; fixture.role = null; fixture.userId = undefined;
   });
   afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllEnvs(); });
@@ -36,6 +41,24 @@ describe('viewer automatic collaboration requires its actual cloud document', ()
     fixture.bridge = bridge();
     renderHook(() => useDiagramViewerCollaboration(options()));
     expect(fixture.enabled).toBe(true);
+  });
+
+  it('keeps Auth resolution mandatory before the current account has loaded', async () => {
+    vi.stubEnv('VITE_SUPABASE_URL', 'https://fixture.supabase.co');
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'sb_publishable_fixture');
+    fixture.bridge = bridge();
+    renderHook(() => useDiagramViewerCollaboration(options()));
+    expect(fixture.resolveToken).toBeTypeOf('function');
+    expect(await fixture.resolveToken?.()).toBeNull();
+    expect(fixture.resolveSession).toHaveBeenCalledWith(undefined);
+  });
+
+  it('preserves optional-token transports with a local display identity when Auth is unconfigured', () => {
+    fixture.bridge = bridge();
+    renderHook(() => useDiagramViewerCollaboration({ ...options(), userId: 'local-display-identity' }));
+    expect(fixture.enabled).toBe(true);
+    expect(fixture.resolveToken).toBeUndefined();
+    expect(fixture.resolveSession).not.toHaveBeenCalled();
   });
 
   it('forwards the active account display identity without granting an editor role', () => {

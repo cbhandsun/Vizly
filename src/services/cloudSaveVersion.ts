@@ -2,6 +2,8 @@ import { parseCloudDiagramRevision } from './cloudDiagramRevision';
 import { parseS3ObjectRevision } from './s3ObjectRevision';
 
 export class CloudSaveVersionError extends Error {
+    // A zero-row conditional update can return HTTP 200 while the version precondition failed.
+    readonly status = 409;
     constructor(message: string) { super(message); this.name = 'CloudSaveVersionError'; }
 }
 

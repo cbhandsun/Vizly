@@ -1,3 +1,4 @@
+import { beginApplicationOperation, classifyOperationFailure } from '@/observability/applicationTelemetry';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { invalidateRemoteDiagramPreview } from '@/services/remoteDiagramPreview';
@@ -66,9 +67,10 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
     const activeCloudSaveRequestRef = useRef<Promise<DiagramSaveResult> | null>(null);
 
     const performCloudSave = useCallback(async () => {
+        const finishOperation = beginApplicationOperation('save');
         let hideLoading: (() => void) | undefined;
         try {
-            return await withVersionPreviewPersistence(diagramId, async assertCurrent => {
+            const result = await withVersionPreviewPersistence(diagramId, async assertCurrent => {
             const unifiedStorage = await loadUnifiedStorage();
             if (!unifiedStorage.isConfigured()) {
                 throw new CloudSaveBoundaryError('云存储未配置，请先在设置中配置');
@@ -167,7 +169,11 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
 
             appMessage.success('已保存到云端');
             });
+            finishOperation('success');
+            return result;
         } catch (error) {
+            const code = classifyOperationFailure(error);
+            finishOperation(code === 'cancelled' ? 'cancelled' : 'failure', code);
             if (error instanceof VersionPreviewPersistenceError || error instanceof CloudSaveBoundaryError || error instanceof CloudSaveVersionError
                 || error instanceof S3ConditionalWriteConflictError || error instanceof S3ObjectRevisionError) {
                 appMessage.error(error instanceof CloudSaveBoundaryError ? error.userMessage : error.message);

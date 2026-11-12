@@ -225,4 +225,29 @@ describe('aiProviderClient', () => {
 
         await expect(request).rejects.toThrow('user cancelled');
     });
+    it('keeps the timeout active after response headers while the body is stalled', async () => {
+        vi.useFakeTimers();
+        let signal: AbortSignal | undefined;
+        const cancel = vi.fn();
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+            signal = init?.signal as AbortSignal;
+            return new Response(new ReadableStream<Uint8Array>({ cancel }));
+        });
+        const response = await requestAIChatCompletion(provider, {}, { timeoutMs: 10 });
+        const assertion = expect(response.text()).rejects.toBeInstanceOf(AIProviderTimeoutError);
+        await vi.advanceTimersByTimeAsync(11);
+        await assertion;
+        expect(signal?.aborted).toBe(true);
+        expect(cancel).toHaveBeenCalledOnce();
+    });
+
+    it('continues propagating external cancellation after headers', async () => {
+        const abort = new AbortController();
+        vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(new ReadableStream()));
+        const response = await requestAIChatCompletion(provider, {}, { signal: abort.signal });
+        const reading = response.text();
+        abort.abort(new DOMException('stop', 'AbortError'));
+        await expect(reading).rejects.toMatchObject({ name: 'AbortError' });
+    });
+
 });
